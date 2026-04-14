@@ -6,32 +6,32 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export async function getSettings() {
-  const rows = db.select().from(settings).all();
-  const result: Record<string, string> = {};
-  for (const row of rows) {
-    result[row.key] = row.value;
-  }
-  return result;
+    const rows = db.select().from(settings).all();
+    const result: Record<string, string> = {};
+    for (const row of rows) {
+        result[row.key] = row.value;
+    }
+    return result;
 }
 
 export async function getSetting(key: string) {
-  const row = db.select().from(settings).where(eq(settings.key, key)).get();
-  return row?.value ?? null;
+    const row = db.select().from(settings).where(eq(settings.key, key)).get();
+    return row?.value ?? null;
 }
 
 export async function updateSetting(key: string, value: string) {
-  const existing = db
-    .select()
-    .from(settings)
-    .where(eq(settings.key, key))
-    .get();
+    const existing = db
+        .select()
+        .from(settings)
+        .where(eq(settings.key, key))
+        .get();
 
-  if (existing) {
-    db.update(settings).set({ value }).where(eq(settings.key, key)).run();
-  } else {
-    db.insert(settings).values({ key, value }).run();
-  }
+    if (existing) {
+        db.update(settings).set({ value }).where(eq(settings.key, key)).run();
+    } else {
+        db.insert(settings).values({ key, value }).run();
+    }
 
-  revalidatePath("/settings");
-  return { success: true };
+    revalidatePath("/settings");
+    return { success: true };
 }

@@ -6,7 +6,7 @@ import fs from "node:fs";
 
 const dataDir = path.join(process.cwd(), "data");
 if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+    fs.mkdirSync(dataDir, { recursive: true });
 }
 
 const dbPath = path.join(dataDir, "music-organizer.db");
@@ -98,10 +98,10 @@ sqlite.exec(`
 
 // Migrate existing DB: add new columns if they don't exist
 const colCheck = sqlite
-  .prepare("SELECT COUNT(*) as cnt FROM pragma_table_info('tracks') WHERE name='rating'")
-  .get() as { cnt: number };
+    .prepare("SELECT COUNT(*) as cnt FROM pragma_table_info('tracks') WHERE name='rating'")
+    .get() as { cnt: number };
 if (colCheck.cnt === 0) {
-  sqlite.exec(`
+    sqlite.exec(`
     ALTER TABLE tracks ADD COLUMN rating INTEGER;
     ALTER TABLE tracks ADD COLUMN is_favorite INTEGER DEFAULT 0;
     ALTER TABLE tracks ADD COLUMN tags TEXT;
@@ -115,38 +115,38 @@ if (colCheck.cnt === 0) {
 
 // Seed default settings if empty
 const settingsCount = sqlite
-  .prepare("SELECT COUNT(*) as count FROM settings")
-  .get() as { count: number };
+    .prepare("SELECT COUNT(*) as count FROM settings")
+    .get() as { count: number };
 
 if (settingsCount.count === 0) {
-  const defaultSettings = [
-    ["music_root", "H:\\\\Music"],
-    ["inbox_folder", "H:\\\\Music\\\\_Inbox"],
-    [
-      "watch_folders",
-      JSON.stringify(["H:\\\\Music\\\\_Inbox", "H:\\\\Music\\\\DJ"]),
-    ],
-    [
-      "genre_folders",
-      JSON.stringify({
-        Techno: "DJ/Techno",
-        "Tech House": "DJ/Tech House",
-        Acid: "DJ/Acid",
-        Psytrance: "DJ/Psytrance",
-        Bounce: "DJ/Bounce",
-        Manele: "DJ/Manele",
-        "Populară": "DJ/Populara",
-        "Balkanică": "DJ/Balkanica",
-        Latino: "DJ/Latino",
-        Other: "DJ/Other",
-      }),
-    ],
-  ];
+    const defaultSettings = [
+        ["music_root", "H:\\\\Music"],
+        ["inbox_folder", "H:\\\\Music\\\\_Inbox"],
+        [
+            "watch_folders",
+            JSON.stringify(["H:\\\\Music\\\\_Inbox", "H:\\\\Music\\\\DJ"]),
+        ],
+        [
+            "genre_folders",
+            JSON.stringify({
+                Techno: "DJ/Techno",
+                "Tech House": "DJ/Tech House",
+                Acid: "DJ/Acid",
+                Psytrance: "DJ/Psytrance",
+                Bounce: "DJ/Bounce",
+                Manele: "DJ/Manele",
+                "Populară": "DJ/Populara",
+                "Balkanică": "DJ/Balkanica",
+                Latino: "DJ/Latino",
+                Other: "DJ/Other",
+            }),
+        ],
+    ];
 
-  const insert = sqlite.prepare(
-    "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)"
-  );
-  for (const [key, value] of defaultSettings) {
-    insert.run(key, value);
-  }
+    const insert = sqlite.prepare(
+        "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)"
+    );
+    for (const [key, value] of defaultSettings) {
+        insert.run(key, value);
+    }
 }
