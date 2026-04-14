@@ -24,12 +24,65 @@
         }
       },
       "options": {
-        "cwd": "${workspaceFolder}/music-organizer"
+        "cwd": "${workspaceFolder}/app"
       },
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
         "clear": true
+      }
+    },
+    {
+      "label": "Install Dependencies",
+      "type": "shell",
+      "command": "pnpm install",
+      "options": {
+        "cwd": "${workspaceFolder}/app"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Build",
+      "type": "shell",
+      "command": "pnpm build",
+      "options": {
+        "cwd": "${workspaceFolder}/app"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "DB Studio",
+      "type": "shell",
+      "command": "pnpm db:studio",
+      "options": {
+        "cwd": "${workspaceFolder}/app"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Type Check",
+      "type": "shell",
+      "command": "pnpm exec tsc --noEmit",
+      "options": {
+        "cwd": "${workspaceFolder}/app"
+      },
+      "group": "test",
+      "problemMatcher": "$tsc",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
       }
     }
   ]
