@@ -4,6 +4,7 @@ import { useRef, useEffect, useCallback } from "react";
 import { usePlayer } from "./player-context";
 import { useAudioAnalyzer } from "@/lib/audio-analyzer";
 import type { VisualizationDef, RenderConfig, AudioData } from "@/lib/visualizations/types";
+import { ShaderCanvas } from "./shader-canvas";
 
 interface VisualizationCanvasProps {
     visualization: VisualizationDef;
@@ -15,6 +16,39 @@ interface VisualizationCanvasProps {
 }
 
 export function VisualizationCanvas({
+    visualization,
+    sensitivity = 1,
+    quality = "medium",
+    className = "",
+    onFpsUpdate,
+    showStats = false,
+}: VisualizationCanvasProps) {
+    // Delegate to WebGL shader canvas if this is a shader visualization
+    if (visualization.shader) {
+        return (
+            <ShaderCanvas
+                visualization={visualization}
+                sensitivity={sensitivity}
+                quality={quality}
+                className={`w-full h-full ${className}`}
+                onFpsUpdate={onFpsUpdate}
+            />
+        );
+    }
+
+    return (
+        <Canvas2DRenderer
+            visualization={visualization}
+            sensitivity={sensitivity}
+            quality={quality}
+            className={className}
+            onFpsUpdate={onFpsUpdate}
+            showStats={showStats}
+        />
+    );
+}
+
+function Canvas2DRenderer({
     visualization,
     sensitivity = 1,
     quality = "medium",

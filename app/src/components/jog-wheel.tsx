@@ -1,0 +1,316 @@
+"use client";
+
+import { useRef, useEffect, useState, useCallback, memo } from "react";
+import { useMixer } from "./mixer-context";
+import { usePersonalization } from "@/hooks/use-personalization";
+import type { DeckState } from "@/lib/mixer-engine";
+import { JOG_RENDERERS, type JogDesignProps } from "./jogwheel-designs";
+
+// ─── Constants ───────────────────────────────────────────────────────────
+
+const PROGRESS_R = 46;
+const PROGRESS_C = 2 * Math.PI * PROGRESS_R;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────
+
+function formatTime(s: number): string {
+    if (!s || !isFinite(s)) return "0:00";
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function formatTimeRemaining(current: number, duration: number): string {
+    const rem = Math.max(0, duration - current);
+    return `-${formatTime(rem)}`;
+}
+
+// ─── Tonearm Needle ──────────────────────────────────────────────────────
+// Pivots from top-right corner, swings over the platter when playing
+
+const Tonearm = memo(function Tonearm({ isPlaying, color, side }: { isPlaying: boolean; color: string; side: "A" | "B" }) {
+    const isLeft = side === "A";
+    return (
+        <div
+            className="absolute pointer-events-none z-10"
+            style={{
+                // Pivot point: top corner on the outside edge of the jog wheel
+                top: "-6%",
+                [isLeft ? "right" : "left"]: "-10%",
+                width: "45%",
+                height: "55%",
+                transformOrigin: isLeft ? "95% 5%" : "5% 5%",
+                transform: isPlaying
+                    ? `rotate(${isLeft ? "25" : "-25"}deg)`
+                    : `rotate(${isLeft ? "-30" : "30"}deg)`,
+                transition: "transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            }}
+        >
+            <svg viewBox="0 0 60 80" className="w-full h-full" style={{ overflow: "visible" }}>
+                {/* Pivot base (hinge) */}
+                <circle
+                    cx={isLeft ? 55 : 5} cy="4" r="4"
+                    fill="rgba(60,60,60,0.9)"
+                    stroke="rgba(255,255,255,0.15)"
+                    strokeWidth="0.8"
+                />
+                {/* Arm */}
+                <line
+                    x1={isLeft ? 55 : 5} y1="4"
+                    x2={isLeft ? 12 : 48} y2="62"
+                    stroke="rgba(180,180,180,0.5)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                />
+                {/* Secondary arm segment (slightly offset for 3D feel) */}
+                <line
+                    x1={isLeft ? 55 : 5} y1="4"
+                    x2={isLeft ? 12 : 48} y2="62"
+                    stroke="rgba(255,255,255,0.08)"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                />
+                {/* Headshell */}
+                <rect
+                    x={isLeft ? 6 : 42} y="58" width="12" height="6" rx="1.5"
+                    fill="rgba(100,100,100,0.6)"
+                    stroke="rgba(255,255,255,0.12)"
+                    strokeWidth="0.5"
+                />
+                {/* Stylus tip — glows when playing */}
+                <circle
+                    cx={isLeft ? 10 : 50} cy="68" r="1.5"
+                    fill={isPlaying ? color : "rgba(255,255,255,0.3)"}
+                    style={{
+                        filter: isPlaying ? `drop-shadow(0 0 3px ${color})` : "none",
+                        transition: "fill 0.3s, filter 0.3s",
+                    }}
+                />
+            </svg>
+        </div>
+    );
+});
+
+// ─── Progress Ring (static, never rotates) ───────────────────────────────
+
+const ProgressRing = memo(function ProgressRing({
+    progress, color, isWarning, warningIntensity, warningFlicker,
+}: {
+    progress: number; color: string;
+    isWarning: boolean; warningIntensity: number; warningFlicker: boolean;
+}) {
+    const strokeColor = isWarning
+        ? `rgba(255,${Math.round(80 * (1 - warningIntensity))},0,${warningFlicker ? 1 : 0.5})`
+        : color;
+    const offset = PROGRESS_C * (1 - progress);
+
+    return (
+        <svg
+            viewBox="0 0 100 100"
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            style={{ zIndex: 2 }}
+        >
+            {/* Track background */}
+            <circle cx="50" cy="50" r={PROGRESS_R} fill="none"
+                stroke="rgba(255,255,255,0.04)" strokeWidth="2.5"
+                transform="rotate(-90 50 50)" />
+            {/* Progress fill */}
+            <circle cx="50" cy="50" r={PROGRESS_R} fill="none"
+                stroke={strokeColor} strokeWidth="2.5" strokeLinecap="round"
+                strokeDasharray={PROGRESS_C} strokeDashoffset={offset}
+                transform="rotate(-90 50 50)"
+                style={{ transition: "stroke-dashoffset 0.3s linear, stroke 0.2s" }} />
+        </svg>
+    );
+});
+
+// ─── Center Display Overlay (static, never rotates) ──────────────────────
+
+const CenterOverlay = memo(function CenterOverlay({
+    timeDisplay, remainingDisplay, color, isWarning, warningFlicker,
+}: {
+    timeDisplay: string; remainingDisplay: string; color: string;
+    isWarning: boolean; warningFlicker: boolean;
+}) {
+    const warnColor = isWarning && warningFlicker ? "#ff4444" : color;
+    return (
+        <svg
+            viewBox="0 0 100 100"
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            style={{ zIndex: 3 }}
+        >
+            <text x="50" y="47" textAnchor="middle" fill="white" fontSize="5"
+                fontWeight="700" fontFamily="monospace" opacity="0.7">
+                {timeDisplay}
+            </text>
+            <text x="50" y="54" textAnchor="middle" fill={warnColor} fontSize="3.5"
+                fontFamily="monospace" opacity={isWarning ? 0.9 : 0.5}>
+                {remainingDisplay}
+            </text>
+        </svg>
+    );
+});
+
+// ─── Main JogWheel Component ─────────────────────────────────────────────
+
+interface JogWheelProps {
+    side: "A" | "B";
+    deck: DeckState;
+    color: string;
+}
+
+export const JogWheel = memo(function JogWheel({ side, deck, color }: JogWheelProps) {
+    const mixer = useMixer();
+    const personalization = usePersonalization();
+    const isDragging = useRef(false);
+    const lastAngle = useRef(0);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const platterRef = useRef<HTMLDivElement>(null);
+
+    // ── CSS animation speed ──────────────────────────────────────────
+    // We use a CSS animation for rotation. The speed is controlled by
+    // animation-duration (derived from BPM). When paused, we freeze
+    // the animation via animation-play-state.
+    //
+    // ~0.55 RPS at 120 BPM → duration = 1/rps seconds per revolution
+    const rps = deck.bpm / 220;
+    const animDuration = rps > 0 ? (1 / rps) : 10;
+
+    // ── End-of-track warning ─────────────────────────────────────────
+    const remaining = deck.duration > 0 ? Math.max(0, deck.duration - deck.currentTime) : Infinity;
+    const endWarnSec = personalization.endWarningSeconds;
+    const isWarning = endWarnSec > 0 && remaining < endWarnSec && remaining < Infinity && deck.isPlaying;
+    const warningIntensity = isWarning ? Math.max(0, 1 - remaining / endWarnSec) : 0;
+
+    // Warning flicker — ref-driven for zero-cost updates
+    const [warningFlicker, setWarningFlicker] = useState(false);
+    useEffect(() => {
+        if (!isWarning) { setWarningFlicker(false); return; }
+        const interval = setInterval(() => {
+            setWarningFlicker(f => !f);
+        }, 500 - warningIntensity * 300);
+        return () => clearInterval(interval);
+    }, [isWarning, warningIntensity > 0.5]);
+
+    // ── Jog drag (scratch / nudge) ───────────────────────────────────
+    const getAngle = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+        const el = containerRef.current;
+        if (!el) return 0;
+        const rect = el.getBoundingClientRect();
+        const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+        const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+        return Math.atan2(clientY - rect.top - rect.height / 2, clientX - rect.left - rect.width / 2);
+    }, []);
+
+    const onStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+        isDragging.current = true;
+        lastAngle.current = getAngle(e);
+    }, [getAngle]);
+
+    const onMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+        if (!isDragging.current) return;
+        const angle = getAngle(e);
+        let delta = angle - lastAngle.current;
+        if (delta > Math.PI) delta -= Math.PI * 2;
+        if (delta < -Math.PI) delta += Math.PI * 2;
+        lastAngle.current = angle;
+        const strength = Math.min(0.08, Math.abs(delta) * 0.3);
+        mixer.nudge(side, delta > 0 ? strength * 1000 : -strength * 1000);
+    }, [getAngle, mixer, side]);
+
+    const onEnd = useCallback(() => {
+        isDragging.current = false;
+        mixer.nudgeRelease(side);
+    }, [mixer, side]);
+
+    // ── Progress & time ──────────────────────────────────────────────
+    const progress = deck.duration > 0 ? deck.currentTime / deck.duration : 0;
+    const timeDisplay = formatTime(deck.currentTime);
+    const remainingDisplay = deck.duration > 0 ? formatTimeRemaining(deck.currentTime, deck.duration) : "—:——";
+
+    // ── Design props for renderer ────────────────────────────────────
+    // Rotation is always 0: the renderer's <g transform=rotate(0)> elements
+    // are static within the platter SVG, and the platter DIV rotates via CSS.
+    const designProps: JogDesignProps = {
+        side,
+        color,
+        progress: 0, // progress ring is drawn separately, not by the renderer
+        rotation: 0,
+        isPlaying: deck.isPlaying,
+        timeDisplay: "", // text overlay drawn separately
+        remainingDisplay: "",
+        isWarning,
+        warningIntensity,
+        warningFlicker,
+    };
+
+    const renderer = JOG_RENDERERS[personalization.jogwheelStyle] || JOG_RENDERERS.classic;
+
+    return (
+        <div
+            ref={containerRef}
+            className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 xl:w-28 xl:h-28 shrink-0 relative cursor-grab active:cursor-grabbing select-none"
+            onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
+            onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
+        >
+            {/* Layer 1: Rotating platter (CSS animation — GPU composited) */}
+            <div
+                ref={platterRef}
+                className="absolute inset-0 rounded-full"
+                style={{
+                    animation: `jog-spin ${animDuration.toFixed(3)}s linear infinite`,
+                    animationPlayState: deck.isPlaying ? "running" : "paused",
+                    willChange: "transform",
+                }}
+            >
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                    {renderer(designProps)}
+                </svg>
+            </div>
+
+            {/* Layer 2: Progress ring (never rotates) */}
+            <ProgressRing
+                progress={progress}
+                color={color}
+                isWarning={isWarning}
+                warningIntensity={warningIntensity}
+                warningFlicker={warningFlicker}
+            />
+
+            {/* Layer 3: Center time display (never rotates) */}
+            <CenterOverlay
+                timeDisplay={timeDisplay}
+                remainingDisplay={remainingDisplay}
+                color={color}
+                isWarning={isWarning}
+                warningFlicker={warningFlicker}
+            />
+
+            {/* Layer 4: Tonearm needle */}
+            <Tonearm isPlaying={deck.isPlaying} color={color} side={side} />
+
+            {/* Playing glow ring */}
+            {deck.isPlaying && !isWarning && (
+                <div className="absolute inset-0 rounded-full pointer-events-none animate-pulse"
+                    style={{
+                        boxShadow: `0 0 15px 2px ${color}20, inset 0 0 8px 1px ${color}10`,
+                        zIndex: 4,
+                    }}
+                />
+            )}
+
+            {/* End-of-track warning glow */}
+            {isWarning && (
+                <div
+                    className="absolute inset-0 rounded-full pointer-events-none"
+                    style={{
+                        boxShadow: `0 0 ${12 + warningIntensity * 18}px ${2 + warningIntensity * 6}px rgba(255,${Math.round(60 * (1 - warningIntensity))},0,0.5), inset 0 0 ${8 + warningIntensity * 12}px ${warningIntensity * 4}px rgba(255,${Math.round(40 * (1 - warningIntensity))},0,0.25)`,
+                        opacity: warningFlicker ? 1 : 0.5,
+                        transition: "opacity 200ms",
+                        zIndex: 4,
+                    }}
+                />
+            )}
+        </div>
+    );
+});

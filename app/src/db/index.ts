@@ -15,6 +15,16 @@ const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 
+// Auto-migrate: add is_hidden column if missing
+try {
+  const cols = sqlite.prepare("PRAGMA table_info(tracks)").all() as { name: string }[];
+  if (!cols.some((c) => c.name === "is_hidden")) {
+    sqlite.exec("ALTER TABLE tracks ADD COLUMN is_hidden INTEGER DEFAULT 0");
+  }
+} catch {
+  // table may not exist yet
+}
+
 export { sqlite };
 export const db = drizzle(sqlite, { schema });
 

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#d946ef"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="256" y1="0" x2="256" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <!-- Subtle top highlight -->
+  <rect width="512" height="256" rx="108" fill="url(#glow)"/>
+  <!-- Vinyl record outer ring -->
+  <circle cx="256" cy="240" r="140" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="8"/>
+  <!-- Vinyl grooves -->
+  <circle cx="256" cy="240" r="110" fill="none" stroke="#ffffff" stroke-opacity="0.1" stroke-width="2"/>
+  <circle cx="256" cy="240" r="85" fill="none" stroke="#ffffff" stroke-opacity="0.1" stroke-width="2"/>
+  <!-- Vinyl center -->
+  <circle cx="256" cy="240" r="30" fill="#ffffff" fill-opacity="0.15"/>
+  <circle cx="256" cy="240" r="8" fill="#ffffff" fill-opacity="0.4"/>
+  <!-- Music note -->
+  <g transform="translate(256, 240)">
+    <!-- Note stem -->
+    <rect x="12" y="-80" width="6" height="100" rx="3" fill="#ffffff"/>
+    <!-- Note flag -->
+    <path d="M18,-80 Q50,-70 40,-45 Q32,-30 18,-35" fill="#ffffff"/>
+    <!-- Note head -->
+    <ellipse cx="0" cy="22" rx="18" ry="14" transform="rotate(-20)" fill="#ffffff"/>
+  </g>
+  <!-- Waveform bars at bottom -->
+  <g transform="translate(128, 400)" fill="#ffffff" fill-opacity="0.6">
+    <rect x="0" y="-10" width="8" height="20" rx="4"/>
+    <rect x="16" y="-20" width="8" height="40" rx="4"/>
+    <rect x="32" y="-30" width="8" height="60" rx="4"/>
+    <rect x="48" y="-22" width="8" height="44" rx="4"/>
+    <rect x="64" y="-35" width="8" height="70" rx="4"/>
+    <rect x="80" y="-25" width="8" height="50" rx="4"/>
+    <rect x="96" y="-40" width="8" height="80" rx="4"/>
+    <rect x="112" y="-30" width="8" height="60" rx="4"/>
+    <rect x="128" y="-45" width="8" height="90" rx="4"/>
+    <rect x="144" y="-32" width="8" height="64" rx="4"/>
+    <rect x="160" y="-38" width="8" height="76" rx="4"/>
+    <rect x="176" y="-28" width="8" height="56" rx="4"/>
+    <rect x="192" y="-20" width="8" height="40" rx="4"/>
+    <rect x="208" y="-35" width="8" height="70" rx="4"/>
+    <rect x="224" y="-25" width="8" height="50" rx="4"/>
+    <rect x="240" y="-15" width="8" height="30" rx="4"/>
+  </g>
+</svg>

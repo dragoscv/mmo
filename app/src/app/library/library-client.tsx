@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useRouteMemorySave, clearRouteMemory } from "@/hooks/use-route-memory";
 import {
     Table,
     TableBody,
@@ -23,8 +24,10 @@ import { TrackDetailModal } from "@/components/track-detail-modal";
 import { ColumnManager, useColumnConfig } from "@/components/column-manager";
 import { MetadataLink } from "@/components/metadata-link";
 import { usePlayer } from "@/components/player-context";
+import { useSelection } from "@/components/selection-provider";
 import { toggleFavorite, setTrackRating } from "@/actions/tracks";
 import { TrackActions, TrackContextMenu } from "@/components/track-actions";
+import { BulkActionsBar } from "@/components/bulk-actions-bar";
 import {
     formatDuration,
     formatNumber,
@@ -49,7 +52,10 @@ import {
     X,
     SlidersHorizontal,
     ListPlus,
+    Check,
+    EyeOff,
 } from "lucide-react";
+import Link from "next/link";
 import type { Track } from "@/db/schema";
 
 interface LibraryClientProps {
@@ -99,6 +105,12 @@ export function LibraryClient({
     const searchParams = useSearchParams();
     const [searchInput, setSearchInput] = useState(currentFilters.search);
     const player = usePlayer();
+    const selection = useSelection();
+    const pageTrackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
+    const allPageSelected = pageTrackIds.length > 0 && pageTrackIds.every((id) => selection.isSelected(id));
+
+    // Persist URL state so sidebar navigation restores it
+    useRouteMemorySave("/library", searchParams.toString());
 
     // Track Detail Modal
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
@@ -183,25 +195,9 @@ export function LibraryClient({
     }
 
     function clearAllFilters() {
-        navigate({
-            genre: undefined,
-            energy: undefined,
-            search: undefined,
-            key: undefined,
-            favorites: undefined,
-            tag: undefined,
-            rating: undefined,
-            minBpm: undefined,
-            maxBpm: undefined,
-            album: undefined,
-            artist: undefined,
-            year: undefined,
-            label: undefined,
-            subgenre: undefined,
-            mood: undefined,
-            page: "1",
-        });
+        clearRouteMemory("/library");
         setSearchInput("");
+        router.push("/library");
     }
 
     const hasFilters =
@@ -221,6 +217,12 @@ export function LibraryClient({
         currentFilters.subgenre ||
         currentFilters.mood;
 
+    const hasNonDefaultState =
+        hasFilters ||
+        currentSort !== "addedAt" ||
+        currentOrder !== "desc" ||
+        page !== 1;
+
     const SortIcon = ({ column }: { column: string }) => {
         if (currentSort !== column) return null;
         return currentOrder === "asc" ? (
@@ -233,562 +235,654 @@ export function LibraryClient({
     const startIdx = (page - 1) * pageSize;
 
     return (
-        <div className="space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">Library</h1>
-                    <p className="text-[var(--muted-foreground)]">
-                        {formatNumber(total)} track{total !== 1 ? "s" : ""} in library
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant={currentFilters.favorites === "true" ? "default" : "outline"}
-                        size="sm"
-                        className="gap-2"
-                        onClick={() =>
-                            handleFilter(
-                                "favorites",
-                                currentFilters.favorites === "true" ? "" : "true"
-                            )
-                        }
-                    >
-                        <Heart
-                            className={cn(
-                                "h-3.5 w-3.5",
-                                currentFilters.favorites === "true" && "fill-current"
-                            )}
-                        />
-                        Favorites
-                    </Button>
-                </div>
-            </div>
-
-            {/* Filters Bar */}
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 space-y-3">
-                <div className="flex flex-wrap items-center gap-3">
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            handleSearch();
-                        }}
-                        className="flex gap-2"
-                    >
-                        <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
-                            <Input
-                                placeholder="Search artist, title..."
-                                value={searchInput}
-                                onChange={(e) => setSearchInput(e.target.value)}
-                                className="w-56 h-8 text-sm pl-8"
-                            />
-                        </div>
-                        <Button type="submit" size="sm" variant="secondary" className="h-8">
-                            Search
-                        </Button>
-                    </form>
-
-                    <ComboboxFilter
-                        multiple
-                        options={genreOptions}
-                        value={genreValues}
-                        onChange={(vals) => handleFilter("genre", vals.join(",") || "")}
-                        placeholder="All Genres"
-                        triggerClassName="w-36"
-                    />
-
-                    <ComboboxFilter
-                        options={energyOptions}
-                        value={currentFilters.energy}
-                        onChange={(val) => handleFilter("energy", val)}
-                        placeholder="All Energy"
-                        triggerClassName="w-32"
-                    />
-
-                    <ComboboxFilter
-                        multiple
-                        options={keyOptions}
-                        value={keyValues}
-                        onChange={(vals) => handleFilter("key", vals.join(",") || "")}
-                        placeholder="All Keys"
-                        triggerClassName="w-28"
-                    />
-
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                            "h-8 gap-1.5",
-                            showAdvanced && "text-purple-400"
-                        )}
-                        onClick={() => setShowAdvanced(!showAdvanced)}
-                    >
-                        <SlidersHorizontal className="h-3.5 w-3.5" />
-                        More
-                    </Button>
-
-                    {hasFilters && (
+        <div className="flex flex-col h-full">
+            {/* Sticky Header + Filters */}
+            <div className="shrink-0 sticky top-0 z-20 bg-background/95 backdrop-blur-sm px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-3 space-y-3 border-b border-border">
+                {/* Header */}
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold">Library</h1>
+                        <p className="text-[var(--muted-foreground)]">
+                            {formatNumber(total)} track{total !== 1 ? "s" : ""} in library
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
                         <Button
-                            variant="ghost"
+                            variant={currentFilters.favorites === "true" ? "default" : "outline"}
                             size="sm"
-                            className="h-8 text-xs gap-1"
-                            onClick={clearAllFilters}
+                            className="gap-2"
+                            onClick={() =>
+                                handleFilter(
+                                    "favorites",
+                                    currentFilters.favorites === "true" ? "" : "true"
+                                )
+                            }
                         >
-                            <X className="h-3 w-3" />
-                            Clear
+                            <Heart
+                                className={cn(
+                                    "h-3.5 w-3.5",
+                                    currentFilters.favorites === "true" && "fill-current"
+                                )}
+                            />
+                            Favorites
                         </Button>
-                    )}
-
-                    <span className="ml-auto text-xs text-[var(--muted-foreground)]">
-                        {startIdx + 1}–{Math.min(startIdx + pageSize, total)} of{" "}
-                        {formatNumber(total)}
-                    </span>
+                        <Link
+                            href="/library/hidden"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-transparent px-3 py-1.5 text-sm font-medium text-[var(--muted-foreground)] hover:text-orange-400 hover:border-orange-500/30 hover:bg-orange-500/5 transition-colors"
+                        >
+                            <EyeOff className="h-3.5 w-3.5" />
+                            Hidden
+                        </Link>
+                    </div>
                 </div>
 
-                {/* Advanced Filters */}
-                {showAdvanced && (
-                    <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[var(--border)]">
+                {/* Filters Bar */}
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSearch();
+                            }}
+                            className="flex gap-2"
+                        >
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+                                <Input
+                                    placeholder="Search artist, title..."
+                                    value={searchInput}
+                                    onChange={(e) => setSearchInput(e.target.value)}
+                                    className="w-full max-w-56 h-8 text-sm pl-8"
+                                />
+                            </div>
+                            <Button type="submit" size="sm" variant="secondary" className="h-8">
+                                Search
+                            </Button>
+                        </form>
+
                         <ComboboxFilter
-                            options={ratingOptions}
-                            value={currentFilters.rating}
-                            onChange={(val) => handleFilter("rating", val)}
-                            placeholder="All Ratings"
+                            multiple
+                            options={genreOptions}
+                            value={genreValues}
+                            onChange={(vals) => handleFilter("genre", vals.join(",") || "")}
+                            placeholder="All Genres"
                             triggerClassName="w-36"
                         />
 
                         <ComboboxFilter
-                            multiple
-                            options={tagOptions}
-                            value={tagValues}
-                            onChange={(vals) => handleFilter("tag", vals.join(",") || "")}
-                            placeholder="All Tags"
-                            triggerClassName="w-40"
+                            options={energyOptions}
+                            value={currentFilters.energy}
+                            onChange={(val) => handleFilter("energy", val)}
+                            placeholder="All Energy"
+                            triggerClassName="w-32"
                         />
 
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-[var(--muted-foreground)]">BPM</span>
-                            <Input
-                                type="number"
-                                placeholder="Min"
-                                value={currentFilters.minBpm}
-                                onChange={(e) => handleFilter("minBpm", e.target.value)}
-                                className="w-16 h-8 text-sm text-center"
-                                min={0}
-                                max={300}
+                        <ComboboxFilter
+                            multiple
+                            options={keyOptions}
+                            value={keyValues}
+                            onChange={(vals) => handleFilter("key", vals.join(",") || "")}
+                            placeholder="All Keys"
+                            triggerClassName="w-28"
+                        />
+
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                                "h-8 gap-1.5",
+                                showAdvanced && "text-purple-400"
+                            )}
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                        >
+                            <SlidersHorizontal className="h-3.5 w-3.5" />
+                            More
+                        </Button>
+
+                        {hasNonDefaultState && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs gap-1"
+                                onClick={clearAllFilters}
+                            >
+                                <X className="h-3 w-3" />
+                                Reset
+                            </Button>
+                        )}
+
+                        <span className="ml-auto text-xs text-[var(--muted-foreground)]">
+                            {startIdx + 1}–{Math.min(startIdx + pageSize, total)} of{" "}
+                            {formatNumber(total)}
+                        </span>
+                    </div>
+
+                    {/* Advanced Filters */}
+                    {showAdvanced && (
+                        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[var(--border)]">
+                            <ComboboxFilter
+                                options={ratingOptions}
+                                value={currentFilters.rating}
+                                onChange={(val) => handleFilter("rating", val)}
+                                placeholder="All Ratings"
+                                triggerClassName="w-36"
                             />
-                            <span className="text-xs text-[var(--muted-foreground)]">–</span>
+
+                            <ComboboxFilter
+                                multiple
+                                options={tagOptions}
+                                value={tagValues}
+                                onChange={(vals) => handleFilter("tag", vals.join(",") || "")}
+                                placeholder="All Tags"
+                                triggerClassName="w-40"
+                            />
+
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-[var(--muted-foreground)]">BPM</span>
+                                <Input
+                                    type="number"
+                                    placeholder="Min"
+                                    value={currentFilters.minBpm}
+                                    onChange={(e) => handleFilter("minBpm", e.target.value)}
+                                    className="w-16 h-8 text-sm text-center"
+                                    min={0}
+                                    max={300}
+                                />
+                                <span className="text-xs text-[var(--muted-foreground)]">–</span>
+                                <Input
+                                    type="number"
+                                    placeholder="Max"
+                                    value={currentFilters.maxBpm}
+                                    onChange={(e) => handleFilter("maxBpm", e.target.value)}
+                                    className="w-16 h-8 text-sm text-center"
+                                    min={0}
+                                    max={300}
+                                />
+                            </div>
+
                             <Input
-                                type="number"
-                                placeholder="Max"
-                                value={currentFilters.maxBpm}
-                                onChange={(e) => handleFilter("maxBpm", e.target.value)}
-                                className="w-16 h-8 text-sm text-center"
-                                min={0}
-                                max={300}
+                                placeholder="Album..."
+                                value={currentFilters.album}
+                                onChange={(e) => handleFilter("album", e.target.value)}
+                                className="w-36 h-8 text-sm"
                             />
                         </div>
+                    )}
+                </div>
 
-                        <Input
-                            placeholder="Album..."
-                            value={currentFilters.album}
-                            onChange={(e) => handleFilter("album", e.target.value)}
-                            className="w-36 h-8 text-sm"
-                        />
+                {/* Active Metadata Filter Badges */}
+                {(currentFilters.artist || currentFilters.label || currentFilters.year || currentFilters.subgenre || currentFilters.mood) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-[var(--muted-foreground)]">Filtered by:</span>
+                        {currentFilters.artist && (
+                            <Badge variant="secondary" className="gap-1 text-xs">
+                                Artist: {currentFilters.artist}
+                                <button onClick={() => handleFilter("artist", "")} className="ml-0.5 hover:text-destructive">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </Badge>
+                        )}
+                        {currentFilters.label && (
+                            <Badge variant="secondary" className="gap-1 text-xs">
+                                Label: {currentFilters.label}
+                                <button onClick={() => handleFilter("label", "")} className="ml-0.5 hover:text-destructive">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </Badge>
+                        )}
+                        {currentFilters.year && (
+                            <Badge variant="secondary" className="gap-1 text-xs">
+                                Year: {currentFilters.year}
+                                <button onClick={() => handleFilter("year", "")} className="ml-0.5 hover:text-destructive">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </Badge>
+                        )}
+                        {currentFilters.subgenre && (
+                            <Badge variant="secondary" className="gap-1 text-xs">
+                                Subgenre: {currentFilters.subgenre}
+                                <button onClick={() => handleFilter("subgenre", "")} className="ml-0.5 hover:text-destructive">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </Badge>
+                        )}
+                        {currentFilters.mood && (
+                            <Badge variant="secondary" className="gap-1 text-xs">
+                                Mood: {currentFilters.mood}
+                                <button onClick={() => handleFilter("mood", "")} className="ml-0.5 hover:text-destructive">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </Badge>
+                        )}
                     </div>
                 )}
             </div>
 
-            {/* Active Metadata Filter Badges */}
-            {(currentFilters.artist || currentFilters.label || currentFilters.year || currentFilters.subgenre || currentFilters.mood) && (
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-[var(--muted-foreground)]">Filtered by:</span>
-                    {currentFilters.artist && (
-                        <Badge variant="secondary" className="gap-1 text-xs">
-                            Artist: {currentFilters.artist}
-                            <button onClick={() => handleFilter("artist", "")} className="ml-0.5 hover:text-destructive">
-                                <X className="h-3 w-3" />
-                            </button>
-                        </Badge>
-                    )}
-                    {currentFilters.label && (
-                        <Badge variant="secondary" className="gap-1 text-xs">
-                            Label: {currentFilters.label}
-                            <button onClick={() => handleFilter("label", "")} className="ml-0.5 hover:text-destructive">
-                                <X className="h-3 w-3" />
-                            </button>
-                        </Badge>
-                    )}
-                    {currentFilters.year && (
-                        <Badge variant="secondary" className="gap-1 text-xs">
-                            Year: {currentFilters.year}
-                            <button onClick={() => handleFilter("year", "")} className="ml-0.5 hover:text-destructive">
-                                <X className="h-3 w-3" />
-                            </button>
-                        </Badge>
-                    )}
-                    {currentFilters.subgenre && (
-                        <Badge variant="secondary" className="gap-1 text-xs">
-                            Subgenre: {currentFilters.subgenre}
-                            <button onClick={() => handleFilter("subgenre", "")} className="ml-0.5 hover:text-destructive">
-                                <X className="h-3 w-3" />
-                            </button>
-                        </Badge>
-                    )}
-                    {currentFilters.mood && (
-                        <Badge variant="secondary" className="gap-1 text-xs">
-                            Mood: {currentFilters.mood}
-                            <button onClick={() => handleFilter("mood", "")} className="ml-0.5 hover:text-destructive">
-                                <X className="h-3 w-3" />
-                            </button>
-                        </Badge>
-                    )}
+            {/* Scrollable Table Area */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-4 space-y-3">
+                {/* Track Table */}
+                <div className="flex items-center justify-end">
+                    <ColumnManager
+                        orderedColumns={orderedColumns}
+                        visibleColumns={visibleColumns}
+                        onToggle={toggleColumn}
+                        onReorder={reorderColumns}
+                        onReset={resetToDefaults}
+                        availableColumns={["index", "play", "artwork", "favorites", "artist", "title", "album", "bpm", "key", "genre", "energy", "rating", "duration", "bitrate", "format", "sampleRate", "year", "label"]}
+                    />
                 </div>
-            )}
-
-            {/* Track Table */}
-            <div className="flex items-center justify-end mb-2">
-                <ColumnManager
-                    orderedColumns={orderedColumns}
-                    visibleColumns={visibleColumns}
-                    onToggle={toggleColumn}
-                    onReorder={reorderColumns}
-                    onReset={resetToDefaults}
-                    availableColumns={["index", "play", "artwork", "favorites", "artist", "title", "album", "bpm", "key", "genre", "energy", "rating", "duration"]}
-                />
-            </div>
-            <div className="rounded-lg border border-[var(--border)] overflow-hidden">
-                <Table>
-                    <TableHeader>
-                        <TableRow className="bg-[var(--card)] hover:bg-[var(--card)]">
-                            {orderedColumns.map((col) => {
-                                switch (col) {
-                                    case "index": return <TableHead key={col} className="w-8 text-center">#</TableHead>;
-                                    case "play": return <TableHead key={col} className="w-8"></TableHead>;
-                                    case "artwork": return <TableHead key={col} className="w-10"></TableHead>;
-                                    case "favorites": return <TableHead key={col} className="w-6"></TableHead>;
-                                    case "artist": return (
-                                        <TableHead key={col} className="cursor-pointer select-none hover:text-[var(--foreground)]" onClick={() => handleSort("artist")}>
-                                            Artist <SortIcon column="artist" />
-                                        </TableHead>
-                                    );
-                                    case "title": return (
-                                        <TableHead key={col} className="cursor-pointer select-none hover:text-[var(--foreground)]" onClick={() => handleSort("title")}>
-                                            Title <SortIcon column="title" />
-                                        </TableHead>
-                                    );
-                                    case "album": return <TableHead key={col}>Album</TableHead>;
-                                    case "bpm": return (
-                                        <TableHead key={col} className="w-16 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("bpm")}>
-                                            BPM <SortIcon column="bpm" />
-                                        </TableHead>
-                                    );
-                                    case "key": return (
-                                        <TableHead key={col} className="w-20 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("key")}>
-                                            Key <SortIcon column="key" />
-                                        </TableHead>
-                                    );
-                                    case "genre": return (
-                                        <TableHead key={col} className="w-24 cursor-pointer select-none hover:text-[var(--foreground)]" onClick={() => handleSort("genre")}>
-                                            Genre <SortIcon column="genre" />
-                                        </TableHead>
-                                    );
-                                    case "energy": return (
-                                        <TableHead key={col} className="w-14 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("energy")}>
-                                            ⚡ <SortIcon column="energy" />
-                                        </TableHead>
-                                    );
-                                    case "rating": return (
-                                        <TableHead key={col} className="w-24 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("rating")}>
-                                            Rating <SortIcon column="rating" />
-                                        </TableHead>
-                                    );
-                                    case "duration": return (
-                                        <TableHead key={col} className="w-16 cursor-pointer select-none text-right hover:text-[var(--foreground)]" onClick={() => handleSort("duration")}>
-                                            Time <SortIcon column="duration" />
-                                        </TableHead>
-                                    );
-                                    default: return null;
-                                }
-                            })}
-                            <TableHead className="w-10"></TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {tracks.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={orderedColumns.length + 1} className="text-center py-12">
-                                    <p className="text-[var(--muted-foreground)]">
-                                        No tracks found. Scan a folder or import from rekordbox.
-                                    </p>
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            tracks.map((track, idx) => {
-                                const isCurrentTrack =
-                                    player.currentTrack?.id === track.id;
-                                const isPlayingThis = isCurrentTrack && player.isPlaying;
-                                const tags: string[] = track.tags
-                                    ? JSON.parse(track.tags)
-                                    : [];
-
-                                const harmonicColor = !isCurrentTrack && player.currentTrack
-                                    ? getHarmonicColor(track.keyCamelot, player.currentTrack.keyCamelot)
-                                    : "";
-
-                                return (
-                                    <TrackContextMenu
-                                        key={track.id}
-                                        track={track}
-                                        onOpenDetail={() => {
-                                            setSelectedTrack(track);
-                                            setModalOpen(true);
-                                        }}
-                                        onMutate={() => router.refresh()}
+                {selection.count > 0 && (
+                    <BulkActionsBar onDone={() => router.refresh()} />
+                )}
+                <div className="rounded-lg border border-[var(--border)] overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="bg-[var(--card)] hover:bg-[var(--card)]">
+                                <TableHead className="w-8 px-2">
+                                    <button
+                                        onClick={() => selection.toggleAll(pageTrackIds)}
+                                        className={cn(
+                                            "flex h-4 w-4 items-center justify-center rounded border transition-colors cursor-pointer",
+                                            allPageSelected
+                                                ? "bg-purple-500 border-purple-500"
+                                                : "border-[var(--border)] hover:border-purple-500/50"
+                                        )}
                                     >
-                                        <TableRow
-                                            className={cn(
-                                                "group cursor-pointer transition-colors",
-                                                isCurrentTrack
-                                                    ? "bg-purple-500/10 border-l-2 border-l-purple-500"
-                                                    : harmonicColor
-                                            )}
-                                            onClick={() => {
+                                        {allPageSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                                    </button>
+                                </TableHead>
+                                {orderedColumns.map((col) => {
+                                    switch (col) {
+                                        case "index": return <TableHead key={col} className="w-8 text-center">#</TableHead>;
+                                        case "play": return <TableHead key={col} className="w-8"></TableHead>;
+                                        case "artwork": return <TableHead key={col} className="w-10"></TableHead>;
+                                        case "favorites": return <TableHead key={col} className="w-6"></TableHead>;
+                                        case "artist": return (
+                                            <TableHead key={col} className="cursor-pointer select-none hover:text-[var(--foreground)]" onClick={() => handleSort("artist")}>
+                                                Artist <SortIcon column="artist" />
+                                            </TableHead>
+                                        );
+                                        case "title": return (
+                                            <TableHead key={col} className="cursor-pointer select-none hover:text-[var(--foreground)]" onClick={() => handleSort("title")}>
+                                                Title <SortIcon column="title" />
+                                            </TableHead>
+                                        );
+                                        case "album": return <TableHead key={col}>Album</TableHead>;
+                                        case "bpm": return (
+                                            <TableHead key={col} className="w-16 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("bpm")}>
+                                                BPM <SortIcon column="bpm" />
+                                            </TableHead>
+                                        );
+                                        case "key": return (
+                                            <TableHead key={col} className="w-20 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("key")}>
+                                                Key <SortIcon column="key" />
+                                            </TableHead>
+                                        );
+                                        case "genre": return (
+                                            <TableHead key={col} className="w-24 cursor-pointer select-none hover:text-[var(--foreground)]" onClick={() => handleSort("genre")}>
+                                                Genre <SortIcon column="genre" />
+                                            </TableHead>
+                                        );
+                                        case "energy": return (
+                                            <TableHead key={col} className="w-14 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("energy")}>
+                                                ⚡ <SortIcon column="energy" />
+                                            </TableHead>
+                                        );
+                                        case "rating": return (
+                                            <TableHead key={col} className="w-24 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("rating")}>
+                                                Rating <SortIcon column="rating" />
+                                            </TableHead>
+                                        );
+                                        case "duration": return (
+                                            <TableHead key={col} className="w-16 cursor-pointer select-none text-right hover:text-[var(--foreground)]" onClick={() => handleSort("duration")}>
+                                                Time <SortIcon column="duration" />
+                                            </TableHead>
+                                        );
+                                        case "bitrate": return (
+                                            <TableHead key={col} className="w-16 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("bitrate")}>
+                                                Bitrate <SortIcon column="bitrate" />
+                                            </TableHead>
+                                        );
+                                        case "format": return (
+                                            <TableHead key={col} className="w-14 text-center">Format</TableHead>
+                                        );
+                                        case "year": return (
+                                            <TableHead key={col} className="w-14 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("year")}>
+                                                Year <SortIcon column="year" />
+                                            </TableHead>
+                                        );
+                                        case "label": return (
+                                            <TableHead key={col} className="w-28">Label</TableHead>
+                                        );
+                                        case "sampleRate": return (
+                                            <TableHead key={col} className="w-16 text-center">Sample Rate</TableHead>
+                                        );
+                                        default: return null;
+                                    }
+                                })}
+                                <TableHead className="w-10"></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {tracks.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={orderedColumns.length + 2} className="text-center py-12">
+                                        <p className="text-[var(--muted-foreground)]">
+                                            No tracks found. Scan a folder or import from rekordbox.
+                                        </p>
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                tracks.map((track, idx) => {
+                                    const isCurrentTrack =
+                                        player.currentTrack?.id === track.id;
+                                    const isPlayingThis = isCurrentTrack && player.isPlaying;
+                                    const tags: string[] = track.tags
+                                        ? JSON.parse(track.tags)
+                                        : [];
+
+                                    const harmonicColor = !isCurrentTrack && player.currentTrack
+                                        ? getHarmonicColor(track.keyCamelot, player.currentTrack.keyCamelot)
+                                        : "";
+
+                                    return (
+                                        <TrackContextMenu
+                                            key={track.id}
+                                            track={track}
+                                            onOpenDetail={() => {
                                                 setSelectedTrack(track);
                                                 setModalOpen(true);
                                             }}
+                                            onMutate={() => router.refresh()}
                                         >
-                                            {orderedColumns.map((col) => {
-                                                switch (col) {
-                                                    case "index": return (
-                                                        <TableCell key={col} className="text-center text-xs text-[var(--muted-foreground)]">
-                                                            {startIdx + idx + 1}
-                                                        </TableCell>
-                                                    );
-                                                    case "play": return (
-                                                        <TableCell key={col} className="text-center p-0" onClick={(e) => e.stopPropagation()}>
-                                                            <button
-                                                                onClick={() => isPlayingThis ? player.pause() : handlePlay(track)}
-                                                                className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-purple-500/20 transition-colors mx-auto cursor-pointer"
-                                                            >
-                                                                {isPlayingThis ? (
-                                                                    <Pause className="h-3.5 w-3.5 text-purple-400" />
-                                                                ) : (
-                                                                    <Play className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                                )}
-                                                            </button>
-                                                        </TableCell>
-                                                    );
-                                                    case "artwork": return (
-                                                        <TableCell key={col} className="p-1">
-                                                            <Artwork src={track.artworkUrl} size="sm" showPlaceholder={false} />
-                                                        </TableCell>
-                                                    );
-                                                    case "favorites": return (
-                                                        <TableCell key={col} className="p-0" onClick={(e) => e.stopPropagation()}>
-                                                            <FavoriteButton
-                                                                isFavorite={!!track.isFavorite}
-                                                                size="sm"
-                                                                onChange={async () => { await toggleFavorite(track.id); router.refresh(); }}
-                                                            />
-                                                        </TableCell>
-                                                    );
-                                                    case "artist": return (
-                                                        <TableCell key={col} className="max-w-[180px] truncate text-sm" onClick={(e) => e.stopPropagation()}>
-                                                            <MetadataLink field="artist" value={track.artist} className={cn("text-sm", isCurrentTrack && "text-purple-400")}>
-                                                                {track.artist || "Unknown"}
-                                                            </MetadataLink>
-                                                        </TableCell>
-                                                    );
-                                                    case "title": return (
-                                                        <TableCell key={col} className="max-w-[220px] text-sm">
-                                                            <div className="truncate font-medium">
-                                                                <span className={cn(isCurrentTrack && "text-purple-400")}>
-                                                                    {track.title || track.filename}
-                                                                </span>
-                                                            </div>
-                                                            <p className="truncate text-[10px] text-[var(--muted-foreground)]/50 mt-0.5" title={track.filepath}>
-                                                                {track.filepath}
-                                                            </p>
-                                                            {tags.length > 0 && (
-                                                                <div className="mt-0.5"><TagBadges tags={tags} /></div>
-                                                            )}
-                                                        </TableCell>
-                                                    );
-                                                    case "album": return (
-                                                        <TableCell key={col} className="max-w-[150px] truncate text-sm text-[var(--muted-foreground)]" onClick={(e) => e.stopPropagation()}>
-                                                            {track.album ? (
-                                                                <MetadataLink field="album" value={track.album} className="text-sm text-[var(--muted-foreground)]">
-                                                                    {track.album}
-                                                                </MetadataLink>
-                                                            ) : "—"}
-                                                        </TableCell>
-                                                    );
-                                                    case "bpm": return (
-                                                        <TableCell key={col} className="text-center text-sm tabular-nums">
-                                                            {track.bpm ? Math.round(track.bpm) : "—"}
-                                                        </TableCell>
-                                                    );
-                                                    case "key": return (
-                                                        <TableCell key={col} className="text-center font-mono text-xs" onClick={(e) => e.stopPropagation()}>
-                                                            {track.keyCamelot ? (
-                                                                <MetadataLink field="key" value={track.keyCamelot} className="font-mono text-xs">
-                                                                    <span className="text-[var(--foreground)]">{track.keyCamelot}</span>
-                                                                    {" "}
-                                                                    <span className="text-[var(--muted-foreground)]">{track.keyMusical || ""}</span>
-                                                                </MetadataLink>
-                                                            ) : "—"}
-                                                        </TableCell>
-                                                    );
-                                                    case "genre": return (
-                                                        <TableCell key={col} onClick={(e) => e.stopPropagation()}>
-                                                            {track.genre ? (
-                                                                <MetadataLink field="genre" value={track.genre}>
-                                                                    <Badge className={cn("text-[10px] px-1.5 py-0 cursor-pointer", GENRE_COLORS[track.genre] || GENRE_COLORS.Other)}>
-                                                                        {track.genre}
-                                                                    </Badge>
-                                                                </MetadataLink>
-                                                            ) : (
-                                                                <span className="text-xs text-zinc-600">—</span>
-                                                            )}
-                                                        </TableCell>
-                                                    );
-                                                    case "energy": return (
-                                                        <TableCell key={col} className="text-center">
-                                                            {track.energy ? (
-                                                                <div className="flex items-center justify-center gap-1">
-                                                                    <span className={cn("inline-block h-2 w-2 rounded-full", ENERGY_COLORS[track.energy])} />
-                                                                    <span className="text-xs">{track.energy}</span>
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-xs text-zinc-600">—</span>
-                                                            )}
-                                                        </TableCell>
-                                                    );
-                                                    case "rating": return (
-                                                        <TableCell key={col} className="text-center" onClick={(e) => e.stopPropagation()}>
-                                                            <StarRating
-                                                                value={track.rating}
-                                                                size="sm"
-                                                                onChange={async (r) => { await setTrackRating(track.id, r || null); router.refresh(); }}
-                                                            />
-                                                        </TableCell>
-                                                    );
-                                                    case "duration": return (
-                                                        <TableCell key={col} className="text-right text-xs tabular-nums text-[var(--muted-foreground)]">
-                                                            {formatDuration(track.duration)}
-                                                        </TableCell>
-                                                    );
-                                                    default: return null;
-                                                }
-                                            })}
-                                            <TableCell
-                                                className="p-0"
-                                                onClick={(e) => e.stopPropagation()}
+                                            <TableRow
+                                                {...(isCurrentTrack ? { "data-playing-track": true } : {})}
+                                                className={cn(
+                                                    "group cursor-pointer transition-colors",
+                                                    selection.isSelected(track.id) && "bg-purple-500/5",
+                                                    isCurrentTrack
+                                                        ? "bg-purple-500/10 border-l-2 border-l-purple-500"
+                                                        : harmonicColor
+                                                )}
+                                                onClick={() => {
+                                                    setSelectedTrack(track);
+                                                    setModalOpen(true);
+                                                }}
                                             >
-                                                <TrackActions
-                                                    track={track}
-                                                    onOpenDetail={() => {
-                                                        setSelectedTrack(track);
-                                                        setModalOpen(true);
-                                                    }}
-                                                    onMutate={() => router.refresh()}
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    </TrackContextMenu>
-                                );
-                            })
-                        )}
-                    </TableBody>
-                </Table>
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-[var(--muted-foreground)]">
-                            Page {page} of {totalPages}
-                        </span>
-                        <Select
-                            value={String(pageSize)}
-                            onChange={(e) =>
-                                navigate({ pageSize: e.target.value, page: "1" })
-                            }
-                            className="w-20 h-8 text-xs"
-                        >
-                            <option value="25">25</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </Select>
-                        <span className="text-xs text-[var(--muted-foreground)]">
-                            per page
-                        </span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            disabled={page <= 1}
-                            onClick={() => handlePageChange(1)}
-                        >
-                            <ChevronsLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            disabled={page <= 1}
-                            onClick={() => handlePageChange(page - 1)}
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-
-                        {generatePageNumbers(page, totalPages).map((p, i) =>
-                            p === "..." ? (
-                                <span
-                                    key={`e-${i}`}
-                                    className="px-2 text-sm text-[var(--muted-foreground)]"
-                                >
-                                    …
-                                </span>
-                            ) : (
-                                <Button
-                                    key={p}
-                                    variant={p === page ? "default" : "outline"}
-                                    size="icon"
-                                    className="h-8 w-8 text-xs"
-                                    onClick={() => handlePageChange(p as number)}
-                                >
-                                    {p}
-                                </Button>
-                            )
-                        )}
-
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            disabled={page >= totalPages}
-                            onClick={() => handlePageChange(page + 1)}
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            disabled={page >= totalPages}
-                            onClick={() => handlePageChange(totalPages)}
-                        >
-                            <ChevronsRight className="h-4 w-4" />
-                        </Button>
-                    </div>
+                                                <TableCell className="px-2" onClick={(e) => e.stopPropagation()}>
+                                                    <button
+                                                        onClick={() => selection.toggle(track.id)}
+                                                        className={cn(
+                                                            "flex h-4 w-4 items-center justify-center rounded border transition-colors cursor-pointer",
+                                                            selection.isSelected(track.id)
+                                                                ? "bg-purple-500 border-purple-500"
+                                                                : "border-[var(--border)] hover:border-purple-500/50"
+                                                        )}
+                                                    >
+                                                        {selection.isSelected(track.id) && <Check className="h-3 w-3 text-primary-foreground" />}
+                                                    </button>
+                                                </TableCell>
+                                                {orderedColumns.map((col) => {
+                                                    switch (col) {
+                                                        case "index": return (
+                                                            <TableCell key={col} className="text-center text-xs text-[var(--muted-foreground)]">
+                                                                {startIdx + idx + 1}
+                                                            </TableCell>
+                                                        );
+                                                        case "play": return (
+                                                            <TableCell key={col} className="text-center p-0" onClick={(e) => e.stopPropagation()}>
+                                                                <button
+                                                                    onClick={() => isPlayingThis ? player.pause() : handlePlay(track)}
+                                                                    className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-purple-500/20 transition-colors mx-auto cursor-pointer"
+                                                                >
+                                                                    {isPlayingThis ? (
+                                                                        <Pause className="h-3.5 w-3.5 text-purple-400" />
+                                                                    ) : (
+                                                                        <Play className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                    )}
+                                                                </button>
+                                                            </TableCell>
+                                                        );
+                                                        case "artwork": return (
+                                                            <TableCell key={col} className="p-1">
+                                                                <Artwork src={track.artworkUrl} size="sm" showPlaceholder={false} />
+                                                            </TableCell>
+                                                        );
+                                                        case "favorites": return (
+                                                            <TableCell key={col} className="p-0" onClick={(e) => e.stopPropagation()}>
+                                                                <FavoriteButton
+                                                                    isFavorite={!!track.isFavorite}
+                                                                    size="sm"
+                                                                    onChange={async () => { await toggleFavorite(track.id); router.refresh(); }}
+                                                                />
+                                                            </TableCell>
+                                                        );
+                                                        case "artist": return (
+                                                            <TableCell key={col} className="max-w-[180px] truncate text-sm" onClick={(e) => e.stopPropagation()}>
+                                                                <MetadataLink field="artist" value={track.artist} className={cn("text-sm", isCurrentTrack && "text-purple-400")}>
+                                                                    {track.artist || "Unknown"}
+                                                                </MetadataLink>
+                                                            </TableCell>
+                                                        );
+                                                        case "title": return (
+                                                            <TableCell key={col} className="max-w-[220px] text-sm">
+                                                                <div className="truncate font-medium">
+                                                                    <span className={cn(isCurrentTrack && "text-purple-400")}>
+                                                                        {track.title || track.filename}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="truncate text-[10px] text-[var(--muted-foreground)]/50 mt-0.5" title={track.filepath}>
+                                                                    {track.filepath}
+                                                                </p>
+                                                                {tags.length > 0 && (
+                                                                    <div className="mt-0.5"><TagBadges tags={tags} /></div>
+                                                                )}
+                                                            </TableCell>
+                                                        );
+                                                        case "album": return (
+                                                            <TableCell key={col} className="max-w-[150px] truncate text-sm text-[var(--muted-foreground)]" onClick={(e) => e.stopPropagation()}>
+                                                                {track.album ? (
+                                                                    <MetadataLink field="album" value={track.album} className="text-sm text-[var(--muted-foreground)]">
+                                                                        {track.album}
+                                                                    </MetadataLink>
+                                                                ) : "—"}
+                                                            </TableCell>
+                                                        );
+                                                        case "bpm": return (
+                                                            <TableCell key={col} className="text-center text-sm tabular-nums">
+                                                                {track.bpm ? Math.round(track.bpm) : "—"}
+                                                            </TableCell>
+                                                        );
+                                                        case "key": return (
+                                                            <TableCell key={col} className="text-center font-mono text-xs" onClick={(e) => e.stopPropagation()}>
+                                                                {track.keyCamelot ? (
+                                                                    <MetadataLink field="key" value={track.keyCamelot} className="font-mono text-xs">
+                                                                        <span className="text-[var(--foreground)]">{track.keyCamelot}</span>
+                                                                        {" "}
+                                                                        <span className="text-[var(--muted-foreground)]">{track.keyMusical || ""}</span>
+                                                                    </MetadataLink>
+                                                                ) : "—"}
+                                                            </TableCell>
+                                                        );
+                                                        case "genre": return (
+                                                            <TableCell key={col} onClick={(e) => e.stopPropagation()}>
+                                                                {track.genre ? (
+                                                                    <MetadataLink field="genre" value={track.genre}>
+                                                                        <Badge className={cn("text-[10px] px-1.5 py-0 cursor-pointer", GENRE_COLORS[track.genre] || GENRE_COLORS.Other)}>
+                                                                            {track.genre}
+                                                                        </Badge>
+                                                                    </MetadataLink>
+                                                                ) : (
+                                                                    <span className="text-xs text-zinc-600">—</span>
+                                                                )}
+                                                            </TableCell>
+                                                        );
+                                                        case "energy": return (
+                                                            <TableCell key={col} className="text-center">
+                                                                {track.energy ? (
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        <span className={cn("inline-block h-2 w-2 rounded-full", ENERGY_COLORS[track.energy])} />
+                                                                        <span className="text-xs">{track.energy}</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-xs text-zinc-600">—</span>
+                                                                )}
+                                                            </TableCell>
+                                                        );
+                                                        case "rating": return (
+                                                            <TableCell key={col} className="text-center" onClick={(e) => e.stopPropagation()}>
+                                                                <StarRating
+                                                                    value={track.rating}
+                                                                    size="sm"
+                                                                    onChange={async (r) => { await setTrackRating(track.id, r || null); router.refresh(); }}
+                                                                />
+                                                            </TableCell>
+                                                        );
+                                                        case "duration": return (
+                                                            <TableCell key={col} className="text-right text-xs tabular-nums text-[var(--muted-foreground)]">
+                                                                {formatDuration(track.duration)}
+                                                            </TableCell>
+                                                        );
+                                                        case "bitrate": return (
+                                                            <TableCell key={col} className="text-center text-xs tabular-nums text-[var(--muted-foreground)]">
+                                                                {track.bitrate ? `${track.bitrate}` : "—"}
+                                                            </TableCell>
+                                                        );
+                                                        case "format": return (
+                                                            <TableCell key={col} className="text-center">
+                                                                {track.format ? (
+                                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase">
+                                                                        {track.format}
+                                                                    </span>
+                                                                ) : "—"}
+                                                            </TableCell>
+                                                        );
+                                                        case "year": return (
+                                                            <TableCell key={col} className="text-center text-xs tabular-nums text-[var(--muted-foreground)]">
+                                                                {track.year || "—"}
+                                                            </TableCell>
+                                                        );
+                                                        case "label": return (
+                                                            <TableCell key={col} className="max-w-[120px] truncate text-xs text-[var(--muted-foreground)]">
+                                                                {track.label || "—"}
+                                                            </TableCell>
+                                                        );
+                                                        case "sampleRate": return (
+                                                            <TableCell key={col} className="text-center text-xs tabular-nums text-[var(--muted-foreground)]">
+                                                                {track.sampleRate ? `${(track.sampleRate / 1000).toFixed(1)}k` : "—"}
+                                                            </TableCell>
+                                                        );
+                                                        default: return null;
+                                                    }
+                                                })}
+                                                <TableCell
+                                                    className="p-0"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <TrackActions
+                                                        track={track}
+                                                        onOpenDetail={() => {
+                                                            setSelectedTrack(track);
+                                                            setModalOpen(true);
+                                                        }}
+                                                        onMutate={() => router.refresh()}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        </TrackContextMenu>
+                                    );
+                                })
+                            )}
+                        </TableBody>
+                    </Table>
                 </div>
-            )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-[var(--muted-foreground)]">
+                                Page {page} of {totalPages}
+                            </span>
+                            <Select
+                                value={String(pageSize)}
+                                onChange={(e) =>
+                                    navigate({ pageSize: e.target.value, page: "1" })
+                                }
+                                className="w-20 h-8 text-xs"
+                            >
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </Select>
+                            <span className="text-xs text-[var(--muted-foreground)]">
+                                per page
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={page <= 1}
+                                onClick={() => handlePageChange(1)}
+                            >
+                                <ChevronsLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={page <= 1}
+                                onClick={() => handlePageChange(page - 1)}
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                            </Button>
+
+                            {generatePageNumbers(page, totalPages).map((p, i) =>
+                                p === "..." ? (
+                                    <span
+                                        key={`e-${i}`}
+                                        className="px-2 text-sm text-[var(--muted-foreground)]"
+                                    >
+                                        …
+                                    </span>
+                                ) : (
+                                    <Button
+                                        key={p}
+                                        variant={p === page ? "default" : "outline"}
+                                        size="icon"
+                                        className="h-8 w-8 text-xs"
+                                        onClick={() => handlePageChange(p as number)}
+                                    >
+                                        {p}
+                                    </Button>
+                                )
+                            )}
+
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={page >= totalPages}
+                                onClick={() => handlePageChange(page + 1)}
+                            >
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={page >= totalPages}
+                                onClick={() => handlePageChange(totalPages)}
+                            >
+                                <ChevronsRight className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* Track Detail Modal */}
             <TrackDetailModal

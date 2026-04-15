@@ -26,6 +26,12 @@ export type VisualizationRenderer = (
     config: RenderConfig,
 ) => void;
 
+export interface ShaderDef {
+    fragment: string;
+    /** Color palette as vec3 array (0-1 range) */
+    palette?: [number, number, number][];
+}
+
 export interface VisualizationDef {
     id: string;
     name: string;
@@ -33,6 +39,8 @@ export interface VisualizationDef {
     tags: string[];
     render: VisualizationRenderer;
     interactive?: boolean;
+    /** If set, this is a WebGL shader visualization */
+    shader?: ShaderDef;
 }
 
 export type PaletteName =

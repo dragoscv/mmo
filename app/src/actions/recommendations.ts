@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { tracks } from "@/db/schema";
-import { sql, and, ne } from "drizzle-orm";
+import { tracks, type Track } from "@/db/schema";
+import { sql, and, ne, inArray } from "drizzle-orm";
 import { getHarmonicScore } from "@/lib/genre-suggest";
 
 export interface RecommendedTrack {
@@ -126,4 +126,82 @@ export async function getRecommendedTracks(
     // Sort by score descending, take top N
     scored.sort((a, b) => b.score - a.score);
     return scored.filter((t) => t.score > 0).slice(0, limit);
+}
+
+/**
+ * Build a radio mix queue: seed track + up to `size` related tracks,
+ * ordered for smooth mixing (harmonic key flow + close BPM).
+ * Returns full Track objects ready for the player queue.
+ */
+export async function getRadioMix(
+    seedTrackId: number,
+    size: number = 30,
+): Promise<Track[]> {
+    // Get the seed track
+    const seed = db.select().from(tracks).where(sql`${tracks.id} = ${seedTrackId}`).get();
+    if (!seed) return [];
+
+    // Get scored candidates
+    const recommendations = await getRecommendedTracks(
+        seedTrackId,
+        seed.genre,
+        seed.bpm,
+        seed.keyCamelot,
+        size * 2, // over-fetch for ordering
+    );
+
+    if (recommendations.length === 0) return [seed];
+
+    // Fetch full Track rows for the recommended IDs
+    const recIds = recommendations.map((r) => r.id);
+    const fullTracks = db
+        .select()
+        .from(tracks)
+        .where(inArray(tracks.id, recIds))
+        .all();
+
+    const trackMap = new Map(fullTracks.map((t) => [t.id, t]));
+
+    // Order for smooth mixing: greedy nearest-neighbor by key+BPM
+    const ordered: Track[] = [];
+    const remaining = new Map(recommendations.map((r) => [r.id, r]));
+    let currentKey = seed.keyCamelot;
+    let currentBpm = seed.bpm;
+
+    while (ordered.length < size && remaining.size > 0) {
+        let bestId: number | null = null;
+        let bestScore = -1;
+
+        for (const [id, rec] of remaining) {
+            // Prefer harmonic key continuity + BPM closeness
+            let continuityScore = rec.breakdown.key; // key match from seed scoring
+            if (currentKey && rec.keyCamelot) {
+                const harmonic = getHarmonicScore(currentKey, rec.keyCamelot);
+                if (harmonic === 0) continuityScore = 30;
+                else if (harmonic === 1) continuityScore = 25;
+                else if (harmonic === 2) continuityScore = 15;
+                else continuityScore = 0;
+            }
+            if (currentBpm && rec.bpm) {
+                const diff = Math.abs(currentBpm - rec.bpm);
+                continuityScore += Math.max(0, 20 - diff * 2);
+            }
+            if (continuityScore > bestScore) {
+                bestScore = continuityScore;
+                bestId = id;
+            }
+        }
+
+        if (bestId === null) break;
+        const picked = remaining.get(bestId)!;
+        remaining.delete(bestId);
+        const fullTrack = trackMap.get(bestId);
+        if (fullTrack) {
+            ordered.push(fullTrack);
+            currentKey = fullTrack.keyCamelot;
+            currentBpm = fullTrack.bpm;
+        }
+    }
+
+    return [seed, ...ordered];
 }

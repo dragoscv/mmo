@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Sun, Moon, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function ThemeToggle() {
+export function ThemeToggle({ collapsed }: { collapsed?: boolean } = {}) {
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
 
@@ -22,7 +22,10 @@ export function ThemeToggle() {
     ] as const;
 
     return (
-        <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
+        <div className={cn(
+            "flex gap-0.5 rounded-lg bg-muted p-0.5",
+            collapsed ? "flex-col" : "items-center"
+        )}>
             {options.map(({ value, icon: Icon, label }) => (
                 <button
                     key={value}

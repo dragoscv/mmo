@@ -117,6 +117,7 @@ const keyboardShortcuts: { keys: string[]; action: string; note?: string }[] = [
     { keys: ["↑"], action: "Volume up" },
     { keys: ["↓"], action: "Volume down" },
     { keys: ["M"], action: "Mute / Unmute" },
+    { keys: ["Shift", "M"], action: "Open Mixer" },
     { keys: ["S"], action: "Toggle shuffle" },
     { keys: ["R"], action: "Toggle repeat", note: "Cycles: Off → All → One" },
     { keys: ["N"], action: "Toggle Now Playing" },

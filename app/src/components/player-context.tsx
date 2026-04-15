@@ -24,6 +24,7 @@ interface PlayerState {
     shuffle: boolean;
     repeat: RepeatMode;
     isNowPlayingOpen: boolean;
+    requestedView: string | null;
     playHistory: Track[];
 }
 
@@ -45,9 +46,12 @@ interface PlayerActions {
     toggleShuffle: () => void;
     toggleRepeat: () => void;
     openNowPlaying: () => void;
+    openNowPlayingView: (view: string) => void;
     closeNowPlaying: () => void;
     toggleNowPlaying: () => void;
+    clearRequestedView: () => void;
     getAnalyserNode: () => AnalyserNode | null;
+    getAudioNodes: () => { ctx: AudioContext; source: MediaElementAudioSourceNode; analyser: AnalyserNode } | null;
 }
 
 type PlayerContextType = PlayerState & PlayerActions;
@@ -71,6 +75,7 @@ interface PersistedState {
     repeat: RepeatMode;
     currentTime: number;
     playHistory: Track[];
+    isNowPlayingOpen?: boolean;
 }
 
 function loadPersistedState(): Partial<PlayerState> {
@@ -89,7 +94,7 @@ function loadPersistedState(): Partial<PlayerState> {
             currentTime: saved.currentTime ?? 0,
             playHistory: saved.playHistory ?? [],
             isPlaying: false,
-            isNowPlayingOpen: false,
+            isNowPlayingOpen: saved.isNowPlayingOpen ?? false,
         };
     } catch {
         return {};
@@ -107,6 +112,7 @@ function savePersistedState(s: PlayerState) {
             repeat: s.repeat,
             currentTime: s.currentTime,
             playHistory: s.playHistory.slice(0, 50),
+            isNowPlayingOpen: s.isNowPlayingOpen,
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
@@ -141,6 +147,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         shuffle: false,
         repeat: "off",
         isNowPlayingOpen: false,
+        requestedView: null,
         playHistory: [],
     });
 
@@ -173,6 +180,41 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             artwork,
         });
     }, [state.currentTrack?.id, state.currentTrack?.title, state.currentTrack?.artist, state.currentTrack?.album, state.currentTrack?.artworkUrl, state.currentTrack?.filename]);
+
+    // Update document title for PWA taskbar — persists even when paused
+    const lastTrackTitleRef = useRef<string | null>(null);
+
+    const applyTitle = useCallback(() => {
+        const newTitle = lastTrackTitleRef.current || "MMO";
+        document.title = newTitle;
+        const titleEl = document.querySelector("title");
+        if (titleEl && titleEl.textContent !== newTitle) {
+            titleEl.textContent = newTitle;
+        }
+    }, []);
+
+    useEffect(() => {
+        const track = state.currentTrack;
+        if (track) {
+            const name = track.title || track.filename;
+            const artist = track.artist || "Unknown Artist";
+            lastTrackTitleRef.current = `${name} — ${artist} | MMO`;
+        }
+        applyTitle();
+    }, [state.currentTrack?.id, state.currentTrack?.title, state.currentTrack?.artist, state.currentTrack?.filename, applyTitle]);
+
+    // Re-apply title when Next.js overrides it on route changes
+    useEffect(() => {
+        const titleEl = document.querySelector("title");
+        if (!titleEl) return;
+        const observer = new MutationObserver(() => {
+            if (lastTrackTitleRef.current && titleEl.textContent !== lastTrackTitleRef.current) {
+                titleEl.textContent = lastTrackTitleRef.current;
+            }
+        });
+        observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+        return () => observer.disconnect();
+    }, []);
 
     // Update playback state for OS controls
     useEffect(() => {
@@ -352,6 +394,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             audioContextRef.current.resume();
         }
         return analyserRef.current;
+    }, []);
+
+    const getAudioNodes = useCallback(() => {
+        if (!audioContextRef.current || !sourceRef.current || !analyserRef.current) return null;
+        if (audioContextRef.current.state === "suspended") {
+            audioContextRef.current.resume();
+        }
+        return {
+            ctx: audioContextRef.current,
+            source: sourceRef.current,
+            analyser: analyserRef.current,
+        };
     }, []);
 
     const play = useCallback((track: Track, queue?: Track[]) => {
@@ -536,12 +590,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, isNowPlayingOpen: true }));
     }, []);
 
+    const openNowPlayingView = useCallback((view: string) => {
+        setState((s) => ({ ...s, isNowPlayingOpen: true, requestedView: view }));
+    }, []);
+
     const closeNowPlaying = useCallback(() => {
         setState((s) => ({ ...s, isNowPlayingOpen: false }));
     }, []);
 
     const toggleNowPlaying = useCallback(() => {
         setState((s) => ({ ...s, isNowPlayingOpen: !s.isNowPlayingOpen }));
+    }, []);
+
+    const clearRequestedView = useCallback(() => {
+        setState((s) => ({ ...s, requestedView: null }));
     }, []);
 
     // ─── Media Session action handlers ──────────────────────────────────
@@ -597,9 +659,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 toggleShuffle,
                 toggleRepeat,
                 openNowPlaying,
+                openNowPlayingView,
                 closeNowPlaying,
                 toggleNowPlaying,
+                clearRequestedView,
                 getAnalyserNode,
+                getAudioNodes,
             }}
         >
             {children}

@@ -10,9 +10,27 @@ import { createDigitalVisualizations } from "./renderers/digital";
 import { createNatureVisualizations } from "./renderers/nature";
 import { createAbstractVisualizations } from "./renderers/abstract";
 import { createLineVisualizations } from "./renderers/lines";
+// Shader visualizations
+import { createTunnelShaderVisualizations } from "./renderers/shaders-tunnel";
+import { createFractalShaderVisualizations } from "./renderers/shaders-fractal";
+import { createPlasmaShaderVisualizations } from "./renderers/shaders-plasma";
+import { createKaleidoscopeShaderVisualizations } from "./renderers/shaders-kaleidoscope";
+import { createNebulaShaderVisualizations } from "./renderers/shaders-nebula";
+import { createFluidShaderVisualizations } from "./renderers/shaders-fluid";
+import { createGridShaderVisualizations } from "./renderers/shaders-grid";
+import { createVortexShaderVisualizations } from "./renderers/shaders-vortex";
+import { createFireShaderVisualizations } from "./renderers/shaders-fire";
+import { createElectricShaderVisualizations } from "./renderers/shaders-electric";
+import { createOrganicShaderVisualizations } from "./renderers/shaders-organic";
+import { createGlitchShaderVisualizations } from "./renderers/shaders-glitch";
+import { createCosmicShaderVisualizations } from "./renderers/shaders-cosmic";
+import { createWarpShaderVisualizations } from "./renderers/shaders-warp";
+import { createCrystalShaderVisualizations } from "./renderers/shaders-crystal";
+import { createWave3DShaderVisualizations } from "./renderers/shaders-wave3d";
 
 // Build the complete visualization registry
 const ALL_VISUALIZATIONS: VisualizationDef[] = [
+    // Canvas 2D (~240)
     ...createBarVisualizations(),       // 30
     ...createWaveVisualizations(),      // 25
     ...createCircularVisualizations(),  // 25
@@ -24,6 +42,23 @@ const ALL_VISUALIZATIONS: VisualizationDef[] = [
     ...createNatureVisualizations(),    // 20
     ...createAbstractVisualizations(),  // 25
     ...createLineVisualizations(),      // 25
+    // WebGL Shaders (15 categories × 3 shaders × 7 palettes = 315)
+    ...createTunnelShaderVisualizations(),
+    ...createFractalShaderVisualizations(),
+    ...createPlasmaShaderVisualizations(),
+    ...createKaleidoscopeShaderVisualizations(),
+    ...createNebulaShaderVisualizations(),
+    ...createFluidShaderVisualizations(),
+    ...createGridShaderVisualizations(),
+    ...createVortexShaderVisualizations(),
+    ...createFireShaderVisualizations(),
+    ...createElectricShaderVisualizations(),
+    ...createOrganicShaderVisualizations(),
+    ...createGlitchShaderVisualizations(),
+    ...createCosmicShaderVisualizations(),
+    ...createWarpShaderVisualizations(),
+    ...createCrystalShaderVisualizations(),
+    ...createWave3DShaderVisualizations(),
 ];
 
 // Index by ID for fast lookup

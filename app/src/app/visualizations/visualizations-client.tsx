@@ -41,6 +41,8 @@ import {
     Minimize,
     Zap,
     ArrowLeft,
+    PanelLeftClose,
+    PanelLeft,
 } from "lucide-react";
 
 type ViewMode = "browse" | "preview";
@@ -64,6 +66,7 @@ export function VisualizationsClient() {
     // Playlist management
     const [editingPlaylist, setEditingPlaylist] = useState<string | null>(null);
     const [newPlaylistName, setNewPlaylistName] = useState("");
+    const [mobileSidebar, setMobileSidebar] = useState(false);
 
     const updateSettings = useCallback((patch: Partial<VizSettings>) => {
         setSettings(prev => {
@@ -165,7 +168,7 @@ export function VisualizationsClient() {
     // Preview Mode
     if (viewMode === "preview" && selectedViz) {
         return (
-            <div className="h-screen w-full bg-black relative">
+            <div className="h-dvh w-full bg-black relative">
                 <VisualizationCanvas
                     visualization={selectedViz}
                     sensitivity={settings.sensitivity}
@@ -203,9 +206,18 @@ export function VisualizationsClient() {
 
     // Browse Mode
     return (
-        <div className="-m-6 -mb-20 h-[calc(100vh)] flex bg-[var(--background)] text-[var(--foreground)]">
+        <div className="h-full flex bg-[var(--background)] text-[var(--foreground)]">
+            {/* Mobile sidebar overlay */}
+            {mobileSidebar && (
+                <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setMobileSidebar(false)} />
+            )}
             {/* Sidebar */}
-            <div className="w-64 shrink-0 border-r border-[var(--border)] flex flex-col bg-[var(--card)]">
+            <div className={cn(
+                "w-64 shrink-0 border-r border-[var(--border)] flex flex-col bg-[var(--card)]",
+                "fixed inset-y-0 left-0 z-50 md:relative md:z-auto",
+                "transition-transform duration-200 md:translate-x-0",
+                mobileSidebar ? "translate-x-0" : "-translate-x-full"
+            )}>
                 <div className="p-4 border-b border-[var(--border)]">
                     <h1 className="text-lg font-bold mb-1">Visualizations</h1>
                     <p className="text-xs text-[var(--muted-foreground)]">{getVisualizationCount()} visualizations</p>
@@ -242,7 +254,7 @@ export function VisualizationsClient() {
                     {sidebarTab === "categories" && (
                         <div className="space-y-0.5">
                             <button
-                                onClick={() => setSelectedCategory(null)}
+                                onClick={() => { setSelectedCategory(null); setMobileSidebar(false); }}
                                 className={cn(
                                     "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer",
                                     !selectedCategory
@@ -257,7 +269,7 @@ export function VisualizationsClient() {
                                 return (
                                     <button
                                         key={cat}
-                                        onClick={() => setSelectedCategory(cat)}
+                                        onClick={() => { setSelectedCategory(cat); setMobileSidebar(false); }}
                                         className={cn(
                                             "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer flex justify-between",
                                             selectedCategory === cat
@@ -393,7 +405,13 @@ export function VisualizationsClient() {
             {/* Main Content */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Search bar */}
-                <div className="p-4 border-b border-[var(--border)] flex items-center gap-3">
+                <div className="p-3 md:p-4 border-b border-[var(--border)] flex items-center gap-3">
+                    <button
+                        onClick={() => setMobileSidebar(true)}
+                        className="md:hidden p-2 rounded-lg hover:bg-[var(--accent)] transition-colors cursor-pointer shrink-0"
+                    >
+                        <PanelLeft className="h-5 w-5" />
+                    </button>
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted-foreground)]" />
                         <input
@@ -418,8 +436,8 @@ export function VisualizationsClient() {
                 </div>
 
                 {/* Grid */}
-                <div className="flex-1 overflow-y-auto p-4">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+                <div className="flex-1 overflow-y-auto p-3 md:p-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 md:gap-3">
                         {displayedViz.map(viz => (
                             <VizCard
                                 key={viz.id}

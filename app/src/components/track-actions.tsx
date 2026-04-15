@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import React, { useState, useTransition, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
     DropdownMenu,
@@ -50,14 +50,18 @@ import {
     ExternalLink,
     Music,
     Disc3,
+    EyeOff,
+    Radio,
 } from "lucide-react";
-import { toggleFavorite, deleteTrack } from "@/actions/tracks";
+import { toggleFavorite, deleteTrack, hideTracks } from "@/actions/tracks";
 import {
     removeTrackFromPlaylist,
     moveTrackInPlaylist,
 } from "@/actions/playlists";
 import { usePlayer } from "@/components/player-context";
+import { useMixer } from "@/components/mixer-context";
 import { toast } from "sonner";
+import { getRadioMix } from "@/actions/recommendations";
 import type { Track } from "@/db/schema";
 
 // ─── Shared Props ────────────────────────────────────────────────────────────
@@ -65,6 +69,7 @@ interface TrackActionConfig {
     track: Track;
     playlistId?: number;
     showReorder?: boolean;
+    hideDeckActions?: boolean;
     onOpenDetail?: () => void;
     onEdit?: () => void;
     onMutate?: () => void;
@@ -91,6 +96,23 @@ function useTrackActionHandlers(config: TrackActionConfig) {
     function handleAddToQueue() {
         player.addToQueue(track);
         toast.success("Added to queue", { description: trackLabel });
+    }
+
+    function handleRadioMix() {
+        toast.promise(
+            getRadioMix(track.id, 30).then((mixTracks) => {
+                if (mixTracks.length <= 1) {
+                    throw new Error("No similar tracks found");
+                }
+                player.play(mixTracks[0], mixTracks);
+                return mixTracks;
+            }),
+            {
+                loading: `Building radio mix from ${title}...`,
+                success: (t) => `Radio mix started · ${t.length} tracks`,
+                error: "Couldn't find enough similar tracks",
+            }
+        );
     }
 
     function handleToggleFavorite() {
@@ -136,6 +158,15 @@ function useTrackActionHandlers(config: TrackActionConfig) {
         setDeleteDialogOpen(false);
     }
 
+    function handleHideTrack() {
+        startTransition(async () => {
+            await hideTracks([track.id]);
+            onMutate?.();
+            router.refresh();
+            toast.success("Track hidden from library");
+        });
+    }
+
     function handleCopyInfo() {
         const info = `${artist} - ${title}`;
         navigator.clipboard.writeText(info);
@@ -155,11 +186,13 @@ function useTrackActionHandlers(config: TrackActionConfig) {
         setRemoveDialogOpen,
         handlePlay,
         handleAddToQueue,
+        handleRadioMix,
         handleToggleFavorite,
         handleRemoveFromPlaylist,
         handleMoveTrack,
         handleDeleteTrack,
         handleCopyInfo,
+        handleHideTrack,
         router,
     };
 }
@@ -178,7 +211,8 @@ function TrackMenuItems({
     Item: React.ComponentType<{ onClick?: () => void; className?: string; children: React.ReactNode }>;
     Separator: React.ComponentType;
 }) {
-    const { track, playlistId, showReorder, onOpenDetail, onEdit } = config;
+    const { track, playlistId, showReorder, hideDeckActions, onOpenDetail, onEdit } = config;
+    const mixer = useMixer();
 
     return (
         <>
@@ -191,8 +225,28 @@ function TrackMenuItems({
                 <ListPlus className="h-3.5 w-3.5 mr-2" />
                 Add to Queue
             </Item>
+            <Item onClick={handlers.handleRadioMix}>
+                <Radio className="h-3.5 w-3.5 mr-2" />
+                Radio Mix...
+            </Item>
 
             <Separator />
+
+            {/* Mixer Decks */}
+            {!hideDeckActions && (
+                <>
+                    <Item onClick={() => { mixer.loadTrack("A", track); toast.success(`Loaded to Deck A`); }}>
+                        <Disc3 className="h-3.5 w-3.5 mr-2 text-purple-400" />
+                        Load to Deck A
+                    </Item>
+                    <Item onClick={() => { mixer.loadTrack("B", track); toast.success(`Loaded to Deck B`); }}>
+                        <Disc3 className="h-3.5 w-3.5 mr-2 text-blue-400" />
+                        Load to Deck B
+                    </Item>
+
+                    <Separator />
+                </>
+            )}
 
             {/* Playlist */}
             <Item onClick={() => handlers.setPlaylistModalOpen(true)}>
@@ -247,7 +301,11 @@ function TrackMenuItems({
 
             <Separator />
 
-            {/* Destructive */}
+            {/* Hide & Destructive */}
+            <Item onClick={handlers.handleHideTrack}>
+                <EyeOff className="h-3.5 w-3.5 mr-2" />
+                Hide from Library
+            </Item>
             {playlistId && (
                 <Item
                     onClick={() => handlers.setRemoveDialogOpen(true)}
@@ -404,6 +462,56 @@ interface TrackContextMenuProps extends TrackActionConfig {
     children: React.ReactNode;
 }
 
+function LongPressTrigger({ children }: { children: React.ReactNode }) {
+    const ref = useRef<HTMLElement>(null);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const movedRef = useRef(false);
+
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+        movedRef.current = false;
+        const touch = e.touches[0];
+        timerRef.current = setTimeout(() => {
+            timerRef.current = null;
+            if (touch && !movedRef.current && ref.current) {
+                ref.current.dispatchEvent(
+                    new MouseEvent("contextmenu", {
+                        bubbles: true,
+                        clientX: touch.clientX,
+                        clientY: touch.clientY,
+                    })
+                );
+            }
+        }, 500);
+    }, []);
+
+    const cancel = useCallback((e?: React.TouchEvent) => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        } else if (!movedRef.current && e) {
+            // Long press already fired — prevent click/tap from triggering
+            e.preventDefault();
+        }
+        movedRef.current = true;
+    }, []);
+
+    // Merge touch handlers onto the child element to avoid wrapping with a <div>,
+    // which breaks HTML semantics inside <table>/<tbody>
+    const child = React.isValidElement(children) ? children : <span>{children}</span>;
+
+    return (
+        <ContextMenuTrigger asChild>
+            {React.cloneElement(child as React.ReactElement<Record<string, unknown>>, {
+                ref,
+                onTouchStart: handleTouchStart,
+                onTouchMove: cancel,
+                onTouchEnd: cancel,
+                onTouchCancel: cancel,
+            })}
+        </ContextMenuTrigger>
+    );
+}
+
 export function TrackContextMenu({
     children,
     ...config
@@ -413,9 +521,9 @@ export function TrackContextMenu({
     return (
         <>
             <ContextMenu>
-                <ContextMenuTrigger asChild>
+                <LongPressTrigger>
                     {children}
-                </ContextMenuTrigger>
+                </LongPressTrigger>
 
                 <ContextMenuContent className="w-56">
                     {/* Header */}

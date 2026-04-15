@@ -62,7 +62,12 @@ export function useKeyboardShortcuts() {
                 case "m": // M — Mute/unmute
                 case "M":
                     e.preventDefault();
-                    player.setVolume(player.volume > 0 ? 0 : 0.8);
+                    if (e.shiftKey) {
+                        // Shift+M — Open mixer view
+                        player.openNowPlayingView("mixer");
+                    } else {
+                        player.setVolume(player.volume > 0 ? 0 : 0.8);
+                    }
                     break;
 
                 // ─── Modes ────────────────────────────────────────────

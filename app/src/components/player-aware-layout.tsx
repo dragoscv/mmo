@@ -14,7 +14,9 @@ export function PlayerAwareLayout({ children }: { children: React.ReactNode }) {
         <div
             className={cn(
                 "flex overflow-hidden transition-[height] duration-300",
-                hasPlayer ? "h-[calc(100vh-72px)]" : "h-screen"
+                hasPlayer
+                    ? "h-[calc(100dvh-72px-env(safe-area-inset-bottom,0px))]"
+                    : "h-dvh"
             )}
         >
             {children}

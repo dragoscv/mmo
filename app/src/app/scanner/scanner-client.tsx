@@ -76,7 +76,7 @@ export function ScannerClient({
                                 key={folder}
                                 className="flex items-center justify-between rounded-lg border border-[var(--border)] px-4 py-3"
                             >
-                                <span className="text-sm font-mono">{folder}</span>
+                                <span className="text-sm font-mono truncate min-w-0 flex-1">{folder}</span>
                                 <Button
                                     size="sm"
                                     onClick={() => handleScan(folder)}
@@ -99,7 +99,7 @@ export function ScannerClient({
 
                     {/* Scan music root */}
                     <div className="flex items-center justify-between rounded-lg border border-dashed border-[var(--border)] px-4 py-3">
-                        <span className="text-sm font-mono">
+                        <span className="text-sm font-mono truncate min-w-0 flex-1">
                             {musicRoot} (root complet)
                         </span>
                         <Button

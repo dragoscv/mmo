@@ -1,4 +1,10 @@
 @import "tailwindcss";
+
+html,
+body {
+    overscroll-behavior-y: contain;
+}
+
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
@@ -130,6 +136,16 @@
     }
 }
 
+@keyframes jog-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 @keyframes pulseGlow {
 
     0%,
@@ -219,6 +235,26 @@
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        transform: translateX(-100%);
+    }
+
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
     }
 }
 

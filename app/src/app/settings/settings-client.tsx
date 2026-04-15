@@ -368,12 +368,12 @@ export function SettingsClient({ settings }: SettingsClientProps) {
                             </div>
                         )}
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             <Input
                                 value={newGenre}
                                 onChange={(e) => setNewGenre(e.target.value)}
                                 placeholder="Genre name"
-                                className="w-36"
+                                className="w-28 sm:w-36"
                             />
                             <Input
                                 value={newGenreFolder}
@@ -534,7 +534,7 @@ export function SettingsClient({ settings }: SettingsClientProps) {
                                     <CheckCircle className="h-5 w-5 text-green-500" />
                                     <span className="text-sm font-semibold text-green-500">Import Complete!</span>
                                 </div>
-                                <div className="grid grid-cols-3 gap-3 text-center">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
                                     <div className="rounded-lg bg-[var(--background)] p-3">
                                         <p className="text-2xl font-bold">{importResult.imported}</p>
                                         <p className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider">New Tracks</p>

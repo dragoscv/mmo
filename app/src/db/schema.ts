@@ -41,6 +41,7 @@ export const tracks = sqliteTable("tracks", {
     comment: text("comment"),
     lyrics: text("lyrics"),
     syncedLyrics: text("synced_lyrics"),
+    isHidden: integer("is_hidden", { mode: "boolean" }).default(false),
 });
 
 export const drives = sqliteTable("drives", {

@@ -15,6 +15,7 @@ export interface TrackFilters {
     key?: string;
     isProcessed?: boolean;
     isFavorite?: boolean;
+    isHidden?: boolean;
     tag?: string;
     rating?: number;
     album?: string;
@@ -38,6 +39,16 @@ export interface PaginatedTracks {
 
 function buildConditions(filters: TrackFilters) {
     const conditions = [];
+
+    // By default exclude hidden tracks; only show hidden when explicitly requested
+    if (filters.isHidden === true) {
+        conditions.push(eq(tracks.isHidden, true));
+    } else if (filters.isHidden !== undefined) {
+        conditions.push(sql`(${tracks.isHidden} IS NULL OR ${tracks.isHidden} = 0)`);
+    } else {
+        // Default: exclude hidden
+        conditions.push(sql`(${tracks.isHidden} IS NULL OR ${tracks.isHidden} = 0)`);
+    }
 
     if (filters.genre) {
         const genres = filters.genre.split(",").map((g) => g.trim()).filter(Boolean);
@@ -140,6 +151,10 @@ function buildOrderBy(sort?: string, order?: "asc" | "desc") {
             return dir(tracks.rating);
         case "favorite":
             return dir(tracks.isFavorite);
+        case "bitrate":
+            return dir(tracks.bitrate);
+        case "year":
+            return dir(tracks.year);
         case "addedAt":
         default:
             return dir(tracks.addedAt);
@@ -534,5 +549,71 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         },
         recentTracks,
         topRated,
+    };
+}
+
+export async function hideTracks(ids: number[]) {
+    if (ids.length === 0) return { success: true, count: 0 };
+    db.update(tracks)
+        .set({ isHidden: true })
+        .where(inArray(tracks.id, ids))
+        .run();
+    revalidatePath("/library");
+    revalidatePath("/");
+    return { success: true, count: ids.length };
+}
+
+export async function unhideTracks(ids: number[]) {
+    if (ids.length === 0) return { success: true, count: 0 };
+    db.update(tracks)
+        .set({ isHidden: false })
+        .where(inArray(tracks.id, ids))
+        .run();
+    revalidatePath("/library");
+    revalidatePath("/library/hidden");
+    revalidatePath("/");
+    return { success: true, count: ids.length };
+}
+
+export async function getHiddenTracks(
+    filters?: Pick<TrackFilters, "page" | "pageSize" | "search" | "sort" | "order">
+): Promise<PaginatedTracks> {
+    const page = filters?.page || 1;
+    const pageSize = filters?.pageSize || 50;
+    const offset = (page - 1) * pageSize;
+    const orderBy = buildOrderBy(filters?.sort, filters?.order);
+
+    const conditions = [eq(tracks.isHidden, true)];
+
+    if (filters?.search) {
+        const term = `%${filters.search}%`;
+        conditions.push(
+            sql`(${tracks.artist} LIKE ${term} OR ${tracks.title} LIKE ${term} OR ${tracks.filename} LIKE ${term})`
+        );
+    }
+
+    const whereClause = and(...conditions);
+
+    const totalResult = db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(tracks)
+        .where(whereClause)
+        .get();
+
+    const result = db
+        .select()
+        .from(tracks)
+        .where(whereClause)
+        .orderBy(orderBy)
+        .limit(pageSize)
+        .offset(offset)
+        .all();
+
+    return {
+        tracks: result,
+        total: totalResult?.count ?? 0,
+        page,
+        pageSize,
+        totalPages: Math.ceil((totalResult?.count ?? 0) / pageSize),
     };
 }

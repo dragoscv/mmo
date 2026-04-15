@@ -637,207 +637,213 @@ export function DashboardClient({ stats, recommendedCategories, recentScans }: D
     const greeting = getGreeting();
 
     return (
-        <div className="space-y-6 pb-8">
-            {/* ── Header ──────────────────────────────────────── */}
-            <AnimatedSection delay={0}>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                            Dashboard
-                            <span className="text-xl">{greeting.emoji}</span>
-                        </h1>
-                        <p className="text-muted-foreground mt-1">{greeting.text} — your library at a glance</p>
-                    </div>
-                    {stats.total > 0 && (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <FormatBadges data={stats.formatStats} />
-                            {stats.totalSize > 0 && (
-                                <Badge variant="secondary" className="gap-1.5 text-xs">
-                                    <HardDrive className="h-3 w-3" />
-                                    {formatBytes(stats.totalSize)}
-                                </Badge>
-                            )}
+        <div className="flex flex-col h-full">
+            {/* Sticky Header */}
+            <div className="shrink-0 sticky top-0 z-20 bg-background/95 backdrop-blur-sm px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-3 border-b border-border">
+                <AnimatedSection delay={0}>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+                                Dashboard
+                                <span className="text-xl">{greeting.emoji}</span>
+                            </h1>
+                            <p className="text-muted-foreground mt-1">{greeting.text} — your library at a glance</p>
                         </div>
-                    )}
-                </div>
-            </AnimatedSection>
-
-            {/* ── Stat Cards ──────────────────────────────────── */}
-            <AnimatedSection delay={50}>
-                <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
-                    <StatCard
-                        title="Total Tracks"
-                        value={stats.total}
-                        icon={<Music className="h-5 w-5" />}
-                        theme="purple"
-                        delay={100}
-                    />
-                    <StatCard
-                        title="Analyzed"
-                        value={stats.analyzed}
-                        icon={<CheckCircle className="h-5 w-5" />}
-                        description={stats.total > 0 ? `${Math.round((stats.analyzed / stats.total) * 100)}% of library` : undefined}
-                        theme="green"
-                        delay={150}
-                    />
-                    <StatCard
-                        title="Avg BPM"
-                        value={stats.avgBpm}
-                        icon={<Activity className="h-5 w-5" />}
-                        theme="blue"
-                        delay={200}
-                    />
-                    <StatCard
-                        title="Total Duration"
-                        value={stats.totalDuration}
-                        formattedValue={formatTotalDuration(stats.totalDuration)}
-                        icon={<Clock className="h-5 w-5" />}
-                        theme="cyan"
-                        delay={250}
-                        skipCountUp
-                    />
-                    <StatCard
-                        title="Favorites"
-                        value={stats.favorites}
-                        icon={<Heart className="h-5 w-5" />}
-                        theme="rose"
-                        delay={300}
-                    />
-                    <StatCard
-                        title="Playlists"
-                        value={stats.playlistCount}
-                        icon={<ListMusic className="h-5 w-5" />}
-                        theme="amber"
-                        delay={350}
-                    />
-                </div>
-            </AnimatedSection>
-
-            {/* ── Quick Actions + Library Health ───────────────── */}
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <AnimatedSection delay={100}>
-                    <ChartCard className="h-full">
-                        <SectionHeader
-                            icon={<Zap className="h-5 w-5 text-purple-400" />}
-                            title="Quick Actions"
-                        />
-                        <DashboardActions />
-                    </ChartCard>
-                </AnimatedSection>
-                <AnimatedSection delay={150}>
-                    <ChartCard className="h-full">
-                        <SectionHeader
-                            icon={<Shield className="h-5 w-5 text-green-400" />}
-                            title="Library Health"
-                        />
-                        <LibraryHealth health={stats.health} />
-                    </ChartCard>
+                        {stats.total > 0 && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <FormatBadges data={stats.formatStats} />
+                                {stats.totalSize > 0 && (
+                                    <Badge variant="secondary" className="gap-1.5 text-xs">
+                                        <HardDrive className="h-3 w-3" />
+                                        {formatBytes(stats.totalSize)}
+                                    </Badge>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </AnimatedSection>
             </div>
 
-            {/* ── Genre + Energy Charts ───────────────────────── */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <AnimatedSection delay={200}>
-                    <ChartCard>
-                        <SectionHeader
-                            icon={<Disc3 className="h-5 w-5 text-purple-400" />}
-                            title="Genre Distribution"
-                        />
-                        <GenreDistribution data={stats.genreStats} />
-                    </ChartCard>
-                </AnimatedSection>
-                <AnimatedSection delay={250}>
-                    <ChartCard>
-                        <SectionHeader
-                            icon={<Zap className="h-5 w-5 text-amber-400" />}
-                            title="Energy Levels"
-                        />
-                        <EnergyDistribution data={stats.energyStats} />
-                    </ChartCard>
-                </AnimatedSection>
-            </div>
+            {/* Scrollable Content */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 space-y-6">
 
-            {/* ── BPM + Key Charts ────────────────────────────── */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <AnimatedSection delay={300}>
-                    <ChartCard>
-                        <SectionHeader
-                            icon={<TrendingUp className="h-5 w-5 text-blue-400" />}
-                            title="BPM Ranges"
+                {/* ── Stat Cards ──────────────────────────────────── */}
+                <AnimatedSection delay={50}>
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
+                        <StatCard
+                            title="Total Tracks"
+                            value={stats.total}
+                            icon={<Music className="h-5 w-5" />}
+                            theme="purple"
+                            delay={100}
                         />
-                        <BpmDistribution data={stats.bpmRanges} />
-                    </ChartCard>
+                        <StatCard
+                            title="Analyzed"
+                            value={stats.analyzed}
+                            icon={<CheckCircle className="h-5 w-5" />}
+                            description={stats.total > 0 ? `${Math.round((stats.analyzed / stats.total) * 100)}% of library` : undefined}
+                            theme="green"
+                            delay={150}
+                        />
+                        <StatCard
+                            title="Avg BPM"
+                            value={stats.avgBpm}
+                            icon={<Activity className="h-5 w-5" />}
+                            theme="blue"
+                            delay={200}
+                        />
+                        <StatCard
+                            title="Total Duration"
+                            value={stats.totalDuration}
+                            formattedValue={formatTotalDuration(stats.totalDuration)}
+                            icon={<Clock className="h-5 w-5" />}
+                            theme="cyan"
+                            delay={250}
+                            skipCountUp
+                        />
+                        <StatCard
+                            title="Favorites"
+                            value={stats.favorites}
+                            icon={<Heart className="h-5 w-5" />}
+                            theme="rose"
+                            delay={300}
+                        />
+                        <StatCard
+                            title="Playlists"
+                            value={stats.playlistCount}
+                            icon={<ListMusic className="h-5 w-5" />}
+                            theme="amber"
+                            delay={350}
+                        />
+                    </div>
                 </AnimatedSection>
+
+                {/* ── Quick Actions + Library Health ───────────────── */}
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <AnimatedSection delay={100}>
+                        <ChartCard className="h-full">
+                            <SectionHeader
+                                icon={<Zap className="h-5 w-5 text-purple-400" />}
+                                title="Quick Actions"
+                            />
+                            <DashboardActions />
+                        </ChartCard>
+                    </AnimatedSection>
+                    <AnimatedSection delay={150}>
+                        <ChartCard className="h-full">
+                            <SectionHeader
+                                icon={<Shield className="h-5 w-5 text-green-400" />}
+                                title="Library Health"
+                            />
+                            <LibraryHealth health={stats.health} />
+                        </ChartCard>
+                    </AnimatedSection>
+                </div>
+
+                {/* ── Genre + Energy Charts ───────────────────────── */}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    <AnimatedSection delay={200}>
+                        <ChartCard>
+                            <SectionHeader
+                                icon={<Disc3 className="h-5 w-5 text-purple-400" />}
+                                title="Genre Distribution"
+                            />
+                            <GenreDistribution data={stats.genreStats} />
+                        </ChartCard>
+                    </AnimatedSection>
+                    <AnimatedSection delay={250}>
+                        <ChartCard>
+                            <SectionHeader
+                                icon={<Zap className="h-5 w-5 text-amber-400" />}
+                                title="Energy Levels"
+                            />
+                            <EnergyDistribution data={stats.energyStats} />
+                        </ChartCard>
+                    </AnimatedSection>
+                </div>
+
+                {/* ── BPM + Key Charts ────────────────────────────── */}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    <AnimatedSection delay={300}>
+                        <ChartCard>
+                            <SectionHeader
+                                icon={<TrendingUp className="h-5 w-5 text-blue-400" />}
+                                title="BPM Ranges"
+                            />
+                            <BpmDistribution data={stats.bpmRanges} />
+                        </ChartCard>
+                    </AnimatedSection>
+                    <AnimatedSection delay={350}>
+                        <ChartCard>
+                            <SectionHeader
+                                icon={<KeyRound className="h-5 w-5 text-cyan-400" />}
+                                title="Key Distribution"
+                            />
+                            <KeyDistribution data={stats.keyStats} />
+                        </ChartCard>
+                    </AnimatedSection>
+                </div>
+
+                {/* ── Recently Added ──────────────────────────────── */}
                 <AnimatedSection delay={350}>
                     <ChartCard>
                         <SectionHeader
-                            icon={<KeyRound className="h-5 w-5 text-cyan-400" />}
-                            title="Key Distribution"
-                        />
-                        <KeyDistribution data={stats.keyStats} />
-                    </ChartCard>
-                </AnimatedSection>
-            </div>
-
-            {/* ── Recently Added ──────────────────────────────── */}
-            <AnimatedSection delay={350}>
-                <ChartCard>
-                    <SectionHeader
-                        icon={<Music className="h-5 w-5 text-blue-400" />}
-                        title="Recently Added"
-                        action={
-                            stats.recentTracks.length > 0 ? (
-                                <Link href="/library?sort=addedAt&order=desc">
-                                    <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground">
-                                        View all <ChevronRight className="h-3 w-3" />
-                                    </Button>
-                                </Link>
-                            ) : undefined
-                        }
-                    />
-                    <RecentTracks tracks={stats.recentTracks} />
-                </ChartCard>
-            </AnimatedSection>
-
-            {/* ── Top Rated + Playlist Recommendations ────────── */}
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <AnimatedSection delay={400}>
-                    <ChartCard className="h-full">
-                        <SectionHeader
-                            icon={<Star className="h-5 w-5 text-amber-400" />}
-                            title="Top Rated"
-                        />
-                        <TopRated tracks={stats.topRated} />
-                    </ChartCard>
-                </AnimatedSection>
-                <AnimatedSection delay={450}>
-                    <ChartCard className="h-full">
-                        <SectionHeader
-                            icon={<Sparkles className="h-5 w-5 text-violet-400" />}
-                            title="Playlist Recommendations"
+                            icon={<Music className="h-5 w-5 text-blue-400" />}
+                            title="Recently Added"
                             action={
-                                <Link href="/playlists">
-                                    <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground">
-                                        Manage <ChevronRight className="h-3 w-3" />
-                                    </Button>
-                                </Link>
+                                stats.recentTracks.length > 0 ? (
+                                    <Link href="/library?sort=addedAt&order=desc">
+                                        <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground">
+                                            View all <ChevronRight className="h-3 w-3" />
+                                        </Button>
+                                    </Link>
+                                ) : undefined
                             }
                         />
-                        <CompactRecommendations categories={recommendedCategories} />
+                        <RecentTracks tracks={stats.recentTracks} />
+                    </ChartCard>
+                </AnimatedSection>
+
+                {/* ── Top Rated + Playlist Recommendations ────────── */}
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <AnimatedSection delay={400}>
+                        <ChartCard className="h-full">
+                            <SectionHeader
+                                icon={<Star className="h-5 w-5 text-amber-400" />}
+                                title="Top Rated"
+                            />
+                            <TopRated tracks={stats.topRated} />
+                        </ChartCard>
+                    </AnimatedSection>
+                    <AnimatedSection delay={450}>
+                        <ChartCard className="h-full">
+                            <SectionHeader
+                                icon={<Sparkles className="h-5 w-5 text-violet-400" />}
+                                title="Playlist Recommendations"
+                                action={
+                                    <Link href="/playlists">
+                                        <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground">
+                                            Manage <ChevronRight className="h-3 w-3" />
+                                        </Button>
+                                    </Link>
+                                }
+                            />
+                            <CompactRecommendations categories={recommendedCategories} />
+                        </ChartCard>
+                    </AnimatedSection>
+                </div>
+
+                {/* ── Recent Activity ─────────────────────────────── */}
+                <AnimatedSection delay={500}>
+                    <ChartCard>
+                        <SectionHeader
+                            icon={<Activity className="h-5 w-5 text-green-400" />}
+                            title="Recent Activity"
+                        />
+                        <RecentActivity scans={recentScans} />
                     </ChartCard>
                 </AnimatedSection>
             </div>
-
-            {/* ── Recent Activity ─────────────────────────────── */}
-            <AnimatedSection delay={500}>
-                <ChartCard>
-                    <SectionHeader
-                        icon={<Activity className="h-5 w-5 text-green-400" />}
-                        title="Recent Activity"
-                    />
-                    <RecentActivity scans={recentScans} />
-                </ChartCard>
-            </AnimatedSection>
         </div>
     );
 }
