@@ -88,17 +88,26 @@ export function AudioPlayer() {
 
             {/* Glass container */}
             <div className="relative bg-card/90 backdrop-blur-2xl border-t border-border">
-                {/* Animated progress line at top */}
-                <div className="absolute top-0 left-0 right-0 h-[2px] bg-muted">
-                    <div
-                        className="h-full bg-gradient-to-r from-purple-500 via-purple-400 to-fuchsia-500 transition-[width] duration-200 ease-linear"
-                        style={{ width: `${progress}%` }}
-                    />
-                    {/* Glow dot at the end of progress */}
-                    <div
-                        className="absolute top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(139,92,246,0.6)] transition-[left] duration-200 ease-linear"
-                        style={{ left: `${progress}%`, marginLeft: "-4px", opacity: progress > 0 ? 1 : 0 }}
-                    />
+                {/* Animated progress line at top — clickable for seeking */}
+                <div
+                    className="absolute top-0 left-0 right-0 h-2 -mt-1 cursor-pointer group/top z-10"
+                    onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const pct = (e.clientX - rect.left) / rect.width;
+                        seek(Math.max(0, Math.min(1, pct)) * duration);
+                    }}
+                >
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-muted">
+                        <div
+                            className="h-full bg-gradient-to-r from-purple-500 via-purple-400 to-fuchsia-500 transition-[width] duration-200 ease-linear"
+                            style={{ width: `${progress}%` }}
+                        />
+                        {/* Glow dot at the end of progress */}
+                        <div
+                            className="absolute top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(139,92,246,0.6)] transition-[left] duration-200 ease-linear group-hover/top:h-3 group-hover/top:w-3 group-hover/top:-ml-[1.5px]"
+                            style={{ left: `${progress}%`, marginLeft: "-4px", opacity: progress > 0 ? 1 : 0 }}
+                        />
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-3 px-4 py-2.5 h-[72px]">

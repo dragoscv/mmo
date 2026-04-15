@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { tracks } from "@/db/schema";
+import { tracks, playlists } from "@/db/schema";
 import { eq, sql, and, gte, lte, desc, asc, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
@@ -336,4 +336,203 @@ export async function getKeys(): Promise<string[]> {
         .orderBy(tracks.keyCamelot)
         .all();
     return keys.map((k) => k.key).filter(Boolean) as string[];
+}
+
+export interface DashboardStats {
+    total: number;
+    processed: number;
+    unprocessed: number;
+    analyzed: number;
+    favorites: number;
+    avgBpm: number;
+    totalDuration: number;
+    totalSize: number;
+    playlistCount: number;
+    genreStats: { genre: string; count: number }[];
+    energyStats: { energy: number; count: number }[];
+    bpmRanges: { range: string; count: number }[];
+    keyStats: { key: string; count: number }[];
+    formatStats: { format: string; count: number }[];
+    health: {
+        total: number;
+        missingGenre: number;
+        missingBpm: number;
+        missingKey: number;
+        missingEnergy: number;
+        missingArtwork: number;
+    };
+    recentTracks: {
+        id: number;
+        title: string | null;
+        artist: string | null;
+        genre: string | null;
+        bpm: number | null;
+        keyCamelot: string | null;
+        energy: number | null;
+        rating: number | null;
+        artworkUrl: string | null;
+        addedAt: string | null;
+        duration: number | null;
+        isFavorite: boolean | null;
+    }[];
+    topRated: {
+        id: number;
+        title: string | null;
+        artist: string | null;
+        rating: number | null;
+        artworkUrl: string | null;
+    }[];
+}
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+    const total = db.select({ count: sql<number>`COUNT(*)` }).from(tracks).get();
+    const processed = db.select({ count: sql<number>`COUNT(*)` }).from(tracks).where(eq(tracks.isProcessed, true)).get();
+    const analyzed = db.select({ count: sql<number>`COUNT(*)` }).from(tracks).where(sql`${tracks.analyzedAt} IS NOT NULL`).get();
+    const favorites = db.select({ count: sql<number>`COUNT(*)` }).from(tracks).where(eq(tracks.isFavorite, true)).get();
+    const avgBpm = db.select({ avg: sql<number>`AVG(${tracks.bpm})` }).from(tracks).where(sql`${tracks.bpm} IS NOT NULL`).get();
+    const totalDuration = db.select({ sum: sql<number>`COALESCE(SUM(${tracks.duration}), 0)` }).from(tracks).get();
+    const totalSize = db.select({ sum: sql<number>`COALESCE(SUM(${tracks.fileSize}), 0)` }).from(tracks).get();
+    const playlistCount = db.select({ count: sql<number>`COUNT(*)` }).from(playlists).get();
+
+    const rawGenreStats = db
+        .select({ genre: tracks.genre, count: sql<number>`COUNT(*)` })
+        .from(tracks)
+        .groupBy(tracks.genre)
+        .orderBy(sql`COUNT(*) DESC`)
+        .all();
+
+    // Normalize genre data: merge Unknown variants, take first genre from comma-separated
+    const UNKNOWN_PATTERNS = ["unknown", "unknowngenre", "unknown genre", "various", "other", "none", "n/a"];
+    const genreMap = new Map<string, number>();
+    for (const g of rawGenreStats) {
+        const raw = (g.genre || "").trim();
+        const lower = raw.toLowerCase();
+        let normalized: string;
+        if (!raw || UNKNOWN_PATTERNS.includes(lower)) {
+            normalized = "Unknown";
+        } else if (raw.includes(",")) {
+            normalized = raw.split(",")[0].trim();
+        } else {
+            normalized = raw;
+        }
+        genreMap.set(normalized, (genreMap.get(normalized) || 0) + g.count);
+    }
+    const genreStats = Array.from(genreMap, ([genre, count]) => ({ genre, count }))
+        .sort((a, b) => {
+            if (a.genre === "Unknown") return 1;
+            if (b.genre === "Unknown") return -1;
+            return b.count - a.count;
+        });
+
+    const energyStats = db
+        .select({ energy: tracks.energy, count: sql<number>`COUNT(*)` })
+        .from(tracks)
+        .where(sql`${tracks.energy} IS NOT NULL`)
+        .groupBy(tracks.energy)
+        .orderBy(tracks.energy)
+        .all();
+
+    const bpmRanges = db
+        .select({
+            range: sql<string>`CASE
+                WHEN ${tracks.bpm} < 100 THEN '<100'
+                WHEN ${tracks.bpm} < 120 THEN '100-119'
+                WHEN ${tracks.bpm} < 130 THEN '120-129'
+                WHEN ${tracks.bpm} < 140 THEN '130-139'
+                WHEN ${tracks.bpm} < 150 THEN '140-149'
+                WHEN ${tracks.bpm} < 160 THEN '150-159'
+                ELSE '160+'
+            END`,
+            count: sql<number>`COUNT(*)`,
+        })
+        .from(tracks)
+        .where(sql`${tracks.bpm} IS NOT NULL`)
+        .groupBy(sql`1`)
+        .orderBy(sql`MIN(${tracks.bpm})`)
+        .all();
+
+    const keyStats = db
+        .select({ key: tracks.keyCamelot, count: sql<number>`COUNT(*)` })
+        .from(tracks)
+        .where(sql`${tracks.keyCamelot} IS NOT NULL AND ${tracks.keyCamelot} != ''`)
+        .groupBy(tracks.keyCamelot)
+        .orderBy(sql`COUNT(*) DESC`)
+        .all();
+
+    const formatStats = db
+        .select({ format: sql<string>`UPPER(${tracks.format})`, count: sql<number>`COUNT(*)` })
+        .from(tracks)
+        .where(sql`${tracks.format} IS NOT NULL`)
+        .groupBy(sql`UPPER(${tracks.format})`)
+        .orderBy(sql`COUNT(*) DESC`)
+        .all();
+
+    const missingGenre = db.select({ count: sql<number>`COUNT(*)` }).from(tracks).where(sql`${tracks.genre} IS NULL OR ${tracks.genre} = ''`).get();
+    const missingBpm = db.select({ count: sql<number>`COUNT(*)` }).from(tracks).where(sql`${tracks.bpm} IS NULL`).get();
+    const missingKey = db.select({ count: sql<number>`COUNT(*)` }).from(tracks).where(sql`${tracks.keyCamelot} IS NULL OR ${tracks.keyCamelot} = ''`).get();
+    const missingEnergy = db.select({ count: sql<number>`COUNT(*)` }).from(tracks).where(sql`${tracks.energy} IS NULL`).get();
+    const missingArtwork = db.select({ count: sql<number>`COUNT(*)` }).from(tracks).where(sql`${tracks.artworkUrl} IS NULL OR ${tracks.artworkUrl} = ''`).get();
+
+    const recentTracks = db
+        .select({
+            id: tracks.id,
+            title: tracks.title,
+            artist: tracks.artist,
+            genre: tracks.genre,
+            bpm: tracks.bpm,
+            keyCamelot: tracks.keyCamelot,
+            energy: tracks.energy,
+            rating: tracks.rating,
+            artworkUrl: tracks.artworkUrl,
+            addedAt: tracks.addedAt,
+            duration: tracks.duration,
+            isFavorite: tracks.isFavorite,
+        })
+        .from(tracks)
+        .orderBy(desc(tracks.addedAt))
+        .limit(8)
+        .all();
+
+    const topRated = db
+        .select({
+            id: tracks.id,
+            title: tracks.title,
+            artist: tracks.artist,
+            rating: tracks.rating,
+            artworkUrl: tracks.artworkUrl,
+        })
+        .from(tracks)
+        .where(sql`${tracks.rating} IS NOT NULL AND ${tracks.rating} >= 4`)
+        .orderBy(desc(tracks.rating), desc(tracks.addedAt))
+        .limit(5)
+        .all();
+
+    const totalCount = total?.count ?? 0;
+
+    return {
+        total: totalCount,
+        processed: processed?.count ?? 0,
+        unprocessed: totalCount - (processed?.count ?? 0),
+        analyzed: analyzed?.count ?? 0,
+        favorites: favorites?.count ?? 0,
+        avgBpm: avgBpm?.avg ? Math.round(avgBpm.avg) : 0,
+        totalDuration: totalDuration?.sum ?? 0,
+        totalSize: totalSize?.sum ?? 0,
+        playlistCount: playlistCount?.count ?? 0,
+        genreStats,
+        energyStats: energyStats.map((e) => ({ energy: e.energy ?? 0, count: e.count })),
+        bpmRanges,
+        keyStats: keyStats.map((k) => ({ key: k.key || "Unknown", count: k.count })),
+        formatStats: formatStats.map((f) => ({ format: f.format || "Unknown", count: f.count })),
+        health: {
+            total: totalCount,
+            missingGenre: missingGenre?.count ?? 0,
+            missingBpm: missingBpm?.count ?? 0,
+            missingKey: missingKey?.count ?? 0,
+            missingEnergy: missingEnergy?.count ?? 0,
+            missingArtwork: missingArtwork?.count ?? 0,
+        },
+        recentTracks,
+        topRated,
+    };
 }

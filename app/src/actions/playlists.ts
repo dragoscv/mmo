@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { db, sqlite } from "@/db";
 import { playlists, playlistTracks, tracks } from "@/db/schema";
 import { eq, sql, and, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -15,8 +15,8 @@ export async function getPlaylists() {
             createdAt: playlists.createdAt,
             trackCount: sql<number>`(
         SELECT COUNT(*) FROM playlist_tracks 
-        WHERE playlist_tracks.playlist_id = ${playlists.id}
-      )`,
+        WHERE playlist_tracks.playlist_id = playlists.id
+      )`.mapWith(Number),
         })
         .from(playlists)
         .orderBy(playlists.name)
@@ -532,4 +532,147 @@ export async function createRecommendedPlaylists(
 
     revalidatePath("/playlists");
     return { created };
+}
+
+// ─── Similar Tracks ─────────────────────────────────────────────────────────
+
+export async function getSimilarTracks(playlistId: number, limit = 50) {
+    const playlist = db
+        .select()
+        .from(playlists)
+        .where(eq(playlists.id, playlistId))
+        .get();
+    if (!playlist) return [];
+
+    // IDs already in playlist
+    const existingIds = db
+        .select({ trackId: playlistTracks.trackId })
+        .from(playlistTracks)
+        .where(eq(playlistTracks.playlistId, playlistId))
+        .all()
+        .map((r) => r.trackId!)
+        .filter(Boolean);
+
+    // Profile of existing tracks
+    const existingTracks = existingIds.length > 0
+        ? db
+            .select({
+                genre: tracks.genre,
+                subgenre: tracks.subgenre,
+                bpm: tracks.bpm,
+                energy: tracks.energy,
+                keyCamelot: tracks.keyCamelot,
+            })
+            .from(tracks)
+            .where(inArray(tracks.id, existingIds))
+            .all()
+        : [];
+
+    // Build scoring expression parts
+    const scoreParts: string[] = [];
+
+    if (existingTracks.length > 0) {
+        const genres = [...new Set(existingTracks.map((t) => t.genre).filter(Boolean))];
+        const subgenres = [...new Set(existingTracks.map((t) => t.subgenre).filter(Boolean))];
+        const bpms = existingTracks.map((t) => t.bpm).filter(Boolean) as number[];
+        const energies = existingTracks.map((t) => t.energy).filter(Boolean) as number[];
+        const keys = [...new Set(existingTracks.map((t) => t.keyCamelot).filter(Boolean))];
+
+        if (genres.length > 0) {
+            const escaped = genres.map((g) => `'${g!.replace(/'/g, "''")}'`).join(",");
+            scoreParts.push(`(CASE WHEN genre IN (${escaped}) THEN 30 ELSE 0 END)`);
+        }
+        if (subgenres.length > 0) {
+            const escaped = subgenres.map((s) => `'${s!.replace(/'/g, "''")}'`).join(",");
+            scoreParts.push(`(CASE WHEN subgenre IN (${escaped}) THEN 10 ELSE 0 END)`);
+        }
+        if (bpms.length > 0) {
+            const minBpm = Math.min(...bpms) - 8;
+            const maxBpm = Math.max(...bpms) + 8;
+            scoreParts.push(`(CASE WHEN bpm BETWEEN ${minBpm} AND ${maxBpm} THEN 20 ELSE 0 END)`);
+        }
+        if (energies.length > 0) {
+            const minE = Math.max(1, Math.min(...energies) - 1);
+            const maxE = Math.min(10, Math.max(...energies) + 1);
+            scoreParts.push(`(CASE WHEN energy BETWEEN ${minE} AND ${maxE} THEN 15 ELSE 0 END)`);
+        }
+        if (keys.length > 0) {
+            const escaped = keys.map((k) => `'${k!.replace(/'/g, "''")}'`).join(",");
+            scoreParts.push(`(CASE WHEN key_camelot IN (${escaped}) THEN 10 ELSE 0 END)`);
+        }
+    }
+
+    // Match on playlist name (genre names, keywords)
+    const esc = (s: string) => s.replace(/'/g, "''");
+    const nameLower = esc(playlist.name.toLowerCase());
+    scoreParts.push(`(CASE WHEN LOWER(genre) = '${nameLower}' THEN 25 ELSE 0 END)`);
+    scoreParts.push(`(CASE WHEN LOWER(subgenre) = '${nameLower}' THEN 15 ELSE 0 END)`);
+    scoreParts.push(`(CASE WHEN LOWER(genre) LIKE '%${nameLower}%' THEN 10 ELSE 0 END)`);
+    scoreParts.push(`(CASE WHEN LOWER(title) LIKE '%${nameLower}%' THEN 5 ELSE 0 END)`);
+    scoreParts.push(`(CASE WHEN LOWER(artist) LIKE '%${nameLower}%' THEN 5 ELSE 0 END)`);
+
+    const scoreExpr = scoreParts.join(" + ");
+    const excludeClause = existingIds.length > 0
+        ? `WHERE tracks.id NOT IN (${existingIds.join(",")})`
+        : "";
+
+    const rawSql = `
+        SELECT * FROM (
+            SELECT 
+                tracks.id, tracks.filepath, tracks.filename,
+                tracks.artist, tracks.title, tracks.album,
+                tracks.bpm, tracks.key_camelot, tracks.duration,
+                tracks.energy, tracks.genre, tracks.subgenre,
+                tracks.mood, tracks.rating, tracks.is_favorite,
+                tracks.artwork_url, tracks.tags,
+                (${scoreExpr}) as score
+            FROM tracks
+            ${excludeClause}
+        )
+        WHERE score > 0
+        ORDER BY score DESC, COALESCE(rating, 0) DESC
+        LIMIT ?
+    `;
+
+    const result = sqlite.prepare(rawSql).all(limit) as Array<{
+        id: number;
+        filepath: string;
+        filename: string;
+        artist: string | null;
+        title: string | null;
+        album: string | null;
+        bpm: number | null;
+        key_camelot: string | null;
+        duration: number | null;
+        energy: number | null;
+        genre: string | null;
+        subgenre: string | null;
+        mood: string | null;
+        rating: number | null;
+        is_favorite: number | null;
+        artwork_url: string | null;
+        tags: string | null;
+        score: number;
+    }>;
+
+    return result.map((r) => ({
+        id: r.id,
+        filepath: r.filepath,
+        filename: r.filename,
+        artist: r.artist,
+        title: r.title,
+        album: r.album,
+        bpm: r.bpm,
+        keyCamelot: r.key_camelot,
+        duration: r.duration,
+        energy: r.energy,
+        genre: r.genre,
+        subgenre: r.subgenre,
+        mood: r.mood,
+        rating: r.rating,
+        isFavorite: !!r.is_favorite,
+        artworkUrl: r.artwork_url,
+        tags: r.tags,
+        score: r.score,
+    }));
 }

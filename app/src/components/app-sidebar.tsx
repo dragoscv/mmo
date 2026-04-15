@@ -13,10 +13,12 @@ import {
     ListMusic,
     AudioWaveform,
     HelpCircle,
+    Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
 import { LegendModal } from "./legend-modal";
+import { GlobalSearch } from "./global-search";
 
 const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -31,6 +33,7 @@ const navItems = [
 export function AppSidebar() {
     const pathname = usePathname();
     const [legendOpen, setLegendOpen] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
 
     return (
         <aside className="flex h-full w-56 flex-col border-r border-sidebar-border bg-sidebar">
@@ -42,6 +45,20 @@ export function AppSidebar() {
                 <span className="text-[15px] font-bold tracking-tight text-sidebar-foreground">
                     Music Organizer
                 </span>
+            </div>
+
+            {/* Search button */}
+            <div className="px-2 pt-2">
+                <button
+                    onClick={() => setSearchOpen(true)}
+                    className="flex w-full items-center gap-2.5 rounded-xl border border-sidebar-border/50 bg-sidebar-accent/30 px-3 py-2 text-sm text-sidebar-foreground/40 transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground/70 hover:border-sidebar-border cursor-pointer"
+                >
+                    <Search className="h-3.5 w-3.5" />
+                    <span className="flex-1 text-left">Search...</span>
+                    <kbd className="inline-flex h-5 items-center rounded border border-sidebar-border/60 bg-sidebar-accent/50 px-1.5 font-mono text-[10px] font-medium text-sidebar-foreground/25">
+                        ⌘K
+                    </kbd>
+                </button>
             </div>
 
             <nav className="flex-1 space-y-0.5 p-2">
@@ -93,6 +110,7 @@ export function AppSidebar() {
                 </div>
             </div>
             <LegendModal open={legendOpen} onOpenChange={setLegendOpen} />
+            <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
         </aside>
     );
 }

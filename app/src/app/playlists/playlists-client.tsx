@@ -49,6 +49,7 @@ import {
     ChevronsLeft,
     ChevronsRight,
     ListPlus,
+    Sparkles,
 } from "lucide-react";
 import type { Track } from "@/db/schema";
 import {
@@ -61,6 +62,7 @@ import {
     type RecommendedCategory,
 } from "@/actions/playlists";
 import { PlaylistRecommendations } from "@/components/playlist-recommendations";
+import { SimilarTracksModal } from "@/components/similar-tracks-modal";
 import { toggleFavorite, setTrackRating } from "@/actions/tracks";
 
 interface PlaylistInfo {
@@ -108,9 +110,10 @@ export function PlaylistsClient({
     // Track detail modal
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
+    const [similarOpen, setSimilarOpen] = useState(false);
 
     // Column management
-    const { visibleColumns, toggleColumn, isVisible, resetToDefaults } = useColumnConfig("playlist-columns");
+    const { orderedColumns, visibleColumns, toggleColumn, isVisible, reorderColumns, resetToDefaults } = useColumnConfig("playlist-columns");
 
     const [isPending, startTransition] = useTransition();
 
@@ -276,7 +279,9 @@ export function PlaylistsClient({
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate font-medium">{pl.name}</p>
                                         <p className="text-xs text-[var(--muted-foreground)]">
-                                            {pl.trackCount} tracks
+                                            {String(pl.id) === activeId
+                                                ? `${formatNumber(total)} tracks`
+                                                : `${pl.trackCount} tracks`}
                                         </p>
                                     </div>
                                 </Link>
@@ -316,6 +321,15 @@ export function PlaylistsClient({
                                         variant="outline"
                                         size="sm"
                                         className="gap-1.5"
+                                        onClick={() => setSimilarOpen(true)}
+                                    >
+                                        <Sparkles className="h-3.5 w-3.5" />
+                                        Similar
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5"
                                         onClick={handleExportPlaylist}
                                     >
                                         <Download className="h-3.5 w-3.5" />
@@ -351,8 +365,10 @@ export function PlaylistsClient({
                                     {formatNumber((page - 1) * pageSize + 1)} – {formatNumber(Math.min(page * pageSize, total))} of {formatNumber(total)}
                                 </span>
                                 <ColumnManager
+                                    orderedColumns={orderedColumns}
                                     visibleColumns={visibleColumns}
                                     onToggle={toggleColumn}
+                                    onReorder={reorderColumns}
                                     onReset={resetToDefaults}
                                     availableColumns={["index", "play", "artwork", "artist", "title", "album", "bpm", "key", "genre", "energy", "rating", "duration", "favorites", "tags", "remove"]}
                                 />
@@ -361,18 +377,23 @@ export function PlaylistsClient({
                                 <Table>
                                     <TableHeader>
                                         <TableRow className="bg-[var(--card)] hover:bg-[var(--card)]">
-                                            {isVisible("index") && <TableHead className="w-8 text-center">#</TableHead>}
-                                            {isVisible("play") && <TableHead className="w-10"></TableHead>}
-                                            {isVisible("artwork") && <TableHead className="w-10"></TableHead>}
-                                            {isVisible("artist") && <TableHead>Artist</TableHead>}
-                                            {isVisible("title") && <TableHead>Title</TableHead>}
-                                            {isVisible("album") && <TableHead>Album</TableHead>}
-                                            {isVisible("bpm") && <TableHead className="w-16 text-center">BPM</TableHead>}
-                                            {isVisible("key") && <TableHead className="w-14 text-center">Key</TableHead>}
-                                            {isVisible("genre") && <TableHead className="w-20">Genre</TableHead>}
-                                            {isVisible("energy") && <TableHead className="w-14 text-center">⚡</TableHead>}
-                                            {isVisible("rating") && <TableHead className="w-20 text-center">Rating</TableHead>}
-                                            {isVisible("duration") && <TableHead className="w-16 text-right">Time</TableHead>}
+                                            {orderedColumns.map((col) => {
+                                                switch (col) {
+                                                    case "index": return <TableHead key={col} className="w-8 text-center">#</TableHead>;
+                                                    case "play": return <TableHead key={col} className="w-10"></TableHead>;
+                                                    case "artwork": return <TableHead key={col} className="w-10"></TableHead>;
+                                                    case "artist": return <TableHead key={col}>Artist</TableHead>;
+                                                    case "title": return <TableHead key={col}>Title</TableHead>;
+                                                    case "album": return <TableHead key={col}>Album</TableHead>;
+                                                    case "bpm": return <TableHead key={col} className="w-16 text-center">BPM</TableHead>;
+                                                    case "key": return <TableHead key={col} className="w-14 text-center">Key</TableHead>;
+                                                    case "genre": return <TableHead key={col} className="w-20">Genre</TableHead>;
+                                                    case "energy": return <TableHead key={col} className="w-14 text-center">⚡</TableHead>;
+                                                    case "rating": return <TableHead key={col} className="w-20 text-center">Rating</TableHead>;
+                                                    case "duration": return <TableHead key={col} className="w-16 text-right">Time</TableHead>;
+                                                    default: return null;
+                                                }
+                                            })}
                                             <TableHead className="w-16"></TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -399,139 +420,102 @@ export function PlaylistsClient({
                                                         setModalOpen(true);
                                                     }}
                                                 >
-                                                    {isVisible("index") && (
-                                                        <TableCell className="text-center text-xs text-[var(--muted-foreground)]">
-                                                            {(page - 1) * pageSize + idx + 1}
-                                                        </TableCell>
-                                                    )}
-                                                    {isVisible("play") && (
-                                                        <TableCell
-                                                            className="text-center p-0"
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                            <button
-                                                                onClick={() =>
-                                                                    isPlayingThis
-                                                                        ? player.pause()
-                                                                        : handlePlay(track)
-                                                                }
-                                                                className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-purple-500/20 transition-colors mx-auto cursor-pointer"
-                                                            >
-                                                                {isPlayingThis ? (
-                                                                    <Pause className="h-3.5 w-3.5 text-purple-400" />
-                                                                ) : (
-                                                                    <Play className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                                )}
-                                                            </button>
-                                                        </TableCell>
-                                                    )}
-                                                    {isVisible("artwork") && (
-                                                        <TableCell className="p-0">
-                                                            <Artwork
-                                                                src={track.artworkUrl}
-                                                                size="sm"
-                                                                showPlaceholder={false}
-                                                            />
-                                                        </TableCell>
-                                                    )}
-                                                    {isVisible("artist") && (
-                                                        <TableCell className="max-w-[180px] truncate text-sm">
-                                                            <span
-                                                                className={cn(
-                                                                    isCurrentTrack && "text-purple-400"
-                                                                )}
-                                                            >
-                                                                {track.artist || "Unknown"}
-                                                            </span>
-                                                        </TableCell>
-                                                    )}
-                                                    {isVisible("title") && (
-                                                        <TableCell className="max-w-[220px] text-sm font-medium">
-                                                            <div className="truncate">
-                                                                <span
-                                                                    className={cn(
-                                                                        isCurrentTrack && "text-purple-400"
-                                                                    )}
-                                                                >
-                                                                    {track.title || track.filename}
-                                                                </span>
-                                                            </div>
-                                                            {tags.length > 0 && (
-                                                                <div className="mt-0.5">
-                                                                    <TagBadges tags={tags} />
-                                                                </div>
-                                                            )}
-                                                        </TableCell>
-                                                    )}
-                                                    {isVisible("album") && (
-                                                        <TableCell className="max-w-[150px] truncate text-sm text-[var(--muted-foreground)]">
-                                                            {track.album || "—"}
-                                                        </TableCell>
-                                                    )}
-                                                    {isVisible("bpm") && (
-                                                        <TableCell className="text-center text-sm tabular-nums">
-                                                            {track.bpm ? Math.round(track.bpm) : "—"}
-                                                        </TableCell>
-                                                    )}
-                                                    {isVisible("key") && (
-                                                        <TableCell className="text-center font-mono text-xs">
-                                                            {track.keyCamelot || "—"}
-                                                        </TableCell>
-                                                    )}
-                                                    {isVisible("genre") && (
-                                                        <TableCell>
-                                                            {track.genre ? (
-                                                                <Badge
-                                                                    className={cn(
-                                                                        "text-[10px] px-1.5 py-0",
-                                                                        GENRE_COLORS[track.genre] ||
-                                                                        GENRE_COLORS.Other
-                                                                    )}
-                                                                >
-                                                                    {track.genre}
-                                                                </Badge>
-                                                            ) : (
-                                                                "—"
-                                                            )}
-                                                        </TableCell>
-                                                    )}
-                                                    {isVisible("energy") && (
-                                                        <TableCell className="text-center">
-                                                            {track.energy ? (
-                                                                <div className="flex items-center justify-center gap-1">
-                                                                    <span
-                                                                        className={cn(
-                                                                            "inline-block h-2 w-2 rounded-full",
-                                                                            ENERGY_COLORS[track.energy]
+                                                    {orderedColumns.map((col) => {
+                                                        switch (col) {
+                                                            case "index": return (
+                                                                <TableCell key={col} className="text-center text-xs text-[var(--muted-foreground)]">
+                                                                    {(page - 1) * pageSize + idx + 1}
+                                                                </TableCell>
+                                                            );
+                                                            case "play": return (
+                                                                <TableCell key={col} className="text-center p-0" onClick={(e) => e.stopPropagation()}>
+                                                                    <button
+                                                                        onClick={() => isPlayingThis ? player.pause() : handlePlay(track)}
+                                                                        className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-purple-500/20 transition-colors mx-auto cursor-pointer"
+                                                                    >
+                                                                        {isPlayingThis ? (
+                                                                            <Pause className="h-3.5 w-3.5 text-purple-400" />
+                                                                        ) : (
+                                                                            <Play className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                                                                         )}
+                                                                    </button>
+                                                                </TableCell>
+                                                            );
+                                                            case "artwork": return (
+                                                                <TableCell key={col} className="p-0">
+                                                                    <Artwork src={track.artworkUrl} size="sm" showPlaceholder={false} />
+                                                                </TableCell>
+                                                            );
+                                                            case "artist": return (
+                                                                <TableCell key={col} className="max-w-[180px] truncate text-sm">
+                                                                    <span className={cn(isCurrentTrack && "text-purple-400")}>
+                                                                        {track.artist || "Unknown"}
+                                                                    </span>
+                                                                </TableCell>
+                                                            );
+                                                            case "title": return (
+                                                                <TableCell key={col} className="max-w-[220px] text-sm font-medium">
+                                                                    <div className="truncate">
+                                                                        <span className={cn(isCurrentTrack && "text-purple-400")}>
+                                                                            {track.title || track.filename}
+                                                                        </span>
+                                                                    </div>
+                                                                    {tags.length > 0 && (
+                                                                        <div className="mt-0.5"><TagBadges tags={tags} /></div>
+                                                                    )}
+                                                                </TableCell>
+                                                            );
+                                                            case "album": return (
+                                                                <TableCell key={col} className="max-w-[150px] truncate text-sm text-[var(--muted-foreground)]">
+                                                                    {track.album || "—"}
+                                                                </TableCell>
+                                                            );
+                                                            case "bpm": return (
+                                                                <TableCell key={col} className="text-center text-sm tabular-nums">
+                                                                    {track.bpm ? Math.round(track.bpm) : "—"}
+                                                                </TableCell>
+                                                            );
+                                                            case "key": return (
+                                                                <TableCell key={col} className="text-center font-mono text-xs">
+                                                                    {track.keyCamelot || "—"}
+                                                                </TableCell>
+                                                            );
+                                                            case "genre": return (
+                                                                <TableCell key={col}>
+                                                                    {track.genre ? (
+                                                                        <Badge className={cn("text-[10px] px-1.5 py-0", GENRE_COLORS[track.genre] || GENRE_COLORS.Other)}>
+                                                                            {track.genre}
+                                                                        </Badge>
+                                                                    ) : "—"}
+                                                                </TableCell>
+                                                            );
+                                                            case "energy": return (
+                                                                <TableCell key={col} className="text-center">
+                                                                    {track.energy ? (
+                                                                        <div className="flex items-center justify-center gap-1">
+                                                                            <span className={cn("inline-block h-2 w-2 rounded-full", ENERGY_COLORS[track.energy])} />
+                                                                            <span className="text-xs">{track.energy}</span>
+                                                                        </div>
+                                                                    ) : "—"}
+                                                                </TableCell>
+                                                            );
+                                                            case "rating": return (
+                                                                <TableCell key={col} className="text-center" onClick={(e) => e.stopPropagation()}>
+                                                                    <StarRating
+                                                                        value={track.rating}
+                                                                        size="sm"
+                                                                        onChange={async (r) => { await setTrackRating(track.id, r || null); router.refresh(); }}
                                                                     />
-                                                                    <span className="text-xs">{track.energy}</span>
-                                                                </div>
-                                                            ) : (
-                                                                "—"
-                                                            )}
-                                                        </TableCell>
-                                                    )}
-                                                    {isVisible("rating") && (
-                                                        <TableCell
-                                                            className="text-center"
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                            <StarRating
-                                                                value={track.rating}
-                                                                size="sm"
-                                                                onChange={async (r) => {
-                                                                    await setTrackRating(track.id, r || null);
-                                                                    router.refresh();
-                                                                }}
-                                                            />
-                                                        </TableCell>
-                                                    )}
-                                                    {isVisible("duration") && (
-                                                        <TableCell className="text-right text-xs tabular-nums text-[var(--muted-foreground)]">
-                                                            {formatDuration(track.duration)}
-                                                        </TableCell>
-                                                    )}
+                                                                </TableCell>
+                                                            );
+                                                            case "duration": return (
+                                                                <TableCell key={col} className="text-right text-xs tabular-nums text-[var(--muted-foreground)]">
+                                                                    {formatDuration(track.duration)}
+                                                                </TableCell>
+                                                            );
+                                                            default: return null;
+                                                        }
+                                                    })}
                                                     <TableCell
                                                         className="p-0"
                                                         onClick={(e) => e.stopPropagation()}
@@ -752,6 +736,17 @@ export function PlaylistsClient({
                 onOpenChange={setModalOpen}
                 onTrackUpdated={() => router.refresh()}
             />
+
+            {/* Similar Tracks Modal */}
+            {activePlaylist && (
+                <SimilarTracksModal
+                    open={similarOpen}
+                    onOpenChange={setSimilarOpen}
+                    playlistId={activePlaylist.id}
+                    playlistName={activePlaylist.name}
+                    onMutate={() => router.refresh()}
+                />
+            )}
         </div>
     );
 }

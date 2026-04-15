@@ -105,7 +105,7 @@ export function LibraryClient({
     const [modalOpen, setModalOpen] = useState(false);
 
     // Column management
-    const { visibleColumns, toggleColumn, isVisible, resetToDefaults } = useColumnConfig("library-columns");
+    const { orderedColumns, visibleColumns, toggleColumn, isVisible, reorderColumns, resetToDefaults } = useColumnConfig("library-columns");
 
     // Filters expanded
     const [showAdvanced, setShowAdvanced] = useState(
@@ -449,8 +449,10 @@ export function LibraryClient({
             {/* Track Table */}
             <div className="flex items-center justify-end mb-2">
                 <ColumnManager
+                    orderedColumns={orderedColumns}
                     visibleColumns={visibleColumns}
                     onToggle={toggleColumn}
+                    onReorder={reorderColumns}
                     onReset={resetToDefaults}
                     availableColumns={["index", "play", "artwork", "favorites", "artist", "title", "album", "bpm", "key", "genre", "energy", "rating", "duration"]}
                 />
@@ -459,82 +461,63 @@ export function LibraryClient({
                 <Table>
                     <TableHeader>
                         <TableRow className="bg-[var(--card)] hover:bg-[var(--card)]">
-                            {isVisible("index") && <TableHead className="w-8 text-center">#</TableHead>}
-                            {isVisible("play") && <TableHead className="w-8"></TableHead>}
-                            {isVisible("artwork") && <TableHead className="w-10"></TableHead>}
-                            {isVisible("favorites") && <TableHead className="w-6"></TableHead>}
-                            {isVisible("artist") && (
-                                <TableHead
-                                    className="cursor-pointer select-none hover:text-[var(--foreground)]"
-                                    onClick={() => handleSort("artist")}
-                                >
-                                    Artist <SortIcon column="artist" />
-                                </TableHead>
-                            )}
-                            {isVisible("title") && (
-                                <TableHead
-                                    className="cursor-pointer select-none hover:text-[var(--foreground)]"
-                                    onClick={() => handleSort("title")}
-                                >
-                                    Title <SortIcon column="title" />
-                                </TableHead>
-                            )}
-                            {isVisible("album") && <TableHead>Album</TableHead>}
-                            {isVisible("bpm") && (
-                                <TableHead
-                                    className="w-16 cursor-pointer select-none text-center hover:text-[var(--foreground)]"
-                                    onClick={() => handleSort("bpm")}
-                                >
-                                    BPM <SortIcon column="bpm" />
-                                </TableHead>
-                            )}
-                            {isVisible("key") && (
-                                <TableHead
-                                    className="w-20 cursor-pointer select-none text-center hover:text-[var(--foreground)]"
-                                    onClick={() => handleSort("key")}
-                                >
-                                    Key <SortIcon column="key" />
-                                </TableHead>
-                            )}
-                            {isVisible("genre") && (
-                                <TableHead
-                                    className="w-24 cursor-pointer select-none hover:text-[var(--foreground)]"
-                                    onClick={() => handleSort("genre")}
-                                >
-                                    Genre <SortIcon column="genre" />
-                                </TableHead>
-                            )}
-                            {isVisible("energy") && (
-                                <TableHead
-                                    className="w-14 cursor-pointer select-none text-center hover:text-[var(--foreground)]"
-                                    onClick={() => handleSort("energy")}
-                                >
-                                    ⚡ <SortIcon column="energy" />
-                                </TableHead>
-                            )}
-                            {isVisible("rating") && (
-                                <TableHead
-                                    className="w-24 cursor-pointer select-none text-center hover:text-[var(--foreground)]"
-                                    onClick={() => handleSort("rating")}
-                                >
-                                    Rating <SortIcon column="rating" />
-                                </TableHead>
-                            )}
-                            {isVisible("duration") && (
-                                <TableHead
-                                    className="w-16 cursor-pointer select-none text-right hover:text-[var(--foreground)]"
-                                    onClick={() => handleSort("duration")}
-                                >
-                                    Time <SortIcon column="duration" />
-                                </TableHead>
-                            )}
+                            {orderedColumns.map((col) => {
+                                switch (col) {
+                                    case "index": return <TableHead key={col} className="w-8 text-center">#</TableHead>;
+                                    case "play": return <TableHead key={col} className="w-8"></TableHead>;
+                                    case "artwork": return <TableHead key={col} className="w-10"></TableHead>;
+                                    case "favorites": return <TableHead key={col} className="w-6"></TableHead>;
+                                    case "artist": return (
+                                        <TableHead key={col} className="cursor-pointer select-none hover:text-[var(--foreground)]" onClick={() => handleSort("artist")}>
+                                            Artist <SortIcon column="artist" />
+                                        </TableHead>
+                                    );
+                                    case "title": return (
+                                        <TableHead key={col} className="cursor-pointer select-none hover:text-[var(--foreground)]" onClick={() => handleSort("title")}>
+                                            Title <SortIcon column="title" />
+                                        </TableHead>
+                                    );
+                                    case "album": return <TableHead key={col}>Album</TableHead>;
+                                    case "bpm": return (
+                                        <TableHead key={col} className="w-16 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("bpm")}>
+                                            BPM <SortIcon column="bpm" />
+                                        </TableHead>
+                                    );
+                                    case "key": return (
+                                        <TableHead key={col} className="w-20 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("key")}>
+                                            Key <SortIcon column="key" />
+                                        </TableHead>
+                                    );
+                                    case "genre": return (
+                                        <TableHead key={col} className="w-24 cursor-pointer select-none hover:text-[var(--foreground)]" onClick={() => handleSort("genre")}>
+                                            Genre <SortIcon column="genre" />
+                                        </TableHead>
+                                    );
+                                    case "energy": return (
+                                        <TableHead key={col} className="w-14 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("energy")}>
+                                            ⚡ <SortIcon column="energy" />
+                                        </TableHead>
+                                    );
+                                    case "rating": return (
+                                        <TableHead key={col} className="w-24 cursor-pointer select-none text-center hover:text-[var(--foreground)]" onClick={() => handleSort("rating")}>
+                                            Rating <SortIcon column="rating" />
+                                        </TableHead>
+                                    );
+                                    case "duration": return (
+                                        <TableHead key={col} className="w-16 cursor-pointer select-none text-right hover:text-[var(--foreground)]" onClick={() => handleSort("duration")}>
+                                            Time <SortIcon column="duration" />
+                                        </TableHead>
+                                    );
+                                    default: return null;
+                                }
+                            })}
                             <TableHead className="w-10"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {tracks.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={12} className="text-center py-12">
+                                <TableCell colSpan={orderedColumns.length + 1} className="text-center py-12">
                                     <p className="text-[var(--muted-foreground)]">
                                         No tracks found. Scan a folder or import from rekordbox.
                                     </p>
@@ -575,184 +558,130 @@ export function LibraryClient({
                                                 setModalOpen(true);
                                             }}
                                         >
-                                            {isVisible("index") && (
-                                                <TableCell className="text-center text-xs text-[var(--muted-foreground)]">
-                                                    {startIdx + idx + 1}
-                                                </TableCell>
-                                            )}
-                                            {/* Play */}
-                                            {isVisible("play") && (
-                                                <TableCell
-                                                    className="text-center p-0"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <button
-                                                        onClick={() =>
-                                                            isPlayingThis
-                                                                ? player.pause()
-                                                                : handlePlay(track)
-                                                        }
-                                                        className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-purple-500/20 transition-colors mx-auto cursor-pointer"
-                                                    >
-                                                        {isPlayingThis ? (
-                                                            <Pause className="h-3.5 w-3.5 text-purple-400" />
-                                                        ) : (
-                                                            <Play className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                        )}
-                                                    </button>
-                                                </TableCell>
-                                            )}
-                                            {/* Artwork */}
-                                            {isVisible("artwork") && (
-                                                <TableCell className="p-1">
-                                                    <Artwork
-                                                        src={track.artworkUrl}
-                                                        size="sm"
-                                                        showPlaceholder={false}
-                                                    />
-                                                </TableCell>
-                                            )}
-                                            {/* Favorite */}
-                                            {isVisible("favorites") && (
-                                                <TableCell
-                                                    className="p-0"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <FavoriteButton
-                                                        isFavorite={!!track.isFavorite}
-                                                        size="sm"
-                                                        onChange={async () => {
-                                                            await toggleFavorite(track.id);
-                                                            router.refresh();
-                                                        }}
-                                                    />
-                                                </TableCell>
-                                            )}
-                                            {/* Artist */}
-                                            {isVisible("artist") && (
-                                                <TableCell className="max-w-[180px] truncate text-sm" onClick={(e) => e.stopPropagation()}>
-                                                    <MetadataLink
-                                                        field="artist"
-                                                        value={track.artist}
-                                                        className={cn(
-                                                            "text-sm",
-                                                            isCurrentTrack && "text-purple-400"
-                                                        )}
-                                                    >
-                                                        {track.artist || "Unknown"}
-                                                    </MetadataLink>
-                                                </TableCell>
-                                            )}
-                                            {/* Title + Tags */}
-                                            {isVisible("title") && (
-                                                <TableCell className="max-w-[220px] text-sm">
-                                                    <div className="truncate font-medium">
-                                                        <span
-                                                            className={cn(
-                                                                isCurrentTrack && "text-purple-400"
-                                                            )}
-                                                        >
-                                                            {track.title || track.filename}
-                                                        </span>
-                                                    </div>
-                                                    {tags.length > 0 && (
-                                                        <div className="mt-0.5">
-                                                            <TagBadges tags={tags} />
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                            )}
-                                            {/* Album */}
-                                            {isVisible("album") && (
-                                                <TableCell className="max-w-[150px] truncate text-sm text-[var(--muted-foreground)]" onClick={(e) => e.stopPropagation()}>
-                                                    {track.album ? (
-                                                        <MetadataLink field="album" value={track.album} className="text-sm text-[var(--muted-foreground)]">
-                                                            {track.album}
-                                                        </MetadataLink>
-                                                    ) : "—"}
-                                                </TableCell>
-                                            )}
-                                            {/* BPM */}
-                                            {isVisible("bpm") && (
-                                                <TableCell className="text-center text-sm tabular-nums">
-                                                    {track.bpm ? Math.round(track.bpm) : "—"}
-                                                </TableCell>
-                                            )}
-                                            {/* Key */}
-                                            {isVisible("key") && (
-                                                <TableCell className="text-center font-mono text-xs" onClick={(e) => e.stopPropagation()}>
-                                                    {track.keyCamelot ? (
-                                                        <MetadataLink field="key" value={track.keyCamelot} className="font-mono text-xs">
-                                                            <span className="text-[var(--foreground)]">{track.keyCamelot}</span>
-                                                            {" "}
-                                                            <span className="text-[var(--muted-foreground)]">
-                                                                {track.keyMusical || ""}
-                                                            </span>
-                                                        </MetadataLink>
-                                                    ) : "—"}
-                                                </TableCell>
-                                            )}
-                                            {/* Genre */}
-                                            {isVisible("genre") && (
-                                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                                    {track.genre ? (
-                                                        <MetadataLink field="genre" value={track.genre}>
-                                                            <Badge
-                                                                className={cn(
-                                                                    "text-[10px] px-1.5 py-0 cursor-pointer",
-                                                                    GENRE_COLORS[track.genre] ||
-                                                                    GENRE_COLORS.Other
-                                                                )}
+                                            {orderedColumns.map((col) => {
+                                                switch (col) {
+                                                    case "index": return (
+                                                        <TableCell key={col} className="text-center text-xs text-[var(--muted-foreground)]">
+                                                            {startIdx + idx + 1}
+                                                        </TableCell>
+                                                    );
+                                                    case "play": return (
+                                                        <TableCell key={col} className="text-center p-0" onClick={(e) => e.stopPropagation()}>
+                                                            <button
+                                                                onClick={() => isPlayingThis ? player.pause() : handlePlay(track)}
+                                                                className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-purple-500/20 transition-colors mx-auto cursor-pointer"
                                                             >
-                                                                {track.genre}
-                                                            </Badge>
-                                                        </MetadataLink>
-                                                    ) : (
-                                                        <span className="text-xs text-zinc-600">—</span>
-                                                    )}
-                                                </TableCell>
-                                            )}
-                                            {/* Energy */}
-                                            {isVisible("energy") && (
-                                                <TableCell className="text-center">
-                                                    {track.energy ? (
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <span
-                                                                className={cn(
-                                                                    "inline-block h-2 w-2 rounded-full",
-                                                                    ENERGY_COLORS[track.energy]
+                                                                {isPlayingThis ? (
+                                                                    <Pause className="h-3.5 w-3.5 text-purple-400" />
+                                                                ) : (
+                                                                    <Play className="h-3.5 w-3.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                                                                 )}
+                                                            </button>
+                                                        </TableCell>
+                                                    );
+                                                    case "artwork": return (
+                                                        <TableCell key={col} className="p-1">
+                                                            <Artwork src={track.artworkUrl} size="sm" showPlaceholder={false} />
+                                                        </TableCell>
+                                                    );
+                                                    case "favorites": return (
+                                                        <TableCell key={col} className="p-0" onClick={(e) => e.stopPropagation()}>
+                                                            <FavoriteButton
+                                                                isFavorite={!!track.isFavorite}
+                                                                size="sm"
+                                                                onChange={async () => { await toggleFavorite(track.id); router.refresh(); }}
                                                             />
-                                                            <span className="text-xs">{track.energy}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-xs text-zinc-600">—</span>
-                                                    )}
-                                                </TableCell>
-                                            )}
-                                            {/* Rating */}
-                                            {isVisible("rating") && (
-                                                <TableCell
-                                                    className="text-center"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <StarRating
-                                                        value={track.rating}
-                                                        size="sm"
-                                                        onChange={async (r) => {
-                                                            await setTrackRating(track.id, r || null);
-                                                            router.refresh();
-                                                        }}
-                                                    />
-                                                </TableCell>
-                                            )}
-                                            {/* Duration */}
-                                            {isVisible("duration") && (
-                                                <TableCell className="text-right text-xs tabular-nums text-[var(--muted-foreground)]">
-                                                    {formatDuration(track.duration)}
-                                                </TableCell>
-                                            )}
-                                            {/* Track Actions */}
+                                                        </TableCell>
+                                                    );
+                                                    case "artist": return (
+                                                        <TableCell key={col} className="max-w-[180px] truncate text-sm" onClick={(e) => e.stopPropagation()}>
+                                                            <MetadataLink field="artist" value={track.artist} className={cn("text-sm", isCurrentTrack && "text-purple-400")}>
+                                                                {track.artist || "Unknown"}
+                                                            </MetadataLink>
+                                                        </TableCell>
+                                                    );
+                                                    case "title": return (
+                                                        <TableCell key={col} className="max-w-[220px] text-sm">
+                                                            <div className="truncate font-medium">
+                                                                <span className={cn(isCurrentTrack && "text-purple-400")}>
+                                                                    {track.title || track.filename}
+                                                                </span>
+                                                            </div>
+                                                            <p className="truncate text-[10px] text-[var(--muted-foreground)]/50 mt-0.5" title={track.filepath}>
+                                                                {track.filepath}
+                                                            </p>
+                                                            {tags.length > 0 && (
+                                                                <div className="mt-0.5"><TagBadges tags={tags} /></div>
+                                                            )}
+                                                        </TableCell>
+                                                    );
+                                                    case "album": return (
+                                                        <TableCell key={col} className="max-w-[150px] truncate text-sm text-[var(--muted-foreground)]" onClick={(e) => e.stopPropagation()}>
+                                                            {track.album ? (
+                                                                <MetadataLink field="album" value={track.album} className="text-sm text-[var(--muted-foreground)]">
+                                                                    {track.album}
+                                                                </MetadataLink>
+                                                            ) : "—"}
+                                                        </TableCell>
+                                                    );
+                                                    case "bpm": return (
+                                                        <TableCell key={col} className="text-center text-sm tabular-nums">
+                                                            {track.bpm ? Math.round(track.bpm) : "—"}
+                                                        </TableCell>
+                                                    );
+                                                    case "key": return (
+                                                        <TableCell key={col} className="text-center font-mono text-xs" onClick={(e) => e.stopPropagation()}>
+                                                            {track.keyCamelot ? (
+                                                                <MetadataLink field="key" value={track.keyCamelot} className="font-mono text-xs">
+                                                                    <span className="text-[var(--foreground)]">{track.keyCamelot}</span>
+                                                                    {" "}
+                                                                    <span className="text-[var(--muted-foreground)]">{track.keyMusical || ""}</span>
+                                                                </MetadataLink>
+                                                            ) : "—"}
+                                                        </TableCell>
+                                                    );
+                                                    case "genre": return (
+                                                        <TableCell key={col} onClick={(e) => e.stopPropagation()}>
+                                                            {track.genre ? (
+                                                                <MetadataLink field="genre" value={track.genre}>
+                                                                    <Badge className={cn("text-[10px] px-1.5 py-0 cursor-pointer", GENRE_COLORS[track.genre] || GENRE_COLORS.Other)}>
+                                                                        {track.genre}
+                                                                    </Badge>
+                                                                </MetadataLink>
+                                                            ) : (
+                                                                <span className="text-xs text-zinc-600">—</span>
+                                                            )}
+                                                        </TableCell>
+                                                    );
+                                                    case "energy": return (
+                                                        <TableCell key={col} className="text-center">
+                                                            {track.energy ? (
+                                                                <div className="flex items-center justify-center gap-1">
+                                                                    <span className={cn("inline-block h-2 w-2 rounded-full", ENERGY_COLORS[track.energy])} />
+                                                                    <span className="text-xs">{track.energy}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-zinc-600">—</span>
+                                                            )}
+                                                        </TableCell>
+                                                    );
+                                                    case "rating": return (
+                                                        <TableCell key={col} className="text-center" onClick={(e) => e.stopPropagation()}>
+                                                            <StarRating
+                                                                value={track.rating}
+                                                                size="sm"
+                                                                onChange={async (r) => { await setTrackRating(track.id, r || null); router.refresh(); }}
+                                                            />
+                                                        </TableCell>
+                                                    );
+                                                    case "duration": return (
+                                                        <TableCell key={col} className="text-right text-xs tabular-nums text-[var(--muted-foreground)]">
+                                                            {formatDuration(track.duration)}
+                                                        </TableCell>
+                                                    );
+                                                    default: return null;
+                                                }
+                                            })}
                                             <TableCell
                                                 className="p-0"
                                                 onClick={(e) => e.stopPropagation()}

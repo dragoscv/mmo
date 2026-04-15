@@ -120,28 +120,81 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const analyserRef = useRef<AnalyserNode | null>(null);
     const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
 
-    // Safe play helper — catches AbortError when src changes mid-play
+    // Safe play helper — resumes AudioContext (browser autoplay policy) and
+    // catches AbortError when src changes mid-play
     const safePlay = (audio: HTMLAudioElement) => {
+        if (audioContextRef.current?.state === "suspended") {
+            audioContextRef.current.resume();
+        }
         audio.play().catch(() => {
             // AbortError is expected when a new load interrupts play()
         });
     };
-    const [state, setState] = useState<PlayerState>(() => {
-        const defaults: PlayerState = {
-            currentTrack: null,
-            isPlaying: false,
-            duration: 0,
-            currentTime: 0,
-            volume: 0.8,
-            queue: [],
-            queueIndex: -1,
-            shuffle: false,
-            repeat: "off",
-            isNowPlayingOpen: false,
-            playHistory: [],
-        };
-        return { ...defaults, ...loadPersistedState() };
+    const [state, setState] = useState<PlayerState>({
+        currentTrack: null,
+        isPlaying: false,
+        duration: 0,
+        currentTime: 0,
+        volume: 0.8,
+        queue: [],
+        queueIndex: -1,
+        shuffle: false,
+        repeat: "off",
+        isNowPlayingOpen: false,
+        playHistory: [],
     });
+
+    // Restore persisted state after mount to avoid hydration mismatch
+    useEffect(() => {
+        const persisted = loadPersistedState();
+        if (persisted.currentTrack) {
+            setState((prev) => ({ ...prev, ...persisted }));
+        }
+    }, []);
+
+    // ─── Media Session API — OS media controls ──────────────────────────
+    useEffect(() => {
+        if (!("mediaSession" in navigator)) return;
+
+        const track = state.currentTrack;
+        if (!track) {
+            navigator.mediaSession.metadata = null;
+            return;
+        }
+
+        const artwork: MediaImage[] = track.artworkUrl
+            ? [{ src: track.artworkUrl, sizes: "512x512", type: "image/jpeg" }]
+            : [];
+
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: track.title || track.filename,
+            artist: track.artist || "Unknown Artist",
+            album: track.album || "",
+            artwork,
+        });
+    }, [state.currentTrack?.id, state.currentTrack?.title, state.currentTrack?.artist, state.currentTrack?.album, state.currentTrack?.artworkUrl, state.currentTrack?.filename]);
+
+    // Update playback state for OS controls
+    useEffect(() => {
+        if (!("mediaSession" in navigator)) return;
+        navigator.mediaSession.playbackState = state.isPlaying ? "playing" : "paused";
+    }, [state.isPlaying]);
+
+    // Update position state for OS seek bar
+    useEffect(() => {
+        if (!("mediaSession" in navigator) || !navigator.mediaSession.setPositionState) return;
+        if (state.duration > 0) {
+            try {
+                navigator.mediaSession.setPositionState({
+                    duration: state.duration,
+                    playbackRate: 1,
+                    position: Math.min(state.currentTime, state.duration),
+                });
+            } catch {
+                // Invalid state (e.g., position > duration during track change)
+            }
+        }
+    }, [Math.floor(state.currentTime), state.duration]);
 
     // Helper: transition to a new track, pushing the old one to history
     const withHistory = (s: PlayerState, newTrack: Track, newIndex: number): Partial<PlayerState> => {
@@ -196,9 +249,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return () => window.removeEventListener("beforeunload", handleUnload);
     }, []);
 
-    // On mount: preload the saved track into the <audio> element (paused)
-    const hasRestoredRef = useRef(false);
-
+    // On mount: create <audio> element and preload saved track (paused)
     useEffect(() => {
         const audio = new Audio();
         audio.volume = state.volume;
@@ -274,21 +325,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         });
 
         // Restore saved track into audio element (paused) so the bar shows
-        if (!hasRestoredRef.current) {
-            hasRestoredRef.current = true;
-            const saved = loadPersistedState();
-            if (saved.currentTrack) {
-                const savedTime = saved.currentTime ?? 0;
-                audio.src = `/api/audio/${saved.currentTrack.id}`;
-                // Seek to saved position once metadata loads
-                const restoreTime = () => {
-                    if (savedTime > 0 && savedTime < audio.duration) {
-                        audio.currentTime = savedTime;
-                    }
-                    audio.removeEventListener("loadedmetadata", restoreTime);
-                };
-                audio.addEventListener("loadedmetadata", restoreTime);
-            }
+        const saved = loadPersistedState();
+        if (saved.currentTrack) {
+            const savedTime = saved.currentTime ?? 0;
+            audio.src = `/api/audio/${saved.currentTrack.id}`;
+            // Seek to saved position once metadata loads
+            const restoreTime = () => {
+                if (savedTime > 0 && savedTime < audio.duration) {
+                    audio.currentTime = savedTime;
+                }
+                audio.removeEventListener("loadedmetadata", restoreTime);
+            };
+            audio.addEventListener("loadedmetadata", restoreTime);
         }
 
         return () => {
@@ -495,6 +543,38 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const toggleNowPlaying = useCallback(() => {
         setState((s) => ({ ...s, isNowPlayingOpen: !s.isNowPlayingOpen }));
     }, []);
+
+    // ─── Media Session action handlers ──────────────────────────────────
+    useEffect(() => {
+        if (!("mediaSession" in navigator)) return;
+        const ms = navigator.mediaSession;
+        ms.setActionHandler("play", () => resume());
+        ms.setActionHandler("pause", () => pause());
+        ms.setActionHandler("previoustrack", () => prev());
+        ms.setActionHandler("nexttrack", () => next());
+        ms.setActionHandler("seekto", (details) => {
+            if (details.seekTime != null) seek(details.seekTime);
+        });
+        ms.setActionHandler("seekbackward", (details) => {
+            const offset = details.seekOffset || 10;
+            const audio = audioRef.current;
+            if (audio) seek(Math.max(0, audio.currentTime - offset));
+        });
+        ms.setActionHandler("seekforward", (details) => {
+            const offset = details.seekOffset || 10;
+            const audio = audioRef.current;
+            if (audio) seek(Math.min(audio.duration || 0, audio.currentTime + offset));
+        });
+        return () => {
+            ms.setActionHandler("play", null);
+            ms.setActionHandler("pause", null);
+            ms.setActionHandler("previoustrack", null);
+            ms.setActionHandler("nexttrack", null);
+            ms.setActionHandler("seekto", null);
+            ms.setActionHandler("seekbackward", null);
+            ms.setActionHandler("seekforward", null);
+        };
+    }, [resume, pause, prev, next, seek]);
 
     return (
         <PlayerContext.Provider
