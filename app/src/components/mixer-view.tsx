@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useEffect, useState, memo } from "react";
+import { useCallback, useRef, useEffect, useState, memo, Fragment } from "react";
 import { useMixer } from "./mixer-context";
 import { usePlayer } from "./player-context";
 import { DeckTrackPicker } from "./deck-track-picker";
-import { MixerWaveforms } from "./mixer-waveforms";
+import { MixerWaveforms, CUE_COLORS } from "./mixer-waveforms";
 import { MixerSettingsModal } from "./mixer-settings-modal";
 import { MixerBrowserModal } from "./mixer-browser-modal";
 import { SamplePickerModal } from "./sample-picker-modal";
@@ -22,6 +22,7 @@ import {
     FILTER_TYPES, COLOR_FX_TYPES, BEAT_FX_TYPES,
     type FilterType, type ColorFxType, type BeatFxType, type PadMode,
     type CrossfaderAssign, type WaveformMode, type AutomixMode,
+    type DeckSide, type DeckMode, DECK_COLORS,
 } from "@/lib/mixer-engine";
 import type { Track } from "@/db/schema";
 import {
@@ -55,6 +56,8 @@ import {
 } from "lucide-react";
 
 // ─── Utilities ───────────────────────────────────────────────────────────
+
+type DeckProps = { side: DeckSide; deck: DeckState; color: string; analyser: AnalyserNode | null };
 
 function formatTime(s: number): string {
     if (!s || !isFinite(s)) return "0:00";
@@ -393,7 +396,7 @@ const Crossfader = memo(function Crossfader({ value, onChange }: { value: number
 function LevelMeter({ analyser, color }: { analyser: AnalyserNode | null; color: string }) {
     const barARef = useRef<HTMLDivElement>(null);
     const barBRef = useRef<HTMLDivElement>(null);
-    const rafRef = useRef<number>();
+    const rafRef = useRef<number>(undefined);
 
     useEffect(() => {
         if (!analyser) return;
@@ -693,7 +696,7 @@ function ColorFxLinkSwitch({ value, onChange }: { value: ColorFxTarget; onChange
 
 // ─── Deck Info (Header + Track + Details + Time) ─────────────────────────
 
-function DeckInfo({ side, deck, color, track, onBrowse }: { side: "A" | "B"; deck: DeckState; color: string; track: Track | null; onBrowse?: () => void }) {
+function DeckInfo({ side, deck, color, track, onBrowse }: { side: DeckSide; deck: DeckState; color: string; track: Track | null; onBrowse?: () => void }) {
     const mixer = useMixer();
     const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -1152,7 +1155,7 @@ const DeckControls = memo(function DeckControls({ side, deck, color, analyser }:
                                             ? shiftActive ? "bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30" : "text-black shadow-sm"
                                             : "bg-white/[0.04] text-white/15 hover:bg-white/10 border border-dashed border-white/[0.08]"
                                     )}
-                                    style={cue != null && !shiftActive ? { backgroundColor: color } : undefined}>
+                                    style={cue != null && !shiftActive ? { backgroundColor: CUE_COLORS[i] || color } : undefined}>
                                     {shiftActive && cue != null ? <X className="h-3 w-3 mx-auto" /> : cue != null ? formatTime(cue) : `${i + 1}`}
                                 </button>
                             );
@@ -1195,212 +1198,201 @@ const DeckControls = memo(function DeckControls({ side, deck, color, analyser }:
     );
 });
 
-// ─── Center Mixer Strip (EQ, Trim, Filter, Color for both decks) ─────────
+// ─── Center Mixer Strip (EQ, Trim, Filter, Color for all channels) ───────
 
-const CenterMixerStrip = memo(function CenterMixerStrip({ deckAAnalyser, deckBAnalyser }: { deckAAnalyser: AnalyserNode | null; deckBAnalyser: AnalyserNode | null }) {
+const CenterMixerStrip = memo(function CenterMixerStrip({ analysers }: { analysers: Record<DeckSide, AnalyserNode | null> }) {
     const mixer = useMixer();
-    const personalization = usePersonalization();
-    const deckA = mixer.deckA;
-    const deckB = mixer.deckB;
+    const is4 = mixer.deckMode === "4deck";
     const [colorFxTarget, setColorFxTarget] = useState<ColorFxTarget>("LINK");
 
-    // When in LINK mode, sync both decks' Color FX knob + type
     const handleLinkedColorFx = useCallback((v: number) => {
-        mixer.setColorFx("A", v);
-        mixer.setColorFx("B", v);
+        mixer.setColorFx("A", v); mixer.setColorFx("B", v);
     }, [mixer]);
     const handleLinkedColorFxType = useCallback((type: ColorFxType) => {
-        mixer.setColorFxType("A", type);
-        mixer.setColorFxType("B", type);
+        mixer.setColorFxType("A", type); mixer.setColorFxType("B", type);
     }, [mixer]);
+
+    // Channel order: A,C on left — D,B on right
+    const sides: DeckSide[] = is4 ? ["A", "C", "D", "B"] : ["A", "B"];
+    const getDeck = (s: DeckSide) => mixer[`deck${s}` as "deckA" | "deckB" | "deckC" | "deckD"];
+    const leftSides: DeckSide[] = is4 ? ["A", "C"] : ["A"];
+    const rightSides: DeckSide[] = is4 ? ["D", "B"] : ["B"];
+
+    const gridCols = is4 ? "grid-cols-4" : "grid-cols-2";
+    const knobSz = is4 ? 24 : 30;
+    const knobSmSz = is4 ? 22 : 26;
+    const faderH = is4 ? 60 : 80;
 
     const selectClass = "w-full text-[7px] lg:text-[8px] xl:text-[9px] bg-white/[0.03] border border-white/[0.06] rounded px-1 py-0.5 text-white/40 outline-none cursor-pointer hover:bg-white/[0.06] transition-colors appearance-none text-center [&_option]:bg-[#1a1a2e] [&_option]:text-white/80";
     const labelCls = "text-[8px] lg:text-[9px] xl:text-[10px] uppercase tracking-wider text-white/20";
     const killBtnCls = "text-[7px] lg:text-[8px] xl:text-[9px] uppercase font-bold px-1 lg:px-1.5 py-0.5 rounded cursor-pointer transition-colors";
     const cueBtnCls = "text-[7px] lg:text-[8px] xl:text-[9px] py-1 lg:py-1.5 rounded flex items-center justify-center gap-1 cursor-pointer transition-colors";
 
+    const colorFxCategories = [...new Set(COLOR_FX_TYPES.map(f => f.category))];
+    const anyPlaying = sides.some(s => getDeck(s).isPlaying);
+
+    const renderColorFxSelect = (side: DeckSide, value: ColorFxType, onChange: (t: ColorFxType) => void, colSpan?: string) => (
+        <select value={value} onChange={e => onChange(e.target.value as ColorFxType)} className={cn(selectClass, "text-pink-400/40 [&_optgroup]:bg-[#1a1a2e] [&_optgroup]:text-white/50", colSpan)}>
+            {colorFxCategories.map(cat => (
+                <optgroup key={cat} label={cat}>
+                    {COLOR_FX_TYPES.filter(f => f.category === cat).map(f => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                </optgroup>
+            ))}
+        </select>
+    );
+
     return (
-        <div className="w-40 lg:w-48 xl:w-56 2xl:w-64 shrink-0 overflow-y-auto border-x border-white/[0.04] bg-white/[0.01] px-1.5 lg:px-2 xl:px-2.5 py-1.5 flex flex-col gap-1.5 lg:gap-2">
-            {/* Column labels */}
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center">
-                <span className="text-[8px] lg:text-[9px] font-bold text-purple-400/70 text-center">A</span>
-                <span className={cn(labelCls, "px-1 text-white/15")}>Mixer</span>
-                <span className="text-[8px] lg:text-[9px] font-bold text-blue-400/70 text-center">B</span>
+        <div className={cn(
+            "shrink-0 overflow-y-auto border-x border-white/[0.04] bg-white/[0.01] px-1.5 lg:px-2 xl:px-2.5 py-1.5 flex flex-col gap-1.5 lg:gap-2",
+            is4 ? "w-64 lg:w-80 xl:w-96 2xl:w-[28rem]" : "w-40 lg:w-48 xl:w-56 2xl:w-64"
+        )}>
+            {/* Column labels + Deck Mode Switcher */}
+            <div className="flex items-center">
+                {sides.map((s, i) => (
+                    <Fragment key={s}>
+                        <span className="text-[8px] lg:text-[9px] font-bold text-center flex-1" style={{ color: DECK_COLORS[s] }}>{s}</span>
+                        {i === (is4 ? 1 : 0) && (
+                            <div className="flex items-center gap-0.5 shrink-0 mx-1">
+                                <span className={cn(labelCls, "text-white/15 mr-0.5")}>Mixer</span>
+                                <button onClick={() => mixer.setDeckMode("2deck")}
+                                    className={cn("text-[7px] font-bold px-1 py-0.5 rounded cursor-pointer transition-all border",
+                                        !is4 ? "bg-white/15 text-white/70 border-white/20" : "text-white/20 hover:text-white/40 border-transparent"
+                                    )}>2</button>
+                                <button onClick={() => mixer.setDeckMode("4deck")}
+                                    className={cn("text-[7px] font-bold px-1 py-0.5 rounded cursor-pointer transition-all border",
+                                        is4 ? "bg-white/15 text-white/70 border-white/20" : "text-white/20 hover:text-white/40 border-transparent"
+                                    )}>4</button>
+                            </div>
+                        )}
+                    </Fragment>
+                ))}
             </div>
 
             {/* EQ */}
             <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-1.5 lg:p-2 xl:p-2.5">
                 <span className={cn(labelCls, "mb-1.5 block text-center")}>EQ</span>
-                <div className="grid grid-cols-2 gap-x-3 lg:gap-x-4 gap-y-1">
-                    {(["hi", "mid", "low"] as const).map(band => {
-                        const eqA = band === "hi" ? deckA.eqHi : band === "mid" ? deckA.eqMid : deckA.eqLow;
-                        const killA = band === "hi" ? deckA.eqHiKill : band === "mid" ? deckA.eqMidKill : deckA.eqLowKill;
-                        const eqB = band === "hi" ? deckB.eqHi : band === "mid" ? deckB.eqMid : deckB.eqLow;
-                        const killB = band === "hi" ? deckB.eqHiKill : band === "mid" ? deckB.eqMidKill : deckB.eqLowKill;
-                        return [
-                            <div key={`a-${band}`} className="flex flex-col items-center gap-0.5">
-                                <Knob value={eqA} min={-26} max={6} onChange={(v) => mixer.setEQ("A", band, v)} onDoubleClick={() => mixer.toggleEQKill("A", band)} color="rgb(168,85,247)" size={30} isKilled={killA} showValue centerValue={0} valueFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}dB`} />
-                                <button onClick={() => mixer.toggleEQKill("A", band)} className={cn(killBtnCls, killA ? "bg-red-500/30 text-red-400" : "text-white/20 hover:text-white/40")}>{band}</button>
-                            </div>,
-                            <div key={`b-${band}`} className="flex flex-col items-center gap-0.5">
-                                <Knob value={eqB} min={-26} max={6} onChange={(v) => mixer.setEQ("B", band, v)} onDoubleClick={() => mixer.toggleEQKill("B", band)} color="rgb(59,130,246)" size={30} isKilled={killB} showValue centerValue={0} valueFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}dB`} />
-                                <button onClick={() => mixer.toggleEQKill("B", band)} className={cn(killBtnCls, killB ? "bg-red-500/30 text-red-400" : "text-white/20 hover:text-white/40")}>{band}</button>
-                            </div>,
-                        ];
-                    })}
+                <div className={cn("grid gap-x-2 lg:gap-x-3 gap-y-1", gridCols)}>
+                    {(["hi", "mid", "low"] as const).map(band =>
+                        sides.map(s => {
+                            const d = getDeck(s);
+                            const eq = band === "hi" ? d.eqHi : band === "mid" ? d.eqMid : d.eqLow;
+                            const kill = band === "hi" ? d.eqHiKill : band === "mid" ? d.eqMidKill : d.eqLowKill;
+                            return (
+                                <div key={`${s}-${band}`} className="flex flex-col items-center gap-0.5">
+                                    <Knob value={eq} min={-26} max={6} onChange={v => mixer.setEQ(s, band, v)} onDoubleClick={() => mixer.toggleEQKill(s, band)} color={DECK_COLORS[s]} size={knobSz} isKilled={kill} showValue centerValue={0} valueFormatter={v => `${v > 0 ? "+" : ""}${v.toFixed(0)}dB`} />
+                                    <button onClick={() => mixer.toggleEQKill(s, band)} className={cn(killBtnCls, kill ? "bg-red-500/30 text-red-400" : "text-white/20 hover:text-white/40")}>{band}</button>
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
             </div>
 
             {/* Trim / Filter / Color */}
             <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-1.5 lg:p-2 xl:p-2.5">
-                <div className="grid grid-cols-2 gap-x-3 lg:gap-x-4 gap-y-1.5">
+                <div className={cn("grid gap-x-2 lg:gap-x-3 gap-y-1.5", gridCols)}>
                     {/* Trim */}
-                    <div className="flex flex-col items-center">
-                        <Knob
-                            value={deckA.volume > 0 ? Math.max(-26, 20 * Math.log10(deckA.volume)) : -26}
-                            min={-26} max={6}
-                            onChange={(v) => mixer.setVolume("A", Math.pow(10, v / 20))}
-                            onDoubleClick={() => mixer.setVolume("A", 1)}
-                            color={deckA.volume > 1.05 ? "rgb(234,179,8)" : deckA.volume < 0.05 ? "rgba(255,255,255,0.15)" : "rgb(168,85,247)"}
-                            size={26} label="Trim" showValue centerValue={0}
-                            valueFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}dB`}
-                        />
-                    </div>
-                    <div className="flex flex-col items-center">
-                        <Knob
-                            value={deckB.volume > 0 ? Math.max(-26, 20 * Math.log10(deckB.volume)) : -26}
-                            min={-26} max={6}
-                            onChange={(v) => mixer.setVolume("B", Math.pow(10, v / 20))}
-                            onDoubleClick={() => mixer.setVolume("B", 1)}
-                            color={deckB.volume > 1.05 ? "rgb(234,179,8)" : deckB.volume < 0.05 ? "rgba(255,255,255,0.15)" : "rgb(59,130,246)"}
-                            size={26} label="Trim" showValue centerValue={0}
-                            valueFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}dB`}
-                        />
-                    </div>
+                    {sides.map(s => {
+                        const d = getDeck(s);
+                        return (
+                            <div key={`trim-${s}`} className="flex flex-col items-center">
+                                <Knob
+                                    value={d.volume > 0 ? Math.max(-26, 20 * Math.log10(d.volume)) : -26}
+                                    min={-26} max={6}
+                                    onChange={v => mixer.setVolume(s, Math.pow(10, v / 20))}
+                                    onDoubleClick={() => mixer.setVolume(s, 1)}
+                                    color={d.volume > 1.05 ? "rgb(234,179,8)" : d.volume < 0.05 ? "rgba(255,255,255,0.15)" : DECK_COLORS[s]}
+                                    size={knobSmSz} label="Trim" showValue centerValue={0}
+                                    valueFormatter={v => `${v > 0 ? "+" : ""}${v.toFixed(0)}dB`}
+                                />
+                            </div>
+                        );
+                    })}
                     {/* Filter */}
-                    <div className="flex flex-col items-center">
-                        <Knob
-                            value={deckA.filter} min={-1} max={1}
-                            onChange={(v) => mixer.setFilter("A", v)}
-                            onDoubleClick={() => mixer.setFilter("A", 0)}
-                            color={Math.abs(deckA.filter) > 0.05 ? (deckA.filter < 0 ? "rgb(234,179,8)" : "rgb(59,130,246)") : "rgba(255,255,255,0.3)"}
-                            size={26} label="Filter" showValue centerValue={0}
-                            valueFormatter={(v) => { if (Math.abs(v) < 0.05) return "OFF"; return v < 0 ? "LP" : "HP"; }}
-                        />
-                    </div>
-                    <div className="flex flex-col items-center">
-                        <Knob
-                            value={deckB.filter} min={-1} max={1}
-                            onChange={(v) => mixer.setFilter("B", v)}
-                            onDoubleClick={() => mixer.setFilter("B", 0)}
-                            color={Math.abs(deckB.filter) > 0.05 ? (deckB.filter < 0 ? "rgb(234,179,8)" : "rgb(59,130,246)") : "rgba(255,255,255,0.3)"}
-                            size={26} label="Filter" showValue centerValue={0}
-                            valueFormatter={(v) => { if (Math.abs(v) < 0.05) return "OFF"; return v < 0 ? "LP" : "HP"; }}
-                        />
-                    </div>
-                    {/* Color FX — respects LINK mode */}
-                    {colorFxTarget === "LINK" ? (
+                    {sides.map(s => {
+                        const d = getDeck(s);
+                        return (
+                            <div key={`filter-${s}`} className="flex flex-col items-center">
+                                <Knob
+                                    value={d.filter} min={-1} max={1}
+                                    onChange={v => mixer.setFilter(s, v)}
+                                    onDoubleClick={() => mixer.setFilter(s, 0)}
+                                    color={Math.abs(d.filter) > 0.05 ? (d.filter < 0 ? "rgb(234,179,8)" : "rgb(59,130,246)") : "rgba(255,255,255,0.3)"}
+                                    size={knobSmSz} label="Filter" showValue centerValue={0}
+                                    valueFormatter={v => { if (Math.abs(v) < 0.05) return "OFF"; return v < 0 ? "LP" : "HP"; }}
+                                />
+                            </div>
+                        );
+                    })}
+                    {/* Color FX */}
+                    {is4 ? (
+                        sides.map(s => {
+                            const d = getDeck(s);
+                            return (
+                                <div key={`color-${s}`} className="flex flex-col items-center">
+                                    <Knob
+                                        value={d.colorFx} min={-1} max={1}
+                                        onChange={v => mixer.setColorFx(s, v)}
+                                        onDoubleClick={() => mixer.setColorFx(s, 0)}
+                                        color={Math.abs(d.colorFx) > 0.05 ? "rgb(236,72,153)" : "rgba(255,255,255,0.3)"}
+                                        size={knobSmSz} label="Color" showValue centerValue={0}
+                                        valueFormatter={v => { const fx = COLOR_FX_TYPES.find(f => f.id === d.colorFxType); if (Math.abs(v) < 0.05) return "OFF"; return fx?.name || "Echo"; }}
+                                    />
+                                </div>
+                            );
+                        })
+                    ) : colorFxTarget === "LINK" ? (
                         <div className="col-span-2 flex flex-col items-center">
                             <Knob
-                                value={deckA.colorFx} min={-1} max={1}
+                                value={getDeck("A").colorFx} min={-1} max={1}
                                 onChange={handleLinkedColorFx}
                                 onDoubleClick={() => { mixer.setColorFx("A", 0); mixer.setColorFx("B", 0); }}
-                                color={Math.abs(deckA.colorFx) > 0.05 ? "rgb(236,72,153)" : "rgba(255,255,255,0.3)"}
+                                color={Math.abs(getDeck("A").colorFx) > 0.05 ? "rgb(236,72,153)" : "rgba(255,255,255,0.3)"}
                                 size={30} label="Color" showValue centerValue={0}
-                                valueFormatter={(v) => { const fx = COLOR_FX_TYPES.find(f => f.id === deckA.colorFxType); if (Math.abs(v) < 0.05) return "OFF"; return fx?.name || "Echo"; }}
+                                valueFormatter={v => { const fx = COLOR_FX_TYPES.find(f => f.id === getDeck("A").colorFxType); if (Math.abs(v) < 0.05) return "OFF"; return fx?.name || "Echo"; }}
                             />
                         </div>
                     ) : (
-                        <>
-                            <div className="flex flex-col items-center" style={{ opacity: colorFxTarget === "B" ? 0.3 : 1 }}>
-                                <Knob
-                                    value={deckA.colorFx} min={-1} max={1}
-                                    onChange={(v) => mixer.setColorFx("A", v)}
-                                    onDoubleClick={() => mixer.setColorFx("A", 0)}
-                                    color={Math.abs(deckA.colorFx) > 0.05 ? "rgb(236,72,153)" : "rgba(255,255,255,0.3)"}
-                                    size={26} label="Color" showValue centerValue={0}
-                                    valueFormatter={(v) => { const fx = COLOR_FX_TYPES.find(f => f.id === deckA.colorFxType); if (Math.abs(v) < 0.05) return "OFF"; return fx?.name || "Echo"; }}
-                                />
-                            </div>
-                            <div className="flex flex-col items-center" style={{ opacity: colorFxTarget === "A" ? 0.3 : 1 }}>
-                                <Knob
-                                    value={deckB.colorFx} min={-1} max={1}
-                                    onChange={(v) => mixer.setColorFx("B", v)}
-                                    onDoubleClick={() => mixer.setColorFx("B", 0)}
-                                    color={Math.abs(deckB.colorFx) > 0.05 ? "rgb(236,72,153)" : "rgba(255,255,255,0.3)"}
-                                    size={26} label="Color" showValue centerValue={0}
-                                    valueFormatter={(v) => { const fx = COLOR_FX_TYPES.find(f => f.id === deckB.colorFxType); if (Math.abs(v) < 0.05) return "OFF"; return fx?.name || "Echo"; }}
-                                />
-                            </div>
-                        </>
+                        sides.map(s => {
+                            const d = getDeck(s);
+                            return (
+                                <div key={`color-${s}`} className="flex flex-col items-center" style={{ opacity: colorFxTarget !== s ? 0.3 : 1 }}>
+                                    <Knob
+                                        value={d.colorFx} min={-1} max={1}
+                                        onChange={v => mixer.setColorFx(s, v)}
+                                        onDoubleClick={() => mixer.setColorFx(s, 0)}
+                                        color={Math.abs(d.colorFx) > 0.05 ? "rgb(236,72,153)" : "rgba(255,255,255,0.3)"}
+                                        size={knobSmSz} label="Color" showValue centerValue={0}
+                                        valueFormatter={v => { const fx = COLOR_FX_TYPES.find(f => f.id === d.colorFxType); if (Math.abs(v) < 0.05) return "OFF"; return fx?.name || "Echo"; }}
+                                    />
+                                </div>
+                            );
+                        })
                     )}
                 </div>
 
-                {/* Color FX Link Switch */}
-                <div className="flex justify-center mt-1">
-                    <ColorFxLinkSwitch value={colorFxTarget} onChange={setColorFxTarget} />
-                </div>
+                {/* Color FX Link Switch (2-deck only) */}
+                {!is4 && (
+                    <div className="flex justify-center mt-1">
+                        <ColorFxLinkSwitch value={colorFxTarget} onChange={setColorFxTarget} />
+                    </div>
+                )}
 
                 {/* Type Selectors */}
-                <div className="grid grid-cols-2 gap-1 mt-1.5 lg:mt-2">
-                    <select value={deckA.filterType} onChange={(e) => mixer.setFilterType("A", e.target.value as FilterType)} className={selectClass}>
-                        {FILTER_TYPES.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                    </select>
-                    <select value={deckB.filterType} onChange={(e) => mixer.setFilterType("B", e.target.value as FilterType)} className={selectClass}>
-                        {FILTER_TYPES.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                    </select>
-                    {colorFxTarget === "LINK" ? (
-                        <select
-                            value={deckA.colorFxType}
-                            onChange={(e) => handleLinkedColorFxType(e.target.value as ColorFxType)}
-                            className={cn(selectClass, "col-span-2 text-pink-400/40 [&_optgroup]:bg-[#1a1a2e] [&_optgroup]:text-white/50")}
-                        >
-                            {(() => {
-                                const categories = [...new Set(COLOR_FX_TYPES.map(f => f.category))];
-                                return categories.map(cat => (
-                                    <optgroup key={cat} label={cat}>
-                                        {COLOR_FX_TYPES.filter(f => f.category === cat).map(f => (
-                                            <option key={f.id} value={f.id}>{f.name}</option>
-                                        ))}
-                                    </optgroup>
-                                ));
-                            })()}
+                <div className={cn("grid gap-1 mt-1.5 lg:mt-2", gridCols)}>
+                    {sides.map(s => (
+                        <select key={`ft-${s}`} value={getDeck(s).filterType} onChange={e => mixer.setFilterType(s, e.target.value as FilterType)} className={selectClass}>
+                            {FILTER_TYPES.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                         </select>
+                    ))}
+                    {is4 ? (
+                        sides.map(s => renderColorFxSelect(s, getDeck(s).colorFxType, t => mixer.setColorFxType(s, t)))
+                    ) : colorFxTarget === "LINK" ? (
+                        renderColorFxSelect("A", getDeck("A").colorFxType, handleLinkedColorFxType, "col-span-2")
                     ) : (
-                        <>
-                            <select
-                                value={deckA.colorFxType}
-                                onChange={(e) => mixer.setColorFxType("A", e.target.value as ColorFxType)}
-                                className={cn(selectClass, "text-pink-400/40 [&_optgroup]:bg-[#1a1a2e] [&_optgroup]:text-white/50")}
-                            >
-                                {(() => {
-                                    const categories = [...new Set(COLOR_FX_TYPES.map(f => f.category))];
-                                    return categories.map(cat => (
-                                        <optgroup key={cat} label={cat}>
-                                            {COLOR_FX_TYPES.filter(f => f.category === cat).map(f => (
-                                                <option key={f.id} value={f.id}>{f.name}</option>
-                                            ))}
-                                        </optgroup>
-                                    ));
-                                })()}
-                            </select>
-                            <select
-                                value={deckB.colorFxType}
-                                onChange={(e) => mixer.setColorFxType("B", e.target.value as ColorFxType)}
-                                className={cn(selectClass, "text-pink-400/40 [&_optgroup]:bg-[#1a1a2e] [&_optgroup]:text-white/50")}
-                            >
-                                {(() => {
-                                    const categories = [...new Set(COLOR_FX_TYPES.map(f => f.category))];
-                                    return categories.map(cat => (
-                                        <optgroup key={cat} label={cat}>
-                                            {COLOR_FX_TYPES.filter(f => f.category === cat).map(f => (
-                                                <option key={f.id} value={f.id}>{f.name}</option>
-                                            ))}
-                                        </optgroup>
-                                    ));
-                                })()}
-                            </select>
-                        </>
+                        sides.map(s => renderColorFxSelect(s, getDeck(s).colorFxType, t => mixer.setColorFxType(s, t)))
                     )}
                 </div>
             </div>
@@ -1408,60 +1400,57 @@ const CenterMixerStrip = memo(function CenterMixerStrip({ deckAAnalyser, deckBAn
             {/* Channel Volume Faders + Level Meters */}
             <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-1.5 lg:p-2 xl:p-2.5">
                 <span className={cn(labelCls, "mb-1.5 block text-center")}>Channel</span>
-                <div className="flex items-end justify-center gap-2 lg:gap-3">
-                    <VerticalFader
-                        value={deckA.volume}
-                        min={0} max={1.5}
-                        onChange={(v) => mixer.setVolume("A", v)}
-                        height={80}
-                        color="rgb(168,85,247)"
-                        label="A"
-                    />
-                    <LevelMeter analyser={deckAAnalyser} color="rgb(168,85,247)" />
+                <div className={cn("flex items-end justify-center", is4 ? "gap-1" : "gap-2 lg:gap-3")}>
+                    {leftSides.map(s => (
+                        <Fragment key={s}>
+                            <VerticalFader value={getDeck(s).volume} min={0} max={1.5} onChange={v => mixer.setVolume(s, v)} height={faderH} color={DECK_COLORS[s]} label={s} />
+                            <LevelMeter analyser={analysers[s]} color={DECK_COLORS[s]} />
+                        </Fragment>
+                    ))}
                     <button
                         onClick={() => {
-                            const aPlaying = mixer.deckA.isPlaying;
-                            const bPlaying = mixer.deckB.isPlaying;
-                            if (aPlaying || bPlaying) {
-                                if (aPlaying) mixer.pause("A");
-                                if (bPlaying) mixer.pause("B");
+                            if (anyPlaying) {
+                                sides.forEach(s => { if (getDeck(s).isPlaying) mixer.pause(s); });
                             } else {
-                                if (mixer.deckA.trackId) mixer.play("A");
-                                if (mixer.deckB.trackId) mixer.play("B");
+                                sides.forEach(s => { if (getDeck(s).trackId) mixer.play(s); });
                             }
                         }}
                         className={cn(
                             "flex items-center justify-center w-7 h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 rounded-full transition-all cursor-pointer border shrink-0",
-                            mixer.deckA.isPlaying || mixer.deckB.isPlaying
+                            anyPlaying
                                 ? "bg-white/15 border-white/20 text-white shadow-[0_0_12px_rgba(255,255,255,0.1)]"
                                 : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"
                         )}
-                        title={mixer.deckA.isPlaying || mixer.deckB.isPlaying ? "Pause All" : "Play All"}
+                        title={anyPlaying ? "Pause All" : "Play All"}
                     >
-                        {mixer.deckA.isPlaying || mixer.deckB.isPlaying ? <Pause className="h-3 w-3 lg:h-3.5 lg:w-3.5" /> : <Play className="h-3 w-3 lg:h-3.5 lg:w-3.5 ml-0.5" />}
+                        {anyPlaying ? <Pause className="h-3 w-3 lg:h-3.5 lg:w-3.5" /> : <Play className="h-3 w-3 lg:h-3.5 lg:w-3.5 ml-0.5" />}
                     </button>
-                    <LevelMeter analyser={deckBAnalyser} color="rgb(59,130,246)" />
-                    <VerticalFader
-                        value={deckB.volume}
-                        min={0} max={1.5}
-                        onChange={(v) => mixer.setVolume("B", v)}
-                        height={80}
-                        color="rgb(59,130,246)"
-                        label="B"
-                    />
+                    {rightSides.map(s => (
+                        <Fragment key={s}>
+                            <LevelMeter analyser={analysers[s]} color={DECK_COLORS[s]} />
+                            <VerticalFader value={getDeck(s).volume} min={0} max={1.5} onChange={v => mixer.setVolume(s, v)} height={faderH} color={DECK_COLORS[s]} label={s} />
+                        </Fragment>
+                    ))}
                 </div>
             </div>
 
             {/* Headphone Cue Toggles */}
-            <div className="grid grid-cols-2 gap-1">
-                <button
-                    onClick={() => mixer.toggleHeadphoneCue("A")}
-                    className={cn(cueBtnCls, mixer.deckA.headphoneCue ? "bg-purple-500/20 text-purple-300 border border-purple-500/30" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06] border border-white/[0.06]")}
-                ><Headphones className="h-2.5 w-2.5 lg:h-3 lg:w-3" /> CUE A</button>
-                <button
-                    onClick={() => mixer.toggleHeadphoneCue("B")}
-                    className={cn(cueBtnCls, mixer.deckB.headphoneCue ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06] border border-white/[0.06]")}
-                ><Headphones className="h-2.5 w-2.5 lg:h-3 lg:w-3" /> CUE B</button>
+            <div className={cn("grid gap-1", gridCols)}>
+                {sides.map(s => {
+                    const d = getDeck(s);
+                    const isActive = d.headphoneCue;
+                    return (
+                        <button key={`cue-${s}`}
+                            onClick={() => mixer.toggleHeadphoneCue(s)}
+                            className={cn(cueBtnCls, isActive
+                                ? `border` : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06] border border-white/[0.06]"
+                            )}
+                            style={isActive ? { backgroundColor: `${DECK_COLORS[s]}20`, color: DECK_COLORS[s], borderColor: `${DECK_COLORS[s]}40` } : undefined}
+                        >
+                            <Headphones className="h-2.5 w-2.5 lg:h-3 lg:w-3" /> CUE {s}
+                        </button>
+                    );
+                })}
             </div>
 
         </div>
@@ -1477,7 +1466,10 @@ export function MixerView() {
     const currentTrack = player.currentTrack;
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [browserOpen, setBrowserOpen] = useState(false);
-    const [browserTargetDeck, setBrowserTargetDeck] = useState<"A" | "B">("A");
+    const [browserTargetDeck, setBrowserTargetDeck] = useState<DeckSide>("A");
+    const [activeDeckLeft, setActiveDeckLeft] = useState<DeckSide>("A");
+    const [activeDeckRight, setActiveDeckRight] = useState<DeckSide>("B");
+    const is4 = mixer.deckMode === "4deck";
 
     const [waveformOrientation, setWaveformOrientation] = useState<"horizontal" | "vertical">(() => {
         if (typeof window !== "undefined") {
@@ -1659,7 +1651,7 @@ export function MixerView() {
                 }
                 break;
             case "loop-in":
-                if (deck && isPress) mixer.setLoop(deck, mixer[deck === "A" ? "deckA" : "deckB"].loopBeats);
+                if (deck && isPress) mixer.setLoop(deck, mixer[`deck${deck}` as "deckA" | "deckB" | "deckC" | "deckD"].loopBeats);
                 break;
             case "beatloop-0.25":
                 if (deck && isPress) mixer.setLoop(deck, 0.25);
@@ -1690,14 +1682,14 @@ export function MixerView() {
                 break;
             case "loop-halve":
                 if (deck && isPress) {
-                    const deckState = mixer[deck === "A" ? "deckA" : "deckB"];
+                    const deckState = mixer[`deck${deck}` as "deckA" | "deckB" | "deckC" | "deckD"];
                     const newBeats = Math.max(0.25, deckState.loopBeats / 2);
                     mixer.setLoop(deck, newBeats);
                 }
                 break;
             case "loop-double":
                 if (deck && isPress) {
-                    const deckState = mixer[deck === "A" ? "deckA" : "deckB"];
+                    const deckState = mixer[`deck${deck}` as "deckA" | "deckB" | "deckC" | "deckD"];
                     const newBeats = Math.min(32, deckState.loopBeats * 2);
                     mixer.setLoop(deck, newBeats);
                 }
@@ -1705,7 +1697,7 @@ export function MixerView() {
             case "hotcue-1": case "hotcue-2": case "hotcue-3": case "hotcue-4":
                 if (deck && isPress) {
                     const idx = parseInt(action.split("-")[1]) - 1;
-                    const cue = mixer[deck === "A" ? "deckA" : "deckB"].hotCues[idx];
+                    const cue = mixer[`deck${deck}` as "deckA" | "deckB" | "deckC" | "deckD"].hotCues[idx];
                     if (cue != null) mixer.jumpHotCue(deck, idx);
                     else mixer.setHotCue(deck, idx);
                 }
@@ -1719,7 +1711,7 @@ export function MixerView() {
             case "hotcue-5": case "hotcue-6": case "hotcue-7": case "hotcue-8":
                 if (deck && isPress) {
                     const idx = parseInt(action.split("-")[1]) - 1;
-                    const cue = mixer[deck === "A" ? "deckA" : "deckB"].hotCues[idx];
+                    const cue = mixer[`deck${deck}` as "deckA" | "deckB" | "deckC" | "deckD"].hotCues[idx];
                     if (cue != null) mixer.jumpHotCue(deck, idx);
                     else mixer.setHotCue(deck, idx);
                 }
@@ -1806,7 +1798,7 @@ export function MixerView() {
             case "fx-select":
                 // Cycle Beat FX types
                 if (deck && isPress) {
-                    const deckState = mixer[deck === "A" ? "deckA" : "deckB"];
+                    const deckState = mixer[`deck${deck}` as "deckA" | "deckB" | "deckC" | "deckD"];
                     const currentIdx = BEAT_FX_TYPES.findIndex(f => f.id === deckState.beatFxType);
                     const nextIdx = (currentIdx + 1) % BEAT_FX_TYPES.length;
                     mixer.setBeatFx(deck, BEAT_FX_TYPES[nextIdx].id);
@@ -1847,7 +1839,7 @@ export function MixerView() {
             case "color-fx-select":
                 // Cycle color FX type for the deck
                 if (deck && isPress) {
-                    const deckState = mixer[deck === "A" ? "deckA" : "deckB"];
+                    const deckState = mixer[`deck${deck}` as "deckA" | "deckB" | "deckC" | "deckD"];
                     const currentIdx = COLOR_FX_TYPES.findIndex(f => f.id === deckState.colorFxType);
                     const nextIdx = (currentIdx + 1) % COLOR_FX_TYPES.length;
                     mixer.setColorFxType(deck, COLOR_FX_TYPES[nextIdx].id);
@@ -1866,7 +1858,7 @@ export function MixerView() {
             case "pad-mode":
                 if (deck && isPress) {
                     const modes: PadMode[] = ["hotcue", "beatloop", "beatjump", "sampler"];
-                    const deckState = mixer[deck === "A" ? "deckA" : "deckB"];
+                    const deckState = mixer[`deck${deck}` as "deckA" | "deckB" | "deckC" | "deckD"];
                     const currentIdx = modes.indexOf(deckState.padMode);
                     mixer.setPadMode(deck, modes[(currentIdx + 1) % modes.length]);
                 }
@@ -1874,8 +1866,18 @@ export function MixerView() {
         }
     }, [mixer, browserOpen]);
 
-    const deckAAnalyser = mixer.getDeckAnalyser("A");
-    const deckBAnalyser = mixer.getDeckAnalyser("B");
+    const analysers: Record<DeckSide, AnalyserNode | null> = {
+        A: mixer.getDeckAnalyser("A"),
+        B: mixer.getDeckAnalyser("B"),
+        C: mixer.getDeckAnalyser("C"),
+        D: mixer.getDeckAnalyser("D"),
+    };
+    const getDeck = (s: DeckSide) => mixer[`deck${s}` as "deckA" | "deckB" | "deckC" | "deckD"];
+    const getDeckTrack = (s: DeckSide) => mixer[`deck${s}Track` as "deckATrack" | "deckBTrack" | "deckCTrack" | "deckDTrack"];
+
+    // Active deck for left/right controls — auto-reset to A/B if switching to 2-deck mode
+    const leftDeck = is4 ? activeDeckLeft : "A" as DeckSide;
+    const rightDeck = is4 ? activeDeckRight : "B" as DeckSide;
 
     return (
         <div
@@ -1891,13 +1893,15 @@ export function MixerView() {
         >
             {/* Row 1: Track Info Cards + Performance Stats */}
             <div className="shrink-0 flex gap-1.5 lg:gap-2 px-1.5 lg:px-2 pt-1.5 pb-1 [&>*]:min-w-0">
-                <DeckInfo side="A" deck={mixer.deckA} color="rgb(168,85,247)" track={mixer.deckATrack} onBrowse={() => { setBrowserTargetDeck("A"); setBrowserOpen(true); }} />
+                <DeckInfo side="A" deck={mixer.deckA} color={DECK_COLORS.A} track={mixer.deckATrack} onBrowse={() => { setBrowserTargetDeck("A"); setBrowserOpen(true); }} />
+                {is4 && <DeckInfo side="C" deck={mixer.deckC} color={DECK_COLORS.C} track={mixer.deckCTrack} onBrowse={() => { setBrowserTargetDeck("C"); setBrowserOpen(true); }} />}
                 {personalization.performanceStatsPosition === "on" && (
                     <div className="shrink-0">
                         <PerformancePanel />
                     </div>
                 )}
-                <DeckInfo side="B" deck={mixer.deckB} color="rgb(59,130,246)" track={mixer.deckBTrack} onBrowse={() => { setBrowserTargetDeck("B"); setBrowserOpen(true); }} />
+                {is4 && <DeckInfo side="D" deck={mixer.deckD} color={DECK_COLORS.D} track={mixer.deckDTrack} onBrowse={() => { setBrowserTargetDeck("D"); setBrowserOpen(true); }} />}
+                <DeckInfo side="B" deck={mixer.deckB} color={DECK_COLORS.B} track={mixer.deckBTrack} onBrowse={() => { setBrowserTargetDeck("B"); setBrowserOpen(true); }} />
             </div>
 
             {/* Row 2: Full-width Waveforms */}
@@ -1908,19 +1912,45 @@ export function MixerView() {
                 />
             </div>
 
-            {/* Row 3: Deck A | Center Mixer Strip | Deck B */}
+            {/* Row 3: Left Deck | Center Mixer Strip | Right Deck */}
             <div className="flex-1 min-h-0 grid grid-cols-[1fr_auto_1fr] overflow-hidden">
-                {/* Deck A Controls */}
+                {/* Left Deck Controls */}
                 <div className="overflow-y-auto px-1.5 lg:px-2 xl:px-3 py-1.5">
-                    <DeckControls side="A" deck={mixer.deckA} color="rgb(168,85,247)" analyser={deckAAnalyser} />
+                    {is4 && (
+                        <div className="flex gap-1 mb-1.5">
+                            {(["A", "C"] as DeckSide[]).map(s => (
+                                <button key={s} onClick={() => setActiveDeckLeft(s)}
+                                    className={cn("text-[9px] font-bold px-2 py-0.5 rounded cursor-pointer transition-all border",
+                                        leftDeck === s
+                                            ? "border-current text-white/80" : "text-white/25 hover:text-white/45 border-transparent"
+                                    )}
+                                    style={leftDeck === s ? { color: DECK_COLORS[s], borderColor: DECK_COLORS[s] + "60", backgroundColor: DECK_COLORS[s] + "15" } : undefined}
+                                >Deck {s}</button>
+                            ))}
+                        </div>
+                    )}
+                    <DeckControls side={leftDeck} deck={getDeck(leftDeck)} color={DECK_COLORS[leftDeck]} analyser={analysers[leftDeck]} />
                 </div>
 
                 {/* Center Mixer Strip */}
-                <CenterMixerStrip deckAAnalyser={deckAAnalyser} deckBAnalyser={deckBAnalyser} />
+                <CenterMixerStrip analysers={analysers} />
 
-                {/* Deck B Controls */}
+                {/* Right Deck Controls */}
                 <div className="overflow-y-auto px-1.5 lg:px-2 xl:px-3 py-1.5">
-                    <DeckControls side="B" deck={mixer.deckB} color="rgb(59,130,246)" analyser={deckBAnalyser} />
+                    {is4 && (
+                        <div className="flex gap-1 mb-1.5 justify-end">
+                            {(["B", "D"] as DeckSide[]).map(s => (
+                                <button key={s} onClick={() => setActiveDeckRight(s)}
+                                    className={cn("text-[9px] font-bold px-2 py-0.5 rounded cursor-pointer transition-all border",
+                                        rightDeck === s
+                                            ? "border-current text-white/80" : "text-white/25 hover:text-white/45 border-transparent"
+                                    )}
+                                    style={rightDeck === s ? { color: DECK_COLORS[s], borderColor: DECK_COLORS[s] + "60", backgroundColor: DECK_COLORS[s] + "15" } : undefined}
+                                >Deck {s}</button>
+                            ))}
+                        </div>
+                    )}
+                    <DeckControls side={rightDeck} deck={getDeck(rightDeck)} color={DECK_COLORS[rightDeck]} analyser={analysers[rightDeck]} />
                 </div>
             </div>
 
@@ -1928,18 +1958,21 @@ export function MixerView() {
             <div className="shrink-0 border-t border-white/[0.06] px-2 lg:px-3 py-1 lg:py-1.5 flex flex-col gap-1">
                 {/* Crossfader Assign + Automix + Crossfader */}
                 <div className="flex items-center gap-2 lg:gap-3">
-                    {/* Assign A */}
-                    <div className="flex items-center gap-0.5 shrink-0">
-                        <span className="text-[7px] lg:text-[8px] text-white/20">A:</span>
-                        {(["thru", "A", "B"] as CrossfaderAssign[]).map(a => (
-                            <button key={a} onClick={() => mixer.setCrossfaderAssign("A", a)}
-                                className={cn("text-[7px] lg:text-[8px] px-1 lg:px-1.5 py-0.5 rounded cursor-pointer transition-colors",
-                                    mixer.deckA.crossfaderAssign === a
-                                        ? "bg-purple-500/30 text-purple-300 border border-purple-500/40"
-                                        : "bg-white/5 text-white/25 hover:bg-white/10 border border-white/[0.06]"
-                                )}>{a === "thru" ? "THRU" : a}</button>
-                        ))}
-                    </div>
+                    {/* Left-side assigns (A, and C in 4-deck mode) */}
+                    {(is4 ? ["A", "C"] as DeckSide[] : ["A"] as DeckSide[]).map(s => (
+                        <div key={`assign-${s}`} className="flex items-center gap-0.5 shrink-0">
+                            <span className="text-[7px] lg:text-[8px]" style={{ color: DECK_COLORS[s] + "70" }}>{s}:</span>
+                            {(["thru", "A", "B"] as CrossfaderAssign[]).map(a => (
+                                <button key={a} onClick={() => mixer.setCrossfaderAssign(s, a)}
+                                    className={cn("text-[7px] lg:text-[8px] px-1 lg:px-1.5 py-0.5 rounded cursor-pointer transition-colors",
+                                        getDeck(s).crossfaderAssign === a
+                                            ? "border" : "bg-white/5 text-white/25 hover:bg-white/10 border border-white/[0.06]"
+                                    )}
+                                    style={getDeck(s).crossfaderAssign === a ? { backgroundColor: DECK_COLORS[s] + "30", color: DECK_COLORS[s], borderColor: DECK_COLORS[s] + "40" } : undefined}
+                                >{a === "thru" ? "THRU" : a}</button>
+                            ))}
+                        </div>
+                    ))}
 
                     {/* Automix + Undo */}
                     <button onClick={() => mixer.toggleAutomix()}
@@ -1955,18 +1988,21 @@ export function MixerView() {
                         <Crossfader value={mixer.crossfader} onChange={mixer.setCrossfader} />
                     </div>
 
-                    {/* Assign B */}
-                    <div className="flex items-center gap-0.5 shrink-0">
-                        <span className="text-[7px] lg:text-[8px] text-white/20">B:</span>
-                        {(["thru", "A", "B"] as CrossfaderAssign[]).map(a => (
-                            <button key={a} onClick={() => mixer.setCrossfaderAssign("B", a)}
-                                className={cn("text-[7px] lg:text-[8px] px-1 lg:px-1.5 py-0.5 rounded cursor-pointer transition-colors",
-                                    mixer.deckB.crossfaderAssign === a
-                                        ? "bg-blue-500/30 text-blue-300 border border-blue-500/40"
-                                        : "bg-white/5 text-white/25 hover:bg-white/10 border border-white/[0.06]"
-                                )}>{a === "thru" ? "THRU" : a}</button>
-                        ))}
-                    </div>
+                    {/* Right-side assigns (B, and D in 4-deck mode) */}
+                    {(is4 ? ["D", "B"] as DeckSide[] : ["B"] as DeckSide[]).map(s => (
+                        <div key={`assign-${s}`} className="flex items-center gap-0.5 shrink-0">
+                            <span className="text-[7px] lg:text-[8px]" style={{ color: DECK_COLORS[s] + "70" }}>{s}:</span>
+                            {(["thru", "A", "B"] as CrossfaderAssign[]).map(a => (
+                                <button key={a} onClick={() => mixer.setCrossfaderAssign(s, a)}
+                                    className={cn("text-[7px] lg:text-[8px] px-1 lg:px-1.5 py-0.5 rounded cursor-pointer transition-colors",
+                                        getDeck(s).crossfaderAssign === a
+                                            ? "border" : "bg-white/5 text-white/25 hover:bg-white/10 border border-white/[0.06]"
+                                    )}
+                                    style={getDeck(s).crossfaderAssign === a ? { backgroundColor: DECK_COLORS[s] + "30", color: DECK_COLORS[s], borderColor: DECK_COLORS[s] + "40" } : undefined}
+                                >{a === "thru" ? "THRU" : a}</button>
+                            ))}
+                        </div>
+                    ))}
                 </div>
 
                 {/* Master + Headphone + Recording + Settings — single row */}

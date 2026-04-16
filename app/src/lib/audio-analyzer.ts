@@ -7,8 +7,8 @@ const BEAT_THRESHOLD = 1.4;
 const BEAT_COOLDOWN = 200; // ms
 
 export function useAudioAnalyzer() {
-    const freqDataRef = useRef<Uint8Array | null>(null);
-    const timeDataRef = useRef<Uint8Array | null>(null);
+    const freqDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+    const timeDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
     const prevBassRef = useRef(0);
     const lastBeatRef = useRef(0);
 
@@ -31,8 +31,8 @@ export function useAudioAnalyzer() {
             timeDataRef.current = new Uint8Array(bufLen);
         }
 
-        analyser.getByteFrequencyData(freqDataRef.current as Uint8Array);
-        analyser.getByteTimeDomainData(timeDataRef.current as Uint8Array);
+        analyser.getByteFrequencyData(freqDataRef.current);
+        analyser.getByteTimeDomainData(timeDataRef.current);
 
         const freq = freqDataRef.current;
         const time = timeDataRef.current;

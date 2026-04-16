@@ -16,6 +16,7 @@ import {
     exportPreset,
     type MidiPreset,
     type MidiDevice,
+    type MidiMapping,
     type MidiMessage,
     type MidiAction,
     type MidiActionHandler,
@@ -25,7 +26,7 @@ import {
     saveBeatGridEnabled,
 } from "./mixer-waveforms";
 import { useMixer } from "./mixer-context";
-import type { CrossfaderCurve, EQMode, WaveformMode } from "@/lib/mixer-engine";
+import type { CrossfaderCurve, EQMode, WaveformMode, DeckSide } from "@/lib/mixer-engine";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -1092,7 +1093,7 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                                                 <td className="p-1">
                                                                     <select
                                                                         value={m.deck || ""}
-                                                                        onChange={e => updateEditingMapping(originalIndex, { deck: (e.target.value || null) as "A" | "B" | null })}
+                                                                        onChange={e => updateEditingMapping(originalIndex, { deck: (e.target.value || null) as DeckSide | null })}
                                                                         className="w-full text-[10px] bg-transparent border-none text-white/50 outline-none cursor-pointer"
                                                                     >
                                                                         <option value="">—</option>

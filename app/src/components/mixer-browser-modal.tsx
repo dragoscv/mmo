@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { getTracks } from "@/actions/tracks";
 import type { Track } from "@/db/schema";
 import { useMixer } from "./mixer-context";
+import type { DeckSide } from "@/lib/mixer-engine";
 import {
     Search,
     Upload,
@@ -21,8 +22,8 @@ import {
 interface MixerBrowserModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    targetDeck: "A" | "B";
-    onDeckChange: (deck: "A" | "B") => void;
+    targetDeck: DeckSide;
+    onDeckChange: (deck: DeckSide) => void;
 }
 
 export function MixerBrowserModal({
@@ -67,7 +68,7 @@ export function MixerBrowserModal({
     }, [open]);
 
     // Debounced search
-    const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
     useEffect(() => {
         if (!open) return;
         if (searchTimerRef.current) clearTimeout(searchTimerRef.current);

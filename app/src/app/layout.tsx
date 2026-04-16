@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Toaster } from "sonner";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider } from "@/components/sidebar-context";
@@ -72,7 +73,9 @@ export default function RootLayout({
                                     <MixerProvider>
                                         <AnalysisProvider>
                                             <PlayerAwareLayout>
-                                                <AppSidebar />
+                                                <div data-app-sidebar="">
+                                                    <AppSidebar />
+                                                </div>
                                                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                                                     <MobileHeader />
                                                     <main className="flex-1 min-h-0">
@@ -80,9 +83,13 @@ export default function RootLayout({
                                                     </main>
                                                 </div>
                                             </PlayerAwareLayout>
-                                            <AudioPlayer />
-                                            <NowPlaying />
-                                            <StickyNowPlaying />
+                                            <div data-app-nowplaying="">
+                                                <AudioPlayer />
+                                                <Suspense>
+                                                    <NowPlaying />
+                                                </Suspense>
+                                                <StickyNowPlaying />
+                                            </div>
                                         </AnalysisProvider>
                                     </MixerProvider>
                                 </EQProvider>

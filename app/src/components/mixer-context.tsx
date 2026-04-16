@@ -7,6 +7,7 @@ import {
     useState,
     useCallback,
     useEffect,
+    useMemo,
     type ReactNode,
 } from "react";
 import {
@@ -14,6 +15,8 @@ import {
     DEFAULT_DECK_STATE,
     shiftKeyName,
     type DeckState,
+    type DeckSide,
+    type DeckMode,
     type FilterType,
     type ColorFxType,
     type BeatFxType,
@@ -39,8 +42,13 @@ import { getTrackById } from "@/actions/tracks";
 interface MixerState {
     deckA: DeckState;
     deckB: DeckState;
+    deckC: DeckState;
+    deckD: DeckState;
     deckATrack: Track | null;
     deckBTrack: Track | null;
+    deckCTrack: Track | null;
+    deckDTrack: Track | null;
+    deckMode: DeckMode;
     crossfader: number; // 0 = full A, 0.5 = center, 1 = full B
     crossfaderCurve: CrossfaderCurve;
     masterVolume: number;
@@ -69,43 +77,43 @@ interface MixerState {
 }
 
 interface DeckActions {
-    loadTrack: (deck: "A" | "B", track: Track) => void;
-    play: (deck: "A" | "B") => void;
-    pause: (deck: "A" | "B") => void;
-    togglePlay: (deck: "A" | "B") => void;
-    seek: (deck: "A" | "B", time: number) => void;
-    beatJump: (deck: "A" | "B", beats: number) => void;
-    nudge: (deck: "A" | "B", ms: number) => void;
-    nudgeRelease: (deck: "A" | "B") => void;
-    setVolume: (deck: "A" | "B", vol: number) => void;
-    setEQ: (deck: "A" | "B", band: "low" | "mid" | "hi", gain: number) => void;
-    toggleEQKill: (deck: "A" | "B", band: "low" | "mid" | "hi") => void;
-    setBpm: (deck: "A" | "B", bpm: number) => void;
-    syncBpm: (deck: "A" | "B") => void;
-    setKeyShift: (deck: "A" | "B", semitones: number) => void;
-    setKeyLock: (deck: "A" | "B", enabled: boolean) => void;
-    setFilter: (deck: "A" | "B", value: number) => void;
-    setFilterType: (deck: "A" | "B", type: FilterType) => void;
-    setColorFx: (deck: "A" | "B", value: number) => void;
-    setColorFxType: (deck: "A" | "B", type: ColorFxType) => void;
-    setBeatFx: (deck: "A" | "B", type: BeatFxType) => void;
-    setBeatFxAmount: (deck: "A" | "B", amount: number) => void;
-    toggleBeatFx: (deck: "A" | "B") => void;
-    setBeatFxBeatDiv: (deck: "A" | "B", div: number) => void;
-    setLoop: (deck: "A" | "B", beats: number) => void;
-    toggleLoop: (deck: "A" | "B") => void;
-    moveLoop: (deck: "A" | "B", direction: "left" | "right") => void;
-    setHotCue: (deck: "A" | "B", index: number) => void;
-    jumpHotCue: (deck: "A" | "B", index: number) => void;
-    clearHotCue: (deck: "A" | "B", index: number) => void;
-    ejectTrack: (deck: "A" | "B") => void;
-    toggleSlipMode: (deck: "A" | "B") => void;
-    toggleQuantize: (deck: "A" | "B") => void;
-    toggleHeadphoneCue: (deck: "A" | "B") => void;
-    setPadMode: (deck: "A" | "B", mode: PadMode) => void;
-    setCrossfaderAssign: (deck: "A" | "B", assign: CrossfaderAssign) => void;
-    setBeatGrid: (deck: "A" | "B", grid: Partial<BeatGridState>) => void;
-    nudgeBeatGrid: (deck: "A" | "B", direction: "left" | "right") => void;
+    loadTrack: (deck: DeckSide, track: Track) => void;
+    play: (deck: DeckSide) => void;
+    pause: (deck: DeckSide) => void;
+    togglePlay: (deck: DeckSide) => void;
+    seek: (deck: DeckSide, time: number) => void;
+    beatJump: (deck: DeckSide, beats: number) => void;
+    nudge: (deck: DeckSide, ms: number) => void;
+    nudgeRelease: (deck: DeckSide) => void;
+    setVolume: (deck: DeckSide, vol: number) => void;
+    setEQ: (deck: DeckSide, band: "low" | "mid" | "hi", gain: number) => void;
+    toggleEQKill: (deck: DeckSide, band: "low" | "mid" | "hi") => void;
+    setBpm: (deck: DeckSide, bpm: number) => void;
+    syncBpm: (deck: DeckSide) => void;
+    setKeyShift: (deck: DeckSide, semitones: number) => void;
+    setKeyLock: (deck: DeckSide, enabled: boolean) => void;
+    setFilter: (deck: DeckSide, value: number) => void;
+    setFilterType: (deck: DeckSide, type: FilterType) => void;
+    setColorFx: (deck: DeckSide, value: number) => void;
+    setColorFxType: (deck: DeckSide, type: ColorFxType) => void;
+    setBeatFx: (deck: DeckSide, type: BeatFxType) => void;
+    setBeatFxAmount: (deck: DeckSide, amount: number) => void;
+    toggleBeatFx: (deck: DeckSide) => void;
+    setBeatFxBeatDiv: (deck: DeckSide, div: number) => void;
+    setLoop: (deck: DeckSide, beats: number) => void;
+    toggleLoop: (deck: DeckSide) => void;
+    moveLoop: (deck: DeckSide, direction: "left" | "right") => void;
+    setHotCue: (deck: DeckSide, index: number) => void;
+    jumpHotCue: (deck: DeckSide, index: number) => void;
+    clearHotCue: (deck: DeckSide, index: number) => void;
+    ejectTrack: (deck: DeckSide) => void;
+    toggleSlipMode: (deck: DeckSide) => void;
+    toggleQuantize: (deck: DeckSide) => void;
+    toggleHeadphoneCue: (deck: DeckSide) => void;
+    setPadMode: (deck: DeckSide, mode: PadMode) => void;
+    setCrossfaderAssign: (deck: DeckSide, assign: CrossfaderAssign) => void;
+    setBeatGrid: (deck: DeckSide, grid: Partial<BeatGridState>) => void;
+    nudgeBeatGrid: (deck: DeckSide, direction: "left" | "right") => void;
 }
 
 interface MixerActions extends DeckActions {
@@ -117,10 +125,11 @@ interface MixerActions extends DeckActions {
     setEQMode: (mode: EQMode) => void;
     setTempoRange: (range: number) => void;
     setJogSensitivity: (sens: number) => void;
+    setDeckMode: (mode: DeckMode) => void;
     toggleRecording: () => void;
     initMixer: () => void;
     destroyMixer: () => void;
-    getDeckAnalyser: (deck: "A" | "B") => AnalyserNode | null;
+    getDeckAnalyser: (deck: DeckSide) => AnalyserNode | null;
     getMasterAnalyser: () => AnalyserNode | null;
     getAudioInfo: () => { sampleRate: number; baseLatency: number; outputLatency: number; channelCount: number; state: string } | null;
     // New actions
@@ -131,26 +140,43 @@ interface MixerActions extends DeckActions {
     loadSampleFromFile: (slotIndex: number, file: File) => Promise<boolean>;
     clearSampler: (slotIndex: number) => void;
     toggleSamplerLoop: (slotIndex: number) => void;
-    captureLoopToSampler: (deck: "A" | "B", slotIndex: number) => void;
+    captureLoopToSampler: (deck: DeckSide, slotIndex: number) => void;
     setAutomixConfig: (config: Partial<AutomixConfig>) => void;
     toggleAutomix: () => void;
     undoMixAction: () => void;
-    computeTransitionSuggestions: (deck: "A" | "B") => void;
+    computeTransitionSuggestions: (deck: DeckSide) => void;
     setMidiClockEnabled: (enabled: boolean) => void;
     /** Read current playback time directly from audio element — use in rAF loops to avoid React re-renders */
-    getDeckCurrentTime: (deck: "A" | "B") => number;
+    getDeckCurrentTime: (deck: DeckSide) => number;
 }
 
 type MixerContextType = MixerState & MixerActions;
 
-// ─── Context ─────────────────────────────────────────────────────────────
+// ─── Context (split: state changes often, actions are stable) ────────────
 
-const MixerContext = createContext<MixerContextType | null>(null);
+const MixerStateContext = createContext<MixerState | null>(null);
+const MixerActionsContext = createContext<MixerActions | null>(null);
 
+/** Full mixer context — returns both state + actions. Use when you need both. */
 export function useMixer() {
-    const ctx = useContext(MixerContext);
-    if (!ctx) throw new Error("useMixer must be used within MixerProvider");
-    return ctx;
+    const state = useContext(MixerStateContext);
+    const actions = useContext(MixerActionsContext);
+    if (!state || !actions) throw new Error("useMixer must be used within MixerProvider");
+    return { ...state, ...actions } as MixerContextType;
+}
+
+/** Only actions — components using this won't re-render on state changes. */
+export function useMixerActions() {
+    const actions = useContext(MixerActionsContext);
+    if (!actions) throw new Error("useMixerActions must be used within MixerProvider");
+    return actions;
+}
+
+/** Only state — use when you don't need to dispatch any actions. */
+export function useMixerState() {
+    const state = useContext(MixerStateContext);
+    if (!state) throw new Error("useMixerState must be used within MixerProvider");
+    return state;
 }
 
 // ─── Provider ────────────────────────────────────────────────────────────
@@ -199,6 +225,9 @@ interface PersistedDeckState {
 interface PersistedMixerState {
     deckA: PersistedDeckState;
     deckB: PersistedDeckState;
+    deckC?: PersistedDeckState;
+    deckD?: PersistedDeckState;
+    deckMode?: DeckMode;
     crossfader: number;
     crossfaderCurve: CrossfaderCurve;
     masterVolume: number;
@@ -264,6 +293,9 @@ function savePersistedState(state: MixerState) {
         const persisted: PersistedMixerState = {
             deckA: serializeDeck(state.deckA),
             deckB: serializeDeck(state.deckB),
+            deckC: serializeDeck(state.deckC),
+            deckD: serializeDeck(state.deckD),
+            deckMode: state.deckMode,
             crossfader: state.crossfader,
             crossfaderCurve: state.crossfaderCurve,
             masterVolume: state.masterVolume,
@@ -278,9 +310,15 @@ function savePersistedState(state: MixerState) {
     } catch { /* ignore */ }
 }
 
+type DeckStateKey = "deckA" | "deckB" | "deckC" | "deckD";
+type DeckTrackKey = "deckATrack" | "deckBTrack" | "deckCTrack" | "deckDTrack";
+const DECK_STATE_KEY: Record<DeckSide, DeckStateKey> = { A: "deckA", B: "deckB", C: "deckC", D: "deckD" };
+const DECK_TRACK_KEY: Record<DeckSide, DeckTrackKey> = { A: "deckATrack", B: "deckBTrack", C: "deckCTrack", D: "deckDTrack" };
+const ALL_SIDES: DeckSide[] = ["A", "B", "C", "D"];
+
 export function MixerProvider({ children }: { children: ReactNode }) {
     const engineRef = useRef<MixerEngine | null>(null);
-    const recordingTimerRef = useRef<ReturnType<typeof setInterval>>();
+    const recordingTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
     const [state, setState] = useState<MixerState>(() => {
         const newStateFields = {
             waveformMode: "rgb" as WaveformMode,
@@ -305,15 +343,20 @@ export function MixerProvider({ children }: { children: ReactNode }) {
                 ...pd,
                 isPlaying: false,
                 isLoaded: false,
-                // currentTime and duration are restored from persisted (will seek after engine loads)
                 currentTime: pd?.currentTime ?? 0,
                 duration: pd?.duration ?? 0,
             });
+            const hasAnyTrack = !!(persisted.deckA?.trackId || persisted.deckB?.trackId || persisted.deckC?.trackId || persisted.deckD?.trackId);
             return {
                 deckA: restoreDeck(persisted.deckA),
                 deckB: restoreDeck(persisted.deckB),
+                deckC: restoreDeck(persisted.deckC),
+                deckD: restoreDeck(persisted.deckD),
                 deckATrack: null,
                 deckBTrack: null,
+                deckCTrack: null,
+                deckDTrack: null,
+                deckMode: persisted.deckMode ?? "2deck" as DeckMode,
                 crossfader: persisted.crossfader ?? 0.5,
                 crossfaderCurve: persisted.crossfaderCurve ?? "smooth" as CrossfaderCurve,
                 masterVolume: persisted.masterVolume ?? 0.8,
@@ -328,7 +371,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
                 sessionHistory: [],
                 ...newStateFields,
                 waveformMode: persisted.waveformMode ?? "rgb" as WaveformMode,
-                isRestoring: !!(persisted.deckA?.trackId || persisted.deckB?.trackId),
+                isRestoring: hasAnyTrack,
                 restorationProgress: 0,
                 restorationLabel: "Initializing...",
             };
@@ -336,8 +379,13 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         return {
             deckA: { ...DEFAULT_DECK_STATE },
             deckB: { ...DEFAULT_DECK_STATE },
+            deckC: { ...DEFAULT_DECK_STATE },
+            deckD: { ...DEFAULT_DECK_STATE },
             deckATrack: null,
             deckBTrack: null,
+            deckCTrack: null,
+            deckDTrack: null,
+            deckMode: "2deck" as DeckMode,
             crossfader: 0.5,
             crossfaderCurve: "smooth" as CrossfaderCurve,
             masterVolume: 0.8,
@@ -358,19 +406,44 @@ export function MixerProvider({ children }: { children: ReactNode }) {
     });
 
     // Helper to update a single deck
-    const updateDeck = useCallback((deck: "A" | "B", update: Partial<DeckState>) => {
+    const updateDeck = useCallback((deck: DeckSide, update: Partial<DeckState>) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => ({
             ...prev,
-            [deck === "A" ? "deckA" : "deckB"]: {
-                ...prev[deck === "A" ? "deckA" : "deckB"],
-                ...update,
-            },
+            [key]: { ...(prev[key] as DeckState), ...update },
         }));
     }, []);
 
-    const getDeckEngine = useCallback((deck: "A" | "B") => {
+    // Batched time updates: accumulate per-deck times and flush once per frame
+    const pendingTimeUpdates = useRef<Partial<Record<DeckSide, number>>>({});
+    const timeFlushScheduled = useRef(false);
+    const flushTimeUpdates = useCallback(() => {
+        timeFlushScheduled.current = false;
+        const updates = pendingTimeUpdates.current;
+        if (Object.keys(updates).length === 0) return;
+        setState(prev => {
+            let next = prev;
+            for (const [side, time] of Object.entries(updates) as [DeckSide, number][]) {
+                const key = DECK_STATE_KEY[side];
+                next = { ...next, [key]: { ...(next[key] as DeckState), currentTime: time } };
+            }
+            return next;
+        });
+        pendingTimeUpdates.current = {};
+    }, []);
+
+    const batchTimeUpdate = useCallback((deck: DeckSide, time: number) => {
+        pendingTimeUpdates.current[deck] = time;
+        if (!timeFlushScheduled.current) {
+            timeFlushScheduled.current = true;
+            // Use queueMicrotask for same-frame batching (faster than rAF)
+            queueMicrotask(flushTimeUpdates);
+        }
+    }, [flushTimeUpdates]);
+
+    const getDeckEngine = useCallback((deck: DeckSide) => {
         if (!engineRef.current) return null;
-        return deck === "A" ? engineRef.current.deckA : engineRef.current.deckB;
+        return engineRef.current.getDeck(deck);
     }, []);
 
     // ─── Lifecycle ──────────────────────────────────────────────────────
@@ -379,13 +452,13 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         if (engineRef.current) return;
         const engine = new MixerEngine();
 
-        // Wire up time tracking
-        engine.deckA.onTimeUpdate = (t) => updateDeck("A", { currentTime: t });
-        engine.deckB.onTimeUpdate = (t) => updateDeck("B", { currentTime: t });
-        engine.deckA.onLoaded = (d) => updateDeck("A", { duration: d, isLoaded: true });
-        engine.deckB.onLoaded = (d) => updateDeck("B", { duration: d, isLoaded: true });
-        engine.deckA.onEnded = () => updateDeck("A", { isPlaying: false });
-        engine.deckB.onEnded = () => updateDeck("B", { isPlaying: false });
+        // Wire up time tracking for all 4 decks
+        for (const side of ALL_SIDES) {
+            const eng = engine.getDeck(side);
+            eng.onTimeUpdate = (t) => batchTimeUpdate(side, t);
+            eng.onLoaded = (d) => updateDeck(side, { duration: d, isLoaded: true });
+            eng.onEnded = () => updateDeck(side, { isPlaying: false });
+        }
 
         // Load persisted MIDI settings and apply to engine
         try {
@@ -406,11 +479,16 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
         engineRef.current?.destroy();
         engineRef.current = null;
-        setState({
+        setState(prev => ({
             deckA: { ...DEFAULT_DECK_STATE },
             deckB: { ...DEFAULT_DECK_STATE },
+            deckC: { ...DEFAULT_DECK_STATE },
+            deckD: { ...DEFAULT_DECK_STATE },
             deckATrack: null,
             deckBTrack: null,
+            deckCTrack: null,
+            deckDTrack: null,
+            deckMode: prev.deckMode,
             crossfader: 0.5,
             crossfaderCurve: "smooth",
             masterVolume: 0.8,
@@ -423,7 +501,18 @@ export function MixerProvider({ children }: { children: ReactNode }) {
             tempoRange: 10,
             jogSensitivity: 5,
             sessionHistory: [],
-        });
+            waveformMode: prev.waveformMode,
+            samplerSlots: prev.samplerSlots,
+            automixConfig: prev.automixConfig,
+            automixEnabled: false,
+            mixHistory: [],
+            transitionSuggestions: [],
+            midiClockEnabled: false,
+            midiClockBpm: 120,
+            isRestoring: false,
+            restorationProgress: 0,
+            restorationLabel: "",
+        }));
     }, []);
 
     // Cleanup on unmount
@@ -433,11 +522,21 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         };
     }, []);
 
-    // Persist state to localStorage (debounced)
-    const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+    // Persist state to localStorage (debounced, skip time-only changes)
+    const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const stateRef = useRef(state);
+    const lastSavedStateRef = useRef<string>("");
     stateRef.current = state;
     useEffect(() => {
+        // Quick fingerprint excluding volatile fields (currentTime, isPlaying, recordingDuration)
+        const fingerprint = `${state.deckA.trackId}|${state.deckB.trackId}|${state.deckC.trackId}|${state.deckD.trackId}|` +
+            `${state.crossfader}|${state.masterVolume}|${state.deckMode}|${state.eqMode}|` +
+            `${state.deckA.volume}|${state.deckB.volume}|${state.deckA.eqLow}|${state.deckA.eqMid}|${state.deckA.eqHi}|` +
+            `${state.deckB.eqLow}|${state.deckB.eqMid}|${state.deckB.eqHi}|` +
+            `${state.deckA.filter}|${state.deckB.filter}|${state.deckA.bpm}|${state.deckB.bpm}|` +
+            `${state.waveformMode}|${state.headphoneVolume}|${state.headphoneMix}|${state.tempoRange}`;
+        if (fingerprint === lastSavedStateRef.current) return; // skip time-only changes
+        lastSavedStateRef.current = fingerprint;
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(() => savePersistedState(state), 500);
         return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
@@ -450,14 +549,39 @@ export function MixerProvider({ children }: { children: ReactNode }) {
             const s = stateRef.current;
             const finalState = { ...s };
             if (engine) {
-                finalState.deckA = { ...s.deckA, currentTime: engine.deckA.getCurrentTime() || s.deckA.currentTime };
-                finalState.deckB = { ...s.deckB, currentTime: engine.deckB.getCurrentTime() || s.deckB.currentTime };
+                for (const side of ALL_SIDES) {
+                    const key = DECK_STATE_KEY[side] as "deckA" | "deckB" | "deckC" | "deckD";
+                    finalState[key] = { ...s[key], currentTime: engine.getDeck(side).getCurrentTime() || s[key].currentTime };
+                }
             }
             savePersistedState(finalState);
         };
         window.addEventListener("beforeunload", handleBeforeUnload);
         return () => window.removeEventListener("beforeunload", handleBeforeUnload);
     }, []);
+
+    // Auto-suspend AudioContext when all decks are paused (save CPU)
+    const suspendTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    useEffect(() => {
+        const engine = engineRef.current;
+        if (!engine || !state.isActive) return;
+        const anyPlaying = state.deckA.isPlaying || state.deckB.isPlaying ||
+            state.deckC.isPlaying || state.deckD.isPlaying || state.isRecording;
+        if (anyPlaying) {
+            // Cancel pending suspend and ensure running
+            if (suspendTimerRef.current) { clearTimeout(suspendTimerRef.current); suspendTimerRef.current = undefined; }
+            engine.ensureRunning();
+        } else {
+            // Suspend after 30s of silence to save CPU/battery
+            if (!suspendTimerRef.current) {
+                suspendTimerRef.current = setTimeout(() => {
+                    engine.suspend();
+                    suspendTimerRef.current = undefined;
+                }, 30_000);
+            }
+        }
+        return () => { if (suspendTimerRef.current) { clearTimeout(suspendTimerRef.current); suspendTimerRef.current = undefined; } };
+    }, [state.deckA.isPlaying, state.deckB.isPlaying, state.deckC.isPlaying, state.deckD.isPlaying, state.isRecording, state.isActive]);
 
     // Auto-reload persisted tracks and apply ALL state to engine after init
     const hasRestoredRef = useRef(false);
@@ -467,8 +591,12 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         const engine = engineRef.current;
         if (!engine) return;
 
-        const hasTracksToRestore = !!(state.deckA.trackId || state.deckB.trackId);
-        if (!hasTracksToRestore) {
+        const allDecks: { side: DeckSide; deck: DeckState }[] = ALL_SIDES.map(side => ({
+            side,
+            deck: state[DECK_STATE_KEY[side]] as DeckState,
+        }));
+        const decksWithTracks = allDecks.filter(d => d.deck.trackId);
+        if (decksWithTracks.length === 0) {
             setState(prev => ({ ...prev, isRestoring: false, restorationProgress: 100, restorationLabel: "" }));
             return;
         }
@@ -488,102 +616,75 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         engine.setHeadphoneMix(state.headphoneMix);
 
         // Crossfader assignments per deck
-        engine.setCrossfaderAssign("A", state.deckA.crossfaderAssign);
-        engine.setCrossfaderAssign("B", state.deckB.crossfaderAssign);
+        for (const side of ALL_SIDES) {
+            engine.setCrossfaderAssign(side, (state[DECK_STATE_KEY[side]] as DeckState).crossfaderAssign);
+        }
 
         setProgress(15, "Restoring EQ & effects...");
 
-        // Track how many decks need loading to know when fully done
-        const decksToLoad = [state.deckA, state.deckB].filter(d => d.trackId).length;
         let decksLoaded = 0;
+        const progressPerDeck = 75 / decksWithTracks.length; // spread remaining 75% across decks
 
         // ─── Restore each deck ──────────────────────────────────────────
-        const restoreDeckEngine = (side: "A" | "B", deck: DeckState, baseProgress: number) => {
-            const eng = side === "A" ? engine.deckA : engine.deckB;
-            if (!eng) return;
+        const restoreDeckEngine = (side: DeckSide, deck: DeckState, baseProgress: number) => {
+            const eng = engine.getDeck(side);
 
-            // Apply EQ mode
             eng.setEQMode(state.eqMode);
-
-            // Apply volume
             eng.setVolume(deck.volume);
-
-            // Apply EQ
             eng.setEQ("low", deck.eqLow);
             eng.setEQ("mid", deck.eqMid);
             eng.setEQ("hi", deck.eqHi);
             if (deck.eqLowKill) eng.setEQKill("low", true);
             if (deck.eqMidKill) eng.setEQKill("mid", true);
             if (deck.eqHiKill) eng.setEQKill("hi", true);
-
-            // Apply filter
             if (deck.filter !== 0) eng.setFilter(deck.filter, deck.filterType);
-
-            // Apply color FX
             if (deck.colorFx !== 0) eng.setColorFx(deck.colorFx, deck.colorFxType);
-
-            // Apply beat FX
             if (deck.beatFxOn) eng.setBeatFx(deck.beatFxType, deck.beatFxAmount, deck.bpm, deck.beatFxBeatDiv);
-
-            // Apply key shift & key lock
             if (deck.keyShift !== 0) eng.setKeyShift(deck.keyShift);
             if (deck.keyLock) eng.setKeyLock(true);
-
-            // Apply headphone cue
             if (deck.headphoneCue) eng.setHeadphoneCue(true);
 
-            // Load track & seek to persisted position once loaded
             if (deck.trackId) {
                 setProgress(baseProgress, `Loading Deck ${side} track...`);
                 const savedTime = deck.currentTime;
                 eng.loadTrack(deck.trackId);
-
-                // Apply tempo
                 if (deck.bpm > 0 && deck.originalBpm > 0 && deck.bpm !== deck.originalBpm) {
                     eng.setTempo(deck.bpm / deck.originalBpm);
                 }
-
-                // After track loads: seek to saved position and restore loop
                 const existingOnLoaded = eng.onLoaded;
                 eng.onLoaded = (duration) => {
                     existingOnLoaded?.(duration);
-                    // Seek to the saved position
                     if (savedTime > 0 && savedTime < duration) {
                         eng.seek(savedTime);
                         updateDeck(side, { currentTime: savedTime, duration, isLoaded: true });
                     }
-                    // Restore loop
                     if (deck.loopEnabled && deck.loopStart >= 0 && deck.loopEnd > deck.loopStart) {
                         eng.enableLoop(deck.loopStart, deck.loopEnd);
                     }
-                    // Track completion
                     decksLoaded++;
-                    if (decksLoaded >= decksToLoad) {
+                    if (decksLoaded >= decksWithTracks.length) {
                         setProgress(100, "Session restored");
-                        // Auto-hide after a short delay
                         setTimeout(() => {
                             setState(prev => ({ ...prev, isRestoring: false, restorationLabel: "" }));
                         }, 1500);
                     } else {
-                        setProgress(70, `Deck ${side} ready, loading next...`);
+                        setProgress(baseProgress + progressPerDeck * 0.8, `Deck ${side} ready, loading next...`);
                     }
                 };
-
-                // Fetch full Track object from DB
-                setProgress(baseProgress + 10, `Fetching Deck ${side} metadata...`);
                 getTrackById(deck.trackId).then(t => {
-                    if (t) setState(prev => ({ ...prev, [side === "A" ? "deckATrack" : "deckBTrack"]: t }));
+                    if (t) setState(prev => ({ ...prev, [DECK_TRACK_KEY[side]]: t }));
                 });
             }
         };
 
-        restoreDeckEngine("A", state.deckA, 25);
-        restoreDeckEngine("B", state.deckB, 55);
+        decksWithTracks.forEach((d, i) => {
+            restoreDeckEngine(d.side, d.deck, 20 + i * progressPerDeck);
+        });
     }, [state.isActive, updateDeck]);
 
     // ─── Deck Actions ───────────────────────────────────────────────────
 
-    const loadTrack = useCallback((deck: "A" | "B", track: Track) => {
+    const loadTrack = useCallback((deck: DeckSide, track: Track) => {
         console.log("[Mixer] loadTrack called:", deck, track.id, track.title);
         if (!engineRef.current) {
             console.log("[Mixer] No engine, calling initMixer...");
@@ -634,7 +735,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         };
         setState(prev => ({
             ...prev,
-            [deck === "A" ? "deckATrack" : "deckBTrack"]: track,
+            [DECK_TRACK_KEY[deck]]: track,
             sessionHistory: engineRef.current?.sessionHistory || prev.sessionHistory,
         }));
         updateDeck(deck, {
@@ -665,20 +766,20 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [initMixer, getDeckEngine, updateDeck]);
 
-    const play = useCallback((deck: "A" | "B") => {
+    const play = useCallback((deck: DeckSide) => {
         getDeckEngine(deck)?.play();
         updateDeck(deck, { isPlaying: true });
         // Mark session history as played
         engineRef.current?.markPlayed(deck);
     }, [getDeckEngine, updateDeck]);
 
-    const pause = useCallback((deck: "A" | "B") => {
+    const pause = useCallback((deck: DeckSide) => {
         getDeckEngine(deck)?.pause();
         updateDeck(deck, { isPlaying: false });
     }, [getDeckEngine, updateDeck]);
 
-    const togglePlay = useCallback((deck: "A" | "B") => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const togglePlay = useCallback((deck: DeckSide) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const isPlaying = prev[key].isPlaying;
             if (isPlaying) {
@@ -690,13 +791,13 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const seek = useCallback((deck: "A" | "B", time: number) => {
+    const seek = useCallback((deck: DeckSide, time: number) => {
         getDeckEngine(deck)?.seek(time);
         updateDeck(deck, { currentTime: time });
     }, [getDeckEngine, updateDeck]);
 
-    const beatJump = useCallback((deck: "A" | "B", beats: number) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const beatJump = useCallback((deck: DeckSide, beats: number) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             const beatDuration = 60 / deckState.bpm;
@@ -711,7 +812,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const nudge = useCallback((deck: "A" | "B", ms: number) => {
+    const nudge = useCallback((deck: DeckSide, ms: number) => {
         // ms is now treated as a direction/strength indicator:
         // positive = speed up, negative = slow down
         // Convert ms to a pitch bend strength (larger ms = stronger bend)
@@ -719,23 +820,23 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         getDeckEngine(deck)?.nudgeBurst(ms > 0 ? 1 : -1, strength);
     }, [getDeckEngine]);
 
-    const nudgeRelease = useCallback((deck: "A" | "B") => {
+    const nudgeRelease = useCallback((deck: DeckSide) => {
         getDeckEngine(deck)?.releaseNudge();
     }, [getDeckEngine]);
 
-    const setVolume = useCallback((deck: "A" | "B", vol: number) => {
+    const setVolume = useCallback((deck: DeckSide, vol: number) => {
         getDeckEngine(deck)?.setVolume(vol);
         updateDeck(deck, { volume: vol });
     }, [getDeckEngine, updateDeck]);
 
-    const setEQ = useCallback((deck: "A" | "B", band: "low" | "mid" | "hi", gain: number) => {
+    const setEQ = useCallback((deck: DeckSide, band: "low" | "mid" | "hi", gain: number) => {
         getDeckEngine(deck)?.setEQ(band, gain);
         const update = band === "low" ? { eqLow: gain } : band === "mid" ? { eqMid: gain } : { eqHi: gain };
         updateDeck(deck, update);
     }, [getDeckEngine, updateDeck]);
 
-    const toggleEQKill = useCallback((deck: "A" | "B", band: "low" | "mid" | "hi") => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const toggleEQKill = useCallback((deck: DeckSide, band: "low" | "mid" | "hi") => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             const killKey = band === "low" ? "eqLowKill" : band === "mid" ? "eqMidKill" : "eqHiKill";
@@ -753,8 +854,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const setBpm = useCallback((deck: "A" | "B", bpm: number) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setBpm = useCallback((deck: DeckSide, bpm: number) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             const ratio = bpm / deckState.originalBpm;
@@ -763,20 +864,23 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const syncBpm = useCallback((deck: "A" | "B") => {
-        const otherKey = deck === "A" ? "deckB" : "deckA";
+    const syncBpm = useCallback((deck: DeckSide) => {
+        // Sync pairs: A↔B, C↔D
+        const SYNC_PAIR: Record<DeckSide, DeckSide> = { A: "B", B: "A", C: "D", D: "C" };
+        const otherKey = DECK_STATE_KEY[SYNC_PAIR[deck]];
         setState(prev => {
-            const targetBpm = prev[otherKey].bpm;
-            const deckKey = deck === "A" ? "deckA" : "deckB";
-            const deckState = prev[deckKey];
+            const targetBpm = (prev[otherKey] as DeckState).bpm;
+            const deckKey = DECK_STATE_KEY[deck];
+            const deckState = prev[deckKey] as DeckState;
+            if (!targetBpm || !deckState.originalBpm) return prev;
             const ratio = targetBpm / deckState.originalBpm;
             getDeckEngine(deck)?.setTempo(ratio);
             return { ...prev, [deckKey]: { ...deckState, bpm: targetBpm } };
         });
     }, [getDeckEngine]);
 
-    const setKeyShift = useCallback((deck: "A" | "B", semitones: number) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setKeyShift = useCallback((deck: DeckSide, semitones: number) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             getDeckEngine(deck)?.setKeyShift(semitones);
@@ -791,8 +895,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const setFilterAction = useCallback((deck: "A" | "B", value: number) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setFilterAction = useCallback((deck: DeckSide, value: number) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             getDeckEngine(deck)?.setFilter(value, deckState.filterType);
@@ -800,8 +904,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const setFilterType = useCallback((deck: "A" | "B", type: FilterType) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setFilterType = useCallback((deck: DeckSide, type: FilterType) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             getDeckEngine(deck)?.setFilter(deckState.filter, type);
@@ -809,8 +913,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const setColorFxAction = useCallback((deck: "A" | "B", value: number) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setColorFxAction = useCallback((deck: DeckSide, value: number) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             getDeckEngine(deck)?.setColorFx(value, deckState.colorFxType);
@@ -818,8 +922,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const setColorFxType = useCallback((deck: "A" | "B", type: ColorFxType) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setColorFxType = useCallback((deck: DeckSide, type: ColorFxType) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             getDeckEngine(deck)?.setColorFx(deckState.colorFx, type);
@@ -827,8 +931,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const setLoop = useCallback((deck: "A" | "B", beats: number) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setLoop = useCallback((deck: DeckSide, beats: number) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             const beatDuration = 60 / deckState.bpm;
@@ -847,8 +951,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const toggleLoop = useCallback((deck: "A" | "B") => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const toggleLoop = useCallback((deck: DeckSide) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             if (deckState.loopEnabled) {
@@ -868,8 +972,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const moveLoop = useCallback((deck: "A" | "B", direction: "left" | "right") => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const moveLoop = useCallback((deck: DeckSide, direction: "left" | "right") => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             const beatDuration = 60 / deckState.bpm;
@@ -887,8 +991,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const setHotCue = useCallback((deck: "A" | "B", index: number) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setHotCue = useCallback((deck: DeckSide, index: number) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             const hotCues = [...deckState.hotCues];
@@ -902,8 +1006,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const jumpHotCue = useCallback((deck: "A" | "B", index: number) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const jumpHotCue = useCallback((deck: DeckSide, index: number) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             const time = deckState.hotCues[index];
@@ -915,8 +1019,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const clearHotCue = useCallback((deck: "A" | "B", index: number) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const clearHotCue = useCallback((deck: DeckSide, index: number) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             const hotCues = [...deckState.hotCues];
@@ -925,7 +1029,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
-    const ejectTrack = useCallback((deck: "A" | "B") => {
+    const ejectTrack = useCallback((deck: DeckSide) => {
         const eng = getDeckEngine(deck);
         if (eng) {
             eng.pause();
@@ -933,20 +1037,20 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         }
         setState(prev => ({
             ...prev,
-            [deck === "A" ? "deckATrack" : "deckBTrack"]: null,
+            [DECK_TRACK_KEY[deck]]: null,
         }));
         updateDeck(deck, { ...DEFAULT_DECK_STATE });
     }, [getDeckEngine, updateDeck]);
 
     // ─── New Deck Actions ───────────────────────────────────────────────
 
-    const setKeyLock = useCallback((deck: "A" | "B", enabled: boolean) => {
+    const setKeyLock = useCallback((deck: DeckSide, enabled: boolean) => {
         getDeckEngine(deck)?.setKeyLock(enabled);
         updateDeck(deck, { keyLock: enabled });
     }, [getDeckEngine, updateDeck]);
 
-    const setBeatFxAction = useCallback((deck: "A" | "B", type: BeatFxType) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setBeatFxAction = useCallback((deck: DeckSide, type: BeatFxType) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             if (deckState.beatFxOn) {
@@ -956,8 +1060,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const setBeatFxAmount = useCallback((deck: "A" | "B", amount: number) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setBeatFxAmount = useCallback((deck: DeckSide, amount: number) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             if (deckState.beatFxOn) {
@@ -967,8 +1071,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const toggleBeatFx = useCallback((deck: "A" | "B") => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const toggleBeatFx = useCallback((deck: DeckSide) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             const newOn = !deckState.beatFxOn;
@@ -981,8 +1085,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const setBeatFxBeatDiv = useCallback((deck: "A" | "B", div: number) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setBeatFxBeatDiv = useCallback((deck: DeckSide, div: number) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             if (deckState.beatFxOn) {
@@ -992,8 +1096,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const toggleSlipMode = useCallback((deck: "A" | "B") => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const toggleSlipMode = useCallback((deck: DeckSide) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             const newSlip = !deckState.slipMode;
@@ -1010,12 +1114,16 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const toggleQuantize = useCallback((deck: "A" | "B") => {
-        updateDeck(deck, { quantize: !(deck === "A" ? state.deckA : state.deckB).quantize });
-    }, [updateDeck, state.deckA.quantize, state.deckB.quantize]);
+    const toggleQuantize = useCallback((deck: DeckSide) => {
+        const key = DECK_STATE_KEY[deck];
+        setState(prev => {
+            const d = prev[key] as DeckState;
+            return { ...prev, [key]: { ...d, quantize: !d.quantize } };
+        });
+    }, []);
 
-    const toggleHeadphoneCue = useCallback((deck: "A" | "B") => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const toggleHeadphoneCue = useCallback((deck: DeckSide) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const deckState = prev[key];
             const newCue = !deckState.headphoneCue;
@@ -1024,7 +1132,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         });
     }, [getDeckEngine]);
 
-    const setPadMode = useCallback((deck: "A" | "B", mode: PadMode) => {
+    const setPadMode = useCallback((deck: DeckSide, mode: PadMode) => {
         updateDeck(deck, { padMode: mode });
     }, [updateDeck]);
 
@@ -1099,11 +1207,11 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const getDeckAnalyser = useCallback((deck: "A" | "B") => {
+    const getDeckAnalyser = useCallback((deck: DeckSide) => {
         return getDeckEngine(deck)?.analyser ?? null;
     }, [getDeckEngine]);
 
-    const getDeckCurrentTime = useCallback((deck: "A" | "B") => {
+    const getDeckCurrentTime = useCallback((deck: DeckSide) => {
         return getDeckEngine(deck)?.getCurrentTime() ?? 0;
     }, [getDeckEngine]);
 
@@ -1117,26 +1225,31 @@ export function MixerProvider({ children }: { children: ReactNode }) {
 
     // ─── New Actions ─────────────────────────────────────────────────
 
+    const setDeckMode = useCallback((mode: DeckMode) => {
+        setState(prev => ({ ...prev, deckMode: mode }));
+        try { localStorage.setItem("mmo-mixer-deck-mode", mode); } catch { /* ignore */ }
+    }, []);
+
     const setWaveformMode = useCallback((mode: WaveformMode) => {
         setState(prev => ({ ...prev, waveformMode: mode }));
         try { localStorage.setItem("mmo-mixer-wf-mode", mode); } catch { /* ignore */ }
     }, []);
 
-    const setCrossfaderAssign = useCallback((deck: "A" | "B", assign: CrossfaderAssign) => {
+    const setCrossfaderAssign = useCallback((deck: DeckSide, assign: CrossfaderAssign) => {
         engineRef.current?.setCrossfaderAssign(deck, assign);
         updateDeck(deck, { crossfaderAssign: assign });
     }, [updateDeck]);
 
-    const setBeatGrid = useCallback((deck: "A" | "B", grid: Partial<BeatGridState>) => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const setBeatGrid = useCallback((deck: DeckSide, grid: Partial<BeatGridState>) => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => ({
             ...prev,
             [key]: { ...prev[key], beatGrid: { ...prev[key].beatGrid, ...grid } },
         }));
     }, []);
 
-    const nudgeBeatGrid = useCallback((deck: "A" | "B", direction: "left" | "right") => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const nudgeBeatGrid = useCallback((deck: DeckSide, direction: "left" | "right") => {
+        const key = DECK_STATE_KEY[deck];
         setState(prev => {
             const grid = prev[key].beatGrid;
             if (grid.isLocked) return prev;
@@ -1220,12 +1333,12 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         }));
     }, []);
 
-    const captureLoopToSampler = useCallback(async (deck: "A" | "B", slotIndex: number) => {
+    const captureLoopToSampler = useCallback(async (deck: DeckSide, slotIndex: number) => {
         const engine = engineRef.current;
         const deckEngine = getDeckEngine(deck);
         if (!engine || !deckEngine) return;
 
-        const key = deck === "A" ? "deckA" : "deckB";
+        const key = DECK_STATE_KEY[deck];
         const deckState = state[key];
         if (!deckState.loopEnabled) return;
 
@@ -1275,8 +1388,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const computeTransitionSuggestions = useCallback(async (deck: "A" | "B") => {
-        const key = deck === "A" ? "deckA" : "deckB";
+    const computeTransitionSuggestions = useCallback(async (deck: DeckSide) => {
+        const key = DECK_STATE_KEY[deck];
         const deckState = state[key];
         if (!deckState.bpm || !deckState.key) return;
 
@@ -1315,79 +1428,96 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         setState(prev => ({ ...prev, midiClockEnabled: enabled }));
     }, []);
 
+    // Memoize actions object — stable reference, only changes if callbacks change
+    // (they won't because they're all useCallback with stable deps)
+    const actions = useMemo<MixerActions>(() => ({
+        loadTrack,
+        play,
+        pause,
+        togglePlay,
+        seek,
+        beatJump,
+        nudge,
+        nudgeRelease,
+        setVolume,
+        setEQ,
+        toggleEQKill,
+        setBpm,
+        syncBpm,
+        setKeyShift,
+        setKeyLock,
+        setFilter: setFilterAction,
+        setFilterType,
+        setColorFx: setColorFxAction,
+        setColorFxType,
+        setBeatFx: setBeatFxAction,
+        setBeatFxAmount,
+        toggleBeatFx,
+        setBeatFxBeatDiv,
+        setLoop,
+        toggleLoop,
+        moveLoop,
+        setHotCue,
+        jumpHotCue,
+        clearHotCue,
+        ejectTrack,
+        toggleSlipMode,
+        toggleQuantize,
+        toggleHeadphoneCue,
+        setPadMode,
+        setCrossfader,
+        setCrossfaderCurve,
+        setMasterVolume,
+        setHeadphoneVolume,
+        setHeadphoneMix,
+        setEQMode: setEQModeAction,
+        setTempoRange,
+        setJogSensitivity,
+        toggleRecording,
+        initMixer,
+        destroyMixer,
+        getDeckAnalyser,
+        getMasterAnalyser,
+        getAudioInfo,
+        setDeckMode,
+        setWaveformMode,
+        setCrossfaderAssign,
+        setBeatGrid,
+        nudgeBeatGrid,
+        triggerSampler,
+        stopSampler,
+        loadSample,
+        loadSampleFromFile,
+        clearSampler,
+        toggleSamplerLoop,
+        captureLoopToSampler,
+        setAutomixConfig,
+        toggleAutomix,
+        undoMixAction,
+        computeTransitionSuggestions,
+        setMidiClockEnabled,
+        getDeckCurrentTime,
+    }), [
+        loadTrack, play, pause, togglePlay, seek, beatJump, nudge, nudgeRelease,
+        setVolume, setEQ, toggleEQKill, setBpm, syncBpm, setKeyShift, setKeyLock,
+        setFilterAction, setFilterType, setColorFxAction, setColorFxType,
+        setBeatFxAction, setBeatFxAmount, toggleBeatFx, setBeatFxBeatDiv,
+        setLoop, toggleLoop, moveLoop, setHotCue, jumpHotCue, clearHotCue,
+        ejectTrack, toggleSlipMode, toggleQuantize, toggleHeadphoneCue, setPadMode,
+        setCrossfader, setCrossfaderCurve, setMasterVolume, setHeadphoneVolume, setHeadphoneMix,
+        setEQModeAction, setTempoRange, setJogSensitivity, toggleRecording,
+        initMixer, destroyMixer, getDeckAnalyser, getMasterAnalyser, getAudioInfo,
+        setDeckMode, setWaveformMode, setCrossfaderAssign, setBeatGrid, nudgeBeatGrid,
+        triggerSampler, stopSampler, loadSample, loadSampleFromFile, clearSampler,
+        toggleSamplerLoop, captureLoopToSampler, setAutomixConfig, toggleAutomix,
+        undoMixAction, computeTransitionSuggestions, setMidiClockEnabled, getDeckCurrentTime,
+    ]);
+
     return (
-        <MixerContext.Provider
-            value={{
-                ...state,
-                loadTrack,
-                play,
-                pause,
-                togglePlay,
-                seek,
-                beatJump,
-                nudge,
-                nudgeRelease,
-                setVolume,
-                setEQ,
-                toggleEQKill,
-                setBpm,
-                syncBpm,
-                setKeyShift,
-                setKeyLock,
-                setFilter: setFilterAction,
-                setFilterType,
-                setColorFx: setColorFxAction,
-                setColorFxType,
-                setBeatFx: setBeatFxAction,
-                setBeatFxAmount,
-                toggleBeatFx,
-                setBeatFxBeatDiv,
-                setLoop,
-                toggleLoop,
-                moveLoop,
-                setHotCue,
-                jumpHotCue,
-                clearHotCue,
-                ejectTrack,
-                toggleSlipMode,
-                toggleQuantize,
-                toggleHeadphoneCue,
-                setPadMode,
-                setCrossfader,
-                setCrossfaderCurve,
-                setMasterVolume,
-                setHeadphoneVolume,
-                setHeadphoneMix,
-                setEQMode: setEQModeAction,
-                setTempoRange,
-                setJogSensitivity,
-                toggleRecording,
-                initMixer,
-                destroyMixer,
-                getDeckAnalyser,
-                getMasterAnalyser,
-                getAudioInfo,
-                // New actions
-                setWaveformMode,
-                setCrossfaderAssign,
-                setBeatGrid,
-                nudgeBeatGrid,
-                triggerSampler,
-                stopSampler,
-                loadSample,
-                loadSampleFromFile,
-                clearSampler,
-                toggleSamplerLoop,
-                captureLoopToSampler,
-                setAutomixConfig,
-                toggleAutomix,
-                undoMixAction,
-                computeTransitionSuggestions,
-                setMidiClockEnabled,
-                getDeckCurrentTime,
-            }}
-        >
-            {children}
-        </MixerContext.Provider>
+        <MixerActionsContext.Provider value={actions}>
+            <MixerStateContext.Provider value={state}>
+                {children}
+            </MixerStateContext.Provider>
+        </MixerActionsContext.Provider>
     );
 }

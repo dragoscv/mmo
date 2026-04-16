@@ -42,6 +42,9 @@ export const tracks = sqliteTable("tracks", {
     lyrics: text("lyrics"),
     syncedLyrics: text("synced_lyrics"),
     isHidden: integer("is_hidden", { mode: "boolean" }).default(false),
+    sourceUrl: text("source_url"),
+    sourcePlatform: text("source_platform"),
+    sourceId: text("source_id"),
 });
 
 export const drives = sqliteTable("drives", {
@@ -117,6 +120,26 @@ export const analysisChanges = sqliteTable("analysis_changes", {
     checked: integer("checked", { mode: "boolean" }).default(false),
 });
 
+// ─── Download History ────────────────────────────────────────────────────────
+
+export const downloads = sqliteTable("downloads", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    url: text("url").notNull(),
+    title: text("title"),
+    artist: text("artist"),
+    duration: integer("duration"),
+    thumbnail: text("thumbnail"),
+    extractor: text("extractor"),
+    filePath: text("file_path"),
+    fileSize: integer("file_size"),
+    format: text("format"),
+    quality: text("quality"),
+    status: text("status").notNull().default("pending"), // pending | downloading | complete | error | added
+    trackId: integer("track_id").references(() => tracks.id, { onDelete: "set null" }),
+    error: text("error"),
+    downloadedAt: text("downloaded_at").default(sql`(datetime('now'))`),
+});
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type Track = typeof tracks.$inferSelect;
@@ -126,3 +149,4 @@ export type Playlist = typeof playlists.$inferSelect;
 export type ScanLog = typeof scanLogs.$inferSelect;
 export type AnalysisJob = typeof analysisJobs.$inferSelect;
 export type AnalysisChangeRecord = typeof analysisChanges.$inferSelect;
+export type DownloadRecord = typeof downloads.$inferSelect;

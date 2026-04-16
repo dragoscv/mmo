@@ -108,6 +108,15 @@ export type CrossfaderCurve = "linear" | "smooth" | "sharp";
 export type EQMode = "eq" | "isolator";
 export type CrossfaderAssign = "thru" | "A" | "B";
 export type WaveformMode = "rgb" | "blue" | "3band";
+export type DeckSide = "A" | "B" | "C" | "D";
+export type DeckMode = "2deck" | "4deck";
+
+export const DECK_COLORS: Record<DeckSide, string> = {
+    A: "rgb(168,85,247)",  // purple
+    B: "rgb(59,130,246)",  // blue
+    C: "rgb(234,179,8)",   // yellow
+    D: "rgb(239,68,68)",   // red
+};
 
 // ─── Sampler Types ───────────────────────────────────────────────────────
 
@@ -303,6 +312,7 @@ export class DeckEngine {
     private beatFxDelay: DelayNode;
     private beatFxFeedback: GainNode;
     private beatFxFilter: BiquadFilterNode;
+    private beatFxActive = false; // track if beat FX feedback loop is connected
     analyser: AnalyserNode;
     private destination: GainNode; // connects to crossfader
     private cueDestination: GainNode | null = null; // headphone cue bus
@@ -338,6 +348,7 @@ export class DeckEngine {
         this.audio = new Audio();
         this.audio.crossOrigin = "anonymous";
         this.audio.preload = "auto";
+        this.audio.preservesPitch = false; // natural pitch follows tempo by default
 
         // Create source
         this.source = ctx.createMediaElementSource(this.audio);
@@ -460,6 +471,15 @@ export class DeckEngine {
         this.loopRAF = requestAnimationFrame(update);
     }
 
+    /** Smoothly ramp an AudioParam to avoid clicks/zipper noise.
+     *  Uses cancel → snapshot → linearRamp pattern for glitch-free transitions. */
+    private rampParam(param: AudioParam, value: number, rampTime = 0.01) {
+        const now = this.ctx.currentTime;
+        param.cancelScheduledValues(now);
+        param.setValueAtTime(param.value, now);
+        param.linearRampToValueAtTime(value, now + rampTime);
+    }
+
     /** Read current playback time directly — no React overhead. Use in rAF draw loops. */
     getCurrentTime(): number {
         return this.audio.currentTime;
@@ -573,9 +593,9 @@ export class DeckEngine {
 
     setKeyLock(enabled: boolean) {
         this.keyLock = enabled;
-        // When key lock is enabled, tempo changes should not affect pitch.
-        // With MediaElement, playbackRate always changes pitch proportionally.
-        // We accept this limitation and note it in the UI.
+        // Browser-native pitch preservation: when enabled, pitch stays constant
+        // regardless of playbackRate changes (tempo changes don't affect key).
+        this.audio.preservesPitch = enabled;
     }
 
     setBeatFx(fxType: BeatFxType, amount: number, bpm: number, beatDiv: number) {
@@ -583,139 +603,154 @@ export class DeckEngine {
         const delayTime = Math.min(4, beatDuration * beatDiv);
 
         if (amount < 0.01) {
-            // FX off
-            this.beatFxWet.gain.value = 0;
-            this.beatFxDry.gain.value = 1;
-            this.beatFxFeedback.gain.value = 0;
+            // FX off — ramp to silence to avoid clicks, then disconnect feedback loop to save CPU
+            this.rampParam(this.beatFxWet.gain, 0);
+            this.rampParam(this.beatFxDry.gain, 1);
+            this.rampParam(this.beatFxFeedback.gain, 0);
+            if (this.beatFxActive) {
+                this.beatFxActive = false;
+                // Disconnect feedback loop after ramp completes (~15ms)
+                setTimeout(() => {
+                    if (!this.beatFxActive) {
+                        try { this.beatFxFeedback.disconnect(); } catch { /* already disconnected */ }
+                    }
+                }, 20);
+            }
             return;
+        }
+
+        // Reconnect feedback loop if it was disconnected
+        if (!this.beatFxActive) {
+            this.beatFxActive = true;
+            try { this.beatFxFeedback.connect(this.beatFxDelay); } catch { /* already connected */ }
         }
 
         switch (fxType) {
             case "delay":
-                this.beatFxDelay.delayTime.value = delayTime;
-                this.beatFxWet.gain.value = amount * 0.7;
-                this.beatFxDry.gain.value = 1;
-                this.beatFxFeedback.gain.value = amount * 0.3;
+                this.rampParam(this.beatFxDelay.delayTime, delayTime);
+                this.rampParam(this.beatFxWet.gain, amount * 0.7);
+                this.rampParam(this.beatFxDry.gain, 1);
+                this.rampParam(this.beatFxFeedback.gain, amount * 0.3);
                 this.beatFxFilter.type = "lowpass";
-                this.beatFxFilter.frequency.value = 8000;
-                this.beatFxFilter.Q.value = 0.5;
+                this.rampParam(this.beatFxFilter.frequency, 8000);
+                this.rampParam(this.beatFxFilter.Q, 0.5);
                 break;
 
             case "echo":
-                this.beatFxDelay.delayTime.value = delayTime;
-                this.beatFxWet.gain.value = amount * 0.6;
-                this.beatFxDry.gain.value = 1;
-                this.beatFxFeedback.gain.value = amount * 0.6;
+                this.rampParam(this.beatFxDelay.delayTime, delayTime);
+                this.rampParam(this.beatFxWet.gain, amount * 0.6);
+                this.rampParam(this.beatFxDry.gain, 1);
+                this.rampParam(this.beatFxFeedback.gain, amount * 0.6);
                 this.beatFxFilter.type = "lowpass";
-                this.beatFxFilter.frequency.value = 4000 + (1 - amount) * 8000;
-                this.beatFxFilter.Q.value = 0.7;
+                this.rampParam(this.beatFxFilter.frequency, 4000 + (1 - amount) * 8000);
+                this.rampParam(this.beatFxFilter.Q, 0.7);
                 break;
 
             case "reverb":
                 // Simulate reverb with short multi-tap delay + high feedback
-                this.beatFxDelay.delayTime.value = Math.min(0.08, delayTime * 0.15);
-                this.beatFxWet.gain.value = amount * 0.8;
-                this.beatFxDry.gain.value = 1 - amount * 0.2;
-                this.beatFxFeedback.gain.value = amount * 0.75;
+                this.rampParam(this.beatFxDelay.delayTime, Math.min(0.08, delayTime * 0.15));
+                this.rampParam(this.beatFxWet.gain, amount * 0.8);
+                this.rampParam(this.beatFxDry.gain, 1 - amount * 0.2);
+                this.rampParam(this.beatFxFeedback.gain, amount * 0.75);
                 this.beatFxFilter.type = "lowpass";
-                this.beatFxFilter.frequency.value = 3000 + (1 - amount) * 6000;
-                this.beatFxFilter.Q.value = 0.3;
+                this.rampParam(this.beatFxFilter.frequency, 3000 + (1 - amount) * 6000);
+                this.rampParam(this.beatFxFilter.Q, 0.3);
                 break;
 
             case "flanger":
                 // Short modulated delay
-                this.beatFxDelay.delayTime.value = 0.002 + amount * 0.008;
-                this.beatFxWet.gain.value = amount * 0.9;
-                this.beatFxDry.gain.value = 1;
-                this.beatFxFeedback.gain.value = amount * 0.7;
+                this.rampParam(this.beatFxDelay.delayTime, 0.002 + amount * 0.008);
+                this.rampParam(this.beatFxWet.gain, amount * 0.9);
+                this.rampParam(this.beatFxDry.gain, 1);
+                this.rampParam(this.beatFxFeedback.gain, amount * 0.7);
                 this.beatFxFilter.type = "allpass";
-                this.beatFxFilter.frequency.value = 1000;
+                this.rampParam(this.beatFxFilter.frequency, 1000);
                 break;
 
             case "phaser":
-                this.beatFxDelay.delayTime.value = 0.001 + amount * 0.004;
-                this.beatFxWet.gain.value = amount * 0.8;
-                this.beatFxDry.gain.value = 1;
-                this.beatFxFeedback.gain.value = amount * 0.5;
+                this.rampParam(this.beatFxDelay.delayTime, 0.001 + amount * 0.004);
+                this.rampParam(this.beatFxWet.gain, amount * 0.8);
+                this.rampParam(this.beatFxDry.gain, 1);
+                this.rampParam(this.beatFxFeedback.gain, amount * 0.5);
                 this.beatFxFilter.type = "notch";
-                this.beatFxFilter.frequency.value = 1000;
-                this.beatFxFilter.Q.value = 2;
+                this.rampParam(this.beatFxFilter.frequency, 1000);
+                this.rampParam(this.beatFxFilter.Q, 2);
                 break;
 
             case "trans":
                 // Transform/gate — no delay, just sharp volume chopping simulated via filter
-                this.beatFxDelay.delayTime.value = 0.001;
-                this.beatFxWet.gain.value = 0;
-                this.beatFxDry.gain.value = 1;
-                this.beatFxFeedback.gain.value = 0;
+                this.rampParam(this.beatFxDelay.delayTime, 0.001);
+                this.rampParam(this.beatFxWet.gain, 0);
+                this.rampParam(this.beatFxDry.gain, 1);
+                this.rampParam(this.beatFxFeedback.gain, 0);
                 this.beatFxFilter.type = "highpass";
-                this.beatFxFilter.frequency.value = amount > 0.5 ? 15000 : 20;
+                this.rampParam(this.beatFxFilter.frequency, amount > 0.5 ? 15000 : 20);
                 break;
 
             case "roll":
                 // Beat repeat — tight loop with delay
-                this.beatFxDelay.delayTime.value = delayTime;
-                this.beatFxWet.gain.value = amount;
-                this.beatFxDry.gain.value = 1 - amount * 0.5;
-                this.beatFxFeedback.gain.value = amount * 0.85;
+                this.rampParam(this.beatFxDelay.delayTime, delayTime);
+                this.rampParam(this.beatFxWet.gain, amount);
+                this.rampParam(this.beatFxDry.gain, 1 - amount * 0.5);
+                this.rampParam(this.beatFxFeedback.gain, amount * 0.85);
                 this.beatFxFilter.type = "lowpass";
-                this.beatFxFilter.frequency.value = 12000;
-                this.beatFxFilter.Q.value = 0.5;
+                this.rampParam(this.beatFxFilter.frequency, 12000);
+                this.rampParam(this.beatFxFilter.Q, 0.5);
                 break;
 
             case "filter":
                 // Filter sweep synced to beat
-                this.beatFxDelay.delayTime.value = 0.001;
-                this.beatFxWet.gain.value = 0;
-                this.beatFxDry.gain.value = 1;
-                this.beatFxFeedback.gain.value = 0;
+                this.rampParam(this.beatFxDelay.delayTime, 0.001);
+                this.rampParam(this.beatFxWet.gain, 0);
+                this.rampParam(this.beatFxDry.gain, 1);
+                this.rampParam(this.beatFxFeedback.gain, 0);
                 this.beatFxFilter.type = "lowpass";
-                this.beatFxFilter.frequency.value = 200 + (1 - amount) * 18000;
-                this.beatFxFilter.Q.value = 1 + amount * 8;
+                this.rampParam(this.beatFxFilter.frequency, 200 + (1 - amount) * 18000);
+                this.rampParam(this.beatFxFilter.Q, 1 + amount * 8);
                 break;
 
             case "spiral":
                 // Pitch-shifting echo feel
-                this.beatFxDelay.delayTime.value = delayTime * 0.5;
-                this.beatFxWet.gain.value = amount * 0.7;
-                this.beatFxDry.gain.value = 1;
-                this.beatFxFeedback.gain.value = amount * 0.65;
+                this.rampParam(this.beatFxDelay.delayTime, delayTime * 0.5);
+                this.rampParam(this.beatFxWet.gain, amount * 0.7);
+                this.rampParam(this.beatFxDry.gain, 1);
+                this.rampParam(this.beatFxFeedback.gain, amount * 0.65);
                 this.beatFxFilter.type = "highpass";
-                this.beatFxFilter.frequency.value = 200 + amount * 4000;
-                this.beatFxFilter.Q.value = 2 + amount * 8;
+                this.rampParam(this.beatFxFilter.frequency, 200 + amount * 4000);
+                this.rampParam(this.beatFxFilter.Q, 2 + amount * 8);
                 break;
 
             case "noise":
                 // White noise blend via HP resonance
-                this.beatFxDelay.delayTime.value = 0.001;
-                this.beatFxWet.gain.value = amount * 0.4;
-                this.beatFxDry.gain.value = 1;
-                this.beatFxFeedback.gain.value = amount * 0.9;
+                this.rampParam(this.beatFxDelay.delayTime, 0.001);
+                this.rampParam(this.beatFxWet.gain, amount * 0.4);
+                this.rampParam(this.beatFxDry.gain, 1);
+                this.rampParam(this.beatFxFeedback.gain, amount * 0.9);
                 this.beatFxFilter.type = "highpass";
-                this.beatFxFilter.frequency.value = 8000 + amount * 10000;
-                this.beatFxFilter.Q.value = 15 + amount * 10;
+                this.rampParam(this.beatFxFilter.frequency, 8000 + amount * 10000);
+                this.rampParam(this.beatFxFilter.Q, 15 + amount * 10);
                 break;
 
             case "crush":
                 // Bit crush simulation via high-Q bandpass + feedback
-                this.beatFxDelay.delayTime.value = 0.001;
-                this.beatFxWet.gain.value = amount * 0.6;
-                this.beatFxDry.gain.value = 1 - amount * 0.3;
-                this.beatFxFeedback.gain.value = amount * 0.4;
+                this.rampParam(this.beatFxDelay.delayTime, 0.001);
+                this.rampParam(this.beatFxWet.gain, amount * 0.6);
+                this.rampParam(this.beatFxDry.gain, 1 - amount * 0.3);
+                this.rampParam(this.beatFxFeedback.gain, amount * 0.4);
                 this.beatFxFilter.type = "bandpass";
-                this.beatFxFilter.frequency.value = 2000 + amount * 4000;
-                this.beatFxFilter.Q.value = 10 + amount * 20;
+                this.rampParam(this.beatFxFilter.frequency, 2000 + amount * 4000);
+                this.rampParam(this.beatFxFilter.Q, 10 + amount * 20);
                 break;
 
             case "ping-pong":
                 // Stereo ping-pong delay
-                this.beatFxDelay.delayTime.value = delayTime;
-                this.beatFxWet.gain.value = amount * 0.6;
-                this.beatFxDry.gain.value = 1;
-                this.beatFxFeedback.gain.value = amount * 0.5;
+                this.rampParam(this.beatFxDelay.delayTime, delayTime);
+                this.rampParam(this.beatFxWet.gain, amount * 0.6);
+                this.rampParam(this.beatFxDry.gain, 1);
+                this.rampParam(this.beatFxFeedback.gain, amount * 0.5);
                 this.beatFxFilter.type = "lowpass";
-                this.beatFxFilter.frequency.value = 6000;
-                this.beatFxFilter.Q.value = 0.5;
+                this.rampParam(this.beatFxFilter.frequency, 6000);
+                this.rampParam(this.beatFxFilter.Q, 0.5);
                 break;
 
             default:
@@ -725,11 +760,11 @@ export class DeckEngine {
     }
 
     setHeadphoneCue(enabled: boolean) {
-        this.cueSendGain.gain.value = enabled ? 1 : 0;
+        this.rampParam(this.cueSendGain.gain, enabled ? 1 : 0, 0.008);
     }
 
     setAutoGain(gain: number) {
-        this.autoGainNode.gain.value = Math.max(0, Math.min(4, gain));
+        this.rampParam(this.autoGainNode.gain, Math.max(0, Math.min(4, gain)), 0.015);
     }
 
     setEQMode(mode: EQMode) {
@@ -737,20 +772,20 @@ export class DeckEngine {
         if (mode === "isolator") {
             // Isolator: full-cut shelves become bandpass-like
             this.eqLowNode.type = "lowshelf";
-            this.eqLowNode.frequency.value = 250;
+            this.rampParam(this.eqLowNode.frequency, 250);
             this.eqMidNode.type = "peaking";
-            this.eqMidNode.frequency.value = 1000;
-            this.eqMidNode.Q.value = 1.4;
+            this.rampParam(this.eqMidNode.frequency, 1000);
+            this.rampParam(this.eqMidNode.Q, 1.4);
             this.eqHiNode.type = "highshelf";
-            this.eqHiNode.frequency.value = 2500;
+            this.rampParam(this.eqHiNode.frequency, 2500);
         } else {
             this.eqLowNode.type = "lowshelf";
-            this.eqLowNode.frequency.value = 320;
+            this.rampParam(this.eqLowNode.frequency, 320);
             this.eqMidNode.type = "peaking";
-            this.eqMidNode.frequency.value = 1000;
-            this.eqMidNode.Q.value = 0.7;
+            this.rampParam(this.eqMidNode.frequency, 1000);
+            this.rampParam(this.eqMidNode.Q, 0.7);
             this.eqHiNode.type = "highshelf";
-            this.eqHiNode.frequency.value = 3200;
+            this.rampParam(this.eqHiNode.frequency, 3200);
         }
     }
 
@@ -790,8 +825,8 @@ export class DeckEngine {
 
         if (isOff) {
             this.filterNode.type = "allpass";
-            this.filterNode.frequency.value = 1000;
-            this.filterNode.Q.value = 1;
+            this.rampParam(this.filterNode.frequency, 1000);
+            this.rampParam(this.filterNode.Q, 1);
             return;
         }
 
@@ -800,37 +835,37 @@ export class DeckEngine {
                 if (value < 0) {
                     this.filterNode.type = "lowpass";
                     const t = 1 + value; // 0..1
-                    this.filterNode.frequency.value = 200 * Math.pow(100, t);
-                    this.filterNode.Q.value = 1 + absVal * 5;
+                    this.rampParam(this.filterNode.frequency, 200 * Math.pow(100, t));
+                    this.rampParam(this.filterNode.Q, 1 + absVal * 5);
                 } else {
                     this.filterNode.type = "highpass";
-                    this.filterNode.frequency.value = 20 * Math.pow(1000, value);
-                    this.filterNode.Q.value = 1 + value * 5;
+                    this.rampParam(this.filterNode.frequency, 20 * Math.pow(1000, value));
+                    this.rampParam(this.filterNode.Q, 1 + value * 5);
                 }
                 break;
 
             case "lpf":
                 this.filterNode.type = "lowpass";
-                this.filterNode.frequency.value = 200 * Math.pow(100, 1 - absVal);
-                this.filterNode.Q.value = 1 + absVal * 6;
+                this.rampParam(this.filterNode.frequency, 200 * Math.pow(100, 1 - absVal));
+                this.rampParam(this.filterNode.Q, 1 + absVal * 6);
                 break;
 
             case "hpf":
                 this.filterNode.type = "highpass";
-                this.filterNode.frequency.value = 20 * Math.pow(1000, absVal);
-                this.filterNode.Q.value = 1 + absVal * 6;
+                this.rampParam(this.filterNode.frequency, 20 * Math.pow(1000, absVal));
+                this.rampParam(this.filterNode.Q, 1 + absVal * 6);
                 break;
 
             case "bpf":
                 this.filterNode.type = "bandpass";
-                this.filterNode.frequency.value = 200 * Math.pow(50, (value + 1) / 2);
-                this.filterNode.Q.value = 2 + absVal * 10;
+                this.rampParam(this.filterNode.frequency, 200 * Math.pow(50, (value + 1) / 2));
+                this.rampParam(this.filterNode.Q, 2 + absVal * 10);
                 break;
 
             case "notch":
                 this.filterNode.type = "notch";
-                this.filterNode.frequency.value = 200 * Math.pow(50, (value + 1) / 2);
-                this.filterNode.Q.value = 1 + absVal * 8;
+                this.rampParam(this.filterNode.frequency, 200 * Math.pow(50, (value + 1) / 2));
+                this.rampParam(this.filterNode.Q, 1 + absVal * 8);
                 break;
 
             case "sweep":
@@ -838,24 +873,24 @@ export class DeckEngine {
                     const freq = 20 * Math.pow(1000, (value + 1) / 2);
                     if (value < 0) {
                         this.filterNode.type = "lowpass";
-                        this.filterNode.frequency.value = freq;
+                        this.rampParam(this.filterNode.frequency, freq);
                     } else {
                         this.filterNode.type = "highpass";
-                        this.filterNode.frequency.value = freq;
+                        this.rampParam(this.filterNode.frequency, freq);
                     }
-                    this.filterNode.Q.value = 1 + absVal * 4;
+                    this.rampParam(this.filterNode.Q, 1 + absVal * 4);
                 }
                 break;
 
             case "resonance":
                 if (value < 0) {
                     this.filterNode.type = "lowpass";
-                    this.filterNode.frequency.value = 200 * Math.pow(100, 1 - absVal);
-                    this.filterNode.Q.value = 5 + absVal * 20;
+                    this.rampParam(this.filterNode.frequency, 200 * Math.pow(100, 1 - absVal));
+                    this.rampParam(this.filterNode.Q, 5 + absVal * 20);
                 } else {
                     this.filterNode.type = "highpass";
-                    this.filterNode.frequency.value = 20 * Math.pow(1000, value);
-                    this.filterNode.Q.value = 5 + absVal * 20;
+                    this.rampParam(this.filterNode.frequency, 20 * Math.pow(1000, value));
+                    this.rampParam(this.filterNode.Q, 5 + absVal * 20);
                 }
                 break;
 
@@ -872,8 +907,8 @@ export class DeckEngine {
 
         if (isOff) {
             this.colorFxNode.type = "allpass";
-            this.colorFxNode.frequency.value = 1000;
-            this.colorFxNode.Q.value = 1;
+            this.rampParam(this.colorFxNode.frequency, 1000);
+            this.rampParam(this.colorFxNode.Q, 1);
             return;
         }
 
@@ -882,45 +917,45 @@ export class DeckEngine {
             case "dub-echo":
                 // Simulate echo with heavy LP + high Q for resonant feedback feel
                 this.colorFxNode.type = "lowpass";
-                this.colorFxNode.frequency.value = 800 * Math.pow(10, 1 - absVal);
-                this.colorFxNode.Q.value = 3 + absVal * 15;
+                this.rampParam(this.colorFxNode.frequency, 800 * Math.pow(10, 1 - absVal));
+                this.rampParam(this.colorFxNode.Q, 3 + absVal * 15);
                 break;
 
             case "reverb":
             case "wash":
                 this.colorFxNode.type = "lowpass";
-                this.colorFxNode.frequency.value = 500 + (1 - absVal) * 15000;
-                this.colorFxNode.Q.value = 0.5 + absVal * 3;
+                this.rampParam(this.colorFxNode.frequency, 500 + (1 - absVal) * 15000);
+                this.rampParam(this.colorFxNode.Q, 0.5 + absVal * 3);
                 break;
 
             case "flanger":
                 this.colorFxNode.type = "bandpass";
-                this.colorFxNode.frequency.value = 500 + Math.sin(value * Math.PI * 2) * 400;
-                this.colorFxNode.Q.value = 8 + absVal * 15;
+                this.rampParam(this.colorFxNode.frequency, 500 + Math.sin(value * Math.PI * 2) * 400);
+                this.rampParam(this.colorFxNode.Q, 8 + absVal * 15);
                 break;
 
             case "phaser":
                 this.colorFxNode.type = "notch";
-                this.colorFxNode.frequency.value = 1000 * Math.pow(4, value);
-                this.colorFxNode.Q.value = 2 + absVal * 6;
+                this.rampParam(this.colorFxNode.frequency, 1000 * Math.pow(4, value));
+                this.rampParam(this.colorFxNode.Q, 2 + absVal * 6);
                 break;
 
             case "crusher":
                 this.colorFxNode.type = "bandpass";
-                this.colorFxNode.frequency.value = 2000 + absVal * 3000;
-                this.colorFxNode.Q.value = 10 + absVal * 25;
+                this.rampParam(this.colorFxNode.frequency, 2000 + absVal * 3000);
+                this.rampParam(this.colorFxNode.Q, 10 + absVal * 25);
                 break;
 
             case "spiral":
                 this.colorFxNode.type = "highpass";
-                this.colorFxNode.frequency.value = 50 * Math.pow(200, absVal);
-                this.colorFxNode.Q.value = 2 + absVal * 18;
+                this.rampParam(this.colorFxNode.frequency, 50 * Math.pow(200, absVal));
+                this.rampParam(this.colorFxNode.Q, 2 + absVal * 18);
                 break;
 
             case "gate":
                 this.colorFxNode.type = "highpass";
-                this.colorFxNode.frequency.value = absVal > 0.5 ? 5000 + (absVal - 0.5) * 15000 : 20;
-                this.colorFxNode.Q.value = 1;
+                this.rampParam(this.colorFxNode.frequency, absVal > 0.5 ? 5000 + (absVal - 0.5) * 15000 : 20);
+                this.rampParam(this.colorFxNode.Q, 1);
                 break;
 
             case "formant":
@@ -928,56 +963,56 @@ export class DeckEngine {
                 {
                     const formants = [270, 530, 730, 1090, 2440];
                     const fIdx = Math.floor(((value + 1) / 2) * (formants.length - 1));
-                    this.colorFxNode.frequency.value = formants[Math.min(fIdx, formants.length - 1)];
+                    this.rampParam(this.colorFxNode.frequency, formants[Math.min(fIdx, formants.length - 1)]);
                 }
-                this.colorFxNode.Q.value = 5 + absVal * 10;
+                this.rampParam(this.colorFxNode.Q, 5 + absVal * 10);
                 break;
 
             case "pitch":
                 this.colorFxNode.type = "highpass";
-                this.colorFxNode.frequency.value = 200 * Math.pow(20, absVal);
-                this.colorFxNode.Q.value = 8 + absVal * 15;
+                this.rampParam(this.colorFxNode.frequency, 200 * Math.pow(20, absVal));
+                this.rampParam(this.colorFxNode.Q, 8 + absVal * 15);
                 break;
 
             case "telephone":
                 this.colorFxNode.type = "bandpass";
-                this.colorFxNode.frequency.value = 1200;
-                this.colorFxNode.Q.value = 3 + absVal * 12;
+                this.rampParam(this.colorFxNode.frequency, 1200);
+                this.rampParam(this.colorFxNode.Q, 3 + absVal * 12);
                 break;
 
             case "rumble":
                 this.colorFxNode.type = "lowpass";
-                this.colorFxNode.frequency.value = 80 + (1 - absVal) * 400;
-                this.colorFxNode.Q.value = 4 + absVal * 12;
+                this.rampParam(this.colorFxNode.frequency, 80 + (1 - absVal) * 400);
+                this.rampParam(this.colorFxNode.Q, 4 + absVal * 12);
                 break;
 
             case "tinny":
                 this.colorFxNode.type = "highpass";
-                this.colorFxNode.frequency.value = 2000 + absVal * 8000;
-                this.colorFxNode.Q.value = 3 + absVal * 10;
+                this.rampParam(this.colorFxNode.frequency, 2000 + absVal * 8000);
+                this.rampParam(this.colorFxNode.Q, 3 + absVal * 10);
                 break;
 
             case "vinyl":
                 this.colorFxNode.type = "bandpass";
-                this.colorFxNode.frequency.value = 800 + absVal * 2000;
-                this.colorFxNode.Q.value = 2 + absVal * 8;
+                this.rampParam(this.colorFxNode.frequency, 800 + absVal * 2000);
+                this.rampParam(this.colorFxNode.Q, 2 + absVal * 8);
                 break;
 
             case "radio":
                 this.colorFxNode.type = "bandpass";
-                this.colorFxNode.frequency.value = 1500;
-                this.colorFxNode.Q.value = 5 + absVal * 20;
+                this.rampParam(this.colorFxNode.frequency, 1500);
+                this.rampParam(this.colorFxNode.Q, 5 + absVal * 20);
                 break;
 
             case "noise":
                 if (value < 0) {
                     this.colorFxNode.type = "lowpass";
-                    this.colorFxNode.frequency.value = 100 + (1 - absVal) * 19000;
+                    this.rampParam(this.colorFxNode.frequency, 100 + (1 - absVal) * 19000);
                 } else {
                     this.colorFxNode.type = "highpass";
-                    this.colorFxNode.frequency.value = 100 + absVal * 19000;
+                    this.rampParam(this.colorFxNode.frequency, 100 + absVal * 19000);
                 }
-                this.colorFxNode.Q.value = 0.5;
+                this.rampParam(this.colorFxNode.Q, 0.5);
                 break;
 
             default:
@@ -1043,6 +1078,8 @@ export class MixerEngine {
     ctx: AudioContext;
     private deckAGain: GainNode;
     private deckBGain: GainNode;
+    private deckCGain: GainNode;
+    private deckDGain: GainNode;
     private masterGain: GainNode;
     private cueGain: GainNode; // headphone cue bus
     private cueMixGain: GainNode; // master → cue mix
@@ -1050,10 +1087,14 @@ export class MixerEngine {
     cueAnalyser: AnalyserNode;
     deckA: DeckEngine;
     deckB: DeckEngine;
+    deckC: DeckEngine;
+    deckD: DeckEngine;
     private crossfader = 0.5; // 0 = full A, 1 = full B
     private crossfaderCurve: CrossfaderCurve = "smooth";
     private crossfaderAssignA: CrossfaderAssign = "thru"; // Deck A assignment
     private crossfaderAssignB: CrossfaderAssign = "thru"; // Deck B assignment
+    private crossfaderAssignC: CrossfaderAssign = "thru"; // Deck C assignment
+    private crossfaderAssignD: CrossfaderAssign = "thru"; // Deck D assignment
     // Recording
     private mediaRecorder: MediaRecorder | null = null;
     private recordedChunks: Blob[] = [];
@@ -1074,10 +1115,17 @@ export class MixerEngine {
     midiClockBpm = 120;
 
     constructor() {
-        this.ctx = new AudioContext();
+        this.ctx = new AudioContext({ latencyHint: "playback" });
+
+        // Expose AudioContext globally for performance monitoring
+        if (typeof window !== "undefined") {
+            (window as unknown as { __mmo_audio_ctx: AudioContext }).__mmo_audio_ctx = this.ctx;
+        }
 
         this.deckAGain = this.ctx.createGain();
         this.deckBGain = this.ctx.createGain();
+        this.deckCGain = this.ctx.createGain();
+        this.deckDGain = this.ctx.createGain();
         this.masterGain = this.ctx.createGain();
         this.masterAnalyser = this.ctx.createAnalyser();
         this.masterAnalyser.fftSize = 256;
@@ -1094,6 +1142,8 @@ export class MixerEngine {
         // Routing: deck gains → master gain → analyser → destination
         this.deckAGain.connect(this.masterGain);
         this.deckBGain.connect(this.masterGain);
+        this.deckCGain.connect(this.masterGain);
+        this.deckDGain.connect(this.masterGain);
         this.masterGain.connect(this.masterAnalyser);
         this.masterAnalyser.connect(this.ctx.destination);
 
@@ -1104,6 +1154,8 @@ export class MixerEngine {
 
         this.deckA = new DeckEngine(this.ctx, this.deckAGain, this.cueGain);
         this.deckB = new DeckEngine(this.ctx, this.deckBGain, this.cueGain);
+        this.deckC = new DeckEngine(this.ctx, this.deckCGain, this.cueGain);
+        this.deckD = new DeckEngine(this.ctx, this.deckDGain, this.cueGain);
 
         // Sampler engine
         this.sampler = new SamplerEngine(this.ctx, this.masterGain);
@@ -1116,9 +1168,33 @@ export class MixerEngine {
         this.setCrossfader(this.crossfader); // reapply
     }
 
-    setCrossfaderAssign(deck: "A" | "B", assign: CrossfaderAssign) {
-        if (deck === "A") this.crossfaderAssignA = assign;
-        else this.crossfaderAssignB = assign;
+    /** Get a DeckEngine by side letter */
+    getDeck(side: DeckSide): DeckEngine {
+        switch (side) {
+            case "A": return this.deckA;
+            case "B": return this.deckB;
+            case "C": return this.deckC;
+            case "D": return this.deckD;
+        }
+    }
+
+    /** Get the gain node for a deck */
+    private getDeckGain(side: DeckSide): GainNode {
+        switch (side) {
+            case "A": return this.deckAGain;
+            case "B": return this.deckBGain;
+            case "C": return this.deckCGain;
+            case "D": return this.deckDGain;
+        }
+    }
+
+    setCrossfaderAssign(deck: DeckSide, assign: CrossfaderAssign) {
+        switch (deck) {
+            case "A": this.crossfaderAssignA = assign; break;
+            case "B": this.crossfaderAssignB = assign; break;
+            case "C": this.crossfaderAssignC = assign; break;
+            case "D": this.crossfaderAssignD = assign; break;
+        }
         this.setCrossfader(this.crossfader); // reapply
     }
 
@@ -1154,14 +1230,16 @@ export class MixerEngine {
         // "A" = responds to A side of crossfader
         // "B" = responds to B side of crossfader
         const now = this.ctx.currentTime;
-        const valA = this.crossfaderAssignA === "thru" ? 1 : this.crossfaderAssignA === "A" ? gainA : gainB;
-        const valB = this.crossfaderAssignB === "thru" ? 1 : this.crossfaderAssignB === "A" ? gainA : gainB;
-        this.deckAGain.gain.cancelScheduledValues(now);
-        this.deckAGain.gain.setValueAtTime(this.deckAGain.gain.value, now);
-        this.deckAGain.gain.linearRampToValueAtTime(valA, now + 0.008);
-        this.deckBGain.gain.cancelScheduledValues(now);
-        this.deckBGain.gain.setValueAtTime(this.deckBGain.gain.value, now);
-        this.deckBGain.gain.linearRampToValueAtTime(valB, now + 0.008);
+        const applyGain = (gainNode: GainNode, assign: CrossfaderAssign) => {
+            const val = assign === "thru" ? 1 : assign === "A" ? gainA : gainB;
+            gainNode.gain.cancelScheduledValues(now);
+            gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+            gainNode.gain.linearRampToValueAtTime(val, now + 0.008);
+        };
+        applyGain(this.deckAGain, this.crossfaderAssignA);
+        applyGain(this.deckBGain, this.crossfaderAssignB);
+        applyGain(this.deckCGain, this.crossfaderAssignC);
+        applyGain(this.deckDGain, this.crossfaderAssignD);
     }
 
     setMasterVolume(vol: number) {
@@ -1170,6 +1248,36 @@ export class MixerEngine {
         this.masterGain.gain.cancelScheduledValues(now);
         this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
         this.masterGain.gain.linearRampToValueAtTime(v, now + 0.015);
+    }
+
+    /** Ensure AudioContext is running. Call on any user interaction that plays audio.
+     *  Browsers suspend AudioContext until a user gesture occurs. */
+    ensureRunning() {
+        if (this.ctx.state === "suspended") {
+            this.ctx.resume();
+        }
+    }
+
+    /** Suspend AudioContext to save CPU when no audio is playing. */
+    suspend() {
+        if (this.ctx.state === "running") {
+            this.ctx.suspend();
+        }
+    }
+
+    /** Get AudioContext state for monitoring */
+    getContextState(): AudioContextState {
+        return this.ctx.state;
+    }
+
+    /** Get actual audio latency in seconds (baseLatency + outputLatency) */
+    getAudioLatency(): number {
+        return (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0);
+    }
+
+    /** Get audio sample rate */
+    getSampleRate(): number {
+        return this.ctx.sampleRate;
     }
 
     setHeadphoneVolume(vol: number) {
@@ -1383,9 +1491,13 @@ export class MixerEngine {
         this.sampler.destroy();
         this.deckA.destroy();
         this.deckB.destroy();
+        this.deckC.destroy();
+        this.deckD.destroy();
         try {
             this.deckAGain.disconnect();
             this.deckBGain.disconnect();
+            this.deckCGain.disconnect();
+            this.deckDGain.disconnect();
             this.masterGain.disconnect();
             this.masterAnalyser.disconnect();
             this.cueGain.disconnect();
@@ -1404,6 +1516,7 @@ export class SamplerEngine {
     private masterGain: GainNode;
     slots: SamplerSlot[];
     private activeSources: Map<number, AudioBufferSourceNode> = new Map();
+    private slotGains: GainNode[]; // pre-allocated per-slot gain nodes
 
     constructor(ctx: AudioContext, masterOutput: GainNode) {
         this.ctx = ctx;
@@ -1421,6 +1534,14 @@ export class SamplerEngine {
             volume: 0.8,
             isLooping: false,
         }));
+
+        // Pre-allocate gain nodes per slot (avoid per-trigger allocation)
+        this.slotGains = Array.from({ length: 8 }, () => {
+            const g = ctx.createGain();
+            g.gain.value = 0.8;
+            g.connect(this.masterGain);
+            return g;
+        });
     }
 
     /** Load an audio file into a sampler slot */
@@ -1461,11 +1582,14 @@ export class SamplerEngine {
         source.buffer = slot.buffer;
         source.loop = slot.isLooping;
 
-        const slotGain = this.ctx.createGain();
-        slotGain.gain.value = slot.volume;
+        // Use pre-allocated gain node — update volume via ramp to avoid clicks
+        const slotGain = this.slotGains[slotIndex];
+        const now = this.ctx.currentTime;
+        slotGain.gain.cancelScheduledValues(now);
+        slotGain.gain.setValueAtTime(slotGain.gain.value, now);
+        slotGain.gain.linearRampToValueAtTime(slot.volume, now + 0.005);
 
         source.connect(slotGain);
-        slotGain.connect(this.masterGain);
 
         source.onended = () => {
             this.activeSources.delete(slotIndex);
@@ -1489,7 +1613,14 @@ export class SamplerEngine {
 
     /** Set slot volume */
     setVolume(slotIndex: number, volume: number) {
-        this.slots[slotIndex] = { ...this.slots[slotIndex], volume: Math.max(0, Math.min(1, volume)) };
+        const v = Math.max(0, Math.min(1, volume));
+        this.slots[slotIndex] = { ...this.slots[slotIndex], volume: v };
+        // Update pre-allocated gain node in real-time with ramp
+        const slotGain = this.slotGains[slotIndex];
+        const now = this.ctx.currentTime;
+        slotGain.gain.cancelScheduledValues(now);
+        slotGain.gain.setValueAtTime(slotGain.gain.value, now);
+        slotGain.gain.linearRampToValueAtTime(v, now + 0.01);
     }
 
     /** Toggle looping on a slot */
@@ -1551,7 +1682,11 @@ export class SamplerEngine {
     }
 
     setMasterVolume(vol: number) {
-        this.masterGain.gain.value = Math.max(0, Math.min(1.5, vol));
+        const v = Math.max(0, Math.min(1.5, vol));
+        const now = this.ctx.currentTime;
+        this.masterGain.gain.cancelScheduledValues(now);
+        this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+        this.masterGain.gain.linearRampToValueAtTime(v, now + 0.01);
     }
 
     destroy() {

@@ -74,7 +74,7 @@ export const SamplePickerModal = memo(function SamplePickerModal({
     }, [open, tab]);
 
     // Debounced search
-    const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
     useEffect(() => {
         if (!open || tab !== "library") return;
         if (searchTimerRef.current) clearTimeout(searchTimerRef.current);

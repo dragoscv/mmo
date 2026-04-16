@@ -1,0 +1,174 @@
+/* MMO Extension - Content Script Styles */
+
+/* ─── Base Button ─────────────────────────────────────────────────────── */
+
+.mmo-download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    z-index: 9999;
+    line-height: 1;
+    vertical-align: middle;
+}
+
+.mmo-download-btn:hover {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+}
+
+.mmo-download-btn:active {
+    transform: scale(0.95);
+}
+
+.mmo-download-btn.mmo-btn-clicked {
+    background: #22c55e !important;
+    color: #fff !important;
+}
+
+.mmo-download-btn svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.mmo-btn-label {
+    letter-spacing: 0.5px;
+}
+
+/* ─── YouTube ─────────────────────────────────────────────────────────── */
+
+.mmo-btn-youtube {
+    background: linear-gradient(135deg, #9333ea, #7c3aed);
+    color: #fff;
+    margin-right: 8px;
+    height: 36px;
+    padding: 0 16px;
+    border-radius: 18px;
+}
+
+.mmo-btn-youtube:hover {
+    background: linear-gradient(135deg, #a855f7, #8b5cf6);
+    box-shadow: 0 2px 12px rgba(147, 51, 234, 0.4);
+}
+
+/* ─── YouTube Music ───────────────────────────────────────────────────── */
+
+.mmo-btn-ytmusic {
+    background: rgba(147, 51, 234, 0.9);
+    color: #fff;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 16px;
+    margin-left: 8px;
+}
+
+.mmo-btn-ytmusic:hover {
+    background: rgba(168, 85, 247, 1);
+    box-shadow: 0 2px 12px rgba(147, 51, 234, 0.4);
+}
+
+/* ─── SoundCloud ──────────────────────────────────────────────────────── */
+
+.mmo-btn-soundcloud {
+    background: linear-gradient(135deg, #9333ea, #7c3aed);
+    color: #fff;
+    height: 26px;
+    padding: 0 12px;
+    border-radius: 3px;
+    font-size: 11px;
+    margin-right: 8px;
+}
+
+.mmo-btn-soundcloud:hover {
+    background: linear-gradient(135deg, #a855f7, #8b5cf6);
+    box-shadow: 0 2px 8px rgba(147, 51, 234, 0.3);
+}
+
+/* ─── Spotify ─────────────────────────────────────────────────────────── */
+
+.mmo-btn-spotify {
+    background: rgba(147, 51, 234, 0.85);
+    color: #fff;
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 20px;
+    margin-left: 8px;
+}
+
+.mmo-btn-spotify:hover {
+    background: rgba(168, 85, 247, 1);
+    box-shadow: 0 2px 12px rgba(147, 51, 234, 0.4);
+}
+
+/* ─── Bandcamp ────────────────────────────────────────────────────────── */
+
+.mmo-btn-bandcamp {
+    background: #9333ea;
+    color: #fff;
+    height: 30px;
+    padding: 0 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-top: 8px;
+}
+
+.mmo-btn-bandcamp:hover {
+    background: #a855f7;
+}
+
+/* ─── Generic ─────────────────────────────────────────────────────────── */
+
+.mmo-btn-generic {
+    background: linear-gradient(135deg, #9333ea, #6366f1);
+    color: #fff;
+    height: 30px;
+    padding: 0 14px;
+    border-radius: 15px;
+    font-size: 11px;
+    margin: 4px;
+}
+
+.mmo-btn-generic:hover {
+    background: linear-gradient(135deg, #a855f7, #818cf8);
+    box-shadow: 0 2px 10px rgba(147, 51, 234, 0.3);
+}
+
+/* ─── Floating Button (for pages without clear injection target) ──── */
+
+.mmo-floating-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 99999;
+    background: linear-gradient(135deg, #9333ea, #7c3aed);
+    color: #fff;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(147, 51, 234, 0.4);
+    transition: all 0.3s ease;
+}
+
+.mmo-floating-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 25px rgba(147, 51, 234, 0.6);
+}
+
+.mmo-floating-btn svg {
+    width: 22px;
+    height: 22px;
+}

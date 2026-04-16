@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState, useCallback, memo } from "react";
 import { useMixer } from "./mixer-context";
 import { usePersonalization } from "@/hooks/use-personalization";
-import type { DeckState } from "@/lib/mixer-engine";
+import type { DeckState, DeckSide } from "@/lib/mixer-engine";
 import { JOG_RENDERERS, type JogDesignProps } from "./jogwheel-designs";
 
 // ─── Constants ───────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ function formatTimeRemaining(current: number, duration: number): string {
 // ─── Tonearm Needle ──────────────────────────────────────────────────────
 // Pivots from top-right corner, swings over the platter when playing
 
-const Tonearm = memo(function Tonearm({ isPlaying, color, side }: { isPlaying: boolean; color: string; side: "A" | "B" }) {
+const Tonearm = memo(function Tonearm({ isPlaying, color, side }: { isPlaying: boolean; color: string; side: DeckSide }) {
     const isLeft = side === "A";
     return (
         <div
@@ -154,7 +154,7 @@ const CenterOverlay = memo(function CenterOverlay({
 // ─── Main JogWheel Component ─────────────────────────────────────────────
 
 interface JogWheelProps {
-    side: "A" | "B";
+    side: DeckSide;
     deck: DeckState;
     color: string;
 }

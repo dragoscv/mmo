@@ -445,3 +445,253 @@ body {
         @apply font-sans;
     }
 }
+
+/* ─── DAW Focus Mode ──────────────────────────────────────────────────── */
+body.daw-focus-mode [data-app-sidebar] {
+    display: none !important;
+}
+
+body.daw-focus-mode [data-app-nowplaying] {
+    display: none !important;
+}
+
+body.daw-focus-mode [data-app-layout] {
+    height: 100dvh !important;
+}
+
+/* ─── DAW Design System ──────────────────────────────────────────────── */
+.daw-root {
+    --daw-bg: oklch(0.145 0 0);
+    --daw-surface: oklch(0.175 0 0);
+    --daw-surface-2: oklch(0.205 0 0);
+    --daw-surface-3: oklch(0.235 0 0);
+    --daw-border: oklch(1 0 0 / 8%);
+    --daw-border-strong: oklch(1 0 0 / 12%);
+    --daw-text: oklch(0.95 0 0);
+    --daw-text-muted: oklch(0.65 0 0);
+    --daw-text-dim: oklch(0.45 0 0);
+    --daw-accent: oklch(0.488 0.243 264.376);
+    --daw-accent-glow: rgba(139, 92, 246, 0.15);
+    --daw-accent-strong: rgba(139, 92, 246, 0.35);
+    --daw-green: oklch(0.72 0.17 142);
+    --daw-red: oklch(0.63 0.24 25);
+    --daw-amber: oklch(0.78 0.18 84);
+    --daw-blue: oklch(0.62 0.19 250);
+    --daw-cyan: oklch(0.72 0.15 195);
+    font-feature-settings: "tnum" 1;
+}
+
+/* DAW custom fader (vertical) */
+.daw-fader {
+    appearance: none;
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 6px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.daw-fader::-webkit-slider-runnable-track {
+    width: 4px;
+    border-radius: 2px;
+    background: var(--daw-border);
+}
+
+.daw-fader::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 6px;
+    border-radius: 2px;
+    background: var(--daw-text-muted);
+    margin-left: -5px;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+
+.daw-fader:hover::-webkit-slider-thumb {
+    background: var(--daw-text);
+    box-shadow: 0 0 6px var(--daw-accent-glow);
+}
+
+/* DAW custom slider (horizontal) */
+.daw-slider {
+    appearance: none;
+    height: 4px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.daw-slider::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--daw-border);
+}
+
+.daw-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--daw-text-muted);
+    margin-top: -3.5px;
+    transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+
+.daw-slider:hover::-webkit-slider-thumb {
+    background: var(--daw-text);
+    box-shadow: 0 0 8px var(--daw-accent-glow);
+    transform: scale(1.15);
+}
+
+.daw-slider-accent::-webkit-slider-thumb {
+    background: var(--daw-accent) !important;
+}
+
+.daw-slider-accent:hover::-webkit-slider-thumb {
+    box-shadow: 0 0 10px var(--daw-accent-strong) !important;
+}
+
+/* DAW select dropdown */
+.daw-select {
+    appearance: none;
+    background: var(--daw-surface);
+    border: 1px solid var(--daw-border);
+    border-radius: 6px;
+    color: var(--daw-text-muted);
+    font-size: 11px;
+    padding: 0 24px 0 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+}
+
+.daw-select:hover {
+    border-color: var(--daw-border-strong);
+    background-color: var(--daw-surface-2);
+}
+
+.daw-select:focus {
+    outline: none;
+    border-color: var(--daw-accent);
+    box-shadow: 0 0 0 2px var(--daw-accent-glow);
+}
+
+.daw-select option {
+    background: var(--daw-surface-2);
+    color: var(--daw-text-muted);
+}
+
+/* DAW number input */
+.daw-input {
+    appearance: none;
+    background: var(--daw-surface);
+    border: 1px solid var(--daw-border);
+    border-radius: 6px;
+    color: var(--daw-text);
+    font-family: ui-monospace, monospace;
+    text-align: center;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.daw-input:focus {
+    outline: none;
+    border-color: var(--daw-accent);
+    box-shadow: 0 0 0 2px var(--daw-accent-glow);
+}
+
+.daw-input::-webkit-inner-spin-button {
+    display: none;
+}
+
+/* DAW meter bar */
+.daw-meter {
+    border-radius: 2px;
+    overflow: hidden;
+    background: oklch(0.12 0 0);
+}
+
+.daw-meter-fill {
+    border-radius: 2px;
+    transition: height 60ms linear;
+    will-change: height;
+}
+
+/* DAW panel animation */
+@keyframes dawPanelIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes dawFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.daw-animate-in {
+    animation: dawPanelIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.daw-stagger-1 {
+    animation-delay: 30ms;
+}
+
+.daw-stagger-2 {
+    animation-delay: 60ms;
+}
+
+.daw-stagger-3 {
+    animation-delay: 90ms;
+}
+
+.daw-stagger-4 {
+    animation-delay: 120ms;
+}
+
+/* DAW glass surfaces */
+.daw-glass {
+    backdrop-filter: blur(12px) saturate(1.3);
+    -webkit-backdrop-filter: blur(12px) saturate(1.3);
+}
+
+/* DAW button base */
+.daw-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 11px;
+    transition: all 0.15s;
+    cursor: pointer;
+}
+
+.daw-btn:hover {
+    background: oklch(1 0 0 / 5%);
+}
+
+.daw-btn:active {
+    transform: scale(0.96);
+}
+
+.daw-btn-active {
+    background: var(--daw-accent-glow) !important;
+    color: var(--daw-accent) !important;
+    box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.25);
+}
+
+/* Playhead glow */
+.daw-playhead {
+    box-shadow: 0 0 6px var(--daw-green), 0 0 2px var(--daw-green);
+}

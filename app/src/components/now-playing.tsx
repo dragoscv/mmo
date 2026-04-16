@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useTransition, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { usePlayer } from "./player-context";
 import { usePersonalization, getMixerBackgroundStyle } from "@/hooks/use-personalization";
 import { Artwork } from "./artwork";
 import { FavoriteButton } from "./favorite-button";
-import { VisualizationCanvas } from "./visualization-canvas";
 import { VisualizationControls } from "./visualization-controls";
 import { formatDuration, formatBytes, GENRE_COLORS, cn } from "@/lib/utils";
 import { getRecommendedTracks } from "@/actions/recommendations";
@@ -59,10 +59,19 @@ import {
 import { WaveformSeekbar, type WaveformMode } from "./waveform-seekbar";
 import { Equalizer } from "./equalizer";
 import { useEQ } from "./eq-context";
-import { MixerView } from "./mixer-view";
 import { PerformanceInline, SessionRestoreIndicator } from "./performance-stats";
 import { TrackContextMenu } from "./track-actions";
 import { motion, AnimatePresence } from "framer-motion";
+
+// Dynamic imports for heavy components (code-split, no SSR)
+const VisualizationCanvas = dynamic(
+    () => import("./visualization-canvas").then(m => ({ default: m.VisualizationCanvas })),
+    { ssr: false }
+);
+const MixerView = dynamic(
+    () => import("./mixer-view").then(m => ({ default: m.MixerView })),
+    { ssr: false, loading: () => <div className="flex-1 flex items-center justify-center text-white/30">Loading mixer...</div> }
+);
 import type { Track } from "@/db/schema";
 
 // Genre-based gradient colors

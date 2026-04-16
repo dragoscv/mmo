@@ -1,0 +1,78 @@
+{
+    "manifest_version": 3,
+    "name": "MMO - Music Media Organizer Downloader",
+    "version": "1.0.0",
+    "description": "Detect audio/video on streaming platforms and download to your MMO library",
+    "permissions": [
+        "storage",
+        "activeTab"
+    ],
+    "host_permissions": [
+        "*://*.youtube.com/*",
+        "*://*.youtu.be/*",
+        "*://music.youtube.com/*",
+        "*://*.soundcloud.com/*",
+        "*://*.spotify.com/*",
+        "*://*.bandcamp.com/*",
+        "*://*.mixcloud.com/*",
+        "*://*.vimeo.com/*",
+        "*://*.tiktok.com/*",
+        "*://*.twitter.com/*",
+        "*://*.x.com/*",
+        "*://*.instagram.com/*",
+        "*://*.facebook.com/*",
+        "*://*.twitch.tv/*",
+        "*://*.dailymotion.com/*",
+        "*://*.deezer.com/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.youtube.com/*",
+                "*://music.youtube.com/*",
+                "*://*.soundcloud.com/*",
+                "*://*.spotify.com/*",
+                "*://*.bandcamp.com/*",
+                "*://*.mixcloud.com/*",
+                "*://*.vimeo.com/*",
+                "*://*.tiktok.com/*",
+                "*://*.twitter.com/*",
+                "*://*.x.com/*",
+                "*://*.instagram.com/*",
+                "*://*.facebook.com/*",
+                "*://*.twitch.tv/*",
+                "*://*.dailymotion.com/*",
+                "*://*.deezer.com/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "css": [
+                "content.css"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "options_ui": {
+        "page": "options.html",
+        "open_in_tab": false
+    },
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.svg",
+            "32": "icons/icon32.svg",
+            "48": "icons/icon48.svg",
+            "128": "icons/icon128.svg"
+        }
+    },
+    "icons": {
+        "16": "icons/icon16.svg",
+        "32": "icons/icon32.svg",
+        "48": "icons/icon48.svg",
+        "128": "icons/icon128.svg"
+    }
+}

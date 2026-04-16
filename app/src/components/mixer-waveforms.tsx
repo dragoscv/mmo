@@ -4,6 +4,8 @@ import { useRef, useEffect, useState, useCallback, memo } from "react";
 import { useMixer } from "./mixer-context";
 import { cn } from "@/lib/utils";
 import { Link, Unlink } from "lucide-react";
+import type { DeckSide } from "@/lib/mixer-engine";
+import { DECK_COLORS } from "@/lib/mixer-engine";
 
 interface RGBPeak {
     r: number;
@@ -95,7 +97,7 @@ interface RGBWaveformProps {
     loopStart: number;
     loopEnd: number;
     hotCues: (number | null)[];
-    side: "A" | "B";
+    side: DeckSide;
     orientation: "horizontal" | "vertical";
     analyser: AnalyserNode | null;
     zoom: number;
@@ -107,7 +109,16 @@ interface RGBWaveformProps {
     getCurrentTime?: () => number;
 }
 
-const CUE_COLORS = ["#f59e0b", "#22c55e", "#3b82f6", "#ef4444"];
+export const CUE_COLORS = [
+    "#f59e0b", // 1 amber
+    "#22c55e", // 2 green
+    "#3b82f6", // 3 blue
+    "#ef4444", // 4 red
+    "#a855f7", // 5 purple
+    "#ec4899", // 6 pink
+    "#06b6d4", // 7 cyan
+    "#f97316", // 8 orange
+];
 
 const RGBWaveform = memo(function RGBWaveform({
     peaks,
@@ -137,7 +148,7 @@ const RGBWaveform = memo(function RGBWaveform({
     const dragStartPos = useRef(0);
     const dragStartTime = useRef(0);
     const dragRectRef = useRef<DOMRect | null>(null);
-    const rafRef = useRef<number>();
+    const rafRef = useRef<number>(undefined);
     const pinchDistRef = useRef<number | null>(null);
     const pinchZoomRef = useRef(zoom);
 
@@ -166,7 +177,7 @@ const RGBWaveform = memo(function RGBWaveform({
     }, []);
 
     // Reusable Uint8Array buffer for analyser overlay
-    const freqBufRef = useRef<Uint8Array | null>(null);
+    const freqBufRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
 
     // Draw the waveform with centered playhead + zoom
     useEffect(() => {
@@ -596,18 +607,35 @@ const RGBWaveform = memo(function RGBWaveform({
                 ctx.fillStyle = "rgba(0,0,0,0.5)";
                 ctx.fillRect(0, mapY, w, mapH);
 
-                // Mini waveform
-                const miniBarCount = Math.min(peaks.length, Math.round(w / dpr));
+                // Mini waveform — use as many bars as pixels for smooth display
+                const miniBarCount = Math.min(peaks.length, w);
                 const stepP = peaks.length / miniBarCount;
+                const bw = Math.max(1, w / miniBarCount);
                 for (let i = 0; i < miniBarCount; i++) {
                     const pi = Math.floor(i * stepP);
                     const p = peaks[pi];
                     ctx.fillStyle = `rgba(${Math.round(p.r * 255)},${Math.round(p.g * 255)},${Math.round(p.b * 255)},0.4)`;
                     const bx = (i / miniBarCount) * w;
-                    const bw = w / miniBarCount;
                     const bh = p.amp * mapH;
                     ctx.fillRect(bx, mapY + mapH - bh, bw, bh);
                 }
+
+                // Hot cue markers in minimap
+                hotCues.forEach((cue, ci) => {
+                    if (cue == null || duration <= 0) return;
+                    const cueX = (cue / duration) * w;
+                    ctx.fillStyle = CUE_COLORS[ci] || "#fff";
+                    ctx.globalAlpha = 0.85;
+                    ctx.fillRect(cueX - 0.5 * dpr, mapY, 1.5 * dpr, mapH);
+                    // small triangle at top
+                    ctx.beginPath();
+                    ctx.moveTo(cueX, mapY);
+                    ctx.lineTo(cueX - 3 * dpr, mapY + 4 * dpr);
+                    ctx.lineTo(cueX + 3 * dpr, mapY + 4 * dpr);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                });
 
                 // Visible region indicator
                 const visibleFrac = 1 / zoom;
@@ -815,38 +843,41 @@ export const MixerWaveforms = memo(function MixerWaveforms({
     onToggleOrientation,
 }: MixerWaveformsProps) {
     const mixer = useMixer();
+    const is4 = mixer.deckMode === "4deck";
+    const sides: DeckSide[] = is4 ? ["A", "C", "D", "B"] : ["A", "B"];
+    const getDeck = (s: DeckSide) => mixer[`deck${s}` as "deckA" | "deckB" | "deckC" | "deckD"];
+
     const { peaks: peaksA, loading: loadingA } = useRGBPeaks(mixer.deckA.trackId);
     const { peaks: peaksB, loading: loadingB } = useRGBPeaks(mixer.deckB.trackId);
+    const { peaks: peaksC, loading: loadingC } = useRGBPeaks(mixer.deckC.trackId);
+    const { peaks: peaksD, loading: loadingD } = useRGBPeaks(mixer.deckD.trackId);
+    const peaksMap: Record<DeckSide, RGBPeak[] | null> = { A: peaksA, B: peaksB, C: peaksC, D: peaksD };
+    const loadingMap: Record<DeckSide, boolean> = { A: loadingA, B: loadingB, C: loadingC, D: loadingD };
 
-    const deckAAnalyser = mixer.getDeckAnalyser("A");
-    const deckBAnalyser = mixer.getDeckAnalyser("B");
+    const analysers: Record<DeckSide, AnalyserNode | null> = {
+        A: mixer.getDeckAnalyser("A"),
+        B: mixer.getDeckAnalyser("B"),
+        C: mixer.getDeckAnalyser("C"),
+        D: mixer.getDeckAnalyser("D"),
+    };
 
-    // Stable callbacks to read currentTime directly from engine in rAF loops
-    const getCurrentTimeA = useCallback(() => mixer.getDeckCurrentTime("A"), [mixer]);
-    const getCurrentTimeB = useCallback(() => mixer.getDeckCurrentTime("B"), [mixer]);
+    const getCurrentTimeFn = useCallback((s: DeckSide) => () => mixer.getDeckCurrentTime(s), [mixer]);
 
     const isH = orientation === "horizontal";
 
-    // Beat grid visibility (syncs across settings modal)
     const [showBeatGrid, setShowBeatGrid] = useState(loadBeatGridEnabled);
-
     useEffect(() => {
         const handler = () => setShowBeatGrid(loadBeatGridEnabled());
         window.addEventListener("beatgrid-changed", handler);
         return () => window.removeEventListener("beatgrid-changed", handler);
     }, []);
 
-    // Zoom state with persistence
     const [zoomState, setZoomState] = useState<PersistedZoom>(loadZoom);
+    useEffect(() => { saveZoom(zoomState); }, [zoomState]);
 
-    useEffect(() => {
-        saveZoom(zoomState);
-    }, [zoomState]);
-
-    // Reset zoom when a new track is loaded
+    // Reset zoom when a new track is loaded on A or B
     const prevTrackARef = useRef(mixer.deckA.trackId);
     const prevTrackBRef = useRef(mixer.deckB.trackId);
-
     useEffect(() => {
         if (mixer.deckA.trackId !== prevTrackARef.current) {
             prevTrackARef.current = mixer.deckA.trackId;
@@ -857,7 +888,6 @@ export const MixerWaveforms = memo(function MixerWaveforms({
             });
         }
     }, [mixer.deckA.trackId]);
-
     useEffect(() => {
         if (mixer.deckB.trackId !== prevTrackBRef.current) {
             prevTrackBRef.current = mixer.deckB.trackId;
@@ -869,30 +899,51 @@ export const MixerWaveforms = memo(function MixerWaveforms({
         }
     }, [mixer.deckB.trackId]);
 
-    const handleZoomA = useCallback((z: number) => {
+    // All decks share zoom when linked; left decks use zoomA, right decks use zoomB
+    const getZoom = (s: DeckSide) => (s === "A" || s === "C") ? zoomState.zoomA : zoomState.zoomB;
+    const handleZoom = useCallback((s: DeckSide) => (z: number) => {
         setZoomState(prev => {
             const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
             if (prev.linked) return { ...prev, zoomA: clamped, zoomB: clamped };
-            return { ...prev, zoomA: clamped };
-        });
-    }, []);
-
-    const handleZoomB = useCallback((z: number) => {
-        setZoomState(prev => {
-            const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
-            if (prev.linked) return { ...prev, zoomA: clamped, zoomB: clamped };
-            return { ...prev, zoomB: clamped };
+            return (s === "A" || s === "C") ? { ...prev, zoomA: clamped } : { ...prev, zoomB: clamped };
         });
     }, []);
 
     const toggleLinked = useCallback(() => {
-        setZoomState(prev => {
-            if (!prev.linked) {
-                return { ...prev, linked: true, zoomB: prev.zoomA };
-            }
-            return { ...prev, linked: false };
-        });
+        setZoomState(prev => !prev.linked ? { ...prev, linked: true, zoomB: prev.zoomA } : { ...prev, linked: false });
     }, []);
+
+    const waveformHeight = is4 ? (isH ? "h-16" : "") : (isH ? "h-24" : "");
+
+    const renderWaveform = (s: DeckSide, orient: "horizontal" | "vertical") => {
+        const d = getDeck(s);
+        return (
+            <RGBWaveform
+                peaks={peaksMap[s]}
+                loading={loadingMap[s]}
+                currentTime={d.currentTime}
+                duration={d.duration}
+                onSeek={t => mixer.seek(s, t)}
+                color={DECK_COLORS[s]}
+                isPlaying={d.isPlaying}
+                loopEnabled={d.loopEnabled}
+                loopStart={d.loopStart}
+                loopEnd={d.loopEnd}
+                hotCues={d.hotCues}
+                side={s}
+                orientation={orient}
+                analyser={analysers[s]}
+                zoom={getZoom(s)}
+                onZoomChange={handleZoom(s)}
+                bpm={d.bpm}
+                showBeatGrid={showBeatGrid}
+                waveformMode={mixer.waveformMode}
+                getCurrentTime={getCurrentTimeFn(s)}
+            />
+        );
+    };
+
+    const anyPlaying = sides.some(s => getDeck(s).isPlaying);
 
     return (
         <div className="relative rounded-xl bg-black/40 border border-white/[0.06] overflow-hidden backdrop-blur-sm">
@@ -902,8 +953,8 @@ export const MixerWaveforms = memo(function MixerWaveforms({
                     zoomA={zoomState.zoomA}
                     zoomB={zoomState.zoomB}
                     linked={zoomState.linked}
-                    onZoomA={handleZoomA}
-                    onZoomB={handleZoomB}
+                    onZoomA={handleZoom("A")}
+                    onZoomB={handleZoom("B")}
                     onToggleLinked={toggleLinked}
                 />
                 <button
@@ -920,119 +971,53 @@ export const MixerWaveforms = memo(function MixerWaveforms({
 
             {isH ? (
                 <div className="flex flex-col">
-                    {/* Deck A waveform */}
-                    <div className="relative h-24 border-b border-white/[0.06]">
-                        <div className="absolute top-1.5 left-2 z-10 flex items-center gap-1.5">
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500 text-black">A</span>
-                            <span className="text-[9px] text-white/30 truncate max-w-[150px]">{mixer.deckA.trackTitle || "—"}</span>
-                        </div>
-                        <RGBWaveform
-                            peaks={peaksA}
-                            loading={loadingA}
-                            currentTime={mixer.deckA.currentTime}
-                            duration={mixer.deckA.duration}
-                            onSeek={(t) => mixer.seek("A", t)}
-                            color="rgb(168,85,247)"
-                            isPlaying={mixer.deckA.isPlaying}
-                            loopEnabled={mixer.deckA.loopEnabled}
-                            loopStart={mixer.deckA.loopStart}
-                            loopEnd={mixer.deckA.loopEnd}
-                            hotCues={mixer.deckA.hotCues}
-                            side="A"
-                            orientation="horizontal"
-                            analyser={deckAAnalyser}
-                            zoom={zoomState.zoomA}
-                            onZoomChange={handleZoomA}
-                            bpm={mixer.deckA.bpm}
-                            showBeatGrid={showBeatGrid}
-                            waveformMode={mixer.waveformMode}
-                            getCurrentTime={getCurrentTimeA}
-                        />
-                    </div>
-                    {/* Deck B waveform */}
-                    <div className="relative h-24">
-                        <div className="absolute top-1.5 left-2 z-10 flex items-center gap-1.5">
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500 text-black">B</span>
-                            <span className="text-[9px] text-white/30 truncate max-w-[150px]">{mixer.deckB.trackTitle || "—"}</span>
-                        </div>
-                        <RGBWaveform
-                            peaks={peaksB}
-                            loading={loadingB}
-                            currentTime={mixer.deckB.currentTime}
-                            duration={mixer.deckB.duration}
-                            onSeek={(t) => mixer.seek("B", t)}
-                            color="rgb(59,130,246)"
-                            isPlaying={mixer.deckB.isPlaying}
-                            loopEnabled={mixer.deckB.loopEnabled}
-                            loopStart={mixer.deckB.loopStart}
-                            loopEnd={mixer.deckB.loopEnd}
-                            hotCues={mixer.deckB.hotCues}
-                            side="B"
-                            orientation="horizontal"
-                            analyser={deckBAnalyser}
-                            zoom={zoomState.zoomB}
-                            onZoomChange={handleZoomB}
-                            bpm={mixer.deckB.bpm}
-                            showBeatGrid={showBeatGrid}
-                            waveformMode={mixer.waveformMode}
-                            getCurrentTime={getCurrentTimeB}
-                        />
-                    </div>
+                    {sides.map((s, i) => {
+                        const d = getDeck(s);
+                        const isLast = i === sides.length - 1;
+                        return (
+                            <div key={s} className={cn("relative", waveformHeight, !isLast && "border-b border-white/[0.06]")}>
+                                <div className="absolute top-1.5 left-2 z-10 flex items-center gap-1.5">
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded text-black" style={{ backgroundColor: DECK_COLORS[s] }}>{s}</span>
+                                    <span className="text-[9px] text-white/30 truncate max-w-[150px]">{d.trackTitle || "—"}</span>
+                                </div>
+                                {renderWaveform(s, "horizontal")}
+                            </div>
+                        );
+                    })}
                 </div>
             ) : (
-                <div className="flex h-64">
-                    {/* Deck A */}
-                    <div className="relative flex-1 border-r border-white/[0.06]">
-                        <div className="absolute top-1.5 left-2 z-10">
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500 text-black">A</span>
-                        </div>
-                        <RGBWaveform
-                            peaks={peaksA}
-                            loading={loadingA}
-                            currentTime={mixer.deckA.currentTime}
-                            duration={mixer.deckA.duration}
-                            onSeek={(t) => mixer.seek("A", t)}
-                            color="rgb(168,85,247)"
-                            isPlaying={mixer.deckA.isPlaying}
-                            loopEnabled={mixer.deckA.loopEnabled}
-                            loopStart={mixer.deckA.loopStart}
-                            loopEnd={mixer.deckA.loopEnd}
-                            hotCues={mixer.deckA.hotCues}
-                            side="A"
-                            orientation="vertical"
-                            analyser={deckAAnalyser}
-                            zoom={zoomState.zoomA}
-                            onZoomChange={handleZoomA}
-                            bpm={mixer.deckA.bpm}
-                            showBeatGrid={showBeatGrid}
-                            waveformMode={mixer.waveformMode}
-                            getCurrentTime={getCurrentTimeA}
-                        />
-                    </div>
+                <div className={cn("flex", is4 ? "h-48" : "h-64")}>
+                    {/* Left decks */}
+                    {(is4 ? ["A", "C"] as DeckSide[] : ["A"] as DeckSide[]).map((s, i) => {
+                        const d = getDeck(s);
+                        return (
+                            <div key={s} className={cn("relative flex-1", i > 0 && "border-l border-white/[0.06]")}>
+                                <div className="absolute top-1.5 left-2 z-10">
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded text-black" style={{ backgroundColor: DECK_COLORS[s] }}>{s}</span>
+                                </div>
+                                {renderWaveform(s, "vertical")}
+                            </div>
+                        );
+                    })}
 
                     {/* Center Play All */}
                     <div className="flex flex-col items-center justify-center w-12 bg-white/[0.02] shrink-0 gap-2">
                         <button
                             onClick={() => {
-                                const aPlaying = mixer.deckA.isPlaying;
-                                const bPlaying = mixer.deckB.isPlaying;
-                                const anyPlaying = aPlaying || bPlaying;
                                 if (anyPlaying) {
-                                    if (aPlaying) mixer.pause("A");
-                                    if (bPlaying) mixer.pause("B");
+                                    sides.forEach(s => { if (getDeck(s).isPlaying) mixer.pause(s); });
                                 } else {
-                                    if (mixer.deckA.trackId) mixer.play("A");
-                                    if (mixer.deckB.trackId) mixer.play("B");
+                                    sides.forEach(s => { if (getDeck(s).trackId) mixer.play(s); });
                                 }
                             }}
                             className={cn(
                                 "flex items-center justify-center w-9 h-9 rounded-full transition-all cursor-pointer border",
-                                mixer.deckA.isPlaying || mixer.deckB.isPlaying
+                                anyPlaying
                                     ? "bg-white/20 border-white/20 text-white"
                                     : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
                             )}
                         >
-                            {mixer.deckA.isPlaying || mixer.deckB.isPlaying ? (
+                            {anyPlaying ? (
                                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="2" y="1" width="3" height="10" rx="1" /><rect x="7" y="1" width="3" height="10" rx="1" /></svg>
                             ) : (
                                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M3 1.5v9l7-4.5z" /></svg>
@@ -1040,34 +1025,18 @@ export const MixerWaveforms = memo(function MixerWaveforms({
                         </button>
                     </div>
 
-                    {/* Deck B */}
-                    <div className="relative flex-1 border-l border-white/[0.06]">
-                        <div className="absolute top-1.5 right-2 z-10">
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500 text-black">B</span>
-                        </div>
-                        <RGBWaveform
-                            peaks={peaksB}
-                            loading={loadingB}
-                            currentTime={mixer.deckB.currentTime}
-                            duration={mixer.deckB.duration}
-                            onSeek={(t) => mixer.seek("B", t)}
-                            color="rgb(59,130,246)"
-                            isPlaying={mixer.deckB.isPlaying}
-                            loopEnabled={mixer.deckB.loopEnabled}
-                            loopStart={mixer.deckB.loopStart}
-                            loopEnd={mixer.deckB.loopEnd}
-                            hotCues={mixer.deckB.hotCues}
-                            side="B"
-                            orientation="vertical"
-                            analyser={deckBAnalyser}
-                            zoom={zoomState.zoomB}
-                            onZoomChange={handleZoomB}
-                            bpm={mixer.deckB.bpm}
-                            showBeatGrid={showBeatGrid}
-                            waveformMode={mixer.waveformMode}
-                            getCurrentTime={getCurrentTimeB}
-                        />
-                    </div>
+                    {/* Right decks */}
+                    {(is4 ? ["D", "B"] as DeckSide[] : ["B"] as DeckSide[]).map((s, i) => {
+                        const d = getDeck(s);
+                        return (
+                            <div key={s} className={cn("relative flex-1", "border-l border-white/[0.06]")}>
+                                <div className="absolute top-1.5 right-2 z-10">
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded text-black" style={{ backgroundColor: DECK_COLORS[s] }}>{s}</span>
+                                </div>
+                                {renderWaveform(s, "vertical")}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>

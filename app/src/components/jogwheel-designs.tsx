@@ -2,11 +2,12 @@
 
 import React from "react";
 import type { JogwheelStyle } from "@/hooks/use-personalization";
+import type { DeckSide } from "@/lib/mixer-engine";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
 export interface JogDesignProps {
-    side: "A" | "B";
+    side: DeckSide;
     color: string;
     progress: number;        // 0–1
     rotation: number;        // degrees

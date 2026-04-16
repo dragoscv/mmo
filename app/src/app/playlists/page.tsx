@@ -1,5 +1,6 @@
 import { getPlaylists, getPlaylistTracks, getRecommendedPlaylists } from "@/actions/playlists";
 import { PlaylistsClient } from "./playlists-client";
+import type { Track } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export default async function PlaylistsPage({
     return (
         <PlaylistsClient
             playlists={allPlaylists}
-            tracks={playlistResult?.tracks ?? []}
+            tracks={(playlistResult?.tracks ?? []) as (Track & { position: number })[]}
             total={playlistResult?.total ?? 0}
             page={playlistResult?.page ?? 1}
             pageSize={playlistResult?.pageSize ?? 50}

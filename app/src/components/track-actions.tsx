@@ -52,6 +52,7 @@ import {
     Disc3,
     EyeOff,
     Radio,
+    Piano,
 } from "lucide-react";
 import { toggleFavorite, deleteTrack, hideTracks } from "@/actions/tracks";
 import {
@@ -247,6 +248,15 @@ function TrackMenuItems({
                     <Separator />
                 </>
             )}
+
+            {/* DAW */}
+            <Item onClick={() => {
+                const params = new URLSearchParams({ trackId: String(track.id), title: track.title || track.filename, filePath: track.filepath });
+                handlers.router.push(`/daw?${params.toString()}`);
+            }}>
+                <Piano className="h-3.5 w-3.5 mr-2 text-emerald-400" />
+                Open in DAW
+            </Item>
 
             {/* Playlist */}
             <Item onClick={() => handlers.setPlaylistModalOpen(true)}>

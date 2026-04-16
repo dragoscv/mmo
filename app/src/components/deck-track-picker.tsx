@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useTransition } from "react";
 import { useMixer } from "./mixer-context";
 import { usePlayer } from "./player-context";
+import type { DeckSide } from "@/lib/mixer-engine";
 import { Search, Music, Disc3, Loader2, Zap, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { globalSearch } from "@/actions/search";
@@ -29,7 +30,7 @@ function formatDuration(s: number | null) {
 }
 
 interface DeckTrackPickerProps {
-    side: "A" | "B";
+    side: DeckSide;
     open: boolean;
     onClose: () => void;
 }
@@ -43,7 +44,7 @@ export function DeckTrackPicker({ side, open, onClose }: DeckTrackPickerProps) {
     const [isSearching, startSearchTransition] = useTransition();
     const [isLoadingRecs, setIsLoadingRecs] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
-    const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+    const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     const color = side === "A" ? "rgb(168,85,247)" : "rgb(59,130,246)";
     const colorClass = side === "A" ? "text-purple-400" : "text-blue-400";

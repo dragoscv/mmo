@@ -6,17 +6,19 @@ import { cn } from "@/lib/utils";
 
 export function PlayerAwareLayout({ children }: { children: React.ReactNode }) {
     const { currentTrack } = usePlayer();
-    const hasPlayer = !!currentTrack;
+    const hasTrack = !!currentTrack;
 
     useKeyboardShortcuts();
 
+    // AudioPlayer always renders: 72px with track, 56px without + safe area
     return (
         <div
+            data-app-layout
             className={cn(
                 "flex overflow-hidden transition-[height] duration-300",
-                hasPlayer
+                hasTrack
                     ? "h-[calc(100dvh-72px-env(safe-area-inset-bottom,0px))]"
-                    : "h-dvh"
+                    : "h-[calc(100dvh-56px-env(safe-area-inset-bottom,0px))]"
             )}
         >
             {children}

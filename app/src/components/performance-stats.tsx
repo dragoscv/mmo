@@ -167,13 +167,6 @@ export const PerformancePanel = memo(function PerformancePanel({ className }: { 
                         </div>
                     )}
                 </div>
-                {/* Model info footer */}
-                {cfg.showModelInfo && (system.cpuModel || system.gpuModel !== "N/A") && system.connected && (
-                    <div className="mt-1.5 pt-1 border-t border-white/[0.04] flex flex-col gap-0.5">
-                        {system.cpuModel && <span className="text-[6px] text-white/15 truncate" title={system.cpuModel}>{system.cpuModel}</span>}
-                        {system.gpuModel && system.gpuModel !== "N/A" && <span className="text-[6px] text-white/15 truncate" title={system.gpuModel}>{system.gpuModel}</span>}
-                    </div>
-                )}
             </div>
             <PerfConfigModal open={configOpen} onOpenChange={setConfigOpen} />
         </>

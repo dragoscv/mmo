@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>MMO Downloader - Settings</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 24px;
+            min-width: 400px;
+        }
+
+        h1 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo {
+            font-size: 20px;
+        }
+
+        .field {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: rgba(255, 255, 255, 0.35);
+            margin-bottom: 6px;
+        }
+
+        input[type="text"],
+        input[type="url"] {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
+            color: #e0e0e0;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: #9333ea;
+        }
+
+        .hint {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.2);
+            margin-top: 4px;
+        }
+
+        .checkbox-field {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .checkbox-field input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #9333ea;
+            cursor: pointer;
+        }
+
+        .checkbox-field .text {
+            flex: 1;
+        }
+
+        .checkbox-field .text .title {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .checkbox-field .text .desc {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.3);
+            margin-top: 2px;
+        }
+
+        .btn-save {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #9333ea;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-save:hover {
+            background: #a855f7;
+            box-shadow: 0 2px 12px rgba(147, 51, 234, 0.3);
+        }
+
+        .saved-msg {
+            display: none;
+            font-size: 11px;
+            color: #22c55e;
+            margin-left: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1><span class="logo">🎧</span> MMO Downloader Settings</h1>
+
+    <div class="field">
+        <label>MMO App Base URL</label>
+        <input type="url" id="baseUrl" placeholder="http://localhost:3000">
+        <div class="hint">The URL of your Music Media Organizer app (e.g., http://localhost:3000 or your domain)</div>
+    </div>
+
+    <div class="checkbox-field">
+        <input type="checkbox" id="autoDownload">
+        <div class="text">
+            <div class="title">Auto-download on button click</div>
+            <div class="desc">Automatically start downloading when clicking the MMO button on streaming sites</div>
+        </div>
+    </div>
+
+    <div class="checkbox-field">
+        <input type="checkbox" id="audioOnly" checked>
+        <div class="text">
+            <div class="title">Audio only (MP3)</div>
+            <div class="desc">Extract and download only the audio track as MP3</div>
+        </div>
+    </div>
+
+    <button class="btn-save" id="save">Save Settings</button>
+    <span class="saved-msg" id="saved-msg">✓ Saved</span>
+
+    <script src="options.js"></script>
+</body>
+
+</html>

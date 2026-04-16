@@ -1,5 +1,7 @@
 "use client";
 
+import type { DeckSide } from "./mixer-engine";
+
 /**
  * Web MIDI API Engine for DJ Controller Support
  *
@@ -68,7 +70,7 @@ export interface MidiMapping {
     /** What this control does */
     action: MidiAction;
     /** Which deck (null for master/global controls) */
-    deck: "A" | "B" | null;
+    deck: "A" | "B" | "C" | "D" | null;
     /** Control type */
     type: "note" | "cc" | "cc-14bit-msb" | "cc-14bit-lsb";
     /** Optional description */
@@ -135,7 +137,7 @@ export function parseMidiMessage(data: Uint8Array): MidiMessage | null {
 
 // ─── MIDI Engine ─────────────────────────────────────────────────────────
 
-export type MidiActionHandler = (action: MidiAction, deck: "A" | "B" | null, value: number, isPress: boolean) => void;
+export type MidiActionHandler = (action: MidiAction, deck: DeckSide | null, value: number, isPress: boolean) => void;
 
 export class MidiEngine {
     private midiAccess: MIDIAccess | null = null;
@@ -199,6 +201,7 @@ export class MidiEngine {
 
             // Attach message handler
             input.onmidimessage = (e: MIDIMessageEvent) => {
+                if (!e.data) return;
                 const msg = parseMidiMessage(new Uint8Array(e.data));
                 if (!msg) return;
 

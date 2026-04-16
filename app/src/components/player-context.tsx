@@ -263,7 +263,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, [state.shuffle]);
 
     // Persist state to localStorage (debounced for currentTime)
-    const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+    const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
     const lastSavedTimeRef = useRef(0);
     const stateRef = useRef(state);
     stateRef.current = state;

@@ -257,7 +257,7 @@ function SpectrumAnalyzer({ getAnalyser }: { getAnalyser: () => AnalyserNode | n
         if (!ctx) return;
 
         // Reusable buffer — allocated once
-        let dataBuffer: Uint8Array | null = null;
+        let dataBuffer: Uint8Array<ArrayBuffer> | null = null;
 
         const draw = () => {
             rafRef.current = requestAnimationFrame(draw);
@@ -273,7 +273,7 @@ function SpectrumAnalyzer({ getAnalyser }: { getAnalyser: () => AnalyserNode | n
 
             const bufferLength = analyser.frequencyBinCount;
             if (!dataBuffer || dataBuffer.length !== bufferLength) {
-                dataBuffer = new Uint8Array(bufferLength);
+                dataBuffer = new Uint8Array(bufferLength) as Uint8Array<ArrayBuffer>;
             }
             analyser.getByteFrequencyData(dataBuffer);
 
