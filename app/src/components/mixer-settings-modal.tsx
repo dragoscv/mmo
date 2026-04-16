@@ -1179,6 +1179,28 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
 
                         {/* ── Audio & Mix Tab ── */}
                         <TabsContent value="audio" className="mt-0 space-y-4">
+                            {/* Confirm Load on Playing Deck */}
+                            <div className="flex items-center justify-between rounded-lg bg-white/[0.03] border border-white/[0.06] p-3">
+                                <div>
+                                    <div className="text-xs text-white/80">Confirm Load on Playing Deck</div>
+                                    <div className="text-[10px] text-white/30">
+                                        Show a warning before loading a new track onto a playing deck
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => personalization.update({ confirmLoadOnPlayingDeck: !personalization.confirmLoadOnPlayingDeck })}
+                                    className={cn(
+                                        "relative w-10 h-5 rounded-full transition-colors cursor-pointer",
+                                        personalization.confirmLoadOnPlayingDeck ? "bg-green-500/60" : "bg-white/10"
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform",
+                                        personalization.confirmLoadOnPlayingDeck ? "translate-x-5" : "translate-x-0.5"
+                                    )} />
+                                </button>
+                            </div>
+
                             {/* Beat Grid Overlay */}
                             <div className="flex items-center justify-between rounded-lg bg-white/[0.03] border border-white/[0.06] p-3">
                                 <div>

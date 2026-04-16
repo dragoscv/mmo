@@ -100,8 +100,8 @@ export function DAWStatusBar() {
             <div className="flex items-center gap-3">
                 <StatusItem icon={HardDrive} label="" value={saveText} color={saveColor} />
                 <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-[var(--daw-text-dim)]">Undo</span>
-                    <span className="text-[9px] font-mono tabular-nums text-[var(--daw-text-dim)]">{daw.undoStack.length}</span>
+                    <span className="text-[9px] text-[var(--daw-text-dim)]">History</span>
+                    <span className="text-[9px] font-mono tabular-nums text-[var(--daw-text-dim)]">{daw.history.currentIndex}/{daw.history.entries.length - 1}</span>
                 </div>
                 {daw.isRecording && (
                     <div className="flex items-center gap-1">

@@ -6,11 +6,15 @@ import {
     MousePointer2, Pencil, Eraser, Scissors, VolumeX, TrendingUp,
     FolderOpen, Save, FilePlus, Settings, Undo2, Redo2, Download,
     LayoutGrid, Piano, Drum, Plug, Waves, Maximize, Minimize,
-    PanelLeft, AudioWaveform,
+    PanelLeft, AudioWaveform, RotateCcw,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { resetDockviewLayout } from "./daw-dockview";
 import type { ToolMode, SnapValue } from "@/lib/daw-engine";
+import { canUndo as histCanUndo, canRedo as histCanRedo } from "@/lib/history-engine";
+import { useScrollAdjust } from "./daw-ui-utils";
+import { DAWPanelManager } from "./daw-panel-manager";
 
 const TOOLS: { mode: ToolMode; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
     { mode: "select", icon: MousePointer2, label: "Select", shortcut: "V" },
@@ -34,6 +38,15 @@ const SNAPS: { value: SnapValue; label: string }[] = [
 export function DAWToolbar() {
     const daw = useDAW();
 
+    const zoomRef = useScrollAdjust({
+        value: daw.zoom,
+        min: 10,
+        max: 200,
+        step: 5,
+        fineStep: 1,
+        onChange: v => daw.setZoom(Math.round(v)),
+    });
+
     return (
         <TooltipProvider delayDuration={200}>
             <div className="h-11 bg-[var(--daw-surface)] border-b border-[var(--daw-border)] flex items-center px-2.5 gap-1 daw-animate-in">
@@ -55,8 +68,8 @@ export function DAWToolbar() {
 
                 {/* Undo / Redo */}
                 <ToolGroup>
-                    <ToolBtn icon={Undo2} label="Undo (Ctrl+Z)" onClick={daw.undo} disabled={daw.undoStack.length === 0} />
-                    <ToolBtn icon={Redo2} label="Redo (Ctrl+Y)" onClick={daw.redo} disabled={daw.redoStack.length === 0} />
+                    <ToolBtn icon={Undo2} label="Undo (Ctrl+Z)" onClick={daw.undo} disabled={!histCanUndo(daw.history)} />
+                    <ToolBtn icon={Redo2} label="Redo (Ctrl+Y)" onClick={daw.redo} disabled={!histCanRedo(daw.history)} />
                 </ToolGroup>
 
                 <Divider />
@@ -96,6 +109,7 @@ export function DAWToolbar() {
                 <div className="flex items-center gap-1.5 mx-1">
                     <span className="text-[10px] text-[var(--daw-text-dim)] uppercase tracking-widest">Zoom</span>
                     <input
+                        ref={zoomRef}
                         type="range"
                         min={10}
                         max={200}
@@ -127,6 +141,8 @@ export function DAWToolbar() {
                     onClick={daw.toggleFocusMode}
                     active={daw.focusMode}
                 />
+                <ToolBtn icon={RotateCcw} label="Reset Layout" onClick={resetDockviewLayout} />
+                <DAWPanelManager />
                 <ToolBtn icon={Settings} label="Settings" onClick={() => daw.setSettingsModal(true)} />
 
                 {/* Project name */}

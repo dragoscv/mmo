@@ -1,5 +1,7 @@
 "use client";
 
+import { audioPreloadCache } from "./audio-preload-cache";
+
 /**
  * DJ Mixer Audio Engine
  *
@@ -496,8 +498,25 @@ export class DeckEngine {
     }
 
     loadTrack(trackId: number) {
-        this.audio.src = `/api/audio/${trackId}`;
+        // Use cached blob URL if available, start preloading in background
+        this.audio.src = audioPreloadCache.getUrl(trackId);
         this.audio.load();
+        // Ensure track is fully cached for resilience
+        audioPreloadCache.preload(trackId).then(url => {
+            // Upgrade to blob URL if we're still on this track and using streaming
+            if (this.audio.src !== url && this.audio.src.includes(`/api/audio/${trackId}`)) {
+                const wasTime = this.audio.currentTime;
+                const wasPlaying = !this.audio.paused;
+                this.audio.src = url;
+                this.audio.load();
+                this.audio.addEventListener("loadedmetadata", () => {
+                    if (wasTime > 0 && wasTime < this.audio.duration) {
+                        this.audio.currentTime = wasTime;
+                    }
+                    if (wasPlaying) this.audio.play().catch(() => { });
+                }, { once: true });
+            }
+        }).catch(() => { /* fallback: keep streaming URL */ });
     }
 
     play() {

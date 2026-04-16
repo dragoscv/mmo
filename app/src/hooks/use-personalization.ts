@@ -88,6 +88,9 @@ export interface PersonalizationSettings {
     showVuMeters: boolean;
     showKeyDisplay: boolean;
 
+    // Safety
+    confirmLoadOnPlayingDeck: boolean;
+
     // External Devices
     showExternalDevices: boolean;
     externalDeviceAutoConnect: boolean;
@@ -118,6 +121,7 @@ export const DEFAULT_PERSONALIZATION: PersonalizationSettings = {
     showBeatGrid: true,
     showVuMeters: true,
     showKeyDisplay: true,
+    confirmLoadOnPlayingDeck: true,
     showExternalDevices: true,
     externalDeviceAutoConnect: true,
     externalDevicePosition: { x: 20, y: 100 },
@@ -174,6 +178,11 @@ let currentSettings = load();
 const listeners = new Set<() => void>();
 
 function getSnapshot(): PersonalizationSettings {
+    return currentSettings;
+}
+
+/** Read a personalization setting outside of React (e.g., in callbacks). */
+export function getPersonalization(): PersonalizationSettings {
     return currentSettings;
 }
 

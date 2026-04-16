@@ -116,23 +116,29 @@ export function NowPlaying() {
     const personalization = usePersonalization();
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState<TabType>("queue");
-    const [leftView, setLeftView] = useState<LeftView>(() => {
-        if (typeof window !== "undefined") {
-            // Check URL param first
-            const urlView = new URLSearchParams(window.location.search).get("view");
-            if (urlView === "mixer" || urlView === "artwork" || urlView === "visualization" || urlView === "equalizer") return urlView;
-            const saved = localStorage.getItem("mmo-np-left-view");
-            if (saved === "artwork" || saved === "visualization" || saved === "equalizer" || saved === "mixer") return saved;
-        }
-        return "mixer";
-    });
+    const [leftView, setLeftView] = useState<LeftView>("mixer");
     const [recommendations, setRecommendations] = useState<RecommendedTrack[]>([]);
     const [isClosing, setIsClosing] = useState(false);
+    const [hasMounted, setHasMounted] = useState(false);
+
+    // Restore leftView from localStorage / URL after mount to avoid hydration mismatch
+    useEffect(() => {
+        setHasMounted(true);
+        const urlView = new URLSearchParams(window.location.search).get("view");
+        if (urlView === "mixer" || urlView === "artwork" || urlView === "visualization" || urlView === "equalizer") {
+            setLeftView(urlView);
+            return;
+        }
+        const saved = localStorage.getItem("mmo-np-left-view");
+        if (saved === "artwork" || saved === "visualization" || saved === "equalizer" || saved === "mixer") {
+            setLeftView(saved);
+        }
+    }, []);
 
     // Persist leftView
     useEffect(() => {
-        localStorage.setItem("mmo-np-left-view", leftView);
-    }, [leftView]);
+        if (hasMounted) localStorage.setItem("mmo-np-left-view", leftView);
+    }, [leftView, hasMounted]);
 
     // Handle requestedView from player context (e.g. keyboard shortcut Shift+M)
     useEffect(() => {
@@ -170,11 +176,13 @@ export function NowPlaying() {
     const [showVizBrowser, setShowVizBrowser] = useState(false);
     const [vizBrowseCategory, setVizBrowseCategory] = useState<string | null>(null);
     const [vizSearchQuery, setVizSearchQuery] = useState("");
-    const [waveformMode, setWaveformMode] = useState<WaveformMode>(() => {
-        if (typeof window === "undefined") return "classic";
+    const [waveformMode, setWaveformMode] = useState<WaveformMode>("classic");
+
+    // Restore waveformMode from localStorage after mount
+    useEffect(() => {
         const saved = localStorage.getItem("waveform-mode");
-        return saved === "rgb" ? "rgb" : "classic";
-    });
+        if (saved === "rgb") setWaveformMode("rgb");
+    }, []);
     const [mobilePanel, setMobilePanel] = useState(false);
     const vizContainerRef = useRef<HTMLDivElement>(null);
     const mobilePanelRef = useRef<HTMLDivElement>(null);
@@ -313,7 +321,7 @@ export function NowPlaying() {
         if (dx > 50 && mobilePanel) setMobilePanel(false);
     }, [mobilePanel, player]);
 
-    if (!player.isNowPlayingOpen) return null;
+    if (!hasMounted || !player.isNowPlayingOpen) return null;
 
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
     const gradient = getGenreGradient(currentTrack?.genre);

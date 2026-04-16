@@ -36,6 +36,9 @@ import {
 } from "@/lib/mixer-engine";
 import type { Track } from "@/db/schema";
 import { getTrackById } from "@/actions/tracks";
+import { audioPreloadCache } from "@/lib/audio-preload-cache";
+import { getPersonalization } from "@/hooks/use-personalization";
+import { requestConfirmLoad } from "./confirm-load-dialog";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -622,6 +625,14 @@ export function MixerProvider({ children }: { children: ReactNode }) {
 
         setProgress(15, "Restoring EQ & effects...");
 
+        // Pre-fetch all deck tracks into cache for resilience
+        const trackIdsToPreload = decksWithTracks
+            .map(d => d.deck.trackId)
+            .filter((id): id is number => !!id);
+        if (trackIdsToPreload.length > 0) {
+            audioPreloadCache.preloadMany(trackIdsToPreload);
+        }
+
         let decksLoaded = 0;
         const progressPerDeck = 75 / decksWithTracks.length; // spread remaining 75% across decks
 
@@ -684,7 +695,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
 
     // ─── Deck Actions ───────────────────────────────────────────────────
 
-    const loadTrack = useCallback((deck: DeckSide, track: Track) => {
+    const loadTrackImmediate = useCallback((deck: DeckSide, track: Track) => {
         console.log("[Mixer] loadTrack called:", deck, track.id, track.title);
         if (!engineRef.current) {
             console.log("[Mixer] No engine, calling initMixer...");
@@ -765,6 +776,20 @@ export function MixerProvider({ children }: { children: ReactNode }) {
             hotCues: [null, null, null, null, null, null, null, null],
         });
     }, [initMixer, getDeckEngine, updateDeck]);
+
+    const loadTrack = useCallback((deck: DeckSide, track: Track) => {
+        // Check if target deck is playing and confirmation is enabled
+        const deckKey = DECK_STATE_KEY[deck];
+        const deckState = stateRef.current[deckKey] as DeckState;
+        if (deckState.isPlaying && getPersonalization().confirmLoadOnPlayingDeck) {
+            // Show confirmation dialog, then load if confirmed
+            requestConfirmLoad(deck, track).then(confirmed => {
+                if (confirmed) loadTrackImmediate(deck, track);
+            });
+            return;
+        }
+        loadTrackImmediate(deck, track);
+    }, [loadTrackImmediate]);
 
     const play = useCallback((deck: DeckSide) => {
         getDeckEngine(deck)?.play();

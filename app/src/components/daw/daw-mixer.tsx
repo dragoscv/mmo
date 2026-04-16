@@ -1,9 +1,15 @@
 "use client";
 
+import { useCallback } from "react";
 import { useDAW } from "./daw-context";
-import { Plus } from "lucide-react";
+import {
+    Plus, Copy, VolumeX, Headphones, Snowflake, Palette, Trash2,
+    RotateCcw,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DAWTrack } from "@/lib/daw-engine";
+import { useContextMenu, colorMenuItems, type MenuEntry } from "./daw-context-menu";
+import { InlineEditName, useScrollAdjust } from "./daw-ui-utils";
 
 export function DAWMixer() {
     const daw = useDAW();
@@ -43,9 +49,78 @@ export function DAWMixer() {
 
 function ChannelStrip({ track, index }: { track: DAWTrack; index: number }) {
     const daw = useDAW();
+    const ctxMenu = useContextMenu();
     const isSelected = daw.selectedTrackId === track.id;
     const peakL = track.peakL;
     const peakR = track.peakR;
+
+    const faderRef = useScrollAdjust({
+        value: track.volume,
+        min: 0,
+        max: 1.5,
+        step: 0.02,
+        fineStep: 0.005,
+        onChange: v => daw.setTrackVolume(track.id, v),
+    });
+
+    const handleContextMenu = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        daw.selectTrack(track.id);
+
+        const items: MenuEntry[] = [
+            { type: "label", label: track.name },
+            { type: "separator" },
+            {
+                label: "Duplicate Track",
+                icon: <Copy className="h-3.5 w-3.5" />,
+                onClick: () => daw.duplicateTrack(track.id),
+            },
+            {
+                label: track.muted ? "Unmute" : "Mute",
+                icon: <VolumeX className="h-3.5 w-3.5" />,
+                checked: track.muted,
+                onClick: () => daw.toggleTrackMute(track.id),
+            },
+            {
+                label: track.soloed ? "Unsolo" : "Solo",
+                icon: <Headphones className="h-3.5 w-3.5" />,
+                checked: track.soloed,
+                onClick: () => daw.toggleTrackSolo(track.id),
+            },
+            {
+                label: "Freeze Track",
+                icon: <Snowflake className="h-3.5 w-3.5" />,
+                onClick: () => daw.freezeTrack(track.id),
+            },
+            {
+                label: "Reset Volume",
+                icon: <RotateCcw className="h-3.5 w-3.5" />,
+                onClick: () => daw.setTrackVolume(track.id, 0.8),
+            },
+            {
+                label: "Reset Pan",
+                icon: <RotateCcw className="h-3.5 w-3.5" />,
+                onClick: () => daw.setTrackPan(track.id, 0),
+            },
+            { type: "separator" },
+            {
+                type: "sub",
+                label: "Set Color",
+                icon: <Palette className="h-3.5 w-3.5" />,
+                items: colorMenuItems(track.color, c => daw.setTrackColor(track.id, c)),
+            },
+            { type: "separator" },
+            {
+                label: "Delete Track",
+                icon: <Trash2 className="h-3.5 w-3.5" />,
+                destructive: true,
+                onClick: () => daw.removeTrack(track.id),
+            },
+        ];
+
+        ctxMenu.show(e.clientX, e.clientY, items);
+    }, [daw, track, ctxMenu]);
 
     return (
         <div
@@ -58,6 +133,7 @@ function ChannelStrip({ track, index }: { track: DAWTrack; index: number }) {
             )}
             style={{ animationDelay: `${index * 20}ms` }}
             onClick={() => daw.selectTrack(track.id)}
+            onContextMenu={handleContextMenu}
         >
             {/* Track name */}
             <div className="h-7 px-1.5 flex items-center gap-1.5 border-b border-[var(--daw-border)]">
@@ -65,7 +141,11 @@ function ChannelStrip({ track, index }: { track: DAWTrack; index: number }) {
                     className="w-2 h-2 rounded-full flex-shrink-0 ring-1 ring-white/5"
                     style={{ background: track.color }}
                 />
-                <span className="text-[10px] text-[var(--daw-text-muted)] truncate font-medium">{track.name}</span>
+                <InlineEditName
+                    value={track.name}
+                    onCommit={name => daw.renameTrack(track.id, name)}
+                    className="text-[10px] text-[var(--daw-text-muted)] truncate font-medium"
+                />
             </div>
 
             {/* Inserts indicator */}
@@ -112,6 +192,7 @@ function ChannelStrip({ track, index }: { track: DAWTrack; index: number }) {
                 </div>
                 <div className="flex-1 flex items-center justify-center">
                     <input
+                        ref={faderRef}
                         type="range"
                         min={0}
                         max={1.5}
@@ -153,10 +234,34 @@ function ChannelStrip({ track, index }: { track: DAWTrack; index: number }) {
 
 function MasterStrip() {
     const daw = useDAW();
+    const ctxMenu = useContextMenu();
     const mt = daw.project.masterTrack;
 
+    const masterFaderRef = useScrollAdjust({
+        value: mt.volume,
+        min: 0,
+        max: 1.5,
+        step: 0.02,
+        fineStep: 0.005,
+        onChange: v => daw.setMasterVolume(v),
+    });
+
+    const handleContextMenu = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        const items: MenuEntry[] = [
+            { type: "label", label: "Master Channel" },
+            { type: "separator" },
+            {
+                label: "Reset Volume to 0 dB",
+                icon: <RotateCcw className="h-3.5 w-3.5" />,
+                onClick: () => daw.setMasterVolume(1.0),
+            },
+        ];
+        ctxMenu.show(e.clientX, e.clientY, items);
+    }, [daw, ctxMenu]);
+
     return (
-        <div className="w-[84px] flex-shrink-0 flex flex-col bg-[var(--daw-surface)]">
+        <div className="w-[84px] flex-shrink-0 flex flex-col bg-[var(--daw-surface)]" onContextMenu={handleContextMenu}>
             <div className="h-7 px-1.5 flex items-center gap-1.5 border-b border-[var(--daw-border-strong)]">
                 <div className="w-2 h-2 rounded-full bg-[var(--daw-accent)]" />
                 <span className="text-[10px] text-[var(--daw-text)] font-semibold tracking-wide">MASTER</span>
@@ -176,6 +281,7 @@ function MasterStrip() {
                 </div>
                 <div className="flex-1 flex items-center justify-center">
                     <input
+                        ref={masterFaderRef}
                         type="range"
                         min={0}
                         max={1.5}
@@ -225,9 +331,20 @@ function MixerButton({ label, active, color, onClick }: {
 
 function PanKnob({ value, onChange }: { value: number; onChange: (v: number) => void }) {
     const display = value === 0 ? "C" : value < 0 ? `L${Math.abs(Math.round(value * 100))}` : `R${Math.round(value * 100)}`;
+
+    const panRef = useScrollAdjust({
+        value,
+        min: -1,
+        max: 1,
+        step: 0.05,
+        fineStep: 0.01,
+        onChange,
+    });
+
     return (
         <div className="flex flex-col items-center gap-1">
             <input
+                ref={panRef}
                 type="range"
                 min={-1}
                 max={1}

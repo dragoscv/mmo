@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         const urls = items.map(i => i.url).filter(Boolean) as string[];
         if (urls.length > 0) {
             const bySourceUrl = db
-                .select({ id: tracks.id, sourceUrl: tracks.sourceUrl })
+                .select({ id: tracks.id, sourceUrl: tracks.sourceUrl, filepath: tracks.filepath })
                 .from(tracks)
                 .where(inArray(tracks.sourceUrl, urls))
                 .all();
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
             for (const row of bySourceUrl) {
                 const item = items.find(i => i.url === row.sourceUrl);
                 if (item) {
-                    duplicates[item.id] = { trackId: row.id, reason: "Source URL match" };
+                    duplicates[item.id] = { trackId: row.id, reason: "Source URL match — in library", filePath: row.filepath };
                 }
             }
         }
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         const sourceIds = items.map(i => i.id).filter(Boolean);
         if (sourceIds.length > 0) {
             const bySourceId = db
-                .select({ id: tracks.id, sourceId: tracks.sourceId })
+                .select({ id: tracks.id, sourceId: tracks.sourceId, filepath: tracks.filepath })
                 .from(tracks)
                 .where(inArray(tracks.sourceId, sourceIds))
                 .all();
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
             for (const row of bySourceId) {
                 const item = items.find(i => i.id === row.sourceId);
                 if (item && !duplicates[item.id]) {
-                    duplicates[item.id] = { trackId: row.id, reason: "Source ID match" };
+                    duplicates[item.id] = { trackId: row.id, reason: "Source ID match — in library", filePath: row.filepath };
                 }
             }
         }
@@ -109,14 +109,14 @@ export async function POST(request: NextRequest) {
 
                 // Exact title match
                 if (matchTitle === normalizedTitle) {
-                    duplicates[item.id] = { trackId: match.id, reason: "Title match" };
+                    duplicates[item.id] = { trackId: match.id, reason: "Title match — in library" };
                     break;
                 }
 
                 // Title contains and artist/uploader overlaps
                 if (uploaderLower && matchArtist &&
                     (matchArtist.includes(uploaderLower) || uploaderLower.includes(matchArtist))) {
-                    duplicates[item.id] = { trackId: match.id, reason: "Title + artist match" };
+                    duplicates[item.id] = { trackId: match.id, reason: "Title + artist match — in library" };
                     break;
                 }
             }

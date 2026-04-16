@@ -4,20 +4,12 @@ import { useEffect, useCallback } from "react";
 import { useDAW } from "./daw-context";
 import { DAWToolbar } from "./daw-toolbar";
 import { DAWTransport } from "./daw-transport";
-import { DAWTimeline } from "./daw-timeline";
-import { DAWMixer } from "./daw-mixer";
-import { DAWPianoRoll } from "./daw-piano-roll";
-import { DAWStepSequencer } from "./daw-step-sequencer";
-import { DAWBrowser } from "./daw-browser";
-import { DAWEffectsRack } from "./daw-effects-rack";
-import { DAWSynthesizer } from "./daw-synthesizer";
 import { DAWProjectModal } from "./daw-project-modal";
 import { DAWSettingsModal } from "./daw-settings-modal";
 import { DAWStatusBar } from "./daw-status-bar";
 import { DAWExportModal } from "./daw-export-modal";
-import { motion, AnimatePresence } from "framer-motion";
-
-const panelTransition = { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const };
+import { DAWDockview } from "./daw-dockview";
+import { DAWContextMenuProvider } from "./daw-context-menu";
 
 export function DAWPage() {
     const daw = useDAW();
@@ -55,9 +47,31 @@ export function DAWPage() {
                 if (ctrl && e.shiftKey) { e.preventDefault(); daw.setExportModal(true); }
                 else if (!ctrl) daw.setTool("erase");
                 break;
-            case "KeyV": if (!ctrl) daw.setTool("select"); break;
+            case "KeyV":
+                if (ctrl) {
+                    e.preventDefault();
+                    // Paste clips to selected track at playhead
+                    const targetTrack = daw.selectedTrackId ?? daw.project.tracks[0]?.id;
+                    if (targetTrack) daw.pasteClips(targetTrack, daw.currentBeat);
+                } else {
+                    daw.setTool("select");
+                }
+                break;
             case "KeyD": if (!ctrl) daw.setTool("draw"); break;
-            case "KeyC": if (!ctrl) daw.setTool("slice"); break;
+            case "KeyC":
+                if (ctrl) {
+                    e.preventDefault();
+                    if (daw.selectedClipId) daw.copyClips([daw.selectedClipId]);
+                } else {
+                    daw.setTool("slice");
+                }
+                break;
+            case "KeyX":
+                if (ctrl) {
+                    e.preventDefault();
+                    if (daw.selectedClipId) daw.cutClips([daw.selectedClipId]);
+                }
+                break;
             case "KeyM": if (!ctrl) daw.setTool("mute"); break;
             case "KeyA": if (!ctrl) daw.setTool("automation"); break;
             case "Digit1": if (ctrl) { e.preventDefault(); daw.setSnap("1/1"); } break;
@@ -75,6 +89,8 @@ export function DAWPage() {
             case "F5": e.preventDefault(); daw.togglePanel("effectsRack"); break;
             case "F6": e.preventDefault(); daw.togglePanel("synth"); break;
             case "F7": e.preventDefault(); daw.togglePanel("automation"); break;
+            case "F8": e.preventDefault(); daw.togglePanel("history"); break;
+            case "F9": e.preventDefault(); daw.togglePanel("clipboard"); break;
             case "Delete":
             case "Backspace":
                 if (daw.selectedClipId) { daw.removeClip(daw.selectedClipId); }
@@ -106,77 +122,25 @@ export function DAWPage() {
     }, [handleKeyDown]);
 
     return (
-        <div className="daw-root h-full flex flex-col bg-[var(--daw-bg)] text-[var(--daw-text)] overflow-hidden select-none">
-            {/* Top controls */}
-            <DAWToolbar />
-            <DAWTransport />
+        <DAWContextMenuProvider>
+            <div className="daw-root h-full flex flex-col bg-[var(--daw-bg)] text-[var(--daw-text)] overflow-hidden select-none">
+                {/* Fixed top controls — always visible */}
+                <DAWToolbar />
+                <DAWTransport />
 
-            {/* Main content */}
-            <div className="flex-1 flex min-h-0">
-                {/* Left: Browser */}
-                <AnimatePresence>
-                    {daw.showBrowser && (
-                        <motion.div
-                            initial={{ width: 0, opacity: 0 }}
-                            animate={{ width: 260, opacity: 1 }}
-                            exit={{ width: 0, opacity: 0 }}
-                            transition={panelTransition}
-                            className="border-r border-[var(--daw-border)] overflow-hidden flex-shrink-0"
-                        >
-                            <DAWBrowser />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* Center */}
-                <div className="flex-1 flex flex-col min-w-0">
-                    <div className="flex-1 min-h-0">
-                        <DAWTimeline />
-                    </div>
-
-                    {/* Bottom editor panels */}
-                    <AnimatePresence>
-                        {(daw.showPianoRoll || daw.showStepSequencer || daw.showEffectsRack || daw.showSynth) && (
-                            <motion.div
-                                initial={{ height: 0 }}
-                                animate={{ height: 300 }}
-                                exit={{ height: 0 }}
-                                transition={panelTransition}
-                                className="border-t border-[var(--daw-border)] overflow-hidden flex-shrink-0"
-                            >
-                                <div className="h-full flex">
-                                    {daw.showPianoRoll && <DAWPianoRoll />}
-                                    {daw.showStepSequencer && !daw.showPianoRoll && <DAWStepSequencer />}
-                                    {daw.showEffectsRack && <DAWEffectsRack />}
-                                    {daw.showSynth && <DAWSynthesizer />}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                {/* Dockview layout — all panels are dockable, resizable, floating */}
+                <div className="flex-1 min-h-0">
+                    <DAWDockview />
                 </div>
+
+                {/* Fixed bottom status bar */}
+                <DAWStatusBar />
+
+                {/* Modals (overlays, not docked) */}
+                <DAWProjectModal />
+                <DAWSettingsModal />
+                <DAWExportModal />
             </div>
-
-            {/* Bottom: Mixer */}
-            <AnimatePresence>
-                {daw.showMixer && (
-                    <motion.div
-                        initial={{ height: 0 }}
-                        animate={{ height: 220 }}
-                        exit={{ height: 0 }}
-                        transition={panelTransition}
-                        className="border-t border-[var(--daw-border)] overflow-hidden flex-shrink-0"
-                    >
-                        <DAWMixer />
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            <DAWStatusBar />
-
-            {/* Modals */}
-            <DAWProjectModal />
-            <DAWSettingsModal />
-            <DAWExportModal />
-        </div>
+        </DAWContextMenuProvider>
     );
 }

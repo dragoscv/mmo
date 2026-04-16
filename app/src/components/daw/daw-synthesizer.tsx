@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useDAW } from "./daw-context";
 import { cn } from "@/lib/utils";
 import type { SynthConfig, SynthOscillator } from "@/lib/daw-engine";
+import { useScrollAdjust } from "./daw-ui-utils";
 
 const OSC_TYPES: OscillatorType[] = ["sine", "triangle", "sawtooth", "square"];
 const FILTER_TYPES: BiquadFilterType[] = ["lowpass", "highpass", "bandpass", "notch"];
@@ -303,10 +304,20 @@ function MiniKnob({ label, value, min, max, step, onChange, format }: {
     format?: (v: number) => string;
 }) {
     const display = format ? format(value) : value.toFixed(2);
+    const knobRef = useScrollAdjust({
+        value,
+        min,
+        max,
+        step: step * 5,
+        fineStep: step,
+        onChange,
+    });
+
     return (
         <div className="flex items-center gap-1 h-5">
             <span className="text-[8px] text-white/25 w-14 truncate">{label}</span>
             <input
+                ref={knobRef}
                 type="range"
                 min={min}
                 max={max}

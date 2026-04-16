@@ -6,7 +6,7 @@ import { usePlayer } from "./player-context";
 import { DeckTrackPicker } from "./deck-track-picker";
 import { MixerWaveforms, CUE_COLORS } from "./mixer-waveforms";
 import { MixerSettingsModal } from "./mixer-settings-modal";
-import { MixerBrowserModal } from "./mixer-browser-modal";
+import { MixerBrowserModal } from "./mixer-browser-modal-v2";
 import { SamplePickerModal } from "./sample-picker-modal";
 import { TrackContextMenu } from "./track-actions";
 import type { MidiActionHandler } from "@/lib/midi-engine";
@@ -1541,12 +1541,17 @@ export function MixerView() {
         if (!mixer.isActive) mixer.initMixer();
     }, [mixer.isActive, mixer.initMixer]);
 
-    // Sync currently playing track to Deck A
+    // Sync currently playing track to Deck A — only on initial mount or when currentTrack changes,
+    // NOT when deckA.trackId changes (to avoid overriding user's manual track selection)
+    const lastSyncedTrackRef = useRef<number | null>(null);
     useEffect(() => {
-        if (currentTrack && mixer.isActive && mixer.deckA.trackId !== currentTrack.id) {
-            mixer.loadTrack("A", currentTrack);
+        if (currentTrack && mixer.isActive && lastSyncedTrackRef.current !== currentTrack.id) {
+            lastSyncedTrackRef.current = currentTrack.id;
+            if (mixer.deckA.trackId !== currentTrack.id) {
+                mixer.loadTrack("A", currentTrack);
+            }
         }
-    }, [currentTrack, mixer.isActive, mixer.deckA.trackId, mixer.loadTrack]);
+    }, [currentTrack, mixer.isActive, mixer.loadTrack]);
 
     // Persist waveform orientation
     useEffect(() => {

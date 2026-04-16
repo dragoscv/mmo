@@ -260,6 +260,8 @@ export async function POST(request: NextRequest) {
             autoAddToLibrary: body.autoAddToLibrary || false,
         };
 
+        const parallelDownloads = Math.max(1, Math.min(8, Number(body.parallelDownloads) || 1));
+
         const downloadDir = getDownloadDir(params.downloadFolder);
         ensureDir(downloadDir);
 
@@ -272,41 +274,108 @@ export async function POST(request: NextRequest) {
                     } catch { /* stream closed */ }
                 };
 
-                send({ type: "batch_started", totalTracks: tracks.length });
+                send({ type: "batch_started", totalTracks: tracks.length, parallelDownloads });
 
                 const results: { trackIndex: number; file: string; downloadId: number; error?: string }[] = [];
 
-                for (let i = 0; i < tracks.length; i++) {
-                    const track = tracks[i];
-                    send({
-                        type: "track_started",
-                        trackIndex: i,
-                        totalTracks: tracks.length,
-                        title: track.title,
-                        url: track.url,
-                    });
+                if (tracks.length === 1 || parallelDownloads <= 1) {
+                    // Sequential mode (single track or concurrency=1)
+                    for (let i = 0; i < tracks.length; i++) {
+                        const track = tracks[i];
+                        send({
+                            type: "track_started",
+                            trackIndex: i,
+                            totalTracks: tracks.length,
+                            title: track.title,
+                            url: track.url,
+                        });
 
-                    try {
-                        const result = await downloadTrack(track, params, downloadDir, send);
-                        results.push({ trackIndex: i, file: result.file, downloadId: result.downloadId });
+                        try {
+                            const result = await downloadTrack(track, params, downloadDir, send);
+                            results.push({ trackIndex: i, file: result.file, downloadId: result.downloadId });
+                            send({
+                                type: "track_complete",
+                                trackIndex: i,
+                                totalTracks: tracks.length,
+                                file: result.file,
+                                downloadId: result.downloadId,
+                                title: track.title,
+                            });
+                        } catch (err) {
+                            const msg = err instanceof Error ? err.message : "Unknown error";
+                            results.push({ trackIndex: i, file: "", downloadId: 0, error: msg });
+                            send({
+                                type: "track_error",
+                                trackIndex: i,
+                                totalTracks: tracks.length,
+                                title: track.title,
+                                error: msg,
+                            });
+                        }
+                    }
+                } else {
+                    // Parallel mode — download up to `parallelDownloads` tracks concurrently
+                    let nextIndex = 0;
+                    const running = new Set<Promise<void>>();
+
+                    const startNext = (): Promise<void> | null => {
+                        if (nextIndex >= tracks.length) return null;
+                        const i = nextIndex++;
+                        const track = tracks[i];
+
                         send({
-                            type: "track_complete",
+                            type: "track_started",
                             trackIndex: i,
                             totalTracks: tracks.length,
-                            file: result.file,
-                            downloadId: result.downloadId,
                             title: track.title,
+                            url: track.url,
                         });
-                    } catch (err) {
-                        const msg = err instanceof Error ? err.message : "Unknown error";
-                        results.push({ trackIndex: i, file: "", downloadId: 0, error: msg });
-                        send({
-                            type: "track_error",
-                            trackIndex: i,
-                            totalTracks: tracks.length,
-                            title: track.title,
-                            error: msg,
-                        });
+
+                        const task = (async () => {
+                            try {
+                                const result = await downloadTrack(track, params, downloadDir, send);
+                                results.push({ trackIndex: i, file: result.file, downloadId: result.downloadId });
+                                send({
+                                    type: "track_complete",
+                                    trackIndex: i,
+                                    totalTracks: tracks.length,
+                                    file: result.file,
+                                    downloadId: result.downloadId,
+                                    title: track.title,
+                                });
+                            } catch (err) {
+                                const msg = err instanceof Error ? err.message : "Unknown error";
+                                results.push({ trackIndex: i, file: "", downloadId: 0, error: msg });
+                                send({
+                                    type: "track_error",
+                                    trackIndex: i,
+                                    totalTracks: tracks.length,
+                                    title: track.title,
+                                    error: msg,
+                                });
+                            }
+                        })();
+
+                        return task;
+                    };
+
+                    // Seed the pool
+                    for (let j = 0; j < parallelDownloads && j < tracks.length; j++) {
+                        const task = startNext()!;
+                        const tracked = task.then(() => { running.delete(tracked); });
+                        running.add(tracked);
+                    }
+
+                    // As each finishes, start the next
+                    while (running.size > 0) {
+                        await Promise.race(running);
+                        // Fill empty slots
+                        while (running.size < parallelDownloads) {
+                            const task = startNext();
+                            if (!task) break;
+                            const tracked = task.then(() => { running.delete(tracked); });
+                            running.add(tracked);
+                        }
                     }
                 }
 

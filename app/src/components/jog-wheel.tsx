@@ -258,7 +258,10 @@ export const JogWheel = memo(function JogWheel({ side, deck, color }: JogWheelPr
                 ref={platterRef}
                 className="absolute inset-0 rounded-full"
                 style={{
-                    animation: `jog-spin ${animDuration.toFixed(3)}s linear infinite`,
+                    animationName: "jog-spin",
+                    animationDuration: `${animDuration.toFixed(3)}s`,
+                    animationTimingFunction: "linear",
+                    animationIterationCount: "infinite",
                     animationPlayState: deck.isPlaying ? "running" : "paused",
                     willChange: "transform",
                 }}

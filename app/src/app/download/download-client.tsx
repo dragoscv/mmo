@@ -403,6 +403,7 @@ export function DownloadClient() {
     const [downloadId, setDownloadId] = useState<number | null>(null);
     const [logs, setLogs] = useState<string[]>([]);
     const [showLogs, setShowLogs] = useState(false);
+    const logsEndRef = useRef<HTMLDivElement>(null);
     const [showAllFormats, setShowAllFormats] = useState(false);
     const [addedTrackId, setAddedTrackId] = useState<number | null>(null);
     const abortRef = useRef<AbortController | null>(null);
@@ -416,6 +417,8 @@ export function DownloadClient() {
     const [showFolderPicker, setShowFolderPicker] = useState(false);
     const [conversionFormat, setConversionFormat] = useState("auto");
     const [conversionQuality, setConversionQuality] = useState("auto");
+    const [parallelDownloads, setParallelDownloads] = useState(3);
+    const [parallelConversions, setParallelConversions] = useState(2);
 
     // History
     const [history, setHistory] = useState<DownloadHistoryItem[]>([]);
@@ -430,6 +433,7 @@ export function DownloadClient() {
     const [selectedTracks, setSelectedTracks] = useState<Set<string>>(new Set());
     const [autoAddToLibrary, setAutoAddToLibrary] = useState(true);
     const [batchCurrentIndex, setBatchCurrentIndex] = useState(-1);
+    const [activeDownloads, setActiveDownloads] = useState<Set<number>>(new Set());
     const [batchResults, setBatchResults] = useState<BatchTrackResult[]>([]);
     const [duplicateMap, setDuplicateMap] = useState<Record<string, { trackId: number; reason: string }>>({});
 
@@ -444,6 +448,8 @@ export function DownloadClient() {
                     if (s.audioFormat) setAudioFormat(s.audioFormat);
                     if (s.conversionFormat) setConversionFormat(s.conversionFormat);
                     if (s.conversionQuality) setConversionQuality(s.conversionQuality);
+                    if (s.parallelDownloads) setParallelDownloads(Number(s.parallelDownloads) || 3);
+                    if (s.parallelConversions) setParallelConversions(Number(s.parallelConversions) || 2);
                 }
             })
             .catch(() => { });
@@ -457,6 +463,13 @@ export function DownloadClient() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialUrl]);
+
+    // Auto-scroll logs
+    useEffect(() => {
+        if (showLogs && logsEndRef.current) {
+            logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [logs, showLogs]);
 
     const loadHistory = useCallback(async () => {
         setHistoryLoading(true);
@@ -501,6 +514,7 @@ export function DownloadClient() {
         setDuplicateMap({});
         setBatchResults([]);
         setBatchCurrentIndex(-1);
+        setActiveDownloads(new Set());
         setDownloadedFile(null);
         setDownloadId(null);
         setLogs([]);
@@ -791,6 +805,7 @@ export function DownloadClient() {
         setStatus("batch-downloading");
         setBatchResults([]);
         setBatchCurrentIndex(0);
+        setActiveDownloads(new Set());
         setProgress(null);
         setLogs([]);
         setError(null);
@@ -824,6 +839,7 @@ export function DownloadClient() {
                     downloadFolder: downloadFolder || undefined,
                     mediaExtractor: playlistInfo.extractor,
                     autoAddToLibrary,
+                    parallelDownloads,
                 }),
                 signal: controller.signal,
             });
@@ -855,7 +871,7 @@ export function DownloadClient() {
                         switch (event.type) {
                             case "track_started":
                                 setBatchCurrentIndex(event.trackIndex);
-                                setProgress(null);
+                                setActiveDownloads(prev => new Set(prev).add(event.trackIndex));
                                 break;
                             case "progress":
                                 setProgress({
@@ -866,6 +882,11 @@ export function DownloadClient() {
                                 });
                                 break;
                             case "track_complete":
+                                setActiveDownloads(prev => {
+                                    const next = new Set(prev);
+                                    next.delete(event.trackIndex);
+                                    return next;
+                                });
                                 setBatchResults(prev => [...prev, {
                                     trackIndex: event.trackIndex,
                                     title: event.title || selected[event.trackIndex]?.title || "Unknown",
@@ -874,6 +895,11 @@ export function DownloadClient() {
                                 }]);
                                 break;
                             case "track_error":
+                                setActiveDownloads(prev => {
+                                    const next = new Set(prev);
+                                    next.delete(event.trackIndex);
+                                    return next;
+                                });
                                 setBatchResults(prev => [...prev, {
                                     trackIndex: event.trackIndex,
                                     title: event.title || selected[event.trackIndex]?.title || "Unknown",
@@ -955,7 +981,7 @@ export function DownloadClient() {
                 setStatus("error");
             }
         }
-    }, [playlistInfo, selectedTracks, audioQuality, audioFormat, conversionFormat, conversionQuality, downloadFolder, autoAddToLibrary]);
+    }, [playlistInfo, selectedTracks, audioQuality, audioFormat, conversionFormat, conversionQuality, downloadFolder, autoAddToLibrary, parallelDownloads]);
 
     const batchAddToLibrary = useCallback(async () => {
         const toAdd = batchResults.filter(r => !r.error && r.file && !r.addedTrackId);
@@ -1010,6 +1036,7 @@ export function DownloadClient() {
         setDuplicateMap({});
         setBatchResults([]);
         setBatchCurrentIndex(-1);
+        setActiveDownloads(new Set());
         setProgress(null);
         setError(null);
         setDownloadedFile(null);
@@ -1192,6 +1219,52 @@ export function DownloadClient() {
                                         {CONVERSION_FORMATS.map(f => (
                                             <option key={f.value} value={f.value}>
                                                 {f.label}
+                                            </option>
+                                        ))}
+                                    </Select>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Parallel Processing Settings */}
+                        <div className="pt-3 border-t border-border/50">
+                            <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                <Sparkles className="h-3 w-3 text-orange-400" />
+                                Parallel Processing
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground">Parallel Downloads</Label>
+                                    <Select
+                                        value={String(parallelDownloads)}
+                                        onChange={(e) => {
+                                            const v = Number(e.target.value);
+                                            setParallelDownloads(v);
+                                            saveSetting("parallelDownloads", e.target.value);
+                                        }}
+                                        size="sm"
+                                    >
+                                        {[1, 2, 3, 4, 5, 6, 8].map(n => (
+                                            <option key={n} value={n}>
+                                                {n === 1 ? "1 (Sequential)" : `${n} simultaneous`}
+                                            </option>
+                                        ))}
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground">Parallel Conversions</Label>
+                                    <Select
+                                        value={String(parallelConversions)}
+                                        onChange={(e) => {
+                                            const v = Number(e.target.value);
+                                            setParallelConversions(v);
+                                            saveSetting("parallelConversions", e.target.value);
+                                        }}
+                                        size="sm"
+                                    >
+                                        {[1, 2, 3, 4, 5, 6, 8].map(n => (
+                                            <option key={n} value={n}>
+                                                {n === 1 ? "1 (Sequential)" : `${n} simultaneous`}
                                             </option>
                                         ))}
                                     </Select>
@@ -1411,22 +1484,51 @@ export function DownloadClient() {
 
                                 {/* Quick Actions */}
                                 <div className="flex items-center gap-2 mt-3 flex-wrap">
-                                    <button
-                                        onClick={() => startDownload(undefined, true, undefined, true)}
-                                        disabled={status === "downloading"}
-                                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        <FileAudio className="h-3.5 w-3.5" />
-                                        Download &amp; Convert ({resolvedConversionLabel})
-                                    </button>
-                                    <button
-                                        onClick={() => startDownload(undefined, true)}
-                                        disabled={status === "downloading"}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        <Download className="h-3.5 w-3.5" />
-                                        Original ({resolvedFormatLabel})
-                                    </button>
+                                    {status === "added" ? (
+                                        <>
+                                            <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-medium">
+                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                Already in Library{addedTrackId ? ` (ID: ${addedTrackId})` : ""}
+                                            </div>
+                                        </>
+                                    ) : status === "complete" && downloadedFile ? (
+                                        <>
+                                            <button
+                                                onClick={addToLibrary}
+                                                disabled={status !== "complete"}
+                                                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                            >
+                                                <Library className="h-3.5 w-3.5" />
+                                                Add to Library &amp; Analyze
+                                            </button>
+                                        </>
+                                    ) : status === "adding-to-library" ? (
+                                        <>
+                                            <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-medium">
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                Adding &amp; Analyzing...
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => startDownload(undefined, true, undefined, true)}
+                                                disabled={status === "downloading"}
+                                                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                            >
+                                                <FileAudio className="h-3.5 w-3.5" />
+                                                Download &amp; Convert ({resolvedConversionLabel})
+                                            </button>
+                                            <button
+                                                onClick={() => startDownload(undefined, true)}
+                                                disabled={status === "downloading"}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                            >
+                                                <Download className="h-3.5 w-3.5" />
+                                                Original ({resolvedFormatLabel})
+                                            </button>
+                                        </>
+                                    )}
                                     <a
                                         href={mediaInfo.webpage_url}
                                         target="_blank"
@@ -1606,11 +1708,11 @@ export function DownloadClient() {
                             {playlistInfo.entries.map((entry, idx) => {
                                 const isSelected = selectedTracks.has(entry.id);
                                 const batchResult = batchResults.find(r => r.trackIndex === idx);
-                                const isDownloading = status === "batch-downloading" && batchCurrentIndex === idx;
+                                const isDownloading = status === "batch-downloading" && activeDownloads.has(idx);
                                 const duplicate = duplicateMap[entry.id];
                                 return (
                                     <div
-                                        key={entry.id}
+                                        key={`${entry.id}-${idx}`}
                                         className={cn(
                                             "flex items-center gap-3 px-4 py-2 transition-colors group",
                                             isSelected ? "bg-purple-500/5" : "bg-transparent",
@@ -1704,13 +1806,13 @@ export function DownloadClient() {
                                 <div className="flex items-center gap-3 flex-1">
                                     <div className="flex-1">
                                         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                                            <span>Track {batchCurrentIndex + 1} / {selectedTracks.size}</span>
+                                            <span>{batchResults.length} / {selectedTracks.size}{activeDownloads.size > 0 && ` · ${activeDownloads.size} active`}</span>
                                             {progress && <span>{progress.speed}</span>}
                                         </div>
                                         <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
                                             <div
                                                 className="h-full bg-purple-500 rounded-full transition-all duration-300"
-                                                style={{ width: `${((batchResults.length + (progress ? progress.percent / 100 : 0)) / selectedTracks.size) * 100}%` }}
+                                                style={{ width: `${(batchResults.length / selectedTracks.size) * 100}%` }}
                                             />
                                         </div>
                                     </div>
@@ -1907,6 +2009,7 @@ export function DownloadClient() {
                                 {logs.map((log, i) => (
                                     <div key={i}>{log}</div>
                                 ))}
+                                <div ref={logsEndRef} />
                             </div>
                         )}
                     </div>

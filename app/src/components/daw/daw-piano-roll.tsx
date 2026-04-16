@@ -4,6 +4,8 @@ import { useRef, useCallback, useState, useEffect } from "react";
 import { useDAW } from "./daw-context";
 import { cn } from "@/lib/utils";
 import type { MidiNote } from "@/lib/daw-engine";
+import { useContextMenu, type MenuEntry } from "./daw-context-menu";
+import { Trash2, Copy, Magnet, Music } from "lucide-react";
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const MIN_PITCH = 24; // C1
@@ -108,6 +110,56 @@ export function DAWPianoRoll() {
         setTimeout(() => daw.stopSynthNote(noteId), 300);
     };
 
+    const ctxMenu = useContextMenu();
+
+    const handleGridContextMenu = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!gridRef.current || !clip) return;
+        const rect = gridRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left + gridRef.current.scrollLeft;
+        const y = e.clientY - rect.top + gridRef.current.scrollTop;
+        const pitch = pitchFromY(y);
+        const beat = snapBeat(beatFromX(x));
+
+        // Check if right-clicking on a note
+        const clickedNote = notes.find(n => n.pitch === pitch && beat >= n.start && beat < n.start + n.duration);
+
+        if (clickedNote) {
+            const items: MenuEntry[] = [
+                { type: "label", label: `${noteName(clickedNote.pitch)} — vel ${clickedNote.velocity}` },
+                { type: "separator" },
+                {
+                    type: "sub",
+                    label: "Set Velocity",
+                    icon: <Music className="h-3.5 w-3.5" />,
+                    items: [
+                        { label: "Piano (pp) — 32", onClick: () => daw.setNoteVelocity(clip.id, clickedNote.id, 32) },
+                        { label: "Mezzo (mf) — 80", onClick: () => daw.setNoteVelocity(clip.id, clickedNote.id, 80) },
+                        { label: "Forte (f) — 100", onClick: () => daw.setNoteVelocity(clip.id, clickedNote.id, 100) },
+                        { label: "Fortissimo (ff) — 127", onClick: () => daw.setNoteVelocity(clip.id, clickedNote.id, 127) },
+                    ],
+                },
+                { type: "separator" },
+                {
+                    label: "Delete Note",
+                    icon: <Trash2 className="h-3.5 w-3.5" />,
+                    destructive: true,
+                    onClick: () => daw.removeNote(clip.id, clickedNote.id),
+                },
+            ];
+            ctxMenu.show(e.clientX, e.clientY, items);
+        } else {
+            const items: MenuEntry[] = [
+                { type: "label", label: `${noteName(pitch)} — Beat ${beat.toFixed(1)}` },
+                { type: "separator" },
+                { label: "Add Note Here", onClick: () => daw.addNote(clip.id, { pitch, start: beat, duration: 1, velocity: 100, channel: 0 }) },
+                { type: "separator" },
+                { label: "Select All Notes", shortcut: "Ctrl+A", onClick: () => daw.selectNotes(notes.map(n => n.id)) },
+            ];
+            ctxMenu.show(e.clientX, e.clientY, items);
+        }
+    }, [daw, clip, notes, ctxMenu]);
+
     return (
         <div className="h-full flex flex-col bg-[var(--daw-bg)]">
             {/* Clip info bar */}
@@ -154,6 +206,7 @@ export function DAWPianoRoll() {
                     className="flex-1 overflow-auto relative"
                     onMouseDown={handleGridMouseDown}
                     onMouseUp={handleGridMouseUp}
+                    onContextMenu={handleGridContextMenu}
                 >
                     <div className="relative" style={{ width: clip.length * pxPerBeat, height: gridHeight, minWidth: "100%" }}>
                         {/* Grid lines */}

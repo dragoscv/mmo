@@ -1,12 +1,25 @@
 "use client";
 
+import { useCallback } from "react";
 import { useDAW } from "./daw-context";
 import { cn } from "@/lib/utils";
 import { Volume2, Play, RotateCcw, Plus, Minus } from "lucide-react";
+import { useContextMenu, type MenuEntry } from "./daw-context-menu";
+import { useScrollAdjust } from "./daw-ui-utils";
 
 export function DAWStepSequencer() {
     const daw = useDAW();
+    const ctxMenu = useContextMenu();
     const pattern = daw.stepPattern;
+
+    const swingRef = useScrollAdjust({
+        value: pattern?.swing ?? 0,
+        min: 0,
+        max: 100,
+        step: 5,
+        fineStep: 1,
+        onChange: v => daw.setPatternSwing(Math.round(v)),
+    });
 
     if (!pattern) {
         return (
@@ -47,6 +60,7 @@ export function DAWStepSequencer() {
                 <div className="flex items-center gap-1">
                     <span className="text-[10px] text-white/30">Swing</span>
                     <input
+                        ref={swingRef}
                         type="range"
                         min={0}
                         max={100}
@@ -119,10 +133,23 @@ export function DAWStepSequencer() {
                                         onClick={() => daw.toggleStep(trackIdx, step)}
                                         onContextMenu={e => {
                                             e.preventDefault();
-                                            // Cycle velocity: 50 -> 80 -> 100 -> 127 -> 50
-                                            const vels = [50, 80, 100, 127];
-                                            const nextIdx = (vels.indexOf(stepData.velocity) + 1) % vels.length;
-                                            daw.setStepVelocity(trackIdx, step, vels[nextIdx]);
+                                            const items: MenuEntry[] = [
+                                                { type: "label", label: `Step ${step + 1}` },
+                                                { type: "separator" },
+                                                { label: stepData.active ? "Deactivate Step" : "Activate Step", onClick: () => daw.toggleStep(trackIdx, step) },
+                                                { type: "separator" },
+                                                {
+                                                    type: "sub",
+                                                    label: `Velocity: ${stepData.velocity}`,
+                                                    items: [
+                                                        { label: "Soft (50)", onClick: () => daw.setStepVelocity(trackIdx, step, 50) },
+                                                        { label: "Medium (80)", onClick: () => daw.setStepVelocity(trackIdx, step, 80) },
+                                                        { label: "Hard (100)", onClick: () => daw.setStepVelocity(trackIdx, step, 100) },
+                                                        { label: "Max (127)", onClick: () => daw.setStepVelocity(trackIdx, step, 127) },
+                                                    ],
+                                                },
+                                            ];
+                                            ctxMenu.show(e.clientX, e.clientY, items);
                                         }}
                                         className={cn(
                                             "flex-shrink-0 border-r border-white/5 transition-all relative",

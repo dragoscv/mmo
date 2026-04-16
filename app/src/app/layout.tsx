@@ -14,6 +14,7 @@ import { SelectionProvider } from "@/components/selection-provider";
 import { EQProvider } from "@/components/eq-context";
 import { MixerProvider } from "@/components/mixer-context";
 import { MobileHeader } from "@/components/mobile-header";
+import { ConfirmLoadDialog } from "@/components/confirm-load-dialog";
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -73,7 +74,7 @@ export default function RootLayout({
                                     <MixerProvider>
                                         <AnalysisProvider>
                                             <PlayerAwareLayout>
-                                                <div data-app-sidebar="">
+                                                <div data-app-sidebar="" className="self-stretch">
                                                     <AppSidebar />
                                                 </div>
                                                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -89,6 +90,7 @@ export default function RootLayout({
                                                     <NowPlaying />
                                                 </Suspense>
                                                 <StickyNowPlaying />
+                                                <ConfirmLoadDialog />
                                             </div>
                                         </AnalysisProvider>
                                     </MixerProvider>

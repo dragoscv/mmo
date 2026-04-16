@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { settings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-const DOWNLOAD_SETTINGS_KEYS = ["downloadFolder", "audioQuality", "audioFormat"];
+const DOWNLOAD_SETTINGS_KEYS = ["downloadFolder", "audioQuality", "audioFormat", "conversionFormat", "conversionQuality", "parallelDownloads", "parallelConversions"];
 
 // GET — load download settings
 export async function GET() {

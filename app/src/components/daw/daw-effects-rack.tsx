@@ -1,18 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useDAW } from "./daw-context";
 import { cn } from "@/lib/utils";
 import {
     Power, Trash2, GripVertical, Plus, ChevronDown, ChevronRight,
-    Sliders,
+    Sliders, RotateCcw, Copy,
 } from "lucide-react";
 import { EFFECT_TYPES, DEFAULT_EFFECT_PARAMS, type EffectType, type InsertEffect } from "@/lib/daw-engine";
+import { useContextMenu, type MenuEntry } from "./daw-context-menu";
+import { useScrollAdjust } from "./daw-ui-utils";
 
 export function DAWEffectsRack() {
     const daw = useDAW();
+    const ctxMenu = useContextMenu();
     const track = daw.project.tracks.find(t => t.id === daw.selectedTrackId);
     const [selectedFx, setSelectedFx] = useState<string | null>(null);
+
+    const handleInsertContextMenu = useCallback((e: React.MouseEvent, insert: InsertEffect, idx: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!track) return;
+
+        const items: MenuEntry[] = [
+            { type: "label", label: insert.type.replace(/_/g, " ") },
+            { type: "separator" },
+            {
+                label: insert.enabled ? "Bypass Effect" : "Enable Effect",
+                icon: <Power className="h-3.5 w-3.5" />,
+                checked: insert.enabled,
+                onClick: () => daw.toggleInsert(track.id, insert.id),
+            },
+            { type: "separator" },
+            {
+                label: "Delete Effect",
+                icon: <Trash2 className="h-3.5 w-3.5" />,
+                destructive: true,
+                onClick: () => {
+                    daw.removeInsert(track.id, insert.id);
+                    if (selectedFx === insert.id) setSelectedFx(null);
+                },
+            },
+        ];
+        ctxMenu.show(e.clientX, e.clientY, items);
+    }, [daw, track, selectedFx, ctxMenu]);
 
     if (!track) {
         return (
@@ -56,6 +87,7 @@ export function DAWEffectsRack() {
                                     selectedFx === insert.id ? "bg-white/5" : "hover:bg-white/[0.02]"
                                 )}
                                 onClick={() => setSelectedFx(insert.id)}
+                                onContextMenu={e => handleInsertContextMenu(e, insert, idx)}
                             >
                                 <GripVertical className="h-3 w-3 text-white/10 flex-shrink-0 cursor-grab" />
 
@@ -186,6 +218,15 @@ function ParamControl({ name, value, onChange }: { name: string; value: number; 
         ? value >= 1000 ? `${(value / 1000).toFixed(1)}k` : `${Math.round(value)}`
         : isTime ? `${value.toFixed(2)}s` : `${value.toFixed(2)}`;
 
+    const paramRef = useScrollAdjust({
+        value,
+        min,
+        max,
+        step: isFreq ? 10 : step * 5,
+        fineStep: step,
+        onChange,
+    });
+
     return (
         <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between">
@@ -193,6 +234,7 @@ function ParamControl({ name, value, onChange }: { name: string; value: number; 
                 <span className="text-[9px] text-white/40 font-mono">{display}</span>
             </div>
             <input
+                ref={paramRef}
                 type="range"
                 min={min}
                 max={max}

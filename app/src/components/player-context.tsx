@@ -10,6 +10,7 @@ import {
     type ReactNode,
 } from "react";
 import type { Track } from "@/db/schema";
+import { audioPreloadCache } from "@/lib/audio-preload-cache";
 
 type RepeatMode = "off" | "one" | "all";
 
@@ -355,8 +356,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
                 const nextTrack = s.queue[nextIdx];
                 if (nextTrack) {
-                    audio.src = `/api/audio/${nextTrack.id}`;
+                    audio.src = audioPreloadCache.getUrl(nextTrack.id);
                     safePlay(audio);
+                    // Preload upcoming tracks
+                    const upcoming = s.queue.slice(nextIdx + 1, nextIdx + 4).map(t => t.id);
+                    if (upcoming.length) audioPreloadCache.preloadMany(upcoming);
                     return { ...s, ...withHistory(s, nextTrack, nextIdx) };
                 }
                 return { ...s, isPlaying: false };
@@ -370,7 +374,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const saved = loadPersistedState();
         if (saved.currentTrack) {
             const savedTime = saved.currentTime ?? 0;
-            audio.src = `/api/audio/${saved.currentTrack.id}`;
+            audio.src = audioPreloadCache.getUrl(saved.currentTrack.id);
+            // Preload current + next tracks from saved queue
+            audioPreloadCache.preload(saved.currentTrack.id).then(url => {
+                if (audioRef.current && audioRef.current.src !== url) {
+                    const wasTime = audioRef.current.currentTime;
+                    audioRef.current.src = url;
+                    audioRef.current.addEventListener("loadedmetadata", () => {
+                        if (wasTime > 0) audioRef.current!.currentTime = wasTime;
+                    }, { once: true });
+                }
+            }).catch(() => { });
+            const savedIdx = saved.queueIndex ?? 0;
+            const savedQueue = saved.queue ?? [];
+            const nextIds = savedQueue.slice(savedIdx + 1, savedIdx + 4).map(t => t.id);
+            if (nextIds.length) audioPreloadCache.preloadMany(nextIds);
             // Seek to saved position once metadata loads
             const restoreTime = () => {
                 if (savedTime > 0 && savedTime < audio.duration) {
@@ -411,12 +429,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const play = useCallback((track: Track, queue?: Track[]) => {
         const audio = audioRef.current;
         if (!audio) return;
-        audio.src = `/api/audio/${track.id}`;
+        // Use cached blob URL if available, start preloading if not
+        audio.src = audioPreloadCache.getUrl(track.id);
+        audioPreloadCache.preload(track.id).then(url => {
+            // Upgrade to blob URL once cached (if not already playing from it)
+            if (audioRef.current && !audioPreloadCache.has(track.id)) return;
+            if (audioRef.current && audioRef.current.src !== url && !audioRef.current.paused) {
+                // Already playing from stream — blob is cached for next use
+            }
+        }).catch(() => { });
         safePlay(audio);
         setState((s) => {
             const newQueue = queue || s.queue;
             const idx = newQueue.findIndex((t) => t.id === track.id);
             const newIndex = idx >= 0 ? idx : 0;
+            // Preload next 3 tracks in queue
+            const upcoming = newQueue.slice(newIndex + 1, newIndex + 4).map(t => t.id);
+            if (upcoming.length) audioPreloadCache.preloadMany(upcoming);
             return {
                 ...s,
                 ...withHistory(s, track, newIndex),
@@ -464,9 +493,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             if (!nextTrack) return s;
             const audio = audioRef.current;
             if (audio) {
-                audio.src = `/api/audio/${nextTrack.id}`;
+                audio.src = audioPreloadCache.getUrl(nextTrack.id);
                 safePlay(audio);
             }
+            // Preload upcoming
+            const upcoming = s.queue.slice(nextIdx + 1, nextIdx + 4).map(t => t.id);
+            if (upcoming.length) audioPreloadCache.preloadMany(upcoming);
             return { ...s, ...withHistory(s, nextTrack, nextIdx) };
         });
     }, []);
@@ -482,7 +514,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 const prevIdx = s.queueIndex - 1;
                 const prevTrack = s.queue[prevIdx];
                 if (audio) {
-                    audio.src = `/api/audio/${prevTrack.id}`;
+                    audio.src = audioPreloadCache.getUrl(prevTrack.id);
                     safePlay(audio);
                 }
                 return { ...s, ...withHistory(s, prevTrack, prevIdx) };
@@ -567,9 +599,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             if (!track) return s;
             const audio = audioRef.current;
             if (audio) {
-                audio.src = `/api/audio/${track.id}`;
+                audio.src = audioPreloadCache.getUrl(track.id);
                 safePlay(audio);
             }
+            // Preload upcoming
+            const upcoming = s.queue.slice(index + 1, index + 4).map(t => t.id);
+            if (upcoming.length) audioPreloadCache.preloadMany(upcoming);
             return { ...s, ...withHistory(s, track, index) };
         });
     }, []);

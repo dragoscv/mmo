@@ -20,6 +20,7 @@ import {
     X,
     Download,
     Piano,
+    Waves,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
@@ -33,6 +34,7 @@ const navItems = [
     { href: "/library", label: "Library", icon: Library },
     { href: "/playlists", label: "Playlists", icon: ListMusic },
     { href: "/daw", label: "DAW", icon: Piano },
+    { href: "/editor", label: "Sound Editor", icon: Waves },
     { href: "/download", label: "Download", icon: Download },
     { href: "/visualizations", label: "Visualizations", icon: AudioWaveform },
     { href: "/scanner", label: "Scanner", icon: ScanSearch },
@@ -186,7 +188,7 @@ export function AppSidebar() {
     return (
         <>
             {/* Desktop sidebar */}
-            <div className="hidden md:flex relative shrink-0">
+            <div className="hidden md:flex relative shrink-0 h-full">
                 <aside
                     className={cn(
                         "flex h-full flex-col bg-sidebar transition-[width] duration-300 ease-in-out overflow-hidden",

@@ -6,9 +6,37 @@ import {
     Repeat,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useScrollAdjust } from "./daw-ui-utils";
+import { useContextMenu, type MenuEntry } from "./daw-context-menu";
+import { useCallback } from "react";
 
 export function DAWTransport() {
     const daw = useDAW();
+    const ctxMenu = useContextMenu();
+
+    const masterRef = useScrollAdjust({
+        value: daw.project.masterTrack.volume,
+        min: 0,
+        max: 1,
+        step: 0.02,
+        fineStep: 0.005,
+        onChange: v => daw.setMasterVolume(v),
+    });
+
+    const handleTransportContextMenu = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        const items: MenuEntry[] = [
+            { type: "label", label: "Transport" },
+            { type: "separator" },
+            { label: daw.isPlaying ? "Pause" : "Play", shortcut: "Space", onClick: () => daw.togglePlay() },
+            { label: "Stop & Rewind", shortcut: "Enter", onClick: () => daw.stop() },
+            { label: daw.isRecording ? "Stop Recording" : "Record", shortcut: "R", onClick: () => daw.record() },
+            { type: "separator" },
+            { label: daw.metronomeOn ? "Disable Metronome" : "Enable Metronome", shortcut: "K", checked: daw.metronomeOn, onClick: () => daw.toggleMetronome() },
+            { label: daw.project.loopRegion.enabled ? "Disable Loop" : "Enable Loop", shortcut: "L", checked: daw.project.loopRegion.enabled, onClick: () => daw.toggleLoop() },
+        ];
+        ctxMenu.show(e.clientX, e.clientY, items);
+    }, [daw, ctxMenu]);
 
     const beats = daw.currentBeat;
     const bar = Math.floor(beats / daw.project.timeSignature.numerator) + 1;
@@ -16,7 +44,7 @@ export function DAWTransport() {
     const tick = Math.floor((beats % 1) * 960);
 
     return (
-        <div className="h-12 bg-[var(--daw-bg)] border-b border-[var(--daw-border)] flex items-center px-3 gap-3 daw-animate-in daw-stagger-1">
+        <div className="h-12 bg-[var(--daw-bg)] border-b border-[var(--daw-border)] flex items-center px-3 gap-3 daw-animate-in daw-stagger-1" onContextMenu={handleTransportContextMenu}>
             {/* Position display */}
             <div className="flex items-center bg-[var(--daw-surface)] rounded-lg px-3 py-1.5 gap-0.5 font-mono min-w-[150px] border border-[var(--daw-border)]">
                 <span className="text-[9px] text-[var(--daw-text-dim)] mr-1.5 uppercase tracking-widest">Pos</span>
@@ -128,6 +156,7 @@ export function DAWTransport() {
                     <MeterBar value={daw.masterPeakR} />
                 </div>
                 <input
+                    ref={masterRef}
                     type="range"
                     min={0}
                     max={1}

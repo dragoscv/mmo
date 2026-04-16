@@ -40,6 +40,31 @@ import {
     type StepSequencerPattern,
     type AudioClipData,
 } from "@/lib/daw-engine";
+import {
+    type HistoryState,
+    type HistoryEntry,
+    createHistory,
+    pushHistory,
+    undoHistory,
+    redoHistory,
+    jumpToHistory,
+    getCurrentSnapshot,
+    canUndo as histCanUndo,
+    canRedo as histCanRedo,
+    resetHistory,
+} from "@/lib/history-engine";
+import {
+    type ClipboardState,
+    type ClipboardEntry,
+    loadClipboard,
+    saveClipboard,
+    addToClipboard,
+    removeFromClipboard,
+    togglePinClipboard,
+    setActiveClipboard,
+    getActiveEntry,
+    clearClipboard,
+} from "@/lib/clipboard-manager";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // State Types
@@ -60,9 +85,8 @@ interface DAWState {
     selectedTrackId: string | null;
     selectedClipId: string | null;
     selectedNotes: Set<string>;
-    clipboard: Clip[] | MidiNote[] | null;
-    undoStack: DAWProject[];
-    redoStack: DAWProject[];
+    clipboard: ClipboardState;
+    history: HistoryState<DAWProject>;
     showPianoRoll: boolean;
     showMixer: boolean;
     showStepSequencer: boolean;
@@ -70,6 +94,8 @@ interface DAWState {
     showEffectsRack: boolean;
     showSynth: boolean;
     showAutomation: boolean;
+    showHistory: boolean;
+    showClipboard: boolean;
     pianoRollTrackId: string | null;
     pianoRollClipId: string | null;
     synthConfig: SynthConfig;
@@ -179,7 +205,7 @@ interface DAWActions {
     moveAutomationPoint: (laneId: string, pointIndex: number, time: number, value: number) => void;
     toggleAutomationVisibility: () => void;
     // Panels
-    togglePanel: (panel: "pianoRoll" | "mixer" | "stepSequencer" | "browser" | "effectsRack" | "synth" | "automation") => void;
+    togglePanel: (panel: "pianoRoll" | "mixer" | "stepSequencer" | "browser" | "effectsRack" | "synth" | "automation" | "history" | "clipboard") => void;
     // Project
     newProject: (name?: string) => void;
     openProject: (id: string) => void;
@@ -190,9 +216,23 @@ interface DAWActions {
     setExportModal: (open: boolean) => void;
     toggleFocusMode: () => void;
     setBrowserTab: (tab: "files" | "samples" | "presets" | "plugins") => void;
-    // Undo
+    // Undo / Redo / History
     undo: () => void;
     redo: () => void;
+    jumpToHistoryEntry: (index: number) => void;
+    // Clipboard
+    copyClips: (clipIds: string[]) => void;
+    cutClips: (clipIds: string[]) => void;
+    copyNotes: (clipId: string, noteIds: string[]) => void;
+    cutNotes: (clipId: string, noteIds: string[]) => void;
+    copyTrack: (trackId: string) => void;
+    pasteClips: (trackId: string, position: number) => void;
+    pasteNotes: (clipId: string, startBeat: number) => void;
+    pasteTrack: () => void;
+    removeClipboardEntry: (id: string) => void;
+    togglePinClipboardEntry: (id: string) => void;
+    setActiveClipboardEntry: (index: number) => void;
+    clearAllClipboard: () => void;
     // Import from library
     importTrackFromLibrary: (trackFilepath: string, trackTitle: string, newProject?: boolean) => Promise<void>;
     // Master
@@ -245,11 +285,70 @@ function loadInitialProject(): DAWProject {
     return createDefaultProject();
 }
 
+const DAW_UI_STATE_KEY = "daw_ui_state";
+
+interface PersistentUIState {
+    tool: string;
+    snap: string;
+    zoom: number;
+    showPianoRoll: boolean;
+    showMixer: boolean;
+    showStepSequencer: boolean;
+    showBrowser: boolean;
+    showEffectsRack: boolean;
+    showSynth: boolean;
+    showAutomation: boolean;
+    showHistory: boolean;
+    showClipboard: boolean;
+    focusMode: boolean;
+    metronomeOn: boolean;
+    metronomeVolume: number;
+    browserTab: string;
+}
+
+function loadUIState(): Partial<PersistentUIState> {
+    if (typeof window === "undefined") return {};
+    try {
+        const raw = localStorage.getItem(DAW_UI_STATE_KEY);
+        if (!raw) return {};
+        return JSON.parse(raw) as Partial<PersistentUIState>;
+    } catch {
+        return {};
+    }
+}
+
+function saveUIState(state: DAWState) {
+    try {
+        const uiState: PersistentUIState = {
+            tool: state.tool,
+            snap: state.snap,
+            zoom: state.zoom,
+            showPianoRoll: state.showPianoRoll,
+            showMixer: state.showMixer,
+            showStepSequencer: state.showStepSequencer,
+            showBrowser: state.showBrowser,
+            showEffectsRack: state.showEffectsRack,
+            showSynth: state.showSynth,
+            showAutomation: state.showAutomation,
+            showHistory: state.showHistory,
+            showClipboard: state.showClipboard,
+            focusMode: state.focusMode,
+            metronomeOn: state.metronomeOn,
+            metronomeVolume: state.metronomeVolume,
+            browserTab: state.browserTab,
+        };
+        localStorage.setItem(DAW_UI_STATE_KEY, JSON.stringify(uiState));
+    } catch {
+        // Silently fail
+    }
+}
+
 export function DAWProvider({ children }: { children: ReactNode }) {
     const engineRef = useRef<DAWEngine | null>(null);
     const meterRAF = useRef<number>(0);
     // Always start with default project for SSR hydration consistency.
     // Saved project is loaded in the engine-init useEffect below.
+    // UI state is restored from localStorage after hydration to avoid hydration mismatch.
     const [state, setState] = useState<DAWState>(() => ({
         project: createDefaultProject(),
         isPlaying: false,
@@ -265,9 +364,8 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         selectedTrackId: null,
         selectedClipId: null,
         selectedNotes: new Set(),
-        clipboard: null,
-        undoStack: [],
-        redoStack: [],
+        clipboard: loadClipboard(),
+        history: createHistory(createDefaultProject(), "New Project", 100),
         showPianoRoll: false,
         showMixer: true,
         showStepSequencer: false,
@@ -275,6 +373,8 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         showEffectsRack: false,
         showSynth: false,
         showAutomation: false,
+        showHistory: false,
+        showClipboard: false,
         pianoRollTrackId: null,
         pianoRollClipId: null,
         synthConfig: DEFAULT_SYNTH_CONFIG,
@@ -289,6 +389,43 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         isDirty: false,
         focusMode: true,
     }));
+
+    // Restore persisted UI state after hydration (client-only)
+    useEffect(() => {
+        const savedUI = loadUIState();
+        if (Object.keys(savedUI).length > 0) {
+            setState(prev => ({
+                ...prev,
+                tool: (savedUI.tool as DAWState["tool"]) || prev.tool,
+                snap: (savedUI.snap as DAWState["snap"]) || prev.snap,
+                metronomeOn: savedUI.metronomeOn ?? prev.metronomeOn,
+                metronomeVolume: savedUI.metronomeVolume ?? prev.metronomeVolume,
+                zoom: savedUI.zoom ?? prev.zoom,
+                showPianoRoll: savedUI.showPianoRoll ?? prev.showPianoRoll,
+                showMixer: savedUI.showMixer ?? prev.showMixer,
+                showStepSequencer: savedUI.showStepSequencer ?? prev.showStepSequencer,
+                showBrowser: savedUI.showBrowser ?? prev.showBrowser,
+                showEffectsRack: savedUI.showEffectsRack ?? prev.showEffectsRack,
+                showSynth: savedUI.showSynth ?? prev.showSynth,
+                showAutomation: savedUI.showAutomation ?? prev.showAutomation,
+                focusMode: savedUI.focusMode ?? prev.focusMode,
+                browserTab: (savedUI.browserTab as DAWState["browserTab"]) || prev.browserTab,
+            }));
+        }
+    }, []);
+
+    // Persist UI state on relevant changes
+    const uiStateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        if (uiStateTimerRef.current) clearTimeout(uiStateTimerRef.current);
+        uiStateTimerRef.current = setTimeout(() => saveUIState(state), 300);
+        return () => { if (uiStateTimerRef.current) clearTimeout(uiStateTimerRef.current); };
+    }, [
+        state.tool, state.snap, state.zoom, state.metronomeOn, state.metronomeVolume,
+        state.showPianoRoll, state.showMixer, state.showStepSequencer, state.showBrowser,
+        state.showEffectsRack, state.showSynth, state.showAutomation, state.focusMode,
+        state.browserTab,
+    ]);
 
     // Initialize engine
     useEffect(() => {
@@ -339,12 +476,11 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         return () => cancelAnimationFrame(meterRAF.current);
     }, [state.isPlaying]);
 
-    // Push to undo before mutating project
-    const pushUndo = useCallback(() => {
+    // Push named entry to history before mutating project
+    const pushUndoNamed = useCallback((label: string, icon?: string) => {
         setState(prev => ({
             ...prev,
-            undoStack: [...prev.undoStack.slice(-50), prev.project],
-            redoStack: [],
+            history: pushHistory(prev.history, prev.project, label, icon),
             isDirty: true,
         }));
     }, []);
@@ -414,14 +550,14 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const setTempo = useCallback((bpm: number) => {
-        pushUndo();
+        pushUndoNamed(`Set Tempo to ${bpm} BPM`, "Gauge");
         updateProject(p => ({ ...p, tempo: Math.max(20, Math.min(999, bpm)) }));
-    }, [pushUndo, updateProject]);
+    }, [pushUndoNamed, updateProject]);
 
     const setTimeSignature = useCallback((num: number, den: number) => {
-        pushUndo();
+        pushUndoNamed(`Set Time Signature ${num}/${den}`, "Clock");
         updateProject(p => ({ ...p, timeSignature: { numerator: num, denominator: den } }));
-    }, [pushUndo, updateProject]);
+    }, [pushUndoNamed, updateProject]);
 
     const toggleMetronome = useCallback(() => {
         setState(prev => {
@@ -471,20 +607,21 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     // ─── Track Management ────────────────────────────────────────────────
 
     const addTrack = useCallback((type: TrackType) => {
-        pushUndo();
         const names: Record<TrackType, string> = { audio: "Audio", midi: "MIDI", return: "Return", master: "Master" };
         const count = state.project.tracks.filter(t => t.type === type).length + 1;
+        pushUndoNamed(`Add ${names[type]} Track ${count}`, "Plus");
         const track = createDefaultTrack(type, `${names[type]} ${count}`);
         if (type === "midi") track.instrumentId = "synth";
         engineRef.current?.createChannel(track.id, type);
         updateProject(p => ({ ...p, tracks: [...p.tracks, track] }));
-    }, [pushUndo, state.project.tracks, updateProject]);
+    }, [pushUndoNamed, state.project.tracks, updateProject]);
 
     const removeTrack = useCallback((id: string) => {
-        pushUndo();
+        const track = state.project.tracks.find(t => t.id === id);
+        pushUndoNamed(`Delete Track "${track?.name || id}"`, "Trash2");
         engineRef.current?.removeChannel(id);
         updateProject(p => ({ ...p, tracks: p.tracks.filter(t => t.id !== id) }));
-    }, [pushUndo, updateProject]);
+    }, [pushUndoNamed, state.project.tracks, updateProject]);
 
     const renameTrack = useCallback((id: string, name: string) => {
         updateTrack(id, t => ({ ...t, name }));
@@ -525,7 +662,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     }, [updateTrack]);
 
     const reorderTrack = useCallback((id: string, newIndex: number) => {
-        pushUndo();
+        pushUndoNamed("Reorder Track", "ArrowUpDown");
         updateProject(p => {
             const tracks = [...p.tracks];
             const oldIdx = tracks.findIndex(t => t.id === id);
@@ -534,16 +671,16 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             tracks.splice(newIndex, 0, moved);
             return { ...p, tracks };
         });
-    }, [pushUndo, updateProject]);
+    }, [pushUndoNamed, updateProject]);
 
     const selectTrack = useCallback((id: string | null) => {
         setState(prev => ({ ...prev, selectedTrackId: id }));
     }, []);
 
     const duplicateTrack = useCallback((id: string) => {
-        pushUndo();
         const source = state.project.tracks.find(t => t.id === id);
         if (!source) return;
+        pushUndoNamed(`Duplicate Track "${source.name}"`, "Copy");
         const newTrack: DAWTrack = {
             ...source,
             id: createId(),
@@ -556,7 +693,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             ...p,
             tracks: [...p.tracks.slice(0, p.tracks.findIndex(t => t.id === id) + 1), newTrack, ...p.tracks.slice(p.tracks.findIndex(t => t.id === id) + 1)],
         }));
-    }, [pushUndo, state.project.tracks, updateProject]);
+    }, [pushUndoNamed, state.project.tracks, updateProject]);
 
     const freezeTrack = useCallback((id: string) => {
         updateTrack(id, t => ({ ...t, frozen: !t.frozen }));
@@ -565,14 +702,15 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     // ─── Clip Management ─────────────────────────────────────────────────
 
     const addClip = useCallback((trackId: string, type: ClipType, position: number, length: number, name?: string): Clip => {
-        pushUndo();
+        pushUndoNamed(`Add ${type} Clip`, "Plus");
         const clip = createClip(type, trackId, position, length, name || `Clip ${Date.now()}`);
         updateTrack(trackId, t => ({ ...t, clips: [...t.clips, clip] }));
         return clip;
-    }, [pushUndo, updateTrack]);
+    }, [pushUndoNamed, updateTrack]);
 
     const removeClip = useCallback((clipId: string) => {
-        pushUndo();
+        const found = findClip(clipId);
+        pushUndoNamed(`Delete Clip "${found?.clip.name || clipId}"`, "Trash2");
         updateProject(p => ({
             ...p,
             tracks: p.tracks.map(t => ({
@@ -580,10 +718,10 @@ export function DAWProvider({ children }: { children: ReactNode }) {
                 clips: t.clips.filter(c => c.id !== clipId),
             })),
         }));
-    }, [pushUndo, updateProject]);
+    }, [pushUndoNamed, findClip, updateProject]);
 
     const moveClip = useCallback((clipId: string, newTrackId: string, newPosition: number) => {
-        pushUndo();
+        pushUndoNamed("Move Clip", "Move");
         updateProject(p => {
             let movedClip: Clip | null = null;
             const tracks = p.tracks.map(t => ({
@@ -598,7 +736,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             }
             return { ...p, tracks };
         });
-    }, [pushUndo, updateProject]);
+    }, [pushUndoNamed, updateProject]);
 
     const resizeClip = useCallback((clipId: string, newLength: number) => {
         const found = findClip(clipId);
@@ -610,7 +748,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     }, [findClip, updateTrack]);
 
     const splitClip = useCallback((clipId: string, position: number) => {
-        pushUndo();
+        pushUndoNamed("Split Clip", "Scissors");
         const found = findClip(clipId);
         if (!found) return;
         const { track, clip } = found;
@@ -639,12 +777,12 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             ...t,
             clips: t.clips.map(c => c.id === clipId ? clip1 : c).concat(clip2),
         }));
-    }, [pushUndo, findClip, updateTrack]);
+    }, [pushUndoNamed, findClip, updateTrack]);
 
     const duplicateClip = useCallback((clipId: string) => {
-        pushUndo();
         const found = findClip(clipId);
         if (!found) return;
+        pushUndoNamed(`Duplicate Clip "${found.clip.name}"`, "Copy");
         const newClip: Clip = {
             ...found.clip,
             id: createId(),
@@ -652,7 +790,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             name: `${found.clip.name} (copy)`,
         };
         updateTrack(found.track.id, t => ({ ...t, clips: [...t.clips, newClip] }));
-    }, [pushUndo, findClip, updateTrack]);
+    }, [pushUndoNamed, findClip, updateTrack]);
 
     const muteClip = useCallback((clipId: string) => {
         const found = findClip(clipId);
@@ -955,7 +1093,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     // ─── Effects ─────────────────────────────────────────────────────────
 
     const addInsert = useCallback((trackId: string, type: EffectType) => {
-        pushUndo();
+        pushUndoNamed(`Add Effect: ${type}`, "Plug");
         const insert: InsertEffect = {
             id: createId(),
             type,
@@ -963,12 +1101,12 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             params: { ...DEFAULT_EFFECT_PARAMS[type] },
         };
         updateTrack(trackId, t => ({ ...t, inserts: [...t.inserts, insert] }));
-    }, [pushUndo, updateTrack]);
+    }, [pushUndoNamed, updateTrack]);
 
     const removeInsert = useCallback((trackId: string, insertId: string) => {
-        pushUndo();
+        pushUndoNamed("Remove Effect", "Trash2");
         updateTrack(trackId, t => ({ ...t, inserts: t.inserts.filter(i => i.id !== insertId) }));
-    }, [pushUndo, updateTrack]);
+    }, [pushUndoNamed, updateTrack]);
 
     const toggleInsert = useCallback((trackId: string, insertId: string) => {
         updateTrack(trackId, t => ({
@@ -985,27 +1123,27 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     }, [updateTrack]);
 
     const reorderInserts = useCallback((trackId: string, fromIndex: number, toIndex: number) => {
-        pushUndo();
+        pushUndoNamed("Reorder Effects", "ArrowUpDown");
         updateTrack(trackId, t => {
             const inserts = [...t.inserts];
             const [moved] = inserts.splice(fromIndex, 1);
             inserts.splice(toIndex, 0, moved);
             return { ...t, inserts };
         });
-    }, [pushUndo, updateTrack]);
+    }, [pushUndoNamed, updateTrack]);
 
     // ─── Sends ───────────────────────────────────────────────────────────
 
     const addSend = useCallback((trackId: string, returnTrackId: string) => {
-        pushUndo();
+        pushUndoNamed("Add Send", "ArrowRight");
         const send: SendConfig = { returnTrackId, amount: 0.5, preFader: false };
         updateTrack(trackId, t => ({ ...t, sends: [...t.sends, send] }));
-    }, [pushUndo, updateTrack]);
+    }, [pushUndoNamed, updateTrack]);
 
     const removeSend = useCallback((trackId: string, returnTrackId: string) => {
-        pushUndo();
+        pushUndoNamed("Remove Send", "Trash2");
         updateTrack(trackId, t => ({ ...t, sends: t.sends.filter(s => s.returnTrackId !== returnTrackId) }));
-    }, [pushUndo, updateTrack]);
+    }, [pushUndoNamed, updateTrack]);
 
     const setSendAmount = useCallback((trackId: string, returnTrackId: string, amount: number) => {
         updateTrack(trackId, t => ({
@@ -1087,7 +1225,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
 
     // ─── Panels ──────────────────────────────────────────────────────────
 
-    const togglePanel = useCallback((panel: "pianoRoll" | "mixer" | "stepSequencer" | "browser" | "effectsRack" | "synth" | "automation") => {
+    const togglePanel = useCallback((panel: "pianoRoll" | "mixer" | "stepSequencer" | "browser" | "effectsRack" | "synth" | "automation" | "history" | "clipboard") => {
         const key = `show${panel.charAt(0).toUpperCase() + panel.slice(1)}` as keyof DAWState;
         setState(prev => ({ ...prev, [key]: !prev[key] }));
     }, []);
@@ -1111,8 +1249,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             currentBeat: 0,
             selectedTrackId: null,
             selectedClipId: null,
-            undoStack: [],
-            redoStack: [],
+            history: createHistory(project, "New Project"),
             isDirty: false,
         }));
         saveProject(project);
@@ -1135,8 +1272,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             currentBeat: 0,
             selectedTrackId: null,
             selectedClipId: null,
-            undoStack: [],
-            redoStack: [],
+            history: createHistory(project, `Opened "${project.name}"`),
             isDirty: false,
             showProjectModal: false,
         }));
@@ -1175,29 +1311,237 @@ export function DAWProvider({ children }: { children: ReactNode }) {
 
     const undo = useCallback(() => {
         setState(prev => {
-            if (prev.undoStack.length === 0) return prev;
-            const newUndo = [...prev.undoStack];
-            const restored = newUndo.pop()!;
+            if (!histCanUndo(prev.history)) return prev;
+            const newHistory = undoHistory(prev.history);
             return {
                 ...prev,
-                project: restored,
-                undoStack: newUndo,
-                redoStack: [...prev.redoStack, prev.project],
+                project: getCurrentSnapshot(newHistory),
+                history: newHistory,
             };
         });
     }, []);
 
     const redo = useCallback(() => {
         setState(prev => {
-            if (prev.redoStack.length === 0) return prev;
-            const newRedo = [...prev.redoStack];
-            const restored = newRedo.pop()!;
+            if (!histCanRedo(prev.history)) return prev;
+            const newHistory = redoHistory(prev.history);
             return {
                 ...prev,
-                project: restored,
-                redoStack: newRedo,
-                undoStack: [...prev.undoStack, prev.project],
+                project: getCurrentSnapshot(newHistory),
+                history: newHistory,
             };
+        });
+    }, []);
+
+    const jumpToHistoryEntry = useCallback((index: number) => {
+        setState(prev => {
+            const newHistory = jumpToHistory(prev.history, index);
+            return {
+                ...prev,
+                project: getCurrentSnapshot(newHistory),
+                history: newHistory,
+            };
+        });
+    }, []);
+
+    // ─── Clipboard Actions ───────────────────────────────────────────────
+
+    const copyClips = useCallback((clipIds: string[]) => {
+        const clips = clipIds.map(id => findClip(id)?.clip).filter(Boolean) as Clip[];
+        if (clips.length === 0) return;
+        setState(prev => ({
+            ...prev,
+            clipboard: addToClipboard(
+                prev.clipboard,
+                "daw-clips",
+                clips.length === 1 ? `Clip "${clips[0].name}"` : `${clips.length} Clips`,
+                `${clips.length} clip(s) from timeline`,
+                clips.map(c => ({ ...c })),
+                { clipCount: clips.length },
+            ),
+        }));
+    }, [findClip]);
+
+    const cutClips = useCallback((clipIds: string[]) => {
+        copyClips(clipIds);
+        for (const id of clipIds) {
+            const found = findClip(id);
+            if (found) {
+                pushUndoNamed(`Cut Clip "${found.clip.name}"`, "Scissors");
+                updateProject(p => ({
+                    ...p,
+                    tracks: p.tracks.map(t => ({
+                        ...t,
+                        clips: t.clips.filter(c => c.id !== id),
+                    })),
+                }));
+            }
+        }
+    }, [copyClips, findClip, pushUndoNamed, updateProject]);
+
+    const copyNotes = useCallback((clipId: string, noteIds: string[]) => {
+        const found = findClip(clipId);
+        if (!found || !found.clip.midi) return;
+        const notes = found.clip.midi.notes.filter(n => noteIds.includes(n.id));
+        if (notes.length === 0) return;
+        setState(prev => ({
+            ...prev,
+            clipboard: addToClipboard(
+                prev.clipboard,
+                "daw-notes",
+                `${notes.length} Note(s)`,
+                `MIDI notes from "${found.clip.name}"`,
+                notes.map(n => ({ ...n })),
+                { noteCount: notes.length },
+            ),
+        }));
+    }, [findClip]);
+
+    const cutNotes = useCallback((clipId: string, noteIds: string[]) => {
+        copyNotes(clipId, noteIds);
+        pushUndoNamed("Cut Notes", "Scissors");
+        const found = findClip(clipId);
+        if (!found) return;
+        updateTrack(found.track.id, t => ({
+            ...t,
+            clips: t.clips.map(c =>
+                c.id === clipId && c.midi
+                    ? { ...c, midi: { ...c.midi, notes: c.midi.notes.filter(n => !noteIds.includes(n.id)) } }
+                    : c
+            ),
+        }));
+    }, [copyNotes, pushUndoNamed, findClip, updateTrack]);
+
+    const copyTrack = useCallback((trackId: string) => {
+        const track = state.project.tracks.find(t => t.id === trackId);
+        if (!track) return;
+        setState(prev => ({
+            ...prev,
+            clipboard: addToClipboard(
+                prev.clipboard,
+                "daw-track",
+                `Track "${track.name}"`,
+                `${track.type} track with ${track.clips.length} clips`,
+                { ...track, clips: track.clips.map(c => ({ ...c })) },
+                { clipCount: track.clips.length },
+            ),
+        }));
+    }, [state.project.tracks]);
+
+    const pasteClips = useCallback((trackId: string, position: number) => {
+        setState(prev => {
+            const entry = getActiveEntry(prev.clipboard);
+            if (!entry || entry.type !== "daw-clips") return prev;
+            const clips = entry.data as Clip[];
+            if (clips.length === 0) return prev;
+
+            const minPos = Math.min(...clips.map(c => c.position));
+            const newClips = clips.map(c => ({
+                ...c,
+                id: createId(),
+                trackId,
+                position: c.position - minPos + position,
+            }));
+
+            const newHistory = pushHistory(prev.history, prev.project, `Paste ${clips.length} Clip(s)`, "Clipboard");
+            const project = {
+                ...prev.project,
+                tracks: prev.project.tracks.map(t =>
+                    t.id === trackId ? { ...t, clips: [...t.clips, ...newClips] } : t
+                ),
+                modifiedAt: Date.now(),
+            };
+
+            return { ...prev, project, history: newHistory, isDirty: true };
+        });
+    }, []);
+
+    const pasteNotes = useCallback((clipId: string, startBeat: number) => {
+        setState(prev => {
+            const entry = getActiveEntry(prev.clipboard);
+            if (!entry || entry.type !== "daw-notes") return prev;
+            const notes = entry.data as import("@/lib/daw-engine").MidiNote[];
+            if (notes.length === 0) return prev;
+
+            const minStart = Math.min(...notes.map(n => n.start));
+            const newNotes = notes.map(n => ({
+                ...n,
+                id: createId(),
+                start: n.start - minStart + startBeat,
+            }));
+
+            const newHistory = pushHistory(prev.history, prev.project, `Paste ${notes.length} Notes`, "Clipboard");
+            const project = {
+                ...prev.project,
+                tracks: prev.project.tracks.map(t => ({
+                    ...t,
+                    clips: t.clips.map(c =>
+                        c.id === clipId && c.midi
+                            ? { ...c, midi: { ...c.midi, notes: [...c.midi.notes, ...newNotes] } }
+                            : c
+                    ),
+                })),
+                modifiedAt: Date.now(),
+            };
+
+            return { ...prev, project, history: newHistory, isDirty: true };
+        });
+    }, []);
+
+    const pasteTrack = useCallback(() => {
+        setState(prev => {
+            const entry = getActiveEntry(prev.clipboard);
+            if (!entry || entry.type !== "daw-track") return prev;
+            const srcTrack = entry.data as DAWTrack;
+
+            const newTrack: DAWTrack = {
+                ...srcTrack,
+                id: createId(),
+                name: `${srcTrack.name} (pasted)`,
+                clips: srcTrack.clips.map(c => ({ ...c, id: createId(), trackId: "" })),
+            };
+            newTrack.clips.forEach(c => { c.trackId = newTrack.id; });
+            engineRef.current?.createChannel(newTrack.id, newTrack.type);
+
+            const newHistory = pushHistory(prev.history, prev.project, `Paste Track "${srcTrack.name}"`, "Clipboard");
+            const project = {
+                ...prev.project,
+                tracks: [...prev.project.tracks, newTrack],
+                modifiedAt: Date.now(),
+            };
+
+            return { ...prev, project, history: newHistory, isDirty: true };
+        });
+    }, []);
+
+    const removeClipboardEntry = useCallback((id: string) => {
+        setState(prev => {
+            const newCb = removeFromClipboard(prev.clipboard, id);
+            saveClipboard(newCb);
+            return { ...prev, clipboard: newCb };
+        });
+    }, []);
+
+    const togglePinClipboardEntry = useCallback((id: string) => {
+        setState(prev => {
+            const newCb = togglePinClipboard(prev.clipboard, id);
+            saveClipboard(newCb);
+            return { ...prev, clipboard: newCb };
+        });
+    }, []);
+
+    const setActiveClipboardEntry = useCallback((index: number) => {
+        setState(prev => ({
+            ...prev,
+            clipboard: setActiveClipboard(prev.clipboard, index),
+        }));
+    }, []);
+
+    const clearAllClipboard = useCallback(() => {
+        setState(prev => {
+            const newCb = clearClipboard(prev.clipboard);
+            saveClipboard(newCb);
+            return { ...prev, clipboard: newCb };
         });
     }, []);
 
@@ -1211,7 +1555,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         if (!engine) return;
 
         // Add a new audio track
-        pushUndo();
+        pushUndoNamed(`Import "${trackTitle}"`, "FileAudio");
         const track = createDefaultTrack("audio", trackTitle);
         engine.createChannel(track.id, "audio");
 
@@ -1244,7 +1588,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         } catch {
             // Audio load failed, clip remains empty
         }
-    }, [newProject, pushUndo, updateProject, updateTrack, state.project.tempo]);
+    }, [newProject, pushUndoNamed, updateProject, updateTrack, state.project.tempo]);
 
     // ─── Master ──────────────────────────────────────────────────────────
 
@@ -1309,7 +1653,10 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         togglePanel,
         newProject, openProject, saveCurrentProject, renameProject,
         setProjectModal, setSettingsModal, setExportModal, toggleFocusMode, setBrowserTab,
-        undo, redo,
+        undo, redo, jumpToHistoryEntry,
+        copyClips, cutClips, copyNotes, cutNotes, copyTrack,
+        pasteClips, pasteNotes, pasteTrack,
+        removeClipboardEntry, togglePinClipboardEntry, setActiveClipboardEntry, clearAllClipboard,
         importTrackFromLibrary,
         setMasterVolume, exportProject, getEngine,
     }), [
@@ -1333,7 +1680,10 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         togglePanel,
         newProject, openProject, saveCurrentProject, renameProject,
         setProjectModal, setSettingsModal, setExportModal, toggleFocusMode, setBrowserTab,
-        undo, redo,
+        undo, redo, jumpToHistoryEntry,
+        copyClips, cutClips, copyNotes, cutNotes, copyTrack,
+        pasteClips, pasteNotes, pasteTrack,
+        removeClipboardEntry, togglePinClipboardEntry, setActiveClipboardEntry, clearAllClipboard,
         importTrackFromLibrary,
         setMasterVolume, exportProject, getEngine,
     ]);

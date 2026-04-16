@@ -1,15 +1,56 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useDAW } from "./daw-context";
 import { cn } from "@/lib/utils";
 import {
     Search, FolderOpen, Music, Piano, Sliders, ChevronRight, ChevronDown,
-    File, FileAudio, Plus, Play, GripVertical, Drum,
+    File, FileAudio, Plus, Play, Pause, GripVertical, Drum, Info,
+    Volume2, Clock, Hash, Disc,
 } from "lucide-react";
 import { EFFECT_TYPES, DRUM_KIT_DEFAULT } from "@/lib/daw-engine";
+import { useContextMenu, type MenuEntry } from "./daw-context-menu";
 
 type BrowserTab = "files" | "samples" | "plugins" | "presets";
+
+// ─── Manifest types ─────────────────────────────────────────────────────────
+
+interface SampleInfo {
+    file: string;
+    path: string;
+    name: string;
+    type: string;
+    duration: number;
+    sizeKB: number;
+    oneshot: boolean;
+    bpm: number | null;
+    key: string | null;
+    brightness: string | null;
+    rmsDb: number | null;
+}
+
+interface GenreGroup {
+    name: string;
+    label: string;
+    path: string;
+    samples: SampleInfo[];
+}
+
+interface SampleCategory {
+    path: string;
+    label: string;
+    genres: GenreGroup[];
+    sampleCount: number;
+}
+
+interface SampleManifest {
+    version: number;
+    name: string;
+    description: string;
+    categories: SampleCategory[];
+    totalSamples: number;
+    totalSizeKB: number;
+}
 
 // For library integration
 interface LibraryTrack {
@@ -117,6 +158,34 @@ export function DAWBrowser() {
 
 function FileBrowser({ tracks, loading, query }: { tracks: LibraryTrack[]; loading: boolean; query: string }) {
     const daw = useDAW();
+    const ctxMenu = useContextMenu();
+
+    const handleTrackContextMenu = useCallback((e: React.MouseEvent, track: LibraryTrack) => {
+        e.preventDefault();
+        const items: MenuEntry[] = [
+            { type: "label", label: track.title },
+            { type: "separator" },
+            {
+                label: "Add to Timeline",
+                icon: <Plus className="h-3.5 w-3.5" />,
+                onClick: () => daw.importTrackFromLibrary(track.filePath, track.title),
+            },
+            { type: "separator" },
+            {
+                label: `BPM: ${track.bpm ?? "—"}`,
+                icon: <Info className="h-3.5 w-3.5" />,
+                disabled: true,
+                onClick: () => { },
+            },
+            {
+                label: `Key: ${track.key ?? "—"}`,
+                icon: <Music className="h-3.5 w-3.5" />,
+                disabled: true,
+                onClick: () => { },
+            },
+        ];
+        ctxMenu.show(e.clientX, e.clientY, items);
+    }, [daw, ctxMenu]);
 
     if (!query) {
         return (
@@ -142,6 +211,7 @@ function FileBrowser({ tracks, loading, query }: { tracks: LibraryTrack[]; loadi
                     onDragStart={e => {
                         e.dataTransfer.setData("text/plain", JSON.stringify({ type: "library-track", track }));
                     }}
+                    onContextMenu={e => handleTrackContextMenu(e, track)}
                 >
                     <FileAudio className="h-3 w-3 text-white/20 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -168,29 +238,272 @@ function FileBrowser({ tracks, loading, query }: { tracks: LibraryTrack[]; loadi
 
 function SampleBrowser() {
     const daw = useDAW();
+    const ctxMenu = useContextMenu();
+    const [manifest, setManifest] = useState<SampleManifest | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [searchFilter, setSearchFilter] = useState("");
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [previewPlaying, setPreviewPlaying] = useState(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
 
-    const categories = [
-        { name: "Drum Kits", items: DRUM_KIT_DEFAULT.map(d => d.name) },
-        { name: "One Shots", items: ["Kick", "Snare", "Clap", "Hi-Hat", "Crash", "Ride", "Tom", "Percussion"] },
-        { name: "Loops", items: ["Drum Loop 1", "Bass Loop 1", "Synth Loop 1"] },
-    ];
+    // Load manifest on mount
+    useEffect(() => {
+        fetch("/samples/manifest.json")
+            .then(res => {
+                if (!res.ok) throw new Error("Manifest not found — run: python scripts/build-sample-pack.py");
+                return res.json();
+            })
+            .then((data: SampleManifest) => {
+                setManifest(data);
+                setLoading(false);
+            })
+            .catch(err => {
+                setError(err.message);
+                setLoading(false);
+            });
+    }, []);
+
+    // Cleanup audio preview on unmount
+    useEffect(() => {
+        return () => {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current = null;
+            }
+        };
+    }, []);
+
+    // Toggle preview playback
+    const togglePreview = useCallback((samplePath: string) => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
+
+        if (previewUrl === samplePath) {
+            setPreviewUrl(null);
+            setPreviewPlaying(false);
+            return;
+        }
+
+        const audio = new Audio(samplePath);
+        audio.volume = 0.5;
+        audio.onended = () => {
+            setPreviewUrl(null);
+            setPreviewPlaying(false);
+        };
+        audio.play();
+        audioRef.current = audio;
+        setPreviewUrl(samplePath);
+        setPreviewPlaying(true);
+    }, [previewUrl]);
+
+    // Filter samples by search query
+    const filteredCategories = useMemo(() => {
+        if (!manifest) return [];
+        if (!searchFilter.trim()) return manifest.categories;
+
+        const q = searchFilter.toLowerCase();
+        return manifest.categories
+            .map(cat => ({
+                ...cat,
+                genres: cat.genres
+                    .map(g => ({
+                        ...g,
+                        samples: g.samples.filter(s =>
+                            s.name.toLowerCase().includes(q) ||
+                            s.type.toLowerCase().includes(q) ||
+                            g.label.toLowerCase().includes(q) ||
+                            cat.label.toLowerCase().includes(q) ||
+                            (s.key && s.key.toLowerCase().includes(q)) ||
+                            (s.brightness && s.brightness.toLowerCase().includes(q))
+                        ),
+                    }))
+                    .filter(g => g.samples.length > 0),
+                sampleCount: 0, // will recalc
+            }))
+            .map(cat => ({ ...cat, sampleCount: cat.genres.reduce((sum, g) => sum + g.samples.length, 0) }))
+            .filter(cat => cat.sampleCount > 0);
+    }, [manifest, searchFilter]);
+
+    const handleSampleContextMenu = useCallback((e: React.MouseEvent, sample: SampleInfo, genre: GenreGroup) => {
+        e.preventDefault();
+        const items: MenuEntry[] = [
+            { type: "label", label: sample.name },
+            { type: "separator" },
+            {
+                label: "Add to Timeline",
+                icon: <Plus className="h-3.5 w-3.5" />,
+                onClick: () => daw.importTrackFromLibrary(sample.path, sample.name),
+            },
+            {
+                label: previewUrl === sample.path ? "Stop Preview" : "Preview",
+                icon: previewUrl === sample.path ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />,
+                onClick: () => togglePreview(sample.path),
+            },
+            { type: "separator" },
+            {
+                label: `Duration: ${sample.duration.toFixed(2)}s`,
+                icon: <Clock className="h-3.5 w-3.5" />,
+                disabled: true, onClick: () => { },
+            },
+            {
+                label: `Size: ${sample.sizeKB < 1024 ? `${Math.round(sample.sizeKB)}KB` : `${(sample.sizeKB / 1024).toFixed(1)}MB`}`,
+                icon: <Info className="h-3.5 w-3.5" />,
+                disabled: true, onClick: () => { },
+            },
+            ...(sample.bpm ? [{
+                label: `BPM: ${sample.bpm}`,
+                icon: <Hash className="h-3.5 w-3.5" />,
+                disabled: true, onClick: () => { },
+            } as MenuEntry] : []),
+            ...(sample.key ? [{
+                label: `Key: ${sample.key}`,
+                icon: <Music className="h-3.5 w-3.5" />,
+                disabled: true, onClick: () => { },
+            } as MenuEntry] : []),
+        ];
+        ctxMenu.show(e.clientX, e.clientY, items);
+    }, [daw, ctxMenu, previewUrl, togglePreview]);
+
+    if (loading) {
+        return (
+            <div className="p-3 text-center">
+                <div className="animate-spin h-5 w-5 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-2" />
+                <p className="text-[11px] text-white/30">Loading samples...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="p-3 text-center">
+                <Disc className="h-8 w-8 text-white/10 mx-auto mb-2" />
+                <p className="text-[11px] text-red-400/60">{error}</p>
+                <p className="text-[9px] text-white/20 mt-1">Run the build script to generate samples</p>
+            </div>
+        );
+    }
 
     return (
-        <div>
-            {categories.map(cat => (
-                <CollapsibleSection key={cat.name} title={cat.name}>
-                    {cat.items.map(item => (
-                        <div
-                            key={item}
-                            className="flex items-center gap-2 px-3 py-1 hover:bg-white/5 cursor-pointer text-[11px] text-white/50"
-                            draggable
-                        >
-                            <Drum className="h-3 w-3 text-white/20" />
-                            {item}
-                        </div>
-                    ))}
-                </CollapsibleSection>
-            ))}
+        <div className="flex flex-col h-full">
+            {/* Sample search */}
+            <div className="px-1.5 pb-1 flex-shrink-0">
+                <div className="flex items-center gap-1 bg-black/20 rounded px-2 h-5">
+                    <Search className="h-2.5 w-2.5 text-white/15" />
+                    <input
+                        type="text"
+                        value={searchFilter}
+                        onChange={e => setSearchFilter(e.target.value)}
+                        placeholder="Filter samples..."
+                        className="flex-1 bg-transparent text-[10px] text-white/60 placeholder:text-white/15 focus:outline-none"
+                    />
+                    {manifest && (
+                        <span className="text-[8px] text-white/15 font-mono">
+                            {searchFilter
+                                ? filteredCategories.reduce((s, c) => s + c.sampleCount, 0)
+                                : manifest.totalSamples}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* Category tree */}
+            <div className="flex-1 overflow-y-auto">
+                {filteredCategories.map(cat => (
+                    <CollapsibleSection
+                        key={cat.path}
+                        title={`${cat.label} (${cat.sampleCount})`}
+                        defaultOpen={false}
+                    >
+                        {cat.genres.map(genre => (
+                            <CollapsibleSection
+                                key={genre.path}
+                                title={`${genre.label} (${genre.samples.length})`}
+                                indent
+                                defaultOpen={false}
+                            >
+                                {genre.samples.map(sample => (
+                                    <div
+                                        key={sample.path}
+                                        className={cn(
+                                            "flex items-center gap-1.5 px-4 py-0.5 hover:bg-white/5 cursor-pointer group text-[10px]",
+                                            previewUrl === sample.path && "bg-purple-500/10"
+                                        )}
+                                        draggable
+                                        onDragStart={e => {
+                                            e.dataTransfer.setData("text/plain", JSON.stringify({
+                                                type: "sample",
+                                                path: sample.path,
+                                                name: sample.name,
+                                                duration: sample.duration,
+                                                sampleType: sample.type,
+                                            }));
+                                            e.dataTransfer.effectAllowed = "copy";
+                                        }}
+                                        onContextMenu={e => handleSampleContextMenu(e, sample, genre)}
+                                        onDoubleClick={() => daw.importTrackFromLibrary(sample.path, sample.name)}
+                                    >
+                                        {/* Play preview button */}
+                                        <button
+                                            onClick={e => { e.stopPropagation(); togglePreview(sample.path); }}
+                                            className={cn(
+                                                "w-3.5 h-3.5 flex items-center justify-center flex-shrink-0 rounded-sm transition-colors",
+                                                previewUrl === sample.path
+                                                    ? "text-purple-400"
+                                                    : "text-white/15 opacity-0 group-hover:opacity-100"
+                                            )}
+                                        >
+                                            {previewUrl === sample.path
+                                                ? <Pause className="h-2.5 w-2.5" />
+                                                : <Play className="h-2.5 w-2.5" />}
+                                        </button>
+
+                                        {/* Name */}
+                                        <span className={cn(
+                                            "flex-1 truncate",
+                                            previewUrl === sample.path ? "text-purple-300/80" : "text-white/50"
+                                        )}>
+                                            {sample.name}
+                                        </span>
+
+                                        {/* Duration */}
+                                        <span className="text-[8px] text-white/15 font-mono flex-shrink-0">
+                                            {sample.duration < 1
+                                                ? `${Math.round(sample.duration * 1000)}ms`
+                                                : `${sample.duration.toFixed(1)}s`}
+                                        </span>
+
+                                        {/* Key indicator */}
+                                        {sample.key && (
+                                            <span className="text-[8px] text-cyan-400/30 font-mono flex-shrink-0 w-5 text-center">
+                                                {sample.key}
+                                            </span>
+                                        )}
+
+                                        {/* One-shot indicator */}
+                                        {sample.oneshot && (
+                                            <span className="text-[7px] text-green-400/25 flex-shrink-0">1S</span>
+                                        )}
+
+                                        {/* Add button */}
+                                        <button
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                daw.importTrackFromLibrary(sample.path, sample.name);
+                                            }}
+                                            className="opacity-0 group-hover:opacity-100 w-3.5 h-3.5 flex items-center justify-center rounded-sm bg-purple-500/20 hover:bg-purple-500/40 text-purple-400 transition-all flex-shrink-0"
+                                        >
+                                            <Plus className="h-2.5 w-2.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </CollapsibleSection>
+                        ))}
+                    </CollapsibleSection>
+                ))}
+            </div>
         </div>
     );
 }
@@ -255,17 +568,20 @@ function PresetBrowser() {
     );
 }
 
-function CollapsibleSection({ title, children }: { title: string; children: React.ReactNode }) {
-    const [open, setOpen] = useState(true);
+function CollapsibleSection({ title, children, indent, defaultOpen = true }: { title: string; children: React.ReactNode; indent?: boolean; defaultOpen?: boolean }) {
+    const [open, setOpen] = useState(defaultOpen);
 
     return (
         <div>
             <button
                 onClick={() => setOpen(!open)}
-                className="w-full flex items-center gap-1 px-2 py-1 text-[10px] text-white/40 hover:text-white/60 bg-white/[0.02]"
+                className={cn(
+                    "w-full flex items-center gap-1 py-0.5 text-[10px] text-white/40 hover:text-white/60 bg-white/[0.02]",
+                    indent ? "px-3" : "px-2",
+                )}
             >
-                {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                <span className="uppercase tracking-wider">{title}</span>
+                {open ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
+                <span className={cn("uppercase tracking-wider truncate", indent && "text-[9px]")}>{title}</span>
             </button>
             {open && children}
         </div>
