@@ -210,6 +210,21 @@ function FileBrowser({ tracks, loading, query }: { tracks: LibraryTrack[]; loadi
                     draggable
                     onDragStart={e => {
                         e.dataTransfer.setData("text/plain", JSON.stringify({ type: "library-track", track }));
+                        e.dataTransfer.effectAllowed = "copy";
+                        const ghost = document.createElement("div");
+                        ghost.style.cssText = `
+                            position: fixed; top: -1000px; left: -1000px;
+                            padding: 6px 12px; border-radius: 6px;
+                            background: linear-gradient(135deg, rgba(59,130,246,0.9), rgba(37,99,235,0.9));
+                            color: white; font-size: 11px; font-family: system-ui;
+                            display: flex; align-items: center; gap: 6px;
+                            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+                            white-space: nowrap; border: 1px solid rgba(255,255,255,0.15);
+                        `;
+                        ghost.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span>${track.title}</span>`;
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, 20, 20);
+                        requestAnimationFrame(() => document.body.removeChild(ghost));
                     }}
                     onContextMenu={e => handleTrackContextMenu(e, track)}
                 >
@@ -441,6 +456,22 @@ function SampleBrowser() {
                                                 sampleType: sample.type,
                                             }));
                                             e.dataTransfer.effectAllowed = "copy";
+                                            // Custom drag image
+                                            const ghost = document.createElement("div");
+                                            ghost.style.cssText = `
+                                                position: fixed; top: -1000px; left: -1000px;
+                                                padding: 6px 12px; border-radius: 6px;
+                                                background: linear-gradient(135deg, rgba(139,92,246,0.9), rgba(109,40,217,0.9));
+                                                color: white; font-size: 11px; font-family: system-ui;
+                                                display: flex; align-items: center; gap: 6px;
+                                                box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+                                                backdrop-filter: blur(8px); white-space: nowrap;
+                                                border: 1px solid rgba(255,255,255,0.15);
+                                            `;
+                                            ghost.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M2 12h4l3-9 4 18 3-9h4"/></svg><span>${sample.name}</span>`;
+                                            document.body.appendChild(ghost);
+                                            e.dataTransfer.setDragImage(ghost, 20, 20);
+                                            requestAnimationFrame(() => document.body.removeChild(ghost));
                                         }}
                                         onContextMenu={e => handleSampleContextMenu(e, sample, genre)}
                                         onDoubleClick={() => daw.importTrackFromLibrary(sample.path, sample.name)}

@@ -91,6 +91,47 @@ function CompactStat({ icon: Icon, label, value, color }: {
     );
 }
 
+// ─── Session Restore Indicator ───────────────────────────────────────────
+
+export const SessionRestoreIndicator = memo(function SessionRestoreIndicator({ className }: { className?: string }) {
+    const mixer = useMixer();
+    if (!mixer.isRestoring && mixer.restorationProgress < 100) return null;
+
+    const isDone = mixer.restorationProgress >= 100;
+
+    return (
+        <div className={cn(
+            "flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-500",
+            isDone ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-purple-500/10 border border-purple-500/20",
+            className,
+        )}>
+            <RotateCw
+                className={cn("h-3 w-3 shrink-0", isDone ? "text-emerald-400" : "text-purple-400")}
+                style={isDone ? undefined : { animationName: "spin", animationDuration: "1s", animationTimingFunction: "linear", animationIterationCount: "infinite" }}
+            />
+            <div className="flex items-center gap-1.5 min-w-0">
+                <span className={cn(
+                    "text-[9px] font-medium whitespace-nowrap",
+                    isDone ? "text-emerald-300" : "text-purple-300",
+                )}>
+                    {isDone ? "Session restored" : mixer.restorationLabel || "Restoring..."}
+                </span>
+                {!isDone && (
+                    <div className="w-16 h-1 rounded-full bg-white/[0.08] overflow-hidden">
+                        <div
+                            className="h-full rounded-full bg-purple-500 transition-all duration-300"
+                            style={{ width: `${mixer.restorationProgress}%` }}
+                        />
+                    </div>
+                )}
+                {!isDone && (
+                    <span className="text-[8px] tabular-nums text-purple-300/60">{mixer.restorationProgress}%</span>
+                )}
+            </div>
+        </div>
+    );
+});
+
 // ─── Full panel (two columns: System + Browser) ─────────────────────────
 
 export const PerformancePanel = memo(function PerformancePanel({ className }: { className?: string }) {
@@ -110,6 +151,7 @@ export const PerformancePanel = memo(function PerformancePanel({ className }: { 
                 <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[8px] lg:text-[9px] uppercase tracking-wider text-white/20">Performance</span>
                     <div className="flex items-center gap-1.5">
+                        <SessionRestoreIndicator />
                         <div className={cn("h-1.5 w-1.5 rounded-full", system.connected ? "bg-emerald-500" : "bg-white/10")} title={system.connected ? "System stats connected" : "Connecting..."} />
                         <button
                             onClick={() => setConfigOpen(true)}
@@ -192,43 +234,3 @@ export const PerformanceInline = memo(function PerformanceInline({ className }: 
     );
 });
 
-// ─── Session Restore Indicator (for header) ──────────────────────────────
-
-export const SessionRestoreIndicator = memo(function SessionRestoreIndicator({ className }: { className?: string }) {
-    const mixer = useMixer();
-    if (!mixer.isRestoring && mixer.restorationProgress < 100) return null;
-
-    const isDone = mixer.restorationProgress >= 100;
-
-    return (
-        <div className={cn(
-            "flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-500",
-            isDone ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-purple-500/10 border border-purple-500/20",
-            className,
-        )}>
-            <RotateCw
-                className={cn("h-3 w-3 shrink-0", isDone ? "text-emerald-400" : "text-purple-400")}
-                style={isDone ? undefined : { animationName: "spin", animationDuration: "1s", animationTimingFunction: "linear", animationIterationCount: "infinite" }}
-            />
-            <div className="flex items-center gap-1.5 min-w-0">
-                <span className={cn(
-                    "text-[9px] font-medium whitespace-nowrap",
-                    isDone ? "text-emerald-300" : "text-purple-300",
-                )}>
-                    {isDone ? "Session restored" : mixer.restorationLabel || "Restoring..."}
-                </span>
-                {!isDone && (
-                    <div className="w-16 h-1 rounded-full bg-white/[0.08] overflow-hidden">
-                        <div
-                            className="h-full rounded-full bg-purple-500 transition-all duration-300"
-                            style={{ width: `${mixer.restorationProgress}%` }}
-                        />
-                    </div>
-                )}
-                {!isDone && (
-                    <span className="text-[8px] tabular-nums text-purple-300/60">{mixer.restorationProgress}%</span>
-                )}
-            </div>
-        </div>
-    );
-});

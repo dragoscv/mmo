@@ -1,7 +1,8 @@
 "use client";
 
 import { usePlayer } from "./player-context";
-import { formatDuration, cn } from "@/lib/utils";
+import { formatDuration, cn, formatKey } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import {
     Play,
     Pause,
@@ -70,6 +71,7 @@ function PlayingIndicator({ isPlaying }: { isPlaying: boolean }) {
 
 export function AudioPlayer() {
     const player = usePlayer();
+    const { noteNotations } = useDAWSettings();
     const {
         currentTrack,
         isPlaying,
@@ -216,8 +218,7 @@ export function AudioPlayer() {
                                         )}
                                         {currentTrack.keyCamelot && (
                                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                                                {currentTrack.keyCamelot}
-                                                {currentTrack.keyMusical ? ` · ${currentTrack.keyMusical}` : ""}
+                                                {formatKey(currentTrack.keyCamelot, noteNotations)}
                                             </span>
                                         )}
                                         {currentTrack.genre && (

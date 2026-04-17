@@ -13,6 +13,7 @@ export interface AnalysisOptions {
     artwork: boolean;
     lyrics: boolean;
     bpmKey: boolean;
+    stems: boolean;
     skipAnalyzedDays: number | null;
     workers: number;
 }
@@ -534,6 +535,14 @@ class AnalysisManager {
                 .set({ analyzedAt: new Date().toISOString() })
                 .where(eq(tracks.id, track.id))
                 .run();
+
+            // Queue for stems separation if enabled and not already processed
+            if (options.stems && track.stemsStatus !== "ready") {
+                db.update(tracks)
+                    .set({ stemsStatus: "pending" })
+                    .where(eq(tracks.id, track.id))
+                    .run();
+            }
         } catch (err) {
             const errMsg = `${this._currentTrack}: ${err instanceof Error ? err.message : "Unknown error"}`;
             this._errors.push(errMsg);

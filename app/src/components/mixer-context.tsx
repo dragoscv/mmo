@@ -135,6 +135,7 @@ interface MixerActions extends DeckActions {
     getDeckAnalyser: (deck: DeckSide) => AnalyserNode | null;
     getMasterAnalyser: () => AnalyserNode | null;
     getAudioInfo: () => { sampleRate: number; baseLatency: number; outputLatency: number; channelCount: number; state: string } | null;
+    getDeckStems: (deck: DeckSide) => import("@/lib/stems-engine").RealtimeStemProcessor | null;
     // New actions
     setWaveformMode: (mode: WaveformMode) => void;
     triggerSampler: (slotIndex: number) => void;
@@ -775,6 +776,20 @@ export function MixerProvider({ children }: { children: ReactNode }) {
             filter: 0,
             hotCues: [null, null, null, null, null, null, null, null],
         });
+
+        // Auto-queue stems analysis if track hasn't been analyzed
+        if (!track.stemsStatus) {
+            import("@/actions/stems").then(({ updateStemsStatus }) => {
+                updateStemsStatus(track.id, "pending").catch(() => {});
+            });
+            import("sonner").then(({ toast }) => {
+                toast("Stems ready", {
+                    description: `${track.title || track.filename} — toggle stems in the mixer panel`,
+                    icon: "🎛️",
+                    duration: 3000,
+                });
+            });
+        }
     }, [initMixer, getDeckEngine, updateDeck]);
 
     const loadTrack = useCallback((deck: DeckSide, track: Track) => {
@@ -1236,6 +1251,10 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         return getDeckEngine(deck)?.analyser ?? null;
     }, [getDeckEngine]);
 
+    const getDeckStems = useCallback((deck: DeckSide) => {
+        return getDeckEngine(deck)?.stemProcessor ?? null;
+    }, [getDeckEngine]);
+
     const getDeckCurrentTime = useCallback((deck: DeckSide) => {
         return getDeckEngine(deck)?.getCurrentTime() ?? 0;
     }, [getDeckEngine]);
@@ -1502,6 +1521,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         initMixer,
         destroyMixer,
         getDeckAnalyser,
+        getDeckStems,
         getMasterAnalyser,
         getAudioInfo,
         setDeckMode,
@@ -1531,7 +1551,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         ejectTrack, toggleSlipMode, toggleQuantize, toggleHeadphoneCue, setPadMode,
         setCrossfader, setCrossfaderCurve, setMasterVolume, setHeadphoneVolume, setHeadphoneMix,
         setEQModeAction, setTempoRange, setJogSensitivity, toggleRecording,
-        initMixer, destroyMixer, getDeckAnalyser, getMasterAnalyser, getAudioInfo,
+        initMixer, destroyMixer, getDeckAnalyser, getDeckStems, getMasterAnalyser, getAudioInfo,
         setDeckMode, setWaveformMode, setCrossfaderAssign, setBeatGrid, nudgeBeatGrid,
         triggerSampler, stopSampler, loadSample, loadSampleFromFile, clearSampler,
         toggleSamplerLoop, captureLoopToSampler, setAutomixConfig, toggleAutomix,

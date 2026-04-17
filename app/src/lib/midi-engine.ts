@@ -95,19 +95,28 @@ export interface MidiDevice {
 
 export interface MidiMessage {
     status: number; // Full status byte
-    channel: number; // 0-15
-    type: "noteOn" | "noteOff" | "cc";
-    note: number; // note or CC number
-    value: number; // velocity or CC value
+    channel: number; // 0-15, or -1 for system messages
+    type: "noteOn" | "noteOff" | "cc" | "programChange" | "start" | "stop" | "continue" | "clock";
+    note: number; // note or CC number (or program number for PC)
+    value: number; // velocity or CC value (0 for PC/system)
     raw: Uint8Array;
 }
 
 // ─── MIDI Message Parser ─────────────────────────────────────────────────
 
 export function parseMidiMessage(data: Uint8Array): MidiMessage | null {
-    if (data.length < 2) return null;
+    if (data.length < 1) return null;
 
     const status = data[0];
+
+    // System real-time messages (single byte, no channel)
+    if (status === 0xFA) return { status, channel: -1, type: "start", note: 0, value: 0, raw: data };
+    if (status === 0xFC) return { status, channel: -1, type: "stop", note: 0, value: 0, raw: data };
+    if (status === 0xFB) return { status, channel: -1, type: "continue", note: 0, value: 0, raw: data };
+    if (status === 0xF8) return { status, channel: -1, type: "clock", note: 0, value: 0, raw: data };
+
+    if (data.length < 2) return null;
+
     const type = status & 0xf0;
     const channel = status & 0x0f;
     const note = data[1];
@@ -129,6 +138,11 @@ export function parseMidiMessage(data: Uint8Array): MidiMessage | null {
             return {
                 status, channel, type: "cc",
                 note, value, raw: data,
+            };
+        case 0xc0: // Program Change
+            return {
+                status, channel, type: "programChange",
+                note, value: 0, raw: data,
             };
         default:
             return null;
@@ -155,67 +169,145 @@ export class MidiEngine {
 
     async init(): Promise<boolean> {
         if (!navigator.requestMIDIAccess) {
-            console.warn("Web MIDI API not supported in this browser");
+            console.warn("[MIDI] Web MIDI API not supported in this browser");
             return false;
         }
 
         try {
-            this.midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+            // Check MIDI permission status first
+            try {
+                const permStatus = await navigator.permissions.query({ name: "midi" as PermissionName });
+                console.log("[MIDI] Permission status:", permStatus.state);
+            } catch (permErr) {
+                console.log("[MIDI] Could not query permission:", permErr);
+            }
+
+            // Try sysex=true first — needed to receive System Real-Time messages
+            // (Start 0xFA, Stop 0xFC, Clock 0xF8, Continue 0xFB)
+            // Fall back to sysex=false if user denies the permission
+            try {
+                console.log("[MIDI] Requesting MIDIAccess (sysex=true)...");
+                this.midiAccess = await navigator.requestMIDIAccess({ sysex: true });
+                console.log("[MIDI] Got MIDIAccess (sysex=true), inputs:", this.midiAccess.inputs.size, "outputs:", this.midiAccess.outputs.size);
+            } catch (err) {
+                console.warn("[MIDI] sysex=true failed, trying sysex=false:", err);
+                try {
+                    this.midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+                    console.log("[MIDI] Got MIDIAccess (sysex=false), inputs:", this.midiAccess.inputs.size, "outputs:", this.midiAccess.outputs.size);
+                } catch (err2) {
+                    console.warn("[MIDI] sysex=false also failed:", err2);
+                    return false;
+                }
+            }
+
+            console.log("[MIDI] MIDIAccess inputs:", this.midiAccess.inputs.size, "outputs:", this.midiAccess.outputs.size);
+
+            // Log ALL raw ports regardless of state
+            this.midiAccess.inputs.forEach((input, key) => {
+                console.log(`[MIDI] Raw Input: key=${key} id="${input.id}" name="${input.name}" manufacturer="${input.manufacturer}" state=${input.state} connection=${input.connection}`);
+            });
+            this.midiAccess.outputs.forEach((output, key) => {
+                console.log(`[MIDI] Raw Output: key=${key} id="${output.id}" name="${output.name}" manufacturer="${output.manufacturer}" state=${output.state} connection=${output.connection}`);
+            });
 
             // Listen for device changes
-            this.midiAccess.onstatechange = () => this.refreshDevices();
+            this.midiAccess.onstatechange = (e) => {
+                const port = (e as MIDIConnectionEvent).port;
+                console.log(`[MIDI] statechange: ${port?.type} "${port?.name}" state=${port?.state} conn=${port?.connection}`);
+                this.refreshDevices();
+                // Delayed re-scans for Windows — port may not be fully ready yet
+                setTimeout(() => this.refreshDevices(), 300);
+                setTimeout(() => this.refreshDevices(), 1000);
+            };
 
-            this.refreshDevices();
+            await this.refreshDevices();
+
+            // On Windows, devices may appear slightly after init completes
+            // Schedule additional re-scans
+            if (this.devices.size === 0) {
+                console.log("[MIDI] No devices found, scheduling delayed re-scans...");
+                setTimeout(() => this.refreshDevices(), 1000);
+                setTimeout(() => this.refreshDevices(), 3000);
+            }
+
             return true;
         } catch (err) {
-            console.error("Failed to access MIDI devices:", err);
+            console.error("[MIDI] Failed to access MIDI devices:", err);
             return false;
         }
     }
 
-    private refreshDevices() {
+    private async refreshDevices() {
         if (!this.midiAccess) return;
 
         const newDevices = new Map<string, MidiDevice>();
         const inputs = this.midiAccess.inputs;
         const outputs = this.midiAccess.outputs;
 
+        console.log(`[MIDI] refreshDevices: ${inputs.size} inputs, ${outputs.size} outputs`);
+
+        // Build output lookup — include ALL outputs (not just connected)
+        const outputsByName = new Map<string, MIDIOutput>();
+        outputs.forEach((output) => {
+            if (output.name) {
+                outputsByName.set(output.name, output);
+            }
+        });
+
+        // Open ALL inputs (not just state=connected — some devices report "disconnected" until opened)
+        const openPromises: Promise<void>[] = [];
         inputs.forEach((input) => {
-            // Find matching output
-            let matchingOutput: MIDIOutput | null = null;
-            outputs.forEach((output) => {
-                if (output.name === input.name || output.manufacturer === input.manufacturer) {
-                    matchingOutput = output;
-                }
-            });
+            console.log(`[MIDI] Attempting to open input: "${input.name}" state=${input.state} connection=${input.connection}`);
 
-            const device: MidiDevice = {
-                id: input.id,
-                name: input.name || "Unknown MIDI Device",
-                manufacturer: input.manufacturer || "",
-                input,
-                output: matchingOutput,
-            };
+            openPromises.push(
+                input.open().then(() => {
+                    console.log(`[MIDI] Opened input: "${input.name}" state=${input.state} connection=${input.connection}`);
+                    const matchingOutput = (input.name ? outputsByName.get(input.name) : null) ?? null;
 
-            newDevices.set(input.id, device);
+                    const device: MidiDevice = {
+                        id: input.id,
+                        name: input.name || "Unknown MIDI Device",
+                        manufacturer: input.manufacturer || "",
+                        input,
+                        output: matchingOutput,
+                    };
 
-            // Attach message handler
-            input.onmidimessage = (e: MIDIMessageEvent) => {
-                if (!e.data) return;
-                const msg = parseMidiMessage(new Uint8Array(e.data));
-                if (!msg) return;
+                    newDevices.set(input.id, device);
 
-                this.onMessage?.(msg);
+                    // Attach message handler
+                    input.onmidimessage = (e: MIDIMessageEvent) => {
+                        if (!e.data) return;
+                        const msg = parseMidiMessage(new Uint8Array(e.data));
+                        if (!msg) return;
 
-                // MIDI learn mode
-                if (this.learnCallback) {
-                    this.learnCallback(msg);
-                    return;
-                }
+                        this.onMessage?.(msg);
 
-                // Route through mapping
-                this.routeMessage(msg);
-            };
+                        if (this.learnCallback) {
+                            this.learnCallback(msg);
+                            return;
+                        }
+
+                        this.routeMessage(msg);
+                    };
+                }).catch((openErr) => {
+                    console.warn(`[MIDI] Failed to open input: "${input.name}"`, openErr);
+                    // Still add it so user can see it exists even if it can't open
+                    newDevices.set(input.id, {
+                        id: input.id,
+                        name: `${input.name || "Unknown"} (failed to open)`,
+                        manufacturer: input.manufacturer || "",
+                        input,
+                        output: null,
+                    });
+                })
+            );
+        });
+
+        await Promise.allSettled(openPromises);
+
+        console.log(`[MIDI] refreshDevices complete: ${newDevices.size} devices`);
+        newDevices.forEach((d) => {
+            console.log(`[MIDI] Device: "${d.name}" manufacturer="${d.manufacturer}" hasOutput=${!!d.output}`);
         });
 
         this.devices = newDevices;
@@ -224,6 +316,29 @@ export class MidiEngine {
 
     getDevices(): MidiDevice[] {
         return Array.from(this.devices.values());
+    }
+
+    /** Get raw diagnostic info about MIDI access state */
+    getDiagnostics(): string[] {
+        const lines: string[] = [];
+        if (!this.midiAccess) {
+            lines.push("MIDIAccess: null (not initialized)");
+            return lines;
+        }
+        lines.push(`MIDIAccess: OK, sysexEnabled=${this.midiAccess.sysexEnabled}`);
+        lines.push(`Raw inputs: ${this.midiAccess.inputs.size}`);
+        this.midiAccess.inputs.forEach((input, key) => {
+            lines.push(`  IN  [${key}] "${input.name}" mfr="${input.manufacturer}" state=${input.state} conn=${input.connection}`);
+        });
+        lines.push(`Raw outputs: ${this.midiAccess.outputs.size}`);
+        this.midiAccess.outputs.forEach((output, key) => {
+            lines.push(`  OUT [${key}] "${output.name}" mfr="${output.manufacturer}" state=${output.state} conn=${output.connection}`);
+        });
+        lines.push(`Devices map: ${this.devices.size}`);
+        this.devices.forEach((d) => {
+            lines.push(`  DEV "${d.name}" mfr="${d.manufacturer}" hasOut=${!!d.output}`);
+        });
+        return lines;
     }
 
     setMapping(preset: MidiPreset) {
@@ -424,6 +539,12 @@ export class MidiEngine {
         this.sendToDevice(deviceId, [status, note, 0]);
     }
 
+    /** Send a Program Change message to a specific device */
+    sendProgramChange(deviceId: string, channel: number, program: number) {
+        const status = 0xC0 | (channel & 0x0F);
+        this.sendToDevice(deviceId, [status, Math.round(Math.max(0, Math.min(127, program)))]);
+    }
+
     /** Send MIDI Start (0xFA) to a specific device */
     sendStartToDevice(deviceId: string) {
         this.sendToDevice(deviceId, [0xFA]);
@@ -442,6 +563,8 @@ export class MidiEngine {
     destroy() {
         this.devices.forEach(d => {
             d.input.onmidimessage = null;
+            try { d.input.close(); } catch { /* ignore */ }
+            try { d.output?.close(); } catch { /* ignore */ }
         });
         this.devices.clear();
         this.mappingLookup.clear();
@@ -930,28 +1053,28 @@ export const CIRCUIT_TRACKS_PROFILE: ExternalDeviceProfile = {
             type: "drum",
             midiChannel: 9, // Ch 10
             color: "#f97316", // Orange
-            noteRange: { low: 60, high: 67 }, // 8 pads
+            noteRange: { low: 60, high: 60 }, // CT sends note 60 for Drum 1
         },
         {
             name: "Drum 2",
             type: "drum",
             midiChannel: 9,
             color: "#eab308", // Yellow
-            noteRange: { low: 68, high: 75 },
+            noteRange: { low: 62, high: 62 }, // CT sends note 62 for Drum 2
         },
         {
             name: "Drum 3",
             type: "drum",
             midiChannel: 9,
             color: "#22c55e", // Green
-            noteRange: { low: 76, high: 83 },
+            noteRange: { low: 64, high: 64 }, // CT sends note 64 for Drum 3
         },
         {
             name: "Drum 4",
             type: "drum",
             midiChannel: 9,
             color: "#ef4444", // Red
-            noteRange: { low: 84, high: 91 },
+            noteRange: { low: 65, high: 65 }, // CT sends note 65 for Drum 4
         },
         {
             name: "MIDI 1",

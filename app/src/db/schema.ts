@@ -1,5 +1,63 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, primaryKey } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
+
+// ─── Auth.js Tables ──────────────────────────────────────────────────────────
+
+export const users = sqliteTable("user", {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    name: text("name"),
+    email: text("email").unique(),
+    emailVerified: integer("emailVerified", { mode: "timestamp_ms" }),
+    image: text("image"),
+    createdAt: text("created_at").default(sql`(datetime('now'))`),
+});
+
+export const accounts = sqliteTable("account", {
+    userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("providerAccountId").notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: text("token_type"),
+    scope: text("scope"),
+    id_token: text("id_token"),
+    session_state: text("session_state"),
+}, (account) => [
+    primaryKey({ columns: [account.provider, account.providerAccountId] }),
+]);
+
+export const sessions = sqliteTable("session", {
+    sessionToken: text("sessionToken").primaryKey(),
+    userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const verificationTokens = sqliteTable("verificationToken", {
+    identifier: text("identifier").notNull(),
+    token: text("token").notNull(),
+    expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+}, (verificationToken) => [
+    primaryKey({ columns: [verificationToken.identifier, verificationToken.token] }),
+]);
+
+// ─── User Preferences (per-user localStorage sync) ──────────────────────────
+
+export const userPreferences = sqliteTable("user_preferences", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    updatedAt: text("updated_at").default(sql`(datetime('now'))`),
+});
+
+// ─── Auth Types ──────────────────────────────────────────────────────────────
+
+export type User = typeof users.$inferSelect;
+export type Account = typeof accounts.$inferSelect;
+export type Session = typeof sessions.$inferSelect;
+export type UserPreference = typeof userPreferences.$inferSelect;
 
 export const tracks = sqliteTable("tracks", {
     id: integer("id").primaryKey({ autoIncrement: true }),
@@ -45,6 +103,17 @@ export const tracks = sqliteTable("tracks", {
     sourceUrl: text("source_url"),
     sourcePlatform: text("source_platform"),
     sourceId: text("source_id"),
+    relatedTrackId: integer("related_track_id"),
+    // Device/offline fields
+    deviceId: text("device_id"),
+    isOfflineAvailable: integer("is_offline_available", { mode: "boolean" }).default(false),
+    // Stems separation
+    stemsStatus: text("stems_status"), // null | "pending" | "processing" | "ready" | "error"
+    stemsVocalsPath: text("stems_vocals_path"),
+    stemsDrumsPath: text("stems_drums_path"),
+    stemsBassPath: text("stems_bass_path"),
+    stemsMelodyPath: text("stems_melody_path"),
+    stemsAnalyzedAt: text("stems_analyzed_at"),
 });
 
 export const drives = sqliteTable("drives", {
@@ -150,3 +219,50 @@ export type ScanLog = typeof scanLogs.$inferSelect;
 export type AnalysisJob = typeof analysisJobs.$inferSelect;
 export type AnalysisChangeRecord = typeof analysisChanges.$inferSelect;
 export type DownloadRecord = typeof downloads.$inferSelect;
+
+// ─── Devices (remote companion apps) ────────────────────────────────────────
+
+export const devices = sqliteTable("devices", {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    os: text("os"), // windows | linux | macos
+    hostname: text("hostname"),
+    apiUrl: text("api_url").notNull(), // e.g. http://192.168.1.100:9876
+    token: text("token").notNull(), // device auth token
+    status: text("status").notNull().default("offline"), // online | offline | syncing
+    lastSeenAt: text("last_seen_at"),
+    version: text("version"),
+    createdAt: text("created_at").default(sql`(datetime('now'))`),
+});
+
+export const deviceFolders = sqliteTable("device_folders", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    deviceId: text("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+    path: text("path").notNull(),
+    label: text("label"),
+    trackCount: integer("track_count").default(0),
+    totalSize: integer("total_size").default(0),
+    lastScannedAt: text("last_scanned_at"),
+    isEnabled: integer("is_enabled", { mode: "boolean" }).default(true),
+    createdAt: text("created_at").default(sql`(datetime('now'))`),
+});
+
+// ─── Offline Cache Tracking ─────────────────────────────────────────────────
+
+export const offlineTracks = sqliteTable("offline_tracks", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    trackId: integer("track_id").notNull().references(() => tracks.id, { onDelete: "cascade" }),
+    deviceId: text("device_id").references(() => devices.id, { onDelete: "set null" }),
+    cachedAt: text("cached_at").default(sql`(datetime('now'))`),
+    size: integer("size").notNull(), // bytes
+    priority: integer("priority").default(0), // higher = keep longer
+    isPinned: integer("is_pinned", { mode: "boolean" }).default(false),
+});
+
+// ─── Device/Offline Types ───────────────────────────────────────────────────
+
+export type Device = typeof devices.$inferSelect;
+export type NewDevice = typeof devices.$inferInsert;
+export type DeviceFolder = typeof deviceFolders.$inferSelect;
+export type OfflineTrack = typeof offlineTracks.$inferSelect;

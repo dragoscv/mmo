@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useEffect, useState, memo, Fragment } from "react";
+import { useCallback, useRef, useEffect, useState, useReducer, memo, Fragment } from "react";
 import { useMixer } from "./mixer-context";
 import { usePlayer } from "./player-context";
 import { DeckTrackPicker } from "./deck-track-picker";
@@ -10,14 +10,14 @@ import { MixerBrowserModal } from "./mixer-browser-modal-v2";
 import { SamplePickerModal } from "./sample-picker-modal";
 import { TrackContextMenu } from "./track-actions";
 import type { MidiActionHandler } from "@/lib/midi-engine";
-import { MidiEngine, EXTERNAL_DEVICE_PROFILES } from "@/lib/midi-engine";
-import type { ExternalDeviceProfile, MidiDevice } from "@/lib/midi-engine";
+import { useMidi, useMidiMessages } from "@/hooks/use-midi";
 import { usePersonalization } from "@/hooks/use-personalization";
 import { CircuitTracksPanel, CircuitTracksBadge } from "./circuit-tracks-panel";
 import { PerformancePanel } from "./performance-stats";
 import { JogWheel } from "./jog-wheel";
-import { cn, formatDuration, formatBytes } from "@/lib/utils";
+import { cn, formatDuration, formatBytes, formatKey } from "@/lib/utils";
 import type { DeckState } from "@/lib/mixer-engine";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import {
     FILTER_TYPES, COLOR_FX_TYPES, BEAT_FX_TYPES,
     type FilterType, type ColorFxType, type BeatFxType, type PadMode,
@@ -53,7 +53,24 @@ import {
     Unlink2,
     Gauge,
     Square,
+    Maximize2,
+    Minimize2,
+    Mic,
+    Drum,
+    Music2,
+    Piano,
+    Volume2,
+    VolumeX,
 } from "lucide-react";
+import { useFocusMode } from "./focus-mode-context";
+import {
+    type StemType,
+    STEM_TYPES,
+    STEM_LABELS,
+    STEM_COLORS,
+    createDefaultStemConfigs,
+    type RealtimeStemProcessor,
+} from "@/lib/stems-engine";
 
 // ─── Utilities ───────────────────────────────────────────────────────────
 
@@ -698,6 +715,7 @@ function ColorFxLinkSwitch({ value, onChange }: { value: ColorFxTarget; onChange
 
 function DeckInfo({ side, deck, color, track, onBrowse }: { side: DeckSide; deck: DeckState; color: string; track: Track | null; onBrowse?: () => void }) {
     const mixer = useMixer();
+    const { noteNotations } = useDAWSettings();
     const [pickerOpen, setPickerOpen] = useState(false);
 
     const trackCard = (
@@ -722,7 +740,7 @@ function DeckInfo({ side, deck, color, track, onBrowse }: { side: DeckSide; deck
                             </span>
                         )}
                         {deck.key && (
-                            <span className="text-[8px] lg:text-[9px] xl:text-[10px] px-1 py-0.5 rounded-full bg-white/8 text-white/50">{deck.key}</span>
+                            <span className="text-[8px] lg:text-[9px] xl:text-[10px] px-1 py-0.5 rounded-full bg-white/8 text-white/50">{formatKey(deck.key, noteNotations)}</span>
                         )}
                         {track?.genre && (
                             <span className="text-[8px] lg:text-[9px] xl:text-[10px] px-1 py-0.5 rounded-full text-purple-300/70" style={{ backgroundColor: `${color}15` }}>{track.genre}</span>
@@ -770,10 +788,221 @@ function DeckInfo({ side, deck, color, track, onBrowse }: { side: DeckSide; deck
     );
 }
 
+// ─── Deck Stems Panel ────────────────────────────────────────────────────
+
+const STEM_ICON_MAP: Record<StemType, typeof Mic> = {
+    vocals: Mic,
+    drums: Drum,
+    bass: Music2,
+    melody: Piano,
+};
+
+const DeckStemsPanel = memo(function DeckStemsPanel({
+    processor,
+    color,
+}: {
+    processor: RealtimeStemProcessor | null;
+    color: string;
+}) {
+    const [, forceRender] = useReducer((x: number) => x + 1, 0);
+    const levelsRef = useRef<Record<StemType, number>>({ vocals: 0, drums: 0, bass: 0, melody: 0 });
+    const [levels, setLevels] = useState<Record<StemType, number>>({ vocals: 0, drums: 0, bass: 0, melody: 0 });
+    const rafRef = useRef(0);
+    const dataRef = useRef(new Float32Array(128));
+
+    const isActive = processor?.isActive ?? false;
+    const configs = processor?.configs ?? createDefaultStemConfigs();
+
+    // Animate levels when active
+    useEffect(() => {
+        if (!processor?.isActive) {
+            setLevels({ vocals: 0, drums: 0, bass: 0, melody: 0 });
+            return;
+        }
+        const update = () => {
+            const newLevels: Record<StemType, number> = { vocals: 0, drums: 0, bass: 0, melody: 0 };
+            for (const stem of STEM_TYPES) {
+                const analyser = processor.getAnalyser(stem);
+                if (!analyser) continue;
+                if (dataRef.current.length !== analyser.fftSize) dataRef.current = new Float32Array(analyser.fftSize);
+                analyser.getFloatTimeDomainData(dataRef.current);
+                let max = 0;
+                for (let i = 0; i < dataRef.current.length; i++) { const abs = Math.abs(dataRef.current[i]); if (abs > max) max = abs; }
+                newLevels[stem] = max;
+            }
+            levelsRef.current = newLevels;
+            setLevels(newLevels);
+            rafRef.current = requestAnimationFrame(update);
+        };
+        rafRef.current = requestAnimationFrame(update);
+        return () => cancelAnimationFrame(rafRef.current);
+    }, [processor, processor?.isActive]);
+
+    // Dragging state for horizontal faders
+    const draggingRef = useRef<StemType | null>(null);
+
+    const handlePointerDown = useCallback((stem: StemType, e: React.PointerEvent) => {
+        e.preventDefault();
+        draggingRef.current = stem;
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        updateVolume(stem, e);
+    }, [processor]);
+
+    const handlePointerMove = useCallback((stem: StemType, e: React.PointerEvent) => {
+        if (draggingRef.current !== stem) return;
+        updateVolume(stem, e);
+    }, [processor]);
+
+    const handlePointerUp = useCallback(() => {
+        draggingRef.current = null;
+    }, []);
+
+    const updateVolume = useCallback((stem: StemType, e: React.PointerEvent) => {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        processor?.setStemVolume(stem, x);
+        forceRender();
+    }, [processor]);
+
+    if (!processor) return null;
+
+    return (
+        <div className={cn(
+            "rounded-lg border transition-all duration-300",
+            isActive
+                ? "border-purple-500/30 bg-purple-950/20"
+                : "border-white/[0.06] bg-white/[0.03]",
+        )}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-2 py-1.5">
+                <div className="flex items-center gap-1.5">
+                    <button
+                        onClick={() => { processor.toggle(); forceRender(); }}
+                        className={cn(
+                            "flex items-center justify-center w-6 h-6 rounded-md transition-all duration-200 cursor-pointer",
+                            isActive
+                                ? "bg-purple-500/25 text-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.25)]"
+                                : "bg-white/5 text-white/30 hover:bg-white/10 hover:text-white/50",
+                        )}
+                    >
+                        <Power className="w-3 h-3" />
+                    </button>
+                    <span className="text-[8px] lg:text-[9px] uppercase tracking-wider font-semibold text-white/25">
+                        Stems
+                    </span>
+                    {isActive && (
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-500/15 text-[8px] font-medium text-purple-400 animate-[fadeIn_200ms_ease-out]">
+                            <span className="w-1 h-1 rounded-full bg-purple-400 animate-pulse" />
+                            Live
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* Stem controls — 4 rows, each stem a horizontal strip */}
+            {isActive && (
+                <div className="px-2 pb-2 flex flex-col gap-1 animate-[fadeIn_200ms_ease-out]">
+                    {STEM_TYPES.map((stemType) => {
+                        const config = configs.find(c => c.type === stemType);
+                        if (!config) return null;
+                        const Icon = STEM_ICON_MAP[stemType];
+                        const stemColor = STEM_COLORS[stemType];
+                        const stemActive = !config.muted && config.volume > 0;
+                        const isSoloed = config.solo;
+                        const effectiveLevel = config.muted ? 0 : levels[stemType] * config.volume;
+
+                        return (
+                            <div key={stemType} className="flex items-center gap-1.5">
+                                {/* Icon */}
+                                <div className={cn(
+                                    "flex items-center justify-center w-5 h-5 rounded shrink-0 transition-all",
+                                    stemActive ? "bg-white/10" : "bg-white/5 opacity-40",
+                                )}>
+                                    <Icon className="w-2.5 h-2.5" style={{ color: stemActive ? stemColor : undefined }} />
+                                </div>
+
+                                {/* Horizontal volume fader */}
+                                <div
+                                    className="relative flex-1 h-4 rounded-full bg-white/[0.04] cursor-pointer overflow-hidden select-none"
+                                    onPointerDown={(e) => handlePointerDown(stemType, e)}
+                                    onPointerMove={(e) => handlePointerMove(stemType, e)}
+                                    onPointerUp={handlePointerUp}
+                                    onDoubleClick={() => { processor.setStemVolume(stemType, 1); forceRender(); }}
+                                    title={`${STEM_LABELS[stemType]}: ${Math.round(config.volume * 100)}%`}
+                                >
+                                    {/* Volume fill */}
+                                    <div
+                                        className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-75"
+                                        style={{
+                                            width: `${config.volume * 100}%`,
+                                            background: `linear-gradient(to right, ${stemColor}30, ${stemColor}60)`,
+                                        }}
+                                    />
+                                    {/* Level overlay */}
+                                    <div
+                                        className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-75"
+                                        style={{
+                                            width: `${effectiveLevel * 100}%`,
+                                            background: `${stemColor}20`,
+                                        }}
+                                    />
+                                    {/* Thumb */}
+                                    <div
+                                        className="absolute top-1/2 -translate-y-1/2 w-1.5 h-3 rounded-full bg-white shadow-sm transition-[left] duration-75"
+                                        style={{ left: `calc(${config.volume * 100}% - 3px)` }}
+                                    />
+                                    {/* Label inside */}
+                                    <span className="absolute inset-0 flex items-center px-1.5 text-[7px] lg:text-[8px] font-medium tracking-wide text-white/40 pointer-events-none">
+                                        {STEM_LABELS[stemType]}
+                                    </span>
+                                    {/* Percentage */}
+                                    <span className="absolute inset-0 flex items-center justify-end px-1.5 text-[7px] tabular-nums text-white/25 pointer-events-none">
+                                        {Math.round(config.volume * 100)}
+                                    </span>
+                                </div>
+
+                                {/* Mute */}
+                                <button
+                                    onClick={() => { processor.toggleStemMute(stemType); forceRender(); }}
+                                    className={cn(
+                                        "flex items-center justify-center w-5 h-5 rounded shrink-0 transition-all cursor-pointer",
+                                        config.muted
+                                            ? "bg-red-500/20 text-red-400"
+                                            : "bg-white/5 text-white/25 hover:bg-white/10 hover:text-white/40",
+                                    )}
+                                    title={config.muted ? "Unmute" : "Mute"}
+                                >
+                                    {config.muted ? <VolumeX className="w-2.5 h-2.5" /> : <Volume2 className="w-2.5 h-2.5" />}
+                                </button>
+
+                                {/* Solo */}
+                                <button
+                                    onClick={() => { processor.toggleStemSolo(stemType); forceRender(); }}
+                                    className={cn(
+                                        "flex items-center justify-center w-5 h-5 rounded shrink-0 text-[8px] font-bold transition-all cursor-pointer",
+                                        isSoloed
+                                            ? "text-amber-400"
+                                            : "bg-white/5 text-white/25 hover:bg-white/10 hover:text-white/40",
+                                    )}
+                                    style={isSoloed ? { backgroundColor: `${stemColor}30` } : undefined}
+                                    title={isSoloed ? "Unsolo" : "Solo"}
+                                >
+                                    S
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+});
+
 // ─── Deck Controls (Transport + BPM/Key + EQ + etc) ──────────────────────
 
 const DeckControls = memo(function DeckControls({ side, deck, color, analyser }: DeckProps) {
     const mixer = useMixer();
+    const { noteNotations } = useDAWSettings();
     const [shiftActive, setShiftActive] = useState(false);
     const [shiftLocked, setShiftLocked] = useState(false);
     const [samplePickerSlot, setSamplePickerSlot] = useState<number | null>(null);
@@ -881,7 +1110,7 @@ const DeckControls = memo(function DeckControls({ side, deck, color, analyser }:
                                 </div>
                                 <div className="flex items-center gap-0.5">
                                     <button onClick={() => mixer.setKeyShift(side, deck.keyShift - 1)} className="p-0.5 rounded hover:bg-white/10 text-white/30 hover:text-white cursor-pointer"><ChevronLeft className={iconSm} /></button>
-                                    <span className="flex-1 text-center text-sm lg:text-base xl:text-lg font-bold tabular-nums" style={{ color }}>{deck.key || "—"}</span>
+                                    <span className="flex-1 text-center text-sm lg:text-base xl:text-lg font-bold tabular-nums" style={{ color }}>{formatKey(deck.key, noteNotations) || "—"}</span>
                                     <button onClick={() => mixer.setKeyShift(side, deck.keyShift + 1)} className="p-0.5 rounded hover:bg-white/10 text-white/30 hover:text-white cursor-pointer"><ChevronRight className={iconSm} /></button>
                                 </div>
                             </div>
@@ -1184,6 +1413,9 @@ const DeckControls = memo(function DeckControls({ side, deck, color, analyser }:
                         ))}
                     </div>
                 </div>
+
+                {/* Stems */}
+                <DeckStemsPanel processor={mixer.getDeckStems(side)} color={color} />
             </div>
 
             {/* Sample Picker Modal */}
@@ -1465,6 +1697,7 @@ export function MixerView() {
     const personalization = usePersonalization();
     const currentTrack = player.currentTrack;
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const focusMode = useFocusMode();
     const [browserOpen, setBrowserOpen] = useState(false);
     const [browserTargetDeck, setBrowserTargetDeck] = useState<DeckSide>("A");
     const [activeDeckLeft, setActiveDeckLeft] = useState<DeckSide>("A");
@@ -1479,58 +1712,37 @@ export function MixerView() {
     });
 
     // ── External Devices (Circuit Tracks etc.) ───────────────────────────
-    const externalMidiRef = useRef<MidiEngine | null>(null);
-    const [externalDevices, setExternalDevices] = useState<{ profile: ExternalDeviceProfile; device: MidiDevice }[]>([]);
+    const midi = useMidi();
     const [externalPanelVisible, setExternalPanelVisible] = useState(false);
     const [externalMinimized, setExternalMinimized] = useState(personalization.externalDeviceMinimized);
     const [externalPosition, setExternalPosition] = useState(personalization.externalDevicePosition);
+    const [externalSize, setExternalSize] = useState(personalization.externalDeviceSize);
 
-    // Initialize MIDI engine for external device detection
+    // Forward MIDI messages as custom events for the Circuit Tracks panel
+    useMidiMessages((msg) => {
+        window.dispatchEvent(new CustomEvent("circuit-tracks-midi", { detail: msg }));
+    });
+
+    // Auto-show/hide external device panel based on detected devices
     useEffect(() => {
         if (!personalization.showExternalDevices) return;
-        if (externalMidiRef.current) return;
-
-        const engine = new MidiEngine();
-        externalMidiRef.current = engine;
-
-        engine.onDeviceChange = () => {
-            const found = engine.autoDetectExternalDevices(EXTERNAL_DEVICE_PROFILES);
-            setExternalDevices(found);
-            // Auto-show panel when device connects
-            if (found.length > 0 && personalization.externalDeviceAutoConnect) {
-                setExternalPanelVisible(true);
-                setExternalMinimized(false);
-            }
-            if (found.length === 0) {
-                setExternalPanelVisible(false);
-            }
-        };
-
-        // Also forward raw MIDI messages as custom events for the panel
-        engine.onMessage = (msg) => {
-            window.dispatchEvent(new CustomEvent("circuit-tracks-midi", { detail: msg }));
-        };
-
-        engine.init().then((success) => {
-            if (success) {
-                const found = engine.autoDetectExternalDevices(EXTERNAL_DEVICE_PROFILES);
-                setExternalDevices(found);
-                if (found.length > 0 && personalization.externalDeviceAutoConnect) {
-                    setExternalPanelVisible(true);
-                }
-            }
-        });
-
-        return () => {
-            engine.destroy();
-            externalMidiRef.current = null;
-        };
-    }, [personalization.showExternalDevices, personalization.externalDeviceAutoConnect]);
+        if (midi.externalDevices.length > 0 && personalization.externalDeviceAutoConnect) {
+            setExternalPanelVisible(true);
+            setExternalMinimized(false);
+        }
+        if (midi.externalDevices.length === 0) {
+            setExternalPanelVisible(false);
+        }
+    }, [midi.externalDevices, personalization.showExternalDevices, personalization.externalDeviceAutoConnect]);
 
     // Persist external device position
     useEffect(() => {
         personalization.update({ externalDevicePosition: externalPosition });
     }, [externalPosition]);
+
+    useEffect(() => {
+        personalization.update({ externalDeviceSize: externalSize });
+    }, [externalSize]);
 
     useEffect(() => {
         personalization.update({ externalDeviceMinimized: externalMinimized });
@@ -1871,6 +2083,11 @@ export function MixerView() {
         }
     }, [mixer, browserOpen]);
 
+    // Wire MIDI action handler to the shared engine
+    useEffect(() => {
+        midi.setActionHandler(handleMidiAction);
+    }, [midi, handleMidiAction]);
+
     const analysers: Record<DeckSide, AnalyserNode | null> = {
         A: mixer.getDeckAnalyser("A"),
         B: mixer.getDeckAnalyser("B"),
@@ -2050,8 +2267,19 @@ export function MixerView() {
                         className="p-1 rounded-md bg-white/5 hover:bg-white/10 text-white/25 hover:text-white/50 transition-colors cursor-pointer border border-white/5"
                         title="Settings"><Settings2 className="h-3 w-3" /></button>
 
+                    {/* Focus Mode */}
+                    <button onClick={focusMode.toggleFocusMode}
+                        className={cn("p-1 rounded-md transition-colors cursor-pointer border",
+                            focusMode.isFocusMode
+                                ? "bg-purple-500/20 border-purple-500/30 text-purple-400 hover:bg-purple-500/30"
+                                : "bg-white/5 border-white/5 text-white/25 hover:bg-white/10 hover:text-white/50"
+                        )}
+                        title={focusMode.isFocusMode ? "Exit focus mode" : "Focus mode (hide sidebar & player)"}>
+                        {focusMode.isFocusMode ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+                    </button>
+
                     {/* External Device Badges (minimized panels) */}
-                    {externalDevices.map(({ profile, device }) => (
+                    {midi.externalDevices.map(({ profile, device }) => (
                         externalMinimized && externalPanelVisible ? (
                             <CircuitTracksBadge
                                 key={device.id}
@@ -2110,17 +2338,19 @@ export function MixerView() {
             )}
 
             {/* External Device Floating Panels */}
-            {externalPanelVisible && !externalMinimized && externalMidiRef.current && externalDevices.map(({ profile, device }) => (
+            {externalPanelVisible && !externalMinimized && midi.engine && midi.externalDevices.map(({ profile, device }) => (
                 <CircuitTracksPanel
                     key={device.id}
                     profile={profile}
                     device={device}
-                    midiEngine={externalMidiRef.current!}
+                    midiEngine={midi.engine!}
                     isMinimized={false}
                     onMinimize={() => setExternalMinimized(true)}
                     onClose={() => setExternalPanelVisible(false)}
                     position={externalPosition}
                     onPositionChange={setExternalPosition}
+                    size={externalSize}
+                    onSizeChange={setExternalSize}
                 />
             ))}
 

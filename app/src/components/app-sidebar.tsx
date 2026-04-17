@@ -21,6 +21,9 @@ import {
     Download,
     Piano,
     Waves,
+    Disc3,
+    Monitor,
+    Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
@@ -28,17 +31,21 @@ import { LegendModal } from "./legend-modal";
 import { GlobalSearch } from "./global-search";
 import { useRouteMemoryHrefs } from "@/hooks/use-route-memory";
 import { useSidebar } from "./sidebar-context";
+import { UserCard } from "./user-card";
 
 const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/library", label: "Library", icon: Library },
     { href: "/playlists", label: "Playlists", icon: ListMusic },
+    { href: "/mixer", label: "Mixer", icon: Disc3 },
     { href: "/daw", label: "DAW", icon: Piano },
     { href: "/editor", label: "Sound Editor", icon: Waves },
     { href: "/download", label: "Download", icon: Download },
     { href: "/visualizations", label: "Visualizations", icon: AudioWaveform },
     { href: "/scanner", label: "Scanner", icon: ScanSearch },
     { href: "/drives", label: "Drives", icon: HardDrive },
+    { href: "/devices", label: "Devices", icon: Monitor },
+    { href: "/remote", label: "Remote", icon: Smartphone },
     { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -145,6 +152,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
             <div className="border-t border-sidebar-border px-2 py-3 space-y-2">
                 {collapsed ? (
                     <div className="flex flex-col items-center gap-1">
+                        <UserCard collapsed />
                         <ThemeToggle collapsed />
                         <button
                             onClick={() => setLegendOpen(true)}
@@ -156,6 +164,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                     </div>
                 ) : (
                     <>
+                        <UserCard />
                         <div className="flex items-center justify-between px-2">
                             <ThemeToggle />
                             <button

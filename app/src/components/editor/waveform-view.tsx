@@ -3,6 +3,7 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useEditor } from "./editor-context";
 import { cn } from "@/lib/utils";
+import { useDAWSettings, EDITOR_WAVEFORM_COLORS } from "@/hooks/use-daw-settings";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Waveform View — Canvas-based zoomable waveform
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 export function WaveformView() {
     const editor = useEditor();
+    const ds = useDAWSettings();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 800, height: 300 });
@@ -54,18 +56,29 @@ export function WaveformView() {
         ctx.fillStyle = "oklch(0.14 0.01 260)";
         ctx.fillRect(0, 0, width, height);
 
+        const waveColor = ds.editorWaveformHex;
+        // Extract oklch base values for alpha variants
+        const waveColorMatch = waveColor.match(/oklch\(([^)]+)\)/);
+        const waveBase = waveColorMatch ? waveColorMatch[1] : "0.62 0.19 250";
+        const waveColor06 = `oklch(${waveBase} / 0.6)`;
+        const waveColor03 = `oklch(${waveBase} / 0.3)`;
+        const waveColor015 = `oklch(${waveBase} / 0.15)`;
+        const waveColor05 = `oklch(${waveBase} / 0.5)`;
+
         // Draw grid lines (every 0.5s)
-        ctx.strokeStyle = "oklch(1 0 0 / 0.04)";
-        ctx.lineWidth = 1;
-        const startSec = scrollX;
-        const endSec = scrollX + width / zoom;
-        const gridInterval = zoom > 200 ? 0.1 : zoom > 50 ? 0.5 : 1;
-        for (let t = Math.floor(startSec / gridInterval) * gridInterval; t < endSec; t += gridInterval) {
-            const x = (t - scrollX) * zoom;
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
-            ctx.stroke();
+        if (ds.editorShowGridLines) {
+            ctx.strokeStyle = "oklch(1 0 0 / 0.04)";
+            ctx.lineWidth = 1;
+            const startSec = scrollX;
+            const endSec = scrollX + width / zoom;
+            const gridInterval = zoom > 200 ? 0.1 : zoom > 50 ? 0.5 : 1;
+            for (let t = Math.floor(startSec / gridInterval) * gridInterval; t < endSec; t += gridInterval) {
+                const x = (t - scrollX) * zoom;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
         }
 
         // Draw each channel
@@ -75,7 +88,7 @@ export function WaveformView() {
             const centerY = yOffset + channelHeight / 2;
 
             // Waveform
-            ctx.fillStyle = "oklch(0.62 0.19 250 / 0.6)";
+            ctx.fillStyle = waveColor06;
 
             const startSample = Math.floor(scrollX * buffer.sampleRate);
             const samplesPerPx = buffer.sampleRate / zoom;
@@ -98,21 +111,23 @@ export function WaveformView() {
             }
 
             // RMS overlay (softer fill for perceived loudness)
-            ctx.fillStyle = "oklch(0.62 0.19 250 / 0.3)";
-            for (let px = 0; px < width; px++) {
-                const sampleStart = Math.floor(startSample + px * samplesPerPx);
-                const sampleEnd = Math.floor(startSample + (px + 1) * samplesPerPx);
+            if (ds.editorShowRms) {
+                ctx.fillStyle = waveColor03;
+                for (let px = 0; px < width; px++) {
+                    const sampleStart2 = Math.floor(startSample + px * samplesPerPx);
+                    const sampleEnd2 = Math.floor(startSample + (px + 1) * samplesPerPx);
 
-                let sumSq = 0;
-                let count = 0;
-                for (let s = sampleStart; s < sampleEnd && s < data.length; s++) {
-                    if (s < 0) continue;
-                    sumSq += data[s] * data[s];
-                    count++;
+                    let sumSq = 0;
+                    let count = 0;
+                    for (let s = sampleStart2; s < sampleEnd2 && s < data.length; s++) {
+                        if (s < 0) continue;
+                        sumSq += data[s] * data[s];
+                        count++;
+                    }
+                    const rms = count > 0 ? Math.sqrt(sumSq / count) : 0;
+                    const rmsHeight = rms * channelHeight * 0.45;
+                    ctx.fillRect(px, centerY - rmsHeight, 1, rmsHeight * 2);
                 }
-                const rms = count > 0 ? Math.sqrt(sumSq / count) : 0;
-                const rmsHeight = rms * channelHeight * 0.45;
-                ctx.fillRect(px, centerY - rmsHeight, 1, rmsHeight * 2);
             }
 
             // Center line
@@ -132,9 +147,9 @@ export function WaveformView() {
         if (selection) {
             const selLeft = (selection.start - scrollX) * zoom;
             const selWidth = (selection.end - selection.start) * zoom;
-            ctx.fillStyle = "oklch(0.62 0.19 250 / 0.15)";
+            ctx.fillStyle = waveColor015;
             ctx.fillRect(selLeft, 0, selWidth, height);
-            ctx.strokeStyle = "oklch(0.62 0.19 250 / 0.5)";
+            ctx.strokeStyle = waveColor05;
             ctx.lineWidth = 1;
             ctx.strokeRect(selLeft, 0, selWidth, height);
         }
@@ -187,7 +202,7 @@ export function WaveformView() {
             ctx.closePath();
             ctx.fill();
         }
-    }, [editor.buffer, editor.scrollX, editor.zoom, editor.selection, editor.playPosition, editor.project.markers, editor.project.regions, dimensions]);
+    }, [editor.buffer, editor.scrollX, editor.zoom, editor.selection, editor.playPosition, editor.project.markers, editor.project.regions, dimensions, ds.editorWaveformColor, ds.editorShowRms, ds.editorShowGridLines]);
 
     // ─── Mouse interaction ──────────────────────────────────────────
     const pxToSeconds = useCallback((clientX: number): number => {

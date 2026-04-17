@@ -53,8 +53,11 @@ import {
     EyeOff,
     Radio,
     Piano,
+    RefreshCcw,
+    Layers,
 } from "lucide-react";
 import { toggleFavorite, deleteTrack, hideTracks } from "@/actions/tracks";
+import { reanalyzeTracks } from "@/actions/stems";
 import {
     removeTrackFromPlaylist,
     moveTrackInPlaylist,
@@ -256,6 +259,28 @@ function TrackMenuItems({
             }}>
                 <Piano className="h-3.5 w-3.5 mr-2 text-emerald-400" />
                 Open in DAW
+            </Item>
+
+            <Separator />
+
+            {/* Reanalyze */}
+            <Item onClick={() => {
+                toast.promise(
+                    reanalyzeTracks([track.id], { bpm: true, key: true, stems: false, metadata: false, artwork: false, lyrics: false }),
+                    { loading: "Reanalyzing...", success: "Reanalysis queued", error: "Failed to reanalyze" }
+                );
+            }}>
+                <RefreshCcw className="h-3.5 w-3.5 mr-2 text-amber-400" />
+                Reanalyze Track
+            </Item>
+            <Item onClick={() => {
+                toast.promise(
+                    reanalyzeTracks([track.id], { bpm: true, key: true, stems: true, metadata: false, artwork: false, lyrics: false }),
+                    { loading: "Separating stems...", success: "Stems analysis queued", error: "Failed to queue stems" }
+                );
+            }}>
+                <Layers className="h-3.5 w-3.5 mr-2 text-purple-400" />
+                Separate Stems
             </Item>
 
             {/* Playlist */}

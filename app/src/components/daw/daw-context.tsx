@@ -53,6 +53,7 @@ import {
     canRedo as histCanRedo,
     resetHistory,
 } from "@/lib/history-engine";
+import { getDAWSettings } from "@/hooks/use-daw-settings";
 import {
     type ClipboardState,
     type ClipboardEntry,
@@ -67,6 +68,50 @@ import {
 } from "@/lib/clipboard-manager";
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Voice Processor Bridge (for remote control)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface VPFxInsertSnapshot {
+    id: string;
+    type: string;
+    enabled: boolean;
+    params: Record<string, number>;
+}
+
+export interface VPRemoteState {
+    isActive: boolean;
+    inputGain: number;
+    outputGain: number;
+    selectedKey: number;
+    selectedScale: number;
+    chain: VPFxInsertSnapshot[];
+    peakL: number;
+    peakR: number;
+    rms: number;
+    pitchNote: string;
+    pitchCents: number;
+    pitchConfidence: number;
+}
+
+export interface VPCommandHandlers {
+    toggleActive: () => void;
+    setInputGain: (v: number) => void;
+    setOutputGain: (v: number) => void;
+    setKey: (k: number) => void;
+    setScale: (s: number) => void;
+    addEffect: (type: string) => void;
+    removeEffect: (id: string) => void;
+    toggleEffect: (id: string) => void;
+    updateParam: (insertId: string, param: string, value: number) => void;
+    autoDetect: () => void;
+}
+
+export interface VPBridge {
+    getState: () => VPRemoteState;
+    handlers: VPCommandHandlers;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // State Types
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -75,6 +120,9 @@ interface DAWState {
     isPlaying: boolean;
     isRecording: boolean;
     currentBeat: number;
+    playbackMode: "pattern" | "song";
+    currentStepIndex: number; // current step in step sequencer
+    activeClipIds: string[]; // clips currently under playhead
     tool: ToolMode;
     snap: SnapValue;
     metronomeOn: boolean;
@@ -96,6 +144,7 @@ interface DAWState {
     showAutomation: boolean;
     showHistory: boolean;
     showClipboard: boolean;
+    showVoiceProcessor: boolean;
     pianoRollTrackId: string | null;
     pianoRollClipId: string | null;
     synthConfig: SynthConfig;
@@ -125,6 +174,8 @@ interface DAWActions {
     setTempo: (bpm: number) => void;
     setTimeSignature: (num: number, den: number) => void;
     toggleMetronome: () => void;
+    setPlaybackMode: (mode: "pattern" | "song") => void;
+    togglePlaybackMode: () => void;
     setMetronomeVolume: (vol: number) => void;
     toggleLoop: () => void;
     setLoopRegion: (start: number, end: number) => void;
@@ -205,7 +256,7 @@ interface DAWActions {
     moveAutomationPoint: (laneId: string, pointIndex: number, time: number, value: number) => void;
     toggleAutomationVisibility: () => void;
     // Panels
-    togglePanel: (panel: "pianoRoll" | "mixer" | "stepSequencer" | "browser" | "effectsRack" | "synth" | "automation" | "history" | "clipboard") => void;
+    togglePanel: (panel: "pianoRoll" | "mixer" | "stepSequencer" | "browser" | "effectsRack" | "synth" | "automation" | "history" | "clipboard" | "voiceProcessor") => void;
     // Project
     newProject: (name?: string) => void;
     openProject: (id: string) => void;
@@ -241,6 +292,12 @@ interface DAWActions {
     exportProject: (format: "wav" | "mp3" | "flac" | "ogg", bitRate: number, onProgress?: (pct: number) => void) => Promise<{ blob: Blob; duration: number } | null>;
     // Engine access
     getEngine: () => DAWEngine | null;
+    // Voice Processor bridge (for remote)
+    registerVPBridge: (bridge: VPBridge) => void;
+    unregisterVPBridge: () => void;
+    getVPBridge: () => VPBridge | null;
+    // Stems
+    separateClipToStems: (clipId: string) => Promise<void>;
 }
 
 type DAWContextType = DAWState & DAWActions;
@@ -277,6 +334,13 @@ export function useDAWActions(): DAWActions {
 
 function loadInitialProject(): DAWProject {
     if (typeof window === "undefined") return createDefaultProject();
+    // Check URL params first
+    const params = new URLSearchParams(window.location.search);
+    const urlProjectId = params.get("project");
+    if (urlProjectId) {
+        const saved = loadProject(urlProjectId);
+        if (saved) return saved;
+    }
     const activeId = getActiveProjectId();
     if (activeId) {
         const saved = loadProject(activeId);
@@ -300,6 +364,7 @@ interface PersistentUIState {
     showAutomation: boolean;
     showHistory: boolean;
     showClipboard: boolean;
+    showVoiceProcessor: boolean;
     focusMode: boolean;
     metronomeOn: boolean;
     metronomeVolume: number;
@@ -332,6 +397,7 @@ function saveUIState(state: DAWState) {
             showAutomation: state.showAutomation,
             showHistory: state.showHistory,
             showClipboard: state.showClipboard,
+            showVoiceProcessor: state.showVoiceProcessor,
             focusMode: state.focusMode,
             metronomeOn: state.metronomeOn,
             metronomeVolume: state.metronomeVolume,
@@ -341,6 +407,13 @@ function saveUIState(state: DAWState) {
     } catch {
         // Silently fail
     }
+}
+
+function updateProjectUrl(projectId: string) {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("project", projectId);
+    window.history.replaceState({}, "", url.toString());
 }
 
 export function DAWProvider({ children }: { children: ReactNode }) {
@@ -354,6 +427,9 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         isPlaying: false,
         isRecording: false,
         currentBeat: 0,
+        playbackMode: "song",
+        currentStepIndex: -1,
+        activeClipIds: [],
         tool: "select",
         snap: "1/4",
         metronomeOn: false,
@@ -375,6 +451,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         showAutomation: false,
         showHistory: false,
         showClipboard: false,
+        showVoiceProcessor: false,
         pianoRollTrackId: null,
         pianoRollClipId: null,
         synthConfig: DEFAULT_SYNTH_CONFIG,
@@ -433,22 +510,150 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         engineRef.current = engine;
 
         engine.onBeatUpdate = (beat) => {
-            setState(prev => ({ ...prev, currentBeat: beat }));
+            setState(prev => {
+                // Compute active clip IDs (clips the playhead is currently inside)
+                const activeClips: string[] = [];
+                for (const track of prev.project.tracks) {
+                    if (track.muted) continue;
+                    for (const clip of track.clips) {
+                        if (clip.muted) continue;
+                        if (beat >= clip.position && beat < clip.position + clip.length) {
+                            activeClips.push(clip.id);
+                        }
+                    }
+                }
+                return { ...prev, currentBeat: beat, activeClipIds: activeClips };
+            });
+        };
+
+        engine.onStepUpdate = (step) => {
+            setState(prev => ({ ...prev, currentStepIndex: step }));
         };
 
         engine.onPlaybackEnd = () => {
-            setState(prev => ({ ...prev, isPlaying: false, currentBeat: 0 }));
+            setState(prev => ({ ...prev, isPlaying: false, currentBeat: 0, activeClipIds: [], currentStepIndex: -1 }));
+        };
+
+        // Wire up recording callback — creates an audio clip from the recorded buffer
+        engine.onRecordingData = (trackId: string, buffer: AudioBuffer) => {
+            setState(prev => {
+                const track = prev.project.tracks.find(t => t.id === trackId);
+                if (!track) return prev;
+
+                const startBeat = engine.getRecordingStartBeat();
+                const lengthBeats = engine.secondsToBeats(buffer.duration, prev.project.tempo);
+                const peaks = engine.computeWaveformPeaks(buffer);
+                const clipId = createId();
+                const clip = createClip("audio", trackId, startBeat, lengthBeats, `Recording ${new Date().toLocaleTimeString()}`);
+                clip.id = clipId;
+                clip.audio = {
+                    buffer,
+                    waveformPeaks: peaks,
+                    duration: buffer.duration,
+                    sampleRate: buffer.sampleRate,
+                    channels: buffer.numberOfChannels,
+                    name: clip.name,
+                    sourceUrl: "",
+                    startOffset: 0,
+                    gain: 1,
+                    fadeIn: 0,
+                    fadeOut: 0,
+                    pitchShift: 0,
+                    timeStretch: 1,
+                    reversed: false,
+                };
+
+                return {
+                    ...prev,
+                    project: {
+                        ...prev.project,
+                        tracks: prev.project.tracks.map(t =>
+                            t.id !== trackId ? t : { ...t, clips: [...t.clips, clip] }
+                        ),
+                    },
+                };
+            });
+        };
+
+        // Wire up MIDI recording callback — creates a MIDI clip from recorded notes
+        engine.onMidiRecordingData = (trackId: string, notes: MidiNote[]) => {
+            setState(prev => {
+                const track = prev.project.tracks.find(t => t.id === trackId);
+                if (!track || notes.length === 0) return prev;
+
+                const startBeat = engine.getRecordingStartBeat();
+                const maxEnd = Math.max(...notes.map(n => n.start + n.duration));
+                const lengthBeats = Math.max(4, Math.ceil(maxEnd / 4) * 4); // round up to 4-beat bars
+                const clipId = createId();
+                const clip = createClip("midi", trackId, startBeat, lengthBeats, `MIDI Recording ${new Date().toLocaleTimeString()}`);
+                clip.id = clipId;
+                clip.midi = {
+                    notes,
+                    instrumentId: track.instrumentId || "synth",
+                };
+
+                return {
+                    ...prev,
+                    project: {
+                        ...prev.project,
+                        tracks: prev.project.tracks.map(t =>
+                            t.id !== trackId ? t : { ...t, clips: [...t.clips, clip] }
+                        ),
+                    },
+                };
+            });
         };
 
         // Load saved project from localStorage (client-only, after hydration)
         const saved = loadInitialProject();
         setState(prev => ({ ...prev, project: saved }));
+        updateProjectUrl(saved.id);
 
         // Create channels for initial tracks
         for (const track of saved.tracks) {
             engine.createChannel(track.id, track.type);
         }
         engine.createChannel(saved.masterTrack.id, "master");
+
+        // Reload audio buffers for clips that have sourceUrl but lost buffer on save
+        const clipsToReload: { trackId: string; clipId: string; sourceUrl: string; name: string }[] = [];
+        for (const track of saved.tracks) {
+            for (const clip of track.clips) {
+                if (clip.type === "audio" && clip.audio?.sourceUrl && !clip.audio.buffer) {
+                    clipsToReload.push({ trackId: track.id, clipId: clip.id, sourceUrl: clip.audio.sourceUrl, name: clip.audio.name || clip.name });
+                }
+            }
+        }
+        if (clipsToReload.length > 0) {
+            Promise.all(clipsToReload.map(async ({ trackId, clipId, sourceUrl, name }) => {
+                try {
+                    const buffer = await engine.loadAudioBuffer(sourceUrl);
+                    const peaks = engine.computeWaveformPeaks(buffer);
+                    setState(prev => ({
+                        ...prev,
+                        project: {
+                            ...prev.project,
+                            tracks: prev.project.tracks.map(t => t.id !== trackId ? t : {
+                                ...t,
+                                clips: t.clips.map(c => c.id !== clipId ? c : {
+                                    ...c,
+                                    audio: {
+                                        ...c.audio!,
+                                        buffer,
+                                        waveformPeaks: peaks,
+                                        duration: buffer.duration,
+                                        name,
+                                    },
+                                    length: engine.secondsToBeats(buffer.duration, saved.tempo),
+                                }),
+                            }),
+                        },
+                    }));
+                } catch {
+                    // Failed to reload audio, clip stays empty
+                }
+            }));
+        }
 
         return () => {
             cancelAnimationFrame(meterRAF.current);
@@ -457,6 +662,14 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Sync step pattern and playback mode to engine
+    useEffect(() => {
+        const engine = engineRef.current;
+        if (!engine) return;
+        engine.setStepPattern(state.stepPattern);
+        engine.setPlaybackMode(state.playbackMode);
+    }, [state.stepPattern, state.playbackMode]);
 
     // Metering loop
     useEffect(() => {
@@ -518,13 +731,19 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     }, [state.project, state.currentBeat]);
 
     const stop = useCallback(() => {
-        engineRef.current?.stop();
-        setState(prev => ({ ...prev, isPlaying: false, isRecording: false, currentBeat: 0 }));
-    }, []);
+        const engine = engineRef.current;
+        if (engine) {
+            if (state.isRecording) {
+                engine.stopRecording();
+            }
+            engine.stop();
+        }
+        setState(prev => ({ ...prev, isPlaying: false, isRecording: false, currentBeat: 0, activeClipIds: [], currentStepIndex: -1 }));
+    }, [state.isRecording]);
 
     const pause = useCallback(() => {
         engineRef.current?.pause();
-        setState(prev => ({ ...prev, isPlaying: false }));
+        setState(prev => ({ ...prev, isPlaying: false, activeClipIds: [] }));
     }, []);
 
     const togglePlay = useCallback(() => {
@@ -533,15 +752,39 @@ export function DAWProvider({ children }: { children: ReactNode }) {
 
     const record = useCallback(async () => {
         const engine = engineRef.current;
-        if (!engine || !state.selectedTrackId) return;
+        if (!engine) return;
+
+        // If already recording, stop recording
+        if (state.isRecording) {
+            engine.stopRecording();
+            engine.pause();
+            setState(prev => ({ ...prev, isPlaying: false, isRecording: false }));
+            return;
+        }
+
+        // Find an armed track to record into
+        if (!state.selectedTrackId) return;
         const track = state.project.tracks.find(t => t.id === state.selectedTrackId && t.armed);
         if (!track) return;
-        const success = await engine.startRecording(track.id);
-        if (success) {
+
+        engine.ensureRunning();
+
+        if (track.type === "midi") {
+            // MIDI recording: capture incoming MIDI notes into a clip
+            engine.startMidiRecording(track.id, state.currentBeat);
             engine.play(state.project, state.currentBeat);
             setState(prev => ({ ...prev, isPlaying: true, isRecording: true }));
+        } else {
+            // Audio recording: capture from input device through channel FX
+            const settings = getDAWSettings();
+            const deviceId = settings.audioInputDeviceId;
+            const success = await engine.startRecording(track.id, deviceId, state.currentBeat);
+            if (success) {
+                engine.play(state.project, state.currentBeat);
+                setState(prev => ({ ...prev, isPlaying: true, isRecording: true }));
+            }
         }
-    }, [state.selectedTrackId, state.project, state.currentBeat]);
+    }, [state.selectedTrackId, state.project, state.currentBeat, state.isRecording]);
 
     const seek = useCallback((beat: number) => {
         const clamped = Math.max(0, beat);
@@ -585,6 +828,19 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             loopRegion: { ...p.loopRegion, start, end },
         }));
     }, [updateProject]);
+
+    const setPlaybackMode = useCallback((mode: "pattern" | "song") => {
+        engineRef.current?.setPlaybackMode(mode);
+        setState(prev => ({ ...prev, playbackMode: mode }));
+    }, []);
+
+    const togglePlaybackMode = useCallback(() => {
+        setState(prev => {
+            const next = prev.playbackMode === "pattern" ? "song" : "pattern";
+            engineRef.current?.setPlaybackMode(next);
+            return { ...prev, playbackMode: next };
+        });
+    }, []);
 
     // ─── Tools ───────────────────────────────────────────────────────────
 
@@ -817,52 +1073,76 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     const loadAudioIntoClip = useCallback(async (clipId: string, url: string, name?: string) => {
         const engine = engineRef.current;
         if (!engine) return;
-        const found = findClip(clipId);
-        if (!found || !found.clip.audio) return;
         const buffer = await engine.loadAudioBuffer(url);
         const peaks = engine.computeWaveformPeaks(buffer);
-        updateTrack(found.track.id, t => ({
-            ...t,
-            clips: t.clips.map(c => c.id === clipId ? {
-                ...c,
-                audio: {
-                    ...c.audio!,
-                    buffer,
-                    sourceUrl: url,
-                    name: name || url.split("/").pop() || "Audio",
-                    duration: buffer.duration,
-                    waveformPeaks: peaks,
+        setState(prev => {
+            const tempo = prev.project.tempo;
+            return {
+                ...prev,
+                project: {
+                    ...prev.project,
+                    tracks: prev.project.tracks.map(t => {
+                        const hasClip = t.clips.some(c => c.id === clipId);
+                        if (!hasClip) return t;
+                        return {
+                            ...t,
+                            clips: t.clips.map(c => c.id !== clipId || !c.audio ? c : {
+                                ...c,
+                                audio: {
+                                    ...c.audio,
+                                    buffer,
+                                    sourceUrl: url,
+                                    name: name || url.split("/").pop() || "Audio",
+                                    duration: buffer.duration,
+                                    waveformPeaks: peaks,
+                                },
+                                length: engine.secondsToBeats(buffer.duration, tempo),
+                            }),
+                        };
+                    }),
                 },
-                length: engine.secondsToBeats(buffer.duration, state.project.tempo),
-            } : c),
-        }));
-    }, [findClip, updateTrack, state.project.tempo]);
+                isDirty: true,
+            };
+        });
+    }, []);
 
     const loadFileIntoClip = useCallback(async (clipId: string, file: File) => {
         const engine = engineRef.current;
         if (!engine) return;
-        const found = findClip(clipId);
-        if (!found || !found.clip.audio) return;
         const buffer = await engine.loadAudioFile(file);
         const peaks = engine.computeWaveformPeaks(buffer);
         const url = URL.createObjectURL(file);
-        updateTrack(found.track.id, t => ({
-            ...t,
-            clips: t.clips.map(c => c.id === clipId ? {
-                ...c,
-                name: file.name,
-                audio: {
-                    ...c.audio!,
-                    buffer,
-                    sourceUrl: url,
-                    name: file.name,
-                    duration: buffer.duration,
-                    waveformPeaks: peaks,
+        setState(prev => {
+            const tempo = prev.project.tempo;
+            return {
+                ...prev,
+                project: {
+                    ...prev.project,
+                    tracks: prev.project.tracks.map(t => {
+                        const hasClip = t.clips.some(c => c.id === clipId);
+                        if (!hasClip) return t;
+                        return {
+                            ...t,
+                            clips: t.clips.map(c => c.id !== clipId || !c.audio ? c : {
+                                ...c,
+                                name: file.name,
+                                audio: {
+                                    ...c.audio,
+                                    buffer,
+                                    sourceUrl: url,
+                                    name: file.name,
+                                    duration: buffer.duration,
+                                    waveformPeaks: peaks,
+                                },
+                                length: engine.secondsToBeats(buffer.duration, tempo),
+                            }),
+                        };
+                    }),
                 },
-                length: engine.secondsToBeats(buffer.duration, state.project.tempo),
-            } : c),
-        }));
-    }, [findClip, updateTrack, state.project.tempo]);
+                isDirty: true,
+            };
+        });
+    }, []);
 
     // ─── Audio Clip Editing ──────────────────────────────────────────────
 
@@ -1225,7 +1505,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
 
     // ─── Panels ──────────────────────────────────────────────────────────
 
-    const togglePanel = useCallback((panel: "pianoRoll" | "mixer" | "stepSequencer" | "browser" | "effectsRack" | "synth" | "automation" | "history" | "clipboard") => {
+    const togglePanel = useCallback((panel: "pianoRoll" | "mixer" | "stepSequencer" | "browser" | "effectsRack" | "synth" | "automation" | "history" | "clipboard" | "voiceProcessor") => {
         const key = `show${panel.charAt(0).toUpperCase() + panel.slice(1)}` as keyof DAWState;
         setState(prev => ({ ...prev, [key]: !prev[key] }));
     }, []);
@@ -1253,6 +1533,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             isDirty: false,
         }));
         saveProject(project);
+        updateProjectUrl(project.id);
     }, [state.project.tracks]);
 
     const openProject = useCallback((id: string) => {
@@ -1263,7 +1544,36 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             state.project.tracks.forEach(t => engine.removeChannel(t.id));
             project.tracks.forEach(t => engine.createChannel(t.id, t.type));
             engine.createChannel(project.masterTrack.id, "master");
+
+            // Reload audio buffers for clips that have sourceUrl
+            for (const track of project.tracks) {
+                for (const clip of track.clips) {
+                    if (clip.type === "audio" && clip.audio?.sourceUrl && !clip.audio.buffer) {
+                        const { sourceUrl, name } = clip.audio;
+                        const trackId = track.id;
+                        const clipId = clip.id;
+                        engine.loadAudioBuffer(sourceUrl).then(buffer => {
+                            const peaks = engine.computeWaveformPeaks(buffer);
+                            setState(prev => ({
+                                ...prev,
+                                project: {
+                                    ...prev.project,
+                                    tracks: prev.project.tracks.map(t => t.id !== trackId ? t : {
+                                        ...t,
+                                        clips: t.clips.map(c => c.id !== clipId ? c : {
+                                            ...c,
+                                            audio: { ...c.audio!, buffer, waveformPeaks: peaks, duration: buffer.duration, name: name || c.name },
+                                            length: engine.secondsToBeats(buffer.duration, project.tempo),
+                                        }),
+                                    }),
+                                },
+                            }));
+                        }).catch(() => { /* clip stays empty */ });
+                    }
+                }
+            }
         }
+        updateProjectUrl(id);
         setState(prev => ({
             ...prev,
             project,
@@ -1280,6 +1590,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
 
     const saveCurrentProject = useCallback(() => {
         saveProject(state.project);
+        updateProjectUrl(state.project.id);
         setState(prev => ({ ...prev, isDirty: false }));
     }, [state.project]);
 
@@ -1567,7 +1878,11 @@ export function DAWProvider({ children }: { children: ReactNode }) {
 
         // Load audio into the clip
         try {
-            const audioUrl = `/api/audio/${encodeURIComponent(trackFilepath)}`;
+            // If the path is a direct URL (e.g. /samples/...), use it directly
+            // Otherwise, route through the API for DB track IDs
+            const audioUrl = trackFilepath.startsWith("/")
+                ? trackFilepath
+                : `/api/audio/${encodeURIComponent(trackFilepath)}`;
             const buffer = await engine.loadAudioBuffer(audioUrl);
             const peaks = engine.computeWaveformPeaks(buffer);
             updateTrack(track.id, t => ({
@@ -1612,6 +1927,71 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         return engineRef.current;
     }, []);
 
+    // ─── Voice Processor Bridge ──────────────────────────────────────────
+
+    const vpBridgeRef = useRef<VPBridge | null>(null);
+
+    const registerVPBridge = useCallback((bridge: VPBridge) => {
+        vpBridgeRef.current = bridge;
+    }, []);
+
+    const unregisterVPBridge = useCallback(() => {
+        vpBridgeRef.current = null;
+    }, []);
+
+    const getVPBridge = useCallback((): VPBridge | null => {
+        return vpBridgeRef.current;
+    }, []);
+
+    // ─── Stems Separation ────────────────────────────────────────────────
+
+    const separateClipToStems = useCallback(async (clipId: string) => {
+        const found = findClip(clipId);
+        if (!found || !found.clip.audio?.buffer) return;
+
+        const { clip } = found;
+        const buffer = clip.audio!.buffer!;
+        const { separateStems, STEM_COLORS: stemColors } = await import("@/lib/stems-engine");
+
+        pushUndoNamed(`Separate "${clip.name}" to Stems`, "Layers");
+
+        const result = await separateStems(buffer);
+        const stemEntries = [
+            { type: "vocals" as const, buffer: result.vocals, color: stemColors.vocals },
+            { type: "drums" as const, buffer: result.drums, color: stemColors.drums },
+            { type: "bass" as const, buffer: result.bass, color: stemColors.bass },
+            { type: "melody" as const, buffer: result.melody, color: stemColors.melody },
+        ];
+
+        const newTracks: typeof state.project.tracks = [];
+
+        for (const stem of stemEntries) {
+            if (!stem.buffer) continue;
+            const track = createDefaultTrack("audio", `${clip.name} — ${stem.type.charAt(0).toUpperCase() + stem.type.slice(1)}`);
+            track.color = stem.color;
+            engineRef.current?.createChannel(track.id, "audio");
+
+            const stemClip = createClip("audio", track.id, clip.position, clip.length, `${stem.type}`);
+            stemClip.color = stem.color;
+            stemClip.audio = {
+                ...stemClip.audio!,
+                buffer: stem.buffer,
+                name: `${clip.name} (${stem.type})`,
+                duration: stem.buffer.duration,
+                sampleRate: stem.buffer.sampleRate,
+                channels: stem.buffer.numberOfChannels,
+            };
+
+            track.clips = [stemClip];
+            newTracks.push(track);
+        }
+
+        updateProject(p => ({
+            ...p,
+            tracks: [...p.tracks, ...newTracks],
+        }));
+    }, [findClip, pushUndoNamed, updateProject]);
+
     // ─── Auto-save ───────────────────────────────────────────────────────
 
     useEffect(() => {
@@ -1635,6 +2015,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     const actions = useMemo<DAWActions>(() => ({
         play, stop, pause, togglePlay, record, seek, setTempo, setTimeSignature,
         toggleMetronome, setMetronomeVolume, toggleLoop, setLoopRegion,
+        setPlaybackMode, togglePlaybackMode,
         setTool, setSnap, setZoom, setScroll,
         addTrack, removeTrack, renameTrack, setTrackVolume, setTrackPan,
         toggleTrackMute, toggleTrackSolo, toggleTrackArm, setTrackColor,
@@ -1658,10 +2039,12 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         pasteClips, pasteNotes, pasteTrack,
         removeClipboardEntry, togglePinClipboardEntry, setActiveClipboardEntry, clearAllClipboard,
         importTrackFromLibrary,
-        setMasterVolume, exportProject, getEngine,
+        setMasterVolume, exportProject, getEngine, separateClipToStems,
+        registerVPBridge, unregisterVPBridge, getVPBridge,
     }), [
         play, stop, pause, togglePlay, record, seek, setTempo, setTimeSignature,
         toggleMetronome, setMetronomeVolume, toggleLoop, setLoopRegion,
+        setPlaybackMode, togglePlaybackMode,
         setTool, setSnap, setZoom, setScroll,
         addTrack, removeTrack, renameTrack, setTrackVolume, setTrackPan,
         toggleTrackMute, toggleTrackSolo, toggleTrackArm, setTrackColor,
@@ -1685,7 +2068,8 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         pasteClips, pasteNotes, pasteTrack,
         removeClipboardEntry, togglePinClipboardEntry, setActiveClipboardEntry, clearAllClipboard,
         importTrackFromLibrary,
-        setMasterVolume, exportProject, getEngine,
+        setMasterVolume, exportProject, getEngine, separateClipToStems,
+        registerVPBridge, unregisterVPBridge, getVPBridge,
     ]);
 
     return (

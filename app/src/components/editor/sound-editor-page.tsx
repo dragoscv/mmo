@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EditorProvider, useEditor, type EditorView, type EditorTool } from "./editor-context";
+import { EditorRemoteBridge } from "@/components/remote/editor-remote-bridge";
 import { HistoryPanel } from "../daw/daw-history-panel";
 import { WaveformView } from "./waveform-view";
 import { SpectrogramView } from "./spectrogram-view";
@@ -15,9 +16,24 @@ import {
     SplitSquareHorizontal, BarChart3, Bookmark,
     ArrowDownToLine, ArrowUpFromLine, RotateCcw,
     VolumeX, FileAudio, FolderOpen, Download, Save,
-    ArrowLeft, Clock,
+    ArrowLeft, Clock, Settings, X, Maximize2, Minimize2,
+    Mic, Zap, Cpu, Box, MonitorSpeaker, MemoryStick,
+    Layers,
 } from "lucide-react";
+import { useFocusMode } from "@/components/focus-mode-context";
+import { usePerformanceStats } from "@/hooks/use-performance-stats";
 import Link from "next/link";
+import { VoiceProcessor } from "@/components/daw/daw-voice-processor";
+import {
+    useDAWSettings,
+    enumerateAudioOutputs,
+    enumerateAudioInputs,
+    requestAudioPermission,
+    setAudioContextSinkId,
+    type EditorWaveformColor,
+    type SpectrogramColorMap,
+    EDITOR_WAVEFORM_COLORS,
+} from "@/hooks/use-daw-settings";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Sound Editor Page (wrapper with provider)
@@ -26,6 +42,7 @@ import Link from "next/link";
 export function SoundEditorPage() {
     return (
         <EditorProvider>
+            <EditorRemoteBridge />
             <SoundEditorInner />
         </EditorProvider>
     );
@@ -40,13 +57,21 @@ function SoundEditorInner() {
     const searchParams = useSearchParams();
     const dropRef = useRef<HTMLDivElement>(null);
     const [showHistory, setShowHistory] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
+    const [showFxPanel, setShowFxPanel] = useState(false);
+    const displaySettings = useDAWSettings();
 
     // Load from URL params on mount
     useEffect(() => {
-        const clipId = searchParams.get("clip");
+        const src = searchParams.get("src");
+        const name = searchParams.get("name");
         const trackId = searchParams.get("track");
-        if (trackId) {
-            editor.loadFromUrl(`/api/audio/${trackId}`, `Track ${trackId}`);
+        if (src) {
+            // Direct source URL (from DAW clip or sample)
+            editor.loadFromUrl(src, name || src.split("/").pop() || "Audio");
+        } else if (trackId) {
+            // Legacy: load from API by track ID
+            editor.loadFromUrl(`/api/audio/${trackId}`, name || `Track ${trackId}`);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -73,6 +98,7 @@ function SoundEditorInner() {
                 editor.addMarker(editor.playPosition);
             }
             else if (e.key === "F8") { e.preventDefault(); setShowHistory(h => !h); }
+            else if (e.key === "F10") { e.preventDefault(); setShowFxPanel(f => !f); }
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
@@ -109,7 +135,14 @@ function SoundEditorInner() {
             <input ref={fileInputRef} type="file" accept="audio/*" onChange={handleFileChange} className="hidden" />
 
             {/* Top Toolbar */}
-            <EditorToolbar onFileOpen={handleFileOpen} showHistory={showHistory} onToggleHistory={() => setShowHistory(h => !h)} />
+            <EditorToolbar
+                onFileOpen={handleFileOpen}
+                showHistory={showHistory}
+                onToggleHistory={() => setShowHistory(h => !h)}
+                onToggleSettings={() => setShowSettings(s => !s)}
+                showFx={showFxPanel}
+                onToggleFx={() => setShowFxPanel(f => !f)}
+            />
 
             {/* Main content area with optional history sidebar */}
             <div className="flex-1 flex overflow-hidden">
@@ -160,7 +193,7 @@ function SoundEditorInner() {
                     </div>
 
                     {/* Minimap */}
-                    {editor.buffer && <Minimap />}
+                    {editor.buffer && displaySettings.editorShowMinimap && <Minimap />}
                 </div>
 
                 {/* History sidebar */}
@@ -175,10 +208,20 @@ function SoundEditorInner() {
                         />
                     </div>
                 )}
+
+                {/* FX / Voice Processor sidebar */}
+                {showFxPanel && (
+                    <div className="w-[340px] border-l border-[oklch(1_0_0/0.08)] flex-shrink-0 overflow-hidden">
+                        <VoiceProcessor compact />
+                    </div>
+                )}
             </div>
 
             {/* Bottom info bar */}
             <InfoBar />
+
+            {/* Settings Modal */}
+            {showSettings && <EditorSettingsModal onClose={() => setShowSettings(false)} />}
         </div>
     );
 }
@@ -187,7 +230,7 @@ function SoundEditorInner() {
 // Toolbar
 // ═══════════════════════════════════════════════════════════════════════════
 
-function EditorToolbar({ onFileOpen, showHistory, onToggleHistory }: { onFileOpen: () => void; showHistory: boolean; onToggleHistory: () => void }) {
+function EditorToolbar({ onFileOpen, showHistory, onToggleHistory, onToggleSettings, showFx, onToggleFx }: { onFileOpen: () => void; showHistory: boolean; onToggleHistory: () => void; onToggleSettings: () => void; showFx: boolean; onToggleFx: () => void }) {
     const editor = useEditor();
 
     const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; key: string }[] = [
@@ -277,8 +320,22 @@ function EditorToolbar({ onFileOpen, showHistory, onToggleHistory }: { onFileOpe
 
             <Sep />
 
+            {/* Stems */}
+            <StemsToolbarSection />
+
+            <Sep />
+
             {/* History toggle */}
             <Btn icon={Clock} label="History (F8)" onClick={onToggleHistory} active={showHistory} />
+
+            {/* Voice Processor / FX Panel */}
+            <Btn icon={Mic} label="Voice Processor (F10)" onClick={onToggleFx} active={showFx} />
+
+            {/* Settings */}
+            <Btn icon={Settings} label="Settings" onClick={onToggleSettings} />
+
+            {/* Focus Mode */}
+            <FocusModeBtn />
 
             <Sep />
 
@@ -485,6 +542,12 @@ function Minimap() {
 
 function InfoBar() {
     const editor = useEditor();
+    const stats = usePerformanceStats();
+    const settings = useDAWSettings();
+    const cfg = settings.editorStatusBarStats;
+
+    const fpsPct = (stats.fps / 60) * 100;
+    const heapPct = stats.jsHeapLimit > 0 ? (stats.jsHeapUsed / stats.jsHeapLimit) * 100 : 0;
 
     const formatTime = (s: number) => {
         const min = Math.floor(s / 60);
@@ -492,8 +555,64 @@ function InfoBar() {
         return `${min}:${sec.padStart(6, "0")}`;
     };
 
+    const hasAnyPerfStat = cfg.showFps || cfg.showHeapMemory || cfg.showJsHeapTotal || cfg.showDomNodes || cfg.showAudioLatency || cfg.showCpuCores || cfg.showDeviceMemory;
+
     return (
         <div className="h-7 bg-[oklch(0.16_0.01_260)] border-t border-[oklch(1_0_0/0.08)] flex items-center px-3 gap-4 flex-shrink-0 text-[10px] font-mono text-[oklch(1_0_0/0.35)]">
+            {/* Performance stats */}
+            {hasAnyPerfStat && (
+                <>
+                    <div className="flex items-center gap-2.5">
+                        {cfg.showFps && (
+                            <div className="flex items-center gap-1">
+                                <div className={cn("h-1.5 w-1.5 rounded-full shrink-0", fpsPct >= 90 ? "bg-emerald-500" : fpsPct >= 50 ? "bg-amber-500" : "bg-rose-500")} />
+                                <span>{stats.fps} FPS</span>
+                            </div>
+                        )}
+                        {cfg.showHeapMemory && (
+                            <div className="flex items-center gap-1">
+                                <Cpu className="h-2.5 w-2.5 opacity-40" />
+                                <span className={cn(heapPct >= 90 ? "text-rose-400" : heapPct >= 70 ? "text-amber-400" : "")}>
+                                    {stats.jsHeapUsed.toFixed(0)}MB
+                                </span>
+                            </div>
+                        )}
+                        {cfg.showJsHeapTotal && (
+                            <div className="flex items-center gap-1">
+                                <Box className="h-2.5 w-2.5 opacity-40" />
+                                <span>Heap {stats.jsHeapTotal.toFixed(0)}MB</span>
+                            </div>
+                        )}
+                        {cfg.showDomNodes && (
+                            <div className="flex items-center gap-1">
+                                <MonitorSpeaker className="h-2.5 w-2.5 opacity-40" />
+                                <span>{stats.domNodes} DOM</span>
+                            </div>
+                        )}
+                        {cfg.showAudioLatency && stats.audioLatency > 0 && (
+                            <div className="flex items-center gap-1">
+                                <Zap className="h-2.5 w-2.5 opacity-40" />
+                                <span className={cn(stats.audioLatency > 20 ? "text-amber-400" : "")}>
+                                    {stats.audioLatency.toFixed(1)}ms
+                                </span>
+                            </div>
+                        )}
+                        {cfg.showCpuCores && stats.cpuCores > 0 && (
+                            <div className="flex items-center gap-1">
+                                <MemoryStick className="h-2.5 w-2.5 opacity-40" />
+                                <span>{stats.cpuCores} cores</span>
+                            </div>
+                        )}
+                        {cfg.showDeviceMemory && stats.deviceMemory > 0 && (
+                            <div className="flex items-center gap-1">
+                                <MemoryStick className="h-2.5 w-2.5 opacity-40" />
+                                <span>{stats.deviceMemory}GB RAM</span>
+                            </div>
+                        )}
+                    </div>
+                    <Sep />
+                </>
+            )}
             {/* File info */}
             <span>{editor.project.name}</span>
             <Sep />
@@ -578,4 +697,383 @@ function Btn({ icon: Icon, label, onClick, active, disabled }: {
 
 function Sep() {
     return <div className="w-px h-4 bg-[oklch(1_0_0/0.06)] mx-0.5" />;
+}
+
+function FocusModeBtn() {
+    const { isFocusMode, toggleFocusMode } = useFocusMode();
+    return (
+        <button
+            onClick={toggleFocusMode}
+            title={isFocusMode ? "Exit focus mode" : "Focus mode (hide sidebar & player)"}
+            className={cn(
+                "editor-btn h-7 w-7 flex items-center justify-center rounded transition-colors",
+                isFocusMode
+                    ? "bg-[oklch(0.62_0.19_300/0.2)] text-[oklch(0.62_0.19_300)]"
+                    : "text-[oklch(1_0_0/0.4)] hover:text-[oklch(1_0_0/0.7)] hover:bg-[oklch(1_0_0/0.05)]"
+            )}
+        >
+            {isFocusMode ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+        </button>
+    );
+}
+
+const STEM_ITEMS: { type: import("@/lib/stems-engine").StemType; label: string; color: string }[] = [
+    { type: "vocals", label: "Vocals", color: "#a855f7" },
+    { type: "drums", label: "Drums", color: "#ef4444" },
+    { type: "bass", label: "Bass", color: "#3b82f6" },
+    { type: "melody", label: "Melody", color: "#22c55e" },
+];
+
+function StemsToolbarSection() {
+    const editor = useEditor();
+    const [open, setOpen] = useState(false);
+    const hasBuf = !!editor.buffer;
+
+    return (
+        <div className="relative">
+            <button
+                onClick={() => setOpen(o => !o)}
+                disabled={!hasBuf}
+                title="Stems Separation"
+                className={cn(
+                    "editor-btn h-7 px-2 flex items-center gap-1 rounded transition-colors",
+                    open
+                        ? "bg-purple-500/20 text-purple-400"
+                        : "text-[oklch(1_0_0/0.4)] hover:text-[oklch(1_0_0/0.7)] hover:bg-[oklch(1_0_0/0.05)]",
+                    !hasBuf && "opacity-30 pointer-events-none",
+                )}
+            >
+                <Layers className="h-3.5 w-3.5" />
+                <span className="text-[10px] font-medium">Stems</span>
+            </button>
+
+            {open && hasBuf && (
+                <div className="absolute top-full left-0 mt-1 z-50 w-44 rounded-lg border border-[oklch(1_0_0/0.1)] bg-[oklch(0.14_0.01_260)] shadow-xl p-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                    {/* Separate All */}
+                    <button
+                        onClick={() => {
+                            import("sonner").then(({ toast }) => {
+                                const toastId = toast.loading("Separating stems...");
+                                editor.separateStems().then(() => {
+                                    toast.success("Stems separated", { id: toastId, description: "Click a stem below to extract it" });
+                                }).catch(() => {
+                                    toast.error("Separation failed", { id: toastId });
+                                });
+                            });
+                        }}
+                        disabled={editor.isSeparatingStems}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-purple-400 hover:bg-purple-500/10 transition-colors cursor-pointer disabled:opacity-40"
+                    >
+                        <Layers className="h-3.5 w-3.5" />
+                        {editor.isSeparatingStems ? "Separating..." : "Analyze Stems"}
+                    </button>
+
+                    <div className="h-px bg-[oklch(1_0_0/0.06)] my-1" />
+
+                    {/* Extract individual stems */}
+                    {STEM_ITEMS.map(s => (
+                        <button
+                            key={s.type}
+                            onClick={() => {
+                                import("sonner").then(({ toast }) => {
+                                    const toastId = toast.loading(`Extracting ${s.label}...`);
+                                    editor.extractStem(s.type).then(() => {
+                                        toast.success(`${s.label} extracted`, { id: toastId, description: "Buffer replaced with stem audio" });
+                                        setOpen(false);
+                                    }).catch(() => {
+                                        toast.error(`Failed to extract ${s.label}`, { id: toastId });
+                                    });
+                                });
+                            }}
+                            disabled={editor.isSeparatingStems}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[oklch(1_0_0/0.6)] hover:bg-[oklch(1_0_0/0.05)] transition-colors cursor-pointer disabled:opacity-40"
+                        >
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                            Extract {s.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Editor Settings Modal
+// ═══════════════════════════════════════════════════════════════════════════
+
+function EditorSettingsModal({ onClose }: { onClose: () => void }) {
+    const s = useDAWSettings();
+    const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+    const [inputDevices, setInputDevices] = useState<MediaDeviceInfo[]>([]);
+    const [audioPermission, setAudioPermission] = useState<"prompt" | "granted" | "denied">("prompt");
+    const [tab, setTab] = useState<"audio" | "display">("audio");
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const status = await navigator.permissions.query({ name: "microphone" as PermissionName });
+                if (status.state === "granted") {
+                    setAudioPermission("granted");
+                    setAudioDevices(await enumerateAudioOutputs());
+                    setInputDevices(await enumerateAudioInputs());
+                } else if (status.state === "denied") {
+                    setAudioPermission("denied");
+                } else {
+                    setAudioPermission("prompt");
+                    setAudioDevices(await enumerateAudioOutputs());
+                }
+            } catch {
+                setAudioDevices(await enumerateAudioOutputs());
+            }
+        })();
+    }, []);
+
+    const handleRequestPermission = useCallback(async () => {
+        const result = await requestAudioPermission();
+        setAudioPermission(result);
+        if (result === "granted") {
+            setAudioDevices(await enumerateAudioOutputs());
+            setInputDevices(await enumerateAudioInputs());
+        }
+    }, []);
+
+    const handleOutputChange = useCallback(async (deviceId: string) => {
+        s.update({ audioOutputDeviceId: deviceId });
+        const audios = document.querySelectorAll("audio");
+        for (const audio of audios) {
+            if ("setSinkId" in audio) {
+                try {
+                    await (audio as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> }).setSinkId(deviceId);
+                } catch { /* not supported */ }
+            }
+        }
+    }, [s]);
+
+    const tabs = [
+        { id: "audio" as const, label: "Audio", icon: Volume2 },
+        { id: "display" as const, label: "Display", icon: Settings },
+    ];
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="w-[500px] max-h-[70vh] bg-[oklch(0.14_0.01_260)] border border-[oklch(1_0_0/0.1)] rounded-xl shadow-2xl flex flex-col overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[oklch(1_0_0/0.08)]">
+                    <div className="flex items-center gap-2">
+                        <Settings className="h-4 w-4 text-[oklch(1_0_0/0.3)]" />
+                        <h2 className="text-sm font-medium text-[oklch(1_0_0/0.8)]">Editor Settings</h2>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="w-6 h-6 rounded flex items-center justify-center text-[oklch(1_0_0/0.3)] hover:text-[oklch(1_0_0/0.6)] hover:bg-[oklch(1_0_0/0.05)]"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                {/* Tab bar */}
+                <div className="flex border-b border-[oklch(1_0_0/0.08)] px-2">
+                    {tabs.map(t => (
+                        <button
+                            key={t.id}
+                            onClick={() => setTab(t.id)}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 h-9 text-xs transition-colors",
+                                tab === t.id ? "text-[oklch(1_0_0/0.8)] border-b-2 border-[oklch(0.62_0.19_250)]" : "text-[oklch(1_0_0/0.3)]"
+                            )}
+                        >
+                            <t.icon className="h-3 w-3" />
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {tab === "audio" && (
+                        <>
+                            <EditorSettingsSection title="Audio Output">
+                                <EditorSettingsRow label="Output Device" description="Select audio playback device">
+                                    {audioPermission !== "granted" ? (
+                                        <button
+                                            onClick={handleRequestPermission}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium bg-[oklch(0.62_0.19_250/0.2)] border border-[oklch(0.62_0.19_250/0.3)] text-[oklch(0.75_0.15_250)] hover:bg-[oklch(0.62_0.19_250/0.3)] transition-colors cursor-pointer"
+                                        >
+                                            <Volume2 className="w-3 h-3" />
+                                            Grant Permission
+                                        </button>
+                                    ) : (
+                                        <select
+                                            value={s.audioOutputDeviceId}
+                                            onChange={(e) => handleOutputChange(e.target.value)}
+                                            className="h-7 bg-black/30 border border-[oklch(1_0_0/0.1)] rounded text-xs px-2 text-[oklch(1_0_0/0.6)] focus:outline-none min-w-[180px]"
+                                        >
+                                            {audioDevices.length === 0 && (
+                                                <option value="default">Default</option>
+                                            )}
+                                            {audioDevices.map(d => (
+                                                <option key={d.deviceId} value={d.deviceId}>
+                                                    {d.label || `Output ${d.deviceId.slice(0, 8)}`}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </EditorSettingsRow>
+                            </EditorSettingsSection>
+
+                            <EditorSettingsSection title="Audio Input">
+                                <EditorSettingsRow label="Input Device" description="Microphone / line input for voice processor">
+                                    {audioPermission !== "granted" ? (
+                                        <button
+                                            onClick={handleRequestPermission}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium bg-[oklch(0.62_0.19_250/0.2)] border border-[oklch(0.62_0.19_250/0.3)] text-[oklch(0.75_0.15_250)] hover:bg-[oklch(0.62_0.19_250/0.3)] transition-colors cursor-pointer"
+                                        >
+                                            <Mic className="w-3 h-3" />
+                                            Grant Permission
+                                        </button>
+                                    ) : (
+                                        <select
+                                            value={s.audioInputDeviceId}
+                                            onChange={(e) => s.update({ audioInputDeviceId: e.target.value })}
+                                            className="h-7 bg-black/30 border border-[oklch(1_0_0/0.1)] rounded text-xs px-2 text-[oklch(1_0_0/0.6)] focus:outline-none min-w-[180px]"
+                                        >
+                                            {inputDevices.length === 0 && (
+                                                <option value="default">Default</option>
+                                            )}
+                                            {inputDevices.map(d => (
+                                                <option key={d.deviceId} value={d.deviceId}>
+                                                    {d.label || `Input ${d.deviceId.slice(0, 8)}`}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </EditorSettingsRow>
+                            </EditorSettingsSection>
+                        </>
+                    )}
+
+                    {tab === "display" && (
+                        <>
+                            <EditorSettingsSection title="Waveform">
+                                <EditorSettingsRow label="Waveform Color" description="Color of the waveform display">
+                                    <div className="flex items-center gap-1.5">
+                                        {(Object.keys(EDITOR_WAVEFORM_COLORS) as EditorWaveformColor[]).map(c => (
+                                            <button
+                                                key={c}
+                                                onClick={() => s.update({ editorWaveformColor: c })}
+                                                className={cn(
+                                                    "w-5 h-5 rounded-full border-2 transition-all",
+                                                    s.editorWaveformColor === c ? "border-white/60 scale-110" : "border-white/10 hover:border-white/30"
+                                                )}
+                                                style={{ background: EDITOR_WAVEFORM_COLORS[c] }}
+                                                title={c}
+                                            />
+                                        ))}
+                                    </div>
+                                </EditorSettingsRow>
+                                <EditorSettingsRow label="Show RMS Overlay" description="Display RMS energy alongside peaks">
+                                    <EditorToggle checked={s.editorShowRms} onChange={(v) => s.update({ editorShowRms: v })} />
+                                </EditorSettingsRow>
+                                <EditorSettingsRow label="Show Grid Lines" description="Time grid lines in waveform view">
+                                    <EditorToggle checked={s.editorShowGridLines} onChange={(v) => s.update({ editorShowGridLines: v })} />
+                                </EditorSettingsRow>
+                                <EditorSettingsRow label="Show Minimap" description="Overview minimap below waveform">
+                                    <EditorToggle checked={s.editorShowMinimap} onChange={(v) => s.update({ editorShowMinimap: v })} />
+                                </EditorSettingsRow>
+                            </EditorSettingsSection>
+
+                            <EditorSettingsSection title="Spectrogram">
+                                <EditorSettingsRow label="Color Map" description="Spectrogram color scheme">
+                                    <select
+                                        value={s.spectrogramColorMap}
+                                        onChange={(e) => s.update({ spectrogramColorMap: e.target.value as SpectrogramColorMap })}
+                                        className="h-7 bg-black/30 border border-[oklch(1_0_0/0.1)] rounded text-xs px-2 text-[oklch(1_0_0/0.6)] focus:outline-none"
+                                    >
+                                        <option value="magma">Magma</option>
+                                        <option value="viridis">Viridis</option>
+                                        <option value="inferno">Inferno</option>
+                                        <option value="plasma">Plasma</option>
+                                        <option value="grayscale">Grayscale</option>
+                                    </select>
+                                </EditorSettingsRow>
+                                <EditorSettingsRow label="FFT Size" description="Frequency resolution">
+                                    <select
+                                        value={s.spectrogramFftSize}
+                                        onChange={(e) => s.update({ spectrogramFftSize: parseInt(e.target.value) })}
+                                        className="h-7 bg-black/30 border border-[oklch(1_0_0/0.1)] rounded text-xs px-2 text-[oklch(1_0_0/0.6)] focus:outline-none"
+                                    >
+                                        <option value="512">512 (fast)</option>
+                                        <option value="1024">1024</option>
+                                        <option value="2048">2048 (balanced)</option>
+                                        <option value="4096">4096 (detailed)</option>
+                                    </select>
+                                </EditorSettingsRow>
+                            </EditorSettingsSection>
+
+                            <EditorSettingsSection title="Status Bar Stats">
+                                <p className="text-[9px] text-[oklch(1_0_0/0.2)] -mt-1 mb-2">Choose which performance metrics to display in the info bar</p>
+                                {([
+                                    { key: "showFps" as const, label: "FPS", desc: "Frame rate counter" },
+                                    { key: "showHeapMemory" as const, label: "Heap Memory", desc: "JS heap used (MB)" },
+                                    { key: "showJsHeapTotal" as const, label: "JS Heap Total", desc: "Total JS heap allocated" },
+                                    { key: "showDomNodes" as const, label: "DOM Nodes", desc: "Number of DOM elements" },
+                                    { key: "showAudioLatency" as const, label: "Audio Latency", desc: "Audio context latency (ms)" },
+                                    { key: "showCpuCores" as const, label: "CPU Cores", desc: "Hardware concurrency" },
+                                    { key: "showDeviceMemory" as const, label: "Device Memory", desc: "Approximate device RAM" },
+                                ] as const).map(item => (
+                                    <EditorSettingsRow key={item.key} label={item.label} description={item.desc}>
+                                        <EditorToggle
+                                            checked={s.editorStatusBarStats[item.key]}
+                                            onChange={(v) => s.update({ editorStatusBarStats: { ...s.editorStatusBarStats, [item.key]: v } })}
+                                        />
+                                    </EditorSettingsRow>
+                                ))}
+                            </EditorSettingsSection>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function EditorSettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div>
+            <h3 className="text-[10px] text-[oklch(1_0_0/0.3)] uppercase tracking-wider mb-2">{title}</h3>
+            <div className="space-y-2 pl-1">{children}</div>
+        </div>
+    );
+}
+
+function EditorSettingsRow({ label, description, children }: { label: string; description: string; children: React.ReactNode }) {
+    return (
+        <div className="flex items-center justify-between py-1">
+            <div>
+                <p className="text-[11px] text-[oklch(1_0_0/0.6)]">{label}</p>
+                <p className="text-[9px] text-[oklch(1_0_0/0.2)]">{description}</p>
+            </div>
+            {children}
+        </div>
+    );
+}
+
+function EditorToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+    return (
+        <button
+            onClick={() => onChange(!checked)}
+            className={cn(
+                "w-8 h-4 rounded-full transition-colors relative",
+                checked ? "bg-[oklch(0.62_0.19_250)]" : "bg-[oklch(1_0_0/0.1)]"
+            )}
+        >
+            <div
+                className={cn(
+                    "w-3 h-3 bg-white rounded-full absolute top-0.5 transition-transform",
+                    checked ? "translate-x-4" : "translate-x-0.5"
+                )}
+            />
+        </button>
+    );
 }

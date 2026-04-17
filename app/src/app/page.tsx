@@ -3,7 +3,7 @@ import { getRecentScans } from "@/actions/scan";
 import { getRecommendedPlaylists } from "@/actions/playlists";
 import { DashboardClient } from "@/components/dashboard-client";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300; // 5 minutes
 
 export default async function DashboardPage() {
     const [stats, recommendedCategories, recentScans] = await Promise.all([

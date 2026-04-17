@@ -20,6 +20,7 @@ import { DAWEffectsRack } from "./daw-effects-rack";
 import { DAWSynthesizer } from "./daw-synthesizer";
 import { HistoryPanel } from "./daw-history-panel";
 import { ClipboardPanel } from "./daw-clipboard-panel";
+import { VoiceProcessor } from "./daw-voice-processor";
 import { useDAWActions, useDAWState } from "./daw-context";
 import { useContextMenu, type MenuEntry } from "./daw-context-menu";
 import {
@@ -53,6 +54,7 @@ export const PANEL_IDS = {
     synthesizer: "panel_synthesizer",
     history: "panel_history",
     clipboard: "panel_clipboard",
+    voiceProcessor: "panel_voice_processor",
 } as const;
 
 // Panel metadata
@@ -66,6 +68,7 @@ const PANEL_META: Record<string, { title: string; component: string; shortcut: s
     [PANEL_IDS.synthesizer]: { title: "Synthesizer", component: "synthesizer", shortcut: "F6" },
     [PANEL_IDS.history]: { title: "History", component: "history", shortcut: "F8" },
     [PANEL_IDS.clipboard]: { title: "Clipboard", component: "clipboard", shortcut: "F9" },
+    [PANEL_IDS.voiceProcessor]: { title: "Voice Processor", component: "voiceProcessor", shortcut: "F10" },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -266,6 +269,14 @@ function ClipboardPanelWrapper(_props: IDockviewPanelProps) {
     );
 }
 
+function VoiceProcessorPanel() {
+    return (
+        <div className="h-full w-full overflow-hidden">
+            <VoiceProcessor />
+        </div>
+    );
+}
+
 // Register all panel components
 const components: Record<string, React.FC<IDockviewPanelProps>> = {
     timeline: TimelinePanel,
@@ -277,6 +288,7 @@ const components: Record<string, React.FC<IDockviewPanelProps>> = {
     synthesizer: SynthesizerPanel,
     history: HistoryPanelWrapper,
     clipboard: ClipboardPanelWrapper,
+    voiceProcessor: VoiceProcessorPanel,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -337,6 +349,7 @@ const STATE_TO_PANEL: Record<string, string> = {
     showSynth: PANEL_IDS.synthesizer,
     showHistory: PANEL_IDS.history,
     showClipboard: PANEL_IDS.clipboard,
+    showVoiceProcessor: PANEL_IDS.voiceProcessor,
 };
 
 const PANEL_TO_STATE: Record<string, string> = {
@@ -348,6 +361,7 @@ const PANEL_TO_STATE: Record<string, string> = {
     [PANEL_IDS.synthesizer]: "synth",
     [PANEL_IDS.history]: "history",
     [PANEL_IDS.clipboard]: "clipboard",
+    [PANEL_IDS.voiceProcessor]: "voiceProcessor",
 };
 
 // Custom DAW theme
@@ -391,7 +405,7 @@ export function DAWDockview() {
                     const stateKey = `show${panelName.charAt(0).toUpperCase() + panelName.slice(1)}` as keyof typeof dawState;
                     const currentlyShown = dawState[stateKey] as boolean;
                     if (exists !== currentlyShown) {
-                        dawActions.togglePanel(panelName as "browser" | "mixer" | "pianoRoll" | "stepSequencer" | "effectsRack" | "synth" | "history" | "clipboard");
+                        dawActions.togglePanel(panelName as "browser" | "mixer" | "pianoRoll" | "stepSequencer" | "effectsRack" | "synth" | "history" | "clipboard" | "voiceProcessor");
                     }
                 }
                 requestAnimationFrame(() => { isSyncingRef.current = false; });
@@ -434,6 +448,7 @@ export function DAWDockview() {
             showStepSequencer: dawState.showStepSequencer,
             showEffectsRack: dawState.showEffectsRack,
             showSynth: dawState.showSynth,
+            showVoiceProcessor: dawState.showVoiceProcessor,
         };
 
         for (const [stateKey, isVisible] of Object.entries(panelStates)) {
@@ -476,6 +491,14 @@ export function DAWDockview() {
                             height: 400,
                         },
                     };
+                } else if (panelId === PANEL_IDS.voiceProcessor) {
+                    // Voice processor floats as a wide panel
+                    positionOpts = {
+                        floating: {
+                            width: 380,
+                            height: 600,
+                        },
+                    };
                 }
 
                 api.addPanel({
@@ -499,6 +522,7 @@ export function DAWDockview() {
         dawState.showStepSequencer,
         dawState.showEffectsRack,
         dawState.showSynth,
+        dawState.showVoiceProcessor,
     ]);
 
     // ─── Sync dockview panel close → DAW state ──────────────────────────
@@ -514,7 +538,7 @@ export function DAWDockview() {
                 const stateKey = `show${panelName.charAt(0).toUpperCase() + panelName.slice(1)}` as keyof typeof dawState;
                 if (dawState[stateKey]) {
                     isSyncingRef.current = true;
-                    dawActions.togglePanel(panelName as "browser" | "mixer" | "pianoRoll" | "stepSequencer" | "effectsRack" | "synth" | "history" | "clipboard");
+                    dawActions.togglePanel(panelName as "browser" | "mixer" | "pianoRoll" | "stepSequencer" | "effectsRack" | "synth" | "history" | "clipboard" | "voiceProcessor");
                     requestAnimationFrame(() => { isSyncingRef.current = false; });
                 }
             }

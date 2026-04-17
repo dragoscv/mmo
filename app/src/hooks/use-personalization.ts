@@ -95,6 +95,7 @@ export interface PersonalizationSettings {
     showExternalDevices: boolean;
     externalDeviceAutoConnect: boolean;
     externalDevicePosition: { x: number; y: number };
+    externalDeviceSize: { w: number; h: number };
     externalDeviceMinimized: boolean;
     externalDeviceCompact: boolean;
 }
@@ -125,6 +126,7 @@ export const DEFAULT_PERSONALIZATION: PersonalizationSettings = {
     showExternalDevices: true,
     externalDeviceAutoConnect: true,
     externalDevicePosition: { x: 20, y: 100 },
+    externalDeviceSize: { w: 380, h: 0 }, // h=0 means auto-height
     externalDeviceMinimized: false,
     externalDeviceCompact: false,
 };
@@ -169,6 +171,7 @@ function load(): PersonalizationSettings {
 function save(settings: PersonalizationSettings) {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        window.dispatchEvent(new Event("mmo-preference-changed"));
     } catch { /* ignore */ }
 }
 

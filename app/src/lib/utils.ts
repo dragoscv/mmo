@@ -32,9 +32,12 @@ export function formatBytes(bytes: number): string {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-export function formatKey(camelot?: string | null): string {
+import { formatCamelotKeyMulti, type NoteNotation } from "@/lib/note-notation";
+
+export function formatKey(camelot?: string | null, notations?: NoteNotation[]): string {
     if (!camelot) return "—";
-    return camelot;
+    if (!notations) return camelot; // fallback: raw Camelot
+    return formatCamelotKeyMulti(camelot, notations);
 }
 
 // ─── Harmonic Mixing ─────────────────────────────────────────────────────────

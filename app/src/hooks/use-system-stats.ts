@@ -115,7 +115,7 @@ function getSnapshot(): SystemStats {
 
 let refCount = 0;
 
-export function useSystemStats(gpuIndex = 0, pollInterval = 2): SystemStats {
+export function useSystemStats(gpuIndex = 0, pollInterval = 5): SystemStats {
     const prevRef = useRef({ gpuIndex, pollInterval });
 
     useEffect(() => {

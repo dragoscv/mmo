@@ -5,12 +5,13 @@ import { useDAW } from "./daw-context";
 import {
     Volume2, VolumeX, Headphones, Circle, Trash2, Plus, Piano, Music,
     Copy, Scissors, Palette, EyeOff, Snowflake, ArrowUp, ArrowDown,
-    Volume1, AudioWaveform,
+    Volume1, AudioWaveform, ChevronDown, Drum, CornerDownRight, Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DAWTrack, Clip } from "@/lib/daw-engine";
+import type { DAWTrack, Clip, AutomationLane } from "@/lib/daw-engine";
 import { useContextMenu, colorMenuItems, type MenuEntry } from "./daw-context-menu";
 import { InlineEditName, useScrollAdjust } from "./daw-ui-utils";
+import { useDAWSettings, PLAYHEAD_COLORS, type WaveformStyle, type WaveformColorMode } from "@/hooks/use-daw-settings";
 
 const HEADER_WIDTH = 200;
 const RULER_HEIGHT = 30;
@@ -31,10 +32,12 @@ type DragMode =
 
 export function DAWTimeline() {
     const daw = useDAW();
+    const ds = useDAWSettings();
     const ctxMenu = useContextMenu();
     const containerRef = useRef<HTMLDivElement>(null);
     const trackAreaRef = useRef<HTMLDivElement>(null);
     const [drag, setDrag] = useState<DragMode>(null);
+    const [dropPreview, setDropPreview] = useState<{ trackId: string; beat: number; name: string; duration: number } | null>(null);
 
     const pxPerBeat = daw.zoom;
     const totalBeats = Math.max(daw.project.duration, 128);
@@ -326,6 +329,19 @@ export function DAWTimeline() {
                     const url = `/editor?clip=${clip.id}&track=${track.id}`;
                     window.open(url, "_blank");
                 },
+            }, {
+                label: "Separate to Stems",
+                icon: <Layers className="h-3.5 w-3.5 text-purple-400" />,
+                onClick: () => {
+                    import("sonner").then(({ toast }) => {
+                        const toastId = toast.loading("Separating stems...", { description: clip.name });
+                        daw.separateClipToStems(clip.id).then(() => {
+                            toast.success("Stems separated into tracks", { id: toastId, description: "4 new tracks created: Vocals, Drums, Bass, Melody" });
+                        }).catch(() => {
+                            toast.error("Stem separation failed", { id: toastId });
+                        });
+                    });
+                },
             }] as MenuEntry[] : []),
             ...(clip.type === "midi" ? [{
                 label: "Open in Piano Roll",
@@ -353,15 +369,61 @@ export function DAWTimeline() {
     }, [daw, ctxMenu]);
 
     // ─── File drop ──────────────────────────────────────────────────
+    const handleTrackDragOver = useCallback((e: React.DragEvent, track: DAWTrack) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left + daw.scrollX * pxPerBeat;
+        const beat = snapToBeat(x / pxPerBeat);
+        // We don't have access to the drag data during dragover (browser security),
+        // so show a generic preview placeholder
+        setDropPreview(prev =>
+            prev?.trackId === track.id && prev.beat === beat ? prev : { trackId: track.id, beat, name: "", duration: 0 }
+        );
+    }, [daw.scrollX, pxPerBeat, snapToBeat]);
+
+    const handleTrackDragLeave = useCallback((e: React.DragEvent) => {
+        // Only clear if actually leaving the track lane (not entering a child)
+        const related = e.relatedTarget as HTMLElement | null;
+        if (related && e.currentTarget.contains(related)) return;
+        setDropPreview(null);
+    }, []);
+
     const handleTrackDrop = useCallback(async (e: React.DragEvent, track: DAWTrack) => {
         e.preventDefault();
+        setDropPreview(null);
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left + daw.scrollX * pxPerBeat;
+        const beat = snapToBeat(x / pxPerBeat);
+
+        // Try JSON data first (sample browser / library drags)
+        const jsonData = e.dataTransfer.getData("text/plain");
+        if (jsonData) {
+            try {
+                const data = JSON.parse(jsonData);
+                if (data.type === "sample" && data.path) {
+                    if (track.type !== "audio") return;
+                    const clip = daw.addClip(track.id, "audio", beat, 4, data.name || "Sample");
+                    await daw.loadAudioIntoClip(clip.id, data.path, data.name);
+                    return;
+                }
+                if (data.type === "library-track" && data.track?.filePath) {
+                    if (track.type !== "audio") return;
+                    const filePath = data.track.filePath;
+                    const audioUrl = filePath.startsWith("/") ? filePath : `/api/audio/${encodeURIComponent(filePath)}`;
+                    const clip = daw.addClip(track.id, "audio", beat, 4, data.track.title || "Audio");
+                    await daw.loadAudioIntoClip(clip.id, audioUrl, data.track.title);
+                    return;
+                }
+            } catch { /* not JSON, fall through to file drop */ }
+        }
+
+        // Native file drop
         if (track.type !== "audio") return;
         const files = Array.from(e.dataTransfer.files);
         const audioFile = files.find(f => f.type.startsWith("audio/"));
         if (!audioFile) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left + daw.scrollX * pxPerBeat;
-        const beat = snapToBeat(x / pxPerBeat);
         const clip = daw.addClip(track.id, "audio", beat, 4, audioFile.name);
         await daw.loadFileIntoClip(clip.id, audioFile);
     }, [daw, pxPerBeat, snapToBeat]);
@@ -394,6 +456,7 @@ export function DAWTimeline() {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            onDragEnd={() => setDropPreview(null)}
         >
             {/* Ruler */}
             <div className="flex flex-shrink-0" style={{ height: RULER_HEIGHT }}>
@@ -401,12 +464,7 @@ export function DAWTimeline() {
                     className="flex-shrink-0 bg-[var(--daw-surface)] border-r border-b border-[var(--daw-border)] flex items-center px-3"
                     style={{ width: HEADER_WIDTH }}
                 >
-                    <button
-                        onClick={() => daw.addTrack("audio")}
-                        className="daw-btn h-6 gap-1 px-2 text-[10px] text-[var(--daw-text-dim)] hover:text-[var(--daw-text-muted)]"
-                    >
-                        <Plus className="h-3 w-3" /> Add Track
-                    </button>
+                    <AddTrackMenu />
                 </div>
                 <div
                     className="flex-1 bg-[var(--daw-surface)] border-b border-[var(--daw-border)] relative overflow-hidden cursor-pointer"
@@ -423,11 +481,11 @@ export function DAWTimeline() {
                     {playheadX >= 0 && (
                         <div
                             className="absolute top-0 bottom-0 w-px daw-playhead pointer-events-none z-20"
-                            style={{ left: playheadX, background: "var(--daw-green)" }}
+                            style={{ left: playheadX, background: ds.playheadHex }}
                         >
                             <div
                                 className="w-3 h-3 rounded-b-sm -ml-[5px]"
-                                style={{ background: "var(--daw-green)" }}
+                                style={{ background: ds.playheadHex }}
                             />
                         </div>
                     )}
@@ -436,17 +494,23 @@ export function DAWTimeline() {
 
             {/* Tracks */}
             <div ref={trackAreaRef} className="flex-1 overflow-y-auto overflow-x-hidden" style={{ marginTop: 0 }}>
-                {daw.project.tracks.map((track, idx) => (
+                {daw.project.tracks.map((track, idx) => {
+                    const hasActiveClip = daw.isPlaying && track.clips.some(c => daw.activeClipIds.includes(c.id));
+                    return (
                     <div key={track.id} className="flex" style={{ height: track.height }}>
-                        <TrackHeader track={track} index={idx} />
+                        <TrackHeader track={track} index={idx} isActive={hasActiveClip} />
 
                         <div
                             data-track-lane={track.id}
-                            className="flex-1 relative border-b border-[var(--daw-border)] overflow-hidden"
-                            style={{ background: `linear-gradient(90deg, ${track.color}06 0%, transparent 100%)` }}
+                            className={cn(
+                                "flex-1 relative border-b border-[var(--daw-border)] overflow-hidden transition-colors duration-150",
+                                dropPreview?.trackId === track.id && "bg-[var(--daw-accent)]/[0.04]"
+                            )}
+                            style={{ background: dropPreview?.trackId === track.id ? undefined : `linear-gradient(90deg, ${track.color}06 0%, transparent 100%)` }}
                             onMouseDown={e => handleTrackMouseDown(e, track)}
                             onDoubleClick={e => handleTrackDoubleClick(e, track)}
-                            onDragOver={e => e.preventDefault()}
+                            onDragOver={e => handleTrackDragOver(e, track)}
+                            onDragLeave={handleTrackDragLeave}
                             onDrop={e => handleTrackDrop(e, track)}
                         >
                             <GridLines scrollX={daw.scrollX} pxPerBeat={pxPerBeat} height={track.height} timeSignature={daw.project.timeSignature} />
@@ -463,6 +527,44 @@ export function DAWTimeline() {
                                 />
                             )}
 
+                            {/* Drop preview ghost */}
+                            {dropPreview && dropPreview.trackId === track.id && (
+                                <div
+                                    className="absolute top-1 rounded-md pointer-events-none z-20 animate-in fade-in-0 zoom-in-95 duration-150"
+                                    style={{
+                                        left: (dropPreview.beat - daw.scrollX) * pxPerBeat,
+                                        width: Math.max(4 * pxPerBeat, 60),
+                                        height: track.height - 10,
+                                        background: `linear-gradient(180deg, ${track.color}25 0%, ${track.color}10 100%)`,
+                                        borderLeft: `2px solid ${track.color}`,
+                                        boxShadow: `0 0 20px ${track.color}20, inset 0 0 20px ${track.color}08`,
+                                    }}
+                                >
+                                    {/* Mini waveform bars placeholder */}
+                                    <div className="absolute inset-0 flex items-center justify-center gap-[1px] px-2 opacity-60">
+                                        {Array.from({ length: 24 }).map((_, i) => {
+                                            const h = 15 + Math.sin(i * 0.8) * 12 + Math.sin(i * 2.1) * 8;
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className="flex-1 rounded-full min-w-[1px]"
+                                                    style={{
+                                                        height: `${Math.max(10, Math.min(85, h))}%`,
+                                                        background: track.color,
+                                                        opacity: 0.4 + Math.sin(i * 0.5) * 0.2,
+                                                    }}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                    {/* Drop indicator line */}
+                                    <div
+                                        className="absolute left-0 top-0 bottom-0 w-0.5 animate-pulse"
+                                        style={{ background: track.color }}
+                                    />
+                                </div>
+                            )}
+
                             {track.clips.map(clip => (
                                 <ClipBlock
                                     key={clip.id}
@@ -472,13 +574,21 @@ export function DAWTimeline() {
                                     pxPerBeat={pxPerBeat}
                                     height={track.height}
                                     selected={daw.selectedClipId === clip.id}
+                                    isActive={daw.isPlaying && daw.activeClipIds.includes(clip.id)}
                                     tool={daw.tool}
                                     onMouseDown={e => handleClipMouseDown(e, clip, track)}
                                     onContextMenu={e => handleClipRightClick(e, clip, track)}
-                                    onDoubleClick={() => {
+                                    onDoubleClick={e => {
+                                        e.stopPropagation();
                                         if (clip.type === "midi") daw.openPianoRoll(track.id, clip.id);
-                                        else if (clip.type === "audio") {
-                                            window.open(`/editor?clip=${clip.id}&track=${track.id}`, "_blank");
+                                        else if (clip.type === "audio" && clip.audio?.sourceUrl) {
+                                            const params = new URLSearchParams({
+                                                clip: clip.id,
+                                                track: track.id,
+                                                src: clip.audio.sourceUrl,
+                                                name: clip.name,
+                                            });
+                                            window.open(`/editor?${params.toString()}`, "_blank");
                                         }
                                     }}
                                     onResizeRightStart={e => handleResizeRightStart(e, clip)}
@@ -491,12 +601,24 @@ export function DAWTimeline() {
                             {playheadX >= 0 && (
                                 <div
                                     className="absolute top-0 bottom-0 w-px pointer-events-none z-10 opacity-50"
-                                    style={{ left: playheadX, background: "var(--daw-green)" }}
+                                    style={{ left: playheadX, background: ds.playheadHex }}
                                 />
                             )}
+
+                            {/* Automation lane overlay */}
+                            {track.automationLanes.filter(l => l.visible).map(lane => (
+                                <AutomationCurve
+                                    key={lane.id}
+                                    lane={lane}
+                                    scrollX={daw.scrollX}
+                                    pxPerBeat={pxPerBeat}
+                                    height={track.height}
+                                />
+                            ))}
                         </div>
                     </div>
-                ))}
+                    );
+                })}
 
                 <div className="h-32" />
             </div>
@@ -506,7 +628,7 @@ export function DAWTimeline() {
 
 // ─── Track Header ────────────────────────────────────────────────────────
 
-function TrackHeader({ track, index }: { track: DAWTrack; index: number }) {
+function TrackHeader({ track, index, isActive }: { track: DAWTrack; index: number; isActive?: boolean }) {
     const daw = useDAW();
     const ctxMenu = useContextMenu();
     const isSelected = daw.selectedTrackId === track.id;
@@ -596,7 +718,9 @@ function TrackHeader({ track, index }: { track: DAWTrack; index: number }) {
                 "flex-shrink-0 border-r border-b border-[var(--daw-border)] flex flex-col justify-center px-2.5 py-1.5 cursor-pointer transition-all duration-150",
                 isSelected
                     ? "bg-[var(--daw-surface-2)] shadow-[inset_3px_0_0_var(--daw-accent)]"
-                    : "bg-[var(--daw-surface)] hover:bg-[var(--daw-surface-2)]"
+                    : isActive
+                        ? "bg-[var(--daw-surface-2)] shadow-[inset_3px_0_0_var(--daw-green)]"
+                        : "bg-[var(--daw-surface)] hover:bg-[var(--daw-surface-2)]"
             )}
             style={{ width: HEADER_WIDTH }}
             onClick={() => daw.selectTrack(track.id)}
@@ -604,10 +728,15 @@ function TrackHeader({ track, index }: { track: DAWTrack; index: number }) {
         >
             {/* Track name row */}
             <div className="flex items-center gap-1.5 mb-1.5">
-                <div
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10"
-                    style={{ background: track.color }}
-                />
+                <div className="relative flex-shrink-0">
+                    <div
+                        className="w-2.5 h-2.5 rounded-full ring-1 ring-white/10"
+                        style={{ background: track.color }}
+                    />
+                    {isActive && (
+                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--daw-green)] animate-pulse shadow-[0_0_4px_var(--daw-green)]" />
+                    )}
+                </div>
                 <TypeIcon className="h-3 w-3 text-[var(--daw-text-dim)] flex-shrink-0" />
                 <InlineEditName
                     value={track.name}
@@ -696,24 +825,73 @@ function TrackButton({ label, active, color, onClick }: {
     );
 }
 
+// ─── Add Track Menu ────────────────────────────────────────────────────────
+
+function AddTrackMenu() {
+    const daw = useDAW();
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, [open]);
+
+    const items: { label: string; icon: React.ReactNode; type: "audio" | "midi" | "return" }[] = [
+        { label: "Audio Track", icon: <AudioWaveform className="h-3 w-3" />, type: "audio" },
+        { label: "MIDI Track", icon: <Piano className="h-3 w-3" />, type: "midi" },
+        { label: "Return Track", icon: <CornerDownRight className="h-3 w-3" />, type: "return" },
+    ];
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                onClick={() => setOpen(v => !v)}
+                className="daw-btn h-6 gap-1 px-2 text-[10px] text-[var(--daw-text-dim)] hover:text-[var(--daw-text-muted)]"
+            >
+                <Plus className="h-3 w-3" /> Add Track <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+            </button>
+            {open && (
+                <div className="absolute bottom-full left-0 mb-1 z-50 min-w-[140px] rounded-md border border-[var(--daw-border)] bg-[var(--daw-surface)] shadow-lg py-1">
+                    {items.map(item => (
+                        <button
+                            key={item.type}
+                            onClick={() => { daw.addTrack(item.type); setOpen(false); }}
+                            className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] text-[var(--daw-text-muted)] hover:bg-[var(--daw-accent)]/10 hover:text-[var(--daw-text)]"
+                        >
+                            {item.icon} {item.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ─── Clip Block ──────────────────────────────────────────────────────────
 
-function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, tool, onMouseDown, onContextMenu, onDoubleClick, onResizeRightStart, onResizeLeftStart, onFadeInStart, onFadeOutStart }: {
+function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, isActive, tool, onMouseDown, onContextMenu, onDoubleClick, onResizeRightStart, onResizeLeftStart, onFadeInStart, onFadeOutStart }: {
     clip: Clip;
     track: DAWTrack;
     scrollX: number;
     pxPerBeat: number;
     height: number;
     selected: boolean;
+    isActive: boolean;
     tool: string;
     onMouseDown: (e: React.MouseEvent) => void;
     onContextMenu: (e: React.MouseEvent) => void;
-    onDoubleClick: () => void;
+    onDoubleClick: (e: React.MouseEvent) => void;
     onResizeRightStart: (e: React.MouseEvent) => void;
     onResizeLeftStart: (e: React.MouseEvent) => void;
     onFadeInStart: (e: React.MouseEvent) => void;
     onFadeOutStart: (e: React.MouseEvent) => void;
 }) {
+    const ds = useDAWSettings();
     const left = (clip.position - scrollX) * pxPerBeat;
     const width = clip.length * pxPerBeat;
 
@@ -730,7 +908,9 @@ function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, tool, on
                 "absolute top-1 rounded-md overflow-hidden group transition-shadow duration-150",
                 selected
                     ? "ring-1 ring-[var(--daw-accent)] shadow-[0_0_12px_var(--daw-accent-glow)]"
-                    : "ring-1 ring-white/[0.06] hover:ring-white/15",
+                    : (isActive && ds.activeClipHighlight)
+                        ? "ring-1 ring-[var(--daw-green)] shadow-[0_0_10px_oklch(0.72_0.17_142/0.25)]"
+                        : "ring-1 ring-white/[0.06] hover:ring-white/15",
                 clip.muted && "opacity-35",
                 tool === "select" ? "cursor-grab active:cursor-grabbing" :
                     tool === "draw" ? "cursor-crosshair" :
@@ -750,16 +930,35 @@ function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, tool, on
             onDoubleClick={onDoubleClick}
         >
             {/* Clip header */}
-            <div className="h-4 px-1.5 flex items-center bg-black/15">
-                <span className="text-[9px] text-white/60 truncate font-medium">{clip.name}</span>
+            <div className={cn(
+                "h-4 px-1.5 flex items-center gap-1 bg-black/15",
+                (isActive && ds.activeClipHighlight) && "bg-[var(--daw-green)]/10"
+            )}>
+                {(isActive && ds.activeClipHighlight) && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--daw-green)] flex-shrink-0 animate-pulse shadow-[0_0_3px_var(--daw-green)]" />
+                )}
+                {ds.showClipNames && (
+                    <span className={cn(
+                        "text-[9px] truncate font-medium",
+                        (isActive && ds.activeClipHighlight) ? "text-white/80" : "text-white/60"
+                    )}>{clip.name}</span>
+                )}
+                {ds.showClipInfoBadges && clip.type === "midi" && (
+                    <span className="text-[7px] text-purple-400/40 flex-shrink-0 ml-auto">MIDI</span>
+                )}
+                {ds.showClipInfoBadges && clip.type === "audio" && clip.audio && clip.audio.duration > 0 && (
+                    <span className="text-[7px] text-cyan-400/40 flex-shrink-0 ml-auto">
+                        {clip.audio.duration < 1 ? `${Math.round(clip.audio.duration * 1000)}ms` : `${clip.audio.duration.toFixed(1)}s`}
+                    </span>
+                )}
             </div>
 
             {/* Clip content */}
-            <div className="flex-1 relative overflow-hidden">
-                {clip.type === "audio" && clip.audio?.waveformPeaks && (
-                    <WaveformPreview peaks={clip.audio.waveformPeaks} color={clip.color} />
+            <div className="flex-1 relative overflow-hidden" style={{ opacity: ds.clipOpacity }}>
+                {clip.type === "audio" && clip.audio?.waveformPeaks && (ds.clipDisplayMode === "waveform" || ds.clipDisplayMode === "both") && (
+                    <WaveformPreview peaks={clip.audio.waveformPeaks} color={clip.color} style={ds.waveformStyle} colorMode={ds.waveformColorMode} />
                 )}
-                {clip.type === "midi" && clip.midi && (
+                {clip.type === "midi" && clip.midi && (ds.clipDisplayMode === "notes" || ds.clipDisplayMode === "both") && (
                     <MidiPreview notes={clip.midi.notes} length={clip.length} color={clip.color} />
                 )}
 
@@ -825,7 +1024,7 @@ function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, tool, on
 
 // ─── Previews ────────────────────────────────────────────────────────────
 
-function WaveformPreview({ peaks, color }: { peaks: Float32Array; color: string }) {
+function WaveformPreview({ peaks, color, style, colorMode }: { peaks: Float32Array; color: string; style: WaveformStyle; colorMode: WaveformColorMode }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -836,14 +1035,91 @@ function WaveformPreview({ peaks, color }: { peaks: Float32Array; color: string 
         const w = canvas.width;
         const h = canvas.height;
         ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = color + "70";
+
+        const baseColor = colorMode === "mono" ? "#888888" : color;
         const step = peaks.length / w;
-        for (let i = 0; i < w; i++) {
-            const idx = Math.floor(i * step);
-            const amp = peaks[idx] * h * 0.4;
-            ctx.fillRect(i, h / 2 - amp, 1, amp * 2);
+
+        if (style === "filled") {
+            // Filled area under the waveform
+            ctx.fillStyle = baseColor + "40";
+            ctx.beginPath();
+            ctx.moveTo(0, h / 2);
+            for (let i = 0; i < w; i++) {
+                const idx = Math.floor(i * step);
+                const amp = peaks[idx] * h * 0.4;
+                ctx.lineTo(i, h / 2 - amp);
+            }
+            for (let i = w - 1; i >= 0; i--) {
+                const idx = Math.floor(i * step);
+                const amp = peaks[idx] * h * 0.4;
+                ctx.lineTo(i, h / 2 + amp);
+            }
+            ctx.closePath();
+            ctx.fill();
+            // Outline
+            ctx.strokeStyle = baseColor + "90";
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            for (let i = 0; i < w; i++) {
+                const idx = Math.floor(i * step);
+                const amp = peaks[idx] * h * 0.4;
+                if (i === 0) ctx.moveTo(i, h / 2 - amp);
+                else ctx.lineTo(i, h / 2 - amp);
+            }
+            ctx.stroke();
+        } else if (style === "lines") {
+            // Line waveform (single line connecting peaks)
+            ctx.strokeStyle = baseColor + "90";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let i = 0; i < w; i++) {
+                const idx = Math.floor(i * step);
+                const amp = peaks[idx] * h * 0.4;
+                const y = h / 2 - amp;
+                if (i === 0) ctx.moveTo(i, y);
+                else ctx.lineTo(i, y);
+            }
+            ctx.stroke();
+        } else if (style === "bars") {
+            // Discrete bars
+            const barWidth = Math.max(2, Math.floor(w / 60));
+            const barGap = 1;
+            if (colorMode === "gradient") {
+                for (let x = 0; x < w; x += barWidth + barGap) {
+                    const idx = Math.floor(x * step);
+                    const amp = peaks[idx] * h * 0.4;
+                    const ratio = x / w;
+                    ctx.fillStyle = `hsl(${200 + ratio * 160}, 70%, 55%)`;
+                    ctx.fillRect(x, h / 2 - amp, barWidth, amp * 2);
+                }
+            } else {
+                ctx.fillStyle = baseColor + "70";
+                for (let x = 0; x < w; x += barWidth + barGap) {
+                    const idx = Math.floor(x * step);
+                    const amp = peaks[idx] * h * 0.4;
+                    ctx.fillRect(x, h / 2 - amp, barWidth, amp * 2);
+                }
+            }
+        } else {
+            // Classic (default): column per pixel
+            if (colorMode === "gradient") {
+                for (let i = 0; i < w; i++) {
+                    const idx = Math.floor(i * step);
+                    const amp = peaks[idx] * h * 0.4;
+                    const ratio = i / w;
+                    ctx.fillStyle = `hsl(${200 + ratio * 160}, 70%, 55%)`;
+                    ctx.fillRect(i, h / 2 - amp, 1, amp * 2);
+                }
+            } else {
+                ctx.fillStyle = baseColor + "70";
+                for (let i = 0; i < w; i++) {
+                    const idx = Math.floor(i * step);
+                    const amp = peaks[idx] * h * 0.4;
+                    ctx.fillRect(i, h / 2 - amp, 1, amp * 2);
+                }
+            }
         }
-    }, [peaks, color]);
+    }, [peaks, color, style, colorMode]);
 
     return <canvas ref={canvasRef} className="w-full h-full" width={200} height={40} />;
 }
@@ -880,6 +1156,9 @@ function MidiPreview({ notes, length, color }: { notes: { pitch: number; start: 
 function GridLines({ scrollX, pxPerBeat, height, timeSignature }: {
     scrollX: number; pxPerBeat: number; height: number; timeSignature: { numerator: number; denominator: number };
 }) {
+    const ds = useDAWSettings();
+    if (ds.gridStyle === "none") return null;
+
     const lines: { x: number; isBeat: boolean; isBar: boolean }[] = [];
     const beatsPerBar = timeSignature.numerator;
     const startBeat = Math.floor(scrollX);
@@ -890,16 +1169,40 @@ function GridLines({ scrollX, pxPerBeat, height, timeSignature }: {
         lines.push({ x, isBeat: b % 1 === 0, isBar: b % beatsPerBar === 0 });
     }
 
+    if (ds.gridStyle === "dots") {
+        return (
+            <>
+                {lines.filter(l => l.isBeat).map((l, i) => (
+                    <div
+                        key={i}
+                        className="absolute pointer-events-none rounded-full"
+                        style={{
+                            left: l.x - 1,
+                            top: height / 2 - 1,
+                            width: l.isBar ? 3 : 2,
+                            height: l.isBar ? 3 : 2,
+                            background: `oklch(1 0 0 / ${l.isBar ? ds.gridOpacity * 0.15 : ds.gridOpacity * 0.08})`,
+                        }}
+                    />
+                ))}
+            </>
+        );
+    }
+
     return (
         <>
             {lines.map((l, i) => (
                 <div
                     key={i}
-                    className={cn(
-                        "absolute top-0 bottom-0 pointer-events-none",
-                        l.isBar ? "w-px bg-[oklch(1_0_0/8%)]" : l.isBeat ? "w-px bg-[oklch(1_0_0/4%)]" : ""
-                    )}
-                    style={{ left: l.x }}
+                    className="absolute top-0 bottom-0 pointer-events-none w-px"
+                    style={{
+                        left: l.x,
+                        background: l.isBar
+                            ? `oklch(1 0 0 / ${ds.gridOpacity * 0.15})`
+                            : l.isBeat
+                                ? `oklch(1 0 0 / ${ds.gridOpacity * 0.08})`
+                                : undefined,
+                    }}
                 />
             ))}
         </>
@@ -952,5 +1255,91 @@ function RulerCanvas({ scrollX, pxPerBeat, totalBeats, timeSignature, loopRegion
                 );
             })}
         </div>
+    );
+}
+
+// ─── Automation Curve Overlay ────────────────────────────────────────────
+
+function AutomationCurve({ lane, scrollX, pxPerBeat, height }: {
+    lane: AutomationLane;
+    scrollX: number;
+    pxPerBeat: number;
+    height: number;
+}) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || lane.points.length < 2) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        // Draw automation curve
+        ctx.beginPath();
+        ctx.strokeStyle = lane.color + "90";
+        ctx.lineWidth = 1.5;
+
+        const points = lane.points.sort((a, b) => a.time - b.time);
+
+        for (let i = 0; i < points.length; i++) {
+            const x = (points[i].time - scrollX) * pxPerBeat;
+            const y = h - points[i].value * h; // value is 0-1, map to height
+            if (i === 0) ctx.moveTo(x, y);
+            else if (points[i].curve === "step") {
+                const prevY = h - points[i - 1].value * h;
+                ctx.lineTo(x, prevY);
+                ctx.lineTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+
+        // Draw points
+        for (const point of points) {
+            const x = (point.time - scrollX) * pxPerBeat;
+            const y = h - point.value * h;
+            if (x < -5 || x > w + 5) continue;
+            ctx.beginPath();
+            ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = lane.color;
+            ctx.fill();
+        }
+
+        // Fill under curve with low opacity
+        ctx.beginPath();
+        for (let i = 0; i < points.length; i++) {
+            const x = (points[i].time - scrollX) * pxPerBeat;
+            const y = h - points[i].value * h;
+            if (i === 0) ctx.moveTo(x, y);
+            else if (points[i].curve === "step") {
+                const prevY = h - points[i - 1].value * h;
+                ctx.lineTo(x, prevY);
+                ctx.lineTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        const lastX = (points[points.length - 1].time - scrollX) * pxPerBeat;
+        ctx.lineTo(lastX, h);
+        ctx.lineTo((points[0].time - scrollX) * pxPerBeat, h);
+        ctx.closePath();
+        ctx.fillStyle = lane.color + "15";
+        ctx.fill();
+    }, [lane, scrollX, pxPerBeat, height]);
+
+    if (lane.points.length < 2) return null;
+
+    return (
+        <canvas
+            ref={canvasRef}
+            className="absolute top-0 left-0 w-full h-full pointer-events-none z-5"
+            width={2000}
+            height={height}
+        />
     );
 }

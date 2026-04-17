@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Artwork } from "@/components/artwork";
 import { usePlayer } from "@/components/player-context";
-import { formatDuration, cn, GENRE_COLORS, ENERGY_COLORS } from "@/lib/utils";
+import { formatDuration, cn, GENRE_COLORS, ENERGY_COLORS, formatKey } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import {
     Play,
     Pause,
@@ -65,6 +66,7 @@ export function SimilarTracksModal({
     onMutate,
 }: SimilarTracksModalProps) {
     const player = usePlayer();
+    const { noteNotations } = useDAWSettings();
     const [tracks, setTracks] = useState<SimilarTrack[]>([]);
     const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(false);
@@ -218,7 +220,7 @@ export function SimilarTracksModal({
                                             )}
                                             {track.keyCamelot && (
                                                 <span className="text-xs font-mono text-[var(--muted-foreground)]">
-                                                    {track.keyCamelot}
+                                                    {formatKey(track.keyCamelot, noteNotations)}
                                                 </span>
                                             )}
                                             {track.energy && (

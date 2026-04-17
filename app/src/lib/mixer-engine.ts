@@ -1,6 +1,7 @@
 "use client";
 
 import { audioPreloadCache } from "./audio-preload-cache";
+import { RealtimeStemProcessor } from "./stems-engine";
 
 /**
  * DJ Mixer Audio Engine
@@ -338,6 +339,9 @@ export class DeckEngine {
     // EQ mode
     private eqMode: EQMode = "eq";
 
+    // Stems processor
+    stemProcessor: RealtimeStemProcessor;
+
     onTimeUpdate?: (time: number) => void;
     onEnded?: () => void;
     onLoaded?: (duration: number) => void;
@@ -408,8 +412,12 @@ export class DeckEngine {
         this.cueSendGain = ctx.createGain();
         this.cueSendGain.gain.value = 0; // off by default
 
-        // Connect main chain
-        this.source.connect(this.autoGainNode);
+        // Stems processor: inserted between source and EQ chain
+        this.stemProcessor = new RealtimeStemProcessor(ctx);
+
+        // Connect main chain: source → stems → autoGain → EQ → filter → colorFx → beatFx → gain → analyser → output
+        this.source.connect(this.stemProcessor.inputNode);
+        this.stemProcessor.outputNode.connect(this.autoGainNode);
         this.autoGainNode.connect(this.eqLowNode);
         this.eqLowNode.connect(this.eqMidNode);
         this.eqMidNode.connect(this.eqHiNode);
@@ -1195,6 +1203,11 @@ export class MixerEngine {
             case "C": return this.deckC;
             case "D": return this.deckD;
         }
+    }
+
+    /** Get the RealtimeStemProcessor for a deck */
+    getDeckStems(side: DeckSide): RealtimeStemProcessor {
+        return this.getDeck(side).stemProcessor;
     }
 
     /** Get the gain node for a deck */

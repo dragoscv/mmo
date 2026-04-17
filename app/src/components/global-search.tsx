@@ -30,7 +30,8 @@ import {
   ArrowRight,
   Loader2,
 } from "lucide-react";
-import { cn, formatDuration } from "@/lib/utils";
+import { cn, formatDuration, formatKey } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { globalSearch, type SearchResult } from "@/actions/search";
 import { usePlayer } from "@/components/player-context";
 
@@ -52,6 +53,7 @@ interface GlobalSearchProps {
 export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const router = useRouter();
   const player = usePlayer();
+  const { noteNotations } = useDAWSettings();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -262,7 +264,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                           )}
                           {track.keyCamelot && (
                             <span className="text-[10px] text-muted-foreground/50">
-                              {track.keyCamelot}
+                              {formatKey(track.keyCamelot, noteNotations)}
                             </span>
                           )}
                           {track.duration && (

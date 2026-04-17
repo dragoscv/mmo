@@ -36,7 +36,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Artwork } from "@/components/artwork";
 import { DashboardActions } from "@/components/dashboard-actions";
-import { cn, formatBytes } from "@/lib/utils";
+import { cn, formatBytes, formatKey } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import type { DashboardStats } from "@/actions/tracks";
 import type { RecommendedCategory } from "@/actions/playlists";
 
@@ -414,6 +415,7 @@ function LibraryHealth({ health }: { health: DashboardStats["health"] }) {
 // ── Recently Added ───────────────────────────────────────────────
 
 function RecentTracks({ tracks }: { tracks: DashboardStats["recentTracks"] }) {
+    const { noteNotations } = useDAWSettings();
     if (tracks.length === 0) {
         return (
             <div className="flex h-[140px] items-center justify-center text-sm text-muted-foreground">
@@ -440,7 +442,7 @@ function RecentTracks({ tracks }: { tracks: DashboardStats["recentTracks"] }) {
                     <p className="text-xs text-muted-foreground truncate">{track.artist || "Unknown Artist"}</p>
                     <div className="flex flex-wrap gap-1 mt-2">
                         {track.bpm && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{Math.round(track.bpm)} BPM</Badge>}
-                        {track.keyCamelot && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{track.keyCamelot}</Badge>}
+                        {track.keyCamelot && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{formatKey(track.keyCamelot, noteNotations)}</Badge>}
                     </div>
                 </div>
             ))}

@@ -24,9 +24,15 @@ import {
     X,
     FolderSearch,
     ArrowRight,
+    MonitorPlay,
+    RotateCcw,
+    CloudOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { resetUserPreferences } from "@/actions/user-preferences";
+import { SYNCABLE_KEYS } from "@/lib/syncable-keys";
+import { useOfflineMode } from "@/hooks/use-offline";
 
 interface SettingsClientProps {
     settings: Record<string, string>;
@@ -41,10 +47,15 @@ function formatBytes(bytes: number): string {
 export function SettingsClient({ settings }: SettingsClientProps) {
     const [isPending, startTransition] = useTransition();
     const [activeTab, setActiveTab] = useState("general");
+    const offline = useOfflineMode();
 
     // General settings
     const [musicRoot, setMusicRoot] = useState(settings.music_root || "H:\\Music");
     const [inboxFolder, setInboxFolder] = useState(settings.inbox_folder || "H:\\Music\\_Inbox");
+    const [restoreNowPlaying, setRestoreNowPlaying] = useState(() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem("mmo-restore-now-playing") === "true";
+    });
 
     // Watch folders
     const [watchFolders, setWatchFolders] = useState<string[]>(
@@ -177,7 +188,7 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 
     return (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-3xl">
-            <TabsList className="mb-6 w-full grid grid-cols-3">
+            <TabsList className="mb-6 w-full grid grid-cols-4">
                 <TabsTrigger value="general" className="gap-2">
                     <Settings className="h-3.5 w-3.5" />
                     General
@@ -189,6 +200,10 @@ export function SettingsClient({ settings }: SettingsClientProps) {
                 <TabsTrigger value="import" className="gap-2">
                     <FileDown className="h-3.5 w-3.5" />
                     Import
+                </TabsTrigger>
+                <TabsTrigger value="offline" className="gap-2">
+                    <CloudOff className="h-3.5 w-3.5" />
+                    Offline
                 </TabsTrigger>
             </TabsList>
 
@@ -262,6 +277,77 @@ export function SettingsClient({ settings }: SettingsClientProps) {
                         <p className="text-xs text-[var(--muted-foreground)]">
                             Where new tracks arrive before processing.
                         </p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <MonitorPlay className="h-4 w-4 text-cyan-400" />
+                            Playback
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <p className="text-sm font-medium">
+                                    Restore Now Playing on refresh
+                                </p>
+                                <p className="text-xs text-[var(--muted-foreground)]">
+                                    When enabled, the Now Playing view will reopen automatically after a page refresh.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const next = !restoreNowPlaying;
+                                    setRestoreNowPlaying(next);
+                                    localStorage.setItem("mmo-restore-now-playing", String(next));
+                                    toast.success(next ? "Now Playing will restore on refresh" : "Now Playing won't restore on refresh");
+                                }}
+                                className={cn(
+                                    "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200",
+                                    restoreNowPlaying ? "bg-purple-500" : "bg-[var(--muted)]"
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200",
+                                        restoreNowPlaying ? "translate-x-5" : "translate-x-0"
+                                    )}
+                                />
+                            </button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <RotateCcw className="h-4 w-4 text-red-400" />
+                            Reset Preferences
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <p className="text-xs text-[var(--muted-foreground)]">
+                            Reset all UI preferences (theme, personalization, DAW settings, MIDI, FX presets) to their default values.
+                        </p>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 text-red-400 hover:text-red-300 hover:border-red-500/50"
+                            onClick={async () => {
+                                for (const key of SYNCABLE_KEYS) {
+                                    localStorage.removeItem(key);
+                                }
+                                try {
+                                    await resetUserPreferences();
+                                } catch { /* ignore if not authenticated */ }
+                                toast.success("All preferences reset to defaults. Reload to apply.");
+                            }}
+                        >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Reset All to Defaults
+                        </Button>
                     </CardContent>
                 </Card>
 
@@ -576,6 +662,172 @@ export function SettingsClient({ settings }: SettingsClientProps) {
                                 {p}
                             </button>
                         ))}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            {/* ===== OFFLINE TAB ===== */}
+            <TabsContent value="offline" className="space-y-4 animate-[fadeIn_200ms_ease-out]">
+                {/* Offline Toggle */}
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <CloudOff className="h-4 w-4 text-blue-400" />
+                            Offline Mode
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium">Enable Offline Mode</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Cache audio files locally for offline playback
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={offline.settings.enabled}
+                                onClick={() => offline.updateSettings({ enabled: !offline.settings.enabled })}
+                                className={cn(
+                                    "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200",
+                                    offline.settings.enabled ? "bg-purple-500" : "bg-[var(--muted)]"
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200",
+                                        offline.settings.enabled ? "translate-x-5" : "translate-x-0"
+                                    )}
+                                />
+                            </button>
+                        </div>
+
+                        {/* Storage allocation */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Storage Limit</label>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="range"
+                                    min="256"
+                                    max="10240"
+                                    step="256"
+                                    value={offline.settings.maxStorageMB}
+                                    onChange={(e) => offline.updateSettings({ maxStorageMB: parseInt(e.target.value) })}
+                                    className="flex-1 accent-purple-500"
+                                    disabled={!offline.settings.enabled}
+                                />
+                                <span className="text-sm font-mono w-16 text-right">
+                                    {offline.settings.maxStorageMB >= 1024
+                                        ? `${(offline.settings.maxStorageMB / 1024).toFixed(1)} GB`
+                                        : `${offline.settings.maxStorageMB} MB`}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>256 MB</span>
+                                <span>10 GB</span>
+                            </div>
+                        </div>
+
+                        {/* Auto download count */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Auto-Download Tracks</label>
+                            <p className="text-xs text-muted-foreground">
+                                Automatically cache your most recently played tracks for offline use
+                            </p>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="200"
+                                    step="10"
+                                    value={offline.settings.autoDownloadCount}
+                                    onChange={(e) => offline.updateSettings({ autoDownloadCount: parseInt(e.target.value) })}
+                                    className="flex-1 accent-purple-500"
+                                    disabled={!offline.settings.enabled}
+                                />
+                                <span className="text-sm font-mono w-16 text-right">
+                                    {offline.settings.autoDownloadCount} tracks
+                                </span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Cache Status */}
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <HardDrive className="h-4 w-4 text-emerald-400" />
+                            Cache Status
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="rounded-lg bg-muted/50 p-3 text-center">
+                                <p className="text-2xl font-bold">{offline.cachedTracks.length}</p>
+                                <p className="text-xs text-muted-foreground">Cached Tracks</p>
+                            </div>
+                            <div className="rounded-lg bg-muted/50 p-3 text-center">
+                                <p className="text-2xl font-bold">
+                                    {offline.totalSize >= 1024 * 1024 * 1024
+                                        ? `${(offline.totalSize / (1024 * 1024 * 1024)).toFixed(1)} GB`
+                                        : `${(offline.totalSize / (1024 * 1024)).toFixed(0)} MB`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">Used Space</p>
+                            </div>
+                            <div className="rounded-lg bg-muted/50 p-3 text-center">
+                                <p className="text-2xl font-bold">
+                                    {Math.round(
+                                        (offline.totalSize / (offline.settings.maxStorageMB * 1024 * 1024)) * 100
+                                    ) || 0}%
+                                </p>
+                                <p className="text-xs text-muted-foreground">Capacity</p>
+                            </div>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                            <div
+                                className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                                style={{
+                                    width: `${Math.min(
+                                        100,
+                                        (offline.totalSize / (offline.settings.maxStorageMB * 1024 * 1024)) * 100
+                                    )}%`,
+                                }}
+                            />
+                        </div>
+
+                        {offline.isDownloading && offline.downloadProgress && (
+                            <div className="flex items-center gap-3 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
+                                <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                                <div className="flex-1">
+                                    <p className="text-sm">
+                                        Downloading... {offline.downloadProgress.current}/{offline.downloadProgress.total}
+                                    </p>
+                                </div>
+                                <Button size="xs" variant="ghost" onClick={offline.cancelDownload}>
+                                    <X className="h-3 w-3" />
+                                </Button>
+                            </div>
+                        )}
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 text-red-400 hover:text-red-300 hover:border-red-500/50"
+                            onClick={() => {
+                                if (confirm("Clear all offline cached tracks?")) {
+                                    offline.clearAll();
+                                    toast.success("Offline cache cleared");
+                                }
+                            }}
+                            disabled={offline.cachedTracks.length === 0}
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Clear Offline Cache
+                        </Button>
                     </CardContent>
                 </Card>
             </TabsContent>

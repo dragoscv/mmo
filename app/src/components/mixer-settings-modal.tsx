@@ -10,7 +10,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
-    MidiEngine,
     BUILTIN_PRESETS,
     importPreset,
     exportPreset,
@@ -21,6 +20,7 @@ import {
     type MidiAction,
     type MidiActionHandler,
 } from "@/lib/midi-engine";
+import { useMidi, useMidiMessages, type MidiSettings } from "@/hooks/use-midi";
 import {
     loadBeatGridEnabled,
     saveBeatGridEnabled,
@@ -94,39 +94,6 @@ interface MixerSettingsModalProps {
     onMidiHandler?: MidiActionHandler;
 }
 
-// Storage key for MIDI settings
-const MIDI_SETTINGS_KEY = "mmo-midi-settings";
-
-interface MidiSettings {
-    enabled: boolean;
-    activePreset: string | null;
-    customPresets: MidiPreset[];
-    jogSensitivity: number; // 0.5 - 2.0
-    tempoRange: number; // ±6, ±10, ±16, ±25
-    crossfaderCurve: "linear" | "smooth" | "sharp";
-}
-
-const DEFAULT_SETTINGS: MidiSettings = {
-    enabled: false,
-    activePreset: null,
-    customPresets: [],
-    jogSensitivity: 1.0,
-    tempoRange: 10,
-    crossfaderCurve: "smooth",
-};
-
-function loadSettings(): MidiSettings {
-    try {
-        const raw = localStorage.getItem(MIDI_SETTINGS_KEY);
-        if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-    } catch { /* ignore */ }
-    return { ...DEFAULT_SETTINGS };
-}
-
-function saveSettings(settings: MidiSettings) {
-    try { localStorage.setItem(MIDI_SETTINGS_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
-}
-
 // ─── Mapping Categories ──────────────────────────────────────────────────
 
 const MAPPING_CATEGORIES: { label: string; actions: MidiAction[] }[] = [
@@ -158,14 +125,12 @@ function getCategoryForAction(action: string): string {
 
 export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerSettingsModalProps) {
     const mixer = useMixer();
+    const midi = useMidi();
     const personalization = usePersonalization();
-    const [settings, setSettings] = useState<MidiSettings>(loadSettings);
+    const { settings } = midi;
     const [beatGrid, setBeatGrid] = useState(loadBeatGridEnabled);
-    const [devices, setDevices] = useState<MidiDevice[]>([]);
-    const [midiStatus, setMidiStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
     const [lastMessage, setLastMessage] = useState<MidiMessage | null>(null);
     const [learnTarget, setLearnTarget] = useState<string | null>(null);
-    const engineRef = useRef<MidiEngine | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
     const [audioPermission, setAudioPermission] = useState<"prompt" | "granted" | "denied">("prompt");
@@ -181,16 +146,24 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
     const [mappingSearch, setMappingSearch] = useState("");
     const [mappingCategory, setMappingCategory] = useState<string>("all");
     const [learnRowIndex, setLearnRowIndex] = useState<number | null>(null);
+    const [midiDiagnostics, setMidiDiagnostics] = useState<string[]>([]);
+    const [midiPermission, setMidiPermission] = useState<"prompt" | "granted" | "denied">("prompt");
+
+    // Derive devices/status from shared context
+    const devices = midi.devices;
+    const midiStatus = midi.status;
+
+    // Subscribe to MIDI messages for last-message display and MIDI learn
+    useMidiMessages((msg: MidiMessage) => {
+        setLastMessage(msg);
+    });
 
     // Request audio permission and enumerate devices
     const requestAudioPermission = useCallback(async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            // Stop all tracks immediately — we only needed the permission grant
             stream.getTracks().forEach(t => t.stop());
             setAudioPermission("granted");
-
-            // Now enumerate devices with full labels
             const devs = await navigator.mediaDevices.enumerateDevices();
             setAudioDevices(devs.filter(d => d.kind === "audiooutput"));
         } catch {
@@ -198,11 +171,10 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
         }
     }, []);
 
-    // Initialize MIDI engine
+    // Wire settings to mixer engine on open + check permissions
     useEffect(() => {
         if (!open) return;
 
-        // Wire saved settings to mixer engine on open
         mixer.setCrossfaderCurve(settings.crossfaderCurve as CrossfaderCurve);
         mixer.setTempoRange(settings.tempoRange);
         mixer.setJogSensitivity(settings.jogSensitivity);
@@ -210,7 +182,6 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
         // Check audio permission status and enumerate devices
         (async () => {
             try {
-                // Check if permission is already granted
                 const status = await navigator.permissions.query({ name: "microphone" as PermissionName });
                 if (status.state === "granted") {
                     setAudioPermission("granted");
@@ -220,69 +191,39 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                     setAudioPermission("denied");
                 } else {
                     setAudioPermission("prompt");
-                    // Still enumerate — will get devices without labels
                     const devs = await navigator.mediaDevices.enumerateDevices();
                     setAudioDevices(devs.filter(d => d.kind === "audiooutput"));
                 }
             } catch {
-                // Fallback: just try enumerating
                 const devs = await navigator.mediaDevices?.enumerateDevices();
                 setAudioDevices(devs?.filter(d => d.kind === "audiooutput") || []);
             }
         })();
 
-        if (engineRef.current) return;
+        // Check MIDI permission status
+        navigator.permissions.query({ name: "midi" as PermissionName }).then((permStatus) => {
+            setMidiPermission(permStatus.state as "prompt" | "granted" | "denied");
+            permStatus.onchange = () => setMidiPermission(permStatus.state as "prompt" | "granted" | "denied");
+        }).catch(() => { /* not all browsers support querying midi permission */ });
 
-        const engine = new MidiEngine();
-        engineRef.current = engine;
-
-        engine.onDeviceChange = (devs) => setDevices(devs);
-        engine.onMessage = (msg) => setLastMessage(msg);
-
-        setMidiStatus("connecting");
-        engine.init().then((success) => {
-            setMidiStatus(success ? "connected" : "error");
-            if (success) {
-                setDevices(engine.getDevices());
-
-                // Auto-detect and load preset
-                const detected = engine.autoDetectPreset(BUILTIN_PRESETS);
-                if (detected && !settings.activePreset) {
-                    engine.setMapping(detected);
-                    updateSettings({ activePreset: detected.name, enabled: true });
-                } else if (settings.activePreset) {
-                    const preset = getAllPresets(settings).find(p => p.name === settings.activePreset);
-                    if (preset) engine.setMapping(preset);
-                }
-
-                if (onMidiHandler) engine.setHandler(onMidiHandler);
-            }
-        });
-
-        return () => {
-            engine.destroy();
-            engineRef.current = null;
-        };
+        // Wire the action handler
+        if (onMidiHandler) midi.setActionHandler(onMidiHandler);
     }, [open]);
 
     // Update handler when it changes
     useEffect(() => {
-        if (engineRef.current && onMidiHandler) {
-            engineRef.current.setHandler(onMidiHandler);
-        }
-    }, [onMidiHandler]);
+        if (onMidiHandler) midi.setActionHandler(onMidiHandler);
+    }, [onMidiHandler, midi]);
 
     // MIDI Learn: capture next MIDI input when learnTarget is set
     useEffect(() => {
         if (!learnTarget || !lastMessage) return;
-        const engine = engineRef.current;
-        if (!engine) return;
 
         // Determine if it's a button or knob based on MIDI status
         const isNote = (lastMessage.status & 0xF0) === 0x90;
         const type: MidiMapping["type"] = isNote ? "note" : "cc";
 
-        engine.addLearnedMapping({
+        midi.addLearnedMapping({
             action: learnTarget as MidiAction,
             status: lastMessage.status,
             midino: lastMessage.note,
@@ -292,19 +233,15 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
         });
 
         setLearnTarget(null);
-    }, [learnTarget, lastMessage]);
+    }, [learnTarget, lastMessage, midi]);
 
     const updateSettings = useCallback((patch: Partial<MidiSettings>) => {
-        setSettings(prev => {
-            const next = { ...prev, ...patch };
-            saveSettings(next);
-            // Wire settings to mixer engine
-            if (patch.crossfaderCurve) mixer.setCrossfaderCurve(patch.crossfaderCurve as CrossfaderCurve);
-            if (patch.tempoRange != null) mixer.setTempoRange(patch.tempoRange);
-            if (patch.jogSensitivity != null) mixer.setJogSensitivity(patch.jogSensitivity);
-            return next;
-        });
-    }, [mixer]);
+        midi.updateSettings(patch);
+        // Wire settings to mixer engine
+        if (patch.crossfaderCurve) mixer.setCrossfaderCurve(patch.crossfaderCurve as CrossfaderCurve);
+        if (patch.tempoRange != null) mixer.setTempoRange(patch.tempoRange);
+        if (patch.jogSensitivity != null) mixer.setJogSensitivity(patch.jogSensitivity);
+    }, [midi, mixer]);
 
     const getAllPresets = useCallback((s: MidiSettings) => {
         return [...BUILTIN_PRESETS, ...s.customPresets];
@@ -312,11 +249,10 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
 
     const selectPreset = useCallback((name: string) => {
         const preset = getAllPresets(settings).find(p => p.name === name);
-        if (preset && engineRef.current) {
-            engineRef.current.setMapping(preset);
-            updateSettings({ activePreset: name });
+        if (preset) {
+            midi.activatePreset(preset);
         }
-    }, [settings, getAllPresets, updateSettings]);
+    }, [settings, getAllPresets, midi]);
 
     const handleImportPreset = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -349,14 +285,8 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
     }, [settings, getAllPresets]);
 
     const refreshDevices = useCallback(() => {
-        if (engineRef.current) {
-            setMidiStatus("connecting");
-            engineRef.current.init().then((ok) => {
-                setMidiStatus(ok ? "connected" : "error");
-                setDevices(engineRef.current?.getDevices() || []);
-            });
-        }
-    }, []);
+        midi.refreshDevices();
+    }, [midi]);
 
     // ── Mapping CRUD ──
 
@@ -440,13 +370,11 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
         });
 
         // Activate the saved preset
-        if (engineRef.current) {
-            engineRef.current.setMapping({ ...editingPreset, name: trimmedName });
-        }
+        midi.activatePreset({ ...editingPreset, name: trimmedName });
 
         setEditingPreset(null);
         setMappingView("list");
-    }, [editingPreset, editingIsNew, editingOriginalName, settings.customPresets, updateSettings]);
+    }, [editingPreset, editingIsNew, editingOriginalName, settings.customPresets, updateSettings, midi]);
 
     const cancelEditing = useCallback(() => {
         setEditingPreset(null);
@@ -573,6 +501,36 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                 </button>
                             </div>
 
+                            {/* MIDI Permission status */}
+                            <div className="flex items-center justify-between rounded-lg bg-white/[0.02] border border-white/[0.06] p-2.5">
+                                <div className="text-[10px] text-white/40">
+                                    MIDI Permission: <span className={cn(
+                                        "font-medium",
+                                        midiPermission === "granted" ? "text-green-400" :
+                                            midiPermission === "denied" ? "text-red-400" : "text-yellow-400"
+                                    )}>{midiPermission}</span>
+                                    {midiPermission === "denied" && (
+                                        <span className="text-red-400/60 ml-1">— Go to Chrome Settings → Site Settings → MIDI for localhost and set to Allow</span>
+                                    )}
+                                </div>
+                                {midiPermission !== "granted" && (
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const access = await navigator.requestMIDIAccess({ sysex: false });
+                                                console.log("[MIDI] Manual request: inputs=", access.inputs.size, "outputs=", access.outputs.size);
+                                                refreshDevices();
+                                            } catch (e) {
+                                                console.error("[MIDI] Manual permission request failed:", e);
+                                            }
+                                        }}
+                                        className="text-[10px] text-purple-400/60 hover:text-purple-400 cursor-pointer transition-colors shrink-0"
+                                    >
+                                        Request Permission
+                                    </button>
+                                )}
+                            </div>
+
                             {/* Enable/Disable */}
                             <div className="flex items-center justify-between rounded-lg bg-white/[0.03] border border-white/[0.06] p-3">
                                 <div className="flex items-center gap-2">
@@ -611,6 +569,26 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                         No MIDI devices detected.
                                         <br />
                                         <span className="text-[10px]">Connect a USB controller and click Refresh</span>
+                                        {midiPermission !== "granted" && (
+                                            <div className="mt-3">
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            await navigator.requestMIDIAccess({ sysex: false });
+                                                            refreshDevices();
+                                                        } catch (e) {
+                                                            console.error("[MIDI] Permission request failed:", e);
+                                                        }
+                                                    }}
+                                                    className="px-3 py-1.5 rounded-md bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-xs cursor-pointer transition-colors border border-purple-500/20"
+                                                >
+                                                    Grant MIDI Access
+                                                </button>
+                                                <div className="text-[10px] text-white/30 mt-1">
+                                                    Chrome requires explicit permission for MIDI
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <div className="space-y-1.5">
@@ -646,6 +624,33 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                     </div>
                                 </div>
                             )}
+
+                            {/* MIDI Diagnostics */}
+                            <div className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-2.5">
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <div className="text-[10px] uppercase tracking-wider text-white/25">Diagnostics</div>
+                                    <button
+                                        onClick={() => {
+                                            const diag = midi.getDiagnostics();
+                                            setMidiDiagnostics(diag);
+                                        }}
+                                        className="text-[9px] text-purple-400/50 hover:text-purple-400 cursor-pointer transition-colors"
+                                    >
+                                        Run Diagnostics
+                                    </button>
+                                </div>
+                                {midiDiagnostics.length > 0 && (
+                                    <div className="font-mono text-[9px] text-white/40 space-y-0.5 max-h-40 overflow-y-auto">
+                                        {midiDiagnostics.map((line, i) => (
+                                            <div key={i} className={cn(
+                                                line.startsWith("  ") ? "pl-3" : "",
+                                                line.includes("state=disconnected") && "text-red-400/50",
+                                                line.includes("state=connected") && "text-green-400/50",
+                                            )}>{line}</div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </TabsContent>
 
                         {/* ── Mapping Tab ── */}

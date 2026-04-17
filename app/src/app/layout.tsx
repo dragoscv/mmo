@@ -15,6 +15,10 @@ import { EQProvider } from "@/components/eq-context";
 import { MixerProvider } from "@/components/mixer-context";
 import { MobileHeader } from "@/components/mobile-header";
 import { ConfirmLoadDialog } from "@/components/confirm-load-dialog";
+import { FocusModeProvider } from "@/components/focus-mode-context";
+import { FocusAwareSidebar, FocusAwareMobileHeader, FocusAwareNowPlayingBar } from "@/components/focus-aware-shell";
+import { AuthProvider } from "@/components/auth-provider";
+import { PreferencesSync } from "@/components/preferences-sync";
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -67,47 +71,54 @@ export default function RootLayout({
                     {`if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js')})}`}
                 </Script>
                 <ThemeProvider>
-                    <SelectionProvider>
-                        <SidebarProvider>
-                            <PlayerProvider>
-                                <EQProvider>
-                                    <MixerProvider>
-                                        <AnalysisProvider>
-                                            <PlayerAwareLayout>
-                                                <div data-app-sidebar="" className="self-stretch">
-                                                    <AppSidebar />
-                                                </div>
-                                                <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                                                    <MobileHeader />
-                                                    <main className="flex-1 min-h-0">
-                                                        {children}
-                                                    </main>
-                                                </div>
-                                            </PlayerAwareLayout>
-                                            <div data-app-nowplaying="">
-                                                <AudioPlayer />
-                                                <Suspense>
-                                                    <NowPlaying />
-                                                </Suspense>
-                                                <StickyNowPlaying />
-                                                <ConfirmLoadDialog />
-                                            </div>
-                                        </AnalysisProvider>
-                                    </MixerProvider>
-                                </EQProvider>
-                                <Toaster
-                                    position="bottom-right"
-                                    toastOptions={{
-                                        style: {
-                                            background: "var(--card)",
-                                            border: "1px solid var(--border)",
-                                            color: "var(--foreground)",
-                                        },
-                                    }}
-                                />
-                            </PlayerProvider>
-                        </SidebarProvider>
-                    </SelectionProvider>
+                    <AuthProvider>
+                        <PreferencesSync />
+                        <SelectionProvider>
+                            <SidebarProvider>
+                                <PlayerProvider>
+                                    <EQProvider>
+                                        <MixerProvider>
+                                            <AnalysisProvider>
+                                                <FocusModeProvider>
+                                                    <PlayerAwareLayout>
+                                                        <FocusAwareSidebar>
+                                                            <AppSidebar />
+                                                        </FocusAwareSidebar>
+                                                        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                                                            <FocusAwareMobileHeader>
+                                                                <MobileHeader />
+                                                            </FocusAwareMobileHeader>
+                                                            <main className="flex-1 min-h-0">
+                                                                {children}
+                                                            </main>
+                                                        </div>
+                                                    </PlayerAwareLayout>
+                                                    <FocusAwareNowPlayingBar>
+                                                        <AudioPlayer />
+                                                        <Suspense>
+                                                            <NowPlaying />
+                                                        </Suspense>
+                                                        <StickyNowPlaying />
+                                                        <ConfirmLoadDialog />
+                                                    </FocusAwareNowPlayingBar>
+                                                </FocusModeProvider>
+                                            </AnalysisProvider>
+                                        </MixerProvider>
+                                    </EQProvider>
+                                    <Toaster
+                                        position="bottom-right"
+                                        toastOptions={{
+                                            style: {
+                                                background: "var(--card)",
+                                                border: "1px solid var(--border)",
+                                                color: "var(--foreground)",
+                                            },
+                                        }}
+                                    />
+                                </PlayerProvider>
+                            </SidebarProvider>
+                        </SelectionProvider>
+                    </AuthProvider>
                 </ThemeProvider>
             </body>
         </html>

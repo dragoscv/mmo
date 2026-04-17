@@ -1,0 +1,89 @@
+{
+  "name": "mmo-companion",
+  "version": "0.2.0",
+  "description": "MMO Companion Server — serves local music files to MMO web app",
+  "main": "dist/main.js",
+  "author": {
+    "name": "mwrty",
+    "email": "vladulescu.catalin@gmail.com"
+  },
+  "license": "MIT",
+  "scripts": {
+    "dev": "tsc && electron dist/main.js",
+    "build": "tsc",
+    "start": "electron dist/main.js",
+    "dist": "tsc && electron-builder --win --x64",
+    "dist:win": "tsc && electron-builder --win --x64",
+    "dist:mac": "tsc && electron-builder --mac",
+    "dist:linux": "tsc && electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.mwrty.mmo-companion",
+    "productName": "MMO Companion",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "dragoscv",
+        "repo": "rekordbox-mwrty"
+      }
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**/*",
+      "ui/**/*",
+      "assets/**/*",
+      "!src/**",
+      "!**/*.ts",
+      "!tsconfig.json"
+    ],
+    "extraResources": [],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.music"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "assets/icon.png",
+      "category": "Audio"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MMO Companion",
+      "deleteAppDataOnUninstall": false
+    }
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.6.2",
+    "express": "^4.21.0",
+    "music-metadata": "^10.6.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/ws": "^8.5.14",
+    "electron": "^34.3.0",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.8.3"
+  }
+}

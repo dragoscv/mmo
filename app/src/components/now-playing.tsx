@@ -8,7 +8,8 @@ import { usePersonalization, getMixerBackgroundStyle } from "@/hooks/use-persona
 import { Artwork } from "./artwork";
 import { FavoriteButton } from "./favorite-button";
 import { VisualizationControls } from "./visualization-controls";
-import { formatDuration, formatBytes, GENRE_COLORS, cn } from "@/lib/utils";
+import { formatDuration, formatBytes, GENRE_COLORS, cn, formatKey } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { getRecommendedTracks } from "@/actions/recommendations";
 import { toggleFavorite } from "@/actions/tracks";
 import {
@@ -72,6 +73,7 @@ const MixerView = dynamic(
     () => import("./mixer-view").then(m => ({ default: m.MixerView })),
     { ssr: false, loading: () => <div className="flex-1 flex items-center justify-center text-white/30">Loading mixer...</div> }
 );
+import { MidiProvider } from "@/hooks/use-midi";
 import type { Track } from "@/db/schema";
 
 // Genre-based gradient colors
@@ -114,6 +116,7 @@ type LeftView = "artwork" | "visualization" | "equalizer" | "mixer";
 export function NowPlaying() {
     const player = usePlayer();
     const personalization = usePersonalization();
+    const { noteNotations } = useDAWSettings();
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState<TabType>("queue");
     const [leftView, setLeftView] = useState<LeftView>("mixer");
@@ -564,8 +567,7 @@ export function NowPlaying() {
                                             )}
                                             {currentTrack.keyCamelot && (
                                                 <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">
-                                                    {currentTrack.keyCamelot}
-                                                    {currentTrack.keyMusical ? ` · ${currentTrack.keyMusical}` : ""}
+                                                    {formatKey(currentTrack.keyCamelot, noteNotations)}
                                                 </span>
                                             )}
                                             {currentTrack.genre && (
@@ -863,7 +865,9 @@ export function NowPlaying() {
                                 )}
                                 style={{ fontSize: `${personalization.textScale * 100}%` }}
                             >
-                                <MixerView />
+                                <MidiProvider>
+                                    <MixerView />
+                                </MidiProvider>
                             </div>
                         )}
                     </div>
@@ -1162,7 +1166,7 @@ export function NowPlaying() {
                                                                                     <p className="text-[10px] text-purple-400/70 leading-relaxed mt-0.5">
                                                                                         {rec.reason}
                                                                                         {rec.bpm ? ` · ${Math.round(rec.bpm)} BPM` : ""}
-                                                                                        {rec.keyCamelot ? ` · ${rec.keyCamelot}` : ""}
+                                                                                        {rec.keyCamelot ? ` · ${formatKey(rec.keyCamelot, noteNotations)}` : ""}
                                                                                     </p>
                                                                                 </div>
                                                                                 <span className="text-xs text-white/30 tabular-nums shrink-0">
@@ -1200,7 +1204,7 @@ export function NowPlaying() {
                                                                             )}
                                                                             {rec.keyCamelot && (
                                                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">
-                                                                                    {rec.keyCamelot}
+                                                                                    {formatKey(rec.keyCamelot, noteNotations)}
                                                                                 </span>
                                                                             )}
                                                                             {rec.genre && (

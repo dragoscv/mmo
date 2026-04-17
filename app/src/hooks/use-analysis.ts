@@ -109,6 +109,7 @@ export function useAnalysis(enabled: boolean) {
                 artwork: boolean;
                 lyrics: boolean;
                 bpmKey: boolean;
+                stems: boolean;
                 skipAnalyzedDays: number | null;
                 workers: number;
             }

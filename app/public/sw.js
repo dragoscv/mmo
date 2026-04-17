@@ -3,7 +3,46 @@
 const CACHE_NAME = "music-org-v2";
 
 // App shell files to precache
-const PRECACHE_URLS = ["/", "/library", "/playlists", "/scanner", "/settings"];
+const PRECACHE_URLS = ["/", "/library", "/playlists", "/scanner", "/settings", "/devices"];
+
+// ─── IndexedDB offline audio helper ─────────────────────────────────────────
+
+function getOfflineBlobFromIDB(trackId) {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open("mmo-offline", 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains("audio-files")) {
+                db.createObjectStore("audio-files", { keyPath: "trackId" });
+            }
+            if (!db.objectStoreNames.contains("metadata")) {
+                const meta = db.createObjectStore("metadata", { keyPath: "trackId" });
+                meta.createIndex("cachedAt", "cachedAt");
+                meta.createIndex("size", "size");
+            }
+        };
+        req.onsuccess = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains("audio-files")) {
+                db.close();
+                resolve(null);
+                return;
+            }
+            const tx = db.transaction("audio-files", "readonly");
+            const store = tx.objectStore("audio-files");
+            const getReq = store.get(trackId);
+            getReq.onsuccess = () => {
+                db.close();
+                resolve(getReq.result?.blob || null);
+            };
+            getReq.onerror = () => {
+                db.close();
+                reject(getReq.error);
+            };
+        };
+        req.onerror = () => reject(req.error);
+    });
+}
 
 // Install: precache app shell
 self.addEventListener("install", (event) => {
@@ -35,8 +74,41 @@ self.addEventListener("fetch", (event) => {
     // Skip non-GET and cross-origin
     if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
-    // API calls & server actions: network only
-    if (url.pathname.startsWith("/api/") || request.headers.get("Next-Action")) {
+    // API calls & server actions: network only (except audio which we handle below)
+    if (
+        (url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/audio/")) ||
+        request.headers.get("Next-Action")
+    ) {
+        return;
+    }
+
+    // Audio API: try network first, then check IndexedDB offline cache
+    if (url.pathname.startsWith("/api/audio/")) {
+        event.respondWith(
+            fetch(request)
+                .catch(async () => {
+                    // Network failed - check IndexedDB offline cache
+                    const trackIdMatch = url.pathname.match(/\/api\/audio\/(?:device\/)?(\d+)/);
+                    if (!trackIdMatch) return new Response("Not found", { status: 404 });
+
+                    const trackId = parseInt(trackIdMatch[1]);
+                    try {
+                        const blob = await getOfflineBlobFromIDB(trackId);
+                        if (blob) {
+                            return new Response(blob, {
+                                status: 200,
+                                headers: {
+                                    "Content-Type": blob.type || "audio/mpeg",
+                                    "Content-Length": blob.size.toString(),
+                                },
+                            });
+                        }
+                    } catch {
+                        // IndexedDB error, return 503
+                    }
+                    return new Response("Offline - track not cached", { status: 503 });
+                })
+        );
         return;
     }
 

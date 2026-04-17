@@ -49,6 +49,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setThemeState(newTheme);
         localStorage.setItem(STORAGE_KEY, newTheme);
         applyTheme(newTheme);
+        window.dispatchEvent(new Event("mmo-preference-changed"));
     }, []);
 
     useLayoutEffect(() => {

@@ -2,50 +2,70 @@
 
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useEditor } from "./editor-context";
+import { useDAWSettings, type SpectrogramColorMap } from "@/hooks/use-daw-settings";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Spectrogram View — FFT-based frequency visualization
 // ═══════════════════════════════════════════════════════════════════════════
 
-const FFT_SIZE = 2048;
-const COLOR_STOPS = [
-    [0, 0, 0],       // silence = black
-    [15, 5, 50],     // very quiet = deep purple
-    [40, 10, 100],   // quiet = purple
-    [80, 20, 160],   // soft = violet
-    [20, 80, 200],   // medium-quiet = blue
-    [20, 180, 200],  // medium = cyan
-    [80, 220, 100],  // medium-loud = green
-    [220, 220, 50],  // loud = yellow
-    [255, 140, 20],  // very loud = orange
-    [255, 40, 40],   // peak = red
-    [255, 255, 255], // clip = white
-];
+const DEFAULT_FFT_SIZE = 2048;
 
-function amplitudeToColor(amplitude: number): [number, number, number] {
-    // Map 0..1 to color stops
-    const idx = amplitude * (COLOR_STOPS.length - 1);
-    const lo = Math.floor(idx);
-    const hi = Math.min(lo + 1, COLOR_STOPS.length - 1);
-    const t = idx - lo;
-    return [
-        COLOR_STOPS[lo][0] + (COLOR_STOPS[hi][0] - COLOR_STOPS[lo][0]) * t,
-        COLOR_STOPS[lo][1] + (COLOR_STOPS[hi][1] - COLOR_STOPS[lo][1]) * t,
-        COLOR_STOPS[lo][2] + (COLOR_STOPS[hi][2] - COLOR_STOPS[lo][2]) * t,
-    ];
+const COLOR_MAPS: Record<SpectrogramColorMap, number[][]> = {
+    magma: [
+        [0, 0, 0], [15, 5, 50], [40, 10, 100], [80, 20, 160],
+        [20, 80, 200], [20, 180, 200], [80, 220, 100],
+        [220, 220, 50], [255, 140, 20], [255, 40, 40], [255, 255, 255],
+    ],
+    viridis: [
+        [68, 1, 84], [72, 35, 116], [64, 67, 135], [52, 94, 141],
+        [33, 145, 140], [53, 183, 121], [109, 205, 89],
+        [180, 222, 44], [253, 231, 37], [253, 231, 37], [255, 255, 255],
+    ],
+    inferno: [
+        [0, 0, 4], [22, 11, 57], [66, 10, 104], [120, 28, 109],
+        [165, 44, 96], [207, 68, 70], [237, 105, 37],
+        [251, 155, 6], [252, 206, 37], [252, 255, 164], [255, 255, 255],
+    ],
+    plasma: [
+        [13, 8, 135], [75, 3, 161], [126, 3, 168], [168, 34, 150],
+        [203, 70, 121], [229, 107, 93], [248, 148, 65],
+        [253, 195, 40], [240, 249, 33], [240, 249, 33], [255, 255, 255],
+    ],
+    grayscale: [
+        [0, 0, 0], [25, 25, 25], [51, 51, 51], [76, 76, 76],
+        [102, 102, 102], [127, 127, 127], [153, 153, 153],
+        [178, 178, 178], [204, 204, 204], [229, 229, 229], [255, 255, 255],
+    ],
+};
+
+function buildColorLUT(colorMap: SpectrogramColorMap): Uint8Array {
+    const stops = COLOR_MAPS[colorMap];
+    const lut = new Uint8Array(256 * 3);
+    for (let i = 0; i < 256; i++) {
+        const amplitude = i / 255;
+        const idx = amplitude * (stops.length - 1);
+        const lo = Math.floor(idx);
+        const hi = Math.min(lo + 1, stops.length - 1);
+        const t = idx - lo;
+        lut[i * 3] = stops[lo][0] + (stops[hi][0] - stops[lo][0]) * t;
+        lut[i * 3 + 1] = stops[lo][1] + (stops[hi][1] - stops[lo][1]) * t;
+        lut[i * 3 + 2] = stops[lo][2] + (stops[hi][2] - stops[lo][2]) * t;
+    }
+    return lut;
 }
 
-// Pre-compute color lookup table
-const COLOR_LUT = new Uint8Array(256 * 3);
-for (let i = 0; i < 256; i++) {
-    const [r, g, b] = amplitudeToColor(i / 255);
-    COLOR_LUT[i * 3] = r;
-    COLOR_LUT[i * 3 + 1] = g;
-    COLOR_LUT[i * 3 + 2] = b;
+// Pre-computed LUT cache
+const lutCache = new Map<SpectrogramColorMap, Uint8Array>();
+function getColorLUT(colorMap: SpectrogramColorMap): Uint8Array {
+    if (!lutCache.has(colorMap)) {
+        lutCache.set(colorMap, buildColorLUT(colorMap));
+    }
+    return lutCache.get(colorMap)!;
 }
 
 export function SpectrogramView() {
     const editor = useEditor();
+    const ds = useDAWSettings();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 800, height: 300 });
@@ -84,7 +104,9 @@ export function SpectrogramView() {
         const { buffer, scrollX, zoom, selection, playPosition } = editor;
         const sampleRate = buffer.sampleRate;
         const data = buffer.getChannelData(0); // mono for spectrogram
-        const halfFFT = FFT_SIZE / 2;
+        const fftSize = ds.spectrogramFftSize;
+        const halfFFT = fftSize / 2;
+        const colorLUT = getColorLUT(ds.spectrogramColorMap);
 
         // Clear
         ctx.fillStyle = "#000";
@@ -95,9 +117,9 @@ export function SpectrogramView() {
         const pixels = imageData.data;
 
         // Hann window
-        const hannWindow = new Float32Array(FFT_SIZE);
-        for (let i = 0; i < FFT_SIZE; i++) {
-            hannWindow[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (FFT_SIZE - 1)));
+        const hannWindow = new Float32Array(fftSize);
+        for (let i = 0; i < fftSize; i++) {
+            hannWindow[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (fftSize - 1)));
         }
 
         for (let px = 0; px < w; px++) {
@@ -105,8 +127,8 @@ export function SpectrogramView() {
             const centerSample = Math.floor(timeSec * sampleRate);
 
             // Extract windowed segment
-            const segment = new Float32Array(FFT_SIZE);
-            for (let i = 0; i < FFT_SIZE; i++) {
+            const segment = new Float32Array(fftSize);
+            for (let i = 0; i < fftSize; i++) {
                 const sampleIdx = centerSample - halfFFT + i;
                 segment[i] = (sampleIdx >= 0 && sampleIdx < data.length ? data[sampleIdx] : 0) * hannWindow[i];
             }
@@ -119,12 +141,12 @@ export function SpectrogramView() {
             for (let k = 0; k < halfFFT; k++) {
                 let real = 0;
                 let imag = 0;
-                for (let n = 0; n < FFT_SIZE; n++) {
-                    const angle = (-2 * Math.PI * k * n) / FFT_SIZE;
+                for (let n = 0; n < fftSize; n++) {
+                    const angle = (-2 * Math.PI * k * n) / fftSize;
                     real += segment[n] * Math.cos(angle);
                     imag += segment[n] * Math.sin(angle);
                 }
-                magnitudes[k] = Math.sqrt(real * real + imag * imag) / FFT_SIZE;
+                magnitudes[k] = Math.sqrt(real * real + imag * imag) / fftSize;
                 if (magnitudes[k] > maxMag) maxMag = magnitudes[k];
             }
 
@@ -138,9 +160,9 @@ export function SpectrogramView() {
                     : 0;
                 const colorIdx = Math.floor(dbNorm * 255);
                 const pixelIdx = (y * w + px) * 4;
-                pixels[pixelIdx] = COLOR_LUT[colorIdx * 3];
-                pixels[pixelIdx + 1] = COLOR_LUT[colorIdx * 3 + 1];
-                pixels[pixelIdx + 2] = COLOR_LUT[colorIdx * 3 + 2];
+                pixels[pixelIdx] = colorLUT[colorIdx * 3];
+                pixels[pixelIdx + 1] = colorLUT[colorIdx * 3 + 1];
+                pixels[pixelIdx + 2] = colorLUT[colorIdx * 3 + 2];
                 pixels[pixelIdx + 3] = 255;
             }
         }
@@ -185,7 +207,7 @@ export function SpectrogramView() {
             ctx.lineTo(w, y);
             ctx.stroke();
         }
-    }, [editor.buffer, editor.scrollX, editor.zoom, editor.selection, editor.playPosition, dimensions]);
+    }, [editor.buffer, editor.scrollX, editor.zoom, editor.selection, editor.playPosition, dimensions, ds.spectrogramColorMap, ds.spectrogramFftSize]);
 
     // Mouse handlers (same as waveform for selection)
     const [isDragging, setIsDragging] = useState(false);

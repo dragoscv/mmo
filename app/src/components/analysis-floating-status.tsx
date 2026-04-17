@@ -10,6 +10,8 @@ import {
     CheckCircle2,
     StopCircle,
     GripHorizontal,
+    Minimize2,
+    Maximize2,
 } from "lucide-react";
 import type { JobStatus } from "@/hooks/use-analysis";
 
@@ -131,6 +133,48 @@ export function AnalysisFloatingStatus({
     const isPaused = status === "paused";
     const isDone = status === "completed" || status === "stopped";
 
+    // ─── Minimize ────────────────────────────────────────────────────────
+    const [minimized, setMinimized] = useState(false);
+
+    // Minimized pill
+    if (minimized) {
+        return (
+            <div
+                ref={containerRef}
+                className="fixed z-50 select-none animate-in fade-in slide-in-from-bottom-2 duration-200"
+                style={{ left: position.x, top: position.y }}
+            >
+                <div
+                    className={cn(
+                        "flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-lg backdrop-blur-xl cursor-pointer",
+                        isDone ? "border-green-500/30 bg-[var(--card)]/95" :
+                        isPaused ? "border-amber-500/30 bg-[var(--card)]/95" :
+                        "border-purple-500/30 bg-[var(--card)]/95"
+                    )}
+                    onClick={() => setMinimized(false)}
+                >
+                    <div
+                        className={cn(isDragging ? "cursor-grabbing" : "cursor-grab")}
+                        onPointerDown={onPointerDown}
+                        onPointerMove={onPointerMove}
+                        onPointerUp={onPointerUp}
+                    >
+                        <GripHorizontal className="h-3 w-3 text-[var(--muted-foreground)]" />
+                    </div>
+                    {isRunning && <Loader2 className="h-3 w-3 text-purple-400 animate-spin" />}
+                    {isPaused && <Pause className="h-3 w-3 text-amber-400" />}
+                    {isDone && <CheckCircle2 className="h-3 w-3 text-green-400" />}
+                    <span className="text-[10px] font-bold tabular-nums">
+                        {isDone ? "Done" : `${pct}%`}
+                    </span>
+                    <span className="text-[9px] text-[var(--muted-foreground)] tabular-nums">
+                        {progress}/{total}
+                    </span>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div
             ref={containerRef}
@@ -210,6 +254,14 @@ export function AnalysisFloatingStatus({
                             {pct}%
                         </span>
                     )}
+
+                    {/* Minimize */}
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setMinimized(true); }}
+                        className="p-0.5 rounded text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors cursor-pointer shrink-0"
+                    >
+                        <Minimize2 className="h-3 w-3" />
+                    </button>
                 </div>
 
                 {/* Track info */}

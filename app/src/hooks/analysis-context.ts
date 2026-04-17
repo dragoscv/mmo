@@ -17,6 +17,7 @@ export interface AnalysisContextValue extends AnalysisState {
             artwork: boolean;
             lyrics: boolean;
             bpmKey: boolean;
+            stems: boolean;
             skipAnalyzedDays: number | null;
             workers: number;
         }

@@ -17,9 +17,10 @@ export function DAWMixer() {
     return (
         <div className="h-full flex bg-[var(--daw-bg)] overflow-x-auto overflow-y-hidden">
             {/* Channel strips */}
-            {daw.project.tracks.map((track, i) => (
-                <ChannelStrip key={track.id} track={track} index={i} />
-            ))}
+            {daw.project.tracks.map((track, i) => {
+                const hasActiveClip = daw.isPlaying && track.clips.some(c => daw.activeClipIds.includes(c.id));
+                return <ChannelStrip key={track.id} track={track} index={i} isActive={hasActiveClip} />;
+            })}
 
             {/* Add track */}
             <div className="w-12 flex-shrink-0 border-l border-[var(--daw-border)] flex flex-col items-center justify-center gap-1.5">
@@ -47,7 +48,7 @@ export function DAWMixer() {
     );
 }
 
-function ChannelStrip({ track, index }: { track: DAWTrack; index: number }) {
+function ChannelStrip({ track, index, isActive }: { track: DAWTrack; index: number; isActive?: boolean }) {
     const daw = useDAW();
     const ctxMenu = useContextMenu();
     const isSelected = daw.selectedTrackId === track.id;
@@ -128,7 +129,10 @@ function ChannelStrip({ track, index }: { track: DAWTrack; index: number }) {
                 "w-[76px] flex-shrink-0 flex flex-col border-r border-[var(--daw-border)] transition-all duration-150 cursor-pointer",
                 isSelected
                     ? "bg-[var(--daw-surface-2)]"
-                    : "bg-[var(--daw-surface)] hover:bg-[oklch(1_0_0/2%)]",
+                    : isActive
+                        ? "bg-[var(--daw-surface-2)]"
+                        : "bg-[var(--daw-surface)] hover:bg-[oklch(1_0_0/2%)]",
+                isActive && "shadow-[inset_0_2px_0_var(--daw-green)]",
                 `daw-animate-in`
             )}
             style={{ animationDelay: `${index * 20}ms` }}
@@ -136,11 +140,19 @@ function ChannelStrip({ track, index }: { track: DAWTrack; index: number }) {
             onContextMenu={handleContextMenu}
         >
             {/* Track name */}
-            <div className="h-7 px-1.5 flex items-center gap-1.5 border-b border-[var(--daw-border)]">
-                <div
-                    className="w-2 h-2 rounded-full flex-shrink-0 ring-1 ring-white/5"
-                    style={{ background: track.color }}
-                />
+            <div className={cn(
+                "h-7 px-1.5 flex items-center gap-1.5 border-b border-[var(--daw-border)]",
+                isActive && "bg-[var(--daw-green)]/5"
+            )}>
+                <div className="relative flex-shrink-0">
+                    <div
+                        className="w-2 h-2 rounded-full ring-1 ring-white/5"
+                        style={{ background: track.color }}
+                    />
+                    {isActive && (
+                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--daw-green)] animate-pulse shadow-[0_0_3px_var(--daw-green)]" />
+                    )}
+                </div>
                 <InlineEditName
                     value={track.name}
                     onCommit={name => daw.renameTrack(track.id, name)}

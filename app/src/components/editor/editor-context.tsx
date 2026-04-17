@@ -137,6 +137,17 @@ interface EditorContextValue {
     loadFromUrl: (url: string, name?: string) => Promise<void>;
     loadFromFile: (file: File) => Promise<void>;
 
+    // Recording
+    isRecording: boolean;
+    startRecording: (deviceId?: string) => Promise<boolean>;
+    stopRecording: () => void;
+
+    // Stems
+    isSeparatingStems: boolean;
+    stemsProgress: number;
+    separateStems: () => Promise<void>;
+    extractStem: (stem: import("@/lib/stems-engine").StemType) => Promise<void>;
+
     // Levels
     peakL: number;
     peakR: number;
@@ -359,6 +370,88 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         }
     }, [getAudioCtx, loadBuffer]);
 
+    // ─── Recording ──────────────────────────────────────────────────
+    const [isRecording, setIsRecording] = useState(false);
+    const recorderRef = useRef<MediaRecorder | null>(null);
+    const recChunksRef = useRef<Blob[]>([]);
+    const recStreamRef = useRef<MediaStream | null>(null);
+
+    // Stems
+    const [isSeparatingStems, setIsSeparatingStems] = useState(false);
+    const [stemsProgress, setStemsProgress] = useState(0);
+
+    const startRecording = useCallback(async (deviceId?: string): Promise<boolean> => {
+        try {
+            const ctx = getAudioCtx();
+            if (ctx.state === "suspended") await ctx.resume();
+
+            // Stop playback if playing
+            if (sourceRef.current) {
+                sourceRef.current.onended = null;
+                try { sourceRef.current.stop(); } catch { /* noop */ }
+            }
+            setIsPlaying(false);
+
+            const constraints: MediaStreamConstraints = {
+                audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            recStreamRef.current = stream;
+
+            // Route through AudioContext so we can capture at correct sample rate
+            const source = ctx.createMediaStreamSource(stream);
+            const dest = ctx.createMediaStreamDestination();
+            source.connect(dest);
+
+            const recorder = new MediaRecorder(dest.stream, {
+                mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+                    ? "audio/webm;codecs=opus"
+                    : "audio/webm",
+            });
+
+            recChunksRef.current = [];
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recChunksRef.current.push(e.data);
+            };
+
+            recorder.onstop = async () => {
+                // Cleanup mic stream
+                recStreamRef.current?.getTracks().forEach(t => t.stop());
+                recStreamRef.current = null;
+                source.disconnect();
+
+                if (recChunksRef.current.length === 0) return;
+
+                const blob = new Blob(recChunksRef.current, { type: recorder.mimeType });
+                recChunksRef.current = [];
+
+                try {
+                    const arrayBuf = await blob.arrayBuffer();
+                    const audioBuf = await ctx.decodeAudioData(arrayBuf);
+                    loadBuffer(audioBuf, "Recording");
+                } catch (e) {
+                    setError(e instanceof Error ? e.message : "Failed to decode recording");
+                }
+            };
+
+            recorder.start(250); // Collect data every 250ms
+            recorderRef.current = recorder;
+            setIsRecording(true);
+            return true;
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Failed to start recording");
+            return false;
+        }
+    }, [getAudioCtx, loadBuffer]);
+
+    const stopRecording = useCallback(() => {
+        if (recorderRef.current && recorderRef.current.state !== "inactive") {
+            recorderRef.current.stop();
+        }
+        recorderRef.current = null;
+        setIsRecording(false);
+    }, []);
+
     // ─── Playback controls ──────────────────────────────────────────
     const play = useCallback(() => {
         if (!buffer) return;
@@ -406,13 +499,65 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const stop = useCallback(() => {
+        if (isRecording) {
+            stopRecording();
+        }
         if (sourceRef.current) {
             sourceRef.current.onended = null;
             sourceRef.current.stop();
         }
         setIsPlaying(false);
         setPlayPosition(0);
-    }, []);
+    }, [isRecording, stopRecording]);
+
+    // ─── Stems ──────────────────────────────────────────────────────
+
+    const separateStems = useCallback(async () => {
+        if (!buffer || isSeparatingStems) return;
+        setIsSeparatingStems(true);
+        setStemsProgress(0);
+        try {
+            const { separateStems: runStemSep, STEM_LABELS } = await import("@/lib/stems-engine");
+            setStemsProgress(25);
+            const result = await runStemSep(buffer);
+            setStemsProgress(100);
+
+            // Store stems for extractStem to use
+            (window as unknown as Record<string, unknown>).__editorStems = result;
+        } finally {
+            setIsSeparatingStems(false);
+        }
+    }, [buffer, isSeparatingStems]);
+
+    const extractStem = useCallback(async (stemType: import("@/lib/stems-engine").StemType) => {
+        const stems = (window as unknown as Record<string, unknown>).__editorStems as Record<string, AudioBuffer> | undefined;
+        if (!stems || !stems[stemType]) {
+            // If no cached stems, separate first
+            if (!buffer) return;
+            setIsSeparatingStems(true);
+            setStemsProgress(0);
+            try {
+                const { separateStems: runStemSep } = await import("@/lib/stems-engine");
+                setStemsProgress(25);
+                const result = await runStemSep(buffer);
+                setStemsProgress(100);
+                (window as unknown as Record<string, unknown>).__editorStems = result;
+                const stemBuf = result[stemType];
+                if (stemBuf) {
+                    pushUndoNamed(`Extract ${stemType}`, "Layers");
+                    loadBuffer(stemBuf, `${stemType} stem`);
+                }
+            } finally {
+                setIsSeparatingStems(false);
+            }
+            return;
+        }
+        const stemBuf = stems[stemType] as AudioBuffer;
+        if (stemBuf) {
+            pushUndoNamed(`Extract ${stemType}`, "Layers");
+            loadBuffer(stemBuf, `${stemType} stem`);
+        }
+    }, [buffer, loadBuffer, pushUndoNamed]);
 
     const seek = useCallback((pos: number) => {
         setPlayPosition(Math.max(0, pos));
@@ -640,6 +785,10 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         return () => {
             cancelAnimationFrame(rafRef.current);
+            if (recorderRef.current && recorderRef.current.state !== "inactive") {
+                recorderRef.current.stop();
+            }
+            recStreamRef.current?.getTracks().forEach(t => t.stop());
             if (sourceRef.current) {
                 sourceRef.current.onended = null;
                 try { sourceRef.current.stop(); } catch { /* already stopped */ }
@@ -666,6 +815,8 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         canRedo: histCanRedo(history),
         history, jumpToHistoryEntry,
         loadFromUrl, loadFromFile,
+        isRecording, startRecording, stopRecording,
+        isSeparatingStems, stemsProgress, separateStems, extractStem,
         peakL, peakR,
     };
 

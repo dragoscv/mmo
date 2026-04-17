@@ -3,7 +3,7 @@
 import { useDAW } from "./daw-context";
 import {
     Play, Pause, Square, Circle, SkipBack,
-    Repeat,
+    Repeat, LayoutGrid, ListMusic,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useScrollAdjust } from "./daw-ui-utils";
@@ -145,6 +145,36 @@ export function DAWTransport() {
                 <Repeat className="h-3.5 w-3.5" />
                 Loop
             </button>
+
+            {/* Pattern / Song mode switch */}
+            <div className="flex items-center bg-[var(--daw-surface)] rounded-lg p-0.5 border border-[var(--daw-border)]">
+                <button
+                    onClick={() => daw.setPlaybackMode("pattern")}
+                    title="Pattern Mode — plays step sequencer pattern in a loop"
+                    className={cn(
+                        "h-6 px-2 rounded text-[10px] font-medium flex items-center gap-1 transition-all",
+                        daw.playbackMode === "pattern"
+                            ? "bg-orange-500/20 text-orange-400 shadow-[0_0_8px_oklch(0.75_0.18_55/0.2)]"
+                            : "text-[var(--daw-text-dim)] hover:text-[var(--daw-text-muted)]"
+                    )}
+                >
+                    <LayoutGrid className="h-3 w-3" />
+                    Pat
+                </button>
+                <button
+                    onClick={() => daw.setPlaybackMode("song")}
+                    title="Song Mode — plays full timeline arrangement"
+                    className={cn(
+                        "h-6 px-2 rounded text-[10px] font-medium flex items-center gap-1 transition-all",
+                        daw.playbackMode === "song"
+                            ? "bg-green-500/20 text-green-400 shadow-[0_0_8px_oklch(0.72_0.17_142/0.2)]"
+                            : "text-[var(--daw-text-dim)] hover:text-[var(--daw-text-muted)]"
+                    )}
+                >
+                    <ListMusic className="h-3 w-3" />
+                    Song
+                </button>
+            </div>
 
             <div className="flex-1" />
 

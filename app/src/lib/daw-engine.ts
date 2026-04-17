@@ -29,6 +29,8 @@ export interface AudioClipData {
     name: string;
     startOffset: number;  // offset within the source file (seconds)
     duration: number;     // clip duration (seconds)
+    sampleRate: number;   // sample rate of the buffer
+    channels: number;     // number of audio channels
     gain: number;         // clip-level gain
     fadeIn: number;       // seconds
     fadeOut: number;      // seconds
@@ -294,10 +296,23 @@ export class DAWEngine {
     private activeVoices: Map<string, { osc: OscillatorNode[]; gain: GainNode; filter: BiquadFilterNode }[]> = new Map();
     private recordingBuffers: Map<string, AudioBuffer[]> = new Map();
     private mediaRecorder: MediaRecorder | null = null;
+    private recordingStream: MediaStream | null = null;
+    private recordingSource: MediaStreamAudioSourceNode | null = null;
+    private recordingDestination: MediaStreamAudioDestinationNode | null = null;
+    private recordingTrackId: string | null = null;
+    private recordingStartBeat = 0;
+    // MIDI recording
+    private midiRecordingNotes: MidiNote[] = [];
+    private midiRecordingActiveNotes: Map<number, { start: number; velocity: number }> = new Map();
+    private midiRecordingTrackId: string | null = null;
+    private _stepPattern: StepSequencerPattern | null = null;
+    private _playbackMode: "pattern" | "song" = "song";
 
     onBeatUpdate?: (beat: number) => void;
+    onStepUpdate?: (step: number) => void; // fires current step index for step sequencer
     onMeterUpdate?: (trackId: string, peakL: number, peakR: number) => void;
     onRecordingData?: (trackId: string, buffer: AudioBuffer) => void;
+    onMidiRecordingData?: (trackId: string, notes: MidiNote[]) => void;
     onPlaybackEnd?: () => void;
 
     constructor() {
@@ -366,6 +381,20 @@ export class DAWEngine {
         return this.channelNodes.get(trackId);
     }
 
+    // ─── Playback Mode ───────────────────────────────────────────────────
+
+    setStepPattern(pattern: StepSequencerPattern | null) {
+        this._stepPattern = pattern;
+    }
+
+    setPlaybackMode(mode: "pattern" | "song") {
+        this._playbackMode = mode;
+    }
+
+    getPlaybackMode(): "pattern" | "song" {
+        return this._playbackMode;
+    }
+
     // ─── Transport ───────────────────────────────────────────────────────
 
     play(project: DAWProject, fromBeat?: number) {
@@ -431,8 +460,31 @@ export class DAWEngine {
                 this.currentBeat = beat;
                 this.onBeatUpdate?.(beat);
 
-                // Check loop region
-                if (project.loopRegion.enabled && beat >= project.loopRegion.end) {
+                // ── Step sequencer scheduling (always active when pattern exists) ──
+                if (this._stepPattern) {
+                    const patternSteps = this._stepPattern.steps;
+                    const stepsPerBar = project.timeSignature.numerator * 4;
+                    const patStep = Math.floor((this.currentStep * patternSteps) / stepsPerBar) % patternSteps;
+                    // Only trigger on 16th-note boundaries that align with pattern steps
+                    if (this.currentStep % Math.max(1, Math.floor(stepsPerBar / patternSteps)) === 0) {
+                        this.onStepUpdate?.(patStep);
+                        this.scheduleStepHits(this._stepPattern, patStep, this.nextNoteTime);
+                    }
+                }
+
+                // In pattern mode, wrap the beat at the pattern length (loop the pattern)
+                if (this._playbackMode === "pattern" && this._stepPattern) {
+                    const patternLengthBeats = project.timeSignature.numerator; // 1 bar
+                    if (beat >= patternLengthBeats) {
+                        this.currentStep = 0;
+                        this.startTime = this.ctx.currentTime;
+                        this.onBeatUpdate?.(0);
+                        continue;
+                    }
+                }
+
+                // Check loop region (song mode)
+                if (this._playbackMode === "song" && project.loopRegion.enabled && beat >= project.loopRegion.end) {
                     this.currentStep = Math.floor(project.loopRegion.start * 4);
                     this.startTime = this.ctx.currentTime - this.beatsToSeconds(project.loopRegion.start, project.tempo);
                     continue;
@@ -443,6 +495,7 @@ export class DAWEngine {
                     this.playMetronomeClick(this.nextNoteTime, this.currentStep % (project.timeSignature.numerator * 4) === 0);
                 }
 
+                // Schedule timeline clips (both modes - song mode plays all, pattern mode plays what's under playhead)
                 // Schedule MIDI notes for this step
                 for (const track of project.tracks) {
                     if (track.muted || track.type !== "midi") continue;
@@ -480,8 +533,8 @@ export class DAWEngine {
                 this.nextNoteTime += secondsPerStep;
                 this.currentStep++;
 
-                // Check if we've passed the end of the project
-                if (beat > project.duration && !project.loopRegion.enabled) {
+                // Check if we've passed the end of the project (song mode only)
+                if (this._playbackMode === "song" && beat > project.duration && !project.loopRegion.enabled) {
                     this.stop();
                     this.onPlaybackEnd?.();
                     return;
@@ -731,50 +784,234 @@ export class DAWEngine {
 
     // ─── Audio Recording ─────────────────────────────────────────────────
 
-    async startRecording(trackId: string): Promise<boolean> {
+    async startRecording(trackId: string, deviceId?: string, startBeat?: number): Promise<boolean> {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // Stop any existing recording first
+            if (this.isRecording) {
+                this.stopRecording();
+            }
+
+            const constraints: MediaStreamConstraints = {
+                audio: deviceId && deviceId !== "default"
+                    ? {
+                        deviceId: { exact: deviceId },
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                    }
+                    : {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                    },
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             const source = this.ctx.createMediaStreamSource(stream);
             const strip = this.channelNodes.get(trackId);
-            if (!strip) return false;
-
-            source.connect(strip.input);
-            this.isRecording = true;
-
-            // Also set up a MediaRecorder for the raw data
-            this.mediaRecorder = new MediaRecorder(stream);
-            const chunks: Blob[] = [];
-            this.mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
-            this.mediaRecorder.onstop = async () => {
-                const blob = new Blob(chunks, { type: "audio/webm" });
-                const arrayBuffer = await blob.arrayBuffer();
-                const buffer = await this.ctx.decodeAudioData(arrayBuffer);
-                this.onRecordingData?.(trackId, buffer);
+            if (!strip) {
                 stream.getTracks().forEach(t => t.stop());
+                return false;
+            }
+
+            // Route mic input through the channel strip (effects, gain, pan)
+            source.connect(strip.input);
+
+            // Capture POST-FX audio via MediaStreamDestination connected to the strip output
+            // This captures the processed audio including any effects on the channel
+            const dest = this.ctx.createMediaStreamDestination();
+            strip.connectRecordingTap(dest);
+
+            this.isRecording = true;
+            this.recordingStream = stream;
+            this.recordingSource = source;
+            this.recordingDestination = dest;
+            this.recordingTrackId = trackId;
+            this.recordingStartBeat = startBeat ?? this.currentBeat;
+
+            // Set up MediaRecorder on the post-FX stream
+            const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+                ? "audio/webm;codecs=opus"
+                : "audio/webm";
+            this.mediaRecorder = new MediaRecorder(dest.stream, { mimeType });
+            const chunks: Blob[] = [];
+            this.mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) chunks.push(e.data);
             };
-            this.mediaRecorder.start();
+            this.mediaRecorder.onstop = async () => {
+                try {
+                    const blob = new Blob(chunks, { type: mimeType });
+                    if (blob.size === 0) return;
+                    const arrayBuffer = await blob.arrayBuffer();
+                    const buffer = await this.ctx.decodeAudioData(arrayBuffer);
+                    this.onRecordingData?.(trackId, buffer);
+                } catch {
+                    // Decoding failed
+                } finally {
+                    stream.getTracks().forEach(t => t.stop());
+                }
+            };
+            this.mediaRecorder.start(500); // 500ms chunks for more reliable capture
             return true;
         } catch {
             return false;
         }
     }
 
+    // ─── MIDI Recording ──────────────────────────────────────────────────
+
+    startMidiRecording(trackId: string, startBeat?: number) {
+        this.midiRecordingTrackId = trackId;
+        this.midiRecordingNotes = [];
+        this.midiRecordingActiveNotes.clear();
+        this.recordingStartBeat = startBeat ?? this.currentBeat;
+    }
+
+    /** Call when a MIDI noteOn is received during recording */
+    recordMidiNoteOn(pitch: number, velocity: number) {
+        if (!this.midiRecordingTrackId) return;
+        const beatPos = this.currentBeat - this.recordingStartBeat;
+        this.midiRecordingActiveNotes.set(pitch, { start: beatPos, velocity });
+
+        // Also play the note live through the track's synth
+        const strip = this.channelNodes.get(this.midiRecordingTrackId);
+        if (strip) {
+            this.playLiveNote(strip, pitch, velocity);
+        }
+    }
+
+    /** Call when a MIDI noteOff is received during recording */
+    recordMidiNoteOff(pitch: number) {
+        if (!this.midiRecordingTrackId) return;
+        const active = this.midiRecordingActiveNotes.get(pitch);
+        if (!active) return;
+        const beatPos = this.currentBeat - this.recordingStartBeat;
+        const duration = Math.max(0.0625, beatPos - active.start); // minimum 1/16 beat
+        this.midiRecordingNotes.push({
+            id: createId(),
+            pitch,
+            velocity: active.velocity,
+            start: active.start,
+            duration,
+            channel: 0,
+        });
+        this.midiRecordingActiveNotes.delete(pitch);
+        this.stopLiveNote(pitch);
+    }
+
+    /** Play a note live during MIDI recording (real-time audition) */
+    private playLiveNote(strip: ChannelStrip, pitch: number, velocity: number) {
+        const now = this.ctx.currentTime;
+        const velocityGain = (velocity / 127) * 0.8;
+        const freq = 440 * Math.pow(2, (pitch - 69) / 12);
+
+        const voiceGain = this.ctx.createGain();
+        voiceGain.gain.setValueAtTime(0, now);
+        voiceGain.gain.linearRampToValueAtTime(velocityGain, now + 0.005);
+
+        const osc = this.ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(freq, now);
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(4000, now);
+        filter.Q.value = 2;
+
+        osc.connect(filter);
+        filter.connect(voiceGain);
+        voiceGain.connect(strip.input);
+        osc.start(now);
+
+        // Store for stopLiveNote
+        const key = `live_${pitch}`;
+        const existing = this.activeVoices.get(key);
+        if (existing) {
+            existing.forEach(v => {
+                v.gain.gain.setTargetAtTime(0, now, 0.01);
+                v.osc.forEach(o => { try { o.stop(now + 0.05); } catch { /* */ } });
+            });
+        }
+        this.activeVoices.set(key, [{ osc: [osc], gain: voiceGain, filter }]);
+    }
+
+    /** Stop a live note during MIDI recording */
+    private stopLiveNote(pitch: number) {
+        const key = `live_${pitch}`;
+        const voices = this.activeVoices.get(key);
+        if (!voices) return;
+        const now = this.ctx.currentTime;
+        voices.forEach(v => {
+            v.gain.gain.setTargetAtTime(0, now, 0.02);
+            v.osc.forEach(o => { try { o.stop(now + 0.1); } catch { /* */ } });
+        });
+        this.activeVoices.delete(key);
+    }
+
+    stopMidiRecording() {
+        if (!this.midiRecordingTrackId) return;
+        // Close any still-held notes
+        const beatPos = this.currentBeat - this.recordingStartBeat;
+        for (const [pitch, active] of this.midiRecordingActiveNotes) {
+            const duration = Math.max(0.0625, beatPos - active.start);
+            this.midiRecordingNotes.push({
+                id: createId(),
+                pitch,
+                velocity: active.velocity,
+                start: active.start,
+                duration,
+                channel: 0,
+            });
+            this.stopLiveNote(pitch);
+        }
+        this.midiRecordingActiveNotes.clear();
+
+        if (this.midiRecordingNotes.length > 0) {
+            this.onMidiRecordingData?.(this.midiRecordingTrackId, [...this.midiRecordingNotes]);
+        }
+        this.midiRecordingTrackId = null;
+        this.midiRecordingNotes = [];
+    }
+
     stopRecording() {
         this.isRecording = false;
-        this.mediaRecorder?.stop();
+        // Disconnect the source node
+        if (this.recordingSource) {
+            try { this.recordingSource.disconnect(); } catch { /* noop */ }
+            this.recordingSource = null;
+        }
+        // Disconnect recording tap
+        if (this.recordingDestination) {
+            const strip = this.recordingTrackId ? this.channelNodes.get(this.recordingTrackId) : null;
+            if (strip) strip.disconnectRecordingTap(this.recordingDestination);
+            this.recordingDestination = null;
+        }
+        // Stop the MediaRecorder (triggers onstop which delivers the buffer)
+        if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
+            this.mediaRecorder.stop();
+        }
         this.mediaRecorder = null;
+        // Also stop MIDI recording
+        this.stopMidiRecording();
+        this.recordingTrackId = null;
+    }
+
+    getRecordingStartBeat(): number {
+        return this.recordingStartBeat;
     }
 
     // ─── Step Sequencer Playback ─────────────────────────────────────────
 
     playStepPattern(pattern: StepSequencerPattern, step: number) {
         const now = this.ctx.currentTime;
+        this.scheduleStepHits(pattern, step, now);
+    }
+
+    private scheduleStepHits(pattern: StepSequencerPattern, step: number, time: number) {
         for (const track of pattern.tracks) {
             if (track.muted) continue;
             const stepData = track.steps[step % pattern.steps];
             if (!stepData?.active) continue;
-            // Play sample or synth hit
-            this.playDrumHit(track, stepData, now);
+            this.playDrumHit(track, stepData, time);
         }
     }
 
@@ -1002,6 +1239,11 @@ export class DAWEngine {
 
     destroy() {
         this.stop();
+        this.stopRecording();
+        if (this.recordingStream) {
+            this.recordingStream.getTracks().forEach(t => t.stop());
+            this.recordingStream = null;
+        }
         this.channelNodes.forEach(strip => strip.destroy());
         this.channelNodes.clear();
         this.ctx.close();
@@ -1088,6 +1330,17 @@ export class ChannelStrip {
     stopAllSources() {
         this.activeSources.forEach(s => { try { s.stop(); } catch { /* noop */ } });
         this.activeSources = [];
+    }
+
+    /** Connect a recording tap to capture post-FX audio from this channel */
+    connectRecordingTap(dest: MediaStreamAudioDestinationNode) {
+        // Tap the mute node output (same signal going to master bus)
+        this.muteNode.connect(dest);
+    }
+
+    /** Disconnect a previously connected recording tap */
+    disconnectRecordingTap(dest: MediaStreamAudioDestinationNode) {
+        try { this.muteNode.disconnect(dest); } catch { /* noop */ }
     }
 
     destroy() {
@@ -1189,6 +1442,8 @@ export function createClip(type: ClipType, trackId: string, position: number, le
                 name,
                 startOffset: 0,
                 duration: 0,
+                sampleRate: 48000,
+                channels: 2,
                 gain: 1,
                 fadeIn: 0,
                 fadeOut: 0,

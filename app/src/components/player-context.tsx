@@ -85,6 +85,7 @@ function loadPersistedState(): Partial<PlayerState> {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return {};
         const saved: PersistedState = JSON.parse(raw);
+        const restoreNowPlaying = localStorage.getItem("mmo-restore-now-playing") === "true";
         return {
             currentTrack: saved.currentTrack ?? null,
             queue: saved.queue ?? [],
@@ -95,7 +96,7 @@ function loadPersistedState(): Partial<PlayerState> {
             currentTime: saved.currentTime ?? 0,
             playHistory: saved.playHistory ?? [],
             isPlaying: false,
-            isNowPlayingOpen: saved.isNowPlayingOpen ?? false,
+            isNowPlayingOpen: restoreNowPlaying ? (saved.isNowPlayingOpen ?? false) : false,
         };
     } catch {
         return {};
@@ -452,6 +453,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 queue: newQueue,
             };
         });
+
+        // Auto-queue stems analysis for first-time plays
+        if (!track.stemsStatus) {
+            import("@/actions/stems").then(({ updateStemsStatus }) => {
+                updateStemsStatus(track.id, "pending").catch(() => {});
+            });
+        }
     }, []);
 
     const pause = useCallback(() => {

@@ -6,7 +6,8 @@ import {
     DialogContent,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn, formatKey } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { getTracks } from "@/actions/tracks";
 import type { Track } from "@/db/schema";
 import { useMixer } from "./mixer-context";
@@ -36,6 +37,7 @@ export const SamplePickerModal = memo(function SamplePickerModal({
     slotIndex,
 }: SamplePickerModalProps) {
     const mixer = useMixer();
+    const { noteNotations } = useDAWSettings();
     const [tab, setTab] = useState<"library" | "file">("library");
     const [tracks, setTracks] = useState<Track[]>([]);
     const [total, setTotal] = useState(0);
@@ -303,7 +305,7 @@ export const SamplePickerModal = memo(function SamplePickerModal({
                                             )}
                                             {track.keyCamelot && (
                                                 <span className="text-[9px] px-1 py-0.5 rounded bg-white/5 text-white/30">
-                                                    {track.keyCamelot}
+                                                    {formatKey(track.keyCamelot, noteNotations)}
                                                 </span>
                                             )}
                                             {track.duration && (

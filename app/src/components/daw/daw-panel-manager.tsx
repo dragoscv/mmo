@@ -27,6 +27,7 @@ import {
     AudioWaveform,
     Clock,
     Clipboard,
+    Mic,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -34,7 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 // Panel definitions
 // ═══════════════════════════════════════════════════════════════════════════
 
-type PanelName = "browser" | "mixer" | "pianoRoll" | "stepSequencer" | "effectsRack" | "synth" | "automation" | "history" | "clipboard";
+type PanelName = "browser" | "mixer" | "pianoRoll" | "stepSequencer" | "effectsRack" | "synth" | "automation" | "history" | "clipboard" | "voiceProcessor";
 
 interface PanelDef {
     id: string;
@@ -55,6 +56,7 @@ const PANELS: PanelDef[] = [
     { id: PANEL_IDS.synthesizer, name: "synth", label: "Synthesizer", icon: Waves, shortcut: "F6", stateKey: "showSynth" },
     { id: PANEL_IDS.history, name: "history", label: "History", icon: Clock, shortcut: "F8", stateKey: "showHistory" },
     { id: PANEL_IDS.clipboard, name: "clipboard", label: "Clipboard", icon: Clipboard, shortcut: "F9", stateKey: "showClipboard" },
+    { id: PANEL_IDS.voiceProcessor, name: "voiceProcessor", label: "Voice Processor", icon: Mic, shortcut: "F10", stateKey: "showVoiceProcessor" },
 ];
 
 // Automation doesn't have a dockview panel, it's a toolbar toggle

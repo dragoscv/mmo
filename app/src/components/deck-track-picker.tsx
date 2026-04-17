@@ -5,7 +5,8 @@ import { useMixer } from "./mixer-context";
 import { usePlayer } from "./player-context";
 import type { DeckSide } from "@/lib/mixer-engine";
 import { Search, Music, Disc3, Loader2, Zap, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatKey } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { globalSearch } from "@/actions/search";
 import { getRecommendedTracks, type RecommendedTrack } from "@/actions/recommendations";
 
@@ -38,6 +39,7 @@ interface DeckTrackPickerProps {
 export function DeckTrackPicker({ side, open, onClose }: DeckTrackPickerProps) {
     const mixer = useMixer();
     const player = usePlayer();
+    const { noteNotations } = useDAWSettings();
     const [query, setQuery] = useState("");
     const [searchResults, setSearchResults] = useState<MixerTrack[]>([]);
     const [recommendations, setRecommendations] = useState<RecommendedTrack[]>([]);
@@ -240,6 +242,7 @@ function TrackRow({
     score?: number;
     maxScore?: number;
 }) {
+    const { noteNotations } = useDAWSettings();
     return (
         <button
             onClick={() => onSelect(track)}
@@ -274,7 +277,7 @@ function TrackRow({
                     {track.keyCamelot && (
                         <>
                             <span className="text-white/10">·</span>
-                            <span className="shrink-0">{track.keyCamelot}</span>
+                            <span className="shrink-0">{formatKey(track.keyCamelot, noteNotations)}</span>
                         </>
                     )}
                 </div>

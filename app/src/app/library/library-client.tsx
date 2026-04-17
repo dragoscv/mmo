@@ -27,6 +27,7 @@ import { usePlayer } from "@/components/player-context";
 import { useSelection } from "@/components/selection-provider";
 import { toggleFavorite, setTrackRating } from "@/actions/tracks";
 import { TrackActions, TrackContextMenu } from "@/components/track-actions";
+import { TrackAvailability } from "@/components/track-availability";
 import { BulkActionsBar } from "@/components/bulk-actions-bar";
 import {
     formatDuration,
@@ -38,6 +39,7 @@ import {
     GENRE_COLORS,
     cn,
 } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import {
     Play,
     Pause,
@@ -106,6 +108,7 @@ export function LibraryClient({
     const [searchInput, setSearchInput] = useState(currentFilters.search);
     const player = usePlayer();
     const selection = useSelection();
+    const { noteNotations } = useDAWSettings();
     const pageTrackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
     const allPageSelected = pageTrackIds.length > 0 && pageTrackIds.every((id) => selection.isSelected(id));
 
@@ -666,10 +669,19 @@ export function LibraryClient({
                                                         );
                                                         case "title": return (
                                                             <TableCell key={col} className="max-w-[220px] text-sm">
-                                                                <div className="truncate font-medium">
-                                                                    <span className={cn(isCurrentTrack && "text-purple-400")}>
+                                                                <div className="truncate font-medium flex items-center gap-1">
+                                                                    <span className={cn(
+                                                                        isCurrentTrack && "text-purple-400",
+                                                                        track.deviceId && "flex items-center gap-1"
+                                                                    )}>
                                                                         {track.title || track.filename}
                                                                     </span>
+                                                                    <TrackAvailability
+                                                                        deviceId={track.deviceId}
+                                                                        isDeviceOnline={true}
+                                                                        isOfflineAvailable={track.isOfflineAvailable}
+                                                                        compact
+                                                                    />
                                                                 </div>
                                                                 <p className="truncate text-[10px] text-[var(--muted-foreground)]/50 mt-0.5" title={track.filepath}>
                                                                     {track.filepath}
@@ -697,9 +709,7 @@ export function LibraryClient({
                                                             <TableCell key={col} className="text-center font-mono text-xs" onClick={(e) => e.stopPropagation()}>
                                                                 {track.keyCamelot ? (
                                                                     <MetadataLink field="key" value={track.keyCamelot} className="font-mono text-xs">
-                                                                        <span className="text-[var(--foreground)]">{track.keyCamelot}</span>
-                                                                        {" "}
-                                                                        <span className="text-[var(--muted-foreground)]">{track.keyMusical || ""}</span>
+                                                                        <span className="text-[var(--foreground)]">{formatKey(track.keyCamelot, noteNotations)}</span>
                                                                     </MetadataLink>
                                                                 ) : "—"}
                                                             </TableCell>

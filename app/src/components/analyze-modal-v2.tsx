@@ -17,6 +17,7 @@ import {
     Image,
     Music2,
     Disc3,
+    Layers,
     Check,
     CheckCheck,
     XCircle,
@@ -74,6 +75,7 @@ interface FetchOptions {
     artwork: boolean;
     lyrics: boolean;
     bpmKey: boolean;
+    stems: boolean;
     skipAnalyzedDays: number | null;
     workers: number;
 }
@@ -104,6 +106,7 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
         artwork: true,
         lyrics: true,
         bpmKey: true,
+        stems: false,
         skipAnalyzedDays: 7,
         workers: 1,
     });
@@ -487,9 +490,26 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
 
                             {/* Options */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">
-                                    What to Fetch
-                                </label>
+                                <div className="flex items-center justify-between">
+                                    <label className="text-sm font-medium">
+                                        What to Fetch
+                                    </label>
+                                    <div className="flex gap-1">
+                                        <button
+                                            onClick={() => setOptions(prev => ({ ...prev, metadata: true, artwork: true, lyrics: true, bpmKey: true, stems: true }))}
+                                            className="text-[10px] text-purple-400 hover:text-purple-300 cursor-pointer transition-colors"
+                                        >
+                                            Select All
+                                        </button>
+                                        <span className="text-[10px] text-[var(--muted-foreground)]">·</span>
+                                        <button
+                                            onClick={() => setOptions(prev => ({ ...prev, metadata: false, artwork: false, lyrics: false, bpmKey: false, stems: false }))}
+                                            className="text-[10px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer transition-colors"
+                                        >
+                                            None
+                                        </button>
+                                    </div>
+                                </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     {[
                                         {
@@ -515,6 +535,12 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                             label: "BPM",
                                             desc: "BPM data from Deezer",
                                             icon: Disc3,
+                                        },
+                                        {
+                                            key: "stems" as const,
+                                            label: "Stems",
+                                            desc: "Separate vocals, drums, bass & melody",
+                                            icon: Layers,
                                         },
                                     ].map((opt) => (
                                         <button
@@ -1285,7 +1311,8 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                     !options.metadata &&
                                     !options.artwork &&
                                     !options.lyrics &&
-                                    !options.bpmKey
+                                    !options.bpmKey &&
+                                    !options.stems
                                 }
                                 className="gap-2 bg-purple-600 hover:bg-purple-700 text-white cursor-pointer"
                             >

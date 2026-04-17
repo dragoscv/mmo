@@ -6,9 +6,10 @@ import type { MidiEngine, ExternalDeviceProfile, MidiDevice } from "@/lib/midi-e
 import { cn } from "@/lib/utils";
 import {
     Play, Square, CircleDot, Minimize2, Maximize2, X,
-    GripHorizontal, Volume2, Music2, Drum, Waves,
+    GripHorizontal, Music2, Drum, Waves,
     Radio, Link2, Unlink2, ChevronDown, ChevronUp,
-    Zap, Clock,
+    Zap, Sliders, Sparkles, Layers,
+    Hash, LinkIcon,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────
@@ -22,10 +23,32 @@ interface CircuitTracksPanelProps {
     onClose: () => void;
     position: { x: number; y: number };
     onPositionChange: (pos: { x: number; y: number }) => void;
+    size: { w: number; h: number };
+    onSizeChange: (size: { w: number; h: number }) => void;
 }
 
 type SyncMode = "send" | "receive" | "none";
-type ActiveTrack = "synth1" | "synth2" | "drums" | "midi1" | "midi2";
+type ActiveTrack = "synth1" | "synth2" | "drums1" | "drums2" | "drums3" | "drums4" | "midi1" | "midi2";
+type PanelView = "tracks" | "mixer" | "fx" | "sidechain" | "patterns";
+
+// ─── Constants ───────────────────────────────────────────────────────────
+
+const REVERB_PRESETS = [
+    "Small Chamber", "Small Room 1", "Small Room 2", "Large Room",
+    "Hall", "Large Hall", "Hall Long", "Large Hall Long",
+];
+
+const DELAY_PRESETS = [
+    "Slapback Fast", "Slapback Slow", "32nd Triplets", "32nd",
+    "16th Triplets", "16th", "16th PingPong", "16th PP Swung",
+    "8th Triplets", "8th Dot PP", "8th", "8th PingPong",
+    "8th PP Swung", "4th Triplets", "4th Dot PP Swung", "4th Trip PP Wide",
+];
+
+const SIDECHAIN_PRESETS = ["OFF", "SC 1", "SC 2", "SC 3", "SC 4", "SC 5", "SC 6", "SC 7"];
+
+const TRACK_NAMES_ALL = ["Synth 1", "Synth 2", "MIDI 1", "MIDI 2", "Drum 1", "Drum 2", "Drum 3", "Drum 4"];
+const TRACK_COLORS_ALL = ["#9333ea", "#06b6d4", "#3b82f6", "#ec4899", "#f97316", "#eab308", "#22c55e", "#ef4444"];
 
 interface TrackState {
     macroValues: number[]; // 8 knobs, 0-127
@@ -190,13 +213,16 @@ const SequencerSteps = memo(function SequencerSteps({
 
 export const CircuitTracksPanel = memo(function CircuitTracksPanel({
     profile, device, midiEngine, isMinimized, onMinimize, onClose,
-    position, onPositionChange,
+    position, onPositionChange, size, onSizeChange,
 }: CircuitTracksPanelProps) {
     const mixer = useMixer();
 
     // Drag state
     const panelRef = useRef<HTMLDivElement>(null);
     const dragState = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+
+    // Resize state
+    const resizeState = useRef<{ startX: number; startY: number; origW: number; origH: number } | null>(null);
 
     // Circuit Tracks state
     const [activeTrack, setActiveTrack] = useState<ActiveTrack>("synth1");
@@ -205,8 +231,35 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
     const [currentStep, setCurrentStep] = useState(0);
     const [syncMode, setSyncMode] = useState<SyncMode>(profile.clock.defaultSyncMode);
     const [bpm, setBpm] = useState(120);
+    const [swing, setSwing] = useState(50); // 20-80, default 50
+    const [editingBpm, setEditingBpm] = useState(false);
+    const [bpmInput, setBpmInput] = useState("");
     const [masterFilter, setMasterFilter] = useState(64); // 0-127, center = no filter
     const [expanded, setExpanded] = useState(false);
+    const [deckSync, setDeckSync] = useState(false); // Forward deck BPM to CT via clock in RX mode
+    const [panelView, setPanelView] = useState<PanelView>("tracks");
+
+    // Mixer state — per-track volume (0-127) and pan (0-127, 64=center)
+    const [mixerVolumes, setMixerVolumes] = useState<number[]>(() => new Array(8).fill(100));
+    const [mixerPans, setMixerPans] = useState<number[]>(() => new Array(8).fill(64));
+    const [mixerShowPan, setMixerShowPan] = useState(false);
+
+    // FX state
+    const [reverbPreset, setReverbPreset] = useState(0); // 0=off, 1-8
+    const [delayPreset, setDelayPreset] = useState(0); // 0=off, 1-16
+    const [reverbSends, setReverbSends] = useState<number[]>(() => new Array(8).fill(0));
+    const [delaySends, setDelaySends] = useState<number[]>(() => new Array(8).fill(0));
+    const [fxTab, setFxTab] = useState<"reverb" | "delay">("reverb");
+
+    // Sidechain state — per synth/midi track: preset (0=off, 1-7), key drum (0-3)
+    const [sidechainPresets, setSidechainPresets] = useState<number[]>(() => new Array(4).fill(0)); // S1,S2,M1,M2
+    const [sidechainKeys, setSidechainKeys] = useState<number[]>(() => new Array(4).fill(0)); // which drum triggers
+
+    // Project & Patch state
+    const [currentProject, setCurrentProject] = useState(0); // 0-based, 0-63 projects. PC on Ch16 switches project
+    const [synth1Patch, setSynth1Patch] = useState(0); // 0-127 patches, PC on Ch1
+    const [synth2Patch, setSynth2Patch] = useState(0); // 0-127 patches, PC on Ch2
+    const [patchPage, setPatchPage] = useState(0); // 0-3 for 4 pages of 32 patches
 
     // Per-track state
     const [trackStates, setTrackStates] = useState<Record<string, TrackState>>(() => {
@@ -223,8 +276,8 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
         return initial;
     });
 
-    // Active drum pads (notes currently sounding)
-    const [activePads, setActivePads] = useState<Set<number>>(new Set());
+    // Active pads (notes currently sounding) — keyed as "channel:note" to distinguish channels
+    const [activePads, setActivePads] = useState<Set<string>>(new Set());
 
     // Sync BPM from mixer
     useEffect(() => {
@@ -233,24 +286,77 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
         }
     }, [syncMode, mixer.deckA.bpm, mixer.deckA.isPlaying]);
 
-    // Simulate sequencer step advancement
+    // Simulate sequencer step advancement with swing (only when NOT receiving external clock)
     useEffect(() => {
-        if (!isPlaying) return;
-        const stepMs = (60000 / bpm) / 4; // 16th note steps
-        const interval = setInterval(() => {
-            setCurrentStep(prev => (prev + 1) % 32);
-        }, stepMs);
-        return () => clearInterval(interval);
-    }, [isPlaying, bpm]);
+        if (!isPlaying || syncMode === "receive") return; // RX mode uses incoming clock ticks
+        const baseStepMs = (60000 / bpm) / 4; // 16th note steps
+        let step = currentStep;
+        let timeoutId: ReturnType<typeof setTimeout>;
+
+        const scheduleNext = () => {
+            // Swing affects even-numbered steps (off-beats)
+            const nextStep = (step + 1) % 32;
+            const isEvenStep = nextStep % 2 === 1; // 0-indexed, so odd index = even musical step
+            const swingFactor = isEvenStep ? (swing / 50) : (2 - swing / 50);
+            const nextMs = baseStepMs * swingFactor;
+
+            timeoutId = setTimeout(() => {
+                step = nextStep;
+                setCurrentStep(step);
+                scheduleNext();
+            }, Math.max(10, nextMs));
+        };
+
+        scheduleNext();
+        return () => clearTimeout(timeoutId);
+    }, [isPlaying, bpm, swing, syncMode]);
 
     // Listen for MIDI input from Circuit Tracks
+    const clockTickRef = useRef(0); // count incoming clock ticks for step advance (24 PPQN)
+    const isPlayingRef = useRef(false);
+    useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
     useEffect(() => {
         const handleMidiMessage = (e: Event) => {
             const detail = (e as CustomEvent).detail;
             if (!detail) return;
             const { channel, type, note, value } = detail;
 
-            // Macro knobs on synth channels
+            // ── Transport: Start / Stop / Continue ──
+            if (type === "start") {
+                setIsPlaying(true);
+                setCurrentStep(0);
+                clockTickRef.current = 0;
+            }
+            if (type === "stop") {
+                setIsPlaying(false);
+                setIsRecording(false);
+                setCurrentStep(0);
+            }
+            if (type === "continue") {
+                setIsPlaying(true);
+            }
+
+            // ── Clock: advance sequencer step (only in RX mode AND already playing) ──
+            if (type === "clock" && syncMode === "receive" && isPlayingRef.current) {
+                clockTickRef.current += 1;
+                if (clockTickRef.current >= 6) { // 24 PPQN / 4 = 6 ticks per 16th note step
+                    clockTickRef.current = 0;
+                    setCurrentStep(prev => (prev + 1) % 32);
+                }
+            }
+
+            // ── Program Change: project / synth patches ──
+            if (type === "programChange") {
+                // Ch16 (ch15) = project change
+                if (channel === 15) setCurrentProject(note);
+                // Ch1 (ch0) = synth 1 patch
+                if (channel === 0) setSynth1Patch(note);
+                // Ch2 (ch1) = synth 2 patch
+                if (channel === 1) setSynth2Patch(note);
+            }
+
+            // ── CC on synth channels: macros, filter ──
             if (type === "cc" && (channel === 0 || channel === 1)) {
                 const trackName = channel === 0 ? "Synth 1" : "Synth 2";
                 const knobIdx = [80, 81, 82, 83, 84, 85, 86, 87].indexOf(note);
@@ -263,14 +369,12 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
                         },
                     }));
                 }
-                // Filter freq
                 if (note === 74) {
                     setTrackStates(prev => ({
                         ...prev,
                         [trackName]: { ...prev[trackName], filterFreq: value },
                     }));
                 }
-                // Filter res
                 if (note === 71) {
                     setTrackStates(prev => ({
                         ...prev,
@@ -279,22 +383,54 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
                 }
             }
 
-            // Drum note triggers
-            if (type === "noteOn" && channel === 9) {
-                setActivePads(prev => new Set([...prev, note]));
+            // ── CC on project channel (ch16=15): master filter ──
+            if (type === "cc" && channel === 15 && note === 74) {
+                setMasterFilter(value);
+            }
+
+            // ── CC on any track: mixer volume (CC12) / pan (CC10) ──
+            if (type === "cc" && (note === 12 || note === 10)) {
+                const trackIdx = profile.tracks.findIndex(t => t.midiChannel === channel);
+                if (trackIdx >= 0) {
+                    if (note === 12) setMixerVolumes(prev => prev.map((v, i) => i === trackIdx ? value : v));
+                    if (note === 10) setMixerPans(prev => prev.map((v, i) => i === trackIdx ? value : v));
+                }
+            }
+
+            // ── CC on any track: reverb send (CC91) / delay send (CC93) ──
+            if (type === "cc" && (note === 91 || note === 93)) {
+                const trackIdx = profile.tracks.findIndex(t => t.midiChannel === channel);
+                if (trackIdx >= 0) {
+                    if (note === 91) setReverbSends(prev => prev.map((v, i) => i === trackIdx ? value : v));
+                    if (note === 93) setDelaySends(prev => prev.map((v, i) => i === trackIdx ? value : v));
+                }
+            }
+
+            // ── Note triggers (all channels — drums Ch10, synths Ch1/Ch2, MIDI Ch3/Ch4) ──
+            if (type === "noteOn") {
+                const padKey = `${channel}:${note}`;
+                setActivePads(prev => new Set([...prev, padKey]));
                 setTimeout(() => {
                     setActivePads(prev => {
                         const next = new Set(prev);
-                        next.delete(note);
+                        next.delete(padKey);
                         return next;
                     });
-                }, 150);
+                }, 200);
+            }
+            if (type === "noteOff") {
+                const padKey = `${channel}:${note}`;
+                setActivePads(prev => {
+                    const next = new Set(prev);
+                    next.delete(padKey);
+                    return next;
+                });
             }
         };
 
         window.addEventListener("circuit-tracks-midi", handleMidiMessage);
         return () => window.removeEventListener("circuit-tracks-midi", handleMidiMessage);
-    }, []);
+    }, [profile.tracks, syncMode]);
 
     // Drag handlers
     const handleDragStart = useCallback((e: React.PointerEvent) => {
@@ -319,6 +455,32 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
 
     const handleDragEnd = useCallback(() => {
         dragState.current = null;
+    }, []);
+
+    // Resize handlers
+    const handleResizeStart = useCallback((e: React.PointerEvent) => {
+        e.stopPropagation();
+        resizeState.current = {
+            startX: e.clientX,
+            startY: e.clientY,
+            origW: size.w,
+            origH: size.h || (panelRef.current?.offsetHeight ?? 400),
+        };
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    }, [size]);
+
+    const handleResizeMove = useCallback((e: React.PointerEvent) => {
+        if (!resizeState.current) return;
+        const dx = e.clientX - resizeState.current.startX;
+        const dy = e.clientY - resizeState.current.startY;
+        onSizeChange({
+            w: Math.max(320, Math.min(700, resizeState.current.origW + dx)),
+            h: Math.max(200, Math.min(900, resizeState.current.origH + dy)),
+        });
+    }, [onSizeChange]);
+
+    const handleResizeEnd = useCallback(() => {
+        resizeState.current = null;
     }, []);
 
     // Transport actions — send MIDI to device
@@ -360,16 +522,32 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
 
     // Send drum trigger
     const handleDrumTrigger = useCallback((note: number) => {
+        const padKey = `9:${note}`;
         midiEngine.sendNoteOn(device.id, 9, note, 100);
-        setActivePads(prev => new Set([...prev, note]));
+        setActivePads(prev => new Set([...prev, padKey]));
         setTimeout(() => {
             midiEngine.sendNoteOff(device.id, 9, note);
             setActivePads(prev => {
                 const next = new Set(prev);
-                next.delete(note);
+                next.delete(padKey);
                 return next;
             });
         }, 150);
+    }, [midiEngine, device.id]);
+
+    // Send synth note trigger
+    const handleSynthNoteTrigger = useCallback((channel: number, note: number) => {
+        const padKey = `${channel}:${note}`;
+        midiEngine.sendNoteOn(device.id, channel, note, 100);
+        setActivePads(prev => new Set([...prev, padKey]));
+        setTimeout(() => {
+            midiEngine.sendNoteOff(device.id, channel, note);
+            setActivePads(prev => {
+                const next = new Set(prev);
+                next.delete(padKey);
+                return next;
+            });
+        }, 200);
     }, [midiEngine, device.id]);
 
     // Master filter
@@ -385,12 +563,114 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
         setSyncMode(prev => modes[(modes.indexOf(prev) + 1) % modes.length]);
     }, []);
 
+    // BPM adjustment
+    const adjustBpm = useCallback((delta: number) => {
+        setBpm(prev => Math.max(40, Math.min(240, prev + delta)));
+    }, []);
+
+    const commitBpmEdit = useCallback(() => {
+        const val = parseInt(bpmInput, 10);
+        if (!isNaN(val) && val >= 40 && val <= 240) {
+            setBpm(val);
+        }
+        setEditingBpm(false);
+    }, [bpmInput]);
+
+    // Swing adjustment
+    const adjustSwing = useCallback((delta: number) => {
+        setSwing(prev => Math.max(20, Math.min(80, prev + delta)));
+    }, []);
+
+    // ── Mixer handlers ─────────────────────────────────
+
+    const handleMixerVolume = useCallback((trackIdx: number, value: number) => {
+        setMixerVolumes(prev => prev.map((v, i) => i === trackIdx ? value : v));
+        // CT mixer volume: CC 12 on each track's channel
+        const track = profile.tracks[trackIdx];
+        if (track) {
+            midiEngine.sendCC(device.id, track.midiChannel, 12, value);
+        }
+    }, [midiEngine, device.id, profile.tracks]);
+
+    const handleMixerPan = useCallback((trackIdx: number, value: number) => {
+        setMixerPans(prev => prev.map((v, i) => i === trackIdx ? value : v));
+        const track = profile.tracks[trackIdx];
+        if (track) {
+            midiEngine.sendCC(device.id, track.midiChannel, 10, value);
+        }
+    }, [midiEngine, device.id, profile.tracks]);
+
+    // ── FX handlers ────────────────────────────────────
+
+    const handleReverbPresetChange = useCallback((preset: number) => {
+        setReverbPreset(preset);
+        // Reverb preset: CC 58 on project channel (ch16 = 15)
+        midiEngine.sendCC(device.id, 15, 58, preset * 16);
+    }, [midiEngine, device.id]);
+
+    const handleDelayPresetChange = useCallback((preset: number) => {
+        setDelayPreset(preset);
+        // Delay preset: CC 59 on project channel
+        midiEngine.sendCC(device.id, 15, 59, preset * 8);
+    }, [midiEngine, device.id]);
+
+    const handleReverbSend = useCallback((trackIdx: number, value: number) => {
+        setReverbSends(prev => prev.map((v, i) => i === trackIdx ? value : v));
+        const track = profile.tracks[trackIdx];
+        if (track) {
+            // Reverb send: CC 91 per track channel
+            midiEngine.sendCC(device.id, track.midiChannel, 91, value);
+        }
+    }, [midiEngine, device.id, profile.tracks]);
+
+    const handleDelaySend = useCallback((trackIdx: number, value: number) => {
+        setDelaySends(prev => prev.map((v, i) => i === trackIdx ? value : v));
+        const track = profile.tracks[trackIdx];
+        if (track) {
+            // Delay send: CC 93 per track channel
+            midiEngine.sendCC(device.id, track.midiChannel, 93, value);
+        }
+    }, [midiEngine, device.id, profile.tracks]);
+
+    // ── Sidechain handlers ─────────────────────────────
+
+    const handleSidechainPreset = useCallback((trackIdx: number, preset: number) => {
+        setSidechainPresets(prev => prev.map((v, i) => i === trackIdx ? preset : v));
+    }, []);
+
+    const handleSidechainKey = useCallback((trackIdx: number, drumIdx: number) => {
+        setSidechainKeys(prev => prev.map((v, i) => i === trackIdx ? drumIdx : v));
+    }, []);
+
+    // ── Project & Patch handlers ───────────────────────
+
+    const handleProjectChange = useCallback((project: number) => {
+        setCurrentProject(project);
+        // Program Change on Ch16 (channel 15) switches the entire project/session
+        midiEngine.sendProgramChange(device.id, 15, project);
+    }, [midiEngine, device.id]);
+
+    const handleSynth1PatchChange = useCallback((patch: number) => {
+        setSynth1Patch(patch);
+        // Program Change on Ch1 (channel 0) selects synth 1 patch
+        midiEngine.sendProgramChange(device.id, 0, patch);
+    }, [midiEngine, device.id]);
+
+    const handleSynth2PatchChange = useCallback((patch: number) => {
+        setSynth2Patch(patch);
+        // Program Change on Ch2 (channel 1) selects synth 2 patch
+        midiEngine.sendProgramChange(device.id, 1, patch);
+    }, [midiEngine, device.id]);
+
     // Current track data
     const activeTrackName = useMemo(() => {
         switch (activeTrack) {
             case "synth1": return "Synth 1";
             case "synth2": return "Synth 2";
-            case "drums": return "Drum 1";
+            case "drums1": return "Drum 1";
+            case "drums2": return "Drum 2";
+            case "drums3": return "Drum 3";
+            case "drums4": return "Drum 4";
             case "midi1": return "MIDI 1";
             case "midi2": return "MIDI 2";
         }
@@ -403,16 +683,36 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
 
     const activeTrackState = trackStates[activeTrackName];
 
-    // MIDI clock sync effect
+    // MIDI clock sync effect — send clock to Circuit Tracks
+    // Active in TX mode (always) or RX mode when deckSync is on
+    // Circuit Tracks derives BPM from clock timing (24 PPQN)
+    // Swing is applied by varying pulse intervals within 8th-note pairs
+    const shouldSendClock = syncMode === "send" || (syncMode === "receive" && deckSync);
+
     useEffect(() => {
-        if (syncMode !== "send" || !isPlaying) return;
-        const pulsesPerBeat = 24; // MIDI standard
-        const pulseMs = 60000 / (bpm * pulsesPerBeat);
-        const interval = setInterval(() => {
+        if (!shouldSendClock) return;
+
+        const quarterNoteMs = 60000 / bpm;
+        const eighthNoteMs = quarterNoteMs / 2;
+
+        // Swing ratio for the two 16th-note halves of each 8th note
+        const firstPulseInterval = ((swing / 100) * eighthNoteMs) / 6;
+        const secondPulseInterval = (((100 - swing) / 100) * eighthNoteMs) / 6;
+
+        let tickInCycle = 0; // 0-11 within each 8th-note pair
+        let timeoutId: ReturnType<typeof setTimeout>;
+
+        const sendTick = () => {
             midiEngine.sendClockToDevice(device.id);
-        }, pulseMs);
-        return () => clearInterval(interval);
-    }, [syncMode, isPlaying, bpm, midiEngine, device.id]);
+            // Ticks 0-5 = first 16th, ticks 6-11 = second 16th
+            const interval = tickInCycle < 6 ? firstPulseInterval : secondPulseInterval;
+            tickInCycle = (tickInCycle + 1) % 12;
+            timeoutId = setTimeout(sendTick, Math.max(1, interval));
+        };
+
+        sendTick();
+        return () => clearTimeout(timeoutId);
+    }, [shouldSendClock, bpm, swing, midiEngine, device.id]);
 
     if (isMinimized) return null;
 
@@ -426,7 +726,8 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
             style={{
                 left: position.x,
                 top: position.y,
-                width: expanded ? 420 : 340,
+                width: size.w,
+                ...(size.h > 0 ? { height: size.h, overflow: "auto" } : {}),
             }}
         >
             <div
@@ -487,6 +788,7 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
                             <Square className="h-3 w-3" />
                         </button>
                         <button onClick={handleRecord}
+                            title="Record (local only — MIDI has no record message)"
                             className={cn(
                                 "w-7 h-7 rounded-md flex items-center justify-center transition-all cursor-pointer border",
                                 isRecording
@@ -497,227 +799,736 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
                         </button>
                     </div>
 
-                    {/* BPM display */}
-                    <div className="flex-1 flex items-center justify-center gap-2">
+                    {/* BPM display + controls */}
+                    <div className="flex-1 flex items-center justify-center gap-1.5">
+                        <button
+                            onClick={() => adjustBpm(-1)}
+                            onContextMenu={(e) => { e.preventDefault(); adjustBpm(-10); }}
+                            className="w-5 h-5 rounded flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/30 hover:text-white/50 transition-all cursor-pointer text-[10px] font-bold"
+                            title="Click: -1 BPM, Right-click: -10 BPM"
+                        >
+                            −
+                        </button>
                         <div className="text-center">
-                            <div className="text-[14px] font-mono font-bold tabular-nums" style={{ color: brandColor }}>
-                                {bpm}
-                            </div>
+                            {editingBpm ? (
+                                <input
+                                    type="number"
+                                    min={40}
+                                    max={240}
+                                    value={bpmInput}
+                                    onChange={(e) => setBpmInput(e.target.value)}
+                                    onBlur={commitBpmEdit}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") commitBpmEdit();
+                                        if (e.key === "Escape") setEditingBpm(false);
+                                    }}
+                                    autoFocus
+                                    className="w-10 text-center text-[14px] font-mono font-bold tabular-nums bg-transparent border-b outline-none"
+                                    style={{ color: brandColor, borderColor: `${brandColor}60` }}
+                                />
+                            ) : (
+                                <div
+                                    className="text-[14px] font-mono font-bold tabular-nums cursor-pointer hover:opacity-80 transition-opacity"
+                                    style={{ color: brandColor }}
+                                    onClick={() => {
+                                        if (syncMode !== "receive") {
+                                            setEditingBpm(true);
+                                            setBpmInput(String(bpm));
+                                        }
+                                    }}
+                                    title={syncMode === "receive" ? "BPM synced from deck" : "Click to edit BPM"}
+                                >
+                                    {bpm}
+                                </div>
+                            )}
                             <div className="text-[6px] text-white/20 uppercase tracking-wider">BPM</div>
+                        </div>
+                        <button
+                            onClick={() => adjustBpm(1)}
+                            onContextMenu={(e) => { e.preventDefault(); adjustBpm(10); }}
+                            className="w-5 h-5 rounded flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/30 hover:text-white/50 transition-all cursor-pointer text-[10px] font-bold"
+                            title="Click: +1 BPM, Right-click: +10 BPM"
+                        >
+                            +
+                        </button>
+                        {/* Swing display — applied via swung MIDI clock in TX mode */}
+                        <div className="ml-2 pl-2 border-l border-white/[0.08] text-center" title={syncMode === "send" ? "Swing sent via MIDI clock" : "Swing (local only — set to TX CLK to send)"}>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => adjustSwing(-1)}
+                                    onContextMenu={(e) => { e.preventDefault(); adjustSwing(-5); }}
+                                    className="w-4 h-4 rounded flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/30 hover:text-white/50 transition-all cursor-pointer text-[8px] font-bold"
+                                >
+                                    −
+                                </button>
+                                <div className="text-[11px] font-mono font-bold tabular-nums min-w-[18px]" style={{ color: swing !== 50 ? "#f59e0b" : "rgba(255,255,255,0.35)" }}>
+                                    {swing}
+                                </div>
+                                <button
+                                    onClick={() => adjustSwing(1)}
+                                    onContextMenu={(e) => { e.preventDefault(); adjustSwing(5); }}
+                                    className="w-4 h-4 rounded flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/30 hover:text-white/50 transition-all cursor-pointer text-[8px] font-bold"
+                                >
+                                    +
+                                </button>
+                            </div>
+                            <div className="text-[6px] uppercase tracking-wider" style={{ color: syncMode === "send" && swing !== 50 ? "#f59e0b80" : "rgba(255,255,255,0.2)" }}>
+                                Swing{syncMode === "send" && swing !== 50 ? " ⚡" : ""}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Sync mode */}
-                    <button onClick={cycleSyncMode}
-                        className={cn(
-                            "flex items-center gap-1 px-2 py-1 rounded-md text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer border",
-                            syncMode === "send" && "bg-orange-500/15 border-orange-500/30 text-orange-400",
-                            syncMode === "receive" && "bg-blue-500/15 border-blue-500/30 text-blue-400",
-                            syncMode === "none" && "bg-white/5 border-white/10 text-white/25",
-                        )}>
-                        {syncMode === "send" && <><Radio className="h-2.5 w-2.5" /> TX CLK</>}
-                        {syncMode === "receive" && <><Link2 className="h-2.5 w-2.5" /> RX CLK</>}
-                        {syncMode === "none" && <><Unlink2 className="h-2.5 w-2.5" /> INT</>}
-                    </button>
-                </div>
-
-                {/* ── Sequencer Steps ───────────────────────────────── */}
-                <div className="px-3 py-1.5 border-t border-white/[0.06]">
-                    <SequencerSteps currentStep={currentStep} totalSteps={32} color={trackColor} isPlaying={isPlaying} />
-                </div>
-
-                {/* ── Track Selector ─────────────────────────────────── */}
-                <div className="px-3 py-1.5 border-t border-white/[0.06] flex gap-1">
-                    {([
-                        { id: "synth1" as const, label: "S1", icon: Waves, color: "#9333ea" },
-                        { id: "synth2" as const, label: "S2", icon: Waves, color: "#06b6d4" },
-                        { id: "drums" as const, label: "DR", icon: Drum, color: "#f97316" },
-                        { id: "midi1" as const, label: "M1", icon: Music2, color: "#3b82f6" },
-                        { id: "midi2" as const, label: "M2", icon: Music2, color: "#ec4899" },
-                    ]).map(t => {
-                        const trackName = t.id === "synth1" ? "Synth 1" : t.id === "synth2" ? "Synth 2" : t.id === "drums" ? "Drum 1" : t.id === "midi1" ? "MIDI 1" : "MIDI 2";
-                        const ts = trackStates[trackName];
-                        return (
+                    {/* Sync mode + deck sync button */}
+                    <div className="flex items-center gap-1">
+                        {syncMode === "receive" && (
                             <button
-                                key={t.id}
-                                onClick={() => setActiveTrack(t.id)}
+                                onClick={() => setDeckSync(prev => !prev)}
                                 className={cn(
-                                    "flex-1 flex flex-col items-center gap-0.5 py-1 rounded-md transition-all cursor-pointer border text-[7px] font-bold",
-                                    activeTrack === t.id
-                                        ? "border-opacity-40"
-                                        : "bg-white/[0.02] border-white/[0.06] text-white/25 hover:bg-white/[0.05]",
-                                    ts?.muted && "opacity-40"
+                                    "flex items-center gap-1 px-1.5 py-1 rounded-md text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer border",
+                                    deckSync
+                                        ? "bg-green-500/15 border-green-500/30 text-green-400 shadow-[0_0_6px_rgba(34,197,94,0.2)]"
+                                        : "bg-white/5 border-white/10 text-white/25 hover:bg-white/10"
                                 )}
-                                style={activeTrack === t.id ? {
-                                    backgroundColor: `${t.color}15`,
-                                    borderColor: `${t.color}40`,
-                                    color: t.color,
-                                } : undefined}
+                                title={deckSync ? "Syncing deck BPM → Circuit Tracks (click to stop)" : "Send deck BPM to Circuit Tracks as MIDI clock"}
                             >
-                                <t.icon className="h-3 w-3" />
-                                {t.label}
+                                <Zap className="h-2.5 w-2.5" />
+                                Sync
                             </button>
-                        );
-                    })}
+                        )}
+                        <button onClick={cycleSyncMode}
+                            className={cn(
+                                "flex items-center gap-1 px-2 py-1 rounded-md text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer border",
+                                syncMode === "send" && "bg-orange-500/15 border-orange-500/30 text-orange-400",
+                                syncMode === "receive" && "bg-blue-500/15 border-blue-500/30 text-blue-400",
+                                syncMode === "none" && "bg-white/5 border-white/10 text-white/25",
+                            )}>
+                            {syncMode === "send" && <><Radio className="h-2.5 w-2.5" /> TX CLK</>}
+                            {syncMode === "receive" && <><Link2 className="h-2.5 w-2.5" /> RX CLK</>}
+                            {syncMode === "none" && <><Unlink2 className="h-2.5 w-2.5" /> INT</>}
+                        </button>
+                    </div>
                 </div>
 
-                {/* ── Track Content ──────────────────────────────────── */}
-                <div className="px-3 py-2 border-t border-white/[0.06] min-h-[80px]">
-                    {/* Synth tracks: 8 macro knobs + filter */}
-                    {(activeTrack === "synth1" || activeTrack === "synth2") && activeTrackProfile?.macroKnobs && (
-                        <div className="space-y-2">
-                            {/* Macro Knobs — 2 rows of 4 */}
-                            <div className="grid grid-cols-4 gap-1 justify-items-center">
-                                {activeTrackProfile.macroKnobs.slice(0, 4).map((knob, i) => (
-                                    <MiniKnob
-                                        key={i}
-                                        value={activeTrackState.macroValues[i]}
-                                        label={knob.label}
-                                        color={trackColor}
-                                        onChange={(v) => handleMacroChange(activeTrackName, i, v)}
-                                    />
-                                ))}
-                            </div>
-                            <div className="grid grid-cols-4 gap-1 justify-items-center">
-                                {activeTrackProfile.macroKnobs.slice(4, 8).map((knob, i) => (
-                                    <MiniKnob
-                                        key={i + 4}
-                                        value={activeTrackState.macroValues[i + 4]}
-                                        label={knob.label}
-                                        color={trackColor}
-                                        onChange={(v) => handleMacroChange(activeTrackName, i + 4, v)}
-                                    />
-                                ))}
-                            </div>
+                {/* ── View Tabs ─────────────────────────────────────── */}
+                <div className="px-2 py-1 border-t border-white/[0.06] flex gap-0.5">
+                    {([
+                        { id: "tracks" as PanelView, label: "Tracks", icon: Layers },
+                        { id: "mixer" as PanelView, label: "Mixer", icon: Sliders },
+                        { id: "fx" as PanelView, label: "FX", icon: Sparkles },
+                        { id: "sidechain" as PanelView, label: "SC", icon: LinkIcon },
+                        { id: "patterns" as PanelView, label: "Proj", icon: Hash },
+                    ]).map(v => (
+                        <button
+                            key={v.id}
+                            onClick={() => setPanelView(v.id)}
+                            className={cn(
+                                "flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[7px] font-bold uppercase tracking-wider transition-all cursor-pointer border",
+                                panelView === v.id
+                                    ? "border-opacity-40"
+                                    : "bg-white/[0.02] border-transparent text-white/20 hover:bg-white/[0.05] hover:text-white/30"
+                            )}
+                            style={panelView === v.id ? {
+                                backgroundColor: `${brandColor}15`,
+                                borderColor: `${brandColor}35`,
+                                color: brandColor,
+                            } : undefined}
+                        >
+                            <v.icon className="h-2.5 w-2.5" />
+                            {v.label}
+                        </button>
+                    ))}
+                </div>
 
-                            {/* Filter section */}
-                            {expanded && (
-                                <div className="flex items-center justify-center gap-3 pt-1 border-t border-white/[0.04]">
-                                    <MiniKnob
-                                        value={activeTrackState.filterFreq}
-                                        label="Cutoff"
-                                        color={trackColor}
-                                        onChange={(v) => {
-                                            midiEngine.sendCC(device.id, activeTrackProfile.midiChannel, 74, v);
-                                            setTrackStates(prev => ({
-                                                ...prev,
-                                                [activeTrackName]: { ...prev[activeTrackName], filterFreq: v },
-                                            }));
-                                        }}
-                                        size={32}
-                                    />
-                                    <MiniKnob
-                                        value={activeTrackState.filterRes}
-                                        label="Reso"
-                                        color={trackColor}
-                                        onChange={(v) => {
-                                            midiEngine.sendCC(device.id, activeTrackProfile.midiChannel, 71, v);
-                                            setTrackStates(prev => ({
-                                                ...prev,
-                                                [activeTrackName]: { ...prev[activeTrackName], filterRes: v },
-                                            }));
-                                        }}
-                                        size={32}
-                                    />
+                {/* ══════════════════════════════════════════════════════
+                    VIEW: TRACKS — Sequencer, track selector, macros/pads
+                   ══════════════════════════════════════════════════════ */}
+                {panelView === "tracks" && (
+                    <>
+                        {/* Sequencer Steps */}
+                        <div className="px-3 py-1.5 border-t border-white/[0.06]">
+                            <SequencerSteps currentStep={currentStep} totalSteps={32} color={trackColor} isPlaying={isPlaying} />
+                        </div>
+
+                        {/* Track Selector */}
+                        <div className="px-3 py-1.5 border-t border-white/[0.06] flex gap-1">
+                            {([
+                                { id: "synth1" as const, label: "S1", icon: Waves, color: "#9333ea" },
+                                { id: "synth2" as const, label: "S2", icon: Waves, color: "#06b6d4" },
+                                { id: "midi1" as const, label: "M1", icon: Music2, color: "#3b82f6" },
+                                { id: "midi2" as const, label: "M2", icon: Music2, color: "#ec4899" },
+                                { id: "drums1" as const, label: "D1", icon: Drum, color: "#f97316" },
+                                { id: "drums2" as const, label: "D2", icon: Drum, color: "#eab308" },
+                                { id: "drums3" as const, label: "D3", icon: Drum, color: "#22c55e" },
+                                { id: "drums4" as const, label: "D4", icon: Drum, color: "#ef4444" },
+                            ]).map(t => {
+                                const trackName = t.id === "synth1" ? "Synth 1" : t.id === "synth2" ? "Synth 2" : t.id === "drums1" ? "Drum 1" : t.id === "drums2" ? "Drum 2" : t.id === "drums3" ? "Drum 3" : t.id === "drums4" ? "Drum 4" : t.id === "midi1" ? "MIDI 1" : "MIDI 2";
+                                const ts = trackStates[trackName];
+                                return (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => setActiveTrack(t.id)}
+                                        className={cn(
+                                            "flex-1 flex flex-col items-center gap-0.5 py-1 rounded-md transition-all cursor-pointer border text-[7px] font-bold",
+                                            activeTrack === t.id
+                                                ? "border-opacity-40"
+                                                : "bg-white/[0.02] border-white/[0.06] text-white/25 hover:bg-white/[0.05]",
+                                            ts?.muted && "opacity-40"
+                                        )}
+                                        style={activeTrack === t.id ? {
+                                            backgroundColor: `${t.color}15`,
+                                            borderColor: `${t.color}40`,
+                                            color: t.color,
+                                        } : undefined}
+                                    >
+                                        <t.icon className="h-3 w-3" />
+                                        {t.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Track Content */}
+                        <div className="px-3 py-2 border-t border-white/[0.06] min-h-[80px]">
+                            {/* Synth tracks: 8 macro knobs + filter + note pads */}
+                            {(activeTrack === "synth1" || activeTrack === "synth2") && activeTrackProfile?.macroKnobs && (
+                                <div className="space-y-2">
+                                    <div className="grid grid-cols-4 gap-1 justify-items-center">
+                                        {activeTrackProfile.macroKnobs.slice(0, 4).map((knob, i) => (
+                                            <MiniKnob
+                                                key={i}
+                                                value={activeTrackState.macroValues[i]}
+                                                label={knob.label}
+                                                color={trackColor}
+                                                onChange={(v) => handleMacroChange(activeTrackName, i, v)}
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-1 justify-items-center">
+                                        {activeTrackProfile.macroKnobs.slice(4, 8).map((knob, i) => (
+                                            <MiniKnob
+                                                key={i + 4}
+                                                value={activeTrackState.macroValues[i + 4]}
+                                                label={knob.label}
+                                                color={trackColor}
+                                                onChange={(v) => handleMacroChange(activeTrackName, i + 4, v)}
+                                            />
+                                        ))}
+                                    </div>
+
+                                    {expanded && (
+                                        <div className="flex items-center justify-center gap-3 pt-1 border-t border-white/[0.04]">
+                                            <MiniKnob
+                                                value={activeTrackState.filterFreq}
+                                                label="Cutoff"
+                                                color={trackColor}
+                                                onChange={(v) => {
+                                                    midiEngine.sendCC(device.id, activeTrackProfile.midiChannel, 74, v);
+                                                    setTrackStates(prev => ({
+                                                        ...prev,
+                                                        [activeTrackName]: { ...prev[activeTrackName], filterFreq: v },
+                                                    }));
+                                                }}
+                                                size={32}
+                                            />
+                                            <MiniKnob
+                                                value={activeTrackState.filterRes}
+                                                label="Reso"
+                                                color={trackColor}
+                                                onChange={(v) => {
+                                                    midiEngine.sendCC(device.id, activeTrackProfile.midiChannel, 71, v);
+                                                    setTrackStates(prev => ({
+                                                        ...prev,
+                                                        [activeTrackName]: { ...prev[activeTrackName], filterRes: v },
+                                                    }));
+                                                }}
+                                                size={32}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Synth Note Pads — 2×8 chromatic grid (C3-D#4 = notes 48-63) */}
+                                    <div className="pt-1 border-t border-white/[0.04]">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-[6px] text-white/20 uppercase tracking-wider">Note Pads</span>
+                                            <span className="text-[6px] text-white/10">Ch {activeTrackProfile.midiChannel + 1}</span>
+                                        </div>
+                                        {[0, 8].map(rowStart => (
+                                            <div key={rowStart} className="grid grid-cols-8 gap-1 mb-1">
+                                                {Array.from({ length: 8 }).map((_, i) => {
+                                                    const noteNum = 48 + rowStart + i; // C3=48 .. D#4=63
+                                                    const padKey = `${activeTrackProfile.midiChannel}:${noteNum}`;
+                                                    const isActive = activePads.has(padKey);
+                                                    const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+                                                    const noteName = noteNames[noteNum % 12];
+                                                    const octave = Math.floor(noteNum / 12) - 1;
+                                                    return (
+                                                        <button
+                                                            key={noteNum}
+                                                            onPointerDown={() => handleSynthNoteTrigger(activeTrackProfile.midiChannel, noteNum)}
+                                                            className={cn(
+                                                                "h-6 rounded-sm border transition-all duration-75 cursor-pointer",
+                                                                "hover:brightness-125 active:scale-95",
+                                                                isActive && "ring-1 ring-white/30"
+                                                            )}
+                                                            style={{
+                                                                backgroundColor: isActive ? trackColor : `${trackColor}20`,
+                                                                borderColor: `${trackColor}40`,
+                                                                boxShadow: isActive ? `0 0 8px ${trackColor}60` : "none",
+                                                            }}
+                                                        >
+                                                            <span className="text-[5px] text-white/40">{noteName}{octave}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Drum tracks: all 4 drums in one view */}
+                            {(activeTrack === "drums1" || activeTrack === "drums2" || activeTrack === "drums3" || activeTrack === "drums4") && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: trackColor }}>{activeTrackName}</span>
+                                        <span className="text-[7px] text-white/20">Ch 10 • All Drums</span>
+                                    </div>
+
+                                    {/* 4 large drum pads — one per drum track */}
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {profile.tracks.filter(t => t.type === "drum").map((dt, i) => {
+                                            const drumNote = dt.noteRange?.low ?? (60 + i * 2);
+                                            const padKey = `9:${drumNote}`;
+                                            const isActive = activePads.has(padKey);
+                                            const drumLabel = dt.name.replace("Drum ", "D");
+                                            return (
+                                                <button
+                                                    key={dt.name}
+                                                    onPointerDown={() => handleDrumTrigger(drumNote)}
+                                                    className={cn(
+                                                        "h-10 rounded-md border-2 transition-all duration-75 cursor-pointer flex flex-col items-center justify-center gap-0.5",
+                                                        "hover:brightness-125 active:scale-95",
+                                                        isActive && "ring-1 ring-white/40"
+                                                    )}
+                                                    style={{
+                                                        backgroundColor: isActive ? dt.color : `${dt.color}25`,
+                                                        borderColor: isActive ? dt.color : `${dt.color}50`,
+                                                        boxShadow: isActive ? `0 0 12px ${dt.color}60, inset 0 0 6px ${dt.color}40` : "none",
+                                                    }}
+                                                >
+                                                    <span className="text-[8px] font-bold" style={{ color: isActive ? "#fff" : `${dt.color}cc` }}>{drumLabel}</span>
+                                                    <span className="text-[5px]" style={{ color: isActive ? "#ffffffaa" : `${dt.color}60` }}>{drumNote}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Drum track selector for macros */}
+                                    <div className="flex gap-1 pt-1 border-t border-white/[0.04]">
+                                        {profile.tracks.filter(t => t.type === "drum").map(dt => {
+                                            const dtId = `drums${profile.tracks.filter(t => t.type === "drum").indexOf(dt) + 1}` as ActiveTrack;
+                                            const isActive = activeTrackName === dt.name;
+                                            return (
+                                                <button
+                                                    key={dt.name}
+                                                    onClick={() => setActiveTrack(dtId)}
+                                                    className={cn(
+                                                        "flex-1 py-0.5 rounded text-[6px] font-bold transition-all cursor-pointer",
+                                                        isActive ? "text-white" : "text-white/20 hover:text-white/40"
+                                                    )}
+                                                    style={{
+                                                        backgroundColor: isActive ? `${dt.color}25` : "transparent",
+                                                        borderBottom: isActive ? `1.5px solid ${dt.color}` : "1.5px solid transparent",
+                                                    }}
+                                                >
+                                                    {dt.name}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* MIDI tracks */}
+                            {(activeTrack === "midi1" || activeTrack === "midi2") && activeTrackProfile && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Radio className="h-3 w-3" style={{ color: trackColor, opacity: 0.5 }} />
+                                        <span className="text-[8px] font-bold" style={{ color: trackColor }}>{activeTrackName}</span>
+                                        <span className="text-[6px] text-white/15">Ch {activeTrackProfile.midiChannel + 1}</span>
+                                    </div>
+                                    {/* Note Pads — 2×8 chromatic grid */}
+                                    {[0, 8].map(rowStart => (
+                                        <div key={rowStart} className="grid grid-cols-8 gap-1">
+                                            {Array.from({ length: 8 }).map((_, i) => {
+                                                const noteNum = 48 + rowStart + i;
+                                                const padKey = `${activeTrackProfile.midiChannel}:${noteNum}`;
+                                                const isActive = activePads.has(padKey);
+                                                const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+                                                const noteName = noteNames[noteNum % 12];
+                                                const octave = Math.floor(noteNum / 12) - 1;
+                                                return (
+                                                    <button
+                                                        key={noteNum}
+                                                        onPointerDown={() => handleSynthNoteTrigger(activeTrackProfile.midiChannel, noteNum)}
+                                                        className={cn(
+                                                            "h-6 rounded-sm border transition-all duration-75 cursor-pointer",
+                                                            "hover:brightness-125 active:scale-95",
+                                                            isActive && "ring-1 ring-white/30"
+                                                        )}
+                                                        style={{
+                                                            backgroundColor: isActive ? trackColor : `${trackColor}20`,
+                                                            borderColor: `${trackColor}40`,
+                                                            boxShadow: isActive ? `0 0 8px ${trackColor}60` : "none",
+                                                        }}
+                                                    >
+                                                        <span className="text-[5px] text-white/40">{noteName}{octave}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
-                    )}
 
-                    {/* Drum tracks: pad grid */}
-                    {activeTrack === "drums" && (
-                        <div className="space-y-2">
-                            {/* 4x4 drum pad grid showing all 4 drum tracks */}
-                            <div className="grid grid-cols-8 gap-1 justify-items-center">
-                                {profile.tracks.filter(t => t.type === "drum").map(drumTrack => {
-                                    const range = drumTrack.noteRange!;
-                                    return Array.from({ length: range.high - range.low + 1 }).map((_, i) => {
-                                        const note = range.low + i;
-                                        return (
-                                            <DrumPad
-                                                key={note}
-                                                note={note}
-                                                color={drumTrack.color}
-                                                isActive={activePads.has(note)}
-                                                onTrigger={handleDrumTrigger}
-                                            />
-                                        );
-                                    });
-                                }).flat().slice(0, expanded ? 32 : 16)}
+                        {/* Master Filter */}
+                        <div className="px-3 py-2 border-t border-white/[0.06] flex items-center gap-3">
+                            <span className="text-[7px] text-white/20 uppercase tracking-wider shrink-0">Filter</span>
+                            <div className="flex-1 relative h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                                <div
+                                    className="absolute inset-y-0 rounded-full transition-all duration-75"
+                                    style={{
+                                        left: masterFilter < 64 ? `${(masterFilter / 64) * 50}%` : "50%",
+                                        right: masterFilter > 64 ? `${(1 - masterFilter / 127) * 50}%` : "50%",
+                                        width: masterFilter === 64 ? "2px" : undefined,
+                                        backgroundColor: brandColor,
+                                        boxShadow: `0 0 6px ${brandColor}60`,
+                                    }}
+                                />
+                                <input
+                                    type="range" min={0} max={127} value={masterFilter}
+                                    onChange={(e) => handleMasterFilter(parseInt(e.target.value))}
+                                    className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                                />
                             </div>
+                            <span className="text-[8px] tabular-nums text-white/25 w-6 text-right">
+                                {masterFilter < 60 ? "LP" : masterFilter > 68 ? "HP" : "—"}
+                            </span>
                         </div>
-                    )}
+                    </>
+                )}
 
-                    {/* MIDI tracks: simple channel info */}
-                    {(activeTrack === "midi1" || activeTrack === "midi2") && (
-                        <div className="flex flex-col items-center justify-center py-3 gap-2">
-                            <Radio className="h-6 w-6" style={{ color: trackColor, opacity: 0.4 }} />
-                            <div className="text-[9px] text-white/30 text-center">
-                                <div className="font-bold" style={{ color: trackColor }}>{activeTrackName}</div>
-                                <div className="text-white/15">MIDI Channel {(activeTrackProfile?.midiChannel ?? 0) + 1}</div>
-                                <div className="text-white/10 mt-1">Sends CC/Note data to external gear</div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* ── Master Filter ──────────────────────────────────── */}
-                <div className="px-3 py-2 border-t border-white/[0.06] flex items-center gap-3">
-                    <span className="text-[7px] text-white/20 uppercase tracking-wider shrink-0">Filter</span>
-                    <div className="flex-1 relative h-2 bg-white/[0.06] rounded-full overflow-hidden">
-                        <div
-                            className="absolute inset-y-0 rounded-full transition-all duration-75"
-                            style={{
-                                left: masterFilter < 64 ? `${(masterFilter / 64) * 50}%` : "50%",
-                                right: masterFilter > 64 ? `${(1 - masterFilter / 127) * 50}%` : "50%",
-                                width: masterFilter === 64 ? "2px" : undefined,
-                                backgroundColor: brandColor,
-                                boxShadow: `0 0 6px ${brandColor}60`,
-                            }}
-                        />
-                        <input
-                            type="range" min={0} max={127} value={masterFilter}
-                            onChange={(e) => handleMasterFilter(parseInt(e.target.value))}
-                            className="absolute inset-0 w-full opacity-0 cursor-pointer"
-                        />
-                    </div>
-                    <span className="text-[8px] tabular-nums text-white/25 w-6 text-right">
-                        {masterFilter < 60 ? "LP" : masterFilter > 68 ? "HP" : "—"}
-                    </span>
-                </div>
-
-                {/* ── Track Mute/Volume (expanded) ──────────────────── */}
-                {expanded && (
+                {/* ══════════════════════════════════════════════════════
+                    VIEW: MIXER — 8-track volume faders, pan, mute
+                   ══════════════════════════════════════════════════════ */}
+                {panelView === "mixer" && (
                     <div className="px-3 py-2 border-t border-white/[0.06]">
-                        <div className="text-[7px] text-white/15 uppercase tracking-wider mb-1.5">Track Mixer</div>
-                        <div className="flex gap-1.5">
-                            {profile.tracks.filter(t => t.type === "synth" || t.type === "drum").slice(0, 6).map(t => {
-                                const ts = trackStates[t.name];
+                        {/* Pan/Vol toggle */}
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-[7px] text-white/15 uppercase tracking-wider">Track Mixer</span>
+                            <div className="flex items-center gap-0.5 bg-white/[0.04] rounded-md p-0.5">
+                                <button
+                                    onClick={() => setMixerShowPan(false)}
+                                    className={cn(
+                                        "text-[6px] font-bold px-1.5 py-0.5 rounded transition-all cursor-pointer",
+                                        !mixerShowPan ? "bg-white/10 text-white/60" : "text-white/20 hover:text-white/35"
+                                    )}
+                                >
+                                    VOL
+                                </button>
+                                <button
+                                    onClick={() => setMixerShowPan(true)}
+                                    className={cn(
+                                        "text-[6px] font-bold px-1.5 py-0.5 rounded transition-all cursor-pointer",
+                                        mixerShowPan ? "bg-white/10 text-white/60" : "text-white/20 hover:text-white/35"
+                                    )}
+                                >
+                                    PAN
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-1">
+                            {TRACK_NAMES_ALL.map((name, idx) => {
+                                const ts = trackStates[name];
+                                const color = TRACK_COLORS_ALL[idx];
+                                const vol = mixerVolumes[idx];
+                                const pan = mixerPans[idx];
+                                const label = name.slice(0, 2).replace(" ", "");
+
                                 return (
-                                    <div key={t.name} className="flex-1 flex flex-col items-center gap-1">
-                                        {/* Volume mini-bar */}
-                                        <div className="w-1.5 h-10 bg-white/[0.06] rounded-full overflow-hidden relative">
-                                            <div
-                                                className="absolute bottom-0 w-full rounded-full transition-all duration-100"
-                                                style={{
-                                                    height: `${(ts.volume / 127) * 100}%`,
-                                                    backgroundColor: ts.muted ? "rgba(255,255,255,0.1)" : t.color,
-                                                }}
+                                    <div key={name} className="flex-1 flex flex-col items-center gap-1">
+                                        {/* Label */}
+                                        <span className="text-[6px] font-bold" style={{ color: ts?.muted ? "rgba(255,255,255,0.15)" : color }}>
+                                            {label}{name.slice(-1)}
+                                        </span>
+
+                                        {!mixerShowPan ? (
+                                            /* Volume fader */
+                                            <div className="relative w-3 h-16 bg-white/[0.06] rounded-full overflow-hidden">
+                                                <div
+                                                    className="absolute bottom-0 w-full rounded-full transition-all duration-75"
+                                                    style={{
+                                                        height: `${(vol / 127) * 100}%`,
+                                                        backgroundColor: ts?.muted ? "rgba(255,255,255,0.08)" : color,
+                                                        boxShadow: !ts?.muted ? `0 0 4px ${color}40` : undefined,
+                                                    }}
+                                                />
+                                                <input
+                                                    type="range" min={0} max={127} value={vol}
+                                                    onChange={(e) => handleMixerVolume(idx, parseInt(e.target.value))}
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                    style={{ writingMode: "vertical-lr", direction: "rtl" }}
+                                                />
+                                            </div>
+                                        ) : (
+                                            /* Pan knob */
+                                            <MiniKnob
+                                                value={pan}
+                                                label=""
+                                                color={color}
+                                                onChange={(v) => handleMixerPan(idx, v)}
+                                                size={22}
                                             />
-                                        </div>
+                                        )}
+
+                                        {/* Value */}
+                                        <span className="text-[6px] tabular-nums text-white/20">
+                                            {!mixerShowPan ? vol : (pan < 60 ? `L${64 - pan}` : pan > 68 ? `R${pan - 64}` : "C")}
+                                        </span>
+
                                         {/* Mute button */}
                                         <button
                                             onClick={() => setTrackStates(prev => ({
                                                 ...prev,
-                                                [t.name]: { ...prev[t.name], muted: !prev[t.name].muted },
+                                                [name]: { ...prev[name], muted: !prev[name].muted },
                                             }))}
                                             className={cn(
-                                                "text-[5px] font-bold px-1 py-0.5 rounded cursor-pointer transition-all",
-                                                ts.muted ? "bg-red-500/20 text-red-400" : "bg-white/5 text-white/20"
+                                                "text-[5px] font-bold w-full py-0.5 rounded cursor-pointer transition-all text-center",
+                                                ts?.muted ? "bg-red-500/20 text-red-400" : "bg-white/5 text-white/20 hover:bg-white/10"
                                             )}
                                         >
-                                            {t.name.slice(0, 2)}
+                                            {ts?.muted ? "M" : "•"}
                                         </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Master Filter below mixer */}
+                        <div className="flex items-center gap-3 mt-2 pt-2 border-t border-white/[0.04]">
+                            <span className="text-[7px] text-white/20 uppercase tracking-wider shrink-0">Master</span>
+                            <div className="flex-1 relative h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                                <div
+                                    className="absolute inset-y-0 rounded-full transition-all duration-75"
+                                    style={{
+                                        left: masterFilter < 64 ? `${(masterFilter / 64) * 50}%` : "50%",
+                                        right: masterFilter > 64 ? `${(1 - masterFilter / 127) * 50}%` : "50%",
+                                        width: masterFilter === 64 ? "2px" : undefined,
+                                        backgroundColor: brandColor,
+                                        boxShadow: `0 0 6px ${brandColor}60`,
+                                    }}
+                                />
+                                <input
+                                    type="range" min={0} max={127} value={masterFilter}
+                                    onChange={(e) => handleMasterFilter(parseInt(e.target.value))}
+                                    className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                                />
+                            </div>
+                            <span className="text-[8px] tabular-nums text-white/25 w-6 text-right">
+                                {masterFilter < 60 ? "LP" : masterFilter > 68 ? "HP" : "—"}
+                            </span>
+                        </div>
+                    </div>
+                )}
+
+                {/* ══════════════════════════════════════════════════════
+                    VIEW: FX — Reverb & Delay presets + per-track sends
+                   ══════════════════════════════════════════════════════ */}
+                {panelView === "fx" && (
+                    <div className="px-3 py-2 border-t border-white/[0.06]">
+                        {/* FX sub-tabs */}
+                        <div className="flex items-center gap-1 mb-2">
+                            <button
+                                onClick={() => setFxTab("reverb")}
+                                className={cn(
+                                    "flex-1 py-1 rounded-md text-[7px] font-bold uppercase tracking-wider transition-all cursor-pointer border",
+                                    fxTab === "reverb"
+                                        ? "bg-purple-500/15 border-purple-500/30 text-purple-400"
+                                        : "bg-white/[0.02] border-transparent text-white/20 hover:bg-white/[0.05]"
+                                )}
+                            >
+                                Reverb
+                            </button>
+                            <button
+                                onClick={() => setFxTab("delay")}
+                                className={cn(
+                                    "flex-1 py-1 rounded-md text-[7px] font-bold uppercase tracking-wider transition-all cursor-pointer border",
+                                    fxTab === "delay"
+                                        ? "bg-blue-500/15 border-blue-500/30 text-blue-400"
+                                        : "bg-white/[0.02] border-transparent text-white/20 hover:bg-white/[0.05]"
+                                )}
+                            >
+                                Delay
+                            </button>
+                        </div>
+
+                        {fxTab === "reverb" ? (
+                            <>
+                                {/* Reverb preset selector */}
+                                <div className="mb-2">
+                                    <div className="text-[6px] text-white/15 uppercase tracking-wider mb-1">Reverb Preset</div>
+                                    <div className="grid grid-cols-4 gap-0.5">
+                                        {REVERB_PRESETS.map((name, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => handleReverbPresetChange(i)}
+                                                className={cn(
+                                                    "py-1 rounded text-[6px] font-medium transition-all cursor-pointer border truncate px-0.5",
+                                                    reverbPreset === i
+                                                        ? "bg-purple-500/20 border-purple-500/30 text-purple-300"
+                                                        : "bg-white/[0.03] border-white/[0.06] text-white/25 hover:bg-white/[0.06]"
+                                                )}
+                                                title={name}
+                                            >
+                                                {i + 1}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="text-[7px] text-purple-400/60 mt-0.5 text-center truncate">{REVERB_PRESETS[reverbPreset]}</div>
+                                </div>
+
+                                {/* Per-track reverb sends */}
+                                <div className="border-t border-white/[0.04] pt-2">
+                                    <div className="text-[6px] text-white/15 uppercase tracking-wider mb-1">Reverb Send</div>
+                                    <div className="flex gap-1">
+                                        {TRACK_NAMES_ALL.map((name, idx) => {
+                                            const color = TRACK_COLORS_ALL[idx];
+                                            return (
+                                                <div key={name} className="flex-1 flex flex-col items-center gap-0.5">
+                                                    <MiniKnob
+                                                        value={reverbSends[idx]}
+                                                        label=""
+                                                        color={color}
+                                                        onChange={(v) => handleReverbSend(idx, v)}
+                                                        size={20}
+                                                    />
+                                                    <span className="text-[5px] font-bold" style={{ color }}>{name.slice(0, 1)}{name.slice(-1)}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {/* Delay preset selector */}
+                                <div className="mb-2">
+                                    <div className="text-[6px] text-white/15 uppercase tracking-wider mb-1">Delay Preset</div>
+                                    <div className="grid grid-cols-4 gap-0.5">
+                                        {DELAY_PRESETS.map((name, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => handleDelayPresetChange(i)}
+                                                className={cn(
+                                                    "py-1 rounded text-[6px] font-medium transition-all cursor-pointer border truncate px-0.5",
+                                                    delayPreset === i
+                                                        ? "bg-blue-500/20 border-blue-500/30 text-blue-300"
+                                                        : "bg-white/[0.03] border-white/[0.06] text-white/25 hover:bg-white/[0.06]"
+                                                )}
+                                                title={name}
+                                            >
+                                                {i + 1}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="text-[7px] text-blue-400/60 mt-0.5 text-center truncate">{DELAY_PRESETS[delayPreset]}</div>
+                                </div>
+
+                                {/* Per-track delay sends */}
+                                <div className="border-t border-white/[0.04] pt-2">
+                                    <div className="text-[6px] text-white/15 uppercase tracking-wider mb-1">Delay Send</div>
+                                    <div className="flex gap-1">
+                                        {TRACK_NAMES_ALL.map((name, idx) => {
+                                            const color = TRACK_COLORS_ALL[idx];
+                                            return (
+                                                <div key={name} className="flex-1 flex flex-col items-center gap-0.5">
+                                                    <MiniKnob
+                                                        value={delaySends[idx]}
+                                                        label=""
+                                                        color={color}
+                                                        onChange={(v) => handleDelaySend(idx, v)}
+                                                        size={20}
+                                                    />
+                                                    <span className="text-[5px] font-bold" style={{ color }}>{name.slice(0, 1)}{name.slice(-1)}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* ══════════════════════════════════════════════════════
+                    VIEW: SIDECHAIN — Per-track sidechain preset & trigger
+                   ══════════════════════════════════════════════════════ */}
+                {panelView === "sidechain" && (
+                    <div className="px-3 py-2 border-t border-white/[0.06]">
+                        <div className="text-[7px] text-white/15 uppercase tracking-wider mb-2">Sidechain Compressor</div>
+                        <div className="space-y-2">
+                            {["Synth 1", "Synth 2", "MIDI 1", "MIDI 2"].map((name, tIdx) => {
+                                const color = TRACK_COLORS_ALL[tIdx];
+                                const preset = sidechainPresets[tIdx];
+                                const key = sidechainKeys[tIdx];
+                                return (
+                                    <div key={name} className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[7px] font-bold w-6" style={{ color }}>{name.slice(0, 1)}{name.slice(-1)}</span>
+                                            <div className="flex gap-0.5 flex-1">
+                                                {SIDECHAIN_PRESETS.map((pName, pIdx) => (
+                                                    <button
+                                                        key={pIdx}
+                                                        onClick={() => handleSidechainPreset(tIdx, pIdx)}
+                                                        className={cn(
+                                                            "flex-1 py-0.5 rounded text-[5px] font-bold transition-all cursor-pointer border",
+                                                            preset === pIdx
+                                                                ? "text-white"
+                                                                : "bg-white/[0.02] border-white/[0.04] text-white/15 hover:bg-white/[0.05]"
+                                                        )}
+                                                        style={preset === pIdx ? {
+                                                            backgroundColor: pIdx === 0 ? "rgba(255,255,255,0.05)" : `${color}20`,
+                                                            borderColor: pIdx === 0 ? "rgba(255,255,255,0.1)" : `${color}40`,
+                                                            color: pIdx === 0 ? "rgba(255,255,255,0.4)" : color,
+                                                        } : undefined}
+                                                    >
+                                                        {pIdx === 0 ? "OFF" : pIdx}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {/* Key drum selector (only shown if sidechain is active) */}
+                                        {preset > 0 && (
+                                            <div className="flex items-center gap-1 ml-8">
+                                                <span className="text-[5px] text-white/15 uppercase tracking-wider">Key:</span>
+                                                {["D1", "D2", "D3", "D4"].map((dName, dIdx) => (
+                                                    <button
+                                                        key={dIdx}
+                                                        onClick={() => handleSidechainKey(tIdx, dIdx)}
+                                                        className={cn(
+                                                            "px-1.5 py-0.5 rounded text-[5px] font-bold transition-all cursor-pointer border",
+                                                            key === dIdx
+                                                                ? "bg-orange-500/15 border-orange-500/30 text-orange-400"
+                                                                : "bg-white/[0.02] border-white/[0.04] text-white/15 hover:bg-white/[0.05]"
+                                                        )}
+                                                    >
+                                                        {dName}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -725,17 +1536,156 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
                     </div>
                 )}
 
-                {/* ── Footer with features ──────────────────────────── */}
-                {expanded && (
-                    <div className="px-3 py-1.5 border-t border-white/[0.06] flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                            {profile.features.slice(0, 3).map(f => (
-                                <span key={f} className="text-[6px] text-white/15 px-1 py-0.5 rounded bg-white/[0.03] border border-white/[0.04]">{f}</span>
-                            ))}
+                {/* ══════════════════════════════════════════════════════
+                    VIEW: PROJECTS & PATCHES — Project select + synth patch select
+                   ══════════════════════════════════════════════════════ */}
+                {panelView === "patterns" && (
+                    <div className="px-3 py-2 border-t border-white/[0.06] space-y-2">
+                        {/* ── Project Selector (64 projects, 8×4 grid per page) ── */}
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-[7px] text-white/15 uppercase tracking-wider">Project / Session</span>
+                                <span className="text-[8px] font-mono font-bold tabular-nums" style={{ color: brandColor }}>
+                                    #{(currentProject + 1).toString().padStart(2, "0")}
+                                </span>
+                            </div>
+                            <div className="text-[5px] text-white/10 mb-1">Program Change on Ch16 — switches entire project (incl. BPM, patterns, patches)</div>
+                            <div className="grid grid-cols-8 gap-0.5">
+                                {Array.from({ length: 64 }).map((_, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => handleProjectChange(i)}
+                                        className={cn(
+                                            "py-1 rounded text-[6px] font-bold transition-all cursor-pointer border",
+                                            currentProject === i
+                                                ? "text-white shadow-md"
+                                                : "bg-white/[0.03] border-white/[0.06] text-white/15 hover:bg-white/[0.06] hover:text-white/30"
+                                        )}
+                                        style={currentProject === i ? {
+                                            backgroundColor: `${brandColor}25`,
+                                            borderColor: `${brandColor}50`,
+                                            boxShadow: `0 0 6px ${brandColor}30`,
+                                        } : undefined}
+                                    >
+                                        {i + 1}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                        <Zap className="h-2.5 w-2.5 text-white/10" />
+
+                        {/* ── Synth Patch Selectors ── */}
+                        <div className="border-t border-white/[0.04] pt-2">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-[7px] text-white/15 uppercase tracking-wider">Synth Patches</span>
+                                <div className="flex items-center gap-0.5">
+                                    {[0, 1, 2, 3].map(p => (
+                                        <button
+                                            key={p}
+                                            onClick={() => setPatchPage(p)}
+                                            className={cn(
+                                                "px-1.5 py-0.5 rounded text-[5px] font-bold transition-all cursor-pointer border",
+                                                patchPage === p
+                                                    ? "bg-white/10 border-white/20 text-white/60"
+                                                    : "bg-white/[0.02] border-white/[0.04] text-white/15 hover:bg-white/[0.06]"
+                                            )}
+                                        >
+                                            P{p + 1}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Synth 1 patches */}
+                            <div className="mb-1.5">
+                                <div className="flex items-center justify-between mb-0.5">
+                                    <span className="text-[6px] font-bold" style={{ color: "#9333ea" }}>Synth 1</span>
+                                    <span className="text-[6px] text-white/20 tabular-nums font-mono">Patch {synth1Patch + 1}</span>
+                                </div>
+                                <div className="grid grid-cols-8 gap-0.5">
+                                    {Array.from({ length: 32 }).map((_, i) => {
+                                        const patchIdx = patchPage * 32 + i;
+                                        return (
+                                            <button
+                                                key={patchIdx}
+                                                onClick={() => handleSynth1PatchChange(patchIdx)}
+                                                className={cn(
+                                                    "py-0.5 rounded text-[5px] font-bold transition-all cursor-pointer border",
+                                                    synth1Patch === patchIdx
+                                                        ? "text-white"
+                                                        : "bg-white/[0.02] border-white/[0.04] text-white/15 hover:bg-white/[0.06]"
+                                                )}
+                                                style={synth1Patch === patchIdx ? {
+                                                    backgroundColor: "#9333ea25",
+                                                    borderColor: "#9333ea50",
+                                                } : undefined}
+                                            >
+                                                {patchIdx + 1}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Synth 2 patches */}
+                            <div>
+                                <div className="flex items-center justify-between mb-0.5">
+                                    <span className="text-[6px] font-bold" style={{ color: "#06b6d4" }}>Synth 2</span>
+                                    <span className="text-[6px] text-white/20 tabular-nums font-mono">Patch {synth2Patch + 1}</span>
+                                </div>
+                                <div className="grid grid-cols-8 gap-0.5">
+                                    {Array.from({ length: 32 }).map((_, i) => {
+                                        const patchIdx = patchPage * 32 + i;
+                                        return (
+                                            <button
+                                                key={patchIdx}
+                                                onClick={() => handleSynth2PatchChange(patchIdx)}
+                                                className={cn(
+                                                    "py-0.5 rounded text-[5px] font-bold transition-all cursor-pointer border",
+                                                    synth2Patch === patchIdx
+                                                        ? "text-white"
+                                                        : "bg-white/[0.02] border-white/[0.04] text-white/15 hover:bg-white/[0.06]"
+                                                )}
+                                                style={synth2Patch === patchIdx ? {
+                                                    backgroundColor: "#06b6d425",
+                                                    borderColor: "#06b6d450",
+                                                } : undefined}
+                                            >
+                                                {patchIdx + 1}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Info: Patterns & Scenes ── */}
+                        <div className="border-t border-white/[0.04] pt-1.5">
+                            <div className="text-[5px] text-white/10 leading-relaxed">
+                                <span className="text-white/20 font-bold">Patterns</span> (8 per track) and <span className="text-white/20 font-bold">Scenes</span> (16 per project) are selected on-device only.
+                                <span className="text-white/20 font-bold"> Sound packs</span> are loaded via Novation Components.
+                            </div>
+                        </div>
+
+                        {/* Sequencer */}
+                        <div className="border-t border-white/[0.04] pt-1.5">
+                            <SequencerSteps currentStep={currentStep} totalSteps={32} color={brandColor} isPlaying={isPlaying} />
+                        </div>
                     </div>
                 )}
+
+                {/* ── Resize Handle ──────────────────────────────────── */}
+                <div
+                    className="flex items-center justify-center py-1 cursor-se-resize group"
+                    onPointerDown={handleResizeStart}
+                    onPointerMove={handleResizeMove}
+                    onPointerUp={handleResizeEnd}
+                >
+                    <svg width="12" height="12" viewBox="0 0 12 12" className="text-white/15 group-hover:text-white/30 transition-colors">
+                        <path d="M10 2 L2 10" stroke="currentColor" strokeWidth="1" />
+                        <path d="M10 6 L6 10" stroke="currentColor" strokeWidth="1" />
+                        <path d="M10 10 L10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                </div>
             </div>
         </div>
     );

@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { db } from "@/db";
 import { tracks, scanLogs, downloads } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { readAudioMetadata } from "@/lib/audio";
 import { fetchAllMetadata } from "@/lib/metadata-services";
 import NodeID3 from "node-id3";
@@ -39,6 +39,69 @@ function writeSourceToID3(filePath: string, sourceUrl?: string, sourcePlatform?:
         NodeID3.update(tags, filePath);
     } catch {
         // ID3 write failure is non-fatal
+    }
+}
+
+// ─── Variant detection & linking ─────────────────────────────────────────
+
+const VARIANT_KEYWORDS = [
+    "remix", "radio edit", "radio version", "extended mix", "extended version",
+    "original mix", "club mix", "dub mix", "instrumental", "acoustic",
+    "vip mix", "vip", "bootleg", "rework", "remaster", "remastered",
+    "live", "live version", "edit", "flip", "mashup", "mash-up",
+    "acapella", "a cappella", "stripped",
+];
+
+function extractBaseTitle(title: string): string {
+    let base = title.toLowerCase().trim();
+    base = base.replace(/[\(\[][^\)\]]*(?:remix|radio edit|radio version|extended|original mix|club mix|dub mix|instrumental|acoustic|vip|bootleg|rework|remaster|live|edit|flip|mashup|mash-up|acapella|a cappella|stripped)[^\)\]]*[\)\]]/gi, "");
+    base = base.replace(/\s*[-–—]\s*(?:radio edit|radio version|extended mix|extended version|original mix|club mix|dub mix|instrumental|acoustic|vip mix|vip|bootleg|rework|remaster|remastered|live|live version|edit|flip|mashup|mash-up|acapella|a cappella|stripped)\s*$/i, "");
+    base = base.replace(/\s+/g, " ").trim();
+    return base;
+}
+
+function isVariantTitle(title: string): boolean {
+    const lower = title.toLowerCase();
+    return VARIANT_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function linkVariantTrack(trackId: number, title?: string | null, artist?: string | null): void {
+    if (!title) return;
+    if (!isVariantTitle(title)) return;
+
+    const baseTitle = extractBaseTitle(title);
+    if (!baseTitle || baseTitle.length < 2) return;
+
+    try {
+        const searchPattern = `%${baseTitle.replace(/[%_]/g, "")}%`;
+        const candidates = db
+            .select({ id: tracks.id, title: tracks.title, artist: tracks.artist })
+            .from(tracks)
+            .where(like(tracks.title, searchPattern))
+            .limit(20)
+            .all();
+
+        for (const candidate of candidates) {
+            if (candidate.id === trackId) continue;
+
+            const candidateBase = extractBaseTitle(candidate.title || "");
+            if (candidateBase !== baseTitle) continue;
+
+            // Check artist overlap if both are available
+            if (artist && candidate.artist) {
+                const artistLower = artist.toLowerCase();
+                const candidateArtistLower = candidate.artist.toLowerCase();
+                if (!artistLower.includes(candidateArtistLower) && !candidateArtistLower.includes(artistLower)) {
+                    continue;
+                }
+            }
+
+            // Found a match — link this track as a variant of the candidate
+            db.update(tracks).set({ relatedTrackId: candidate.id }).where(eq(tracks.id, trackId)).run();
+            return;
+        }
+    } catch {
+        // Non-fatal
     }
 }
 
@@ -95,6 +158,9 @@ async function addSingleFile(filePath: string, downloadId?: number, sourceInfo?:
         sourceId: srcId || null,
     }).run();
     const trackId = Number(result.lastInsertRowid);
+
+    // Check if this is a variant (remix, radio edit, etc.) of an existing track
+    linkVariantTrack(trackId, trackData.title, trackData.artist);
 
     db.insert(scanLogs).values({
         action: "added",

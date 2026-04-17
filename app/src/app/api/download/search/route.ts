@@ -15,6 +15,9 @@ export interface SearchResult {
     extractor: string;
     album?: string;
     viewCount?: number;
+    /** Playlist results only */
+    isPlaylist?: boolean;
+    trackCount?: number;
 }
 
 export interface ProviderSearchResult {
@@ -22,6 +25,11 @@ export interface ProviderSearchResult {
     results: SearchResult[];
     error?: string;
 }
+
+export type SearchType = "tracks" | "playlists";
+
+/** Which providers support playlist search */
+const PLAYLIST_PROVIDERS = new Set(["youtube", "youtubeMusic", "soundcloud", "deezer", "spotify"]);
 
 // ─── All known providers ─────────────────────────────────────────────────
 
@@ -93,11 +101,14 @@ async function searchYtDlpProvider(
     provider: string,
     query: string,
     limit: number,
+    searchType: SearchType = "tracks",
 ): Promise<ProviderSearchResult> {
     try {
-        // YouTube Music uses URL-based search
-        if (provider === "youtubeMusic") {
-            const searchUrl = `https://music.youtube.com/search?q=${encodeURIComponent(query)}`;
+        // Playlist search mode for YouTube
+        if (searchType === "playlists" && provider === "youtube") {
+            // yt-dlp doesn't have a native playlist search prefix,
+            // but we can search YouTube playlists via URL
+            const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAw%3D%3D`;
             const raw = await runYtDlpSearch([
                 "--flat-playlist", "-J", "--no-download", "--no-warnings",
                 "--playlist-end", String(limit),
@@ -111,7 +122,41 @@ async function searchYtDlpProvider(
                     .map(e => ({
                         id: String(e.id || ""),
                         title: String(e.title || "Unknown"),
-                        duration: Number(e.duration || 0),
+                        duration: 0,
+                        thumbnail: String(
+                            (e.thumbnails as Record<string, unknown>[] | undefined)?.at(-1)?.url ||
+                            e.thumbnail || ""
+                        ),
+                        uploader: String(e.uploader || e.channel || ""),
+                        url: String(e.url?.toString().startsWith("http") ? e.url : e.webpage_url || `https://www.youtube.com/playlist?list=${e.id}`),
+                        extractor: "YouTube",
+                        isPlaylist: true,
+                        trackCount: typeof e.playlist_count === "number" ? e.playlist_count : undefined,
+                    }));
+                return { provider, results };
+            }
+            return { provider, results: [] };
+        }
+
+        // YouTube Music uses URL-based search
+        if (provider === "youtubeMusic") {
+            const suffix = searchType === "playlists" ? "&filter=playlists" : "";
+            const searchUrl = `https://music.youtube.com/search?q=${encodeURIComponent(query)}${suffix}`;
+            const raw = await runYtDlpSearch([
+                "--flat-playlist", "-J", "--no-download", "--no-warnings",
+                "--playlist-end", String(limit),
+                searchUrl,
+            ], 25_000);
+            const data = JSON.parse(raw);
+
+            if (data._type === "playlist" && Array.isArray(data.entries)) {
+                const isPlaylistMode = searchType === "playlists";
+                const results = (data.entries as Record<string, unknown>[])
+                    .filter(e => e && (e.id || e.url))
+                    .map(e => ({
+                        id: String(e.id || ""),
+                        title: String(e.title || "Unknown"),
+                        duration: isPlaylistMode ? 0 : Number(e.duration || 0),
                         thumbnail: String(
                             (e.thumbnails as Record<string, unknown>[] | undefined)?.at(-1)?.url ||
                             e.thumbnail || ""
@@ -120,13 +165,47 @@ async function searchYtDlpProvider(
                         url: String(e.url || e.webpage_url || ""),
                         extractor: "YoutubeMusic",
                         viewCount: typeof e.view_count === "number" ? e.view_count : undefined,
+                        ...(isPlaylistMode ? { isPlaylist: true, trackCount: typeof e.playlist_count === "number" ? e.playlist_count : undefined } : {}),
                     }));
                 return { provider, results };
             }
             return { provider, results: [] };
         }
 
-        // Standard yt-dlp search prefix (ytsearch, scsearch)
+        // SoundCloud playlist search
+        if (searchType === "playlists" && provider === "soundcloud") {
+            // SoundCloud playlists/sets can be searched via URL
+            const searchUrl = `https://soundcloud.com/search/sets?q=${encodeURIComponent(query)}`;
+            const raw = await runYtDlpSearch([
+                "--flat-playlist", "-J", "--no-download", "--no-warnings",
+                "--playlist-end", String(limit),
+                searchUrl,
+            ], 25_000);
+            const data = JSON.parse(raw);
+
+            if (data._type === "playlist" && Array.isArray(data.entries)) {
+                const results = (data.entries as Record<string, unknown>[])
+                    .filter(e => e && (e.id || e.url))
+                    .map(e => ({
+                        id: String(e.id || ""),
+                        title: String(e.title || "Unknown"),
+                        duration: 0,
+                        thumbnail: String(
+                            (e.thumbnails as Record<string, unknown>[] | undefined)?.at(-1)?.url ||
+                            e.thumbnail || ""
+                        ),
+                        uploader: String(e.uploader || e.channel || ""),
+                        url: String(e.url || e.webpage_url || ""),
+                        extractor: "SoundCloud",
+                        isPlaylist: true,
+                        trackCount: typeof e.playlist_count === "number" ? e.playlist_count : undefined,
+                    }));
+                return { provider, results };
+            }
+            return { provider, results: [] };
+        }
+
+        // Standard yt-dlp track search (ytsearch, scsearch)
         const prefix = provider === "soundcloud" ? "scsearch" : "ytsearch";
         const searchQuery = `${prefix}${limit}:${query}`;
         const raw = await runYtDlpSearch([
@@ -154,9 +233,36 @@ async function searchYtDlpProvider(
 
 // ─── Deezer Search (free public API, no auth) ───────────────────────────
 
-async function searchDeezer(query: string, limit: number): Promise<ProviderSearchResult> {
+async function searchDeezer(query: string, limit: number, searchType: SearchType = "tracks"): Promise<ProviderSearchResult> {
     try {
         const q = encodeURIComponent(query);
+
+        // Playlist search
+        if (searchType === "playlists") {
+            const res = await fetch(`https://api.deezer.com/search/playlist?q=${q}&limit=${limit}`, {
+                signal: AbortSignal.timeout(10_000),
+            });
+            if (!res.ok) throw new Error(`Deezer API returned ${res.status}`);
+
+            const data = await res.json();
+            if (!data.data || !Array.isArray(data.data)) return { provider: "deezer", results: [] };
+
+            const results: SearchResult[] = data.data.map((p: Record<string, unknown>) => ({
+                id: String(p.id || ""),
+                title: String(p.title || "Unknown"),
+                duration: 0,
+                thumbnail: String(p.picture_big || p.picture_medium || p.picture || ""),
+                uploader: String((p.user as Record<string, unknown>)?.name || ""),
+                url: String(p.link || `https://www.deezer.com/playlist/${p.id}`),
+                extractor: "Deezer",
+                isPlaylist: true,
+                trackCount: typeof p.nb_tracks === "number" ? p.nb_tracks : undefined,
+            }));
+
+            return { provider: "deezer", results };
+        }
+
+        // Track search
         const res = await fetch(`https://api.deezer.com/search?q=${q}&limit=${limit}`, {
             signal: AbortSignal.timeout(10_000),
         });
@@ -192,7 +298,12 @@ async function searchDeezer(query: string, limit: number): Promise<ProviderSearc
 
 // ─── Apple Music / iTunes Search (free public API, no auth) ──────────────
 
-async function searchAppleMusic(query: string, limit: number): Promise<ProviderSearchResult> {
+async function searchAppleMusic(query: string, limit: number, searchType: SearchType = "tracks"): Promise<ProviderSearchResult> {
+    // Apple Music / iTunes API doesn't support playlist search without auth
+    if (searchType === "playlists") {
+        return { provider: "appleMusic", results: [], error: "Apple Music doesn't support playlist search" };
+    }
+
     try {
         const term = encodeURIComponent(query);
         const res = await fetch(
@@ -342,10 +453,11 @@ async function getSpotifyOAuthToken(): Promise<string | null> {
 
 // --- Combined Spotify search ---
 
-async function searchSpotifyViaAPI(token: string, query: string, limit: number): Promise<SearchResult[]> {
+async function searchSpotifyViaAPI(token: string, query: string, limit: number, searchType: SearchType = "tracks"): Promise<SearchResult[]> {
     const q = encodeURIComponent(query);
+    const type = searchType === "playlists" ? "playlist" : "track";
     const res = await fetch(
-        `https://api.spotify.com/v1/search?q=${q}&type=track&limit=${limit}`,
+        `https://api.spotify.com/v1/search?q=${q}&type=${type}&limit=${limit}`,
         {
             headers: { "Authorization": `Bearer ${token}` },
             signal: AbortSignal.timeout(10_000),
@@ -354,6 +466,31 @@ async function searchSpotifyViaAPI(token: string, query: string, limit: number):
     if (!res.ok) throw new Error(`Spotify API returned ${res.status}`);
 
     const data = await res.json();
+
+    // Playlist results
+    if (searchType === "playlists") {
+        const items = data.playlists?.items;
+        if (!Array.isArray(items)) return [];
+        return items.filter(Boolean).map((p: Record<string, unknown>) => {
+            const images = p.images as Record<string, unknown>[] | undefined;
+            const owner = p.owner as Record<string, unknown> | undefined;
+            return {
+                id: String(p.id || ""),
+                title: String(p.name || "Unknown"),
+                duration: 0,
+                thumbnail: String(images?.[0]?.url || ""),
+                uploader: String(owner?.display_name || ""),
+                url: String((p.external_urls as Record<string, unknown>)?.spotify || ""),
+                extractor: "Spotify",
+                isPlaylist: true,
+                trackCount: typeof (p.tracks as Record<string, unknown>)?.total === "number"
+                    ? (p.tracks as Record<string, unknown>).total as number
+                    : undefined,
+            };
+        });
+    }
+
+    // Track results
     const items = data.tracks?.items;
     if (!Array.isArray(items)) return [];
 
@@ -377,12 +514,12 @@ async function searchSpotifyViaAPI(token: string, query: string, limit: number):
     });
 }
 
-async function searchSpotify(query: string, limit: number): Promise<ProviderSearchResult> {
+async function searchSpotify(query: string, limit: number, searchType: SearchType = "tracks"): Promise<ProviderSearchResult> {
     // Tier 1: Try anonymous access token (may work in some regions/configurations)
     try {
         const anonToken = await getSpotifyAnonAccessToken();
         if (anonToken) {
-            const results = await searchSpotifyViaAPI(anonToken, query, limit);
+            const results = await searchSpotifyViaAPI(anonToken, query, limit, searchType);
             return { provider: "spotify", results };
         }
     } catch {
@@ -394,7 +531,7 @@ async function searchSpotify(query: string, limit: number): Promise<ProviderSear
     try {
         const oauthToken = await getSpotifyOAuthToken();
         if (oauthToken) {
-            const results = await searchSpotifyViaAPI(oauthToken, query, limit);
+            const results = await searchSpotifyViaAPI(oauthToken, query, limit, searchType);
             return { provider: "spotify", results };
         }
     } catch {
@@ -411,15 +548,20 @@ async function searchSpotify(query: string, limit: number): Promise<ProviderSear
 
 // ─── Dispatch search to the right provider ───────────────────────────────
 
-async function searchProvider(provider: string, query: string, limit: number): Promise<ProviderSearchResult> {
+async function searchProvider(provider: string, query: string, limit: number, searchType: SearchType = "tracks"): Promise<ProviderSearchResult> {
     const def = ALL_PROVIDERS[provider];
     if (!def) return { provider, results: [], error: `Unknown provider: ${provider}` };
 
+    // Check if this provider supports playlist search
+    if (searchType === "playlists" && !PLAYLIST_PROVIDERS.has(provider)) {
+        return { provider, results: [], error: `${def.label} doesn't support playlist search` };
+    }
+
     switch (provider) {
-        case "deezer": return searchDeezer(query, limit);
-        case "appleMusic": return searchAppleMusic(query, limit);
-        case "spotify": return searchSpotify(query, limit);
-        default: return searchYtDlpProvider(provider, query, limit);
+        case "deezer": return searchDeezer(query, limit, searchType);
+        case "appleMusic": return searchAppleMusic(query, limit, searchType);
+        case "spotify": return searchSpotify(query, limit, searchType);
+        default: return searchYtDlpProvider(provider, query, limit, searchType);
     }
 }
 
@@ -431,6 +573,7 @@ export async function POST(request: NextRequest) {
         const query = body?.query;
         const providers: string[] = body?.providers || ["youtube"];
         const limit = Math.min(Math.max(Number(body?.limit) || 10, 1), 25);
+        const searchType: SearchType = body?.searchType === "playlists" ? "playlists" : "tracks";
 
         if (!query || typeof query !== "string" || query.trim().length < 2) {
             return NextResponse.json({ error: "Query must be at least 2 characters" }, { status: 400 });
@@ -443,7 +586,7 @@ export async function POST(request: NextRequest) {
 
         // Search all providers in parallel
         const results = await Promise.all(
-            validProviders.map(p => searchProvider(p, query.trim(), limit))
+            validProviders.map(p => searchProvider(p, query.trim(), limit, searchType))
         );
 
         return NextResponse.json({ results });

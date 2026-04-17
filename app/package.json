@@ -12,6 +12,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@auth/drizzle-adapter": "^1.11.2",
     "better-sqlite3": "^12.9.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -23,6 +24,7 @@
     "lucide-react": "^1.8.0",
     "music-metadata": "^11.12.3",
     "next": "^16.2.3",
+    "next-auth": "5.0.0-beta.31",
     "next-themes": "^0.4.6",
     "node-id3": "^0.2.9",
     "radix-ui": "^1.4.3",

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="url(#bg)"/>
+  <!-- Music note -->
+  <g transform="translate(128,128)" fill="white">
+    <!-- Note head 1 -->
+    <ellipse cx="-20" cy="36" rx="22" ry="16" transform="rotate(-15,-20,36)"/>
+    <!-- Note head 2 -->
+    <ellipse cx="30" cy="24" rx="22" ry="16" transform="rotate(-15,30,24)"/>
+    <!-- Stems -->
+    <rect x="-2" y="-60" width="5" height="96" rx="2"/>
+    <rect x="48" y="-72" width="5" height="96" rx="2"/>
+    <!-- Beam -->
+    <rect x="-2" y="-72" width="55" height="8" rx="3" transform="rotate(-8,26,-68)"/>
+    <rect x="-2" y="-58" width="55" height="8" rx="3" transform="rotate(-8,26,-54)"/>
+  </g>
+  <!-- WiFi waves -->
+  <g transform="translate(200,56)" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round">
+    <path d="M-12,6 A16,16 0 0,1 12,6" opacity="0.5"/>
+    <path d="M-20,-2 A24,24 0 0,1 20,-2" opacity="0.35"/>
+    <circle cx="0" cy="12" r="3" fill="white" stroke="none"/>
+  </g>
+</svg>

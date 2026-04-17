@@ -6,7 +6,8 @@ import {
     DialogContent,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { cn, formatDuration } from "@/lib/utils";
+import { cn, formatDuration, formatKey } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { getTracks, getTrackById } from "@/actions/tracks";
 import type { Track } from "@/db/schema";
 import { useMixer } from "./mixer-context";
@@ -23,7 +24,13 @@ import {
     Library,
     Music,
     Globe,
+    ListMusic,
+    ExternalLink,
+    Check,
+    GitBranch,
 } from "lucide-react";
+import type { SearchDupeResult } from "@/app/api/download/search-duplicates/route";
+import type { SearchType } from "@/app/api/download/search/route";
 
 // ─── Provider Config ─────────────────────────────────────────────────────
 
@@ -57,6 +64,8 @@ interface SearchResult {
     extractor: string;
     album?: string;
     viewCount?: number;
+    isPlaylist?: boolean;
+    trackCount?: number;
 }
 
 interface ProviderSearchResult {
@@ -66,12 +75,17 @@ interface ProviderSearchResult {
 }
 
 interface ProviderState {
-    results: SearchResult[];
+    trackResults: SearchResult[];
+    playlistResults: SearchResult[];
     loading: boolean;
     error?: string;
     collapsed: boolean;
     visibleCount: number;
+    searchMode: SearchType;
 }
+
+/** Providers that support playlist search */
+const PLAYLIST_CAPABLE_PROVIDERS = new Set(["youtube", "youtubeMusic", "soundcloud", "deezer", "spotify"]);
 
 // ─── Props ───────────────────────────────────────────────────────────────
 
@@ -94,6 +108,7 @@ export function MixerBrowserModal({
     onDeckChange,
 }: MixerBrowserModalProps) {
     const mixer = useMixer();
+    const { noteNotations } = useDAWSettings();
 
     // ── Local library state ──────────────────────────────────────────────
     const [tracks, setTracks] = useState<Track[]>([]);
@@ -115,6 +130,9 @@ export function MixerBrowserModal({
     const [downloadTrack, setDownloadTrack] = useState<TrackDownloadInfo | null>(null);
     const [downloadModalOpen, setDownloadModalOpen] = useState(false);
 
+    // ── Duplicate detection state ────────────────────────────────────────
+    const [dupeResults, setDupeResults] = useState<Record<string, SearchDupeResult>>({});
+
     // ── Fetch local library tracks ───────────────────────────────────────
     const fetchTracks = useCallback(async (query: string) => {
         setLoading(true);
@@ -135,67 +153,125 @@ export function MixerBrowserModal({
     }, []);
 
     // ── Fetch from external providers ────────────────────────────────────
-    const searchProviders = useCallback(async (query: string, providers: Set<string>) => {
+    const searchProviders = useCallback(async (query: string, providers: Set<string>, searchTypeOverride?: SearchType) => {
         if (!query.trim() || providers.size === 0) return;
 
         const activeProviders = Array.from(providers);
 
-        // Set loading state for all active providers
+        // Group providers by their search mode (or use override for all)
+        const providersByMode = new Map<SearchType, string[]>();
+        for (const p of activeProviders) {
+            const mode = searchTypeOverride || (providerStates[p]?.searchMode ?? "tracks");
+            const list = providersByMode.get(mode) || [];
+            list.push(p);
+            providersByMode.set(mode, list);
+        }
+
+        // Set loading state
         setProviderStates(prev => {
             const next = { ...prev };
             for (const p of activeProviders) {
-                next[p] = { ...next[p], loading: true, error: undefined, results: next[p]?.results || [], collapsed: next[p]?.collapsed ?? false, visibleCount: next[p]?.visibleCount ?? INITIAL_VISIBLE };
+                const mode = searchTypeOverride || (prev[p]?.searchMode ?? "tracks");
+                next[p] = {
+                    ...next[p],
+                    loading: true,
+                    error: undefined,
+                    trackResults: next[p]?.trackResults || [],
+                    playlistResults: next[p]?.playlistResults || [],
+                    collapsed: next[p]?.collapsed ?? false,
+                    visibleCount: next[p]?.visibleCount ?? INITIAL_VISIBLE,
+                    searchMode: mode,
+                };
             }
             return next;
         });
 
-        try {
-            const res = await fetch("/api/download/search", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    query: query.trim(),
-                    providers: activeProviders,
-                    limit: 15,
-                }),
-            });
+        // Search each mode group
+        for (const [searchType, modeProviders] of providersByMode) {
+            try {
+                const res = await fetch("/api/download/search", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        query: query.trim(),
+                        providers: modeProviders,
+                        limit: 15,
+                        searchType,
+                    }),
+                });
 
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || `Search failed: ${res.status}`);
-            }
-
-            const data = await res.json();
-            const results: ProviderSearchResult[] = data.results || [];
-
-            setProviderStates(prev => {
-                const next = { ...prev };
-                for (const r of results) {
-                    next[r.provider] = {
-                        results: r.results,
-                        loading: false,
-                        error: r.error,
-                        collapsed: prev[r.provider]?.collapsed ?? false,
-                        visibleCount: INITIAL_VISIBLE,
-                    };
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || `Search failed: ${res.status}`);
                 }
-                // Clear loading for providers that didn't return results
-                for (const p of activeProviders) {
-                    if (!results.find(r => r.provider === p)) {
-                        next[p] = { ...next[p], loading: false };
+
+                const data = await res.json();
+                const results: ProviderSearchResult[] = data.results || [];
+
+                setProviderStates(prev => {
+                    const next = { ...prev };
+                    for (const r of results) {
+                        const isPlaylist = searchType === "playlists";
+                        next[r.provider] = {
+                            ...next[r.provider],
+                            trackResults: isPlaylist ? (prev[r.provider]?.trackResults || []) : r.results,
+                            playlistResults: isPlaylist ? r.results : (prev[r.provider]?.playlistResults || []),
+                            loading: false,
+                            error: r.error,
+                            collapsed: prev[r.provider]?.collapsed ?? false,
+                            visibleCount: INITIAL_VISIBLE,
+                            searchMode: prev[r.provider]?.searchMode ?? "tracks",
+                        };
+                    }
+                    // Clear loading for providers that didn't return results
+                    for (const p of modeProviders) {
+                        if (!results.find(r => r.provider === p)) {
+                            next[p] = { ...next[p], loading: false };
+                        }
+                    }
+                    return next;
+                });
+
+                // Check duplicates for track results
+                if (searchType === "tracks") {
+                    const allTrackResults = results.flatMap(r => r.results.filter(s => !s.isPlaylist));
+                    if (allTrackResults.length > 0) {
+                        checkDuplicates(allTrackResults);
                     }
                 }
-                return next;
+            } catch (err) {
+                const message = err instanceof Error ? err.message : "Search failed";
+                setProviderStates(prev => {
+                    const next = { ...prev };
+                    for (const p of modeProviders) {
+                        next[p] = { ...next[p], loading: false, error: message };
+                    }
+                    return next;
+                });
+            }
+        }
+    }, [providerStates]);
+
+    // ── Check duplicates against library ──────────────────────────────────
+    const checkDuplicates = useCallback(async (results: SearchResult[]) => {
+        try {
+            const items = results.map(r => ({
+                id: r.id,
+                title: r.title,
+                uploader: r.uploader,
+            }));
+            const res = await fetch("/api/download/search-duplicates", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ items }),
             });
-        } catch (err) {
-            const message = err instanceof Error ? err.message : "Search failed";
-            setProviderStates(prev => {
-                const next = { ...prev };
-                for (const p of activeProviders) {
-                    next[p] = { ...next[p], loading: false, error: message };
-                }
-                return next;
-            });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.results) {
+                setDupeResults(prev => ({ ...prev, ...data.results }));
+            }
+        } catch {
+            // Non-critical, silently fail
         }
     }, []);
 
@@ -276,6 +352,13 @@ export function MixerBrowserModal({
 
     // ── Download handler ─────────────────────────────────────────────────
     const handleDownload = useCallback((result: SearchResult) => {
+        // Playlist: open download page in new tab
+        if (result.isPlaylist) {
+            const url = `/download?url=${encodeURIComponent(result.url)}&auto=1`;
+            window.open(url, "_blank", "noopener");
+            return;
+        }
+
         setDownloadTrack({
             url: result.url,
             downloadUrl: result.downloadUrl,
@@ -310,6 +393,32 @@ export function MixerBrowserModal({
             [id]: { ...prev[id], visibleCount: (prev[id]?.visibleCount || INITIAL_VISIBLE) + LOAD_MORE_COUNT },
         }));
     }, []);
+
+    // ── Switch search mode (tracks/playlists) for a provider ─────────────
+    const toggleSearchMode = useCallback((providerId: string, mode: SearchType) => {
+        setProviderStates(prev => ({
+            ...prev,
+            [providerId]: {
+                ...prev[providerId],
+                searchMode: mode,
+                visibleCount: INITIAL_VISIBLE,
+                trackResults: prev[providerId]?.trackResults || [],
+                playlistResults: prev[providerId]?.playlistResults || [],
+                loading: prev[providerId]?.loading ?? false,
+                collapsed: prev[providerId]?.collapsed ?? false,
+            },
+        }));
+
+        // If we don't have results for this mode yet, fetch them
+        const state = providerStates[providerId];
+        const hasResults = mode === "playlists"
+            ? (state?.playlistResults?.length ?? 0) > 0
+            : (state?.trackResults?.length ?? 0) > 0;
+
+        if (!hasResults && search.trim()) {
+            searchProviders(search, new Set([providerId]), mode);
+        }
+    }, [providerStates, search, searchProviders]);
 
     // ── Helper: count visible local tracks ───────────────────────────────
     const visibleLocalTracks = localCollapsed ? [] : tracks.slice(0, localVisibleCount);
@@ -512,7 +621,7 @@ export function MixerBrowserModal({
                                                         )}
                                                         {track.keyCamelot && (
                                                             <span className="text-[9px] px-1 py-0.5 rounded bg-white/5 text-white/30">
-                                                                {track.keyCamelot}
+                                                                {formatKey(track.keyCamelot, noteNotations)}
                                                             </span>
                                                         )}
                                                         {track.genre && (
@@ -540,20 +649,24 @@ export function MixerBrowserModal({
                         {/* ── Provider Sections ── */}
                         {PROVIDERS.filter(p => enabledProviders.has(p.id)).map(provider => {
                             const state = providerStates[provider.id];
-                            const results = state?.results || [];
+                            const searchMode = state?.searchMode ?? "tracks";
+                            const results = searchMode === "playlists"
+                                ? (state?.playlistResults || [])
+                                : (state?.trackResults || []);
                             const isCollapsed = state?.collapsed ?? false;
                             const visibleCount = state?.visibleCount || INITIAL_VISIBLE;
                             const visibleResults = results.slice(0, visibleCount);
                             const isLoading = state?.loading ?? false;
+                            const canSearchPlaylists = PLAYLIST_CAPABLE_PROVIDERS.has(provider.id);
 
                             return (
                                 <div key={provider.id}>
                                     {/* Provider header */}
-                                    <button
-                                        onClick={() => toggleProviderCollapse(provider.id)}
-                                        className="w-full flex items-center justify-between px-3 py-1.5 bg-white/[0.02] border-y border-white/[0.04] cursor-pointer hover:bg-white/[0.04] transition-colors"
-                                    >
-                                        <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-between px-3 py-1.5 bg-white/[0.02] border-y border-white/[0.04]">
+                                        <button
+                                            onClick={() => toggleProviderCollapse(provider.id)}
+                                            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                                        >
                                             <span className={cn("text-xs", provider.color)}>{provider.icon}</span>
                                             <span className="text-[10px] font-semibold text-white/60 uppercase tracking-wider">{provider.label}</span>
                                             {isLoading ? (
@@ -561,9 +674,39 @@ export function MixerBrowserModal({
                                             ) : (
                                                 <span className="text-[9px] text-white/25">{results.length} results</span>
                                             )}
-                                        </div>
-                                        <ChevronRight className={cn("h-3 w-3 text-white/20 transition-transform", !isCollapsed && "rotate-90")} />
-                                    </button>
+                                            <ChevronRight className={cn("h-3 w-3 text-white/20 transition-transform", !isCollapsed && "rotate-90")} />
+                                        </button>
+
+                                        {/* Songs / Playlists toggle */}
+                                        {canSearchPlaylists && (
+                                            <div className="flex items-center bg-white/[0.04] rounded-md overflow-hidden border border-white/[0.06]">
+                                                <button
+                                                    onClick={() => toggleSearchMode(provider.id, "tracks")}
+                                                    className={cn(
+                                                        "flex items-center gap-1 px-2 py-0.5 text-[9px] transition-colors cursor-pointer",
+                                                        searchMode === "tracks"
+                                                            ? "bg-purple-500/20 text-purple-300"
+                                                            : "text-white/30 hover:text-white/50"
+                                                    )}
+                                                >
+                                                    <Music className="h-2.5 w-2.5" />
+                                                    Songs
+                                                </button>
+                                                <button
+                                                    onClick={() => toggleSearchMode(provider.id, "playlists")}
+                                                    className={cn(
+                                                        "flex items-center gap-1 px-2 py-0.5 text-[9px] transition-colors cursor-pointer",
+                                                        searchMode === "playlists"
+                                                            ? "bg-purple-500/20 text-purple-300"
+                                                            : "text-white/30 hover:text-white/50"
+                                                    )}
+                                                >
+                                                    <ListMusic className="h-2.5 w-2.5" />
+                                                    Playlists
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
 
                                     {!isCollapsed && (
                                         <>
@@ -578,53 +721,109 @@ export function MixerBrowserModal({
                                                 </div>
                                             ) : results.length === 0 && search.trim() ? (
                                                 <div className="px-3 py-4 text-[10px] text-white/15 text-center">
-                                                    No results from {provider.label}
+                                                    No {searchMode === "playlists" ? "playlists" : "results"} from {provider.label}
                                                 </div>
                                             ) : (
                                                 <>
-                                                    {visibleResults.map((result) => (
-                                                        <div
-                                                            key={`${provider.id}-${result.id}`}
-                                                            className="flex items-center gap-3 px-3 py-2 border-b border-white/[0.03] hover:bg-white/[0.04] transition-colors group"
-                                                        >
-                                                            {/* Thumbnail */}
-                                                            <div className="h-9 w-9 rounded overflow-hidden bg-white/5 shrink-0">
-                                                                {result.thumbnail ? (
-                                                                    <img src={result.thumbnail} alt="" className="h-full w-full object-cover" />
-                                                                ) : (
-                                                                    <div className="h-full w-full flex items-center justify-center">
-                                                                        <Music className="h-4 w-4 text-white/15" />
-                                                                    </div>
+                                                    {visibleResults.map((result) => {
+                                                        const dupe = dupeResults[result.id];
+                                                        const isInLibrary = !!dupe?.inLibrary;
+                                                        const isVariant = !!dupe?.isVariantOf && !isInLibrary;
+
+                                                        return (
+                                                            <div
+                                                                key={`${provider.id}-${result.id}`}
+                                                                className={cn(
+                                                                    "flex items-center gap-3 px-3 py-2 border-b border-white/[0.03] hover:bg-white/[0.04] transition-colors group",
+                                                                    isInLibrary && "opacity-50"
                                                                 )}
-                                                            </div>
-
-                                                            {/* Info */}
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-xs text-white/80 truncate">{result.title}</div>
-                                                                <div className="text-[10px] text-white/35 truncate">
-                                                                    {result.uploader}
-                                                                    {result.album && <span className="text-white/20"> · {result.album}</span>}
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Duration */}
-                                                            {result.duration > 0 && (
-                                                                <span className="text-[9px] text-white/25 tabular-nums shrink-0">
-                                                                    {formatDuration(result.duration)}
-                                                                </span>
-                                                            )}
-
-                                                            {/* Download button */}
-                                                            <button
-                                                                onClick={() => handleDownload(result)}
-                                                                className="flex items-center gap-1 px-2 py-1 rounded text-[9px] font-medium bg-green-500/10 border border-green-500/20 text-green-400/70 hover:bg-green-500/20 hover:text-green-300 transition-colors cursor-pointer opacity-60 group-hover:opacity-100"
-                                                                title="Download and add to library"
                                                             >
-                                                                <Download className="h-3 w-3" />
-                                                                <span className="hidden sm:inline">Get</span>
-                                                            </button>
-                                                        </div>
-                                                    ))}
+                                                                {/* Thumbnail */}
+                                                                <div className="h-9 w-9 rounded overflow-hidden bg-white/5 shrink-0 relative">
+                                                                    {result.thumbnail ? (
+                                                                        <img src={result.thumbnail} alt="" className="h-full w-full object-cover" />
+                                                                    ) : (
+                                                                        <div className="h-full w-full flex items-center justify-center">
+                                                                            {result.isPlaylist ? (
+                                                                                <ListMusic className="h-4 w-4 text-white/15" />
+                                                                            ) : (
+                                                                                <Music className="h-4 w-4 text-white/15" />
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                    {/* Playlist track count badge */}
+                                                                    {result.isPlaylist && result.trackCount != null && (
+                                                                        <div className="absolute bottom-0 right-0 bg-black/70 rounded-tl px-1 text-[7px] text-white/60">
+                                                                            {result.trackCount}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Info */}
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-xs text-white/80 truncate">{result.title}</span>
+                                                                        {/* In Library badge */}
+                                                                        {isInLibrary && (
+                                                                            <span className="flex items-center gap-0.5 shrink-0 px-1 py-0.5 rounded text-[8px] font-medium bg-green-500/15 text-green-400/80 border border-green-500/20">
+                                                                                <Check className="h-2 w-2" />
+                                                                                In Library
+                                                                            </span>
+                                                                        )}
+                                                                        {/* Variant badge */}
+                                                                        {isVariant && (
+                                                                            <span className="flex items-center gap-0.5 shrink-0 px-1 py-0.5 rounded text-[8px] font-medium bg-blue-500/15 text-blue-400/80 border border-blue-500/20"
+                                                                                title={`Variant of: ${dupe.isVariantOf!.title}`}
+                                                                            >
+                                                                                <GitBranch className="h-2 w-2" />
+                                                                                Variant
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-[10px] text-white/35 truncate">
+                                                                        {result.uploader}
+                                                                        {result.album && <span className="text-white/20"> · {result.album}</span>}
+                                                                        {result.isPlaylist && result.trackCount != null && (
+                                                                            <span className="text-white/20"> · {result.trackCount} tracks</span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Duration (tracks only) */}
+                                                                {!result.isPlaylist && result.duration > 0 && (
+                                                                    <span className="text-[9px] text-white/25 tabular-nums shrink-0">
+                                                                        {formatDuration(result.duration)}
+                                                                    </span>
+                                                                )}
+
+                                                                {/* Download / Open button */}
+                                                                <button
+                                                                    onClick={() => handleDownload(result)}
+                                                                    className={cn(
+                                                                        "flex items-center gap-1 px-2 py-1 rounded text-[9px] font-medium transition-colors cursor-pointer opacity-60 group-hover:opacity-100",
+                                                                        result.isPlaylist
+                                                                            ? "bg-blue-500/10 border border-blue-500/20 text-blue-400/70 hover:bg-blue-500/20 hover:text-blue-300"
+                                                                            : isInLibrary
+                                                                                ? "bg-white/5 border border-white/10 text-white/30 hover:bg-white/10 hover:text-white/50"
+                                                                                : "bg-green-500/10 border border-green-500/20 text-green-400/70 hover:bg-green-500/20 hover:text-green-300"
+                                                                    )}
+                                                                    title={result.isPlaylist ? "Open in download page" : isInLibrary ? "Already in library — download again" : "Download and add to library"}
+                                                                >
+                                                                    {result.isPlaylist ? (
+                                                                        <>
+                                                                            <ExternalLink className="h-3 w-3" />
+                                                                            <span className="hidden sm:inline">Open</span>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Download className="h-3 w-3" />
+                                                                            <span className="hidden sm:inline">{isInLibrary ? "Re-Get" : "Get"}</span>
+                                                                        </>
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
                                                     {results.length > visibleCount && (
                                                         <button
                                                             onClick={() => loadMoreProvider(provider.id)}

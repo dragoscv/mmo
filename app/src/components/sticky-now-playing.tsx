@@ -4,11 +4,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { usePlayer } from "./player-context";
 import { Artwork } from "./artwork";
 import { ChevronUp, ChevronDown, Pause } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatKey } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { usePathname } from "next/navigation";
 
 export function StickyNowPlaying() {
     const player = usePlayer();
+    const { noteNotations } = useDAWSettings();
     const pathname = usePathname();
     const [position, setPosition] = useState<"above" | "below" | null>(null);
     const [mainRect, setMainRect] = useState<{ left: number; width: number } | null>(null);
@@ -143,7 +145,7 @@ export function StickyNowPlaying() {
                 )}
                 {track.keyCamelot && (
                     <span className="text-xs font-mono text-muted-foreground">
-                        {track.keyCamelot}
+                        {formatKey(track.keyCamelot, noteNotations)}
                     </span>
                 )}
             </div>

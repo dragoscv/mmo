@@ -10,6 +10,7 @@ import { DAWStatusBar } from "./daw-status-bar";
 import { DAWExportModal } from "./daw-export-modal";
 import { DAWDockview } from "./daw-dockview";
 import { DAWContextMenuProvider } from "./daw-context-menu";
+import { DAWMidiBridge } from "./daw-midi-bridge";
 
 export function DAWPage() {
     const daw = useDAW();
@@ -91,6 +92,7 @@ export function DAWPage() {
             case "F7": e.preventDefault(); daw.togglePanel("automation"); break;
             case "F8": e.preventDefault(); daw.togglePanel("history"); break;
             case "F9": e.preventDefault(); daw.togglePanel("clipboard"); break;
+            case "F10": e.preventDefault(); daw.togglePanel("voiceProcessor"); break;
             case "Delete":
             case "Backspace":
                 if (daw.selectedClipId) { daw.removeClip(daw.selectedClipId); }
@@ -140,6 +142,9 @@ export function DAWPage() {
                 <DAWProjectModal />
                 <DAWSettingsModal />
                 <DAWExportModal />
+
+                {/* MIDI controller & external device bridge */}
+                <DAWMidiBridge />
             </div>
         </DAWContextMenuProvider>
     );

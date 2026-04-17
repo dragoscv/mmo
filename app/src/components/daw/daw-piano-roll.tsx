@@ -6,17 +6,15 @@ import { cn } from "@/lib/utils";
 import type { MidiNote } from "@/lib/daw-engine";
 import { useContextMenu, type MenuEntry } from "./daw-context-menu";
 import { Trash2, Copy, Magnet, Music } from "lucide-react";
+import { formatNoteMulti, formatPitchMulti, ANGLO_NAMES } from "@/lib/note-notation";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 
-const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const NOTE_NAMES = ANGLO_NAMES;
 const MIN_PITCH = 24; // C1
 const MAX_PITCH = 108; // C8
 const KEY_WIDTH = 48;
 const NOTE_HEIGHT = 12;
 const VELOCITY_HEIGHT = 60;
-
-function noteName(pitch: number) {
-    return `${NOTE_NAMES[pitch % 12]}${Math.floor(pitch / 12) - 1}`;
-}
 
 function isBlackKey(pitch: number) {
     return [1, 3, 6, 8, 10].includes(pitch % 12);
@@ -24,9 +22,13 @@ function isBlackKey(pitch: number) {
 
 export function DAWPianoRoll() {
     const daw = useDAW();
+    const { noteNotations } = useDAWSettings();
     const gridRef = useRef<HTMLDivElement>(null);
     const [drawing, setDrawing] = useState(false);
     const [drawingNote, setDrawingNote] = useState<{ pitch: number; start: number } | null>(null);
+
+    const noteName = useCallback((pitch: number) =>
+        formatPitchMulti(pitch, noteNotations), [noteNotations]);
 
     const { pianoRollTrackId, pianoRollClipId } = daw;
     const track = daw.project.tracks.find(t => t.id === pianoRollTrackId);

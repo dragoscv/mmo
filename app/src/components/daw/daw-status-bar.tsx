@@ -2,9 +2,10 @@
 
 import { useDAW } from "./daw-context";
 import { usePerformanceStats } from "@/hooks/use-performance-stats";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { cn } from "@/lib/utils";
 import {
-    Cpu, HardDrive, Music, Layers, Clock, Activity, Zap,
+    Cpu, HardDrive, Music, Layers, Clock, Activity, Zap, MemoryStick, MonitorSpeaker, Box,
 } from "lucide-react";
 
 function StatusItem({ icon: Icon, label, value, color }: {
@@ -36,6 +37,8 @@ function PerfDot({ pct }: { pct: number }) {
 export function DAWStatusBar() {
     const daw = useDAW();
     const stats = usePerformanceStats();
+    const settings = useDAWSettings();
+    const cfg = settings.dawStatusBarStats;
     const project = daw.project;
 
     const clipCount = project.tracks.reduce((sum, t) => sum + t.clips.length, 0);
@@ -58,20 +61,40 @@ export function DAWStatusBar() {
         <div className="h-6 bg-[var(--daw-surface)] border-t border-[var(--daw-border)] flex items-center px-3 gap-3 flex-shrink-0">
             {/* Performance */}
             <div className="flex items-center gap-2.5">
-                <div className="flex items-center gap-1">
-                    <PerfDot pct={100 - fpsPct} />
-                    <span className="text-[9px] font-mono tabular-nums text-[var(--daw-text-dim)]">{stats.fps} FPS</span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <Cpu className="h-2.5 w-2.5 text-[var(--daw-text-dim)] opacity-40" />
-                    <span className={cn(
-                        "text-[9px] font-mono tabular-nums",
-                        heapPct >= 90 ? "text-[var(--daw-red)]" : heapPct >= 70 ? "text-[var(--daw-amber)]" : "text-[var(--daw-text-dim)]"
-                    )}>
-                        {stats.jsHeapUsed.toFixed(0)}MB
-                    </span>
-                </div>
-                {stats.audioLatency > 0 && (
+                {cfg.showFps && (
+                    <div className="flex items-center gap-1">
+                        <PerfDot pct={100 - fpsPct} />
+                        <span className="text-[9px] font-mono tabular-nums text-[var(--daw-text-dim)]">{stats.fps} FPS</span>
+                    </div>
+                )}
+                {cfg.showHeapMemory && (
+                    <div className="flex items-center gap-1">
+                        <Cpu className="h-2.5 w-2.5 text-[var(--daw-text-dim)] opacity-40" />
+                        <span className={cn(
+                            "text-[9px] font-mono tabular-nums",
+                            heapPct >= 90 ? "text-[var(--daw-red)]" : heapPct >= 70 ? "text-[var(--daw-amber)]" : "text-[var(--daw-text-dim)]"
+                        )}>
+                            {stats.jsHeapUsed.toFixed(0)}MB
+                        </span>
+                    </div>
+                )}
+                {cfg.showJsHeapTotal && (
+                    <div className="flex items-center gap-1">
+                        <Box className="h-2.5 w-2.5 text-[var(--daw-text-dim)] opacity-40" />
+                        <span className="text-[9px] font-mono tabular-nums text-[var(--daw-text-dim)]">
+                            Heap {stats.jsHeapTotal.toFixed(0)}MB
+                        </span>
+                    </div>
+                )}
+                {cfg.showDomNodes && (
+                    <div className="flex items-center gap-1">
+                        <MonitorSpeaker className="h-2.5 w-2.5 text-[var(--daw-text-dim)] opacity-40" />
+                        <span className="text-[9px] font-mono tabular-nums text-[var(--daw-text-dim)]">
+                            {stats.domNodes} DOM
+                        </span>
+                    </div>
+                )}
+                {cfg.showAudioLatency && stats.audioLatency > 0 && (
                     <div className="flex items-center gap-1">
                         <Zap className="h-2.5 w-2.5 text-[var(--daw-text-dim)] opacity-40" />
                         <span className={cn(
@@ -79,6 +102,22 @@ export function DAWStatusBar() {
                             stats.audioLatency > 20 ? "text-[var(--daw-amber)]" : "text-[var(--daw-text-dim)]"
                         )}>
                             {stats.audioLatency.toFixed(1)}ms
+                        </span>
+                    </div>
+                )}
+                {cfg.showCpuCores && stats.cpuCores > 0 && (
+                    <div className="flex items-center gap-1">
+                        <MemoryStick className="h-2.5 w-2.5 text-[var(--daw-text-dim)] opacity-40" />
+                        <span className="text-[9px] font-mono tabular-nums text-[var(--daw-text-dim)]">
+                            {stats.cpuCores} cores
+                        </span>
+                    </div>
+                )}
+                {cfg.showDeviceMemory && stats.deviceMemory > 0 && (
+                    <div className="flex items-center gap-1">
+                        <MemoryStick className="h-2.5 w-2.5 text-[var(--daw-text-dim)] opacity-40" />
+                        <span className="text-[9px] font-mono tabular-nums text-[var(--daw-text-dim)]">
+                            {stats.deviceMemory}GB RAM
                         </span>
                     </div>
                 )}

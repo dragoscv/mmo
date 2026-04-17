@@ -6,7 +6,8 @@ import {
     DialogContent,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn, formatKey } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { getTracks } from "@/actions/tracks";
 import type { Track } from "@/db/schema";
 import { useMixer } from "./mixer-context";
@@ -33,6 +34,7 @@ export function MixerBrowserModal({
     onDeckChange,
 }: MixerBrowserModalProps) {
     const mixer = useMixer();
+    const { noteNotations } = useDAWSettings();
     const [tracks, setTracks] = useState<Track[]>([]);
     const [total, setTotal] = useState(0);
     const [search, setSearch] = useState("");
@@ -240,7 +242,7 @@ export function MixerBrowserModal({
                                     )}
                                     {track.keyCamelot && (
                                         <span className="text-[9px] px-1 py-0.5 rounded bg-white/5 text-white/30">
-                                            {track.keyCamelot}
+                                            {formatKey(track.keyCamelot, noteNotations)}
                                         </span>
                                     )}
                                     {track.genre && (

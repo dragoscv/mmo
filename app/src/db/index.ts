@@ -21,6 +21,9 @@ try {
   if (!cols.some((c) => c.name === "is_hidden")) {
     sqlite.exec("ALTER TABLE tracks ADD COLUMN is_hidden INTEGER DEFAULT 0");
   }
+  if (!cols.some((c) => c.name === "related_track_id")) {
+    sqlite.exec("ALTER TABLE tracks ADD COLUMN related_track_id INTEGER");
+  }
 } catch {
   // table may not exist yet
 }
@@ -139,6 +142,91 @@ sqlite.exec(`
   );
 `);
 
+// ─── Auth.js tables ──────────────────────────────────────────────────────────
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS "user" (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    email TEXT UNIQUE,
+    emailVerified INTEGER,
+    image TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS account (
+    userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    providerAccountId TEXT NOT NULL,
+    refresh_token TEXT,
+    access_token TEXT,
+    expires_at INTEGER,
+    token_type TEXT,
+    scope TEXT,
+    id_token TEXT,
+    session_state TEXT,
+    PRIMARY KEY (provider, providerAccountId)
+  );
+
+  CREATE TABLE IF NOT EXISTS session (
+    sessionToken TEXT PRIMARY KEY,
+    userId TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    expires INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS verificationToken (
+    identifier TEXT NOT NULL,
+    token TEXT NOT NULL,
+    expires INTEGER NOT NULL,
+    PRIMARY KEY (identifier, token)
+  );
+
+  CREATE TABLE IF NOT EXISTS user_preferences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, key)
+  );
+
+  CREATE TABLE IF NOT EXISTS devices (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    os TEXT,
+    hostname TEXT,
+    api_url TEXT NOT NULL,
+    token TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'offline',
+    last_seen_at TEXT,
+    version TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS device_folders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    label TEXT,
+    track_count INTEGER DEFAULT 0,
+    total_size INTEGER DEFAULT 0,
+    last_scanned_at TEXT,
+    is_enabled INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS offline_tracks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+    device_id TEXT REFERENCES devices(id) ON DELETE SET NULL,
+    cached_at TEXT DEFAULT (datetime('now')),
+    size INTEGER NOT NULL,
+    priority INTEGER DEFAULT 0,
+    is_pinned INTEGER DEFAULT 0
+  );
+`);
+
 // Migrate existing DB: add new columns if they don't exist
 const colCheck = sqlite
   .prepare("SELECT COUNT(*) as cnt FROM pragma_table_info('tracks') WHERE name='rating'")
@@ -165,6 +253,32 @@ if (isrcCheck.cnt === 0) {
     ALTER TABLE tracks ADD COLUMN isrc TEXT;
     ALTER TABLE tracks ADD COLUMN lyrics TEXT;
     ALTER TABLE tracks ADD COLUMN synced_lyrics TEXT;
+  `);
+}
+
+// Migrate: add device_id and is_offline_available columns
+const deviceIdCheck = sqlite
+  .prepare("SELECT COUNT(*) as cnt FROM pragma_table_info('tracks') WHERE name='device_id'")
+  .get() as { cnt: number };
+if (deviceIdCheck.cnt === 0) {
+  sqlite.exec(`
+    ALTER TABLE tracks ADD COLUMN device_id TEXT;
+    ALTER TABLE tracks ADD COLUMN is_offline_available INTEGER DEFAULT 0;
+  `);
+}
+
+// Migrate: add stems columns
+const stemsCheck = sqlite
+  .prepare("SELECT COUNT(*) as cnt FROM pragma_table_info('tracks') WHERE name='stems_status'")
+  .get() as { cnt: number };
+if (stemsCheck.cnt === 0) {
+  sqlite.exec(`
+    ALTER TABLE tracks ADD COLUMN stems_status TEXT;
+    ALTER TABLE tracks ADD COLUMN stems_vocals_path TEXT;
+    ALTER TABLE tracks ADD COLUMN stems_drums_path TEXT;
+    ALTER TABLE tracks ADD COLUMN stems_bass_path TEXT;
+    ALTER TABLE tracks ADD COLUMN stems_melody_path TEXT;
+    ALTER TABLE tracks ADD COLUMN stems_analyzed_at TEXT;
   `);
 }
 

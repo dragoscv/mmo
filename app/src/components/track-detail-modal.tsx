@@ -57,7 +57,8 @@ import {
     CheckCircle2,
     X,
 } from "lucide-react";
-import { cn, formatDuration, getHarmonicColor } from "@/lib/utils";
+import { cn, formatDuration, getHarmonicColor, formatKey } from "@/lib/utils";
+import { useDAWSettings } from "@/hooks/use-daw-settings";
 import type { Track } from "@/db/schema";
 import {
     updateTrack,
@@ -152,6 +153,7 @@ export function TrackDetailModal({
     allTags = [],
 }: TrackDetailModalProps) {
     const { currentTrack, isPlaying, play, pause, resume } = usePlayer();
+    const { noteNotations } = useDAWSettings();
 
     // Reanalysis state (lifted to parent so it persists across tabs)
     const [reanalysisResults, setReanalysisResults] =
@@ -235,7 +237,7 @@ export function TrackDetailModal({
             `${track.artist || "Unknown"} - ${track.title || track.filename}`,
             track.album ? `Album: ${track.album}` : null,
             track.bpm ? `BPM: ${track.bpm}` : null,
-            track.keyCamelot ? `Key: ${track.keyCamelot}` : null,
+            track.keyCamelot ? `Key: ${formatKey(track.keyCamelot, noteNotations)}` : null,
             track.genre ? `Genre: ${track.genre}` : null,
             track.energy ? `Energy: ${track.energy}/10` : null,
         ]
@@ -608,6 +610,7 @@ function OverviewTab({
 }) {
     const [localTrack, setLocalTrack] = useState(track);
     const [isPending, startTransition] = useTransition();
+    const { noteNotations } = useDAWSettings();
 
     useEffect(() => setLocalTrack(track), [track]);
 
@@ -718,7 +721,7 @@ function OverviewTab({
                     value={
                         localTrack.keyCamelot ? (
                             <MetadataLink field="key" value={localTrack.keyCamelot} onNavigate={onClose} className="hover:text-foreground">
-                                {localTrack.keyCamelot}
+                                {formatKey(localTrack.keyCamelot, noteNotations)}
                             </MetadataLink>
                         ) : "—"
                     }
@@ -1613,6 +1616,7 @@ function RecommendationsTab({ track, onClose }: { track: Track; onClose: () => v
     const [loading, setLoading] = useState(false);
     const [loaded, setLoaded] = useState(false);
     const { play: playTrack } = usePlayer();
+    const { noteNotations } = useDAWSettings();
 
     const loadRecommendations = useCallback(async () => {
         setLoading(true);
@@ -1782,7 +1786,7 @@ function RecommendationsTab({ track, onClose }: { track: Track; onClose: () => v
                                                         rec.keyCamelot
                                                     )}
                                                 >
-                                                    {rec.keyCamelot}
+                                                    {formatKey(rec.keyCamelot, noteNotations)}
                                                 </span>
                                             )}
                                             {rec.bpm && (
