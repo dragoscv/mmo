@@ -9,12 +9,12 @@ export const dynamic = "force-dynamic";
 export default function DAWRoute() {
     return (
         <RemoteHostBridge page="daw">
-        <MidiProvider>
-            <DAWProvider>
-                <DAWRemoteBridge />
-                <DAWPage />
-            </DAWProvider>
-        </MidiProvider>
+            <MidiProvider>
+                <DAWProvider>
+                    <DAWRemoteBridge />
+                    <DAWPage />
+                </DAWProvider>
+            </MidiProvider>
         </RemoteHostBridge>
     );
 }

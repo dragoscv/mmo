@@ -148,8 +148,8 @@ export function AnalysisFloatingStatus({
                     className={cn(
                         "flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-lg backdrop-blur-xl cursor-pointer",
                         isDone ? "border-green-500/30 bg-[var(--card)]/95" :
-                        isPaused ? "border-amber-500/30 bg-[var(--card)]/95" :
-                        "border-purple-500/30 bg-[var(--card)]/95"
+                            isPaused ? "border-amber-500/30 bg-[var(--card)]/95" :
+                                "border-purple-500/30 bg-[var(--card)]/95"
                     )}
                     onClick={() => setMinimized(false)}
                 >

@@ -457,7 +457,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         // Auto-queue stems analysis for first-time plays
         if (!track.stemsStatus) {
             import("@/actions/stems").then(({ updateStemsStatus }) => {
-                updateStemsStatus(track.id, "pending").catch(() => {});
+                updateStemsStatus(track.id, "pending").catch(() => { });
             });
         }
     }, []);

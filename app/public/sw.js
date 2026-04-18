@@ -1,9 +1,9 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = "music-org-v2";
+const CACHE_NAME = "music-org-v3";
 
 // App shell files to precache
-const PRECACHE_URLS = ["/", "/library", "/playlists", "/scanner", "/settings", "/devices"];
+const PRECACHE_URLS = ["/", "/library", "/playlists", "/scanner", "/settings", "/devices", "/remote", "/live", "/daw", "/mixer", "/sound-editor"];
 
 // ─── IndexedDB offline audio helper ─────────────────────────────────────────
 

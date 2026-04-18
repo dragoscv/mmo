@@ -52,6 +52,9 @@ export function SettingsClient({ settings }: SettingsClientProps) {
     // General settings
     const [musicRoot, setMusicRoot] = useState(settings.music_root || "H:\\Music");
     const [inboxFolder, setInboxFolder] = useState(settings.inbox_folder || "H:\\Music\\_Inbox");
+    const [recordingsFolder, setRecordingsFolder] = useState(
+        settings.recordings_folder || `${(settings.music_root || "H:\\Music")}\\Recordings`
+    );
     const [restoreNowPlaying, setRestoreNowPlaying] = useState(() => {
         if (typeof window === "undefined") return false;
         return localStorage.getItem("mmo-restore-now-playing") === "true";
@@ -97,6 +100,7 @@ export function SettingsClient({ settings }: SettingsClientProps) {
         startTransition(async () => {
             await updateSetting("music_root", musicRoot);
             await updateSetting("inbox_folder", inboxFolder);
+            await updateSetting("recordings_folder", recordingsFolder);
             toast.success("General settings saved!");
         });
     }
@@ -276,6 +280,31 @@ export function SettingsClient({ settings }: SettingsClientProps) {
                         </div>
                         <p className="text-xs text-[var(--muted-foreground)]">
                             Where new tracks arrive before processing.
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <FolderOpen className="h-4 w-4 text-rose-400" />
+                            Recordings Folder
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <div className="flex gap-2">
+                            <Input
+                                value={recordingsFolder}
+                                onChange={(e) => setRecordingsFolder(e.target.value)}
+                                placeholder="H:\Music\Recordings"
+                                className="flex-1"
+                            />
+                            <Button variant="outline" size="icon" className="shrink-0">
+                                <FolderSearch className="h-4 w-4" />
+                            </Button>
+                        </div>
+                        <p className="text-xs text-[var(--muted-foreground)]">
+                            Auto-saved sessions from Live, Mixer, DAW, and Editor land here. Folder is created if it doesn&apos;t exist.
                         </p>
                     </CardContent>
                 </Card>

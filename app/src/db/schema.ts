@@ -260,6 +260,37 @@ export const offlineTracks = sqliteTable("offline_tracks", {
     isPinned: integer("is_pinned", { mode: "boolean" }).default(false),
 });
 
+// ─── Recordings (auto-saved sessions from Live, Mixer, DAW, Editor) ─────────
+
+export const recordings = sqliteTable("recordings", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    /** Source app: live | mixer | daw | editor */
+    source: text("source").notNull(),
+    /** User-editable display name (defaults to source + timestamp) */
+    name: text("name").notNull(),
+    /** Absolute path on disk */
+    filepath: text("filepath").notNull(),
+    /** Just the filename (for display + URL) */
+    filename: text("filename").notNull(),
+    /** MIME type (e.g. audio/webm;codecs=opus) */
+    mimeType: text("mime_type").notNull(),
+    /** Duration in milliseconds */
+    durationMs: integer("duration_ms").notNull(),
+    /** File size in bytes */
+    sizeBytes: integer("size_bytes").notNull(),
+    /** Optional snapshot of contextual metadata (JSON: bpm, key, scene name, etc.) */
+    metadata: text("metadata"),
+    /** Optional user notes */
+    notes: text("notes"),
+    /** User-favorited */
+    isFavorite: integer("is_favorite", { mode: "boolean" }).default(false),
+    createdAt: text("created_at").default(sql`(datetime('now'))`),
+});
+
+export type Recording = typeof recordings.$inferSelect;
+export type NewRecording = typeof recordings.$inferInsert;
+
 // ─── Device/Offline Types ───────────────────────────────────────────────────
 
 export type Device = typeof devices.$inferSelect;

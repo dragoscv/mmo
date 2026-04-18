@@ -22,8 +22,10 @@ import {
     Piano,
     Waves,
     Disc3,
+    Mic,
     Monitor,
     Smartphone,
+    CircleDot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
@@ -40,6 +42,8 @@ const navItems = [
     { href: "/mixer", label: "Mixer", icon: Disc3 },
     { href: "/daw", label: "DAW", icon: Piano },
     { href: "/editor", label: "Sound Editor", icon: Waves },
+    { href: "/live", label: "Live", icon: Mic },
+    { href: "/recordings", label: "Recordings", icon: CircleDot },
     { href: "/download", label: "Download", icon: Download },
     { href: "/visualizations", label: "Visualizations", icon: AudioWaveform },
     { href: "/scanner", label: "Scanner", icon: ScanSearch },

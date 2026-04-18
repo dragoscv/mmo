@@ -39,6 +39,7 @@ import { getTrackById } from "@/actions/tracks";
 import { audioPreloadCache } from "@/lib/audio-preload-cache";
 import { getPersonalization } from "@/hooks/use-personalization";
 import { requestConfirmLoad } from "./confirm-load-dialog";
+import { uploadRecording } from "@/lib/upload-recording";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -350,7 +351,6 @@ export function MixerProvider({ children }: { children: ReactNode }) {
                 currentTime: pd?.currentTime ?? 0,
                 duration: pd?.duration ?? 0,
             });
-            const hasAnyTrack = !!(persisted.deckA?.trackId || persisted.deckB?.trackId || persisted.deckC?.trackId || persisted.deckD?.trackId);
             return {
                 deckA: restoreDeck(persisted.deckA),
                 deckB: restoreDeck(persisted.deckB),
@@ -375,9 +375,14 @@ export function MixerProvider({ children }: { children: ReactNode }) {
                 sessionHistory: [],
                 ...newStateFields,
                 waveformMode: persisted.waveformMode ?? "rgb" as WaveformMode,
-                isRestoring: hasAnyTrack,
+                // NOTE: don't preemptively set isRestoring=true here. The
+                // restoration effect (which only runs after initMixer) is the
+                // single source of truth — otherwise the SessionRestoreIndicator
+                // shows "Initializing..." forever on pages that never mount the
+                // mixer (e.g. /live).
+                isRestoring: false,
                 restorationProgress: 0,
-                restorationLabel: "Initializing...",
+                restorationLabel: "",
             };
         }
         return {
@@ -780,7 +785,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         // Auto-queue stems analysis if track hasn't been analyzed
         if (!track.stemsStatus) {
             import("@/actions/stems").then(({ updateStemsStatus }) => {
-                updateStemsStatus(track.id, "pending").catch(() => {});
+                updateStemsStatus(track.id, "pending").catch(() => { });
             });
             import("sonner").then(({ toast }) => {
                 toast("Stems ready", {
@@ -1224,13 +1229,11 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         if (engine.isRecording) {
             engine.stopRecordingAsync().then(result => {
                 if (result) {
-                    // Download the recording
-                    const url = URL.createObjectURL(result.blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `mix-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.webm`;
-                    a.click();
-                    URL.revokeObjectURL(url);
+                    void uploadRecording({
+                        source: "mixer",
+                        blob: result.blob,
+                        durationMs: result.duration,
+                    });
                 }
             });
             if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);

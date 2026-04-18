@@ -30,6 +30,7 @@ import {
     type MixerSnapshot,
     type DAWSnapshot,
     type EditorSnapshot,
+    type LiveSnapshot,
 } from "@/lib/remote-sync";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -59,9 +60,14 @@ export interface RemoteContextValue {
     broadcastState: (snapshot: StateSnapshot) => void;
     /** Register a command handler (host mode) */
     onCommand: (handler: CommandHandler) => () => void;
+    /** Send a WebRTC signaling payload to a specific peer */
+    sendSignal: (targetPeerId: string, payload: unknown) => void;
+    /** Subscribe to incoming WebRTC signals addressed to this peer */
+    onSignal: (handler: SignalHandler) => () => void;
 }
 
 export type CommandHandler = (action: string, args: unknown[], ack: (success: boolean, error?: string) => void) => void;
+export type SignalHandler = (fromPeerId: string, payload: unknown) => void;
 
 const RemoteContext = createContext<RemoteContextValue | null>(null);
 
@@ -91,6 +97,7 @@ export function RemoteProvider({ page, children }: RemoteProviderProps) {
     const [latency, setLatency] = useState(0);
     const [peerId, setPeerId] = useState("");
     const commandHandlersRef = useRef(new Set<CommandHandler>());
+    const signalHandlersRef = useRef(new Set<SignalHandler>());
 
     // Initialize engine
     useEffect(() => {
@@ -121,6 +128,15 @@ export function RemoteProvider({ page, children }: RemoteProviderProps) {
                             handler(msg.command.action, msg.command.args, (success, error) => {
                                 engine.ackCommand(msg.command.action, success, error);
                             });
+                        }
+                    }
+                    break;
+
+                case "webrtc:signal":
+                    // Only accept signals addressed to us
+                    if (msg.targetPeerId === engine.peerId) {
+                        for (const handler of signalHandlersRef.current) {
+                            try { handler(msg.senderId, msg.payload); } catch { /* noop */ }
                         }
                     }
                     break;
@@ -175,6 +191,15 @@ export function RemoteProvider({ page, children }: RemoteProviderProps) {
         return () => { commandHandlersRef.current.delete(handler); };
     }, []);
 
+    const sendSignal = useCallback((targetPeerId: string, payload: unknown) => {
+        engineRef.current?.sendSignal(targetPeerId, payload);
+    }, []);
+
+    const onSignal = useCallback((handler: SignalHandler) => {
+        signalHandlersRef.current.add(handler);
+        return () => { signalHandlersRef.current.delete(handler); };
+    }, []);
+
     const value = useMemo<RemoteContextValue>(() => ({
         peerId,
         peers,
@@ -187,7 +212,9 @@ export function RemoteProvider({ page, children }: RemoteProviderProps) {
         sendCommand,
         broadcastState,
         onCommand,
-    }), [peerId, peers, connectedPeerId, snapshot, latency, connectToPeer, disconnect, sendCommand, broadcastState, onCommand]);
+        sendSignal,
+        onSignal,
+    }), [peerId, peers, connectedPeerId, snapshot, latency, connectToPeer, disconnect, sendCommand, broadcastState, onCommand, sendSignal, onSignal]);
 
     return (
         <RemoteContext.Provider value={value}>
@@ -205,8 +232,8 @@ export function RemoteProvider({ page, children }: RemoteProviderProps) {
 export function useRemoteHost() {
     const remote = useRemoteOptional();
     return {
-        broadcastState: remote?.broadcastState ?? (() => {}),
-        onCommand: remote?.onCommand ?? (() => () => {}),
+        broadcastState: remote?.broadcastState ?? (() => { }),
+        onCommand: remote?.onCommand ?? (() => () => { }),
         peerId: remote?.peerId ?? "",
         peers: remote?.peers ?? [],
     };
@@ -224,4 +251,8 @@ export function isDAWSnapshot(s: StateSnapshot | null): s is DAWSnapshot {
 
 export function isEditorSnapshot(s: StateSnapshot | null): s is EditorSnapshot {
     return s?.page === "editor";
+}
+
+export function isLiveSnapshot(s: StateSnapshot | null): s is LiveSnapshot {
+    return s?.page === "live";
 }

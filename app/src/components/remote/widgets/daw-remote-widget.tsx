@@ -3,6 +3,7 @@
 import { useCallback, useState, useRef } from "react";
 import type { DAWSnapshot, DAWTrackSnapshot, DAWSynthSnapshot, DAWStepSeqSnapshot, DAWInsertSnapshot, VPSnapshot } from "@/lib/remote-sync";
 import { cn } from "@/lib/utils";
+import { RemotePanel } from "@/components/remote/remote-visibility";
 import {
     Play,
     Pause,
@@ -681,6 +682,7 @@ export function DAWRemoteWidget({ snapshot, sendCommand }: DAWWidgetProps) {
     return (
         <div className="px-4 py-3 flex flex-col gap-3">
             {/* Transport bar */}
+            <RemotePanel id="transport" label="Transport & Master">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <div className="flex items-center gap-2 mb-3">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-white/25">Transport</span>
@@ -761,8 +763,10 @@ export function DAWRemoteWidget({ snapshot, sendCommand }: DAWWidgetProps) {
                     <span className="text-[9px] tabular-nums text-white/25">{Math.round(snapshot.masterVolume * 100)}%</span>
                 </div>
             </div>
+            </RemotePanel>
 
             {/* Tool & Snap */}
+            <RemotePanel id="toolSnap" label="Tool & Snap">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <div className="flex items-center gap-4">
                     <div className="flex-1">
@@ -791,8 +795,10 @@ export function DAWRemoteWidget({ snapshot, sendCommand }: DAWWidgetProps) {
                     </div>
                 </div>
             </div>
+            </RemotePanel>
 
             {/* Track list */}
+            <RemotePanel id="tracks" label="Tracks">
             <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2 px-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-white/25">
@@ -811,8 +817,10 @@ export function DAWRemoteWidget({ snapshot, sendCommand }: DAWWidgetProps) {
                     </div>
                 )}
             </div>
+            </RemotePanel>
 
             {/* Panel toggles */}
+            <RemotePanel id="panelToggles" label="Panel Toggles">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">Panels</span>
                 <div className="flex flex-wrap gap-1.5">
@@ -834,26 +842,35 @@ export function DAWRemoteWidget({ snapshot, sendCommand }: DAWWidgetProps) {
                     ))}
                 </div>
             </div>
+            </RemotePanel>
 
             {/* Synth */}
-            <Section title="Synthesizer" icon={<Music className="w-3.5 h-3.5 text-blue-400/50" />} color="blue">
-                <SynthControls synth={snapshot.synth} sendCommand={sendCommand} />
-            </Section>
+            <RemotePanel id="synth" label="Synthesizer">
+                <Section title="Synthesizer" icon={<Music className="w-3.5 h-3.5 text-blue-400/50" />} color="blue">
+                    <SynthControls synth={snapshot.synth} sendCommand={sendCommand} />
+                </Section>
+            </RemotePanel>
 
             {/* Step Sequencer */}
-            <Section title="Step Sequencer" icon={<Grid3X3 className="w-3.5 h-3.5 text-emerald-400/50" />} color="emerald">
-                <StepSequencerControls stepSeq={snapshot.stepSeq} sendCommand={sendCommand} />
-            </Section>
+            <RemotePanel id="stepSeq" label="Step Sequencer">
+                <Section title="Step Sequencer" icon={<Grid3X3 className="w-3.5 h-3.5 text-emerald-400/50" />} color="emerald">
+                    <StepSequencerControls stepSeq={snapshot.stepSeq} sendCommand={sendCommand} />
+                </Section>
+            </RemotePanel>
 
             {/* Effects Rack */}
-            <Section title="Effects Rack" icon={<Sliders className="w-3.5 h-3.5 text-purple-400/50" />} color="purple">
-                <EffectsRack tracks={snapshot.tracks} selectedTrackId={selectedTrackId} sendCommand={sendCommand} />
-            </Section>
+            <RemotePanel id="fxRack" label="Effects Rack">
+                <Section title="Effects Rack" icon={<Sliders className="w-3.5 h-3.5 text-purple-400/50" />} color="purple">
+                    <EffectsRack tracks={snapshot.tracks} selectedTrackId={selectedTrackId} sendCommand={sendCommand} />
+                </Section>
+            </RemotePanel>
 
             {/* Voice Processor */}
+            <RemotePanel id="voice" label="Voice Processor">
             {snapshot.showVoiceProcessor && snapshot.vp && (
                 <VoiceProcessorControls vp={snapshot.vp} sendCommand={sendCommand} />
             )}
+            </RemotePanel>
         </div>
     );
 }

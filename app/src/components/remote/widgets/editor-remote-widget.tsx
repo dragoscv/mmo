@@ -2,6 +2,7 @@
 
 import type { EditorSnapshot } from "@/lib/remote-sync";
 import { cn } from "@/lib/utils";
+import { RemotePanel } from "@/components/remote/remote-visibility";
 import {
     Play,
     Pause,
@@ -58,6 +59,7 @@ export function EditorRemoteWidget({ snapshot, sendCommand }: EditorWidgetProps)
     return (
         <div className="px-4 py-3 flex flex-col gap-4">
             {/* File info */}
+            <RemotePanel id="file" label="File & Progress">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
@@ -105,8 +107,10 @@ export function EditorRemoteWidget({ snapshot, sendCommand }: EditorWidgetProps)
                     </div>
                 </div>
             </div>
+            </RemotePanel>
 
             {/* Transport */}
+            <RemotePanel id="transport" label="Transport">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <div className="flex items-center gap-2">
                     <button
@@ -166,8 +170,10 @@ export function EditorRemoteWidget({ snapshot, sendCommand }: EditorWidgetProps)
                     </button>
                 </div>
             </div>
+            </RemotePanel>
 
             {/* Selection tools */}
+            <RemotePanel id="selection" label="Selection Tools">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">
                     Selection {snapshot.hasSelection && (
@@ -194,8 +200,10 @@ export function EditorRemoteWidget({ snapshot, sendCommand }: EditorWidgetProps)
                     </button>
                 </div>
             </div>
+            </RemotePanel>
 
             {/* Effects */}
+            <RemotePanel id="effects" label="Effects">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">Effects</span>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -218,8 +226,10 @@ export function EditorRemoteWidget({ snapshot, sendCommand }: EditorWidgetProps)
                     ))}
                 </div>
             </div>
+            </RemotePanel>
 
             {/* Stems */}
+            <RemotePanel id="stems" label="Stems">
             {snapshot.stems.length > 0 && (
                 <div className="rounded-2xl border border-purple-500/10 bg-purple-500/[0.02] p-3">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400/30 block mb-2">Stems</span>
@@ -236,8 +246,10 @@ export function EditorRemoteWidget({ snapshot, sendCommand }: EditorWidgetProps)
                     </div>
                 </div>
             )}
+            </RemotePanel>
 
             {/* Tool selector */}
+            <RemotePanel id="tool" label="Active Tool">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">Active Tool</span>
                 <div className="flex gap-1.5">
@@ -257,8 +269,10 @@ export function EditorRemoteWidget({ snapshot, sendCommand }: EditorWidgetProps)
                     ))}
                 </div>
             </div>
+            </RemotePanel>
 
             {/* View mode */}
+            <RemotePanel id="view" label="View & Zoom">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">View Mode</span>
                 <div className="flex gap-1.5">
@@ -281,6 +295,7 @@ export function EditorRemoteWidget({ snapshot, sendCommand }: EditorWidgetProps)
                         className="w-7 h-7 rounded-lg bg-white/[0.04] text-white/30 hover:bg-white/[0.08] text-xs flex items-center justify-center cursor-pointer">+</button>
                 </div>
             </div>
+            </RemotePanel>
         </div>
     );
 }

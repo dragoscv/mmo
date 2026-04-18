@@ -497,126 +497,126 @@ export function DAWTimeline() {
                 {daw.project.tracks.map((track, idx) => {
                     const hasActiveClip = daw.isPlaying && track.clips.some(c => daw.activeClipIds.includes(c.id));
                     return (
-                    <div key={track.id} className="flex" style={{ height: track.height }}>
-                        <TrackHeader track={track} index={idx} isActive={hasActiveClip} />
+                        <div key={track.id} className="flex" style={{ height: track.height }}>
+                            <TrackHeader track={track} index={idx} isActive={hasActiveClip} />
 
-                        <div
-                            data-track-lane={track.id}
-                            className={cn(
-                                "flex-1 relative border-b border-[var(--daw-border)] overflow-hidden transition-colors duration-150",
-                                dropPreview?.trackId === track.id && "bg-[var(--daw-accent)]/[0.04]"
-                            )}
-                            style={{ background: dropPreview?.trackId === track.id ? undefined : `linear-gradient(90deg, ${track.color}06 0%, transparent 100%)` }}
-                            onMouseDown={e => handleTrackMouseDown(e, track)}
-                            onDoubleClick={e => handleTrackDoubleClick(e, track)}
-                            onDragOver={e => handleTrackDragOver(e, track)}
-                            onDragLeave={handleTrackDragLeave}
-                            onDrop={e => handleTrackDrop(e, track)}
-                        >
-                            <GridLines scrollX={daw.scrollX} pxPerBeat={pxPerBeat} height={track.height} timeSignature={daw.project.timeSignature} />
+                            <div
+                                data-track-lane={track.id}
+                                className={cn(
+                                    "flex-1 relative border-b border-[var(--daw-border)] overflow-hidden transition-colors duration-150",
+                                    dropPreview?.trackId === track.id && "bg-[var(--daw-accent)]/[0.04]"
+                                )}
+                                style={{ background: dropPreview?.trackId === track.id ? undefined : `linear-gradient(90deg, ${track.color}06 0%, transparent 100%)` }}
+                                onMouseDown={e => handleTrackMouseDown(e, track)}
+                                onDoubleClick={e => handleTrackDoubleClick(e, track)}
+                                onDragOver={e => handleTrackDragOver(e, track)}
+                                onDragLeave={handleTrackDragLeave}
+                                onDrop={e => handleTrackDrop(e, track)}
+                            >
+                                <GridLines scrollX={daw.scrollX} pxPerBeat={pxPerBeat} height={track.height} timeSignature={daw.project.timeSignature} />
 
-                            {/* Draw preview ghost */}
-                            {drawPreview && drawPreview.trackId === track.id && drawPreview.width > 0 && (
-                                <div
-                                    className="absolute top-1 rounded-md border border-dashed border-[var(--daw-accent)] bg-[var(--daw-accent)]/10 pointer-events-none z-10"
-                                    style={{
-                                        left: (drawPreview.left - daw.scrollX) * pxPerBeat,
-                                        width: drawPreview.width * pxPerBeat,
-                                        height: track.height - 10,
-                                    }}
-                                />
-                            )}
-
-                            {/* Drop preview ghost */}
-                            {dropPreview && dropPreview.trackId === track.id && (
-                                <div
-                                    className="absolute top-1 rounded-md pointer-events-none z-20 animate-in fade-in-0 zoom-in-95 duration-150"
-                                    style={{
-                                        left: (dropPreview.beat - daw.scrollX) * pxPerBeat,
-                                        width: Math.max(4 * pxPerBeat, 60),
-                                        height: track.height - 10,
-                                        background: `linear-gradient(180deg, ${track.color}25 0%, ${track.color}10 100%)`,
-                                        borderLeft: `2px solid ${track.color}`,
-                                        boxShadow: `0 0 20px ${track.color}20, inset 0 0 20px ${track.color}08`,
-                                    }}
-                                >
-                                    {/* Mini waveform bars placeholder */}
-                                    <div className="absolute inset-0 flex items-center justify-center gap-[1px] px-2 opacity-60">
-                                        {Array.from({ length: 24 }).map((_, i) => {
-                                            const h = 15 + Math.sin(i * 0.8) * 12 + Math.sin(i * 2.1) * 8;
-                                            return (
-                                                <div
-                                                    key={i}
-                                                    className="flex-1 rounded-full min-w-[1px]"
-                                                    style={{
-                                                        height: `${Math.max(10, Math.min(85, h))}%`,
-                                                        background: track.color,
-                                                        opacity: 0.4 + Math.sin(i * 0.5) * 0.2,
-                                                    }}
-                                                />
-                                            );
-                                        })}
-                                    </div>
-                                    {/* Drop indicator line */}
+                                {/* Draw preview ghost */}
+                                {drawPreview && drawPreview.trackId === track.id && drawPreview.width > 0 && (
                                     <div
-                                        className="absolute left-0 top-0 bottom-0 w-0.5 animate-pulse"
-                                        style={{ background: track.color }}
+                                        className="absolute top-1 rounded-md border border-dashed border-[var(--daw-accent)] bg-[var(--daw-accent)]/10 pointer-events-none z-10"
+                                        style={{
+                                            left: (drawPreview.left - daw.scrollX) * pxPerBeat,
+                                            width: drawPreview.width * pxPerBeat,
+                                            height: track.height - 10,
+                                        }}
                                     />
-                                </div>
-                            )}
+                                )}
 
-                            {track.clips.map(clip => (
-                                <ClipBlock
-                                    key={clip.id}
-                                    clip={clip}
-                                    track={track}
-                                    scrollX={daw.scrollX}
-                                    pxPerBeat={pxPerBeat}
-                                    height={track.height}
-                                    selected={daw.selectedClipId === clip.id}
-                                    isActive={daw.isPlaying && daw.activeClipIds.includes(clip.id)}
-                                    tool={daw.tool}
-                                    onMouseDown={e => handleClipMouseDown(e, clip, track)}
-                                    onContextMenu={e => handleClipRightClick(e, clip, track)}
-                                    onDoubleClick={e => {
-                                        e.stopPropagation();
-                                        if (clip.type === "midi") daw.openPianoRoll(track.id, clip.id);
-                                        else if (clip.type === "audio" && clip.audio?.sourceUrl) {
-                                            const params = new URLSearchParams({
-                                                clip: clip.id,
-                                                track: track.id,
-                                                src: clip.audio.sourceUrl,
-                                                name: clip.name,
-                                            });
-                                            window.open(`/editor?${params.toString()}`, "_blank");
-                                        }
-                                    }}
-                                    onResizeRightStart={e => handleResizeRightStart(e, clip)}
-                                    onResizeLeftStart={e => handleResizeLeftStart(e, clip)}
-                                    onFadeInStart={e => handleFadeInStart(e, clip)}
-                                    onFadeOutStart={e => handleFadeOutStart(e, clip)}
-                                />
-                            ))}
+                                {/* Drop preview ghost */}
+                                {dropPreview && dropPreview.trackId === track.id && (
+                                    <div
+                                        className="absolute top-1 rounded-md pointer-events-none z-20 animate-in fade-in-0 zoom-in-95 duration-150"
+                                        style={{
+                                            left: (dropPreview.beat - daw.scrollX) * pxPerBeat,
+                                            width: Math.max(4 * pxPerBeat, 60),
+                                            height: track.height - 10,
+                                            background: `linear-gradient(180deg, ${track.color}25 0%, ${track.color}10 100%)`,
+                                            borderLeft: `2px solid ${track.color}`,
+                                            boxShadow: `0 0 20px ${track.color}20, inset 0 0 20px ${track.color}08`,
+                                        }}
+                                    >
+                                        {/* Mini waveform bars placeholder */}
+                                        <div className="absolute inset-0 flex items-center justify-center gap-[1px] px-2 opacity-60">
+                                            {Array.from({ length: 24 }).map((_, i) => {
+                                                const h = 15 + Math.sin(i * 0.8) * 12 + Math.sin(i * 2.1) * 8;
+                                                return (
+                                                    <div
+                                                        key={i}
+                                                        className="flex-1 rounded-full min-w-[1px]"
+                                                        style={{
+                                                            height: `${Math.max(10, Math.min(85, h))}%`,
+                                                            background: track.color,
+                                                            opacity: 0.4 + Math.sin(i * 0.5) * 0.2,
+                                                        }}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                        {/* Drop indicator line */}
+                                        <div
+                                            className="absolute left-0 top-0 bottom-0 w-0.5 animate-pulse"
+                                            style={{ background: track.color }}
+                                        />
+                                    </div>
+                                )}
 
-                            {playheadX >= 0 && (
-                                <div
-                                    className="absolute top-0 bottom-0 w-px pointer-events-none z-10 opacity-50"
-                                    style={{ left: playheadX, background: ds.playheadHex }}
-                                />
-                            )}
+                                {track.clips.map(clip => (
+                                    <ClipBlock
+                                        key={clip.id}
+                                        clip={clip}
+                                        track={track}
+                                        scrollX={daw.scrollX}
+                                        pxPerBeat={pxPerBeat}
+                                        height={track.height}
+                                        selected={daw.selectedClipId === clip.id}
+                                        isActive={daw.isPlaying && daw.activeClipIds.includes(clip.id)}
+                                        tool={daw.tool}
+                                        onMouseDown={e => handleClipMouseDown(e, clip, track)}
+                                        onContextMenu={e => handleClipRightClick(e, clip, track)}
+                                        onDoubleClick={e => {
+                                            e.stopPropagation();
+                                            if (clip.type === "midi") daw.openPianoRoll(track.id, clip.id);
+                                            else if (clip.type === "audio" && clip.audio?.sourceUrl) {
+                                                const params = new URLSearchParams({
+                                                    clip: clip.id,
+                                                    track: track.id,
+                                                    src: clip.audio.sourceUrl,
+                                                    name: clip.name,
+                                                });
+                                                window.open(`/editor?${params.toString()}`, "_blank");
+                                            }
+                                        }}
+                                        onResizeRightStart={e => handleResizeRightStart(e, clip)}
+                                        onResizeLeftStart={e => handleResizeLeftStart(e, clip)}
+                                        onFadeInStart={e => handleFadeInStart(e, clip)}
+                                        onFadeOutStart={e => handleFadeOutStart(e, clip)}
+                                    />
+                                ))}
 
-                            {/* Automation lane overlay */}
-                            {track.automationLanes.filter(l => l.visible).map(lane => (
-                                <AutomationCurve
-                                    key={lane.id}
-                                    lane={lane}
-                                    scrollX={daw.scrollX}
-                                    pxPerBeat={pxPerBeat}
-                                    height={track.height}
-                                />
-                            ))}
+                                {playheadX >= 0 && (
+                                    <div
+                                        className="absolute top-0 bottom-0 w-px pointer-events-none z-10 opacity-50"
+                                        style={{ left: playheadX, background: ds.playheadHex }}
+                                    />
+                                )}
+
+                                {/* Automation lane overlay */}
+                                {track.automationLanes.filter(l => l.visible).map(lane => (
+                                    <AutomationCurve
+                                        key={lane.id}
+                                        lane={lane}
+                                        scrollX={daw.scrollX}
+                                        pxPerBeat={pxPerBeat}
+                                        height={track.height}
+                                    />
+                                ))}
+                            </div>
                         </div>
-                    </div>
                     );
                 })}
 

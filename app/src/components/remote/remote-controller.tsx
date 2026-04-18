@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { useRemote, isMixerSnapshot, isDAWSnapshot, isEditorSnapshot } from "./remote-context";
+import { useRemote, isMixerSnapshot, isDAWSnapshot, isEditorSnapshot, isLiveSnapshot } from "./remote-context";
 import { useFocusMode } from "@/components/focus-mode-context";
 import { cn } from "@/lib/utils";
 import {
@@ -12,7 +12,9 @@ import {
     Disc3,
     Piano,
     Waves,
+    Mic,
     Radio,
+    Headphones,
     Maximize2,
     Minimize2,
     Settings2,
@@ -28,6 +30,11 @@ import {
 import { MixerRemoteWidget } from "./widgets/mixer-remote-widget";
 import { DAWRemoteWidget } from "./widgets/daw-remote-widget";
 import { EditorRemoteWidget } from "./widgets/editor-remote-widget";
+import { LiveRemoteWidget } from "./widgets/live-remote-widget";
+import { RemoteVisibilityProvider } from "./remote-visibility";
+import { useWebRTCAudioStream } from "./use-webrtc-audio-stream";
+import { RemotePerformanceWidget } from "./remote-performance-widget";
+import { QUALITY_PROFILES, type StreamQuality } from "@/lib/webrtc-audio-bridge";
 import type { PeerInfo, RemotePage } from "@/lib/remote-sync";
 
 // ─── Connection Status Bar ───────────────────────────────────────────────────
@@ -90,6 +97,7 @@ function PageIcon({ page, className }: { page: RemotePage; className?: string })
         case "mixer": return <Disc3 className={className} />;
         case "daw": return <Piano className={className} />;
         case "editor": return <Waves className={className} />;
+        case "live": return <Mic className={className} />;
         default: return <Radio className={className} />;
     }
 }
@@ -101,8 +109,9 @@ function PeerCard({ peer, isConnected, onConnect }: { peer: PeerInfo; isConnecte
     const pageLabel = peer.page === "idle" ? "Idle" : peer.page.charAt(0).toUpperCase() + peer.page.slice(1);
     const pageColor = peer.page === "mixer" ? "text-orange-400 bg-orange-500/10 border-orange-500/20"
         : peer.page === "daw" ? "text-blue-400 bg-blue-500/10 border-blue-500/20"
-        : peer.page === "editor" ? "text-purple-400 bg-purple-500/10 border-purple-500/20"
-        : "text-white/30 bg-white/[0.03] border-white/[0.06]";
+            : peer.page === "editor" ? "text-purple-400 bg-purple-500/10 border-purple-500/20"
+                : peer.page === "live" ? "text-rose-400 bg-rose-500/10 border-rose-500/20"
+                    : "text-white/30 bg-white/[0.03] border-white/[0.06]";
 
     const canConnect = peer.page !== "idle";
 
@@ -187,17 +196,227 @@ const SCALE_STORAGE_KEY = "remote-ui-scale";
 
 function readStoredScale(): number {
     if (typeof window === "undefined") return 1.0;
-    const v = localStorage.getItem(SCALE_STORAGE_KEY);
-    if (!v) return 1.0;
-    const n = parseFloat(v);
-    return SCALE_STEPS.includes(n as typeof SCALE_STEPS[number]) ? n : 1.0;
+    try {
+        const v = localStorage.getItem(SCALE_STORAGE_KEY);
+        if (!v) return 1.0;
+        const n = parseFloat(v);
+        return SCALE_STEPS.includes(n as typeof SCALE_STEPS[number]) ? n : 1.0;
+    } catch { return 1.0; }
+}
+
+// ─── Remote-side Audio Streaming Panel ───────────────────────────────────────
+// Universal: works while connected to any host (Live/DAW/Mixer/Editor).
+// Host's master output is played through phone speakers via <audio>.
+// Phone mic can be sent back to host (routed by host's engine).
+
+function RemoteStreamPanel() {
+    const audioElRef = useRef<HTMLAudioElement | null>(null);
+    const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+
+    const stream = useWebRTCAudioStream({
+        enabled: true,
+        // No local "engine output" on the remote side — we only send the mic.
+        onRemoteStream: (s) => {
+            const el = audioElRef.current;
+            if (!el) return;
+            if (s) {
+                el.srcObject = s;
+                el.play().then(() => setAutoplayBlocked(false)).catch(() => setAutoplayBlocked(true));
+            } else {
+                el.srcObject = null;
+                setAutoplayBlocked(false);
+            }
+        },
+    });
+
+    // Auto-open the WebRTC connection as soon as the controller connects to a host
+    useEffect(() => {
+        if (stream.hasPeer && stream.connectionState === "idle") {
+            void stream.start();
+        }
+    }, [stream.hasPeer, stream.connectionState, stream]);
+
+    const stateColor = stream.connectionState === "connected" ? "#10b981"
+        : stream.connectionState === "connecting" ? "#eab308"
+            : stream.connectionState === "failed" ? "#ef4444"
+                : stream.connectionState === "disconnected" ? "#f97316"
+                    : "#6b7280";
+    const stateLabel = stream.connectionState === "connected" ? "Streaming"
+        : stream.connectionState === "connecting" ? "Connecting…"
+            : stream.connectionState === "failed" ? "Failed"
+                : stream.connectionState === "disconnected" ? "Disconnected"
+                    : stream.hasPeer ? "Idle" : "No peer";
+
+    const rttColor = stream.stats.rttMs < 50 ? "#10b981"
+        : stream.stats.rttMs < 100 ? "#eab308"
+            : "#ef4444";
+
+    return (
+        <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/[0.04] to-transparent p-3 mx-3 mb-3 mt-3 space-y-2.5">
+            {/* Header */}
+            <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
+                    {stream.connectionState === "connected" ? (
+                        <Wifi className="w-3.5 h-3.5 text-cyan-400" />
+                    ) : (
+                        <WifiOff className="w-3.5 h-3.5 text-white/40" />
+                    )}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="text-[10px] text-cyan-400/70 font-bold uppercase tracking-wider">Audio Stream</div>
+                    <div className="text-[10px] text-white/40 truncate">
+                        {stream.isReceivingRemote ? "Hearing host master" : stream.connectionState === "connected" ? "Connected · idle" : "—"}
+                        {stream.isSendingMic ? " · sending mic" : ""}
+                    </div>
+                </div>
+                <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                    style={{ color: stateColor, backgroundColor: `${stateColor}15`, border: `1px solid ${stateColor}30` }}>
+                    <span className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: stateColor }} />
+                    {stateLabel}
+                </span>
+            </div>
+
+            {/* Autoplay blocked notice */}
+            {autoplayBlocked && (
+                <button
+                    onClick={() => {
+                        const el = audioElRef.current;
+                        if (el && el.srcObject) {
+                            void el.play().then(() => setAutoplayBlocked(false));
+                        }
+                    }}
+                    className="w-full py-1.5 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 cursor-pointer hover:bg-amber-500/25"
+                >
+                    🔊 Tap to enable host audio playback
+                </button>
+            )}
+
+            {/* Listen / Mic toggles */}
+            <div className="grid grid-cols-2 gap-1.5">
+                <div className={cn(
+                    "flex items-center gap-1.5 py-1.5 px-2 rounded-lg border text-[10px]",
+                    stream.isReceivingRemote
+                        ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+                        : "bg-white/[0.03] text-white/40 border-white/[0.06]",
+                )}>
+                    <Headphones className="w-3 h-3" />
+                    <span className="font-bold uppercase tracking-wider">
+                        {stream.isReceivingRemote ? "Listening" : "Standby"}
+                    </span>
+                </div>
+                <button onClick={() => void stream.setSendMic(!stream.isSendingMic)}
+                    disabled={stream.connectionState !== "connected"}
+                    className={cn(
+                        "flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed",
+                        stream.isSendingMic
+                            ? "bg-rose-500/15 text-rose-300 border-rose-500/30"
+                            : "bg-white/[0.03] text-white/40 border-white/[0.06] hover:bg-rose-500/5",
+                    )}>
+                    <Mic className="w-3 h-3" /> {stream.isSendingMic ? "Mic ON" : "Send Mic"}
+                </button>
+            </div>
+
+            {/* Quality picker */}
+            <div className="grid grid-cols-4 gap-1">
+                {(["ultra", "high", "balanced", "low"] as StreamQuality[]).map(q => {
+                    const isActive = stream.quality === q;
+                    return (
+                        <button key={q} onClick={() => void stream.setQuality(q)}
+                            className={cn(
+                                "py-1 rounded text-[9px] font-bold uppercase tracking-wider border transition-all cursor-pointer",
+                                isActive
+                                    ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+                                    : "bg-white/[0.02] text-white/40 border-white/[0.04] hover:bg-white/[0.05]",
+                            )}>
+                            {QUALITY_PROFILES[q].label}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Stats grid — always visible to help diagnose connection issues */}
+            <div className="rounded-lg bg-black/30 border border-white/[0.04] divide-y divide-white/[0.04]">
+                <div className="grid grid-cols-4 px-2 py-1.5 text-[9px] tabular-nums">
+                    <div>
+                        <div className="text-white/30 uppercase tracking-wider text-[8px]">RTT</div>
+                        <div className="font-bold" style={{ color: stream.connectionState === "connected" ? rttColor : "rgba(255,255,255,0.3)" }}>
+                            {stream.stats.rttMs}<span className="text-white/30 font-normal text-[8px] ml-0.5">ms</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div className="text-white/30 uppercase tracking-wider text-[8px]">Jitter</div>
+                        <div className="font-bold text-white/70">
+                            {stream.stats.jitterMs}<span className="text-white/30 font-normal text-[8px] ml-0.5">ms</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div className="text-white/30 uppercase tracking-wider text-[8px]">Loss</div>
+                        <div className="font-bold text-white/70">
+                            {stream.stats.packetsLost}
+                        </div>
+                    </div>
+                    <div>
+                        <div className="text-white/30 uppercase tracking-wider text-[8px]">Sync</div>
+                        <div className="font-bold text-white/70 truncate" title={stream.stats.signalingState ?? "n/a"}>
+                            {!stream.stats.signalingState || stream.stats.signalingState === "n/a" ? "—" : stream.stats.signalingState === "stable" ? "OK" : stream.stats.signalingState.replace("have-", "")}
+                        </div>
+                    </div>
+                </div>
+                <div className="grid grid-cols-4 px-2 py-1.5 text-[9px] tabular-nums">
+                    <div>
+                        <div className="text-white/30 uppercase tracking-wider text-[8px]">Up</div>
+                        <div className="font-bold text-cyan-300">
+                            {Math.round(stream.stats.bytesSentPerSec / 1000)}<span className="text-white/30 font-normal text-[8px] ml-0.5">kbps</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div className="text-white/30 uppercase tracking-wider text-[8px]">Down</div>
+                        <div className="font-bold text-cyan-300">
+                            {Math.round(stream.stats.bytesReceivedPerSec / 1000)}<span className="text-white/30 font-normal text-[8px] ml-0.5">kbps</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div className="text-white/30 uppercase tracking-wider text-[8px]">ICE</div>
+                        <div className={cn("font-bold truncate",
+                            stream.stats.iceState === "connected" || stream.stats.iceState === "completed" ? "text-emerald-400"
+                                : stream.stats.iceState === "checking" ? "text-amber-400"
+                                    : stream.stats.iceState === "failed" || stream.stats.iceState === "disconnected" ? "text-red-400"
+                                        : "text-white/50",
+                        )} title={stream.stats.iceState ?? "n/a"}>
+                            {!stream.stats.iceState || stream.stats.iceState === "n/a" ? "—" : stream.stats.iceState}
+                        </div>
+                    </div>
+                    <div>
+                        <div className="text-white/30 uppercase tracking-wider text-[8px]">Role</div>
+                        <div className="font-bold text-white/70">
+                            {stream.stats.role === "initiator" ? "OFR" : stream.stats.role === "responder" ? "ANS" : "—"}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Manual reconnect for failed states */}
+            {(stream.connectionState === "failed" || stream.connectionState === "disconnected") && (
+                <button onClick={() => { stream.stop(); setTimeout(() => void stream.start(), 100); }}
+                    className="w-full py-1.5 rounded-lg text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 cursor-pointer hover:bg-cyan-500/25 uppercase tracking-wider">
+                    Reconnect
+                </button>
+            )}
+
+            {/* Hidden audio element for incoming master playback */}
+            <audio ref={audioElRef} autoPlay playsInline className="hidden" />
+        </div>
+    );
 }
 
 export function RemoteController() {
     const remote = useRemote();
     const { isFocusMode, toggleFocusMode } = useFocusMode();
     const [showDevices, setShowDevices] = useState(true);
-    const [uiScale, setUiScale] = useState(readStoredScale);
+    // Always render with 1.0 on the first paint so SSR matches client; hydrate from
+    // localStorage in an effect to avoid a hydration mismatch.
+    const [uiScale, setUiScale] = useState(1.0);
+    useEffect(() => { setUiScale(readStoredScale()); }, []);
 
     const changeScale = useCallback((dir: 1 | -1) => {
         setUiScale(prev => {
@@ -216,11 +435,11 @@ export function RemoteController() {
     // Filter out self and "idle" peers that aren't remote controllers
     const availablePeers = useMemo(() =>
         remote.peers.filter(p => p.id !== remote.peerId),
-    [remote.peers, remote.peerId]);
+        [remote.peers, remote.peerId]);
 
     const connectedPeer = useMemo(() =>
         availablePeers.find(p => p.id === remote.connectedPeerId) ?? null,
-    [availablePeers, remote.connectedPeerId]);
+        [availablePeers, remote.connectedPeerId]);
 
     // Auto-connect to first available peer if none connected
     useEffect(() => {
@@ -252,26 +471,29 @@ export function RemoteController() {
 
     // Determine what controls to show
     const snapshot = remote.snapshot;
-    const hasControls = snapshot && (isMixerSnapshot(snapshot) || isDAWSnapshot(snapshot) || isEditorSnapshot(snapshot));
+    const hasControls = snapshot && (isMixerSnapshot(snapshot) || isDAWSnapshot(snapshot) || isEditorSnapshot(snapshot) || isLiveSnapshot(snapshot));
     const noHostsAvailable = availablePeers.filter(p => p.page !== "idle").length === 0;
 
     return (
-        <div className="flex flex-col h-full bg-[oklch(0.10_0.01_260)] text-white overflow-hidden">
+        <div className="@container flex flex-col h-full bg-[oklch(0.10_0.01_260)] text-white overflow-hidden">
             {/* Header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] shrink-0">
+            <div className="flex items-center gap-2 @[300px]:gap-3 px-2 @[300px]:px-4 py-2 @[300px]:py-3 border-b border-white/[0.06] shrink-0">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                     <Smartphone className="w-4 h-4 text-white/40 shrink-0" />
-                    <h1 className="text-sm font-semibold text-white/70 truncate">Remote Control</h1>
+                    <h1 className="text-xs @[300px]:text-sm font-semibold text-white/70 truncate">
+                        <span className="@[260px]:hidden">Remote</span>
+                        <span className="hidden @[260px]:inline">Remote Control</span>
+                    </h1>
                     {availablePeers.length > 0 && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-white/[0.06] text-[9px] tabular-nums text-white/40">
+                        <span className="hidden @[280px]:inline px-1.5 py-0.5 rounded-full bg-white/[0.06] text-[9px] tabular-nums text-white/40">
                             {availablePeers.length} device{availablePeers.length !== 1 ? "s" : ""}
                         </span>
                     )}
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                    {/* Size controls */}
-                    <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-0.5 py-0.5">
+                    {/* Size controls — hidden on watch-tiny screens */}
+                    <div className="hidden @[280px]:flex items-center gap-0.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-0.5 py-0.5">
                         <button
                             onClick={() => changeScale(-1)}
                             disabled={uiScale <= SCALE_STEPS[0]}
@@ -330,8 +552,17 @@ export function RemoteController() {
             </div>
 
             {/* Connection status bar */}
-            <div className="px-4 py-2 shrink-0">
-                <ConnectionBar peer={connectedPeer} latency={remote.latency} onDisconnect={handleDisconnect} />
+            <div className="px-2 @[300px]:px-4 py-2 shrink-0 flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                    <ConnectionBar peer={connectedPeer} latency={remote.latency} onDisconnect={handleDisconnect} />
+                </div>
+                {/* Perf widget — watch-friendly compact pill, hidden when no host */}
+                {connectedPeer && (
+                    <RemotePerformanceWidget
+                        variant="compact"
+                        className="hidden @[260px]:flex shrink-0 px-2 py-1 rounded-lg border border-white/[0.06] bg-white/[0.02]"
+                    />
+                )}
             </div>
 
             {/* Content */}
@@ -381,16 +612,31 @@ export function RemoteController() {
                 )}
 
                 {hasControls && isMixerSnapshot(snapshot) && (
-                    <MixerRemoteWidget snapshot={snapshot} sendCommand={remote.sendCommand} />
+                    <RemoteVisibilityProvider page="mixer">
+                        <MixerRemoteWidget snapshot={snapshot} sendCommand={remote.sendCommand} />
+                    </RemoteVisibilityProvider>
                 )}
 
                 {hasControls && isDAWSnapshot(snapshot) && (
-                    <DAWRemoteWidget snapshot={snapshot} sendCommand={remote.sendCommand} />
+                    <RemoteVisibilityProvider page="daw">
+                        <DAWRemoteWidget snapshot={snapshot} sendCommand={remote.sendCommand} />
+                    </RemoteVisibilityProvider>
                 )}
 
                 {hasControls && isEditorSnapshot(snapshot) && (
-                    <EditorRemoteWidget snapshot={snapshot} sendCommand={remote.sendCommand} />
+                    <RemoteVisibilityProvider page="editor">
+                        <EditorRemoteWidget snapshot={snapshot} sendCommand={remote.sendCommand} />
+                    </RemoteVisibilityProvider>
                 )}
+
+                {hasControls && isLiveSnapshot(snapshot) && (
+                    <RemoteVisibilityProvider page="live">
+                        <LiveRemoteWidget snapshot={snapshot} sendCommand={remote.sendCommand} />
+                    </RemoteVisibilityProvider>
+                )}
+
+                {/* Universal audio streaming panel — always visible at the bottom while connected to a host */}
+                {connectedPeer && <RemoteStreamPanel />}
             </div>
         </div>
     );

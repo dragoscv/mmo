@@ -308,7 +308,7 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
         setPresets(AudioFxEngine.loadPresets());
 
         // Enumerate devices
-        engine.enumerateInputDevices().then(setInputDevices).catch(() => {});
+        engine.enumerateInputDevices().then(setInputDevices).catch(() => { });
 
         return () => {
             cancelAnimationFrame(rafRef.current);
@@ -875,8 +875,8 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
                                 RTT <span className={cn(
                                     "font-semibold",
                                     latencyInfo.totalMs < 10 ? "text-green-400" :
-                                    latencyInfo.totalMs < 20 ? "text-yellow-400" :
-                                    "text-red-400"
+                                        latencyInfo.totalMs < 20 ? "text-yellow-400" :
+                                            "text-red-400"
                                 )}>~{latencyInfo.totalMs.toFixed(1)}ms</span>
                             </span>
                             <span className="text-white/20">

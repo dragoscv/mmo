@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { MixerSnapshot, MixerDeckSnapshot, MixerSamplerSlotSnapshot } from "@/lib/remote-sync";
 import { cn } from "@/lib/utils";
+import { RemotePanel } from "@/components/remote/remote-visibility";
 import {
     Play,
     Pause,
@@ -442,6 +443,7 @@ export function MixerRemoteWidget({ snapshot, sendCommand }: MixerWidgetProps) {
     return (
         <div className="px-4 py-3 flex flex-col gap-4">
             {/* Master controls */}
+            <RemotePanel id="master" label="Master & Recording">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <div className="flex items-center gap-3 mb-3">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-white/25">Master</span>
@@ -507,15 +509,19 @@ export function MixerRemoteWidget({ snapshot, sendCommand }: MixerWidgetProps) {
                     {snapshot.isRecording ? `⏺ Recording — ${Math.floor(snapshot.recordingDuration / 1000)}s` : "⏺ Start Recording"}
                 </button>
             </div>
+            </RemotePanel>
 
             {/* Deck cards */}
+            <RemotePanel id="decks" label="Decks">
             <div className={cn("grid gap-3", is4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2")}>
                 {decks.map(({ side, deck }) => (
                     <DeckCard key={side} deck={deck} side={side} sendCommand={sendCommand} />
                 ))}
             </div>
+            </RemotePanel>
 
             {/* Sampler */}
+            <RemotePanel id="sampler" label="Sampler">
             {snapshot.samplerSlots.length > 0 && (
                 <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">Sampler</span>
@@ -541,8 +547,10 @@ export function MixerRemoteWidget({ snapshot, sendCommand }: MixerWidgetProps) {
                     </div>
                 </div>
             )}
+            </RemotePanel>
 
             {/* Global Settings */}
+            <RemotePanel id="settings" label="Settings & Automix">
             <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">
                     <Settings className="w-3 h-3 inline mr-1" />Settings
@@ -612,6 +620,7 @@ export function MixerRemoteWidget({ snapshot, sendCommand }: MixerWidgetProps) {
                     {snapshot.automixEnabled ? "Automix ON" : "Automix OFF"}
                 </button>
             </div>
+            </RemotePanel>
         </div>
     );
 }

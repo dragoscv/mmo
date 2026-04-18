@@ -17,7 +17,7 @@
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type RemotePage = "mixer" | "daw" | "editor" | "idle";
+export type RemotePage = "mixer" | "daw" | "editor" | "live" | "idle";
 
 export interface PeerInfo {
     id: string;
@@ -169,27 +169,7 @@ export interface DAWStepSeqSnapshot {
     swing: number;
     tracks: DAWStepTrackSnapshot[];
 }
-export interface VPFxSnapshot {
-    id: string;
-    type: string;
-    enabled: boolean;
-    params: Record<string, number>;
-}
 
-export interface VPSnapshot {
-    isActive: boolean;
-    inputGain: number;
-    outputGain: number;
-    selectedKey: number;
-    selectedScale: number;
-    chain: VPFxSnapshot[];
-    peakL: number;
-    peakR: number;
-    rms: number;
-    pitchNote: string;
-    pitchCents: number;
-    pitchConfidence: number;
-}
 export interface VPFxSnapshot {
     id: string;
     type: string;
@@ -274,7 +254,88 @@ export interface EditorSnapshot {
     canRedo: boolean;
 }
 
-export type StateSnapshot = MixerSnapshot | DAWSnapshot | EditorSnapshot;
+// ── Live snapshot ────────────────────────────────────────────────────────────
+
+export interface LiveLooperSnapshot {
+    id: number;
+    state: "empty" | "recording" | "playing" | "stopped" | "overdubbing";
+    durationBeats: number;
+    positionBeats: number;
+    volume: number;
+    muted: boolean;
+}
+
+export interface LivePadSnapshot {
+    id: number;
+    name: string;
+    color: string;
+    hasAudio: boolean;
+    isPlaying: boolean;
+    volume: number;
+    loop: boolean;
+}
+
+export interface LiveSetSongSnapshot {
+    id: string;
+    name: string;
+    tempo: number;
+    keyIndex: number;
+    scaleIndex: number;
+}
+
+export interface LiveSnapshot {
+    page: "live";
+    // Master
+    masterVolume: number;
+    monitorVolume: number;
+    masterPeakL: number;
+    masterPeakR: number;
+    isLimiting: boolean;
+    // Tempo / Key
+    tempo: number;
+    isMetronomeOn: boolean;
+    metronomeMonitorOnly: boolean;
+    keyIndex: number;
+    scaleIndex: number;
+    // Recording (full session)
+    isRecording: boolean;
+    recordingDuration: number; // ms
+    // Backing track
+    backingLoaded: boolean;
+    backingName: string;
+    backingIsPlaying: boolean;
+    backingPosition: number;   // seconds
+    backingDuration: number;   // seconds
+    backingVolume: number;
+    backingTempoRatio: number; // 0.5..1.5
+    backingPitchSemis: number; // -12..+12
+    backingLoopActive: boolean;
+    // Voice (reuses VPSnapshot shape)
+    voice: VPSnapshot | null;
+    // Looper
+    loopers: LiveLooperSnapshot[];
+    activeLooperId: number | null;
+    looperBeatLength: number; // bars per loop
+    // Pads
+    pads: LivePadSnapshot[];
+    // Tuner
+    tunerNote: string;
+    tunerCents: number;
+    tunerFrequency: number;
+    tunerConfidence: number;
+    // Tap BPM history
+    tapCount: number;
+    // Set list
+    songs: LiveSetSongSnapshot[];
+    activeSongId: string | null;
+    // Compact master visualization data (32 bins each, 0-255 byte values).
+    // Spectrum is log-bucketed magnitudes; waveform is time-domain samples
+    // centered on 128. Optional so older clients still type-check.
+    spectrum?: number[];
+    waveform?: number[];
+}
+
+export type StateSnapshot = MixerSnapshot | DAWSnapshot | EditorSnapshot | LiveSnapshot;
 
 // ── Command types ────────────────────────────────────────────────────────────
 
@@ -326,6 +387,17 @@ export interface CommandAck extends MsgBase {
     error?: string;
 }
 
+/**
+ * WebRTC signaling envelope. The `payload` is opaque to the relay —
+ * it carries SDP offers/answers and ICE candidates between two peers.
+ * `targetPeerId` ensures only the addressed peer processes it.
+ */
+export interface WebRTCSignalMsg extends MsgBase {
+    type: "webrtc:signal";
+    targetPeerId: string;
+    payload: unknown;
+}
+
 export type SyncMessage =
     | PeerAnnounce
     | PeerHeartbeat
@@ -333,7 +405,8 @@ export type SyncMessage =
     | PeerDiscover
     | StateSnapshotMsg
     | CommandExec
-    | CommandAck;
+    | CommandAck
+    | WebRTCSignalMsg;
 
 // ─── Sync Engine ─────────────────────────────────────────────────────────────
 
@@ -341,7 +414,10 @@ const CHANNEL_NAME = "rekordbox-remote-sync";
 const HEARTBEAT_INTERVAL = 2000;
 const PEER_TIMEOUT = 6000;
 const SSE_RECONNECT_DELAY = 1500;
-const SERVER_SEND_THROTTLE = 80; // min ms between server POSTs for state snapshots
+// State snapshots over the network. The host loop ticks at ~10 Hz (100 ms);
+// 150 ms throttle = ~6.6 POST/sec, smooth enough for meters/playheads on the
+// remote while halving HTTP chatter compared to 80 ms.
+const SERVER_SEND_THROTTLE = 150;
 
 type MessageHandler = (msg: SyncMessage) => void;
 
@@ -447,8 +523,25 @@ export class RemoteSyncEngine {
 
     // ── Server relay POST ────────────────────────────────────────────────────
 
+    /**
+     * State snapshots are only consumed by remote controllers (peers with
+     * page === "idle"). When no such peer is known, skip the server POST
+     * entirely — local BroadcastChannel still works for same-origin tabs.
+     */
+    private hasRemoteSubscriber(): boolean {
+        for (const p of this._peers.values()) {
+            if (p.page === "idle") return true;
+        }
+        return false;
+    }
+
     private sendToServer(msg: SyncMessage) {
         if (this._destroyed) return;
+
+        // Skip server relay for state snapshots when no remote controller listens
+        if (msg.type === "state:snapshot" && !this.hasRemoteSubscriber()) {
+            return;
+        }
 
         // Throttle state:snapshot messages to avoid flooding
         if (msg.type === "state:snapshot") {
@@ -582,6 +675,20 @@ export class RemoteSyncEngine {
     /** Acknowledge a command (called by host pages) */
     ackCommand(action: string, success: boolean, error?: string) {
         this.send({ type: "command:ack", senderId: this.peerId, timestamp: Date.now(), commandAction: action, success, error });
+    }
+
+    /**
+     * Send a WebRTC signaling payload (offer/answer/ICE) to a specific peer.
+     * Not throttled — signaling is low-volume and time-sensitive.
+     */
+    sendSignal(targetPeerId: string, payload: unknown) {
+        this.send({
+            type: "webrtc:signal",
+            senderId: this.peerId,
+            timestamp: Date.now(),
+            targetPeerId,
+            payload,
+        });
     }
 
     /** Subscribe to messages */
