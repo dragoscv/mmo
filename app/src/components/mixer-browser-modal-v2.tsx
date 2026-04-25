@@ -10,9 +10,10 @@ import { cn, formatDuration, formatKey } from "@/lib/utils";
 import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { getTracks, getTrackById } from "@/actions/tracks";
 import type { Track } from "@/db/schema";
-import { useMixer } from "./mixer-context";
+import { useMixerActions } from "./mixer-context";
 import type { DeckSide } from "@/lib/mixer-engine";
 import { InlineDownloadModal, type TrackDownloadInfo } from "./inline-download-modal";
+import { useRenderCount, dlog } from "@/lib/dev-debugger";
 import {
     Search,
     Disc3,
@@ -107,7 +108,8 @@ export function MixerBrowserModal({
     targetDeck,
     onDeckChange,
 }: MixerBrowserModalProps) {
-    const mixer = useMixer();
+    useRenderCount("MixerBrowserModal");
+    const mixer = useMixerActions();
     const { noteNotations } = useDAWSettings();
 
     // ── Local library state ──────────────────────────────────────────────

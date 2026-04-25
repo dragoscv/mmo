@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRouteMemorySave, clearRouteMemory } from "@/hooks/use-route-memory";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     Table,
     TableBody,
@@ -103,6 +104,7 @@ export function LibraryClient({
     currentOrder,
     currentFilters,
 }: LibraryClientProps) {
+    useRenderCount("Page:/library");
     const router = useRouter();
     const searchParams = useSearchParams();
     const [searchInput, setSearchInput] = useState(currentFilters.search);

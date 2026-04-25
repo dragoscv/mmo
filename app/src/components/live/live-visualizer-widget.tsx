@@ -29,9 +29,11 @@ import {
     Gauge, ArrowUpDown, Layers, Grid2x2, Square as SquareIcon, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import { useLiveOptional } from "@/components/live/live-context";
 import { useLiveSettings } from "@/hooks/use-live-settings";
 import { useLiveWidgetSlot } from "@/components/live/live-widget-slot";
+import { subscribeRaf, getSharedFrequencyData } from "@/lib/raf-scheduler";
 
 // ─── Public types ────────────────────────────────────────────────────────
 
@@ -63,11 +65,18 @@ const STORAGE_KEY = "live-visualizer-config-v1";
 interface VizConfig {
     layout: VizLayout;
     modes: VizMode[]; // length 1, 2, or 4 depending on layout
+    /** Number of spectrum bars/segments for bar/mirror/radial/blob renderers. */
+    barCount: number;
 }
+
+const BAR_COUNT_MIN = 16;
+const BAR_COUNT_MAX = 128;
+const BAR_COUNT_DEFAULT = 64;
 
 const DEFAULT_CONFIG: VizConfig = {
     layout: "single",
     modes: ["bars", "wave", "radial", "blob"],
+    barCount: BAR_COUNT_DEFAULT,
 };
 
 function loadConfig(): VizConfig {
@@ -76,9 +85,13 @@ function loadConfig(): VizConfig {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
             const p = JSON.parse(raw) as Partial<VizConfig>;
+            const bc = typeof p.barCount === "number" && Number.isFinite(p.barCount)
+                ? Math.max(BAR_COUNT_MIN, Math.min(BAR_COUNT_MAX, Math.round(p.barCount)))
+                : DEFAULT_CONFIG.barCount;
             return {
                 layout: p.layout ?? DEFAULT_CONFIG.layout,
                 modes: Array.isArray(p.modes) && p.modes.length === 4 ? p.modes : DEFAULT_CONFIG.modes,
+                barCount: bc,
             };
         }
     } catch { /* ignore */ }
@@ -92,11 +105,11 @@ function saveConfig(c: VizConfig) {
 // ─── Accent palette (mirrors Live settings) ──────────────────────────────
 
 const ACCENT_HEX: Record<string, { primary: string; secondary: string; tertiary: string }> = {
-    rose:    { primary: "#f43f5e", secondary: "#a855f7", tertiary: "#06b6d4" },
-    violet:  { primary: "#a855f7", secondary: "#06b6d4", tertiary: "#f43f5e" },
+    rose: { primary: "#f43f5e", secondary: "#a855f7", tertiary: "#06b6d4" },
+    violet: { primary: "#a855f7", secondary: "#06b6d4", tertiary: "#f43f5e" },
     emerald: { primary: "#10b981", secondary: "#06b6d4", tertiary: "#a855f7" },
-    cyan:    { primary: "#06b6d4", secondary: "#10b981", tertiary: "#f43f5e" },
-    amber:   { primary: "#f59e0b", secondary: "#f43f5e", tertiary: "#a855f7" },
+    cyan: { primary: "#06b6d4", secondary: "#10b981", tertiary: "#f43f5e" },
+    amber: { primary: "#f59e0b", secondary: "#f43f5e", tertiary: "#a855f7" },
 };
 
 // ─── Public props ────────────────────────────────────────────────────────
@@ -111,6 +124,7 @@ interface Props {
 // ─── Component ───────────────────────────────────────────────────────────
 
 export function LiveVisualizerWidget({ remoteSnapshot, className }: Props) {
+    useRenderCount("LiveVisualizerWidget");
     const live = useLiveOptional();
     const settings = useLiveSettings();
     const accent = ACCENT_HEX[settings.accent] ?? ACCENT_HEX.rose;
@@ -132,6 +146,10 @@ export function LiveVisualizerWidget({ remoteSnapshot, className }: Props) {
 
     const setLayout = useCallback((layout: VizLayout) => {
         setConfig(c => ({ ...c, layout }));
+    }, []);
+    const setBarCount = useCallback((n: number) => {
+        const clamped = Math.max(BAR_COUNT_MIN, Math.min(BAR_COUNT_MAX, Math.round(n)));
+        setConfig(c => (c.barCount === clamped ? c : { ...c, barCount: clamped }));
     }, []);
     const setSlotMode = useCallback((slot: number, mode: VizMode) => {
         setConfig(c => {
@@ -164,6 +182,23 @@ export function LiveVisualizerWidget({ remoteSnapshot, className }: Props) {
                 </div>
 
                 <div className="ml-auto flex items-center gap-1" data-no-drag>
+                    <div
+                        className="hidden md:flex items-center gap-1.5 px-1.5 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.06] mr-1"
+                        title={`Spectrum bars: ${config.barCount}`}
+                    >
+                        <BarChart3 className="w-3 h-3 text-white/40" />
+                        <input
+                            type="range"
+                            min={BAR_COUNT_MIN}
+                            max={BAR_COUNT_MAX}
+                            step={4}
+                            value={config.barCount}
+                            onChange={e => setBarCount(parseInt(e.target.value, 10))}
+                            className="w-16 accent-white/70 cursor-pointer"
+                            aria-label="Spectrum bar count"
+                        />
+                        <span className="text-[9px] text-white/50 tabular-nums w-5 text-right">{config.barCount}</span>
+                    </div>
                     <LayoutButton active={config.layout === "single"} onClick={() => setLayout("single")} title="Single view">
                         <SquareIcon className="w-3 h-3" />
                     </LayoutButton>
@@ -189,27 +224,28 @@ export function LiveVisualizerWidget({ remoteSnapshot, className }: Props) {
 
             {/* Canvas grid */}
             {!slot?.collapsed && (
-            <div className={cn(
-                "flex-1 grid gap-1 p-1 min-h-0",
-                config.layout === "single" && "grid-cols-1 grid-rows-1",
-                config.layout === "split2" && "grid-cols-2 grid-rows-1",
-                config.layout === "grid4" && "grid-cols-2 grid-rows-2",
-            )}>
-                {visibleModes.map((mode, i) => (
-                    <VizSlot
-                        key={i}
-                        mode={mode}
-                        accent={accent}
-                        isRemote={isRemote}
-                        remoteSnapshot={remoteSnapshot}
-                        engine={live?.engine ?? null}
-                        onPickerOpen={() => setPickerSlot(i)}
-                        showPicker={pickerSlot === i}
-                        onModeChange={(m) => setSlotMode(i, m)}
-                        onPickerClose={() => setPickerSlot(null)}
-                    />
-                ))}
-            </div>
+                <div className={cn(
+                    "flex-1 grid gap-1 p-1 min-h-0",
+                    config.layout === "single" && "grid-cols-1 grid-rows-1",
+                    config.layout === "split2" && "grid-cols-2 grid-rows-1",
+                    config.layout === "grid4" && "grid-cols-2 grid-rows-2",
+                )}>
+                    {visibleModes.map((mode, i) => (
+                        <VizSlot
+                            key={i}
+                            mode={mode}
+                            accent={accent}
+                            barCount={config.barCount}
+                            isRemote={isRemote}
+                            remoteSnapshot={remoteSnapshot}
+                            engine={live?.engine ?? null}
+                            onPickerOpen={() => setPickerSlot(i)}
+                            showPicker={pickerSlot === i}
+                            onModeChange={(m) => setSlotMode(i, m)}
+                            onPickerClose={() => setPickerSlot(null)}
+                        />
+                    ))}
+                </div>
             )}
         </div>
     );
@@ -234,6 +270,7 @@ function LayoutButton({ active, onClick, title, children }: {
 interface SlotProps {
     mode: VizMode;
     accent: { primary: string; secondary: string; tertiary: string };
+    barCount: number;
     isRemote: boolean;
     remoteSnapshot?: Props["remoteSnapshot"];
     engine: NonNullable<ReturnType<typeof useLiveOptional>>["engine"] | null;
@@ -243,7 +280,7 @@ interface SlotProps {
     onPickerClose: () => void;
 }
 
-function VizSlot({ mode, accent, isRemote, remoteSnapshot, engine, onPickerOpen, showPicker, onModeChange, onPickerClose }: SlotProps) {
+function VizSlot({ mode, accent, barCount, isRemote, remoteSnapshot, engine, onPickerOpen, showPicker, onModeChange, onPickerClose }: SlotProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const stateRef = useRef<VizRenderState>({ particles: [], spectroIdx: 0, peakHold: new Float32Array(64), peakHoldDecay: 0 });
@@ -252,6 +289,7 @@ function VizSlot({ mode, accent, isRemote, remoteSnapshot, engine, onPickerOpen,
     // tear down and re-create the loop.
     const modeRef = useRef(mode); modeRef.current = mode;
     const accentRef = useRef(accent); accentRef.current = accent;
+    const barCountRef = useRef(barCount); barCountRef.current = barCount;
     const remoteRef = useRef(remoteSnapshot); remoteRef.current = remoteSnapshot;
     const engineRef = useRef(engine); engineRef.current = engine;
     const isRemoteRef = useRef(isRemote); isRemoteRef.current = isRemote;
@@ -282,12 +320,10 @@ function VizSlot({ mode, accent, isRemote, remoteSnapshot, engine, onPickerOpen,
         let timeBufL: Uint8Array<ArrayBuffer> | null = null;
         let timeBufR: Uint8Array<ArrayBuffer> | null = null;
 
-        let raf = 0;
         let running = true;
 
         const tick = () => {
             if (!running) return;
-            raf = requestAnimationFrame(tick);
 
             const w = canvas.width;
             const h = canvas.height;
@@ -311,12 +347,13 @@ function VizSlot({ mode, accent, isRemote, remoteSnapshot, engine, onPickerOpen,
                 const eng = engineRef.current;
                 if (eng) {
                     const ana = eng.masterAnalyser;
-                    if (!freqBuf || freqBuf.length !== ana.frequencyBinCount) freqBuf = new Uint8Array(new ArrayBuffer(ana.frequencyBinCount));
+                    // Shared analyser cache: if any other visualiser already
+                    // pulled this analyser this frame, we re-use the buffer.
+                    spectrum = getSharedFrequencyData(ana);
                     if (!timeBuf || timeBuf.length !== ana.fftSize) timeBuf = new Uint8Array(new ArrayBuffer(ana.fftSize));
-                    ana.getByteFrequencyData(freqBuf);
                     ana.getByteTimeDomainData(timeBuf);
-                    spectrum = freqBuf;
                     waveform = timeBuf;
+                    void freqBuf;
                     // Stereo for stereoWave / lissajous
                     const lr = eng.masterAnalyserNodes;
                     if (modeRef.current === "stereoWave" || modeRef.current === "lissajous") {
@@ -342,32 +379,37 @@ function VizSlot({ mode, accent, isRemote, remoteSnapshot, engine, onPickerOpen,
                 spectrum, waveform, waveformL, waveformR,
                 peakL, peakR, isLimiting,
                 accent: accentRef.current,
+                barCount: barCountRef.current,
                 state: stateRef.current,
             };
             switch (modeRef.current) {
-                case "bars":       drawBars(args); break;
-                case "mirror":     drawMirror(args); break;
-                case "wave":       drawWave(args); break;
+                case "bars": drawBars(args); break;
+                case "mirror": drawMirror(args); break;
+                case "wave": drawWave(args); break;
                 case "waveFilled": drawWaveFilled(args); break;
                 case "stereoWave": drawStereoWave(args); break;
-                case "radial":     drawRadial(args); break;
-                case "ring":       drawRing(args); break;
-                case "blob":       drawBlob(args); break;
-                case "particles":  drawParticles(args); break;
-                case "vu":         drawVU(args); break;
-                case "peakRms":    drawPeakRms(args); break;
-                case "lissajous":  drawLissajous(args); break;
+                case "radial": drawRadial(args); break;
+                case "ring": drawRing(args); break;
+                case "blob": drawBlob(args); break;
+                case "particles": drawParticles(args); break;
+                case "vu": drawVU(args); break;
+                case "peakRms": drawPeakRms(args); break;
+                case "lissajous": drawLissajous(args); break;
             }
         };
-        raf = requestAnimationFrame(tick);
+
+        // Subscribe via the shared scheduler so we share frame budget with
+        // every other visualiser. 60 fps for fluid motion; falls to 0 cost
+        // when the tab is hidden (we unsubscribe on visibilitychange).
+        let unsub: (() => void) | null = subscribeRaf(tick, { fps: 60 });
 
         const onVisibility = () => {
             if (document.hidden) {
                 running = false;
-                if (raf) cancelAnimationFrame(raf);
+                if (unsub) { unsub(); unsub = null; }
             } else if (!running) {
                 running = true;
-                raf = requestAnimationFrame(tick);
+                if (!unsub) unsub = subscribeRaf(tick, { fps: 60 });
             }
         };
         document.addEventListener("visibilitychange", onVisibility);
@@ -375,7 +417,7 @@ function VizSlot({ mode, accent, isRemote, remoteSnapshot, engine, onPickerOpen,
         return () => {
             running = false;
             document.removeEventListener("visibilitychange", onVisibility);
-            if (raf) cancelAnimationFrame(raf);
+            if (unsub) unsub();
             ro.disconnect();
         };
     }, []);
@@ -451,6 +493,8 @@ interface RenderArgs {
     waveformR: Uint8Array | number[];
     peakL: number; peakR: number; isLimiting: boolean;
     accent: { primary: string; secondary: string; tertiary: string };
+    /** User-configured spectrum bar/segment count (16..128). */
+    barCount: number;
     state: VizRenderState;
 }
 
@@ -474,8 +518,8 @@ function bandEnergy(spectrum: Uint8Array | number[], from: number, to: number): 
 
 // ─── Renderers ───────────────────────────────────────────────────────────
 
-function drawBars({ ctx, w, h, spectrum, accent, state }: RenderArgs) {
-    const N = Math.min(64, spectrum.length);
+function drawBars({ ctx, w, h, spectrum, accent, barCount, state }: RenderArgs) {
+    const N = Math.min(barCount, spectrum.length);
     const bw = w / N;
     if (state.peakHold.length !== N) state.peakHold = new Float32Array(N);
     const grad = ctx.createLinearGradient(0, 0, 0, h);
@@ -494,8 +538,8 @@ function drawBars({ ctx, w, h, spectrum, accent, state }: RenderArgs) {
     }
 }
 
-function drawMirror({ ctx, w, h, spectrum, accent }: RenderArgs) {
-    const N = Math.min(64, spectrum.length);
+function drawMirror({ ctx, w, h, spectrum, accent, barCount }: RenderArgs) {
+    const N = Math.min(barCount, spectrum.length);
     const bw = w / N;
     const cy = h / 2;
     const grad = ctx.createLinearGradient(0, 0, 0, h);
@@ -584,8 +628,8 @@ function drawStereoWave({ ctx, w, h, waveform, waveformL, waveformR, accent }: R
     ctx.beginPath(); ctx.moveTo(0, upH); ctx.lineTo(w, upH); ctx.stroke();
 }
 
-function drawRadial({ ctx, w, h, spectrum, accent }: RenderArgs) {
-    const N = Math.min(64, spectrum.length);
+function drawRadial({ ctx, w, h, spectrum, accent, barCount }: RenderArgs) {
+    const N = Math.min(barCount, spectrum.length);
     const cx = w / 2, cy = h / 2;
     const r0 = Math.min(w, h) * 0.18;
     const rMax = Math.min(w, h) * 0.45;
@@ -630,8 +674,8 @@ function drawRing({ ctx, w, h, spectrum, accent }: RenderArgs) {
     ctx.shadowBlur = 0;
 }
 
-function drawBlob({ ctx, w, h, spectrum, accent }: RenderArgs) {
-    const N = 64;
+function drawBlob({ ctx, w, h, spectrum, accent, barCount }: RenderArgs) {
+    const N = Math.max(16, Math.min(barCount, spectrum.length));
     const cx = w / 2, cy = h / 2;
     const baseR = Math.min(w, h) * 0.25;
     const bass = bandEnergy(spectrum, 0, 0.1);

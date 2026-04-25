@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -390,6 +391,7 @@ function FolderPicker({ currentPath, onSelect, onClose }: {
 // ─── Component ───────────────────────────────────────────────────────────
 
 export function DownloadClient() {
+    useRenderCount("Page:/download");
     const searchParams = useSearchParams();
     const initialUrl = searchParams.get("url") || "";
     const autoDownload = searchParams.get("auto") === "1";

@@ -84,6 +84,21 @@
         "reveal": "always",
         "panel": "shared"
       }
+    },
+    {
+      "label": "Clean .next Cache",
+      "type": "shell",
+      "command": "Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; Write-Host '.next cache removed.'",
+      "options": {
+        "cwd": "${workspaceFolder}/app",
+        "shell": { "executable": "pwsh", "args": ["-NoProfile", "-Command"] }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
     }
   ]
 }

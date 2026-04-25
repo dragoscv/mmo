@@ -104,7 +104,7 @@ export function AudioPlayer() {
                 onTouchEnd={swipe.onTouchEnd}
             >
                 <div className="absolute -top-8 left-0 right-0 h-8 bg-gradient-to-t from-background/80 to-transparent pointer-events-none" />
-                <div className="relative bg-card/90 backdrop-blur-2xl border-t border-border pb-[env(safe-area-inset-bottom)]">
+                <div className="relative bg-card/95 border-t border-border pb-[env(safe-area-inset-bottom)]">
                     <div className="flex items-center justify-center gap-3 px-4 py-3 h-[56px]">
                         <button
                             onClick={openNowPlaying}
@@ -139,8 +139,13 @@ export function AudioPlayer() {
                 {/* Gradient glow behind the bar */}
                 <div className="absolute -top-8 left-0 right-0 h-8 bg-gradient-to-t from-background/80 to-transparent pointer-events-none" />
 
-                {/* Glass container */}
-                <div className="relative bg-card/90 backdrop-blur-2xl border-t border-border pb-[env(safe-area-inset-bottom)]">
+                {/* Glass container — `bg-card/95` is effectively opaque, so a
+                    heavy backdrop-filter would only re-blur what's already
+                    covered. An animated <BarWaveformBg> behind it meant
+                    Chromium was re-blurring the whole bar width every frame
+                    during playback — a large chunk of the compositor cost on
+                    any page that hosts this bar (mixer included). */}
+                <div className="relative bg-card/95 border-t border-border pb-[env(safe-area-inset-bottom)]">
                     {/* Decorative background waveform */}
                     <BarWaveformBg trackId={currentTrack.id} progress={progress / 100} isPlaying={isPlaying} />
                     {/* Animated progress line at top — clickable for seeking */}

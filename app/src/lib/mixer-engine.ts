@@ -2,6 +2,7 @@
 
 import { audioPreloadCache } from "./audio-preload-cache";
 import { RealtimeStemProcessor } from "./stems-engine";
+import { dlog } from "./dev-debugger";
 
 /**
  * DJ Mixer Audio Engine
@@ -406,7 +407,11 @@ export class DeckEngine {
         this.gainNode.gain.value = 1;
 
         this.analyser = ctx.createAnalyser();
-        this.analyser.fftSize = 256;
+        // 1024 gives ~21 Hz frequency resolution at 44.1 kHz — far better
+        // spectrum/EQ visualisation than the old 256 (~86 Hz bins) at
+        // negligible CPU cost on modern browsers (FFT is SIMD/native).
+        this.analyser.fftSize = 1024;
+        this.analyser.smoothingTimeConstant = 0.75;
 
         // Headphone cue pre-fader send
         this.cueSendGain = ctx.createGain();
@@ -454,26 +459,57 @@ export class DeckEngine {
         this.audio.addEventListener("ended", () => {
             this.onEnded?.();
         });
+        // Time-tracking loop runs only while audio is actually playing —
+        // keeping a per-deck rAF spinning at idle (×4 decks) is wasted work.
+        this.audio.addEventListener("play", () => this.startTimeTracking());
+        this.audio.addEventListener("pause", () => this.stopTimeTracking());
 
+        // Initial start in case audio begins before listeners attach.
         this.startTimeTracking();
     }
 
-    private startTimeTracking() {
-        const update = (now: number) => {
-            if (!this.audio.paused) {
-                // Throttle React state updates to ~4Hz (every 250ms) instead of 60fps
-                if (now - this.lastTimeNotify >= 250) {
-                    this.lastTimeNotify = now;
-                    this.onTimeUpdate?.(this.audio.currentTime);
-                }
+    private stopTimeTracking() {
+        if (this.loopRAF !== null) {
+            cancelAnimationFrame(this.loopRAF);
+            this.loopRAF = null;
+        }
+    }
 
-                // Loop logic (must still check every frame)
-                if (this.audio.dataset.loopEnabled === "true") {
-                    const loopEnd = parseFloat(this.audio.dataset.loopEnd || "0");
-                    if (loopEnd > 0 && this.audio.currentTime >= loopEnd) {
-                        const loopStart = parseFloat(this.audio.dataset.loopStart || "0");
-                        this.audio.currentTime = loopStart;
-                    }
+    private startTimeTracking() {
+        // Idempotent: if a previous loop is already pending we have nothing
+        // to do. Multiple `play` events would otherwise stack rAF callbacks.
+        if (this.loopRAF !== null) return;
+
+        // We do two things every frame:
+        //   1. Notify React of the current time (throttled — see below).
+        //   2. Enforce manual loop boundaries.
+        //
+        // Why throttle (1)? Calling onTimeUpdate at 60 Hz triggers a Zustand
+        // setState → React re-render across the whole mixer view, which is
+        // an FPS killer. The waveform/playhead reads time DIRECTLY via
+        // `getCurrentTime()` inside its own draw loop (frame-accurate, no
+        // React work), so we only need React state for time labels & loops.
+        // 12 Hz (~83 ms) is the sweet spot: visibly smooth digit ticking,
+        // ~5× cheaper than the prior 4 Hz vs. 60 Hz options.
+        const update = (now: number) => {
+            // Self-cancel when paused — the `pause` event will already have
+            // called stopTimeTracking but this guards against races where
+            // `audio.paused` flips before the next event fires.
+            if (this.audio.paused) {
+                this.loopRAF = null;
+                return;
+            }
+            if (now - this.lastTimeNotify >= 83) {
+                this.lastTimeNotify = now;
+                this.onTimeUpdate?.(this.audio.currentTime);
+            }
+
+            // Loop logic (must still check every frame for sample-accurate boundary)
+            if (this.audio.dataset.loopEnabled === "true") {
+                const loopEnd = parseFloat(this.audio.dataset.loopEnd || "0");
+                if (loopEnd > 0 && this.audio.currentTime >= loopEnd) {
+                    const loopStart = parseFloat(this.audio.dataset.loopStart || "0");
+                    this.audio.currentTime = loopStart;
                 }
             }
             this.loopRAF = requestAnimationFrame(update);
@@ -506,6 +542,7 @@ export class DeckEngine {
     }
 
     loadTrack(trackId: number) {
+        dlog("deck", `loadTrack id=${trackId}`, { trackId });
         // Use cached blob URL if available, start preloading in background
         this.audio.src = audioPreloadCache.getUrl(trackId);
         this.audio.load();
@@ -528,16 +565,20 @@ export class DeckEngine {
     }
 
     play() {
+        dlog("deck", `play t=${this.audio.currentTime.toFixed(2)}s`, { time: this.audio.currentTime, src: this.audio.src });
         if (this.ctx.state === "suspended") this.ctx.resume();
         this.audio.play().catch(() => { });
     }
 
     pause() {
+        dlog("deck", `pause t=${this.audio.currentTime.toFixed(2)}s`, { time: this.audio.currentTime });
         this.audio.pause();
     }
 
     seek(time: number) {
-        this.audio.currentTime = Math.max(0, Math.min(time, this.audio.duration || 0));
+        const target = Math.max(0, Math.min(time, this.audio.duration || 0));
+        dlog("deck", `seek to=${target.toFixed(2)}s`, { from: this.audio.currentTime, to: target });
+        this.audio.currentTime = target;
     }
 
     /** Nudge playback forward/backward by a small amount (for beatmatching) */
@@ -1142,7 +1183,13 @@ export class MixerEngine {
     midiClockBpm = 120;
 
     constructor() {
-        this.ctx = new AudioContext({ latencyHint: "playback" });
+        // `interactive` requests the smallest hardware audio buffer the OS
+        // will give us. Critical for a DJ mixer: cue/play/sync feel snappy,
+        // beat-FX trigger near-instantly, and MIDI knob → audio response
+        // shrinks from ~50–200 ms (the default "playback" hint) to typically
+        // ~10–30 ms on Windows/macOS.
+        this.ctx = new AudioContext({ latencyHint: "interactive" });
+        dlog("audio", `AudioContext created sr=${this.ctx.sampleRate}Hz state=${this.ctx.state}`, { sampleRate: this.ctx.sampleRate, baseLatency: this.ctx.baseLatency });
 
         // Expose AudioContext globally for performance monitoring
         if (typeof window !== "undefined") {
@@ -1155,7 +1202,8 @@ export class MixerEngine {
         this.deckDGain = this.ctx.createGain();
         this.masterGain = this.ctx.createGain();
         this.masterAnalyser = this.ctx.createAnalyser();
-        this.masterAnalyser.fftSize = 256;
+        this.masterAnalyser.fftSize = 1024;
+        this.masterAnalyser.smoothingTimeConstant = 0.75;
 
         // Headphone cue bus
         this.cueGain = this.ctx.createGain();

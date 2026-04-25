@@ -4,6 +4,7 @@ import { useDAW } from "./daw-context";
 import { usePerformanceStats } from "@/hooks/use-performance-stats";
 import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     Cpu, HardDrive, Music, Layers, Clock, Activity, Zap, MemoryStick, MonitorSpeaker, Box,
 } from "lucide-react";
@@ -35,6 +36,7 @@ function PerfDot({ pct }: { pct: number }) {
 }
 
 export function DAWStatusBar() {
+    useRenderCount("DAWStatusBar");
     const daw = useDAW();
     const stats = usePerformanceStats();
     const settings = useDAWSettings();
@@ -58,9 +60,10 @@ export function DAWStatusBar() {
     const secs = Math.floor(durationTime % 60);
 
     return (
-        <div className="h-6 bg-[var(--daw-surface)] border-t border-[var(--daw-border)] flex items-center px-3 gap-3 flex-shrink-0">
+        <div className="h-6 bg-[var(--daw-surface)] border-t border-[var(--daw-border)] flex items-stretch flex-shrink-0 overflow-hidden">
+            <div className="daw-scroll-x daw-scroll-x-fade flex-1 flex items-center px-2 sm:px-3 gap-3 [&>*]:shrink-0">
             {/* Performance */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 [&>*]:shrink-0">
                 {cfg.showFps && (
                     <div className="flex items-center gap-1">
                         <PerfDot pct={100 - fpsPct} />
@@ -126,7 +129,7 @@ export function DAWStatusBar() {
             <div className="w-px h-3 bg-[var(--daw-border)]" />
 
             {/* Project info */}
-            <div className="flex items-center gap-3 flex-1">
+            <div className="flex items-center gap-3 [&>*]:shrink-0">
                 <StatusItem icon={Music} label="Tracks" value={String(project.tracks.length)} />
                 <StatusItem icon={Layers} label="Clips" value={String(clipCount)} />
                 {noteCount > 0 && <StatusItem label="Notes" value={String(noteCount)} />}
@@ -135,8 +138,10 @@ export function DAWStatusBar() {
                 <StatusItem label="" value={`${project.timeSignature.numerator}/${project.timeSignature.denominator}`} />
             </div>
 
+            <div className="flex-1 min-w-2" />
+
             {/* Right: Status */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 [&>*]:shrink-0">
                 <StatusItem icon={HardDrive} label="" value={saveText} color={saveColor} />
                 <div className="flex items-center gap-1">
                     <span className="text-[9px] text-[var(--daw-text-dim)]">History</span>
@@ -151,6 +156,7 @@ export function DAWStatusBar() {
                 <span className="text-[9px] text-[var(--daw-text-dim)] opacity-60 font-mono">
                     {daw.snap === "none" ? "Free" : `Snap ${daw.snap}`}
                 </span>
+            </div>
             </div>
         </div>
     );

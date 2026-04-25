@@ -59,6 +59,62 @@ export function useContextMenu() {
     return ctx;
 }
 
+/**
+ * Touch-friendly long-press → contextmenu trigger.
+ *
+ * Returns props to spread on any element. On touch devices, holding the
+ * element for `ms` (default 500 ms) without significant movement fires the
+ * provided contextmenu builder. On mouse, this is a no-op (right-click
+ * already works via the standard `onContextMenu` handler).
+ *
+ * Usage:
+ *   const longPress = useLongPress((x, y) => ctx.show(x, y, items));
+ *   <div {...longPress} onContextMenu={...}>...
+ */
+export function useLongPress(
+    onLongPress: (clientX: number, clientY: number) => void,
+    opts: { ms?: number; moveTolerance?: number } = {},
+) {
+    const { ms = 500, moveTolerance = 8 } = opts;
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const startRef = useRef<{ x: number; y: number } | null>(null);
+    const firedRef = useRef(false);
+    const cbRef = useRef(onLongPress);
+    cbRef.current = onLongPress;
+
+    const cancel = useCallback(() => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+        startRef.current = null;
+    }, []);
+
+    const onPointerDown = useCallback((e: React.PointerEvent) => {
+        if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+        firedRef.current = false;
+        startRef.current = { x: e.clientX, y: e.clientY };
+        const x = e.clientX;
+        const y = e.clientY;
+        timerRef.current = setTimeout(() => {
+            firedRef.current = true;
+            cbRef.current(x, y);
+        }, ms);
+    }, [ms]);
+
+    const onPointerMove = useCallback((e: React.PointerEvent) => {
+        if (!startRef.current) return;
+        const dx = Math.abs(e.clientX - startRef.current.x);
+        const dy = Math.abs(e.clientY - startRef.current.y);
+        if (dx > moveTolerance || dy > moveTolerance) cancel();
+    }, [cancel, moveTolerance]);
+
+    const onPointerUp = useCallback(() => cancel(), [cancel]);
+    const onPointerCancel = useCallback(() => cancel(), [cancel]);
+
+    return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Provider
 // ═══════════════════════════════════════════════════════════════════════════
@@ -83,7 +139,7 @@ export function DAWContextMenuProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (!menu) return;
 
-        const handleClick = (e: MouseEvent) => {
+        const handleClick = (e: PointerEvent) => {
             if (menuRef.current?.contains(e.target as Node)) return;
             if (subRef.current?.contains(e.target as Node)) return;
             hide();
@@ -93,11 +149,11 @@ export function DAWContextMenuProvider({ children }: { children: ReactNode }) {
         };
         const handleScroll = () => hide();
 
-        document.addEventListener("mousedown", handleClick, true);
+        document.addEventListener("pointerdown", handleClick, true);
         document.addEventListener("keydown", handleKey);
         window.addEventListener("scroll", handleScroll, true);
         return () => {
-            document.removeEventListener("mousedown", handleClick, true);
+            document.removeEventListener("pointerdown", handleClick, true);
             document.removeEventListener("keydown", handleKey);
             window.removeEventListener("scroll", handleScroll, true);
         };

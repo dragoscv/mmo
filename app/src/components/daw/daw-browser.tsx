@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { EFFECT_TYPES, DRUM_KIT_DEFAULT } from "@/lib/daw-engine";
 import { useContextMenu, type MenuEntry } from "./daw-context-menu";
+import { useTouchDrag } from "./daw-ui-utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 type BrowserTab = "files" | "samples" | "plugins" | "presets";
 
@@ -64,6 +66,7 @@ interface LibraryTrack {
 }
 
 export function DAWBrowser() {
+    useRenderCount("DAWBrowser");
     const daw = useDAW();
     const [tab, setTab] = useState<BrowserTab>("files");
     const [searchQuery, setSearchQuery] = useState("");
@@ -204,49 +207,68 @@ function FileBrowser({ tracks, loading, query }: { tracks: LibraryTrack[]; loadi
     return (
         <div>
             {tracks.map(track => (
-                <div
+                <LibraryTrackRow
                     key={track.id}
-                    className="flex items-center gap-2 px-2 py-1 hover:bg-white/5 cursor-pointer group"
-                    draggable
-                    onDragStart={e => {
-                        e.dataTransfer.setData("text/plain", JSON.stringify({ type: "library-track", track }));
-                        e.dataTransfer.effectAllowed = "copy";
-                        const ghost = document.createElement("div");
-                        ghost.style.cssText = `
-                            position: fixed; top: -1000px; left: -1000px;
-                            padding: 6px 12px; border-radius: 6px;
-                            background: linear-gradient(135deg, rgba(59,130,246,0.9), rgba(37,99,235,0.9));
-                            color: white; font-size: 11px; font-family: system-ui;
-                            display: flex; align-items: center; gap: 6px;
-                            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-                            white-space: nowrap; border: 1px solid rgba(255,255,255,0.15);
-                        `;
-                        ghost.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span>${track.title}</span>`;
-                        document.body.appendChild(ghost);
-                        e.dataTransfer.setDragImage(ghost, 20, 20);
-                        requestAnimationFrame(() => document.body.removeChild(ghost));
-                    }}
+                    track={track}
                     onContextMenu={e => handleTrackContextMenu(e, track)}
-                >
-                    <FileAudio className="h-3 w-3 text-white/20 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                        <p className="text-[11px] text-white/70 truncate">{track.title}</p>
-                        <p className="text-[9px] text-white/30 truncate">{track.artist}</p>
-                    </div>
-                    {track.bpm && <span className="text-[9px] text-white/20 font-mono">{track.bpm}</span>}
-                    {track.key && <span className="text-[9px] text-white/20">{track.key}</span>}
-                    <button
-                        onClick={e => {
-                            e.stopPropagation();
-                            daw.importTrackFromLibrary(track.filePath, track.title);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded bg-purple-500/20 hover:bg-purple-500/40 text-purple-400 transition-all"
-                    >
-                        <Plus className="h-3 w-3" />
-                    </button>
-                </div>
+                    onAdd={() => daw.importTrackFromLibrary(track.filePath, track.title)}
+                />
             ))}
             {tracks.length === 0 && <div className="p-3 text-center text-[11px] text-white/20">No results</div>}
+        </div>
+    );
+}
+
+function LibraryTrackRow({ track, onContextMenu, onAdd }: {
+    track: LibraryTrack;
+    onContextMenu: (e: React.MouseEvent) => void;
+    onAdd: () => void;
+}) {
+    const touchDrag = useTouchDrag({
+        payload: { type: "library-track", track },
+        ghostText: track.title,
+    });
+    return (
+        <div
+            className="flex items-center gap-2 px-2 py-1 hover:bg-white/5 cursor-pointer group"
+            draggable
+            onDragStart={e => {
+                e.dataTransfer.setData("text/plain", JSON.stringify({ type: "library-track", track }));
+                e.dataTransfer.effectAllowed = "copy";
+                const ghost = document.createElement("div");
+                ghost.style.cssText = `
+                    position: fixed; top: -1000px; left: -1000px;
+                    padding: 6px 12px; border-radius: 6px;
+                    background: linear-gradient(135deg, rgba(59,130,246,0.9), rgba(37,99,235,0.9));
+                    color: white; font-size: 11px; font-family: system-ui;
+                    display: flex; align-items: center; gap: 6px;
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+                    white-space: nowrap; border: 1px solid rgba(255,255,255,0.15);
+                `;
+                ghost.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span>${track.title}</span>`;
+                document.body.appendChild(ghost);
+                e.dataTransfer.setDragImage(ghost, 20, 20);
+                requestAnimationFrame(() => document.body.removeChild(ghost));
+            }}
+            onContextMenu={onContextMenu}
+            {...touchDrag}
+        >
+            <FileAudio className="h-3 w-3 text-white/20 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-white/70 truncate">{track.title}</p>
+                <p className="text-[9px] text-white/30 truncate">{track.artist}</p>
+            </div>
+            {track.bpm && <span className="text-[9px] text-white/20 font-mono">{track.bpm}</span>}
+            {track.key && <span className="text-[9px] text-white/20">{track.key}</span>}
+            <button
+                onClick={e => {
+                    e.stopPropagation();
+                    onAdd();
+                }}
+                        className="opacity-60 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded bg-purple-500/20 hover:bg-purple-500/40 text-purple-400 transition-all"
+            >
+                <Plus className="h-3 w-3" />
+            </button>
         </div>
     );
 }
@@ -440,101 +462,106 @@ function SampleBrowser() {
                                 defaultOpen={false}
                             >
                                 {genre.samples.map(sample => (
-                                    <div
+                                    <SampleRow
                                         key={sample.path}
-                                        className={cn(
-                                            "flex items-center gap-1.5 px-4 py-0.5 hover:bg-white/5 cursor-pointer group text-[10px]",
-                                            previewUrl === sample.path && "bg-purple-500/10"
-                                        )}
-                                        draggable
-                                        onDragStart={e => {
-                                            e.dataTransfer.setData("text/plain", JSON.stringify({
-                                                type: "sample",
-                                                path: sample.path,
-                                                name: sample.name,
-                                                duration: sample.duration,
-                                                sampleType: sample.type,
-                                            }));
-                                            e.dataTransfer.effectAllowed = "copy";
-                                            // Custom drag image
-                                            const ghost = document.createElement("div");
-                                            ghost.style.cssText = `
-                                                position: fixed; top: -1000px; left: -1000px;
-                                                padding: 6px 12px; border-radius: 6px;
-                                                background: linear-gradient(135deg, rgba(139,92,246,0.9), rgba(109,40,217,0.9));
-                                                color: white; font-size: 11px; font-family: system-ui;
-                                                display: flex; align-items: center; gap: 6px;
-                                                box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-                                                backdrop-filter: blur(8px); white-space: nowrap;
-                                                border: 1px solid rgba(255,255,255,0.15);
-                                            `;
-                                            ghost.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M2 12h4l3-9 4 18 3-9h4"/></svg><span>${sample.name}</span>`;
-                                            document.body.appendChild(ghost);
-                                            e.dataTransfer.setDragImage(ghost, 20, 20);
-                                            requestAnimationFrame(() => document.body.removeChild(ghost));
-                                        }}
+                                        sample={sample}
+                                        isPreviewing={previewUrl === sample.path}
+                                        onTogglePreview={() => togglePreview(sample.path)}
                                         onContextMenu={e => handleSampleContextMenu(e, sample, genre)}
                                         onDoubleClick={() => daw.importTrackFromLibrary(sample.path, sample.name)}
-                                    >
-                                        {/* Play preview button */}
-                                        <button
-                                            onClick={e => { e.stopPropagation(); togglePreview(sample.path); }}
-                                            className={cn(
-                                                "w-3.5 h-3.5 flex items-center justify-center flex-shrink-0 rounded-sm transition-colors",
-                                                previewUrl === sample.path
-                                                    ? "text-purple-400"
-                                                    : "text-white/15 opacity-0 group-hover:opacity-100"
-                                            )}
-                                        >
-                                            {previewUrl === sample.path
-                                                ? <Pause className="h-2.5 w-2.5" />
-                                                : <Play className="h-2.5 w-2.5" />}
-                                        </button>
-
-                                        {/* Name */}
-                                        <span className={cn(
-                                            "flex-1 truncate",
-                                            previewUrl === sample.path ? "text-purple-300/80" : "text-white/50"
-                                        )}>
-                                            {sample.name}
-                                        </span>
-
-                                        {/* Duration */}
-                                        <span className="text-[8px] text-white/15 font-mono flex-shrink-0">
-                                            {sample.duration < 1
-                                                ? `${Math.round(sample.duration * 1000)}ms`
-                                                : `${sample.duration.toFixed(1)}s`}
-                                        </span>
-
-                                        {/* Key indicator */}
-                                        {sample.key && (
-                                            <span className="text-[8px] text-cyan-400/30 font-mono flex-shrink-0 w-5 text-center">
-                                                {sample.key}
-                                            </span>
-                                        )}
-
-                                        {/* One-shot indicator */}
-                                        {sample.oneshot && (
-                                            <span className="text-[7px] text-green-400/25 flex-shrink-0">1S</span>
-                                        )}
-
-                                        {/* Add button */}
-                                        <button
-                                            onClick={e => {
-                                                e.stopPropagation();
-                                                daw.importTrackFromLibrary(sample.path, sample.name);
-                                            }}
-                                            className="opacity-0 group-hover:opacity-100 w-3.5 h-3.5 flex items-center justify-center rounded-sm bg-purple-500/20 hover:bg-purple-500/40 text-purple-400 transition-all flex-shrink-0"
-                                        >
-                                            <Plus className="h-2.5 w-2.5" />
-                                        </button>
-                                    </div>
+                                        onAdd={() => daw.importTrackFromLibrary(sample.path, sample.name)}
+                                    />
                                 ))}
                             </CollapsibleSection>
                         ))}
                     </CollapsibleSection>
                 ))}
             </div>
+        </div>
+    );
+}
+
+function SampleRow({ sample, isPreviewing, onTogglePreview, onContextMenu, onDoubleClick, onAdd }: {
+    sample: SampleInfo;
+    isPreviewing: boolean;
+    onTogglePreview: () => void;
+    onContextMenu: (e: React.MouseEvent) => void;
+    onDoubleClick: () => void;
+    onAdd: () => void;
+}) {
+    const touchDrag = useTouchDrag({
+        payload: {
+            type: "sample",
+            path: sample.path,
+            name: sample.name,
+            duration: sample.duration,
+            sampleType: sample.type,
+        },
+        ghostText: sample.name,
+    });
+    return (
+        <div
+            className={cn(
+                "flex items-center gap-1.5 px-4 py-0.5 hover:bg-white/5 cursor-pointer group text-[10px]",
+                isPreviewing && "bg-purple-500/10"
+            )}
+            draggable
+            onDragStart={e => {
+                e.dataTransfer.setData("text/plain", JSON.stringify({
+                    type: "sample",
+                    path: sample.path,
+                    name: sample.name,
+                    duration: sample.duration,
+                    sampleType: sample.type,
+                }));
+                e.dataTransfer.effectAllowed = "copy";
+                const ghost = document.createElement("div");
+                ghost.style.cssText = `
+                    position: fixed; top: -1000px; left: -1000px;
+                    padding: 6px 12px; border-radius: 6px;
+                    background: linear-gradient(135deg, rgba(139,92,246,0.9), rgba(109,40,217,0.9));
+                    color: white; font-size: 11px; font-family: system-ui;
+                    display: flex; align-items: center; gap: 6px;
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+                    backdrop-filter: blur(8px); white-space: nowrap;
+                    border: 1px solid rgba(255,255,255,0.15);
+                `;
+                ghost.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M2 12h4l3-9 4 18 3-9h4"/></svg><span>${sample.name}</span>`;
+                document.body.appendChild(ghost);
+                e.dataTransfer.setDragImage(ghost, 20, 20);
+                requestAnimationFrame(() => document.body.removeChild(ghost));
+            }}
+            onContextMenu={onContextMenu}
+            onDoubleClick={onDoubleClick}
+            {...touchDrag}
+        >
+            <button
+                onClick={e => { e.stopPropagation(); onTogglePreview(); }}
+                className={cn(
+                    "w-3.5 h-3.5 flex items-center justify-center flex-shrink-0 rounded-sm transition-colors",
+                    isPreviewing ? "text-purple-400" : "text-white/15 opacity-0 group-hover:opacity-100"
+                )}
+            >
+                {isPreviewing ? <Pause className="h-2.5 w-2.5" /> : <Play className="h-2.5 w-2.5" />}
+            </button>
+            <span className={cn("flex-1 truncate", isPreviewing ? "text-purple-300/80" : "text-white/50")}>
+                {sample.name}
+            </span>
+            <span className="text-[8px] text-white/15 font-mono flex-shrink-0">
+                {sample.duration < 1 ? `${Math.round(sample.duration * 1000)}ms` : `${sample.duration.toFixed(1)}s`}
+            </span>
+            {sample.key && (
+                <span className="text-[8px] text-cyan-400/30 font-mono flex-shrink-0 w-5 text-center">{sample.key}</span>
+            )}
+            {sample.oneshot && (
+                <span className="text-[7px] text-green-400/25 flex-shrink-0">1S</span>
+            )}
+            <button
+                onClick={e => { e.stopPropagation(); onAdd(); }}
+                className="opacity-60 group-hover:opacity-100 w-3.5 h-3.5 flex items-center justify-center rounded-sm bg-purple-500/20 hover:bg-purple-500/40 text-purple-400 transition-all flex-shrink-0"
+            >
+                <Plus className="h-2.5 w-2.5" />
+            </button>
         </div>
     );
 }

@@ -28,6 +28,14 @@ export interface LiveMetersSnapshot {
     tunerCents: number;
     tunerFrequency: number;
     tunerConfidence: number;
+    /** When auto-correct is active, the MIDI note the corrector is steering
+     *  the input towards. -1 when auto-correct is off or no target. */
+    autoCorrectTargetMidi: number;
+    /** When auto-correct is active, the actively detected source MIDI note
+     *  in continuous fractional MIDI. NaN when no detection. */
+    autoCorrectSourceMidi: number;
+    /** True while the engine's internal auto-correct loop is running. */
+    autoCorrectActive: boolean;
     recordingDuration: number;
     backingPosition: number;
 }
@@ -44,6 +52,9 @@ const EMPTY: LiveMetersSnapshot = {
     tunerCents: 0,
     tunerFrequency: 0,
     tunerConfidence: 0,
+    autoCorrectTargetMidi: -1,
+    autoCorrectSourceMidi: NaN,
+    autoCorrectActive: false,
     recordingDuration: 0,
     backingPosition: 0,
 };

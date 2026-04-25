@@ -76,9 +76,9 @@ export function DAWProjectModal() {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => daw.setProjectModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4" onClick={() => daw.setProjectModal(false)}>
             <div
-                className="w-[520px] max-h-[80vh] bg-[var(--daw-bg)] border border-[var(--daw-border)] rounded-xl shadow-2xl flex flex-col overflow-hidden"
+                className="w-full max-w-[520px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[80vh] bg-[var(--daw-bg)] border border-[var(--daw-border)] rounded-xl shadow-2xl flex flex-col overflow-hidden"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}

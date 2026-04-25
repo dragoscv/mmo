@@ -12,6 +12,8 @@
  * - All effects built from native Web Audio API nodes (low latency)
  */
 
+import { dlog } from "@/lib/dev-debugger";
+
 // ─── Types ───────────────────────────────────────────────────────────────
 
 export type FxType =
@@ -118,52 +120,114 @@ export const MUSICAL_SCALES: Record<number, { name: string; intervals: number[] 
 
 // ─── Pitch Detection (YIN Algorithm) ────────────────────────────────────
 
-function detectPitchYIN(buffer: Float32Array<ArrayBufferLike>, sampleRate: number): PitchInfo {
-    const SIZE = buffer.length;
-    const threshold = 0.15;
-    const yinBuffer = new Float32Array(Math.floor(SIZE / 2));
+const PITCH_MIN_HZ = 65;          // ~C2 — covers male vocals, bass instruments
+const PITCH_MAX_HZ = 1500;        // ~F#6 — covers whistle register, no harmonics noise
+const PITCH_THRESHOLD = 0.18;     // YIN absolute threshold; smaller = stricter
+const PITCH_FALLBACK_MIN = 0.7;   // accept the global minimum if it's at least this clean
+const PITCH_RMS_GATE = 0.0008;    // ~ -62 dBFS — just above ambient noise floor
+const PITCH_CORRELATION_WINDOW = 1024; // # samples used for YIN. 1024 @ 48 kHz = 21 ms detection lag, covers ≥ 93 Hz (down to F#2 male voice). Halved from 2048 for lower latency.
 
-    // Step 1+2: Difference function
+function detectPitchYIN(buffer: Float32Array<ArrayBufferLike>, sampleRate: number): PitchInfo {
+    const noPitch: PitchInfo = { frequency: 0, note: "—", noteIndex: -1, cents: 0, confidence: 0 };
+
+    const N = buffer.length;
+
+    // ── 1. Quick RMS gate + DC offset removal ──────────────────────
+    // Computing the autocorrelation on near-silence wastes CPU and the
+    // detector ends up locking onto room tone / electrical hum.
+    let mean = 0;
+    for (let i = 0; i < N; i++) mean += buffer[i];
+    mean /= N;
+    let rmsSum = 0;
+    for (let i = 0; i < N; i++) {
+        const v = buffer[i] - mean;
+        rmsSum += v * v;
+    }
+    const rms = Math.sqrt(rmsSum / N);
+    if (rms < PITCH_RMS_GATE) return noPitch;
+
+    // ── 2. Restricted tau range ────────────────────────────────────
+    // Outside the realistic instrumental/vocal band the algorithm finds
+    // false minima from harmonics or aliasing — restricting saves cycles
+    // AND improves accuracy.
+    const minTau = Math.max(2, Math.floor(sampleRate / PITCH_MAX_HZ));
+    const maxTau = Math.min(Math.floor(N / 2) - 1, Math.ceil(sampleRate / PITCH_MIN_HZ));
+    if (maxTau <= minTau + 4) return noPitch;
+
+    // Inner correlation window — fixed length so cost is predictable
+    // regardless of tau. Length must satisfy W + maxTau <= N. We cap it
+    // to keep CPU bounded; 2048 samples @ 48 kHz still gives 2+ cycles of
+    // even the lowest tracked frequency (65 Hz ⇒ ~740 samples/period).
+    const W = Math.min(PITCH_CORRELATION_WINDOW, N - maxTau);
+    if (W < 256) return noPitch;
+
+    const yinBuffer = new Float32Array(maxTau + 2);
+
+    // ── 3. Difference function over [minTau..maxTau] ───────────────
     let runningSum = 0;
     yinBuffer[0] = 1;
-    for (let tau = 1; tau < yinBuffer.length; tau++) {
+    for (let tau = 1; tau <= maxTau; tau++) {
         let sum = 0;
-        for (let j = 0; j < yinBuffer.length; j++) {
-            const delta = buffer[j] - buffer[j + tau];
+        for (let j = 0; j < W; j++) {
+            const delta = (buffer[j] - mean) - (buffer[j + tau] - mean);
             sum += delta * delta;
         }
         yinBuffer[tau] = sum;
-        runningSum += yinBuffer[tau];
-        yinBuffer[tau] *= tau / runningSum; // Cumulative mean normalized
+        runningSum += sum;
+        // Cumulative-mean normalised difference (CMND)
+        yinBuffer[tau] = runningSum > 0 ? sum * tau / runningSum : 1;
     }
 
-    // Step 3: Absolute threshold
+    // ── 4. Find best minimum within valid tau range ────────────────
+    // Strategy:
+    //   a. Look for the FIRST tau in range where CMND < PITCH_THRESHOLD
+    //      and it's a local minimum (descend into the well).
+    //   b. If none found, fall back to the GLOBAL minimum in range — but
+    //      only if it's at least somewhat clean (< PITCH_FALLBACK_MIN).
     let tauEstimate = -1;
-    for (let tau = 2; tau < yinBuffer.length; tau++) {
-        if (yinBuffer[tau] < threshold) {
-            while (tau + 1 < yinBuffer.length && yinBuffer[tau + 1] < yinBuffer[tau]) {
-                tau++;
-            }
-            tauEstimate = tau;
-            break;
+    let bestVal = Infinity;
+    let bestTau = -1;
+
+    for (let tau = minTau; tau <= maxTau; tau++) {
+        const v = yinBuffer[tau];
+        if (v < bestVal) {
+            bestVal = v;
+            bestTau = tau;
+        }
+        if (tauEstimate === -1 && v < PITCH_THRESHOLD) {
+            // Walk down to the bottom of the well.
+            let t = tau;
+            while (t + 1 <= maxTau && yinBuffer[t + 1] < yinBuffer[t]) t++;
+            tauEstimate = t;
+            // Don't break — we still want bestTau/bestVal for confidence.
         }
     }
 
-    const noPitch: PitchInfo = { frequency: 0, note: "—", noteIndex: -1, cents: 0, confidence: 0 };
-    if (tauEstimate === -1) return noPitch;
+    if (tauEstimate === -1) {
+        if (bestVal > PITCH_FALLBACK_MIN || bestTau < minTau) return noPitch;
+        tauEstimate = bestTau;
+    }
 
-    // Step 4: Parabolic interpolation for sub-sample accuracy
-    const s0 = yinBuffer[tauEstimate - 1];
+    // ── 5. Parabolic interpolation around the chosen tau ───────────
+    const s0 = yinBuffer[tauEstimate - 1] ?? yinBuffer[tauEstimate];
     const s1 = yinBuffer[tauEstimate];
     const s2 = yinBuffer[tauEstimate + 1] ?? s1;
-    const betterTau = tauEstimate + (s0 - s2) / (2 * (s0 - 2 * s1 + s2));
+    const denom = 2 * (s0 - 2 * s1 + s2);
+    const betterTau = denom !== 0 ? tauEstimate + (s0 - s2) / denom : tauEstimate;
 
     const frequency = sampleRate / betterTau;
-    if (frequency < 50 || frequency > 2000) return noPitch;
+    if (!Number.isFinite(frequency) || frequency < PITCH_MIN_HZ || frequency > PITCH_MAX_HZ) {
+        return noPitch;
+    }
 
-    const confidence = 1 - (s1 < 1 ? s1 : 1);
+    // ── 6. Confidence: 1 - dip value, clamped, with octave-error penalty ──
+    // A clean voiced signal gives s1 close to 0; rough or noisy gives ~0.3.
+    // Penalise barely-passing detections so downstream gates can drop them.
+    const dipQuality = 1 - Math.min(1, Math.max(0, s1));
+    const rmsBoost = Math.min(1, rms * 8); // 0..1 ramp from RMS_GATE..0.125
+    const confidence = Math.max(0, Math.min(1, dipQuality * (0.5 + 0.5 * rmsBoost)));
 
-    // Convert to note
+    // ── 7. Convert to MIDI / note name ─────────────────────────────
     const midiNote = 12 * Math.log2(frequency / 440) + 69;
     const roundedNote = Math.round(midiNote);
     const cents = Math.round((midiNote - roundedNote) * 100);
@@ -201,22 +265,66 @@ export class AudioFxEngine {
     private chainInput: GainNode;
     private chainOutput: GainNode;
 
+    // Pitch shifter worklet — lazily loaded the first time a pitchShift /
+    // autotune insert is requested, then reused. While the worklet is still
+    // loading, those inserts fall back to a transparent dry/wet pass-through
+    // so the audio path doesn't break.
+    private pitchWorkletLoaded = false;
+    private pitchWorkletLoading: Promise<boolean> | null = null;
+    private pitchShifterNodes: Map<string, AudioWorkletNode> = new Map();
+
+    // Built-in auto-correct (always-on insertion point between chainOutput
+    // and outputNode). Lives outside the user-managed FX chain so the user
+    // can toggle scale-based pitch correction without touching their FX
+    // setup. Lazily created the first time it's enabled.
+    private autoCorrectNode: AudioWorkletNode | null = null;
+    private autoCorrectActive = false;
+    // Scale + tuning config that drives the auto-correct ratio in real
+    // time. Decoupled from React: a private setInterval reads the latest
+    // pitch and writes pitchRatio so we don't depend on UI tick rate /
+    // effect dependency chasing.
+    private autoCorrectScalePCs: Set<number> | null = null;
+    private autoCorrectAmount = 1;
+    private autoCorrectSpeed = 0.05;
+    private autoCorrectTimer: ReturnType<typeof setInterval> | null = null;
+    private autoCorrectScratch: Float32Array<ArrayBuffer> | null = null;
+    private autoCorrectLastRms = 0;
+    private autoCorrectLastRatio = 1;
+    private autoCorrectLastTargetMidi: number | null = null;
+    private autoCorrectLastSourceMidi: number | null = null;
+    private autoCorrectStableMidi: number | null = null;
+    private autoCorrectStableSince = 0;
+    /** Real-time pitch listeners. Fired at 250 Hz whenever the pitch
+     *  driver is running (auto-correct active OR ≥1 listener present).
+     *  Bypasses the React meter loop, which is throttled to the user's
+     *  UI refresh-rate (default 4 Hz) — way too slow for an instrument
+     *  synth that needs to retune in <30 ms. */
+    private pitchListeners = new Set<(p: { noteIndex: number; frequency: number; confidence: number; rms: number }) => void>();
+
     constructor(ctx?: AudioContext) {
         // Request absolute minimum latency: latencyHint as a number (seconds)
         // 0.001 = request ~1ms, browser will pick the lowest supported buffer
         // On Chrome/Windows WASAPI shared mode this achieves ~3-10ms base latency
         // vs. ~10-20ms with "interactive" hint
         this.ctx = ctx || new AudioContext({ latencyHint: 0.001, sampleRate: 48000 });
+        dlog("audio-fx", "engine constructed", { shared: !!ctx, sampleRate: this.ctx.sampleRate, baseLatency: this.ctx.baseLatency });
 
         this.inputNode = this.ctx.createGain();
         this.outputNode = this.ctx.createGain();
         this.chainInput = this.ctx.createGain();
         this.chainOutput = this.ctx.createGain();
 
-        // Analysers for visualization (NOT in the audio output critical path)
+        // Single analyser used for BOTH visualization (spectrum/waveform)
+        // AND pitch detection. fftSize=2048 gives ~43 ms of time-domain
+        // data — still enough to track fundamentals down to ~93 Hz, and
+        // halves the visualization buffer for lower perceived latency.
+        // We deliberately do NOT use a dedicated pre-FX analyser: a
+        // dangling AnalyserNode (no path to destination) gets optimised
+        // out by Chromium's audio engine and reads back as zeros.
+        // smoothingTimeConstant=0 because YIN must see the raw waveform.
         this.analyserNode = this.ctx.createAnalyser();
         this.analyserNode.fftSize = 2048;
-        this.analyserNode.smoothingTimeConstant = 0.8;
+        this.analyserNode.smoothingTimeConstant = 0;
 
         this.analyserNodeL = this.ctx.createAnalyser();
         this.analyserNodeL.fftSize = 128; // Minimum FFT for peak metering
@@ -229,7 +337,7 @@ export class AudioFxEngine {
         // Analysers on PARALLEL branch (not in series!) to avoid adding latency
         this.inputNode.connect(this.chainInput);
         this.chainOutput.connect(this.outputNode);           // Direct to output
-        this.chainOutput.connect(this.analyserNode);          // Parallel: viz only
+        this.chainOutput.connect(this.analyserNode);          // Parallel: viz + pitch
         this.chainOutput.connect(this.splitter);              // Parallel: L/R meters
         this.splitter.connect(this.analyserNodeL, 0);
         this.splitter.connect(this.analyserNodeR, 1);
@@ -296,6 +404,376 @@ export class AudioFxEngine {
     get inputActive(): boolean { return this.isInputActive; }
     get currentInputDeviceId(): string { return this.inputDeviceId; }
 
+    // ─── Pitch Shifter Worklet ────────────────────────────────────
+
+    /**
+     * Loads the granular pitch shifter AudioWorklet. Idempotent — subsequent
+     * calls return the same promise. Resolves to `true` on success.
+     */
+    async ensurePitchWorkletLoaded(): Promise<boolean> {
+        if (this.pitchWorkletLoaded) return true;
+        if (this.pitchWorkletLoading) return this.pitchWorkletLoading;
+        this.pitchWorkletLoading = (async () => {
+            try {
+                if (!this.ctx.audioWorklet) return false;
+                await this.ctx.audioWorklet.addModule("/worklets/pitch-shifter-processor.js");
+                this.pitchWorkletLoaded = true;
+                return true;
+            } catch (err) {
+                dlog("audio-fx", "pitch worklet load failed", err);
+                return false;
+            }
+        })();
+        return this.pitchWorkletLoading;
+    }
+
+    get isPitchWorkletReady(): boolean { return this.pitchWorkletLoaded; }
+
+    /**
+     * Returns the underlying AudioWorkletNode for a pitchShift / autotune
+     * insert (so external callers — e.g. the autotune meter loop — can update
+     * `pitchRatio` in real time). Returns null if the insert isn't using the
+     * worklet (because it loaded asynchronously after the chain was built).
+     */
+    getPitchShifterNode(insertId: string): AudioWorkletNode | null {
+        return this.pitchShifterNodes.get(insertId) ?? null;
+    }
+
+    /**
+     * Enable / disable the built-in auto-correct pitch shifter that lives
+     * between the user FX chain output and the engine output.
+     *
+     * Routing:
+     *   off →  chainOutput ───────────────────────────► outputNode
+     *   on  →  chainOutput ─► autoCorrectNode ────────► outputNode
+     *
+     * Returns the underlying AudioWorkletNode when active so the caller
+     * can drive `pitchRatio` in real time. Returns null if disabled or if
+     * the worklet failed to load (in which case audio falls through clean).
+     */
+    async setAutoCorrectEnabled(enabled: boolean): Promise<AudioWorkletNode | null> {
+        if (!enabled) {
+            if (this.autoCorrectActive) {
+                this.autoCorrectActive = false;
+                // Reroute: chainOutput → outputNode (direct).
+                try { this.chainOutput.disconnect(); } catch { /* */ }
+                this.chainOutput.connect(this.outputNode);
+                this.chainOutput.connect(this.analyserNode);
+                this.chainOutput.connect(this.splitter);
+                if (this.autoCorrectNode) {
+                    try { this.autoCorrectNode.disconnect(); } catch { /* */ }
+                }
+            }
+            this.stopAutoCorrectDriver();
+            return null;
+        }
+        const ok = await this.ensurePitchWorkletLoaded();
+        if (!ok) return null;
+        if (!this.autoCorrectNode) {
+            try {
+                this.autoCorrectNode = new AudioWorkletNode(this.ctx, "pitch-shifter", {
+                    numberOfInputs: 1,
+                    numberOfOutputs: 1,
+                    outputChannelCount: [1],
+                    channelCount: 1,
+                    channelCountMode: "explicit",
+                    channelInterpretation: "speakers",
+                });
+                const mix = this.autoCorrectNode.parameters.get("mix");
+                if (mix) mix.value = 1;
+                const ratio = this.autoCorrectNode.parameters.get("pitchRatio");
+                if (ratio) ratio.value = 1;
+            } catch (err) {
+                dlog("audio-fx", "auto-correct node creation failed", err);
+                return null;
+            }
+        }
+        if (!this.autoCorrectActive) {
+            this.autoCorrectActive = true;
+            // Reroute: chainOutput → autoCorrectNode → outputNode.
+            try { this.chainOutput.disconnect(); } catch { /* */ }
+            this.chainOutput.connect(this.autoCorrectNode);
+            this.autoCorrectNode.connect(this.outputNode);
+            // Keep meter / viz analysers tapped on chainOutput (pre-correction)
+            // so the pitch detector still sees the original voice and can
+            // compute the corrective ratio.
+            this.chainOutput.connect(this.analyserNode);
+            this.chainOutput.connect(this.splitter);
+        }
+        this.startAutoCorrectDriver();
+        return this.autoCorrectNode;
+    }
+
+    /**
+     * Configure the scale used by the built-in auto-correct shifter. Call
+     * whenever the user changes Key, Scale, Amount or Speed in the UI.
+     */
+    setAutoCorrectScale(opts: { keyIndex: number; intervals: number[]; amount?: number; speed?: number; }): void {
+        const pcs = new Set<number>();
+        for (const iv of opts.intervals) {
+            pcs.add(((opts.keyIndex + iv) % 12 + 12) % 12);
+        }
+        this.autoCorrectScalePCs = pcs.size > 0 ? pcs : null;
+        if (typeof opts.amount === "number") this.autoCorrectAmount = Math.max(0, Math.min(1, opts.amount));
+        if (typeof opts.speed === "number") this.autoCorrectSpeed = Math.max(0.005, Math.min(0.5, opts.speed));
+    }
+
+    /**
+     * Toggle the formant preservation flag on the underlying pitch shifter
+     * worklet. Has effect only while auto-correct is active.
+     */
+    setAutoCorrectFormantPreserve(enabled: boolean): void {
+        const node = this.autoCorrectNode;
+        if (!node) return;
+        const p = node.parameters.get("formantPreserve");
+        if (!p) return;
+        try {
+            p.setValueAtTime(enabled ? 1 : 0, this.ctx.currentTime);
+        } catch { /* */ }
+    }
+
+    private startAutoCorrectDriver(): void {
+        if (this.autoCorrectTimer) return;
+        // 250 Hz internal loop — 4 ms tick. Aggressive but cheap with
+        // PITCH_CORRELATION_WINDOW=1024. Halves the average phase delay
+        // between a pitch change and the corrector reacting.
+        this.autoCorrectTimer = setInterval(() => this.tickPitch(), 4);
+    }
+
+    private stopAutoCorrectDriver(): void {
+        // Don't kill the driver if pitch listeners are still attached —
+        // they need real-time pitch updates too (instrument synth, etc.).
+        if (this.pitchListeners.size > 0) return;
+        if (this.autoCorrectTimer) {
+            clearInterval(this.autoCorrectTimer);
+            this.autoCorrectTimer = null;
+        }
+        // Reset the worklet's ratio so when re-enabled it starts unity.
+        const node = this.autoCorrectNode;
+        if (node) {
+            const p = node.parameters.get("pitchRatio");
+            if (p) {
+                try { p.cancelScheduledValues(this.ctx.currentTime); } catch { /* */ }
+                try { p.setTargetAtTime(1, this.ctx.currentTime, 0.02); } catch { /* */ }
+            }
+        }
+    }
+
+    /**
+     * Subscribe to real-time pitch updates at 250 Hz. The callback runs
+     * inside the engine's pitch-driver tick — keep it fast (no async
+     * work, no React state writes that schedule re-renders).
+     *
+     * The subscriber gets `noteIndex` (0..11, -1 if no pitch),
+     * `frequency` (Hz, 0 if none), `confidence` (0..1) and `rms`.
+     *
+     * Returns an unsubscribe function. The driver auto-stops when the
+     * last listener detaches AND auto-correct is off.
+     */
+    addPitchListener(fn: (p: { noteIndex: number; frequency: number; confidence: number; rms: number }) => void): () => void {
+        this.pitchListeners.add(fn);
+        // Spin up the driver if it wasn't already running for autocorrect.
+        if (!this.autoCorrectTimer) {
+            this.autoCorrectTimer = setInterval(() => this.tickPitch(), 4);
+        }
+        return () => {
+            this.pitchListeners.delete(fn);
+            if (this.pitchListeners.size === 0 && !this.autoCorrectActive) {
+                if (this.autoCorrectTimer) {
+                    clearInterval(this.autoCorrectTimer);
+                    this.autoCorrectTimer = null;
+                }
+            }
+        };
+    }
+
+    private tickPitch(): void {
+        // Always run pitch detection if anyone needs it. Auto-correct
+        // logic only runs when active; listeners (e.g. the instrument
+        // synth) get a notification regardless.
+        const ratioParam = this.autoCorrectNode?.parameters.get("pitchRatio") ?? null;
+
+        // Read pre-correction time-domain data and run YIN.
+        if (!this.autoCorrectScratch || this.autoCorrectScratch.length !== this.analyserNode.fftSize) {
+            this.autoCorrectScratch = new Float32Array(this.analyserNode.fftSize) as Float32Array<ArrayBuffer>;
+        }
+        this.analyserNode.getFloatTimeDomainData(this.autoCorrectScratch);
+        const pitch = detectPitchYIN(this.autoCorrectScratch, this.ctx.sampleRate);
+        // Cache the most recent detection so React can read it for live
+        // diagnostics independently of the UI's tickMeters cadence.
+        this.lastPitch = pitch;
+        // Quick RMS read so UI can show "is anything reaching the analyser?"
+        let acc = 0;
+        const buf = this.autoCorrectScratch;
+        for (let i = 0; i < buf.length; i++) acc += buf[i] * buf[i];
+        const rms = Math.sqrt(acc / buf.length);
+        this.autoCorrectLastRms = rms;
+
+        // Notify listeners FIRST (before any return paths) so an
+        // instrument synth still hears "no pitch / silence" updates and
+        // can release its envelope quickly.
+        if (this.pitchListeners.size > 0) {
+            const payload = {
+                noteIndex: pitch.noteIndex,
+                frequency: pitch.frequency,
+                confidence: pitch.confidence,
+                rms,
+            };
+            for (const fn of this.pitchListeners) {
+                try { fn(payload); } catch { /* never let a listener kill the driver */ }
+            }
+        }
+
+        // From here on, only auto-correct work.
+        if (!this.autoCorrectActive || !this.autoCorrectNode || !ratioParam) return;
+
+        // No pitch → hold last ratio (avoid jolting back to 1.0 between
+        // consonants). After 200 ms of no pitch + low RMS, release to 1.
+        if (!(pitch.confidence > 0.05 && pitch.frequency > 0)) {
+            const now = performance.now();
+            if (this.autoCorrectStableSince === 0) this.autoCorrectStableSince = now;
+            if (now - this.autoCorrectStableSince > 200 || this.autoCorrectLastRms < 0.0008) {
+                this.autoCorrectLastRatio = 1;
+                this.autoCorrectLastTargetMidi = null;
+                this.autoCorrectLastSourceMidi = null;
+                try { ratioParam.setTargetAtTime(1, this.ctx.currentTime, 0.04); } catch { /* */ }
+            }
+            return;
+        }
+        this.autoCorrectStableSince = 0;
+
+        let ratio = 1;
+        let targetMidi: number | null = null;
+        const exactMidi = 12 * Math.log2(pitch.frequency / 440) + 69;
+        if (this.autoCorrectScalePCs) {
+            // Search ±6 semitones for the in-scale candidate with the
+            // smallest fractional distance to the input.
+            //
+            // Tie-break upward: when two scale tones are equidistant
+            // (e.g. F is exactly between E and F# in D Major), prefer
+            // the higher one. Matches musical convention (leading-tone
+            // resolution upward) and the user's ear in major scales.
+            let bestDelta: number | null = null;
+            let bestMidi = 0;
+            for (let off = -6; off <= 6; off++) {
+                const candidateMidi = Math.round(exactMidi) + off;
+                const candidatePC = ((candidateMidi % 12) + 12) % 12;
+                if (!this.autoCorrectScalePCs.has(candidatePC)) continue;
+                const delta = candidateMidi - exactMidi;
+                if (bestDelta === null) {
+                    bestDelta = delta; bestMidi = candidateMidi;
+                } else {
+                    const ad = Math.abs(delta);
+                    const ab = Math.abs(bestDelta);
+                    // Strict closer wins; on ties (within 1 cent), the
+                    // higher candidate wins (upward bias).
+                    if (ad < ab - 0.01 || (Math.abs(ad - ab) <= 0.01 && candidateMidi > bestMidi)) {
+                        bestDelta = delta; bestMidi = candidateMidi;
+                    }
+                }
+            }
+            if (bestDelta !== null) {
+                targetMidi = bestMidi;
+                // Anti-flip hysteresis (60 cents): once locked to a
+                // target, stay there until the input is unambiguously
+                // closer (>50 cents margin) to a different scale tone.
+                // Vibrato is typically ±50–80 cents, so a 25-cent margin
+                // (the previous value) caused the target to flip every
+                // vibrato cycle; the AudioParam couldn't track that and
+                // the output landed in a mix of both targets — what the
+                // user described as "displays correct but sounds wrong".
+                const STICKY_CENTS = 0.60; // 60 cents in semitone units
+                if (
+                    this.autoCorrectStableMidi !== null &&
+                    bestMidi !== this.autoCorrectStableMidi &&
+                    Math.abs(this.autoCorrectStableMidi - exactMidi) < Math.abs(bestDelta) + STICKY_CENTS
+                ) {
+                    targetMidi = this.autoCorrectStableMidi;
+                    bestDelta = this.autoCorrectStableMidi - exactMidi;
+                }
+                this.autoCorrectStableMidi = targetMidi;
+
+                // ── Humanizer soft-knee on the correction amount ──────
+                // Below 8 cents the singer is essentially in tune; we
+                // don't touch the pitch at all so micro-variations and
+                // the peaks of vibrato come through naturally.
+                // 8–40 cents: smooth ramp-in (preserves vibrato shape
+                // while still pulling slow drift back).
+                // >40 cents: full user-set amount.
+                // The soft-knee is what makes Auto-Tune Evo / Melodyne
+                // sound natural rather than T-Pain robotic.
+                const devCents = Math.abs(bestDelta) * 100;
+                let knee: number;
+                if (devCents <= 8) knee = 0;
+                else if (devCents >= 40) knee = 1;
+                else {
+                    const x = (devCents - 8) / (40 - 8);
+                    // smoothstep — C¹ continuous, no corner artifacts.
+                    knee = x * x * (3 - 2 * x);
+                }
+                const semis = bestDelta * this.autoCorrectAmount * knee;
+                ratio = Math.pow(2, semis / 12);
+                if (ratio < 0.5) ratio = 0.5;
+                if (ratio > 2) ratio = 2;
+            }
+        }
+
+        // ── Note-onset fast-path ──────────────────────────────────────
+        // On big pitch jumps (> 1.5 semitones between ticks) the singer
+        // changed notes. Use a much faster time constant so the new
+        // ratio engages quickly, but NEVER snap with setValueAtTime —
+        // an instantaneous param change makes the worklet's read-head
+        // lag stale (anchored for the old ratio), and the heads read
+        // discontinuous content for the rest of the current grain →
+        // audible pop. 15 ms reaches 95 % in ~45 ms, fast enough to
+        // feel instant, slow enough that the worklet smoother + grain
+        // envelope absorb the change cleanly.
+        //
+        // Gate the onset path on confidence > 0.5 so a single noisy
+        // YIN reading on a consonant or breath doesn't fire a fake
+        // onset (which used to produce a stray pop on every "p" / "t").
+        const prevSrc = this.autoCorrectLastSourceMidi;
+        const isOnset =
+            prevSrc !== null &&
+            pitch.confidence > 0.5 &&
+            Math.abs(exactMidi - prevSrc) > 1.5;
+
+        this.autoCorrectLastRatio = ratio;
+        this.autoCorrectLastTargetMidi = targetMidi;
+        this.autoCorrectLastSourceMidi = exactMidi;
+        try {
+            const tau = isOnset ? 0.015 : this.autoCorrectSpeed;
+            ratioParam.setTargetAtTime(ratio, this.ctx.currentTime, tau);
+        } catch { /* */ }
+    }
+
+    /** Live diagnostics for the auto-correct loop. Updated at 60 Hz while
+     *  the auto-corrector is active; stale otherwise. Used by the UI to
+     *  drive the LED-style correction meter. */
+    getAutoCorrectStatus(): {
+        active: boolean;
+        rms: number;
+        pitch: PitchInfo;
+        ratio: number;
+        semitones: number;
+        sourceMidi: number | null;
+        targetMidi: number | null;
+    } {
+        return {
+            active: this.autoCorrectActive,
+            rms: this.autoCorrectLastRms,
+            pitch: this.lastPitch,
+            ratio: this.autoCorrectLastRatio,
+            semitones: this.autoCorrectLastRatio === 1 ? 0 : 12 * Math.log2(this.autoCorrectLastRatio),
+            sourceMidi: this.autoCorrectLastSourceMidi,
+            targetMidi: this.autoCorrectLastTargetMidi,
+        };
+    }
+
+    get autoCorrectShifter(): AudioWorkletNode | null {
+        return this.autoCorrectActive ? this.autoCorrectNode : null;
+    }
+
     // ─── Latency Reporting ────────────────────────────────────────
 
     getLatencyInfo(): LatencyInfo {
@@ -328,6 +806,7 @@ export class AudioFxEngine {
             }
         }
         this.fxNodes.clear();
+        this.pitchShifterNodes.clear();
         this.chain = inserts;
 
         // Build new chain
@@ -379,17 +858,15 @@ export class AudioFxEngine {
         const spectrum = new Float32Array(this.analyserNode.frequencyBinCount) as Float32Array<ArrayBuffer>;
         this.analyserNode.getFloatFrequencyData(spectrum);
 
-        // Waveform
+        // Time domain — used for both pitch detection (YIN) and waveform.
         this.analyserNode.getFloatTimeDomainData(this.pitchBuffer);
-
-        // Pitch
         this.lastPitch = detectPitchYIN(this.pitchBuffer, this.ctx.sampleRate);
 
         return {
             peakL, peakR, rms,
             pitch: this.lastPitch,
             spectrum,
-            waveform: Float32Array.from(this.pitchBuffer),
+            waveform: Float32Array.from(this.pitchBuffer) as Float32Array<ArrayBuffer>,
         };
     }
 
@@ -423,6 +900,7 @@ export class AudioFxEngine {
     // ─── Cleanup ─────────────────────────────────────────────────────
 
     destroy(): void {
+        this.stopAutoCorrectDriver();
         this.stopInput();
         try { this.chainInput.disconnect(); } catch { /* ok */ }
         try { this.chainOutput.disconnect(); } catch { /* ok */ }
@@ -781,34 +1259,55 @@ export class AudioFxEngine {
                 return [comp];
             }
             case "autotune": {
-                // Autotune is mostly about pitch detection + subtle pitch correction
-                // In Web Audio API we can approximate with a pitch-tracking detune approach
-                // The actual correction is done in the metering loop by analyzing pitch
-                // and applying subtle detune to a DelayNode-based granular pitch shifter
-                const dryGain = this.ctx.createGain();
-                dryGain.gain.value = 1 - (p.amount || 1);
-                const wetGain = this.ctx.createGain();
-                wetGain.gain.value = p.amount || 1;
-                const merge = this.ctx.createGain();
-                const split = this.ctx.createGain();
-                split.connect(dryGain);
-                split.connect(wetGain);
-                dryGain.connect(merge);
-                wetGain.connect(merge);
-                return [split, merge];
+                // Real-time pitch correction. Uses a granular pitch-shifter
+                // worklet whose `pitchRatio` is set externally (by the
+                // voice-processor meter loop) to snap detected pitch to the
+                // nearest in-scale note. When the worklet hasn't loaded yet
+                // we kick off the load and return a transparent pass-through;
+                // the chain rebuilds automatically once it's ready.
+                if (this.pitchWorkletLoaded && typeof AudioWorkletNode !== "undefined") {
+                    const node = new AudioWorkletNode(this.ctx, "pitch-shifter", {
+                        numberOfInputs: 1,
+                        numberOfOutputs: 1,
+                        outputChannelCount: [1],
+                    });
+                    const ratioParam = node.parameters.get("pitchRatio");
+                    const mixParam = node.parameters.get("mix");
+                    if (ratioParam) ratioParam.value = 1;
+                    if (mixParam) mixParam.value = Math.max(0, Math.min(1, p.amount ?? 1));
+                    this.pitchShifterNodes.set(insert.id, node);
+                    return [node];
+                }
+                if (!this.pitchWorkletLoading) {
+                    void this.ensurePitchWorkletLoaded().then((ok) => {
+                        if (ok) this.setChain(this.chain);
+                    });
+                }
+                return [this.ctx.createGain()];
             }
             case "pitchShift": {
-                const dry = this.ctx.createGain();
-                dry.gain.value = 1 - p.mix;
-                const wet = this.ctx.createGain();
-                wet.gain.value = p.mix;
-                const merge = this.ctx.createGain();
-                const split = this.ctx.createGain();
-                split.connect(dry);
-                split.connect(wet);
-                dry.connect(merge);
-                wet.connect(merge);
-                return [split, merge];
+                // Static pitch shift driven by `semitones` + `cents` params.
+                if (this.pitchWorkletLoaded && typeof AudioWorkletNode !== "undefined") {
+                    const node = new AudioWorkletNode(this.ctx, "pitch-shifter", {
+                        numberOfInputs: 1,
+                        numberOfOutputs: 1,
+                        outputChannelCount: [1],
+                    });
+                    const semis = (p.semitones ?? 0) + (p.cents ?? 0) / 100;
+                    const ratio = Math.pow(2, semis / 12);
+                    const ratioParam = node.parameters.get("pitchRatio");
+                    const mixParam = node.parameters.get("mix");
+                    if (ratioParam) ratioParam.value = Math.max(0.25, Math.min(4, ratio));
+                    if (mixParam) mixParam.value = Math.max(0, Math.min(1, p.mix ?? 1));
+                    this.pitchShifterNodes.set(insert.id, node);
+                    return [node];
+                }
+                if (!this.pitchWorkletLoading) {
+                    void this.ensurePitchWorkletLoaded().then((ok) => {
+                        if (ok) this.setChain(this.chain);
+                    });
+                }
+                return [this.ctx.createGain()];
             }
             case "noiseSuppression": {
                 // Gate-like noise suppression

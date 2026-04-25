@@ -25,6 +25,7 @@
  */
 
 import { AudioFxEngine, NOTE_NAMES, type LiveMeterData } from "./audio-fx-engine";
+import { dlog } from "@/lib/dev-debugger";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,14 @@ export class LiveEngine {
 
     // Master signal path
     private mainBus: GainNode;
+    /** Insert gain between `voice.output` and `mainBus` so we can mute the
+     *  dry mic without touching the user's voice output gain slider — used
+     *  by the Instrument widget's "Hear mic" toggle. */
+    private voiceMonitorGain: GainNode;
+    /** Public bus for additional in-app sources (e.g. instrument synth) that
+     *  should land on the master mix without going through the voice FX
+     *  engine. */
+    readonly instrumentBus: GainNode;
     private masterLimiter: DynamicsCompressorNode;
     private masterGain: GainNode;
     private monitorGain: GainNode;
@@ -162,6 +171,7 @@ export class LiveEngine {
     constructor() {
         // Aggressively low latency
         this.ctx = new AudioContext({ latencyHint: 0.001, sampleRate: 48000 });
+        dlog("live", "engine constructed", { sampleRate: this.ctx.sampleRate, baseLatency: this.ctx.baseLatency });
 
         // Voice engine — shares no AudioContext (uses its own). For routing we'll connect its output to our mainBus.
         // We pass our own ctx so they share clock/sample rate.
@@ -211,8 +221,19 @@ export class LiveEngine {
         this.metroMonitorGain.gain.value = 0.5;
         this.metroMonitorGain.connect(this.ctx.destination);
 
-        // Voice → mainBus
-        this.voice.output.connect(this.mainBus);
+        // Voice → voiceMonitor → mainBus (the monitor gain lets us mute the
+        // dry mic independently when the user only wants to hear the
+        // re-voiced instrument).
+        this.voiceMonitorGain = this.ctx.createGain();
+        this.voiceMonitorGain.gain.value = 1.0;
+        this.voice.output.connect(this.voiceMonitorGain);
+        this.voiceMonitorGain.connect(this.mainBus);
+
+        // Instrument bus → mainBus (separate node so muting the mic does not
+        // mute the synth and vice-versa).
+        this.instrumentBus = this.ctx.createGain();
+        this.instrumentBus.gain.value = 1.0;
+        this.instrumentBus.connect(this.mainBus);
 
         // mainBus → limiter → masterGain → destination
         this.mainBus.connect(this.masterLimiter);
@@ -315,6 +336,23 @@ export class LiveEngine {
         this.monitorGain.gain.value = clamped;
         this.metroMonitorGain.gain.value = clamped * this.state.metronomeVolume;
         this.notify();
+    }
+
+    /**
+     * Mute / unmute the dry mic monitor (everything coming from the voice FX
+     * engine). When `false`, the mic is silenced on the master mix while
+     * recording, streaming, loopers and the instrument bus continue to
+     * receive a clean voice tap unaffected. Ramps to avoid clicks.
+     */
+    setVoiceMonitor(enabled: boolean, fadeMs = 30) {
+        const t = this.ctx.currentTime;
+        const target = enabled ? 1 : 0;
+        try {
+            this.voiceMonitorGain.gain.cancelScheduledValues(t);
+            this.voiceMonitorGain.gain.setTargetAtTime(target, t, Math.max(0.005, fadeMs / 1000));
+        } catch {
+            this.voiceMonitorGain.gain.value = target;
+        }
     }
 
     // ─── Tempo / Key ─────────────────────────────────────────────────
@@ -546,8 +584,10 @@ export class LiveEngine {
             this.state.isRecording = true;
             this.state.recordingDuration = 0;
             this.notify();
+            dlog("live", "recording started", { mime });
         } catch (e) {
             console.error("[LiveEngine] startRecording failed:", e);
+            dlog("live", "recording start failed", { error: String(e) }, "error");
         }
     }
 

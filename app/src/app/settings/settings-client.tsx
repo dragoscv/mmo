@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { updateSetting } from "@/actions/settings";
 import { importRekordboxAction, checkFileExists, getFileSize } from "@/actions/import";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     Save,
     Loader2,
@@ -31,8 +32,10 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { resetUserPreferences } from "@/actions/user-preferences";
-import { SYNCABLE_KEYS } from "@/lib/syncable-keys";
+import { clearSyncableLocalStorage } from "@/lib/syncable-keys";
 import { useOfflineMode } from "@/hooks/use-offline";
+import { ProfilesTab } from "@/components/settings/profiles-tab";
+import { UserCircle2 } from "lucide-react";
 
 interface SettingsClientProps {
     settings: Record<string, string>;
@@ -45,6 +48,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function SettingsClient({ settings }: SettingsClientProps) {
+    useRenderCount("Page:/settings");
     const [isPending, startTransition] = useTransition();
     const [activeTab, setActiveTab] = useState("general");
     const offline = useOfflineMode();
@@ -192,10 +196,14 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 
     return (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-3xl">
-            <TabsList className="mb-6 w-full grid grid-cols-4">
+            <TabsList className="mb-6 w-full grid grid-cols-5">
                 <TabsTrigger value="general" className="gap-2">
                     <Settings className="h-3.5 w-3.5" />
                     General
+                </TabsTrigger>
+                <TabsTrigger value="profiles" className="gap-2">
+                    <UserCircle2 className="h-3.5 w-3.5" />
+                    Profiles
                 </TabsTrigger>
                 <TabsTrigger value="folders" className="gap-2">
                     <FolderOpen className="h-3.5 w-3.5" />
@@ -210,6 +218,11 @@ export function SettingsClient({ settings }: SettingsClientProps) {
                     Offline
                 </TabsTrigger>
             </TabsList>
+
+            {/* ===== PROFILES TAB ===== */}
+            <TabsContent value="profiles">
+                <ProfilesTab />
+            </TabsContent>
 
             {/* ===== GENERAL TAB ===== */}
             <TabsContent value="general" className="space-y-4 animate-[fadeIn_200ms_ease-out]">
@@ -365,9 +378,7 @@ export function SettingsClient({ settings }: SettingsClientProps) {
                             size="sm"
                             className="gap-2 text-red-400 hover:text-red-300 hover:border-red-500/50"
                             onClick={async () => {
-                                for (const key of SYNCABLE_KEYS) {
-                                    localStorage.removeItem(key);
-                                }
+                                clearSyncableLocalStorage();
                                 try {
                                     await resetUserPreferences();
                                 } catch { /* ignore if not authenticated */ }

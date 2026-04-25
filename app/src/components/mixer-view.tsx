@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useEffect, useState, useReducer, memo, Fragment } from "react";
-import { useMixer } from "./mixer-context";
+import { useCallback, useRef, useEffect, useState, useReducer, useMemo, memo, Fragment } from "react";
+import { useMixer, useMixerActions } from "./mixer-context";
 import { usePlayer } from "./player-context";
 import { DeckTrackPicker } from "./deck-track-picker";
 import { MixerWaveforms, CUE_COLORS } from "./mixer-waveforms";
@@ -11,11 +11,14 @@ import { SamplePickerModal } from "./sample-picker-modal";
 import { TrackContextMenu } from "./track-actions";
 import type { MidiActionHandler } from "@/lib/midi-engine";
 import { useMidi, useMidiMessages } from "@/hooks/use-midi";
+import { subscribeRaf, getSharedFrequencyData, getSharedTimeDomainData } from "@/lib/raf-scheduler";
+import { useDeckCurrentTime } from "@/lib/mixer-time-store";
 import { usePersonalization } from "@/hooks/use-personalization";
 import { CircuitTracksPanel, CircuitTracksBadge } from "./circuit-tracks-panel";
 import { PerformancePanel } from "./performance-stats";
 import { JogWheel } from "./jog-wheel";
 import { cn, formatDuration, formatBytes, formatKey } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import type { DeckState } from "@/lib/mixer-engine";
 import { useDAWSettings } from "@/hooks/use-daw-settings";
 import {
@@ -413,36 +416,43 @@ const Crossfader = memo(function Crossfader({ value, onChange }: { value: number
 function LevelMeter({ analyser, color }: { analyser: AnalyserNode | null; color: string }) {
     const barARef = useRef<HTMLDivElement>(null);
     const barBRef = useRef<HTMLDivElement>(null);
-    const rafRef = useRef<number>(undefined);
 
     useEffect(() => {
         if (!analyser) return;
-        const data = new Uint8Array(analyser.frequencyBinCount);
+        let lastLevel = -1;
+        let lastWasHot = false;
         const update = () => {
-            analyser.getByteFrequencyData(data);
+            // Use the shared analyser cache: if the waveform / spectrum already
+            // pulled this frame, we re-use their buffer instead of stalling the
+            // audio thread again.
+            const data = getSharedFrequencyData(analyser);
             // Sample every 4th bin instead of summing all (4× faster)
             let sum = 0;
             const step = 4;
             const len = data.length;
             for (let i = 0; i < len; i += step) sum += data[i];
             const level = sum / (len / step) / 255;
+            // Skip DOM writes when nothing visibly changed (cheap early exit).
+            if (Math.abs(level - lastLevel) < 0.005 && (level > 0.7) === lastWasHot) return;
+            lastLevel = level;
+            lastWasHot = level > 0.7;
             const h = `${Math.min(level * 130, 100)}%`;
-            const bg = `linear-gradient(to top, ${color}, ${level > 0.7 ? "#ef4444" : color})`;
+            const bg = `linear-gradient(to top, ${color}, ${lastWasHot ? "#ef4444" : color})`;
             if (barARef.current) { barARef.current.style.height = h; barARef.current.style.background = bg; }
             if (barBRef.current) { barBRef.current.style.height = h; barBRef.current.style.background = bg; }
-            rafRef.current = requestAnimationFrame(update);
         };
-        rafRef.current = requestAnimationFrame(update);
-        return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+        // Level meters at 30 fps look identical to 60 fps to the human eye and
+        // halve their main-thread cost.
+        return subscribeRaf(update, { fps: 30 });
     }, [analyser, color]);
 
     return (
         <div className="flex gap-0.5 h-20">
             <div className="w-1.5 rounded-full bg-white/5 overflow-hidden flex flex-col-reverse">
-                <div ref={barARef} className="rounded-full" style={{ height: "0%", willChange: "height", transition: "height 75ms" }} />
+                <div ref={barARef} className="rounded-full" style={{ height: "0%" }} />
             </div>
             <div className="w-1.5 rounded-full bg-white/5 overflow-hidden flex flex-col-reverse">
-                <div ref={barBRef} className="rounded-full" style={{ height: "0%", willChange: "height", transition: "height 75ms" }} />
+                <div ref={barBRef} className="rounded-full" style={{ height: "0%" }} />
             </div>
         </div>
     );
@@ -452,7 +462,6 @@ function LevelMeter({ analyser, color }: { analyser: AnalyserNode | null; color:
 
 function BeatIndicator({ deck, color }: { deck: DeckState; color: string }) {
     const dotsRef = useRef<(HTMLDivElement | null)[]>([]);
-    const animRef = useRef<number>(0);
     const phaseRef = useRef(0);
     const beatRef = useRef(0);
 
@@ -474,8 +483,7 @@ function BeatIndicator({ deck, color }: { deck: DeckState; color: string }) {
         let last = performance.now();
         const animate = (now: number) => {
             const dt = (now - last) / 1000;
-            last = now;
-            phaseRef.current += dt / beatInterval;
+            last = now; phaseRef.current += dt / beatInterval;
             if (phaseRef.current >= 1) {
                 beatRef.current = (beatRef.current + 1) % 4;
                 phaseRef.current %= 1;
@@ -491,17 +499,19 @@ function BeatIndicator({ deck, color }: { deck: DeckState; color: string }) {
                     const pct = Math.round(30 + brightness * 70);
                     dot.style.backgroundColor = `color-mix(in srgb, ${c} ${pct}%, transparent)`;
                     dot.style.borderColor = `color-mix(in srgb, ${c} 60%, transparent)`;
-                    dot.style.boxShadow = brightness > 0.3 ? `0 0 ${Math.round(brightness * 8)}px ${c === "white" ? "rgba(255,255,255,0.3)" : color}` : "none";
+                    // No box-shadow: blurred shadows recalculated per frame are
+                    // a major GPU rasterisation cost (measured 15–25 % GPU on
+                    // integrated Iris Xe per active BeatIndicator).
                 } else {
                     dot.style.backgroundColor = "rgba(255,255,255,0.05)";
                     dot.style.borderColor = "rgba(255,255,255,0.08)";
-                    dot.style.boxShadow = "none";
                 }
             }
-            animRef.current = requestAnimationFrame(animate);
         };
-        animRef.current = requestAnimationFrame(animate);
-        return () => cancelAnimationFrame(animRef.current);
+        // Capped at 30 fps. A beat pulse does not benefit from 120 fps —
+        // the eye cannot distinguish additional smoothness on a 6 px dot,
+        // and the per-frame color-mix + inline-style writes are not free.
+        return subscribeRaf(animate, { fps: 30 });
     }, [deck.isPlaying, deck.bpm, color]);
 
     return (
@@ -514,7 +524,6 @@ function BeatIndicator({ deck, color }: { deck: DeckState; color: string }) {
                         style={{
                             backgroundColor: "rgba(255,255,255,0.05)",
                             borderColor: "rgba(255,255,255,0.08)",
-                            willChange: "background-color, border-color, box-shadow",
                         }}
                     />
                 </div>
@@ -713,10 +722,11 @@ function ColorFxLinkSwitch({ value, onChange }: { value: ColorFxTarget; onChange
 
 // ─── Deck Info (Header + Track + Details + Time) ─────────────────────────
 
-function DeckInfo({ side, deck, color, track, onBrowse }: { side: DeckSide; deck: DeckState; color: string; track: Track | null; onBrowse?: () => void }) {
-    const mixer = useMixer();
+const DeckInfo = memo(function DeckInfo({ side, deck, color, track, onBrowse }: { side: DeckSide; deck: DeckState; color: string; track: Track | null; onBrowse?: () => void }) {
+    const mixer = useMixerActions();
     const { noteNotations } = useDAWSettings();
     const [pickerOpen, setPickerOpen] = useState(false);
+    const currentTime = useDeckCurrentTime(side);
 
     const trackCard = (
         <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-1.5 lg:p-2 xl:p-2.5 min-h-[48px]">
@@ -781,12 +791,12 @@ function DeckInfo({ side, deck, color, track, onBrowse }: { side: DeckSide; deck
                 <TrackContextMenu track={track} hideDeckActions onMutate={() => { }}>{trackCard}</TrackContextMenu>
             ) : trackCard}
             <div className="flex items-center justify-between px-0.5">
-                <span className="text-[10px] lg:text-[11px] xl:text-xs tabular-nums text-white/50 font-mono">{formatTime(deck.currentTime)}</span>
-                <span className="text-[10px] lg:text-[11px] xl:text-xs tabular-nums text-white/25 font-mono">{formatTimeRemaining(deck.currentTime, deck.duration)}</span>
+                <span className="text-[10px] lg:text-[11px] xl:text-xs tabular-nums text-white/50 font-mono">{formatTime(currentTime)}</span>
+                <span className="text-[10px] lg:text-[11px] xl:text-xs tabular-nums text-white/25 font-mono">{formatTimeRemaining(currentTime, deck.duration)}</span>
             </div>
         </div>
     );
-}
+});
 
 // ─── Deck Stems Panel ────────────────────────────────────────────────────
 
@@ -806,36 +816,48 @@ const DeckStemsPanel = memo(function DeckStemsPanel({
 }) {
     const [, forceRender] = useReducer((x: number) => x + 1, 0);
     const levelsRef = useRef<Record<StemType, number>>({ vocals: 0, drums: 0, bass: 0, melody: 0 });
-    const [levels, setLevels] = useState<Record<StemType, number>>({ vocals: 0, drums: 0, bass: 0, melody: 0 });
-    const rafRef = useRef(0);
-    const dataRef = useRef(new Float32Array(128));
+    // Refs to each stem's level-overlay DOM element so we can mutate
+    // `style.width` directly in the RAF loop (no React renders 60–120×/s).
+    const levelOverlayRefs = useRef<Record<StemType, HTMLDivElement | null>>({
+        vocals: null, drums: null, bass: null, melody: null,
+    });
 
     const isActive = processor?.isActive ?? false;
     const configs = processor?.configs ?? createDefaultStemConfigs();
+    const configsRef = useRef(configs);
+    configsRef.current = configs;
 
-    // Animate levels when active
+    // Animate levels when active. We deliberately avoid `setState` here —
+    // every frame we'd otherwise re-render the entire panel, capping the
+    // mixer at ~30 fps. Instead we mutate the bar widths via refs.
     useEffect(() => {
         if (!processor?.isActive) {
-            setLevels({ vocals: 0, drums: 0, bass: 0, melody: 0 });
+            // Reset bars when inactive.
+            for (const stem of STEM_TYPES) {
+                const el = levelOverlayRefs.current[stem];
+                if (el) el.style.width = "0%";
+                levelsRef.current[stem] = 0;
+            }
             return;
         }
         const update = () => {
-            const newLevels: Record<StemType, number> = { vocals: 0, drums: 0, bass: 0, melody: 0 };
             for (const stem of STEM_TYPES) {
                 const analyser = processor.getAnalyser(stem);
                 if (!analyser) continue;
-                if (dataRef.current.length !== analyser.fftSize) dataRef.current = new Float32Array(analyser.fftSize);
-                analyser.getFloatTimeDomainData(dataRef.current);
+                // Shared time-domain read: re-uses the cached buffer if any
+                // other consumer already pulled this analyser this frame.
+                const data = getSharedTimeDomainData(analyser);
                 let max = 0;
-                for (let i = 0; i < dataRef.current.length; i++) { const abs = Math.abs(dataRef.current[i]); if (abs > max) max = abs; }
-                newLevels[stem] = max;
+                for (let i = 0; i < data.length; i++) { const abs = Math.abs(data[i]); if (abs > max) max = abs; }
+                levelsRef.current[stem] = max;
+                const cfg = configsRef.current.find(c => c.type === stem);
+                const eff = cfg && !cfg.muted ? max * cfg.volume : 0;
+                const el = levelOverlayRefs.current[stem];
+                if (el) el.style.width = `${eff * 100}%`;
             }
-            levelsRef.current = newLevels;
-            setLevels(newLevels);
-            rafRef.current = requestAnimationFrame(update);
         };
-        rafRef.current = requestAnimationFrame(update);
-        return () => cancelAnimationFrame(rafRef.current);
+        // Stem level meters at 30 fps — visually indistinguishable, half cost.
+        return subscribeRaf(update, { fps: 30 });
     }, [processor, processor?.isActive]);
 
     // Dragging state for horizontal faders
@@ -909,7 +931,6 @@ const DeckStemsPanel = memo(function DeckStemsPanel({
                         const stemColor = STEM_COLORS[stemType];
                         const stemActive = !config.muted && config.volume > 0;
                         const isSoloed = config.solo;
-                        const effectiveLevel = config.muted ? 0 : levels[stemType] * config.volume;
 
                         return (
                             <div key={stemType} className="flex items-center gap-1.5">
@@ -938,11 +959,12 @@ const DeckStemsPanel = memo(function DeckStemsPanel({
                                             background: `linear-gradient(to right, ${stemColor}30, ${stemColor}60)`,
                                         }}
                                     />
-                                    {/* Level overlay */}
+                                    {/* Level overlay (mutated directly via ref every RAF tick) */}
                                     <div
-                                        className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-75"
+                                        ref={el => { levelOverlayRefs.current[stemType] = el; }}
+                                        className="absolute inset-y-0 left-0 rounded-full pointer-events-none"
                                         style={{
-                                            width: `${effectiveLevel * 100}%`,
+                                            width: "0%",
                                             background: `${stemColor}20`,
                                         }}
                                     />
@@ -1003,6 +1025,7 @@ const DeckStemsPanel = memo(function DeckStemsPanel({
 const DeckControls = memo(function DeckControls({ side, deck, color, analyser }: DeckProps) {
     const mixer = useMixer();
     const { noteNotations } = useDAWSettings();
+    const currentTime = useDeckCurrentTime(side);
     const [shiftActive, setShiftActive] = useState(false);
     const [shiftLocked, setShiftLocked] = useState(false);
     const [samplePickerSlot, setSamplePickerSlot] = useState<number | null>(null);
@@ -1150,8 +1173,8 @@ const DeckControls = memo(function DeckControls({ side, deck, color, analyser }:
                                     if (dMode === oMode && (Math.abs(dNum - oNum) === 1 || Math.abs(dNum - oNum) === 11)) return "harmonic";
                                     return "clash";
                                 })();
-                                const remaining = deck.duration > 0 ? deck.duration - deck.currentTime : 0;
-                                const pct = deck.duration > 0 ? (deck.currentTime / deck.duration) * 100 : 0;
+                                const remaining = deck.duration > 0 ? deck.duration - currentTime : 0;
+                                const pct = deck.duration > 0 ? (currentTime / deck.duration) * 100 : 0;
                                 return (
                                     <div className={sectionCls}>
                                         <div className="flex items-center justify-between mb-1">
@@ -1692,6 +1715,7 @@ const CenterMixerStrip = memo(function CenterMixerStrip({ analysers }: { analyse
 // ─── Main Mixer View ─────────────────────────────────────────────────────
 
 export function MixerView() {
+    useRenderCount("MixerView");
     const mixer = useMixer();
     const player = usePlayer();
     const personalization = usePersonalization();
@@ -1801,9 +1825,27 @@ export function MixerView() {
         setWaveformOrientation(prev => prev === "horizontal" ? "vertical" : "horizontal");
     }, []);
 
+    // Tracks which deck the Beat FX section currently targets when a
+    // "BEAT FX CH SELECT" button is pressed on hardware controllers like
+    // the Pioneer DDJ-FLX4. Defaults to deck A.
+    const activeFxDeckRef = useRef<"A" | "B">("A");
+
     // MIDI action handler - routes MIDI controller input to mixer actions
     const handleMidiAction: MidiActionHandler = useCallback((action, deck, value, isPress) => {
-        if (!isPress && action !== "jog-bend" && action !== "jog-vinyl") return;
+        // Continuous controls (faders / knobs / encoders / jog) report
+        // updates without an explicit "press" — we always want them.
+        // `jog-touch` is included so its Note-Off (release) reaches the
+        // handler to clear any pending bend.
+        const continuousActions = new Set([
+            "jog-bend", "jog-vinyl", "jog-touch",
+            "volume-fader", "trim", "crossfader", "master-volume",
+            "eq-hi", "eq-mid", "eq-low",
+            "filter", "tempo-slider",
+            "color-fx-level", "fx-level",
+            "headphone-mix", "headphone-level",
+            "browse-turn",
+        ]);
+        if (!isPress && !continuousActions.has(action)) return;
 
         switch (action) {
             case "play":
@@ -1811,11 +1853,27 @@ export function MixerView() {
                 break;
             case "cue":
                 if (deck && isPress) {
-                    // If playing, jump to cue point (beginning) and stop
-                    // If stopped, set cue point at current position
-                    mixer.seek(deck, 0);
-                    mixer.pause(deck);
+                    // CDJ-style behaviour:
+                    //   - Playing  → jump to cue (start) and stop
+                    //   - Stopped at start  → begin playback (preview play)
+                    //   - Stopped elsewhere → jump back to cue and stay stopped
+                    const ds = mixer[`deck${deck}` as "deckA" | "deckB" | "deckC" | "deckD"];
+                    if (ds.isPlaying) {
+                        mixer.pause(deck);
+                        mixer.seek(deck, 0);
+                    } else if (ds.currentTime <= 0.05) {
+                        mixer.play(deck);
+                    } else {
+                        mixer.seek(deck, 0);
+                    }
                 }
+                break;
+            case "shift":
+                // SHIFT is a hardware-only modifier on the FLX4: the
+                // controller emits SHIFT-aliased note numbers for buttons
+                // pressed while SHIFT is held, so there's nothing for us
+                // to do here. We swallow the event to avoid the default
+                // "unhandled action" warning.
                 break;
             case "sync":
                 if (deck && isPress) mixer.syncBpm(deck);
@@ -1857,18 +1915,42 @@ export function MixerView() {
                 break;
             case "jog-bend":
             case "jog-vinyl":
+                // Pioneer signed-magnitude convention: 64 = center, >64 = forward,
+                // <64 = reverse. The FLX4 platter sends one tick per detent.
                 if (deck) {
                     const jogValue = Math.round(value * 127);
-                    if (jogValue !== 64) {
-                        const direction = jogValue > 64 ? 1 : -1;
-                        const speed = Math.abs(jogValue - 64) / 63;
-                        const sensitivity = mixer.jogSensitivity / 5; // normalized around 1.0
-                        mixer.nudge(deck, direction * speed * 50 * sensitivity);
+                    if (jogValue === 64) break;
+                    const delta = jogValue - 64;
+                    const sensitivity = mixer.jogSensitivity / 5; // 0.2 .. 2.0
+                    // Scratch (vinyl-on) wants a much sharper response than
+                    // pitch-bend; small turns should feel immediate.
+                    const divisor = action === "jog-vinyl" ? 3 : 6;
+                    const intensity = (delta / divisor) * sensitivity;
+                    if (process.env.NODE_ENV !== "production") {
+                        // eslint-disable-next-line no-console
+                        console.debug(`[jog] ${action} deck=${deck} raw=${jogValue} delta=${delta} → intensity=${intensity.toFixed(3)}`);
                     }
+                    mixer.nudge(deck, intensity);
                 }
+                break;
+            case "jog-touch":
+                // Touching the platter top stops playback if
+                // vinyl-mode is implied; releasing resumes. The current
+                // mixer engine doesn't expose a scratchEnable() yet, so
+                // we issue a release-on-up to clear any pending nudge
+                // bias from a previous bend.
+                if (deck && !isPress) mixer.nudgeRelease(deck);
                 break;
             case "loop-in":
                 if (deck && isPress) mixer.setLoop(deck, mixer[`deck${deck}` as "deckA" | "deckB" | "deckC" | "deckD"].loopBeats);
+                break;
+            case "loop-out":
+                // Loop OUT alone toggles a 4-beat loop at the current
+                // position so the dj can grab a quick loop with a single
+                // press. Holding LOOP IN first then LOOP OUT will
+                // properly capture a manual loop once the engine grows
+                // the dedicated loop-in/loop-out marker actions.
+                if (deck && isPress) mixer.setLoop(deck, 4);
                 break;
             case "beatloop-0.25":
                 if (deck && isPress) mixer.setLoop(deck, 0.25);
@@ -2021,11 +2103,68 @@ export function MixerView() {
                     mixer.setBeatFx(deck, BEAT_FX_TYPES[nextIdx].id);
                 }
                 break;
+            case "fx-select-prev":
+                // Cycle Beat FX types backwards (Pioneer SHIFT + FX SELECT)
+                if (isPress) {
+                    const fxDeck = activeFxDeckRef.current;
+                    const ds = mixer[`deck${fxDeck}` as "deckA" | "deckB"];
+                    const currentIdx = BEAT_FX_TYPES.findIndex(f => f.id === ds.beatFxType);
+                    const prevIdx = (currentIdx - 1 + BEAT_FX_TYPES.length) % BEAT_FX_TYPES.length;
+                    mixer.setBeatFx(fxDeck, BEAT_FX_TYPES[prevIdx].id);
+                }
+                break;
             case "fx-on-off":
-                if (deck && isPress) mixer.toggleBeatFx(deck);
+                // Routes to the currently selected FX channel deck.
+                if (isPress) {
+                    const target = deck ?? activeFxDeckRef.current;
+                    mixer.toggleBeatFx(target);
+                }
                 break;
             case "fx-level":
-                if (deck) mixer.setBeatFxAmount(deck, value);
+                // Continuous: targets the active FX deck unless an explicit
+                // deck is bound on the mapping.
+                {
+                    const target = deck ?? activeFxDeckRef.current;
+                    mixer.setBeatFxAmount(target, value);
+                }
+                break;
+            case "fx-channel-1":
+                if (isPress) activeFxDeckRef.current = "A";
+                break;
+            case "fx-channel-2":
+                if (isPress) activeFxDeckRef.current = "B";
+                break;
+            case "fx-beats-up":
+            case "fx-beats-down":
+                // Pioneer "<" / ">" buttons next to BEAT FX SELECT — adjust
+                // the current FX beat division (×2 / ÷2) on the active deck.
+                if (isPress) {
+                    const fxDeck = activeFxDeckRef.current;
+                    const ds = mixer[`deck${fxDeck}` as "deckA" | "deckB"];
+                    const cur = ds.beatFxBeatDiv || 1;
+                    const next = action === "fx-beats-up"
+                        ? Math.min(16, cur * 2)
+                        : Math.max(1 / 16, cur / 2);
+                    mixer.setBeatFxBeatDiv(fxDeck, next);
+                }
+                break;
+            case "fx-disable-all":
+                if (isPress) {
+                    if (mixer.deckA.beatFxOn) mixer.toggleBeatFx("A");
+                    if (mixer.deckB.beatFxOn) mixer.toggleBeatFx("B");
+                }
+                break;
+            case "quantize":
+                if (deck && isPress) mixer.toggleQuantize(deck);
+                break;
+            case "censor":
+                // Reverse roll while held: the engine doesn't expose a
+                // momentary reverse yet, so this is a no-op until we
+                // wire a slip-reverse helper into DeckEngine.
+                break;
+            case "slip-mode":
+                // Reserved: no FLX4 hardware mapping today and the mixer
+                // engine does not yet expose a slip-mode setter. No-op.
                 break;
 
             // ── Sampler ──────────────────────────────────────────
@@ -2088,12 +2227,13 @@ export function MixerView() {
         midi.setActionHandler(handleMidiAction);
     }, [midi, handleMidiAction]);
 
-    const analysers: Record<DeckSide, AnalyserNode | null> = {
-        A: mixer.getDeckAnalyser("A"),
-        B: mixer.getDeckAnalyser("B"),
-        C: mixer.getDeckAnalyser("C"),
-        D: mixer.getDeckAnalyser("D"),
-    };
+    const getDeckAnalyser = mixer.getDeckAnalyser;
+    const analysers = useMemo<Record<DeckSide, AnalyserNode | null>>(() => ({
+        A: getDeckAnalyser("A"),
+        B: getDeckAnalyser("B"),
+        C: getDeckAnalyser("C"),
+        D: getDeckAnalyser("D"),
+    }), [getDeckAnalyser, mixer.isActive]);
     const getDeck = (s: DeckSide) => mixer[`deck${s}` as "deckA" | "deckB" | "deckC" | "deckD"];
     const getDeckTrack = (s: DeckSide) => mixer[`deck${s}Track` as "deckATrack" | "deckBTrack" | "deckCTrack" | "deckDTrack"];
 

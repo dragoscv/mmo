@@ -666,6 +666,28 @@ body.daw-focus-mode [data-app-layout] {
     -webkit-backdrop-filter: blur(12px) saturate(1.3);
 }
 
+/* Horizontal scroll container used by toolbar/transport/status-bar on
+   narrow viewports. Hides the scrollbar visually but keeps the area
+   wheel/touch-scrollable. Direct children should set `shrink-0`. */
+.daw-scroll-x {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* Allow horizontal wheel scrolling on trackpad and shift+wheel on mouse. */
+    overscroll-behavior-x: contain;
+}
+
+.daw-scroll-x::-webkit-scrollbar {
+    display: none;
+}
+
+/* Subtle fade hints at the edges so users sense overflow on mobile. */
+.daw-scroll-x-fade {
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+}
+
 /* DAW button base */
 .daw-btn {
     display: inline-flex;
@@ -757,6 +779,24 @@ body.daw-focus-mode [data-app-layout] {
     font-size: 11px;
     letter-spacing: 0.01em;
     padding: 0 12px;
+    /* Touch: prevent browser from swallowing the gesture so dockview's
+       pointermove can drive the tab drag (reposition / float). */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+/* `touch-action` is resolved per *touched* element (no inheritance). The
+   user's finger usually lands on the inner label/icon span — if those
+   children stay `auto`, the browser claims the gesture as a scroll and
+   fires pointercancel as soon as the finger moves. Force every descendant
+   of the header strip to opt out as well. */
+.dockview-theme-daw .tabs-and-actions-container,
+.dockview-theme-daw .tabs-and-actions-container *,
+.dockview-theme-daw .tab,
+.dockview-theme-daw .tab * {
+    touch-action: none;
 }
 
 .dockview-theme-daw .tab:hover {
@@ -772,6 +812,48 @@ body.daw-focus-mode [data-app-layout] {
     border-bottom: 1px solid var(--daw-border);
 }
 
+/* Floating group: header is the drag handle for repositioning the window.
+   Make it grabbable on touch by disabling browser pan gestures on the
+   tabs/header strip so dockview's pointer-drag wins. */
+.dockview-theme-daw .dv-floating-group .tabs-and-actions-container,
+.dockview-theme-daw .dv-floating-group .tabs-and-actions-container *,
+.dockview-theme-daw .dv-floating-group .tabs-container,
+.dockview-theme-daw .dv-floating-group .tabs-container * {
+    touch-action: none;
+}
+
+/* Critical: dockview's floating-window move uses window-level pointermove
+   without setPointerCapture. The browser fires pointercancel the instant
+   the finger crosses an element whose `touch-action` allows panning — and
+   the window body slides under the finger as the window follows it. So
+   the entire floating group (and every descendant) must opt out, not just
+   the title bar.
+
+   The ACTUAL drag handle dockview uses for floating windows is
+   `.dv-void-container` (the empty area of the tabs strip) — see
+   addFloatingGroup() in dockview-core. Resize handles are
+   `.dv-resize-handle*`. All of these MUST be touch-action: none. */
+.dv-resize-container,
+.dv-resize-container *,
+.dv-void-container,
+.dv-void-container *,
+.dv-resize-handle,
+[class^="dv-resize-handle-"],
+.dockview-theme-daw .dv-floating-group,
+.dockview-theme-daw .dv-floating-group * {
+    touch-action: none;
+}
+
+/* When a drag is in progress we add this class to <html> as a final
+   guarantee — no element in the document can trigger pointercancel. */
+html.daw-dockview-dragging,
+html.daw-dockview-dragging body,
+html.daw-dockview-dragging * {
+    touch-action: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+}
+
 /* Floating group styling */
 .dockview-theme-daw .dv-floating-group {
     border-radius: 10px;
@@ -785,9 +867,11 @@ body.daw-focus-mode [data-app-layout] {
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--daw-border-strong), 0 0 20px var(--daw-accent-glow);
 }
 
-/* Sash (resize handles) */
+/* Sash (resize handles) — touch needs none so finger drag isn't claimed
+   by the browser as a scroll. */
 .dockview-theme-daw .sash {
     transition: background 0.2s;
+    touch-action: none;
 }
 
 .dockview-theme-daw .sash:hover,
@@ -961,6 +1045,13 @@ body.daw-focus-mode [data-app-layout] {
     letter-spacing: 0.08em;
     color: var(--daw-text-dim);
     user-select: none;
+}
+
+/* Touch DnD: highlight active drop target */
+[data-touch-drop-active="true"] {
+    background: var(--daw-accent-glow, rgba(59, 130, 246, 0.18)) !important;
+    outline: 1px dashed var(--daw-accent, rgb(59, 130, 246));
+    outline-offset: -2px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

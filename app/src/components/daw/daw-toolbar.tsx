@@ -49,7 +49,8 @@ export function DAWToolbar() {
 
     return (
         <TooltipProvider delayDuration={200}>
-            <div className="h-11 bg-[var(--daw-surface)] border-b border-[var(--daw-border)] flex items-center px-2.5 gap-1 daw-animate-in">
+            <div className="h-11 bg-[var(--daw-surface)] border-b border-[var(--daw-border)] daw-animate-in flex items-stretch overflow-hidden">
+                <div className="daw-scroll-x daw-scroll-x-fade flex-1 flex items-center gap-1 px-2 sm:px-2.5 [&>*]:shrink-0">
                 {/* Project actions */}
                 <ToolGroup>
                     <ToolBtn icon={FilePlus} label="New Project" onClick={() => daw.setProjectModal(true)} />
@@ -91,7 +92,7 @@ export function DAWToolbar() {
 
                 {/* Snap */}
                 <div className="flex items-center gap-1.5 mx-1">
-                    <span className="text-[10px] text-[var(--daw-text-dim)] uppercase tracking-widest">Snap</span>
+                    <span className="hidden md:inline text-[10px] text-[var(--daw-text-dim)] uppercase tracking-widest">Snap</span>
                     <select
                         value={daw.snap}
                         onChange={e => daw.setSnap(e.target.value as SnapValue)}
@@ -105,9 +106,9 @@ export function DAWToolbar() {
 
                 <Divider />
 
-                {/* Zoom */}
-                <div className="flex items-center gap-1.5 mx-1">
-                    <span className="text-[10px] text-[var(--daw-text-dim)] uppercase tracking-widest">Zoom</span>
+                {/* Zoom — slider hidden on xs (would be hard to drag anyway), kept on sm+ */}
+                <div className="hidden sm:flex items-center gap-1.5 mx-1">
+                    <span className="hidden md:inline text-[10px] text-[var(--daw-text-dim)] uppercase tracking-widest">Zoom</span>
                     <input
                         ref={zoomRef}
                         type="range"
@@ -120,7 +121,7 @@ export function DAWToolbar() {
                     <span className="text-[10px] text-[var(--daw-text-dim)] w-8 font-mono tabular-nums">{daw.zoom}px</span>
                 </div>
 
-                <div className="flex-1" />
+                <div className="flex-1 min-w-2" />
 
                 {/* Panel toggles */}
                 <ToolGroup>
@@ -145,8 +146,11 @@ export function DAWToolbar() {
                 <DAWPanelManager />
                 <ToolBtn icon={Settings} label="Settings" onClick={() => daw.setSettingsModal(true)} />
 
-                {/* Project name */}
-                <ProjectName />
+                {/* Project name — hidden on small viewports to keep the bar uncluttered */}
+                <div className="hidden md:flex items-center">
+                    <ProjectName />
+                </div>
+                </div>
             </div>
         </TooltipProvider>
     );

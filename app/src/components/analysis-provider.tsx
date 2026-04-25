@@ -16,6 +16,7 @@ import {
 } from "@/hooks/analysis-context";
 import { AnalyzeModal } from "@/components/analyze-modal-v2";
 import { AnalysisFloatingStatus } from "@/components/analysis-floating-status";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 export { useAnalysisContext } from "@/hooks/analysis-context";
 
@@ -43,6 +44,7 @@ function saveModalOpen(open: boolean) {
 }
 
 export function AnalysisProvider({ children }: { children: ReactNode }) {
+    useRenderCount("AnalysisProvider");
     const [modalOpen, setModalOpen] = useState(false);
 
     // SSE should be connected when analysis is active OR modal is open

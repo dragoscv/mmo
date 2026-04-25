@@ -683,165 +683,165 @@ export function DAWRemoteWidget({ snapshot, sendCommand }: DAWWidgetProps) {
         <div className="px-4 py-3 flex flex-col gap-3">
             {/* Transport bar */}
             <RemotePanel id="transport" label="Transport & Master">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
-                <div className="flex items-center gap-2 mb-3">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/25">Transport</span>
-                    <span className="text-[9px] text-white/20 ml-1">{snapshot.playbackMode}</span>
-                    <span className="text-xs tabular-nums text-white/40 font-mono ml-auto">
-                        {snapshot.tempo.toFixed(1)} BPM
-                    </span>
-                    <span className="text-[10px] tabular-nums text-white/25 font-mono">
-                        Beat {snapshot.currentBeat.toFixed(1)}
-                    </span>
-                </div>
+                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+                    <div className="flex items-center gap-2 mb-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/25">Transport</span>
+                        <span className="text-[9px] text-white/20 ml-1">{snapshot.playbackMode}</span>
+                        <span className="text-xs tabular-nums text-white/40 font-mono ml-auto">
+                            {snapshot.tempo.toFixed(1)} BPM
+                        </span>
+                        <span className="text-[10px] tabular-nums text-white/25 font-mono">
+                            Beat {snapshot.currentBeat.toFixed(1)}
+                        </span>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                    <button onClick={() => sendCommand("daw.togglePlay")}
-                        className={cn("flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl font-medium text-xs transition-all cursor-pointer",
-                            snapshot.isPlaying ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                : "bg-white/[0.04] text-white/40 hover:bg-white/[0.08] border border-white/[0.06]")}>
-                        {snapshot.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                        {snapshot.isPlaying ? "Pause" : "Play"}
-                    </button>
-                    <button onClick={() => sendCommand("daw.stop")}
-                        className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.04] text-white/30 hover:bg-white/[0.08] border border-white/[0.06] transition-colors cursor-pointer">
-                        <Square className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => sendCommand("daw.record")}
-                        className={cn("flex items-center justify-center w-12 h-12 rounded-xl border transition-all cursor-pointer",
-                            snapshot.isRecording ? "bg-red-500/20 text-red-400 border-red-500/30" : "bg-white/[0.04] text-white/30 hover:bg-white/[0.08] border-white/[0.06]")}>
-                        <Circle className={cn("w-4 h-4", snapshot.isRecording && "fill-red-400")} />
-                    </button>
-                    <button onClick={() => sendCommand("daw.toggleMetronome")}
-                        className={cn("flex items-center justify-center w-12 h-12 rounded-xl border transition-all cursor-pointer",
-                            snapshot.metronomeOn ? "bg-blue-500/20 text-blue-400 border-blue-500/30" : "bg-white/[0.04] text-white/30 hover:bg-white/[0.08] border-white/[0.06]")}
-                        title="Metronome">
-                        <span className="text-sm">🔔</span>
-                    </button>
-                </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => sendCommand("daw.togglePlay")}
+                            className={cn("flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl font-medium text-xs transition-all cursor-pointer",
+                                snapshot.isPlaying ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : "bg-white/[0.04] text-white/40 hover:bg-white/[0.08] border border-white/[0.06]")}>
+                            {snapshot.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                            {snapshot.isPlaying ? "Pause" : "Play"}
+                        </button>
+                        <button onClick={() => sendCommand("daw.stop")}
+                            className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.04] text-white/30 hover:bg-white/[0.08] border border-white/[0.06] transition-colors cursor-pointer">
+                            <Square className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => sendCommand("daw.record")}
+                            className={cn("flex items-center justify-center w-12 h-12 rounded-xl border transition-all cursor-pointer",
+                                snapshot.isRecording ? "bg-red-500/20 text-red-400 border-red-500/30" : "bg-white/[0.04] text-white/30 hover:bg-white/[0.08] border-white/[0.06]")}>
+                            <Circle className={cn("w-4 h-4", snapshot.isRecording && "fill-red-400")} />
+                        </button>
+                        <button onClick={() => sendCommand("daw.toggleMetronome")}
+                            className={cn("flex items-center justify-center w-12 h-12 rounded-xl border transition-all cursor-pointer",
+                                snapshot.metronomeOn ? "bg-blue-500/20 text-blue-400 border-blue-500/30" : "bg-white/[0.04] text-white/30 hover:bg-white/[0.08] border-white/[0.06]")}
+                            title="Metronome">
+                            <span className="text-sm">🔔</span>
+                        </button>
+                    </div>
 
-                {/* Undo/Redo + tempo + playback mode */}
-                <div className="flex items-center gap-2 mt-3">
-                    <button onClick={() => sendCommand("daw.undo")}
-                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-white/[0.03] text-white/30 hover:bg-white/[0.06] text-xs cursor-pointer">
-                        <Undo2 className="w-3.5 h-3.5" /> Undo
-                    </button>
-                    <button onClick={() => sendCommand("daw.redo")}
-                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-white/[0.03] text-white/30 hover:bg-white/[0.06] text-xs cursor-pointer">
-                        <Redo2 className="w-3.5 h-3.5" /> Redo
-                    </button>
-                    <div className="flex items-center gap-1">
-                        <button onClick={() => sendCommand("daw.setTempo", Math.max(20, snapshot.tempo - 1))}
-                            className="w-8 h-8 rounded-lg bg-white/[0.04] text-white/30 hover:bg-white/[0.08] text-xs flex items-center justify-center cursor-pointer">-</button>
-                        <span className="text-xs tabular-nums text-white/50 font-mono w-12 text-center">{snapshot.tempo.toFixed(0)}</span>
-                        <button onClick={() => sendCommand("daw.setTempo", Math.min(300, snapshot.tempo + 1))}
-                            className="w-8 h-8 rounded-lg bg-white/[0.04] text-white/30 hover:bg-white/[0.08] text-xs flex items-center justify-center cursor-pointer">+</button>
+                    {/* Undo/Redo + tempo + playback mode */}
+                    <div className="flex items-center gap-2 mt-3">
+                        <button onClick={() => sendCommand("daw.undo")}
+                            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-white/[0.03] text-white/30 hover:bg-white/[0.06] text-xs cursor-pointer">
+                            <Undo2 className="w-3.5 h-3.5" /> Undo
+                        </button>
+                        <button onClick={() => sendCommand("daw.redo")}
+                            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-white/[0.03] text-white/30 hover:bg-white/[0.06] text-xs cursor-pointer">
+                            <Redo2 className="w-3.5 h-3.5" /> Redo
+                        </button>
+                        <div className="flex items-center gap-1">
+                            <button onClick={() => sendCommand("daw.setTempo", Math.max(20, snapshot.tempo - 1))}
+                                className="w-8 h-8 rounded-lg bg-white/[0.04] text-white/30 hover:bg-white/[0.08] text-xs flex items-center justify-center cursor-pointer">-</button>
+                            <span className="text-xs tabular-nums text-white/50 font-mono w-12 text-center">{snapshot.tempo.toFixed(0)}</span>
+                            <button onClick={() => sendCommand("daw.setTempo", Math.min(300, snapshot.tempo + 1))}
+                                className="w-8 h-8 rounded-lg bg-white/[0.04] text-white/30 hover:bg-white/[0.08] text-xs flex items-center justify-center cursor-pointer">+</button>
+                        </div>
+                    </div>
+
+                    {/* Playback mode toggle */}
+                    <div className="flex items-center gap-2 mt-2">
+                        <button onClick={() => sendCommand("daw.togglePlaybackMode")}
+                            className={cn("flex-1 py-1.5 rounded-lg text-[10px] font-medium cursor-pointer transition-all",
+                                snapshot.playbackMode === "pattern" ? "bg-emerald-500/15 text-emerald-400" : "bg-white/[0.03] text-white/25 hover:bg-white/[0.06]")}>
+                            Pattern
+                        </button>
+                        <button onClick={() => sendCommand("daw.togglePlaybackMode")}
+                            className={cn("flex-1 py-1.5 rounded-lg text-[10px] font-medium cursor-pointer transition-all",
+                                snapshot.playbackMode === "song" ? "bg-blue-500/15 text-blue-400" : "bg-white/[0.03] text-white/25 hover:bg-white/[0.06]")}>
+                            Song
+                        </button>
+                    </div>
+
+                    {/* Master meter + volume */}
+                    <div className="flex items-center gap-2 mt-3">
+                        <span className="text-[9px] text-white/25 uppercase">Master</span>
+                        <div className="flex-1 h-2 rounded-full bg-white/[0.04] overflow-hidden">
+                            <div className="h-full rounded-full transition-[width] duration-75 bg-gradient-to-r from-emerald-500/50 to-emerald-400/70"
+                                style={{ width: `${Math.min(100, Math.max(snapshot.masterPeakL, snapshot.masterPeakR) * 100)}%` }} />
+                        </div>
+                        <span className="text-[9px] tabular-nums text-white/25">{Math.round(snapshot.masterVolume * 100)}%</span>
                     </div>
                 </div>
-
-                {/* Playback mode toggle */}
-                <div className="flex items-center gap-2 mt-2">
-                    <button onClick={() => sendCommand("daw.togglePlaybackMode")}
-                        className={cn("flex-1 py-1.5 rounded-lg text-[10px] font-medium cursor-pointer transition-all",
-                            snapshot.playbackMode === "pattern" ? "bg-emerald-500/15 text-emerald-400" : "bg-white/[0.03] text-white/25 hover:bg-white/[0.06]")}>
-                        Pattern
-                    </button>
-                    <button onClick={() => sendCommand("daw.togglePlaybackMode")}
-                        className={cn("flex-1 py-1.5 rounded-lg text-[10px] font-medium cursor-pointer transition-all",
-                            snapshot.playbackMode === "song" ? "bg-blue-500/15 text-blue-400" : "bg-white/[0.03] text-white/25 hover:bg-white/[0.06]")}>
-                        Song
-                    </button>
-                </div>
-
-                {/* Master meter + volume */}
-                <div className="flex items-center gap-2 mt-3">
-                    <span className="text-[9px] text-white/25 uppercase">Master</span>
-                    <div className="flex-1 h-2 rounded-full bg-white/[0.04] overflow-hidden">
-                        <div className="h-full rounded-full transition-[width] duration-75 bg-gradient-to-r from-emerald-500/50 to-emerald-400/70"
-                            style={{ width: `${Math.min(100, Math.max(snapshot.masterPeakL, snapshot.masterPeakR) * 100)}%` }} />
-                    </div>
-                    <span className="text-[9px] tabular-nums text-white/25">{Math.round(snapshot.masterVolume * 100)}%</span>
-                </div>
-            </div>
             </RemotePanel>
 
             {/* Tool & Snap */}
             <RemotePanel id="toolSnap" label="Tool & Snap">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
-                <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                        <span className="text-[9px] text-white/25 uppercase block mb-1">Tool</span>
-                        <div className="flex gap-0.5 flex-wrap">
-                            {TOOLS.map(t => (
-                                <button key={t} onClick={() => sendCommand("daw.setTool", t)}
-                                    className={cn("px-2 py-1 rounded text-[8px] cursor-pointer capitalize",
-                                        snapshot.tool === t ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
-                                    {t}
-                                </button>
-                            ))}
+                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+                    <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                            <span className="text-[9px] text-white/25 uppercase block mb-1">Tool</span>
+                            <div className="flex gap-0.5 flex-wrap">
+                                {TOOLS.map(t => (
+                                    <button key={t} onClick={() => sendCommand("daw.setTool", t)}
+                                        className={cn("px-2 py-1 rounded text-[8px] cursor-pointer capitalize",
+                                            snapshot.tool === t ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
+                                        {t}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex-1">
-                        <span className="text-[9px] text-white/25 uppercase block mb-1">Snap</span>
-                        <div className="flex gap-0.5 flex-wrap">
-                            {SNAPS.map(s => (
-                                <button key={s} onClick={() => sendCommand("daw.setSnap", s)}
-                                    className={cn("px-2 py-1 rounded text-[8px] cursor-pointer",
-                                        snapshot.snap === s ? "bg-amber-500/20 text-amber-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
-                                    {s}
-                                </button>
-                            ))}
+                        <div className="flex-1">
+                            <span className="text-[9px] text-white/25 uppercase block mb-1">Snap</span>
+                            <div className="flex gap-0.5 flex-wrap">
+                                {SNAPS.map(s => (
+                                    <button key={s} onClick={() => sendCommand("daw.setSnap", s)}
+                                        className={cn("px-2 py-1 rounded text-[8px] cursor-pointer",
+                                            snapshot.snap === s ? "bg-amber-500/20 text-amber-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
+                                        {s}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
             </RemotePanel>
 
             {/* Track list */}
             <RemotePanel id="tracks" label="Tracks">
-            <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2 px-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/25">
-                        Tracks ({snapshot.tracks.length})
-                    </span>
-                    <span className="text-[10px] text-white/20">{snapshot.projectName}</span>
-                </div>
-                {snapshot.tracks.map(track => (
-                    <TrackStrip key={track.id} track={track} sendCommand={sendCommand}
-                        isSelected={selectedTrackId === track.id}
-                        onSelect={() => setSelectedTrackId(selectedTrackId === track.id ? null : track.id)} />
-                ))}
-                {snapshot.tracks.length === 0 && (
-                    <div className="flex items-center justify-center py-8 rounded-xl border border-dashed border-white/[0.06] text-xs text-white/20">
-                        No tracks in project
+                <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2 px-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/25">
+                            Tracks ({snapshot.tracks.length})
+                        </span>
+                        <span className="text-[10px] text-white/20">{snapshot.projectName}</span>
                     </div>
-                )}
-            </div>
+                    {snapshot.tracks.map(track => (
+                        <TrackStrip key={track.id} track={track} sendCommand={sendCommand}
+                            isSelected={selectedTrackId === track.id}
+                            onSelect={() => setSelectedTrackId(selectedTrackId === track.id ? null : track.id)} />
+                    ))}
+                    {snapshot.tracks.length === 0 && (
+                        <div className="flex items-center justify-center py-8 rounded-xl border border-dashed border-white/[0.06] text-xs text-white/20">
+                            No tracks in project
+                        </div>
+                    )}
+                </div>
             </RemotePanel>
 
             {/* Panel toggles */}
             <RemotePanel id="panelToggles" label="Panel Toggles">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">Panels</span>
-                <div className="flex flex-wrap gap-1.5">
-                    {([
-                        { key: "mixer", active: snapshot.showMixer },
-                        { key: "pianoRoll", active: snapshot.showPianoRoll },
-                        { key: "stepSequencer", active: snapshot.showStepSequencer },
-                        { key: "effectsRack", active: snapshot.showEffectsRack },
-                        { key: "synth", active: snapshot.showSynth },
-                        { key: "voiceProcessor", active: snapshot.showVoiceProcessor },
-                        { key: "automation", active: snapshot.showAutomation },
-                    ] as const).map(({ key, active }) => (
-                        <button key={key} onClick={() => sendCommand("daw.togglePanel", key)}
-                            className={cn("px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer capitalize",
-                                active ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                                    : "bg-white/[0.03] text-white/30 hover:bg-white/[0.06] hover:text-white/50 border border-transparent")}>
-                            {key.replace(/([A-Z])/g, " $1").trim()}
-                        </button>
-                    ))}
+                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">Panels</span>
+                    <div className="flex flex-wrap gap-1.5">
+                        {([
+                            { key: "mixer", active: snapshot.showMixer },
+                            { key: "pianoRoll", active: snapshot.showPianoRoll },
+                            { key: "stepSequencer", active: snapshot.showStepSequencer },
+                            { key: "effectsRack", active: snapshot.showEffectsRack },
+                            { key: "synth", active: snapshot.showSynth },
+                            { key: "voiceProcessor", active: snapshot.showVoiceProcessor },
+                            { key: "automation", active: snapshot.showAutomation },
+                        ] as const).map(({ key, active }) => (
+                            <button key={key} onClick={() => sendCommand("daw.togglePanel", key)}
+                                className={cn("px-2.5 py-1.5 rounded-lg text-[10px] transition-colors cursor-pointer capitalize",
+                                    active ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                                        : "bg-white/[0.03] text-white/30 hover:bg-white/[0.06] hover:text-white/50 border border-transparent")}>
+                                {key.replace(/([A-Z])/g, " $1").trim()}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
             </RemotePanel>
 
             {/* Synth */}
@@ -867,9 +867,9 @@ export function DAWRemoteWidget({ snapshot, sendCommand }: DAWWidgetProps) {
 
             {/* Voice Processor */}
             <RemotePanel id="voice" label="Voice Processor">
-            {snapshot.showVoiceProcessor && snapshot.vp && (
-                <VoiceProcessorControls vp={snapshot.vp} sendCommand={sendCommand} />
-            )}
+                {snapshot.showVoiceProcessor && snapshot.vp && (
+                    <VoiceProcessorControls vp={snapshot.vp} sendCommand={sendCommand} />
+                )}
             </RemotePanel>
         </div>
     );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
+import { useRenderCount } from "@/lib/dev-debugger";
 import { useDAW } from "./daw-context";
 import { DAWToolbar } from "./daw-toolbar";
 import { DAWTransport } from "./daw-transport";
@@ -13,6 +14,7 @@ import { DAWContextMenuProvider } from "./daw-context-menu";
 import { DAWMidiBridge } from "./daw-midi-bridge";
 
 export function DAWPage() {
+    useRenderCount("DAWPage");
     const daw = useDAW();
 
     // ─── Keyboard Shortcuts ──────────────────────────────────────────────

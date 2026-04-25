@@ -19,6 +19,7 @@ import {
 } from "react";
 import { LiveEngine, type LiveEngineState } from "@/lib/live-engine";
 import type { FxInsert, FxType } from "@/lib/audio-fx-engine";
+import { useRenderCount } from "@/lib/dev-debugger";
 import { FX_DEFAULTS } from "@/lib/audio-fx-engine";
 import { useWebRTCAudioStream, type WebRTCAudioStreamApi } from "@/components/remote/use-webrtc-audio-stream";
 import { uploadRecording } from "@/lib/upload-recording";
@@ -134,6 +135,7 @@ const SETTINGS_STORAGE_KEY = "live-settings";
 function uid() { return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`; }
 
 export function LiveProvider({ children }: { children: ReactNode }) {
+    useRenderCount("LiveProvider");
     const engineRef = useRef<LiveEngine | null>(null);
     // `stateTick` increments on actual engine state mutations (volume, tempo,
     // recording start/stop, …) — NOT every animation frame. Realtime meter
@@ -208,6 +210,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
                 voicePeaksRef.current.peakL = m.voiceMeter.peakL;
                 voicePeaksRef.current.peakR = m.voiceMeter.peakR;
                 const s = engine.state;
+                const ac = engine.voice.getAutoCorrectStatus();
                 liveMetersStore.publish({
                     masterPeakL: s.masterPeakL,
                     masterPeakR: s.masterPeakR,
@@ -220,6 +223,9 @@ export function LiveProvider({ children }: { children: ReactNode }) {
                     tunerCents: s.tunerCents,
                     tunerFrequency: s.tunerFrequency,
                     tunerConfidence: s.tunerConfidence,
+                    autoCorrectTargetMidi: ac.targetMidi ?? -1,
+                    autoCorrectSourceMidi: ac.sourceMidi ?? NaN,
+                    autoCorrectActive: ac.active,
                     recordingDuration: s.recordingDuration,
                     backingPosition: s.backingPosition,
                 });

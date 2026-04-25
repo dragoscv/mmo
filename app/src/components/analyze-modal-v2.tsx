@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatNumber } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     RefreshCw,
     Zap,
@@ -92,6 +93,7 @@ interface AnalyzeModalProps {
 }
 
 export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
+    useRenderCount("AnalyzeModal");
     // SSE-backed analysis state from context
     const analysis = useAnalysisContext();
 

@@ -7,6 +7,7 @@ import { HistoryPanel } from "../daw/daw-history-panel";
 import { WaveformView } from "./waveform-view";
 import { SpectrogramView } from "./spectrogram-view";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import { useSearchParams } from "next/navigation";
 import {
     Play, Pause, Square, SkipBack, SkipForward,
@@ -53,6 +54,7 @@ export function SoundEditorPage() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function SoundEditorInner() {
+    useRenderCount("SoundEditorInner");
     const editor = useEditor();
     const searchParams = useSearchParams();
     const dropRef = useRef<HTMLDivElement>(null);

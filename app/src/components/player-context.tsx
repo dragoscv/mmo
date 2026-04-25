@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { Track } from "@/db/schema";
 import { audioPreloadCache } from "@/lib/audio-preload-cache";
+import { useRenderCount, dlog } from "@/lib/dev-debugger";
 
 type RepeatMode = "off" | "one" | "all";
 
@@ -123,6 +124,7 @@ function savePersistedState(s: PlayerState) {
 }
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
+    useRenderCount("PlayerProvider");
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);

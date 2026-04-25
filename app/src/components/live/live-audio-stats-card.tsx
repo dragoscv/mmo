@@ -13,6 +13,7 @@
  */
 
 import { memo, useEffect, useState } from "react";
+import { useRenderCount } from "@/lib/dev-debugger";
 import { cn } from "@/lib/utils";
 import {
     Activity, Gauge, Waves, Mic, Disc3, Square, Circle, Music,
@@ -144,6 +145,7 @@ const PitchRow = memo(function PitchRow() {
 // ─── Main card ───────────────────────────────────────────────────────────────
 
 export const LiveAudioStatsCard = memo(function LiveAudioStatsCard({ className }: { className?: string }) {
+    useRenderCount("LiveAudioStatsCard");
     const live = useLive();
     const engine = live.engine;
     const [tick, setTick] = useState(0);

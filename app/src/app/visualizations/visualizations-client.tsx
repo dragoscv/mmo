@@ -5,6 +5,7 @@ import { usePlayer } from "@/components/player-context";
 import { VisualizationCanvas } from "@/components/visualization-canvas";
 import { VisualizationControls } from "@/components/visualization-controls";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     getAllVisualizations,
     getCategories,
@@ -49,6 +50,7 @@ type ViewMode = "browse" | "preview";
 type SidebarTab = "categories" | "favorites" | "playlists";
 
 export function VisualizationsClient() {
+    useRenderCount("Page:/visualizations");
     const player = usePlayer();
     const allViz = useMemo(() => getAllVisualizations(), []);
     const categories = useMemo(() => getCategories(), []);

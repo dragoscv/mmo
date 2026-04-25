@@ -18,6 +18,7 @@ import { TrackContextMenu } from "@/components/track-actions";
 import { useSelection } from "@/components/selection-provider";
 import { unhideTracks } from "@/actions/tracks";
 import { formatDuration, formatNumber, cn, GENRE_COLORS, ENERGY_COLORS } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     Eye,
     Search,
@@ -52,6 +53,7 @@ export function HiddenClient({
     totalPages,
     search,
 }: HiddenClientProps) {
+    useRenderCount("Page:/library/hidden");
     const router = useRouter();
     const searchParams = useSearchParams();
     const [searchInput, setSearchInput] = useState(search);

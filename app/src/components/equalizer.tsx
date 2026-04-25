@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { subscribeRaf, getSharedFrequencyData } from "@/lib/raf-scheduler";
 import { useEQ } from "./eq-context";
 import { EQ_PRESETS } from "@/lib/eq-engine";
 import {
@@ -17,6 +18,7 @@ import {
     Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 // ─── Rotary Knob ─────────────────────────────────────────────────────────
 
@@ -248,7 +250,6 @@ function Toggle({ enabled, onChange, label, color = "purple" }: {
 
 function SpectrumAnalyzer({ getAnalyser }: { getAnalyser: () => AnalyserNode | null }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const rafRef = useRef<number>(0);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -256,55 +257,64 @@ function SpectrumAnalyzer({ getAnalyser }: { getAnalyser: () => AnalyserNode | n
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        // Reusable buffer — allocated once
-        let dataBuffer: Uint8Array<ArrayBuffer> | null = null;
+        // Cache canvas size + DPR. We MUST NOT resize/scale every frame —
+        // setting canvas.width resets all context state, and stacking
+        // ctx.scale() (as the previous implementation did) compounded the
+        // transform every tick which absolutely tanks performance.
+        let lastW = 0;
+        let lastH = 0;
+        let lastDpr = 0;
+        let cachedGradient: CanvasGradient | null = null;
 
         const draw = () => {
-            rafRef.current = requestAnimationFrame(draw);
             const analyser = getAnalyser();
             if (!analyser) return;
 
-            const dpr = window.devicePixelRatio || 1;
-            const w = canvas.offsetWidth;
-            const h = canvas.offsetHeight;
-            canvas.width = w * dpr;
-            canvas.height = h * dpr;
-            ctx.scale(dpr, dpr);
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const cssW = canvas.offsetWidth;
+            const cssH = canvas.offsetHeight;
+            if (cssW <= 0 || cssH <= 0) return;
 
-            const bufferLength = analyser.frequencyBinCount;
-            if (!dataBuffer || dataBuffer.length !== bufferLength) {
-                dataBuffer = new Uint8Array(bufferLength) as Uint8Array<ArrayBuffer>;
+            if (cssW !== lastW || cssH !== lastH || dpr !== lastDpr) {
+                canvas.width = Math.round(cssW * dpr);
+                canvas.height = Math.round(cssH * dpr);
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // replace, do not stack
+                lastW = cssW;
+                lastH = cssH;
+                lastDpr = dpr;
+                // Gradient depends on logical height — rebuild on resize only.
+                cachedGradient = ctx.createLinearGradient(0, cssH, 0, 0);
+                cachedGradient.addColorStop(0, "rgba(168, 85, 247, 0.6)");
+                cachedGradient.addColorStop(1, "rgba(59, 130, 246, 0.3)");
             }
-            analyser.getByteFrequencyData(dataBuffer);
 
-            ctx.clearRect(0, 0, w, h);
+            const dataBuffer = getSharedFrequencyData(analyser);
+            const bufferLength = dataBuffer.length;
+
+            ctx.clearRect(0, 0, cssW, cssH);
 
             const barCount = 32;
             const gap = 1;
-            const barWidth = (w - gap * (barCount - 1)) / barCount;
-
-            // Single gradient for all bars — avoid creating per bar per frame
-            const gradient = ctx.createLinearGradient(0, h, 0, 0);
-            gradient.addColorStop(0, "rgba(168, 85, 247, 0.6)");
-            gradient.addColorStop(1, "rgba(59, 130, 246, 0.3)");
-            ctx.fillStyle = gradient;
+            const barWidth = (cssW - gap * (barCount - 1)) / barCount;
+            ctx.fillStyle = cachedGradient!;
 
             for (let i = 0; i < barCount; i++) {
                 // Map to frequency range (logarithmic)
                 const freqIdx = Math.floor(Math.pow(i / barCount, 2) * bufferLength * 0.5);
                 const val = dataBuffer[freqIdx] / 255;
-                const barH = val * h;
+                const barH = val * cssH;
 
                 const x = i * (barWidth + gap);
 
                 ctx.beginPath();
-                ctx.roundRect(x, h - barH, barWidth, barH, barWidth / 2);
+                ctx.roundRect(x, cssH - barH, barWidth, barH, barWidth / 2);
                 ctx.fill();
             }
         };
 
-        draw();
-        return () => cancelAnimationFrame(rafRef.current);
+        // Spectrum at 30 fps is plenty — bars look identical and we save half
+        // the per-frame analyser + draw cost.
+        return subscribeRaf(draw, { fps: 30 });
     }, [getAnalyser]);
 
     return (
@@ -386,6 +396,7 @@ function EQCurve({ bands, enabled }: { bands: { frequency: number; gain: number 
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function Equalizer({ getAnalyser }: { getAnalyser: () => AnalyserNode | null }) {
+    useRenderCount("Equalizer");
     const eq = useEQ();
     const [activeEffectsTab, setActiveEffectsTab] = useState<"compressor" | "reverb" | "delay" | "enhance">("compressor");
 

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/command";
 import { Command as CommandPrimitive } from "cmdk";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useRenderCount, dlog } from "@/lib/dev-debugger";
 import { Artwork } from "@/components/artwork";
 import {
   Search,
@@ -51,6 +52,7 @@ interface GlobalSearchProps {
 }
 
 export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
+  useRenderCount("GlobalSearch");
   const router = useRouter();
   const player = usePlayer();
   const { noteNotations } = useDAWSettings();

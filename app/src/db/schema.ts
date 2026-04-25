@@ -42,11 +42,32 @@ export const verificationTokens = sqliteTable("verificationToken", {
     primaryKey({ columns: [verificationToken.identifier, verificationToken.token] }),
 ]);
 
-// ─── User Preferences (per-user localStorage sync) ──────────────────────────
+// ─── User Preferences (legacy: per-user localStorage sync) ──────────────────
+// Kept for backward compatibility. New code should use user_profiles + profile_preferences.
 
 export const userPreferences = sqliteTable("user_preferences", {
     id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    updatedAt: text("updated_at").default(sql`(datetime('now'))`),
+});
+
+// ─── User Profiles (named bundles of UI/app state per user) ─────────────────
+
+export const userProfiles = sqliteTable("user_profiles", {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").default(sql`(datetime('now'))`),
+});
+
+export const profilePreferences = sqliteTable("profile_preferences", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    profileId: text("profile_id").notNull().references(() => userProfiles.id, { onDelete: "cascade" }),
     key: text("key").notNull(),
     value: text("value").notNull(),
     updatedAt: text("updated_at").default(sql`(datetime('now'))`),
@@ -58,6 +79,8 @@ export type User = typeof users.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type UserPreference = typeof userPreferences.$inferSelect;
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type ProfilePreference = typeof profilePreferences.$inferSelect;
 
 export const tracks = sqliteTable("tracks", {
     id: integer("id").primaryKey({ autoIncrement: true }),

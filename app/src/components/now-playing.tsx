@@ -73,7 +73,6 @@ const MixerView = dynamic(
     () => import("./mixer-view").then(m => ({ default: m.MixerView })),
     { ssr: false, loading: () => <div className="flex-1 flex items-center justify-center text-white/30">Loading mixer...</div> }
 );
-import { MidiProvider } from "@/hooks/use-midi";
 import type { Track } from "@/db/schema";
 
 // Genre-based gradient colors
@@ -865,9 +864,7 @@ export function NowPlaying() {
                                 )}
                                 style={{ fontSize: `${personalization.textScale * 100}%` }}
                             >
-                                <MidiProvider>
-                                    <MixerView />
-                                </MidiProvider>
+                                <MixerView />
                             </div>
                         )}
                     </div>

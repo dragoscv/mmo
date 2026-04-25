@@ -10,6 +10,13 @@ import {
     type DockviewTheme,
 } from "dockview";
 import "dockview/dist/styles/dockview.css";
+// Touch → HTML5 Drag-and-Drop polyfill. Dockview's tab/group dragging uses
+// the native HTML5 DnD API (draggable=true + dragstart/dragend), which does
+// not fire on touch devices. This polyfill translates touchstart/touchmove/
+// touchend into synthetic drag events so tabs (and floating windows) can be
+// repositioned with a finger.
+import { polyfill as enableTouchDnD } from "mobile-drag-drop";
+import "mobile-drag-drop/default.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DAWTimeline } from "./daw-timeline";
 import { DAWMixer } from "./daw-mixer";
@@ -22,7 +29,7 @@ import { HistoryPanel } from "./daw-history-panel";
 import { ClipboardPanel } from "./daw-clipboard-panel";
 import { VoiceProcessor } from "./daw-voice-processor";
 import { useDAWActions, useDAWState } from "./daw-context";
-import { useContextMenu, type MenuEntry } from "./daw-context-menu";
+import { useContextMenu, useLongPress, type MenuEntry } from "./daw-context-menu";
 import {
     Maximize2, Minimize2, PanelTop, PanelBottom, X,
     Columns2, Copy, ExternalLink,
@@ -37,6 +44,7 @@ const SAVE_DEBOUNCE_MS = 500;
 
 // Module-level API reference for external access
 let _dockviewApi: DockviewApi | null = null;
+let touchDnDApplied = false;
 
 /** Get the current dockview API instance (or null if not mounted) */
 export function getDockviewApi(): DockviewApi | null {
@@ -157,16 +165,26 @@ function DAWTab({ api, containerApi }: IDockviewPanelHeaderProps) {
         ctxMenu.show(e.clientX, e.clientY, items);
     }, [api, containerApi, ctxMenu, title]);
 
+    // Touch long-press → same context menu (right-click equivalent on mobile)
+    const longPress = useLongPress((x, y) => {
+        handleContextMenu({ clientX: x, clientY: y, preventDefault: () => { /* noop */ } } as React.MouseEvent);
+    });
+
     return (
         <div
             className="dv-default-tab"
             onContextMenu={handleContextMenu}
+            {...longPress}
         >
             <span className="dv-default-tab-content">{title}</span>
             {api.id !== PANEL_IDS.timeline && (
                 <div
                     className="dv-default-tab-action"
-                    onPointerDown={e => e.preventDefault()}
+                    // Stop the event from reaching dockview's tab-drag handler,
+                    // so tapping the close X never starts a drag. Don't call
+                    // preventDefault (that suppresses the synthesised click on
+                    // touch devices, breaking the close button on mobile).
+                    onPointerDown={e => e.stopPropagation()}
                     onClick={e => { e.preventDefault(); api.close(); }}
                 >
                     <svg width="11" height="11" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -381,6 +399,124 @@ export function DAWDockview() {
     const dawActions = useDAWActions();
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isSyncingRef = useRef(false);
+
+    // ─── Touch DnD polyfill (one-shot, idempotent) ───────────────────────
+    // Dockview uses TWO separate drag systems:
+    //   1. HTML5 DnD (draggable + dragstart) for moving tabs between groups
+    //   2. Pointer events (pointerdown/pointermove on window) for moving
+    //      the entire floating window by its title bar
+    //
+    // On touch, system #1 is broken because HTML5 DnD doesn't fire — hence
+    // the polyfill. But the polyfill calls preventDefault() on touchstart,
+    // which suppresses pointer events too — breaking system #2.
+    //
+    // Solution: skip the polyfill entirely when the touch target is inside
+    // a floating window's title bar (let the native pointer-event drag
+    // handle window repositioning), but enable it for docked tab strips
+    // (where HTML5 DnD is the only available mechanism).
+    useEffect(() => {
+        if (touchDnDApplied) return;
+        touchDnDApplied = true;
+        enableTouchDnD({
+            holdToDrag: 200,
+            dragImageCenterOnTouch: false,
+            tryFindDraggableTarget: (event: TouchEvent) => {
+                const touch = event.touches[0];
+                if (!touch) return undefined;
+                const target = touch.target as Element | null;
+                if (!target || !(target instanceof Element)) return undefined;
+
+                // Skip the polyfill entirely when the touch is on a
+                // floating-window drag/resize handle — pointer events
+                // (with our setPointerCapture injection below) drive
+                // those drags natively, and the polyfill's preventDefault
+                // on touchstart would otherwise suppress them.
+                if (
+                    target.closest(
+                        ".dv-floating-group, .dv-resize-container, .dv-void-container, .dv-resize-handle, [class^='dv-resize-handle-']"
+                    )
+                ) {
+                    return undefined;
+                }
+
+                // Otherwise walk up looking for a draggable element (the
+                // polyfill's default behaviour for docked tabs).
+                let el: Element | null = target;
+                while (el && el !== document.body) {
+                    if (el instanceof HTMLElement && el.draggable) return el;
+                    el = el.parentElement;
+                }
+                return undefined;
+            },
+        });
+    }, []);
+
+    // ─── Touch drag fix: inject setPointerCapture into dockview drags ────
+    // Root cause of broken touch drag (verified by reading dockview source):
+    // dockview never calls setPointerCapture anywhere. On touch, the OS
+    // fires `pointercancel` after a few pixels of motion (because no one
+    // claimed the gesture), and dockview's `window.pointermove` listener
+    // simply stops receiving events → drag freezes after a few pixels.
+    //
+    // Fix: in the CAPTURE phase (before dockview's bubble-phase listener),
+    // call setPointerCapture on the actual drag-handle element. This tells
+    // the OS to deliver every pointermove/pointerup for this pointer to
+    // that element until release — pointercancel never fires.
+    //
+    // Drag handles per dockview source:
+    //   • `.dv-void-container`            — moves a floating window
+    //   • `.dv-resize-handle*`            — resizes a floating window
+    //   • `.dv-tab` (with draggable=true) — for tab rearrange (HTML5 DnD,
+    //                                       handled by polyfill instead)
+    useEffect(() => {
+        const onPointerDown = (e: PointerEvent) => {
+            if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+            const target = e.target as Element | null;
+            if (!target || !(target instanceof Element)) return;
+            const handle = target.closest(
+                ".dv-void-container, .dv-resize-handle, [class^='dv-resize-handle-']"
+            ) as HTMLElement | null;
+            if (!handle) return;
+            try {
+                handle.setPointerCapture(e.pointerId);
+                document.documentElement.classList.add("daw-dockview-dragging");
+            } catch {
+                /* element gone or pointer not active — ignore */
+            }
+        };
+        const cleanup = () => {
+            document.documentElement.classList.remove("daw-dockview-dragging");
+            // Defer dockview-class strip so its own pointerup handler runs
+            // first; we only clean up if it left something stuck.
+            setTimeout(() => {
+                document
+                    .querySelectorAll(
+                        ".dv-resize-container-dragging, .dv-tab-dragging, .dv-tab--dragging, .dv-dragged"
+                    )
+                    .forEach(el => {
+                        el.classList.remove(
+                            "dv-resize-container-dragging",
+                            "dv-tab-dragging",
+                            "dv-tab--dragging",
+                            "dv-dragged",
+                        );
+                    });
+            }, 0);
+        };
+        // Capture phase so we run BEFORE dockview's bubble-phase listener.
+        window.addEventListener("pointerdown", onPointerDown, true);
+        window.addEventListener("pointerup", cleanup);
+        window.addEventListener("pointercancel", cleanup);
+        window.addEventListener("touchend", cleanup);
+        window.addEventListener("touchcancel", cleanup);
+        return () => {
+            window.removeEventListener("pointerdown", onPointerDown, true);
+            window.removeEventListener("pointerup", cleanup);
+            window.removeEventListener("pointercancel", cleanup);
+            window.removeEventListener("touchend", cleanup);
+            window.removeEventListener("touchcancel", cleanup);
+        };
+    }, []);
 
     // ─── onReady: Initialize or restore layout ───────────────────────────
     const onReady = useCallback((event: DockviewReadyEvent) => {

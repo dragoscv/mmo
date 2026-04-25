@@ -6,6 +6,7 @@ import { useSystemStats } from "@/hooks/use-system-stats";
 import { usePersonalization } from "@/hooks/use-personalization";
 import { useMixer } from "@/components/mixer-context";
 import { PerfConfigModal } from "@/components/perf-config-modal";
+import { DevDebuggerButton } from "@/components/dev-debugger/dev-debugger-button";
 import { cn } from "@/lib/utils";
 import { Cpu, MemoryStick, Gauge, MonitorSpeaker, Box, RotateCw, Thermometer, Monitor, Settings2 } from "lucide-react";
 
@@ -153,6 +154,7 @@ export const PerformancePanel = memo(function PerformancePanel({ className }: { 
                     <div className="flex items-center gap-1.5">
                         <SessionRestoreIndicator />
                         <div className={cn("h-1.5 w-1.5 rounded-full", system.connected ? "bg-emerald-500" : "bg-white/10")} title={system.connected ? "System stats connected" : "Connecting..."} />
+                        <DevDebuggerButton />
                         <button
                             onClick={() => setConfigOpen(true)}
                             className="text-white/15 hover:text-white/40 transition-colors cursor-pointer"

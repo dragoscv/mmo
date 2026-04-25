@@ -24,6 +24,12 @@ export interface MidiSettings {
     jogSensitivity: number;
     tempoRange: number;
     crossfaderCurve: "linear" | "smooth" | "sharp";
+    /** Active controller driver id (LEDs/screens). null = auto-detect. */
+    controllerDriverId?: string | null;
+    /** Active LED color preset id (see lib/controllers/color-presets). */
+    colorPresetId?: string;
+    /** Per-driver custom palette overrides (id → partial color map). */
+    customColors?: Record<string, Partial<Record<string, string>>>;
 }
 
 export interface ExternalDeviceState {
@@ -76,6 +82,9 @@ const DEFAULT_SETTINGS: MidiSettings = {
     jogSensitivity: 1.0,
     tempoRange: 8,
     crossfaderCurve: "smooth",
+    controllerDriverId: null,
+    colorPresetId: "rekordbox-classic",
+    customColors: {},
 };
 
 const SETTINGS_KEY = "mmo-midi-settings";

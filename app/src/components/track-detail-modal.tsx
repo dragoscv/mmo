@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     Tooltip,
     TooltipContent,
@@ -152,6 +153,7 @@ export function TrackDetailModal({
     onTrackUpdated,
     allTags = [],
 }: TrackDetailModalProps) {
+    useRenderCount("TrackDetailModal");
     const { currentTrack, isPlaying, play, pause, resume } = usePlayer();
     const { noteNotations } = useDAWSettings();
 

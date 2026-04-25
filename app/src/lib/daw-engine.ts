@@ -2,6 +2,8 @@
 // Web Audio API based DAW engine with multi-track mixing, effects, instruments,
 // MIDI, automation, and real-time audio processing.
 
+import { dlog } from "./dev-debugger";
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════════════════
@@ -316,7 +318,11 @@ export class DAWEngine {
     onPlaybackEnd?: () => void;
 
     constructor() {
-        this.ctx = new AudioContext({ latencyHint: "playback" });
+        // DAW monitoring needs low input→output latency for the user to play
+        // along with the backing track or hear themselves through effects.
+        // `interactive` requests the smallest viable buffer; falls back to
+        // the OS default if the hint can't be honoured.
+        this.ctx = new AudioContext({ latencyHint: "interactive" });
 
         // Master chain: gain → compressor → limiter → analyser → destination
         this.masterGain = this.ctx.createGain();
@@ -399,6 +405,7 @@ export class DAWEngine {
 
     play(project: DAWProject, fromBeat?: number) {
         if (this.isPlaying) return;
+        dlog("daw", `play tempo=${project.tempo} fromBeat=${(fromBeat ?? this.currentBeat).toFixed(2)}`, { tempo: project.tempo, fromBeat: fromBeat ?? this.currentBeat, tracks: project.tracks.length });
         this.ctx.resume();
         this.isPlaying = true;
         this.currentBeat = fromBeat ?? this.currentBeat;
@@ -410,6 +417,7 @@ export class DAWEngine {
     }
 
     stop() {
+        if (this.isPlaying) dlog("daw", `stop atBeat=${this.currentBeat.toFixed(2)}`, { atBeat: this.currentBeat });
         this.isPlaying = false;
         if (this.schedulerTimer) {
             clearInterval(this.schedulerTimer);

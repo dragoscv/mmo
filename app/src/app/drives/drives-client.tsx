@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { detectDrives } from "@/actions/drives";
+import { useRenderCount } from "@/lib/dev-debugger";
 import { formatBytes } from "@/lib/utils";
 import { HardDrive, RefreshCw, Loader2 } from "lucide-react";
 
@@ -19,6 +20,7 @@ interface DriveInfo {
 }
 
 export function DrivesClient() {
+    useRenderCount("Page:/drives");
     const [drives, setDrives] = useState<DriveInfo[]>([]);
     const [isPending, startTransition] = useTransition();
     const [loaded, setLoaded] = useState(false);

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     Monitor,
     Trash2,
@@ -41,6 +42,7 @@ interface DevicesClientProps {
 }
 
 export function DevicesClient({ initialDevices }: DevicesClientProps) {
+    useRenderCount("Page:/devices");
     const [devices, setDevices] = useState(initialDevices);
     const [isPending, startTransition] = useTransition();
     const [selectedDevice, setSelectedDevice] = useState<string | null>(null);

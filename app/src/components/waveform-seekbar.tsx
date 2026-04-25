@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 export type WaveformMode = "classic" | "rgb";
 
@@ -39,6 +40,7 @@ export function WaveformSeekbar({
     overlay = false,
     mode = "classic",
 }: WaveformSeekbarProps) {
+    useRenderCount("WaveformSeekbar");
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [peaks, setPeaks] = useState<number[] | null>(null);

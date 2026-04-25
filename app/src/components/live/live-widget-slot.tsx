@@ -62,53 +62,48 @@ export function AutoSize({ children, padding = 0, className }: {
     const slot = useLiveWidgetSlot();
     const ref = useRef<HTMLDivElement>(null);
     const lastReportedRef = useRef(0);
+    // Stash the latest callback in a ref so the effect can run ONCE per mount
+    // (callbacks are typically re-created each parent render, so depending on
+    // them directly would tear down + re-create the observers every render and
+    // synchronously re-trigger requestAutoHeight → setLayouts → infinite loop).
+    const reqRef = useRef<((pixels: number) => void) | undefined>(undefined);
+    reqRef.current = slot?.requestAutoHeight;
 
     useEffect(() => {
         const el = ref.current;
-        if (!el || !slot?.requestAutoHeight) return;
+        if (!el) return;
         let raf = 0;
+        let lastFireAt = 0;
         const measure = () => {
-            // Use scrollHeight so we observe the natural content height even
-            // if the parent has clamped overflow. This responds to BOTH
-            // expansions (e.g. opening an FX section) and contractions
-            // (e.g. closing a section / removing items).
+            const cb = reqRef.current;
+            if (!cb) return;
+            // 8px dead-zone gives proper hysteresis: meter text wobble & sub-pixel
+            // ResizeObserver flutter never trigger a layout write, but real UI
+            // expansions (opening a section, adding a band) still come through.
             const h = el.scrollHeight;
-            // 2px dead-zone to ignore sub-pixel ResizeObserver flutter while
-            // still being responsive to small UI changes.
-            if (Math.abs(h - lastReportedRef.current) < 2) return;
+            if (Math.abs(h - lastReportedRef.current) < 8) return;
+            // Cooldown: if we just reported, wait at least 250ms before another
+            // dispatch — prevents the 200ms grid-item CSS transition from
+            // re-triggering us mid-animation.
+            const now = performance.now();
+            if (now - lastFireAt < 250) return;
+            lastFireAt = now;
             lastReportedRef.current = h;
-            slot.requestAutoHeight!(h + padding);
+            cb(h + padding);
         };
         const ro = new ResizeObserver(() => {
             cancelAnimationFrame(raf);
             raf = requestAnimationFrame(measure);
         });
         ro.observe(el);
-        // Also observe direct children so a child collapsing (which doesn't
-        // change the wrapper's box but does change scrollHeight) still fires.
-        const childObservers: ResizeObserver[] = [];
-        for (const child of Array.from(el.children)) {
-            const cro = new ResizeObserver(() => {
-                cancelAnimationFrame(raf);
-                raf = requestAnimationFrame(measure);
-            });
-            cro.observe(child);
-            childObservers.push(cro);
-        }
-        // MutationObserver — catches added/removed children (e.g. FX inserts).
-        const mo = new MutationObserver(() => {
-            cancelAnimationFrame(raf);
-            raf = requestAnimationFrame(measure);
-        });
-        mo.observe(el, { childList: true, subtree: true });
-        measure();
+        // Defer the initial measure so the wrapper picks up its real size
+        // (RGL needs one layout tick to set the cell dimensions).
+        raf = requestAnimationFrame(measure);
         return () => {
             cancelAnimationFrame(raf);
             ro.disconnect();
-            mo.disconnect();
-            for (const c of childObservers) c.disconnect();
         };
-    }, [slot, padding]);
+    }, [padding]);
 
     return <div ref={ref} className={className}>{children}</div>;
 }

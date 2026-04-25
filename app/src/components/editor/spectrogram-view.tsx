@@ -3,6 +3,7 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useEditor } from "./editor-context";
 import { useDAWSettings, type SpectrogramColorMap } from "@/hooks/use-daw-settings";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Spectrogram View — FFT-based frequency visualization
@@ -64,6 +65,7 @@ function getColorLUT(colorMap: SpectrogramColorMap): Uint8Array {
 }
 
 export function SpectrogramView() {
+    useRenderCount("SpectrogramView");
     const editor = useEditor();
     const ds = useDAWSettings();
     const canvasRef = useRef<HTMLCanvasElement>(null);

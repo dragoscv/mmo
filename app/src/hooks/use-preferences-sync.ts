@@ -3,17 +3,51 @@
 import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import {
-    getUserPreferences,
-    saveUserPreferencesBulk,
-} from "@/actions/user-preferences";
-import { SYNCABLE_KEYS } from "@/lib/syncable-keys";
+    ensureDefaultProfile,
+    getActiveProfilePreferences,
+    saveActiveProfilePreferencesBulk,
+} from "@/actions/profiles";
+import {
+    collectSyncableLocalStorage,
+    clearSyncableLocalStorage,
+    isSyncableKey,
+} from "@/lib/syncable-keys";
+
+/** Custom event fired by the Profiles UI after switching/importing a profile. */
+export const PROFILE_CHANGED_EVENT = "mmo-profile-changed";
 
 /**
- * Syncs localStorage preferences with the database for authenticated users.
- * 
- * On first login (no DB prefs): localStorage → DB
- * On subsequent logins (has DB prefs): DB → localStorage
- * While authenticated: localStorage changes are saved to DB periodically
+ * Reloads the active profile from the DB into localStorage.
+ * Clears existing syncable keys first so deletions persist across devices,
+ * then writes the new set and broadcasts a synthetic storage event so any
+ * `useSyncExternalStore` consumers (theme, EQ, DAW, etc.) re-read.
+ */
+export async function applyActiveProfileToLocalStorage(): Promise<void> {
+    if (typeof window === "undefined") return;
+    const dbPrefs = await getActiveProfilePreferences();
+    clearSyncableLocalStorage();
+    for (const [key, value] of Object.entries(dbPrefs)) {
+        try {
+            localStorage.setItem(key, value);
+        } catch {
+            /* quota / serialization issues — skip */
+        }
+    }
+    window.dispatchEvent(new StorageEvent("storage", { key: null }));
+    window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
+}
+
+/**
+ * Syncs localStorage state with the user's active profile in the DB.
+ *
+ * Behaviour:
+ * - On auth: ensures a default profile exists, pulls active profile entries,
+ *   merges into localStorage (DB wins; deletions in DB propagate to all devices).
+ *   On a fresh sign-in with no DB entries, the current localStorage is uploaded.
+ * - While authenticated: any localStorage write to a *syncable* key triggers a
+ *   debounced bulk save to the DB.
+ * - Cross-tab: piggybacks on `window.storage` events.
+ * - Profile switch: a `mmo-profile-changed` event re-runs the pull.
  */
 export function usePreferencesSync() {
     const { data: session, status } = useSession();
@@ -25,71 +59,65 @@ export function usePreferencesSync() {
         if (status !== "authenticated" || !session?.user?.id || hasSynced.current) return;
         hasSynced.current = true;
 
-        async function sync() {
+        (async () => {
             try {
-                const dbPrefs = await getUserPreferences();
+                await ensureDefaultProfile();
+                const dbPrefs = await getActiveProfilePreferences();
                 const hasDbPrefs = Object.keys(dbPrefs).length > 0;
 
                 if (hasDbPrefs) {
-                    // DB has prefs → load them into localStorage
+                    // DB wins. Wipe local syncable keys then hydrate from DB so
+                    // deletions made on another device propagate here.
+                    clearSyncableLocalStorage();
                     for (const [key, value] of Object.entries(dbPrefs)) {
-                        localStorage.setItem(key, value);
+                        try { localStorage.setItem(key, value); } catch { /* skip */ }
                     }
-                    // Dispatch event so hooks using useSyncExternalStore pick up changes
                     window.dispatchEvent(new StorageEvent("storage", { key: null }));
+                    window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
                 } else {
-                    // No DB prefs → transfer localStorage to DB (first-time sync)
-                    const localPrefs: Array<{ key: string; value: string }> = [];
-                    for (const key of SYNCABLE_KEYS) {
-                        const value = localStorage.getItem(key);
-                        if (value !== null) {
-                            localPrefs.push({ key, value });
-                        }
-                    }
+                    // No DB prefs yet → first-time sign-in: upload local state.
+                    const localPrefs = collectSyncableLocalStorage();
                     if (localPrefs.length > 0) {
-                        await saveUserPreferencesBulk(localPrefs);
+                        await saveActiveProfilePreferencesBulk(localPrefs);
                     }
                 }
             } catch {
-                // Silently fail - localStorage still works as fallback
+                // Silent — localStorage continues to work as fallback.
             }
-        }
-
-        sync();
+        })();
     }, [status, session?.user?.id]);
 
-    // Watch for localStorage changes and persist to DB
+    // Debounced reverse-sync: localStorage → active profile.
     useEffect(() => {
         if (status !== "authenticated" || !session?.user?.id) return;
 
-        function handleStorageChange() {
-            // Debounce saves to avoid hammering the DB
+        function scheduleSave() {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
             saveTimeoutRef.current = setTimeout(async () => {
                 try {
-                    const prefs: Array<{ key: string; value: string }> = [];
-                    for (const key of SYNCABLE_KEYS) {
-                        const value = localStorage.getItem(key);
-                        if (value !== null) {
-                            prefs.push({ key, value });
-                        }
-                    }
+                    const prefs = collectSyncableLocalStorage();
                     if (prefs.length > 0) {
-                        await saveUserPreferencesBulk(prefs);
+                        await saveActiveProfilePreferencesBulk(prefs);
                     }
                 } catch {
-                    // Silently fail
+                    /* silent */
                 }
             }, 2000);
         }
 
-        window.addEventListener("storage", handleStorageChange);
-        // Also listen for custom event for same-tab changes
-        window.addEventListener("mmo-preference-changed", handleStorageChange);
+        function handleStorageEvent(e: StorageEvent) {
+            // Targeted change → only schedule if it's a syncable key.
+            if (e.key && !isSyncableKey(e.key)) return;
+            scheduleSave();
+        }
+
+        window.addEventListener("storage", handleStorageEvent);
+        // Same-tab custom event used by ThemeProvider, EQ, DAW, etc.
+        window.addEventListener("mmo-preference-changed", scheduleSave);
 
         return () => {
-            window.removeEventListener("storage", handleStorageChange);
-            window.removeEventListener("mmo-preference-changed", handleStorageChange);
+            window.removeEventListener("storage", handleStorageEvent);
+            window.removeEventListener("mmo-preference-changed", scheduleSave);
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         };
     }, [status, session?.user?.id]);

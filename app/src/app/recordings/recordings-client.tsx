@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     deleteRecording, renameRecording, toggleRecordingFavorite, type RecordingSource,
 } from "@/actions/recordings";
@@ -54,6 +55,7 @@ interface Props {
 }
 
 export function RecordingsClient({ initialRecordings, folder }: Props) {
+    useRenderCount("Page:/recordings");
     const [items, setItems] = useState<Recording[]>(initialRecordings);
     const [filter, setFilter] = useState<RecordingSource | "all">("all");
     const [favOnly, setFavOnly] = useState(false);

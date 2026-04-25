@@ -10,6 +10,7 @@ import {
     useMemo,
     type ReactNode,
 } from "react";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     DAWEngine,
     createDefaultProject,
@@ -417,6 +418,7 @@ function updateProjectUrl(projectId: string) {
 }
 
 export function DAWProvider({ children }: { children: ReactNode }) {
+    useRenderCount("DAWProvider");
     const engineRef = useRef<DAWEngine | null>(null);
     const meterRAF = useRef<number>(0);
     // Always start with default project for SSR hydration consistency.

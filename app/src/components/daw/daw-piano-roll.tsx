@@ -8,6 +8,7 @@ import { useContextMenu, type MenuEntry } from "./daw-context-menu";
 import { Trash2, Copy, Magnet, Music } from "lucide-react";
 import { formatNoteMulti, formatPitchMulti, ANGLO_NAMES } from "@/lib/note-notation";
 import { useDAWSettings } from "@/hooks/use-daw-settings";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 const NOTE_NAMES = ANGLO_NAMES;
 const MIN_PITCH = 24; // C1
@@ -21,6 +22,7 @@ function isBlackKey(pitch: number) {
 }
 
 export function DAWPianoRoll() {
+    useRenderCount("DAWPianoRoll");
     const daw = useDAW();
     const { noteNotations } = useDAWSettings();
     const gridRef = useRef<HTMLDivElement>(null);
@@ -62,8 +64,9 @@ export function DAWPianoRoll() {
     const beatFromX = (x: number) => x / pxPerBeat;
     const yFromPitch = (pitch: number) => (MAX_PITCH - pitch - 1) * NOTE_HEIGHT;
 
-    const handleGridMouseDown = (e: React.MouseEvent) => {
+    const handleGridMouseDown = (e: React.PointerEvent) => {
         if (!gridRef.current) return;
+        if (e.pointerType === "mouse" && e.button !== 0) return;
         const rect = gridRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left + gridRef.current.scrollLeft;
         const y = e.clientY - rect.top + gridRef.current.scrollTop;
@@ -93,7 +96,7 @@ export function DAWPianoRoll() {
         }
     };
 
-    const handleGridMouseUp = (e: React.MouseEvent) => {
+    const handleGridMouseUp = (e: React.PointerEvent) => {
         if (drawing && drawingNote) {
             if (!gridRef.current) return;
             const rect = gridRef.current.getBoundingClientRect();
@@ -206,8 +209,10 @@ export function DAWPianoRoll() {
                 <div
                     ref={gridRef}
                     className="flex-1 overflow-auto relative"
-                    onMouseDown={handleGridMouseDown}
-                    onMouseUp={handleGridMouseUp}
+                    style={{ touchAction: drawing ? "none" : "pan-x pan-y" }}
+                    onPointerDown={handleGridMouseDown}
+                    onPointerUp={handleGridMouseUp}
+                    onPointerCancel={handleGridMouseUp}
                     onContextMenu={handleGridContextMenu}
                 >
                     <div className="relative" style={{ width: clip.length * pxPerBeat, height: gridHeight, minWidth: "100%" }}>
@@ -338,8 +343,10 @@ function NoteBlock({ note, pxPerBeat, yFromPitch, color, selected, onSelect, onD
                 height: NOTE_HEIGHT - 1,
                 background: color,
                 opacity: note.velocity / 127 * 0.6 + 0.4,
+                touchAction: "none",
             }}
-            onMouseDown={e => {
+            onPointerDown={e => {
+                if (e.pointerType === "mouse" && e.button !== 0) return;
                 e.stopPropagation();
                 if (tool === "erase") {
                     onDelete();

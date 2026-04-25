@@ -7,11 +7,13 @@ import {
     RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import type { DAWTrack } from "@/lib/daw-engine";
 import { useContextMenu, colorMenuItems, type MenuEntry } from "./daw-context-menu";
 import { InlineEditName, useScrollAdjust } from "./daw-ui-utils";
 
 export function DAWMixer() {
+    useRenderCount("DAWMixer");
     const daw = useDAW();
 
     return (

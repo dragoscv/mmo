@@ -11,6 +11,7 @@ import {
     RealtimeStemProcessor,
 } from "@/lib/stems-engine";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     Mic,
     Drum,
@@ -271,6 +272,7 @@ export const StemsPanel = memo(function StemsPanel({
     deckColor,
     className,
 }: StemsPanelProps) {
+    useRenderCount("StemsPanel");
     const [isExpanded, setIsExpanded] = useState(!compact);
     const [, forceRender] = useReducer(x => x + 1, 0);
     const levels = useStemLevels(processor);

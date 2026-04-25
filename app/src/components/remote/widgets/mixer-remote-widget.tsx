@@ -444,182 +444,182 @@ export function MixerRemoteWidget({ snapshot, sendCommand }: MixerWidgetProps) {
         <div className="px-4 py-3 flex flex-col gap-4">
             {/* Master controls */}
             <RemotePanel id="master" label="Master & Recording">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
-                <div className="flex items-center gap-3 mb-3">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/25">Master</span>
-                    {snapshot.isRecording && (
-                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-[9px] font-medium text-red-400">
-                            <Circle className="w-2 h-2 fill-red-400" /> REC
-                        </span>
-                    )}
-                </div>
+                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+                    <div className="flex items-center gap-3 mb-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/25">Master</span>
+                        {snapshot.isRecording && (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-[9px] font-medium text-red-400">
+                                <Circle className="w-2 h-2 fill-red-400" /> REC
+                            </span>
+                        )}
+                    </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                    <RemoteFader
-                        value={snapshot.masterVolume}
-                        min={0} max={1.5}
-                        color="#fff"
-                        label="Master Vol"
-                        onChange={v => sendCommand("mixer.setMasterVolume", v)}
-                        onDoubleClick={() => sendCommand("mixer.setMasterVolume", 1)}
-                        showValue
-                    />
-                    <RemoteFader
-                        value={snapshot.headphoneVolume}
-                        min={0} max={1.5}
-                        color="#eab308"
-                        label="Headphone"
-                        onChange={v => sendCommand("mixer.setHeadphoneVolume", v)}
-                        onDoubleClick={() => sendCommand("mixer.setHeadphoneVolume", 1)}
-                        showValue
-                    />
-                    <RemoteFader
-                        value={snapshot.headphoneMix}
-                        min={0} max={1}
-                        color="#06b6d4"
-                        label="Cue/Master Mix"
-                        onChange={v => sendCommand("mixer.setHeadphoneMix", v)}
-                        onDoubleClick={() => sendCommand("mixer.setHeadphoneMix", 0.5)}
-                        showValue
-                    />
-                </div>
+                    <div className="grid grid-cols-3 gap-3">
+                        <RemoteFader
+                            value={snapshot.masterVolume}
+                            min={0} max={1.5}
+                            color="#fff"
+                            label="Master Vol"
+                            onChange={v => sendCommand("mixer.setMasterVolume", v)}
+                            onDoubleClick={() => sendCommand("mixer.setMasterVolume", 1)}
+                            showValue
+                        />
+                        <RemoteFader
+                            value={snapshot.headphoneVolume}
+                            min={0} max={1.5}
+                            color="#eab308"
+                            label="Headphone"
+                            onChange={v => sendCommand("mixer.setHeadphoneVolume", v)}
+                            onDoubleClick={() => sendCommand("mixer.setHeadphoneVolume", 1)}
+                            showValue
+                        />
+                        <RemoteFader
+                            value={snapshot.headphoneMix}
+                            min={0} max={1}
+                            color="#06b6d4"
+                            label="Cue/Master Mix"
+                            onChange={v => sendCommand("mixer.setHeadphoneMix", v)}
+                            onDoubleClick={() => sendCommand("mixer.setHeadphoneMix", 0.5)}
+                            showValue
+                        />
+                    </div>
 
-                {/* Crossfader */}
-                <div className="mt-3">
-                    <RemoteFader
-                        value={snapshot.crossfader}
-                        min={0} max={1}
-                        color="rgba(255,255,255,0.5)"
-                        label="Crossfader"
-                        onChange={v => sendCommand("mixer.setCrossfader", v)}
-                        onDoubleClick={() => sendCommand("mixer.setCrossfader", 0.5)}
-                    />
-                </div>
+                    {/* Crossfader */}
+                    <div className="mt-3">
+                        <RemoteFader
+                            value={snapshot.crossfader}
+                            min={0} max={1}
+                            color="rgba(255,255,255,0.5)"
+                            label="Crossfader"
+                            onChange={v => sendCommand("mixer.setCrossfader", v)}
+                            onDoubleClick={() => sendCommand("mixer.setCrossfader", 0.5)}
+                        />
+                    </div>
 
-                {/* Recording toggle */}
-                <button
-                    onClick={() => sendCommand("mixer.toggleRecording")}
-                    className={cn(
-                        "mt-3 w-full py-2 rounded-xl text-xs font-medium transition-all cursor-pointer",
-                        snapshot.isRecording
-                            ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                            : "bg-white/[0.03] text-white/30 hover:bg-white/[0.06] border border-white/[0.06]",
-                    )}
-                >
-                    {snapshot.isRecording ? `⏺ Recording — ${Math.floor(snapshot.recordingDuration / 1000)}s` : "⏺ Start Recording"}
-                </button>
-            </div>
+                    {/* Recording toggle */}
+                    <button
+                        onClick={() => sendCommand("mixer.toggleRecording")}
+                        className={cn(
+                            "mt-3 w-full py-2 rounded-xl text-xs font-medium transition-all cursor-pointer",
+                            snapshot.isRecording
+                                ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                                : "bg-white/[0.03] text-white/30 hover:bg-white/[0.06] border border-white/[0.06]",
+                        )}
+                    >
+                        {snapshot.isRecording ? `⏺ Recording — ${Math.floor(snapshot.recordingDuration / 1000)}s` : "⏺ Start Recording"}
+                    </button>
+                </div>
             </RemotePanel>
 
             {/* Deck cards */}
             <RemotePanel id="decks" label="Decks">
-            <div className={cn("grid gap-3", is4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2")}>
-                {decks.map(({ side, deck }) => (
-                    <DeckCard key={side} deck={deck} side={side} sendCommand={sendCommand} />
-                ))}
-            </div>
+                <div className={cn("grid gap-3", is4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2")}>
+                    {decks.map(({ side, deck }) => (
+                        <DeckCard key={side} deck={deck} side={side} sendCommand={sendCommand} />
+                    ))}
+                </div>
             </RemotePanel>
 
             {/* Sampler */}
             <RemotePanel id="sampler" label="Sampler">
-            {snapshot.samplerSlots.length > 0 && (
-                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">Sampler</span>
-                    <div className="grid grid-cols-4 gap-1.5">
-                        {snapshot.samplerSlots.map((slot, i) => (
-                            <button key={slot.id}
-                                onPointerDown={() => slot.hasAudio && sendCommand("mixer.triggerSampler", i)}
-                                onPointerUp={() => slot.isPlaying && sendCommand("mixer.stopSampler", i)}
-                                onContextMenu={e => { e.preventDefault(); sendCommand("mixer.toggleSamplerLoop", i); }}
-                                className={cn(
-                                    "relative flex flex-col items-center justify-center py-3 rounded-xl border transition-all cursor-pointer select-none touch-none",
-                                    slot.isPlaying ? "bg-pink-500/20 border-pink-500/30 text-pink-400"
-                                        : slot.hasAudio ? "bg-white/[0.04] border-white/[0.08] text-white/40 hover:bg-white/[0.08]"
-                                            : "bg-white/[0.01] border-white/[0.04] text-white/10",
-                                )}>
-                                <span className="text-[10px] font-bold">{i + 1}</span>
-                                <span className="text-[7px] truncate max-w-full px-1">{slot.name || "—"}</span>
-                                {slot.isLooping && (
-                                    <Repeat className="absolute top-1 right-1 w-2.5 h-2.5 text-pink-400/50" />
-                                )}
-                            </button>
-                        ))}
+                {snapshot.samplerSlots.length > 0 && (
+                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">Sampler</span>
+                        <div className="grid grid-cols-4 gap-1.5">
+                            {snapshot.samplerSlots.map((slot, i) => (
+                                <button key={slot.id}
+                                    onPointerDown={() => slot.hasAudio && sendCommand("mixer.triggerSampler", i)}
+                                    onPointerUp={() => slot.isPlaying && sendCommand("mixer.stopSampler", i)}
+                                    onContextMenu={e => { e.preventDefault(); sendCommand("mixer.toggleSamplerLoop", i); }}
+                                    className={cn(
+                                        "relative flex flex-col items-center justify-center py-3 rounded-xl border transition-all cursor-pointer select-none touch-none",
+                                        slot.isPlaying ? "bg-pink-500/20 border-pink-500/30 text-pink-400"
+                                            : slot.hasAudio ? "bg-white/[0.04] border-white/[0.08] text-white/40 hover:bg-white/[0.08]"
+                                                : "bg-white/[0.01] border-white/[0.04] text-white/10",
+                                    )}>
+                                    <span className="text-[10px] font-bold">{i + 1}</span>
+                                    <span className="text-[7px] truncate max-w-full px-1">{slot.name || "—"}</span>
+                                    {slot.isLooping && (
+                                        <Repeat className="absolute top-1 right-1 w-2.5 h-2.5 text-pink-400/50" />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
             </RemotePanel>
 
             {/* Global Settings */}
             <RemotePanel id="settings" label="Settings & Automix">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">
-                    <Settings className="w-3 h-3 inline mr-1" />Settings
-                </span>
+                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/25 block mb-2">
+                        <Settings className="w-3 h-3 inline mr-1" />Settings
+                    </span>
 
-                {/* Crossfader Curve */}
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[9px] text-white/25 w-20">XF Curve</span>
-                    <div className="flex gap-0.5 flex-1">
-                        {(["linear", "smooth", "sharp"] as const).map(c => (
-                            <button key={c} onClick={() => sendCommand("mixer.setCrossfaderCurve", c)}
-                                className={cn("flex-1 py-1 rounded text-[8px] cursor-pointer capitalize",
-                                    snapshot.crossfaderCurve === c ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
-                                {c}
-                            </button>
-                        ))}
+                    {/* Crossfader Curve */}
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[9px] text-white/25 w-20">XF Curve</span>
+                        <div className="flex gap-0.5 flex-1">
+                            {(["linear", "smooth", "sharp"] as const).map(c => (
+                                <button key={c} onClick={() => sendCommand("mixer.setCrossfaderCurve", c)}
+                                    className={cn("flex-1 py-1 rounded text-[8px] cursor-pointer capitalize",
+                                        snapshot.crossfaderCurve === c ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
+                                    {c}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
 
-                {/* EQ Mode */}
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[9px] text-white/25 w-20">EQ Mode</span>
-                    <div className="flex gap-0.5 flex-1">
-                        {(["eq", "isolator"] as const).map(m => (
-                            <button key={m} onClick={() => sendCommand("mixer.setEQMode", m)}
-                                className={cn("flex-1 py-1 rounded text-[8px] cursor-pointer capitalize",
-                                    snapshot.eqMode === m ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
-                                {m}
-                            </button>
-                        ))}
+                    {/* EQ Mode */}
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[9px] text-white/25 w-20">EQ Mode</span>
+                        <div className="flex gap-0.5 flex-1">
+                            {(["eq", "isolator"] as const).map(m => (
+                                <button key={m} onClick={() => sendCommand("mixer.setEQMode", m)}
+                                    className={cn("flex-1 py-1 rounded text-[8px] cursor-pointer capitalize",
+                                        snapshot.eqMode === m ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
+                                    {m}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
 
-                {/* Tempo Range */}
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[9px] text-white/25 w-20">Tempo ±</span>
-                    <div className="flex gap-0.5 flex-1">
-                        {[6, 10, 16, 25].map(r => (
-                            <button key={r} onClick={() => sendCommand("mixer.setTempoRange", r)}
-                                className={cn("flex-1 py-1 rounded text-[8px] cursor-pointer",
-                                    snapshot.tempoRange === r ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
-                                ±{r}%
-                            </button>
-                        ))}
+                    {/* Tempo Range */}
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[9px] text-white/25 w-20">Tempo ±</span>
+                        <div className="flex gap-0.5 flex-1">
+                            {[6, 10, 16, 25].map(r => (
+                                <button key={r} onClick={() => sendCommand("mixer.setTempoRange", r)}
+                                    className={cn("flex-1 py-1 rounded text-[8px] cursor-pointer",
+                                        snapshot.tempoRange === r ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
+                                    ±{r}%
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
 
-                {/* Deck Mode */}
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[9px] text-white/25 w-20">Decks</span>
-                    <div className="flex gap-0.5 flex-1">
-                        {(["2deck", "4deck"] as const).map(m => (
-                            <button key={m} onClick={() => sendCommand("mixer.setDeckMode", m)}
-                                className={cn("flex-1 py-1 rounded text-[8px] cursor-pointer",
-                                    snapshot.deckMode === m ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
-                                {m === "2deck" ? "2 Decks" : "4 Decks"}
-                            </button>
-                        ))}
+                    {/* Deck Mode */}
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[9px] text-white/25 w-20">Decks</span>
+                        <div className="flex gap-0.5 flex-1">
+                            {(["2deck", "4deck"] as const).map(m => (
+                                <button key={m} onClick={() => sendCommand("mixer.setDeckMode", m)}
+                                    className={cn("flex-1 py-1 rounded text-[8px] cursor-pointer",
+                                        snapshot.deckMode === m ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.03] text-white/20 hover:bg-white/[0.06]")}>
+                                    {m === "2deck" ? "2 Decks" : "4 Decks"}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
 
-                {/* Automix */}
-                <button onClick={() => sendCommand("mixer.toggleAutomix")}
-                    className={cn("w-full py-1.5 rounded-xl text-[9px] font-medium transition-all cursor-pointer",
-                        snapshot.automixEnabled ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                            : "bg-white/[0.03] text-white/25 hover:bg-white/[0.06] border border-white/[0.06]")}>
-                    {snapshot.automixEnabled ? "Automix ON" : "Automix OFF"}
-                </button>
-            </div>
+                    {/* Automix */}
+                    <button onClick={() => sendCommand("mixer.toggleAutomix")}
+                        className={cn("w-full py-1.5 rounded-xl text-[9px] font-medium transition-all cursor-pointer",
+                            snapshot.automixEnabled ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                : "bg-white/[0.03] text-white/25 hover:bg-white/[0.06] border border-white/[0.06]")}>
+                        {snapshot.automixEnabled ? "Automix ON" : "Automix OFF"}
+                    </button>
+                </div>
             </RemotePanel>
         </div>
     );

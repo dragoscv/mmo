@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
+import { useRenderCount } from "@/lib/dev-debugger";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { resetUserPreferences, deleteUserAccount } from "@/actions/user-preferences";
-import { SYNCABLE_KEYS } from "@/lib/syncable-keys";
+import { clearSyncableLocalStorage, SYNCABLE_KEY_PREFIXES, SYNCABLE_KEYS } from "@/lib/syncable-keys";
 
 interface ProfileClientProps {
     user: {
@@ -36,6 +37,7 @@ interface ProfileClientProps {
 }
 
 export function ProfileClient({ user }: ProfileClientProps) {
+    useRenderCount("Page:/profile");
     const [resetting, setResetting] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -53,10 +55,7 @@ export function ProfileClient({ user }: ProfileClientProps) {
         try {
             const result = await resetUserPreferences();
             if (result.success) {
-                // Also clear localStorage
-                for (const key of SYNCABLE_KEYS) {
-                    localStorage.removeItem(key);
-                }
+                clearSyncableLocalStorage();
                 toast.success("All preferences reset to defaults. Reload the page to apply.");
                 setResetDialogOpen(false);
             } else {
@@ -156,11 +155,21 @@ export function ProfileClient({ user }: ProfileClientProps) {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        Your UI settings (theme, personalization, DAW settings, MIDI settings, FX presets) are
-                        automatically synced to the database when you&apos;re signed in. When you sign out,
-                        settings are kept locally in your browser.
+                        Your UI state — window/panel layouts, mixer & EQ settings, FX chains, MIDI mapping,
+                        theme, sidebar, DAW projects layout, and every other per-app preference — is
+                        automatically synced to your <strong>active profile</strong> in the database when
+                        signed in. Manage profiles (create, switch, import, export) from
+                        <a href="/settings" className="underline ml-1">Settings → Profiles</a>.
                     </p>
                     <div className="flex flex-wrap gap-1.5">
+                        {SYNCABLE_KEY_PREFIXES.map((p) => (
+                            <span
+                                key={p}
+                                className="inline-flex items-center rounded-md bg-purple-500/10 text-purple-300 px-2 py-1 text-xs font-mono"
+                            >
+                                {p}*
+                            </span>
+                        ))}
                         {SYNCABLE_KEYS.map((key) => (
                             <span
                                 key={key}

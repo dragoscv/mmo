@@ -3,6 +3,7 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useEditor } from "./editor-context";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import { useDAWSettings, EDITOR_WAVEFORM_COLORS } from "@/hooks/use-daw-settings";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -10,6 +11,7 @@ import { useDAWSettings, EDITOR_WAVEFORM_COLORS } from "@/hooks/use-daw-settings
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function WaveformView() {
+    useRenderCount("WaveformView");
     const editor = useEditor();
     const ds = useDAWSettings();
     const canvasRef = useRef<HTMLCanvasElement>(null);

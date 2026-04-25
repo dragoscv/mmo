@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { scanFolderAction } from "@/actions/scan";
+import { useRenderCount, dlog } from "@/lib/dev-debugger";
 import {
     ScanSearch,
     FolderOpen,
@@ -31,6 +32,7 @@ export function ScannerClient({
     watchFolders,
     musicRoot,
 }: ScannerClientProps) {
+    useRenderCount("Page:/scanner");
     const [customPath, setCustomPath] = useState("");
     const [scanResult, setScanResult] = useState<ScanResult | null>(null);
     const [isPending, startTransition] = useTransition();

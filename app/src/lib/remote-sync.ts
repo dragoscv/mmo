@@ -436,6 +436,14 @@ export class RemoteSyncEngine {
     private sseRetryTimer: ReturnType<typeof setTimeout> | null = null;
     private lastServerSend = 0;
     private pendingServerSend: ReturnType<typeof setTimeout> | null = null;
+    /**
+     * Set to true when the server relay returns 401 (no session). Happens
+     * when the app is opened on a host where the user hasn't signed in
+     * — e.g. a VS Code dev tunnel URL while only `localhost` is logged in.
+     * Once disabled, all server POST / SSE attempts are skipped and the
+     * client falls back to BroadcastChannel-only mode (same-origin tabs).
+     */
+    private serverDisabled = false;
 
     constructor(page: RemotePage = "idle", label?: string) {
         this.peerId = crypto.randomUUID();
@@ -491,7 +499,7 @@ export class RemoteSyncEngine {
     // ── SSE connection ───────────────────────────────────────────────────────
 
     private connectSSE() {
-        if (this._destroyed) return;
+        if (this._destroyed || this.serverDisabled) return;
         if (typeof EventSource === "undefined") return;
 
         try {
@@ -508,16 +516,64 @@ export class RemoteSyncEngine {
             this.eventSource.onerror = () => {
                 this.eventSource?.close();
                 this.eventSource = null;
-                // Reconnect after delay
-                if (!this._destroyed) {
+                if (this._destroyed) return;
+                // EventSource doesn't expose HTTP status — probe with fetch to
+                // distinguish a transient network error from a 401 (no session
+                // on this host, e.g. tunnel domain). On 401 we stop retrying.
+                void this.probeAuth().then((ok) => {
+                    if (!ok || this._destroyed || this.serverDisabled) return;
                     this.sseRetryTimer = setTimeout(() => this.connectSSE(), SSE_RECONNECT_DELAY);
-                }
+                });
             };
         } catch {
             // SSE failed to open — will retry
-            if (!this._destroyed) {
+            if (!this._destroyed && !this.serverDisabled) {
                 this.sseRetryTimer = setTimeout(() => this.connectSSE(), SSE_RECONNECT_DELAY);
             }
+        }
+    }
+
+    /**
+     * Quick HEAD-style probe to see whether the server relay is reachable
+     * AND we're authenticated. Returns false on 401, in which case we
+     * disable the server relay entirely for the lifetime of this client.
+     */
+    private async probeAuth(): Promise<boolean> {
+        try {
+            const res = await fetch(`/api/remote/send`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                // Empty body — server returns 400, but only after auth check.
+                // 401 means "no session here"; anything else means we're in.
+                body: "{}",
+            });
+            if (res.status === 401) {
+                this.disableServerRelay("401 Unauthorized");
+                return false;
+            }
+            return true;
+        } catch {
+            // Network failure — keep retrying
+            return true;
+        }
+    }
+
+    private disableServerRelay(reason: string) {
+        if (this.serverDisabled) return;
+        this.serverDisabled = true;
+        if (this.sseRetryTimer) {
+            clearTimeout(this.sseRetryTimer);
+            this.sseRetryTimer = null;
+        }
+        if (this.pendingServerSend) {
+            clearTimeout(this.pendingServerSend);
+            this.pendingServerSend = null;
+        }
+        this.eventSource?.close();
+        this.eventSource = null;
+        if (process.env.NODE_ENV !== "production") {
+            // eslint-disable-next-line no-console
+            console.info(`[remote-sync] server relay disabled (${reason}) — falling back to BroadcastChannel only`);
         }
     }
 
@@ -536,7 +592,7 @@ export class RemoteSyncEngine {
     }
 
     private sendToServer(msg: SyncMessage) {
-        if (this._destroyed) return;
+        if (this._destroyed || this.serverDisabled) return;
 
         // Skip server relay for state snapshots when no remote controller listens
         if (msg.type === "state:snapshot" && !this.hasRemoteSubscriber()) {
@@ -562,11 +618,14 @@ export class RemoteSyncEngine {
     }
 
     private doServerPost(msg: SyncMessage) {
+        if (this.serverDisabled) return;
         this.lastServerSend = Date.now();
         fetch("/api/remote/send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ senderId: this.peerId, message: msg }),
+        }).then((res) => {
+            if (res.status === 401) this.disableServerRelay("401 Unauthorized");
         }).catch(() => { /* network error — silent */ });
     }
 

@@ -5,6 +5,7 @@ import { usePlayer } from "./player-context";
 import { useAudioAnalyzer } from "@/lib/audio-analyzer";
 import type { VisualizationDef } from "@/lib/visualizations/types";
 import { AlertTriangle, Loader2 } from "lucide-react";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 const VERTEX_SHADER = `
 attribute vec2 a_position;
@@ -67,6 +68,7 @@ export function ShaderCanvas({
     className = "",
     onFpsUpdate,
 }: ShaderCanvasProps) {
+    useRenderCount("ShaderCanvas");
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const glRef = useRef<WebGLRenderingContext | null>(null);
     const programRef = useRef<WebGLProgram | null>(null);

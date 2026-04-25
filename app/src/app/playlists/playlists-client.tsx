@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useRouteMemorySave } from "@/hooks/use-route-memory";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     Table,
     TableBody,
@@ -95,6 +96,7 @@ export function PlaylistsClient({
     activePlaylist,
     recommendedCategories,
 }: PlaylistsClientProps) {
+    useRenderCount("Page:/playlists");
     const player = usePlayer();
     const searchParams = useSearchParams();
     const router = useRouter();

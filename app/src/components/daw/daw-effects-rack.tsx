@@ -10,8 +10,10 @@ import {
 import { EFFECT_TYPES, DEFAULT_EFFECT_PARAMS, type EffectType, type InsertEffect } from "@/lib/daw-engine";
 import { useContextMenu, type MenuEntry } from "./daw-context-menu";
 import { useScrollAdjust } from "./daw-ui-utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 export function DAWEffectsRack() {
+    useRenderCount("DAWEffectsRack");
     const daw = useDAW();
     const ctxMenu = useContextMenu();
     const track = daw.project.tracks.find(t => t.id === daw.selectedTrackId);
@@ -58,7 +60,7 @@ export function DAWEffectsRack() {
     return (
         <div className="h-full flex bg-[var(--daw-bg)]">
             {/* Effect chain list */}
-            <div className="w-[200px] flex-shrink-0 border-r border-white/10 flex flex-col">
+            <div className="w-[140px] sm:w-[200px] flex-shrink-0 border-r border-white/10 flex flex-col">
                 {/* Header */}
                 <div className="h-7 flex items-center justify-between px-2 border-b border-[var(--daw-border)] bg-[var(--daw-surface)]">
                     <div className="flex items-center gap-1.5">

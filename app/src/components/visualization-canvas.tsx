@@ -5,6 +5,7 @@ import { usePlayer } from "./player-context";
 import { useAudioAnalyzer } from "@/lib/audio-analyzer";
 import type { VisualizationDef, RenderConfig, AudioData } from "@/lib/visualizations/types";
 import { ShaderCanvas } from "./shader-canvas";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 interface VisualizationCanvasProps {
     visualization: VisualizationDef;
@@ -23,6 +24,7 @@ export function VisualizationCanvas({
     onFpsUpdate,
     showStats = false,
 }: VisualizationCanvasProps) {
+    useRenderCount("VisualizationCanvas");
     // Delegate to WebGL shader canvas if this is a shader visualization
     if (visualization.shader) {
         return (

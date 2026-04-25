@@ -20,6 +20,7 @@ import { MUSICAL_SCALES, type PitchInfo } from "@/lib/audio-fx-engine";
 import { useLiveSettings, getActiveLiveNotations } from "@/hooks/use-live-settings";
 import { useStableValue } from "@/hooks/use-stable-value";
 import { formatNoteMulti, type NoteNotation } from "@/lib/note-notation";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -189,6 +190,7 @@ export function LiveRecommendationsWidget({
     scaleIndex: scaleIndexProp,
     voiceActive: voiceActiveProp,
 }: Props) {
+    useRenderCount("LiveRecommendationsWidget");
     const live = useLiveOptional();
     const settings = useLiveSettings();
     const [tips, setTips] = useState<CoachTip[]>(IDLE_TIPS);

@@ -8,12 +8,12 @@ import {
     Volume1, AudioWaveform, ChevronDown, Drum, CornerDownRight, Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import type { DAWTrack, Clip, AutomationLane } from "@/lib/daw-engine";
 import { useContextMenu, colorMenuItems, type MenuEntry } from "./daw-context-menu";
 import { InlineEditName, useScrollAdjust } from "./daw-ui-utils";
 import { useDAWSettings, PLAYHEAD_COLORS, type WaveformStyle, type WaveformColorMode } from "@/hooks/use-daw-settings";
 
-const HEADER_WIDTH = 200;
 const RULER_HEIGHT = 30;
 const MIN_CLIP_LENGTH = 0.25;
 
@@ -28,9 +28,11 @@ type DragMode =
     | { type: "draw"; trackId: string; startBeat: number; currentBeat: number }
     | { type: "fade-in"; clipId: string; trackId: string; startX: number; startFade: number; maxFade: number }
     | { type: "fade-out"; clipId: string; trackId: string; startX: number; startFade: number; maxFade: number }
+    | { type: "pan"; startX: number; startY: number; startScrollX: number; startScrollY: number }
     | null;
 
 export function DAWTimeline() {
+    useRenderCount("DAWTimeline");
     const daw = useDAW();
     const ds = useDAWSettings();
     const ctxMenu = useContextMenu();
@@ -38,6 +40,15 @@ export function DAWTimeline() {
     const trackAreaRef = useRef<HTMLDivElement>(null);
     const [drag, setDrag] = useState<DragMode>(null);
     const [dropPreview, setDropPreview] = useState<{ trackId: string; beat: number; name: string; duration: number } | null>(null);
+    // Long-press timer for touch context menu on clips
+    const longPressRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; startX: number; startY: number; fired: boolean }>({ timer: null, startX: 0, startY: 0, fired: false });
+    const cancelLongPress = useCallback(() => {
+        if (longPressRef.current.timer) {
+            clearTimeout(longPressRef.current.timer);
+            longPressRef.current.timer = null;
+        }
+    }, []);
+    useEffect(() => () => cancelLongPress(), [cancelLongPress]);
 
     const pxPerBeat = daw.zoom;
     const totalBeats = Math.max(daw.project.duration, 128);
@@ -104,11 +115,22 @@ export function DAWTimeline() {
         }
     }, [daw, pxPerBeat]);
 
-    // ─── Clip mousedown (select, start move, or tool action) ────────
-    const handleClipMouseDown = useCallback((e: React.MouseEvent, clip: Clip, track: DAWTrack) => {
-        if (e.button !== 0) return;
+    // ─── Clip pointerdown (select, start move, or tool action) ──────
+    const handleClipMouseDown = useCallback((e: React.PointerEvent, clip: Clip, track: DAWTrack) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
         e.stopPropagation();
         daw.selectClip(clip.id);
+
+        // Touch / pen long-press → context menu (right-click equivalent)
+        if (e.pointerType !== "mouse") {
+            longPressRef.current = { timer: null, startX: e.clientX, startY: e.clientY, fired: false };
+            const sx = e.clientX, sy = e.clientY;
+            longPressRef.current.timer = setTimeout(() => {
+                longPressRef.current.fired = true;
+                setDrag(null); // cancel any in-progress drag
+                handleClipRightClick({ clientX: sx, clientY: sy, preventDefault: () => {} } as React.MouseEvent, clip, track);
+            }, 500);
+        }
 
         if (daw.tool === "select") {
             const trackIdx = daw.project.tracks.findIndex(t => t.id === track.id);
@@ -136,7 +158,7 @@ export function DAWTimeline() {
     }, [daw, pxPerBeat, snapToBeat]);
 
     // ─── Resize handles ─────────────────────────────────────────────
-    const handleResizeRightStart = useCallback((e: React.MouseEvent, clip: Clip) => {
+    const handleResizeRightStart = useCallback((e: React.PointerEvent, clip: Clip) => {
         e.stopPropagation();
         e.preventDefault();
         setDrag({
@@ -148,7 +170,7 @@ export function DAWTimeline() {
         });
     }, []);
 
-    const handleResizeLeftStart = useCallback((e: React.MouseEvent, clip: Clip) => {
+    const handleResizeLeftStart = useCallback((e: React.PointerEvent, clip: Clip) => {
         e.stopPropagation();
         e.preventDefault();
         setDrag({
@@ -162,7 +184,7 @@ export function DAWTimeline() {
     }, []);
 
     // ─── Fade handles ───────────────────────────────────────────────
-    const handleFadeInStart = useCallback((e: React.MouseEvent, clip: Clip) => {
+    const handleFadeInStart = useCallback((e: React.PointerEvent, clip: Clip) => {
         e.stopPropagation();
         e.preventDefault();
         setDrag({
@@ -175,7 +197,7 @@ export function DAWTimeline() {
         });
     }, []);
 
-    const handleFadeOutStart = useCallback((e: React.MouseEvent, clip: Clip) => {
+    const handleFadeOutStart = useCallback((e: React.PointerEvent, clip: Clip) => {
         e.stopPropagation();
         e.preventDefault();
         setDrag({
@@ -188,9 +210,9 @@ export function DAWTimeline() {
         });
     }, []);
 
-    // ─── Track area click (draw tool) ───────────────────────────────
-    const handleTrackMouseDown = useCallback((e: React.MouseEvent, track: DAWTrack) => {
-        if (e.button !== 0) return;
+    // ─── Track area pointerdown (draw tool, or touch pan) ───────────
+    const handleTrackMouseDown = useCallback((e: React.PointerEvent, track: DAWTrack) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left + daw.scrollX * pxPerBeat;
@@ -203,6 +225,17 @@ export function DAWTimeline() {
                 trackId: track.id,
                 startBeat: beat,
                 currentBeat: beat,
+            });
+        } else if (e.pointerType !== "mouse" && daw.tool === "select") {
+            // Touch / pen on empty lane area in select mode → pan the timeline.
+            // Horizontal drag scrolls beats; vertical drag scrolls the track list.
+            try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+            setDrag({
+                type: "pan",
+                startX: e.clientX,
+                startY: e.clientY,
+                startScrollX: daw.scrollX,
+                startScrollY: trackAreaRef.current?.scrollTop ?? 0,
             });
         }
     }, [daw, pxPerBeat, snapToBeat]);
@@ -219,8 +252,14 @@ export function DAWTimeline() {
         }
     }, [daw, pxPerBeat, snapToBeat]);
 
-    // ─── Global mousemove ───────────────────────────────────────────
-    const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // ─── Global pointermove (mouse + touch + pen) ───────────────────
+    const handleMouseMove = useCallback((e: React.PointerEvent) => {
+        // If user moves more than 8px, cancel any pending long-press timer
+        if (longPressRef.current.timer) {
+            const dx = Math.abs(e.clientX - longPressRef.current.startX);
+            const dy = Math.abs(e.clientY - longPressRef.current.startY);
+            if (dx > 8 || dy > 8) cancelLongPress();
+        }
         if (!drag) return;
 
         if (drag.type === "move") {
@@ -276,11 +315,22 @@ export function DAWTimeline() {
             // Find clip to get current fadeIn
             const found = daw.project.tracks.flatMap(t => t.clips).find(c => c.id === drag.clipId);
             daw.setClipFade(drag.clipId, found?.audio?.fadeIn ?? 0, newFade);
+        } else if (drag.type === "pan") {
+            // Touch panning: horizontal drives virtual scrollX (timeline beats),
+            // vertical drives the native track-area scrollTop.
+            const dx = e.clientX - drag.startX;
+            const dy = e.clientY - drag.startY;
+            daw.setScroll(Math.max(0, drag.startScrollX - dx / pxPerBeat), daw.scrollY);
+            const area = trackAreaRef.current;
+            if (area) {
+                area.scrollTop = Math.max(0, drag.startScrollY - dy);
+            }
         }
-    }, [drag, pxPerBeat, snapToBeat, daw, getTrackAtY]);
+    }, [drag, pxPerBeat, snapToBeat, daw, getTrackAtY, cancelLongPress]);
 
     // ─── Global mouseup ─────────────────────────────────────────────
     const handleMouseUp = useCallback(() => {
+        cancelLongPress();
         if (drag?.type === "draw") {
             // Create clip from draw
             const start = Math.min(drag.startBeat, drag.currentBeat);
@@ -295,7 +345,7 @@ export function DAWTimeline() {
             }
         }
         setDrag(null);
-    }, [drag, daw]);
+    }, [drag, daw, cancelLongPress]);
 
     // ─── Clip right-click context menu ──────────────────────────────
     const handleClipRightClick = useCallback((e: React.MouseEvent, clip: Clip, track: DAWTrack) => {
@@ -389,6 +439,37 @@ export function DAWTimeline() {
         setDropPreview(null);
     }, []);
 
+    // ─── Shared drop logic (used by both HTML5 DnD and touch DnD) ───
+    const applyDropPayload = useCallback(async (
+        track: DAWTrack,
+        beat: number,
+        data: { type?: string; path?: string; name?: string; track?: { filePath?: string; title?: string } } | null,
+        files: File[],
+    ) => {
+        if (data) {
+            if (data.type === "sample" && data.path) {
+                if (track.type !== "audio") return;
+                const clip = daw.addClip(track.id, "audio", beat, 4, data.name || "Sample");
+                await daw.loadAudioIntoClip(clip.id, data.path, data.name);
+                return;
+            }
+            if (data.type === "library-track" && data.track?.filePath) {
+                if (track.type !== "audio") return;
+                const filePath = data.track.filePath;
+                const audioUrl = filePath.startsWith("/") ? filePath : `/api/audio/${encodeURIComponent(filePath)}`;
+                const clip = daw.addClip(track.id, "audio", beat, 4, data.track.title || "Audio");
+                await daw.loadAudioIntoClip(clip.id, audioUrl, data.track.title);
+                return;
+            }
+        }
+        // Native file drop (touch path won't have these)
+        if (track.type !== "audio") return;
+        const audioFile = files.find(f => f.type.startsWith("audio/"));
+        if (!audioFile) return;
+        const clip = daw.addClip(track.id, "audio", beat, 4, audioFile.name);
+        await daw.loadFileIntoClip(clip.id, audioFile);
+    }, [daw]);
+
     const handleTrackDrop = useCallback(async (e: React.DragEvent, track: DAWTrack) => {
         e.preventDefault();
         setDropPreview(null);
@@ -397,36 +478,32 @@ export function DAWTimeline() {
         const x = e.clientX - rect.left + daw.scrollX * pxPerBeat;
         const beat = snapToBeat(x / pxPerBeat);
 
-        // Try JSON data first (sample browser / library drags)
+        let data: { type?: string; path?: string; name?: string; track?: { filePath?: string; title?: string } } | null = null;
         const jsonData = e.dataTransfer.getData("text/plain");
         if (jsonData) {
-            try {
-                const data = JSON.parse(jsonData);
-                if (data.type === "sample" && data.path) {
-                    if (track.type !== "audio") return;
-                    const clip = daw.addClip(track.id, "audio", beat, 4, data.name || "Sample");
-                    await daw.loadAudioIntoClip(clip.id, data.path, data.name);
-                    return;
-                }
-                if (data.type === "library-track" && data.track?.filePath) {
-                    if (track.type !== "audio") return;
-                    const filePath = data.track.filePath;
-                    const audioUrl = filePath.startsWith("/") ? filePath : `/api/audio/${encodeURIComponent(filePath)}`;
-                    const clip = daw.addClip(track.id, "audio", beat, 4, data.track.title || "Audio");
-                    await daw.loadAudioIntoClip(clip.id, audioUrl, data.track.title);
-                    return;
-                }
-            } catch { /* not JSON, fall through to file drop */ }
+            try { data = JSON.parse(jsonData); } catch { /* not JSON */ }
         }
+        await applyDropPayload(track, beat, data, Array.from(e.dataTransfer.files));
+    }, [daw.scrollX, pxPerBeat, snapToBeat, applyDropPayload]);
 
-        // Native file drop
-        if (track.type !== "audio") return;
-        const files = Array.from(e.dataTransfer.files);
-        const audioFile = files.find(f => f.type.startsWith("audio/"));
-        if (!audioFile) return;
-        const clip = daw.addClip(track.id, "audio", beat, 4, audioFile.name);
-        await daw.loadFileIntoClip(clip.id, audioFile);
-    }, [daw, pxPerBeat, snapToBeat]);
+    // ─── Touch DnD: listen for window event from useTouchDrag sources ───
+    useEffect(() => {
+        const handler = async (e: Event) => {
+            const ce = e as CustomEvent<{ payload: unknown; targetEl: HTMLElement; clientX: number; clientY: number }>;
+            const lane = ce.detail.targetEl;
+            const trackId = lane.dataset.trackLane;
+            if (!trackId) return;
+            const track = daw.project.tracks.find(t => t.id === trackId);
+            if (!track) return;
+            const rect = lane.getBoundingClientRect();
+            const x = ce.detail.clientX - rect.left + daw.scrollX * pxPerBeat;
+            const beat = snapToBeat(x / pxPerBeat);
+            await applyDropPayload(track, beat, ce.detail.payload as { type?: string; path?: string; name?: string; track?: { filePath?: string; title?: string } }, []);
+            setDropPreview(null);
+        };
+        window.addEventListener("daw-touch-drop", handler);
+        return () => window.removeEventListener("daw-touch-drop", handler);
+    }, [daw.project.tracks, daw.scrollX, pxPerBeat, snapToBeat, applyDropPayload]);
 
     // ─── Draw preview rectangle ─────────────────────────────────────
     const drawPreview = drag?.type === "draw" ? {
@@ -451,18 +528,18 @@ export function DAWTimeline() {
         <div
             ref={containerRef}
             className="h-full flex flex-col bg-[var(--daw-bg)] overflow-hidden"
-            style={{ cursor: toolCursor[daw.tool] ?? "default" }}
+            style={{ cursor: toolCursor[daw.tool] ?? "default", touchAction: "none" }}
             onWheel={handleWheel}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+            onPointerMove={handleMouseMove}
+            onPointerUp={handleMouseUp}
+            onPointerCancel={handleMouseUp}
+            onPointerLeave={handleMouseUp}
             onDragEnd={() => setDropPreview(null)}
         >
             {/* Ruler */}
             <div className="flex flex-shrink-0" style={{ height: RULER_HEIGHT }}>
                 <div
-                    className="flex-shrink-0 bg-[var(--daw-surface)] border-r border-b border-[var(--daw-border)] flex items-center px-3"
-                    style={{ width: HEADER_WIDTH }}
+                    className="shrink-0 w-[120px] sm:w-[200px] bg-[var(--daw-surface)] border-r border-b border-[var(--daw-border)] flex items-center px-2 sm:px-3"
                 >
                     <AddTrackMenu />
                 </div>
@@ -502,12 +579,17 @@ export function DAWTimeline() {
 
                             <div
                                 data-track-lane={track.id}
+                                data-touch-drop-target=""
                                 className={cn(
                                     "flex-1 relative border-b border-[var(--daw-border)] overflow-hidden transition-colors duration-150",
                                     dropPreview?.trackId === track.id && "bg-[var(--daw-accent)]/[0.04]"
                                 )}
-                                style={{ background: dropPreview?.trackId === track.id ? undefined : `linear-gradient(90deg, ${track.color}06 0%, transparent 100%)` }}
-                                onMouseDown={e => handleTrackMouseDown(e, track)}
+                                style={{
+                                    background: dropPreview?.trackId === track.id ? undefined : `linear-gradient(90deg, ${track.color}06 0%, transparent 100%)`,
+                                    // Disable browser pan gestures so we can drive scroll ourselves on touch
+                                    touchAction: "none",
+                                }}
+                                onPointerDown={e => handleTrackMouseDown(e, track)}
                                 onDoubleClick={e => handleTrackDoubleClick(e, track)}
                                 onDragOver={e => handleTrackDragOver(e, track)}
                                 onDragLeave={handleTrackDragLeave}
@@ -576,7 +658,7 @@ export function DAWTimeline() {
                                         selected={daw.selectedClipId === clip.id}
                                         isActive={daw.isPlaying && daw.activeClipIds.includes(clip.id)}
                                         tool={daw.tool}
-                                        onMouseDown={e => handleClipMouseDown(e, clip, track)}
+                                        onPointerDown={e => handleClipMouseDown(e, clip, track)}
                                         onContextMenu={e => handleClipRightClick(e, clip, track)}
                                         onDoubleClick={e => {
                                             e.stopPropagation();
@@ -715,14 +797,13 @@ function TrackHeader({ track, index, isActive }: { track: DAWTrack; index: numbe
     return (
         <div
             className={cn(
-                "flex-shrink-0 border-r border-b border-[var(--daw-border)] flex flex-col justify-center px-2.5 py-1.5 cursor-pointer transition-all duration-150",
+                "shrink-0 w-[120px] sm:w-[200px] border-r border-b border-[var(--daw-border)] flex flex-col justify-center px-2 sm:px-2.5 py-1.5 cursor-pointer transition-all duration-150",
                 isSelected
                     ? "bg-[var(--daw-surface-2)] shadow-[inset_3px_0_0_var(--daw-accent)]"
                     : isActive
                         ? "bg-[var(--daw-surface-2)] shadow-[inset_3px_0_0_var(--daw-green)]"
                         : "bg-[var(--daw-surface)] hover:bg-[var(--daw-surface-2)]"
             )}
-            style={{ width: HEADER_WIDTH }}
             onClick={() => daw.selectTrack(track.id)}
             onContextMenu={handleContextMenu}
         >
@@ -834,11 +915,11 @@ function AddTrackMenu() {
 
     useEffect(() => {
         if (!open) return;
-        const handler = (e: MouseEvent) => {
+        const handler = (e: PointerEvent) => {
             if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
         };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
+        document.addEventListener("pointerdown", handler);
+        return () => document.removeEventListener("pointerdown", handler);
     }, [open]);
 
     const items: { label: string; icon: React.ReactNode; type: "audio" | "midi" | "return" }[] = [
@@ -874,7 +955,7 @@ function AddTrackMenu() {
 
 // ─── Clip Block ──────────────────────────────────────────────────────────
 
-function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, isActive, tool, onMouseDown, onContextMenu, onDoubleClick, onResizeRightStart, onResizeLeftStart, onFadeInStart, onFadeOutStart }: {
+function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, isActive, tool, onPointerDown, onContextMenu, onDoubleClick, onResizeRightStart, onResizeLeftStart, onFadeInStart, onFadeOutStart }: {
     clip: Clip;
     track: DAWTrack;
     scrollX: number;
@@ -883,13 +964,13 @@ function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, isActive
     selected: boolean;
     isActive: boolean;
     tool: string;
-    onMouseDown: (e: React.MouseEvent) => void;
+    onPointerDown: (e: React.PointerEvent) => void;
     onContextMenu: (e: React.MouseEvent) => void;
     onDoubleClick: (e: React.MouseEvent) => void;
-    onResizeRightStart: (e: React.MouseEvent) => void;
-    onResizeLeftStart: (e: React.MouseEvent) => void;
-    onFadeInStart: (e: React.MouseEvent) => void;
-    onFadeOutStart: (e: React.MouseEvent) => void;
+    onResizeRightStart: (e: React.PointerEvent) => void;
+    onResizeLeftStart: (e: React.PointerEvent) => void;
+    onFadeInStart: (e: React.PointerEvent) => void;
+    onFadeOutStart: (e: React.PointerEvent) => void;
 }) {
     const ds = useDAWSettings();
     const left = (clip.position - scrollX) * pxPerBeat;
@@ -924,8 +1005,9 @@ function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, isActive
                 height: clipHeight,
                 background: `linear-gradient(180deg, ${clip.color}30 0%, ${clip.color}12 100%)`,
                 borderLeft: `2px solid ${clip.color}90`,
+                touchAction: "none",
             }}
-            onMouseDown={onMouseDown}
+            onPointerDown={onPointerDown}
             onContextMenu={onContextMenu}
             onDoubleClick={onDoubleClick}
         >
@@ -988,21 +1070,23 @@ function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, isActive
             {/* Left resize handle */}
             <div
                 className="absolute left-0 top-0 bottom-0 w-1.5 cursor-w-resize opacity-0 group-hover:opacity-100 bg-white/15 transition-opacity z-10"
-                onMouseDown={onResizeLeftStart}
+                style={{ touchAction: "none" }}
+                onPointerDown={onResizeLeftStart}
             />
 
             {/* Right resize handle */}
             <div
                 className="absolute right-0 top-0 bottom-0 w-1.5 cursor-e-resize opacity-0 group-hover:opacity-100 bg-white/15 transition-opacity z-10"
-                onMouseDown={onResizeRightStart}
+                style={{ touchAction: "none" }}
+                onPointerDown={onResizeRightStart}
             />
 
             {/* Fade in handle (audio only) */}
             {isAudio && (
                 <div
                     className="absolute top-0 left-0 w-3 h-3 cursor-col-resize opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
-                    style={{ left: Math.max(0, fadeInPx - 4) }}
-                    onMouseDown={onFadeInStart}
+                    style={{ left: Math.max(0, fadeInPx - 4), touchAction: "none" }}
+                    onPointerDown={onFadeInStart}
                 >
                     <div className="w-1.5 h-1.5 rounded-full bg-[var(--daw-accent)] shadow-[0_0_4px_var(--daw-accent-glow)]" />
                 </div>
@@ -1012,8 +1096,8 @@ function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, isActive
             {isAudio && (
                 <div
                     className="absolute top-0 right-0 w-3 h-3 cursor-col-resize opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
-                    style={{ right: Math.max(0, fadeOutPx - 4) }}
-                    onMouseDown={onFadeOutStart}
+                    style={{ right: Math.max(0, fadeOutPx - 4), touchAction: "none" }}
+                    onPointerDown={onFadeOutStart}
                 >
                     <div className="w-1.5 h-1.5 rounded-full bg-[var(--daw-accent)] shadow-[0_0_4px_var(--daw-accent-glow)]" />
                 </div>

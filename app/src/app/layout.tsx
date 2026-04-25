@@ -13,6 +13,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SelectionProvider } from "@/components/selection-provider";
 import { EQProvider } from "@/components/eq-context";
 import { MixerProvider } from "@/components/mixer-context";
+import { MidiProvider } from "@/hooks/use-midi";
+import { ControllerBridge } from "@/components/controller-bridge";
 import { MobileHeader } from "@/components/mobile-header";
 import { ConfirmLoadDialog } from "@/components/confirm-load-dialog";
 import { FocusModeProvider } from "@/components/focus-mode-context";
@@ -78,7 +80,9 @@ export default function RootLayout({
                                 <PlayerProvider>
                                     <EQProvider>
                                         <MixerProvider>
-                                            <AnalysisProvider>
+                                            <MidiProvider>
+                                                <ControllerBridge />
+                                                <AnalysisProvider>
                                                 <FocusModeProvider>
                                                     <PlayerAwareLayout>
                                                         <FocusAwareSidebar>
@@ -103,6 +107,7 @@ export default function RootLayout({
                                                     </FocusAwareNowPlayingBar>
                                                 </FocusModeProvider>
                                             </AnalysisProvider>
+                                            </MidiProvider>
                                         </MixerProvider>
                                     </EQProvider>
                                     <Toaster

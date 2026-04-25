@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useCallback, useRef, useState, useEffect, type ReactNode } from "react";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     type HistoryState,
     type HistoryEntry,
@@ -238,6 +239,7 @@ const DEFAULT_PROJECT: EditorProject = {
 };
 
 export function EditorProvider({ children }: { children: ReactNode }) {
+    useRenderCount("EditorProvider");
     const [project, setProject] = useState<EditorProject>(DEFAULT_PROJECT);
     const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
     const [peaks, setPeaks] = useState<Float32Array | null>(null);

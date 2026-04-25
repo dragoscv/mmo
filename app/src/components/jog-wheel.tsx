@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useEffect, useState, useCallback, memo } from "react";
-import { useMixer } from "./mixer-context";
+import { useMixerActions } from "./mixer-context";
 import { usePersonalization } from "@/hooks/use-personalization";
 import type { DeckState, DeckSide } from "@/lib/mixer-engine";
+import { useRenderCount } from "@/lib/dev-debugger";
+import { useDeckCurrentTime } from "@/lib/mixer-time-store";
 import { JOG_RENDERERS, type JogDesignProps } from "./jogwheel-designs";
 
 // ─── Constants ───────────────────────────────────────────────────────────
@@ -77,14 +79,13 @@ const Tonearm = memo(function Tonearm({ isPlaying, color, side }: { isPlaying: b
                     stroke="rgba(255,255,255,0.12)"
                     strokeWidth="0.5"
                 />
-                {/* Stylus tip — glows when playing */}
+                {/* Stylus tip — plain fill, no filter. `drop-shadow()` would
+                    otherwise force an off-screen compositing layer per deck
+                    on every frame the platter rotates. */}
                 <circle
                     cx={isLeft ? 10 : 50} cy="68" r="1.5"
                     fill={isPlaying ? color : "rgba(255,255,255,0.3)"}
-                    style={{
-                        filter: isPlaying ? `drop-shadow(0 0 3px ${color})` : "none",
-                        transition: "fill 0.3s, filter 0.3s",
-                    }}
+                    style={{ transition: "fill 0.3s" }}
                 />
             </svg>
         </div>
@@ -160,8 +161,10 @@ interface JogWheelProps {
 }
 
 export const JogWheel = memo(function JogWheel({ side, deck, color }: JogWheelProps) {
-    const mixer = useMixer();
+    useRenderCount(`JogWheel:${side}`);
+    const mixer = useMixerActions();
     const personalization = usePersonalization();
+    const currentTime = useDeckCurrentTime(side);
     const isDragging = useRef(false);
     const lastAngle = useRef(0);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -177,7 +180,7 @@ export const JogWheel = memo(function JogWheel({ side, deck, color }: JogWheelPr
     const animDuration = rps > 0 ? (1 / rps) : 10;
 
     // ── End-of-track warning ─────────────────────────────────────────
-    const remaining = deck.duration > 0 ? Math.max(0, deck.duration - deck.currentTime) : Infinity;
+    const remaining = deck.duration > 0 ? Math.max(0, deck.duration - currentTime) : Infinity;
     const endWarnSec = personalization.endWarningSeconds;
     const isWarning = endWarnSec > 0 && remaining < endWarnSec && remaining < Infinity && deck.isPlaying;
     const warningIntensity = isWarning ? Math.max(0, 1 - remaining / endWarnSec) : 0;
@@ -224,9 +227,9 @@ export const JogWheel = memo(function JogWheel({ side, deck, color }: JogWheelPr
     }, [mixer, side]);
 
     // ── Progress & time ──────────────────────────────────────────────
-    const progress = deck.duration > 0 ? deck.currentTime / deck.duration : 0;
-    const timeDisplay = formatTime(deck.currentTime);
-    const remainingDisplay = deck.duration > 0 ? formatTimeRemaining(deck.currentTime, deck.duration) : "—:——";
+    const progress = deck.duration > 0 ? currentTime / deck.duration : 0;
+    const timeDisplay = formatTime(currentTime);
+    const remainingDisplay = deck.duration > 0 ? formatTimeRemaining(currentTime, deck.duration) : "—:——";
 
     // ── Design props for renderer ────────────────────────────────────
     // Rotation is always 0: the renderer's <g transform=rotate(0)> elements
@@ -263,7 +266,10 @@ export const JogWheel = memo(function JogWheel({ side, deck, color }: JogWheelPr
                     animationTimingFunction: "linear",
                     animationIterationCount: "infinite",
                     animationPlayState: deck.isPlaying ? "running" : "paused",
-                    willChange: "transform",
+                    // Only promote the layer while spinning. A paused platter
+                    // with `will-change: transform` still holds its own GPU
+                    // texture for no benefit — significant VRAM on 4 decks.
+                    willChange: deck.isPlaying ? "transform" : undefined,
                 }}
             >
                 <svg viewBox="0 0 100 100" className="w-full h-full">
@@ -292,11 +298,16 @@ export const JogWheel = memo(function JogWheel({ side, deck, color }: JogWheelPr
             {/* Layer 4: Tonearm needle */}
             <Tonearm isPlaying={deck.isPlaying} color={color} side={side} />
 
-            {/* Playing glow ring */}
+            {/* Playing glow ring — static ring, no animation. A pulsing
+                `box-shadow` with a large blur radius is one of the most
+                expensive compositor ops (it has to re-blur every frame of
+                the pulse); on 2× decks during playback it was a measurable
+                chunk of the 89% GPU usage. Keep the visual cue, drop the
+                animation + shrink the blur. */}
             {deck.isPlaying && !isWarning && (
-                <div className="absolute inset-0 rounded-full pointer-events-none animate-pulse"
+                <div className="absolute inset-0 rounded-full pointer-events-none"
                     style={{
-                        boxShadow: `0 0 15px 2px ${color}20, inset 0 0 8px 1px ${color}10`,
+                        boxShadow: `inset 0 0 6px 1px ${color}20`,
                         zIndex: 4,
                     }}
                 />
@@ -307,8 +318,12 @@ export const JogWheel = memo(function JogWheel({ side, deck, color }: JogWheelPr
                 <div
                     className="absolute inset-0 rounded-full pointer-events-none"
                     style={{
-                        boxShadow: `0 0 ${12 + warningIntensity * 18}px ${2 + warningIntensity * 6}px rgba(255,${Math.round(60 * (1 - warningIntensity))},0,0.5), inset 0 0 ${8 + warningIntensity * 12}px ${warningIntensity * 4}px rgba(255,${Math.round(40 * (1 - warningIntensity))},0,0.25)`,
-                        opacity: warningFlicker ? 1 : 0.5,
+                        // Much smaller blur radius — the original `30px+` blur
+                        // forced Chromium to re-composite the whole jog wheel
+                        // area every frame. A tight inset glow gives the same
+                        // "hot" feel for a fraction of the fill-rate cost.
+                        boxShadow: `inset 0 0 ${6 + warningIntensity * 8}px ${1 + warningIntensity * 2}px rgba(255,${Math.round(40 * (1 - warningIntensity))},0,0.45)`,
+                        opacity: warningFlicker ? 1 : 0.55,
                         transition: "opacity 200ms",
                         zIndex: 4,
                     }}

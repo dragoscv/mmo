@@ -19,13 +19,13 @@ import { createPortal } from "react-dom";
 import { useLive } from "./live-context";
 import { useFocusMode } from "@/components/focus-mode-context";
 import { cn } from "@/lib/utils";
-import {
-    Mic, MicOff, Square, Circle, Play, Pause, Volume2, VolumeX,
+import { useRenderCount } from "@/lib/dev-debugger";
+import { Mic, MicOff, Square, Circle, Play, Pause, Volume2, VolumeX,
     Music, Power, Plus, Trash2, ChevronDown, ChevronRight, Sparkles,
     Repeat, Upload, X, Maximize2, Minimize2, Activity,
     Settings2, Headphones, Disc3, GripVertical, Radio, Wifi, WifiOff,
     Save, RotateCcw, Sliders, KeyRound, Zap, Eye, BarChart3,
-    ZoomIn, ZoomOut, Type,
+    ZoomIn, ZoomOut, Type, Music2,
 } from "lucide-react";
 import { Reorder, useDragControls, type DragControls } from "framer-motion";
 import { FX_DEFAULTS, FX_CATEGORIES, MUSICAL_SCALES, NOTE_NAMES, AudioFxEngine, type FxType, type FxPreset } from "@/lib/audio-fx-engine";
@@ -36,6 +36,7 @@ import { LiveRecommendationsWidget } from "@/components/live/live-recommendation
 import { LiveVisualizerWidget } from "@/components/live/live-visualizer-widget";
 import { LiveEqWidget } from "@/components/live/live-eq-widget";
 import { LiveAudioStatsCard } from "@/components/live/live-audio-stats-card";
+import { LiveInstrumentWidget } from "@/components/live/live-instrument-widget";
 import { LiveWidgetSlotContext, useLiveWidgetSlot, AutoSize } from "@/components/live/live-widget-slot";
 import { LiveWidgetGrid, type WidgetMeta } from "@/components/live/live-widget-grid";
 import { useLiveMetersField } from "@/components/live/live-meters-store";
@@ -43,6 +44,7 @@ import { useUIRefreshHz, UI_REFRESH_HZ_MIN, UI_REFRESH_HZ_MAX } from "@/lib/use-
 import { useLiveSettings } from "@/hooks/use-live-settings";
 import { useStableValue } from "@/hooks/use-stable-value";
 import { formatNoteMulti, formatPitch } from "@/lib/note-notation";
+import type { NoteNotation } from "@/lib/note-notation";
 import { LiveSettingsModal } from "@/components/live/live-settings-modal";
 import { Settings as SettingsIcon } from "lucide-react";
 
@@ -679,39 +681,80 @@ function TunerPanel() {
     const centsRaw = useLiveMetersField(s => s.tunerCents);
     const noteIdxRaw = useLiveMetersField(s => s.tunerNoteIndex);
     const freqRaw = useLiveMetersField(s => s.tunerFrequency);
+    // Auto-correct fields. When acActive is true the corrector is steering
+    // the input towards `targetMidi`; we surface BOTH notes in the tuner.
+    const acActive = useLiveMetersField(s => s.autoCorrectActive);
+    const acTargetMidi = useLiveMetersField(s => s.autoCorrectTargetMidi);
+    const acSourceMidi = useLiveMetersField(s => s.autoCorrectSourceMidi);
     // Stickiness: hold each displayed value for at least N ms so the user can
     // actually read it before it changes. The internal signal is unaffected.
     const noteIdx = useStableValue(noteIdxRaw, settings.tunerStickinessMs);
     const cents = useStableValue(Math.round(centsRaw), settings.tunerStickinessMs);
     const freq = useStableValue(Math.round(freqRaw * 10) / 10, settings.tunerStickinessMs);
+    const stickyTarget = useStableValue(acTargetMidi, settings.tunerStickinessMs);
     // Format the held note via the user's chosen notation(s). The tuner shows
     // a sounding pitch (with octave for Anglo/Solfège, code-only for Camelot).
-    const note = noteIdx >= 0
+    const inputNote = noteIdx >= 0
         ? settings.noteNotations.map(n => formatPitch(noteIdx, n, "major")).join(" / ")
         : "";
-    const inTune = Math.abs(cents) <= 8 && conf > 0.5;
-    const sharpFlat = cents > 0 ? "sharp" : cents < 0 ? "flat" : "—";
-    const noteColor = inTune ? "#10b981" : Math.abs(cents) > 25 ? "#ef4444" : "#eab308";
+    const outputNote = acActive && stickyTarget >= 0
+        ? settings.noteNotations.map(n => formatPitch(stickyTarget, n, "major")).join(" / ")
+        : "";
+    // When auto-correct is on, the listener hears the corrected pitch — we
+    // colour the big readout by how close the input is to the corrector's
+    // target (not to the nearest equal-tempered note), since that's what's
+    // actually being snapped to.
+    const inToTarget = acActive && stickyTarget >= 0 && Number.isFinite(acSourceMidi)
+        ? (acSourceMidi - stickyTarget) * 100
+        : cents;
+    const inTune = Math.abs(inToTarget) <= 8 && conf > 0.5;
+    const sharpFlat = inToTarget > 0 ? "sharp" : inToTarget < 0 ? "flat" : "—";
+    const noteColor = inTune ? "#10b981" : Math.abs(inToTarget) > 25 ? "#ef4444" : "#eab308";
 
     // Dial rotation: -50..+50 cents → -45deg..+45deg
-    const dialAngle = (cents / 50) * 45;
+    const dialAngle = Math.max(-50, Math.min(50, inToTarget)) / 50 * 45;
 
     return (
         <Section title="Tuner" accent="#10b981" icon={<Activity className="w-3.5 h-3.5 text-emerald-400/60" />}>
             <div className="flex flex-col items-center gap-2">
-                {/* Big note display — no CSS color transition (never settles
-                    while pitch is fluctuating, which produces visible flicker). */}
-                <div className="relative w-full">
-                    <div className="text-center">
-                        <div className="text-5xl font-bold tabular-nums tracking-tight"
-                            style={{ color: conf > 0.3 ? noteColor : "rgba(255,255,255,0.15)" }}>
-                            {note || "—"}
+                {/* Auto-correct active: stack input → output. Otherwise
+                    keep the classic single big note display. */}
+                {acActive && outputNote ? (
+                    <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                        <div className="text-center">
+                            <div className="text-[8px] uppercase tracking-wider text-white/40 mb-0.5">In</div>
+                            <div className="text-2xl font-bold tabular-nums leading-none"
+                                style={{ color: conf > 0.3 ? noteColor : "rgba(255,255,255,0.15)" }}>
+                                {inputNote || "—"}
+                            </div>
+                            <div className="text-[9px] text-white/40 tabular-nums mt-0.5">
+                                {freq > 0 ? `${freq.toFixed(1)} Hz` : "—"}
+                            </div>
                         </div>
-                        <div className="text-[10px] text-white/40 tabular-nums mt-1">
-                            {freq > 0 ? `${freq.toFixed(1)} Hz` : "—"}
+                        <div className="text-emerald-400/60 text-2xl leading-none -mt-2">→</div>
+                        <div className="text-center">
+                            <div className="text-[8px] uppercase tracking-wider text-emerald-400/70 mb-0.5">Out</div>
+                            <div className="text-2xl font-bold tabular-nums leading-none text-emerald-300">
+                                {outputNote}
+                            </div>
+                            <div className="text-[9px] text-emerald-400/50 tabular-nums mt-0.5">
+                                tuned
+                            </div>
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div className="relative w-full">
+                        <div className="text-center">
+                            <div className="text-5xl font-bold tabular-nums tracking-tight"
+                                style={{ color: conf > 0.3 ? noteColor : "rgba(255,255,255,0.15)" }}>
+                                {inputNote || "—"}
+                            </div>
+                            <div className="text-[10px] text-white/40 tabular-nums mt-1">
+                                {freq > 0 ? `${freq.toFixed(1)} Hz` : "—"}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Tuning dial */}
                 <div className="relative w-full h-12 flex items-center justify-center mt-1">
@@ -737,10 +780,10 @@ function TunerPanel() {
 
                 <div className="flex items-center justify-between w-full px-1 text-[10px] mt-1">
                     <span className={cn("uppercase tracking-wider", inTune ? "text-emerald-400" : "text-white/30")}>
-                        {inTune ? "in tune" : sharpFlat}
+                        {acActive && outputNote ? (inTune ? "locked" : sharpFlat) : (inTune ? "in tune" : sharpFlat)}
                     </span>
                     {settings.showCents && (
-                        <span className="text-white/30 tabular-nums">{Math.abs(cents)}¢</span>
+                        <span className="text-white/30 tabular-nums">{Math.abs(Math.round(inToTarget))}¢</span>
                     )}
                     <span className="text-white/20 tabular-nums">{Math.round(conf * 100)}%</span>
                 </div>
@@ -1429,27 +1472,414 @@ function PadButton({ pad }: { pad: { id: number; name: string; color: string; bu
 
 // ─── Key & Scale Picker ──────────────────────────────────────────────────────
 
+/**
+ * LED-style meter that visualises the auto-correct in real time, like
+ * the front-panel LEDs on a Tascam TA-1VP / Antares Auto-Tune Evo.
+ *
+ * Top row  — input cents deviation from the corrector's target note.
+ *            Centre LED = on pitch; LEDs left = flat; LEDs right = sharp.
+ * Bottom   — large note pill showing what the corrector is steering
+ *            *towards*, with the live correction amount in cents.
+ */
+function AutoCorrectLedMeter({
+    sourceMidi,
+    targetMidi,
+    semitones,
+    confidence,
+    rms,
+    quality,
+    notations,
+}: {
+    sourceMidi: number | null;
+    targetMidi: number | null;
+    semitones: number;
+    confidence: number;
+    rms: number;
+    quality: "major" | "minor";
+    notations: NoteNotation[];
+}) {
+    // Cents the input is OFF the target (positive = sharp).
+    // semitones holds the corrector's applied shift in semitones; the input
+    // is exactly -semitones away from the target (we ignore the user's
+    // Amount slider here so the meter always shows the *raw* deviation).
+    const inputCentsRaw = sourceMidi !== null && targetMidi !== null
+        ? (sourceMidi - targetMidi) * 100
+        : 0;
+    // Clamp to ±50 cents for the meter scale.
+    const inputCents = Math.max(-50, Math.min(50, inputCentsRaw));
+    const correctionCents = -semitones * 100; // applied correction, signed
+
+    // 21 LEDs (10 left, 1 centre, 10 right), 5 cents per LED.
+    const LED_COUNT = 21;
+    const ledIndex = Math.round((inputCents + 50) / 100 * (LED_COUNT - 1));
+    const centreIdx = (LED_COUNT - 1) / 2;
+
+    const hasSignal = confidence > 0.05 && rms > 0.0008 && targetMidi !== null;
+    const targetLabel = targetMidi !== null
+        ? notations.map(n => formatPitch(targetMidi, n, quality)).join(" / ")
+        : "—";
+
+    return (
+        <div className="space-y-1.5">
+            {/* Header: detected → target with correction amount in cents. */}
+            <div className="flex items-baseline justify-between gap-2">
+                <div className="flex items-baseline gap-1.5">
+                    <span className="text-[9px] uppercase tracking-wider text-emerald-300/60">Target</span>
+                    <span className={cn(
+                        "text-base font-semibold tabular-nums leading-none transition-colors",
+                        hasSignal ? "text-emerald-200" : "text-white/20",
+                    )}>
+                        {targetLabel}
+                    </span>
+                </div>
+                <div className="text-[9px] tabular-nums text-emerald-300/70">
+                    {hasSignal ? (
+                        <>
+                            <span className="text-white/40">corr</span>{" "}
+                            <span className={cn(
+                                Math.abs(correctionCents) < 5 ? "text-emerald-300"
+                                    : Math.abs(correctionCents) < 25 ? "text-yellow-300/80"
+                                        : "text-orange-300",
+                            )}>
+                                {correctionCents >= 0 ? "+" : ""}{correctionCents.toFixed(0)}¢
+                            </span>
+                        </>
+                    ) : rms > 0.0005 ? "listening…" : "no input"}
+                </div>
+            </div>
+
+            {/* LED bar: shows input deviation from target. */}
+            <div className="flex items-center justify-between gap-[2px] h-3 px-0.5">
+                {Array.from({ length: LED_COUNT }, (_, i) => {
+                    // distance from this LED to the lit one
+                    const dist = Math.abs(i - ledIndex);
+                    // distance from this LED to centre (target)
+                    const distFromCentre = Math.abs(i - centreIdx);
+                    let color = "bg-white/10";
+                    let glow = "";
+                    if (hasSignal) {
+                        if (dist === 0) {
+                            // The lit LED — coloured by how far off pitch we are.
+                            if (distFromCentre <= 1) {
+                                color = "bg-emerald-400";
+                                glow = "shadow-[0_0_6px_rgba(16,185,129,0.9)]";
+                            } else if (distFromCentre <= 4) {
+                                color = "bg-yellow-300";
+                                glow = "shadow-[0_0_6px_rgba(253,224,71,0.85)]";
+                            } else {
+                                color = i < centreIdx ? "bg-sky-400" : "bg-rose-400";
+                                glow = i < centreIdx
+                                    ? "shadow-[0_0_6px_rgba(56,189,248,0.85)]"
+                                    : "shadow-[0_0_6px_rgba(251,113,133,0.85)]";
+                            }
+                        } else if (dist === 1) {
+                            // Trailing LED for soft glow.
+                            color = i < centreIdx ? "bg-sky-400/30" : i > centreIdx ? "bg-rose-400/30" : "bg-emerald-400/30";
+                        }
+                    }
+                    // Thicker centre LED for "in tune" reference.
+                    const isCentre = i === centreIdx;
+                    return (
+                        <span
+                            key={i}
+                            className={cn(
+                                "flex-1 rounded-sm transition-colors duration-75",
+                                isCentre ? "h-3" : "h-2",
+                                color,
+                                glow,
+                                isCentre && !hasSignal && "bg-white/20",
+                            )}
+                        />
+                    );
+                })}
+            </div>
+
+            {/* Cents scale labels. */}
+            <div className="flex items-center justify-between text-[8px] text-white/25 px-0.5 -mt-0.5 tabular-nums">
+                <span>-50¢</span>
+                <span>-25</span>
+                <span>0</span>
+                <span>+25</span>
+                <span>+50¢</span>
+            </div>
+        </div>
+    );
+}
+
 function KeyScalePanel() {
     const live = useLive();
     const settings = useLiveSettings();
     const scaleName = MUSICAL_SCALES[live.scaleIndex]?.name ?? "";
     const quality: "major" | "minor" = /major/i.test(scaleName) ? "major" : "minor";
+
+    // ── Auto-correct (live re-tune) ──────────────────────────────────
+    const [autoCorrectOn, setAutoCorrectOn] = useState<boolean>(() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem("mmo-live-keyscale-autocorrect") === "1";
+    });
+    const [autoCorrectSpeed, setAutoCorrectSpeed] = useState<number>(() => {
+        if (typeof window === "undefined") return 0.030;
+        const raw = localStorage.getItem("mmo-live-keyscale-autocorrect-speed");
+        const n = raw ? parseFloat(raw) : NaN;
+        // Default 30 ms — close to T-Pain hard-tune feel, but the
+        // soft-knee humanizer in the engine keeps natural vibrato
+        // intact. The audible lag the user perceives is dominated by
+        // pitch-detection (~21 ms YIN window) and shifter group delay
+        // (~10 ms half-grain), not this time constant — so we set it
+        // small to stop adding to the total reaction time.
+        return Number.isFinite(n) ? Math.max(0.005, Math.min(0.5, n)) : 0.030;
+    });
+    const [autoCorrectAmount, setAutoCorrectAmount] = useState<number>(() => {
+        if (typeof window === "undefined") return 1;
+        const raw = localStorage.getItem("mmo-live-keyscale-autocorrect-amount");
+        const n = raw ? parseFloat(raw) : NaN;
+        return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 1;
+    });
+    const [autoCorrectFormant, setAutoCorrectFormant] = useState<boolean>(() => {
+        if (typeof window === "undefined") return true;
+        return localStorage.getItem("mmo-live-keyscale-autocorrect-formant") !== "0";
+    });
+    // Root-lock: when ON, every input snaps to the SELECTED key root
+    // (any octave) regardless of the chosen scale. "Re Major" with
+    // root-lock means: every note becomes a D, period. When OFF, the
+    // corrector behaves as classic Auto-Tune scale-snap (snap to nearest
+    // note IN the scale — so D Major still allows E, F#, G, A, B, C#).
+    // Default ON because that matches user expectation when they pick a
+    // single key like "Re Major".
+    const [autoCorrectRootLock, setAutoCorrectRootLock] = useState<boolean>(() => {
+        if (typeof window === "undefined") return true;
+        return localStorage.getItem("mmo-live-keyscale-autocorrect-rootlock") !== "0";
+    });
+
+    // Built-in auto-correct: lives outside the user-managed FX chain. We
+    // ask the engine to insert a pitch-shifter between the chain output and
+    // the engine output, then push the user's selected scale + tuning
+    // params. The engine drives the pitchRatio param itself in a 30 Hz
+    // internal loop so we don't depend on React effects firing.
+    const autoCorrectNodeRef = useRef<AudioWorkletNode | null>(null);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem("mmo-live-keyscale-autocorrect", autoCorrectOn ? "1" : "0");
+            localStorage.setItem("mmo-live-keyscale-autocorrect-speed", String(autoCorrectSpeed));
+            localStorage.setItem("mmo-live-keyscale-autocorrect-amount", String(autoCorrectAmount));
+            localStorage.setItem("mmo-live-keyscale-autocorrect-formant", autoCorrectFormant ? "1" : "0");
+            localStorage.setItem("mmo-live-keyscale-autocorrect-rootlock", autoCorrectRootLock ? "1" : "0");
+            window.dispatchEvent(new Event("mmo-preference-changed"));
+        } catch { /* */ }
+    }, [autoCorrectOn, autoCorrectSpeed, autoCorrectAmount, autoCorrectFormant, autoCorrectRootLock]);
+
+    // Activate / deactivate the engine's built-in auto-correct shifter.
+    useEffect(() => {
+        const engine = live.engine;
+        if (!engine) return;
+        let cancelled = false;
+        void engine.voice.setAutoCorrectEnabled(autoCorrectOn).then((node) => {
+            if (cancelled) return;
+            autoCorrectNodeRef.current = node;
+            // Apply formant preserve flag once the worklet is up.
+            engine.voice.setAutoCorrectFormantPreserve(autoCorrectFormant);
+        });
+        return () => { cancelled = true; };
+    }, [autoCorrectOn, live.engine, autoCorrectFormant]);
+
+    // Push formant-preserve flag separately so toggling it without re-creating
+    // the worklet still takes effect (otherwise we'd recreate the audio node).
+    useEffect(() => {
+        const engine = live.engine;
+        if (!engine || !autoCorrectOn) return;
+        engine.voice.setAutoCorrectFormantPreserve(autoCorrectFormant);
+    }, [autoCorrectFormant, autoCorrectOn, live.engine]);
+
+    // Tear-down: always disable the shifter when the panel unmounts so we
+    // don't leave an orphan correction node in the audio path.
+    useEffect(() => {
+        return () => {
+            const engine = live.engine;
+            if (!engine) return;
+            void engine.voice.setAutoCorrectEnabled(false);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Push scale + tuning config to the engine whenever it changes. The
+    // engine's internal driver loop will pick this up and drive pitchRatio
+    // independently of React/UI tick rates.
+    useEffect(() => {
+        const engine = live.engine;
+        if (!engine || !autoCorrectOn) return;
+        const scale = MUSICAL_SCALES[live.scaleIndex];
+        // Root-lock collapses the allowed pitch-class set to the tonic
+        // alone (intervals=[0]) so the shifter snaps every input to the
+        // selected key root in the closest octave. Otherwise we honour
+        // the full scale.
+        const intervals = autoCorrectRootLock ? [0] : (scale?.intervals ?? []);
+        engine.voice.setAutoCorrectScale({
+            keyIndex: live.keyIndex,
+            intervals,
+            amount: autoCorrectAmount,
+            speed: autoCorrectSpeed,
+        });
+    }, [autoCorrectOn, autoCorrectSpeed, autoCorrectAmount, autoCorrectRootLock, live.keyIndex, live.scaleIndex, live.engine]);
+
+    // Subscribe to engine's live auto-correct status (60 Hz internal loop).
+    // We poll instead of pushing to keep the engine free of UI deps.
+    const [acStatus, setAcStatus] = useState<{
+        rms: number; freq: number; note: string; semis: number; ratio: number; conf: number;
+        sourceMidi: number | null; targetMidi: number | null;
+    }>({ rms: 0, freq: 0, note: "—", semis: 0, ratio: 1, conf: 0, sourceMidi: null, targetMidi: null });
+    useEffect(() => {
+        if (!autoCorrectOn) return;
+        const engine = live.engine;
+        if (!engine) return;
+        let raf = 0;
+        let alive = true;
+        const tick = () => {
+            if (!alive) return;
+            const s = engine.voice.getAutoCorrectStatus();
+            setAcStatus({
+                rms: s.rms,
+                freq: s.pitch.frequency,
+                note: s.pitch.note,
+                semis: s.semitones,
+                ratio: s.ratio,
+                conf: s.pitch.confidence,
+                sourceMidi: s.sourceMidi,
+                targetMidi: s.targetMidi,
+            });
+            raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => { alive = false; if (raf) cancelAnimationFrame(raf); };
+    }, [autoCorrectOn, live.engine]);
+
     return (
         <Section title="Key & Scale" accent="#06b6d4" icon={<Settings2 className="w-3.5 h-3.5 text-cyan-400/60" />}>
             <div className="space-y-2">
+                {/* Auto-correct toggle row */}
+                <div className="flex items-center justify-between gap-2">
+                    <button
+                        onClick={() => setAutoCorrectOn(v => !v)}
+                        title={
+                            autoCorrectOn
+                                ? `Auto-correct ON — snapping to ${scaleName}`
+                                : "Snap your voice to the nearest note in the selected scale"
+                        }
+                        className={cn(
+                            "flex items-center gap-1.5 h-6 px-2 text-[10px] rounded-full transition-all border cursor-pointer",
+                            autoCorrectOn
+                                ? "bg-emerald-500/25 text-emerald-200 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.25)]"
+                                : "bg-white/[0.04] text-white/45 border-white/10 hover:text-white/80 hover:bg-white/[0.08]",
+                        )}
+                    >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Auto-correct {autoCorrectOn ? "ON" : "OFF"}</span>
+                    </button>
+                    {autoCorrectOn && (
+                        <span className="text-[9px] text-emerald-300/70 tabular-nums">
+                            {acStatus.note !== "—"
+                                ? `► ${acStatus.note} ${acStatus.semis >= 0 ? "+" : ""}${acStatus.semis.toFixed(2)}st`
+                                : acStatus.rms > 0.001
+                                    ? "listening…"
+                                    : "no input"}
+                        </span>
+                    )}
+                </div>
+
+                {autoCorrectOn && (
+                    <div className="rounded-md border border-emerald-500/15 bg-emerald-500/[0.04] p-2 space-y-1.5">
+                        <AutoCorrectLedMeter
+                            sourceMidi={acStatus.sourceMidi}
+                            targetMidi={acStatus.targetMidi}
+                            semitones={acStatus.semis}
+                            confidence={acStatus.conf}
+                            rms={acStatus.rms}
+                            quality={quality}
+                            notations={settings.noteNotations}
+                        />
+                        <div className="flex items-center justify-between text-[9px] text-emerald-300/80">
+                            <span className="uppercase tracking-wider">Speed</span>
+                            <span className="tabular-nums">
+                                {autoCorrectSpeed < 0.02 ? "Hard snap" : autoCorrectSpeed < 0.1 ? "Fast" : autoCorrectSpeed < 0.25 ? "Natural" : "Slow"}
+                            </span>
+                        </div>
+                        <input
+                            type="range"
+                            min={0.005}
+                            max={0.5}
+                            step={0.005}
+                            value={autoCorrectSpeed}
+                            onChange={(e) => setAutoCorrectSpeed(parseFloat(e.target.value))}
+                            className="w-full accent-emerald-400"
+                        />
+                        <div className="flex items-center justify-between text-[9px] text-emerald-300/80">
+                            <span className="uppercase tracking-wider">Amount</span>
+                            <span className="tabular-nums">{Math.round(autoCorrectAmount * 100)}%</span>
+                        </div>
+                        <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={autoCorrectAmount}
+                            onChange={(e) => setAutoCorrectAmount(parseFloat(e.target.value))}
+                            className="w-full accent-emerald-400"
+                        />
+                        {/* Root-lock: snap every input to the SELECTED key
+                            root (any octave) instead of the nearest scale
+                            note. ON = "Re Major" → only D's get produced.
+                            OFF = classic Auto-Tune scale-snap (D, E, F#, G,
+                            A, B, C# all valid for D Major). Default ON to
+                            match the user's expectation that picking a
+                            single key means snap-to-that-note. */}
+                        <button
+                            type="button"
+                            onClick={() => setAutoCorrectRootLock(v => !v)}
+                            className={cn(
+                                "w-full mt-1 flex items-center justify-between gap-2 px-2 py-1 rounded text-[10px] border transition-all cursor-pointer",
+                                autoCorrectRootLock
+                                    ? "bg-amber-500/15 text-amber-200 border-amber-500/30"
+                                    : "bg-white/[0.04] text-white/55 border-white/10 hover:text-white/85",
+                            )}
+                            title="ON: every note snaps to the selected key root in the closest octave (e.g. Re Major → all output is D). OFF: classic scale-snap (any note in the scale is allowed)."
+                        >
+                            <span className="uppercase tracking-wider">Root Lock</span>
+                            <span className="tabular-nums">{autoCorrectRootLock ? "ON" : "OFF"}</span>
+                        </button>
+                        {/* Formant preservation: keeps the singer's vocal-tract
+                            colour even when shifted (no chipmunk effect). LPC
+                            inverse + synthesis filter is applied on the wet
+                            path inside the worklet. */}
+                        <button
+                            type="button"
+                            onClick={() => setAutoCorrectFormant(v => !v)}
+                            className={cn(
+                                "w-full mt-1 flex items-center justify-between gap-2 px-2 py-1 rounded text-[10px] border transition-all cursor-pointer",
+                                autoCorrectFormant
+                                    ? "bg-emerald-500/15 text-emerald-200 border-emerald-500/30"
+                                    : "bg-white/[0.04] text-white/55 border-white/10 hover:text-white/85",
+                            )}
+                            title="When ON, preserves the singer's vocal-tract resonances so the shifted voice doesn't sound chipmunk-like. Uses LPC analysis (~5 ms updates)."
+                        >
+                            <span className="uppercase tracking-wider">Formant Preserve</span>
+                            <span className="tabular-nums">{autoCorrectFormant ? "ON" : "OFF"}</span>
+                        </button>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-12 gap-0.5">
                     {NOTE_NAMES.map((note, i) => {
                         const label = formatNoteMulti(i, settings.noteNotations, quality, "/");
                         return (
-                        <button key={i} onClick={() => live.setKey(i)}
-                            title={label}
-                            className={cn("py-1.5 rounded-md text-[10px] font-medium transition-all cursor-pointer",
-                                note.includes("#") ? "bg-gray-900" : "bg-white/[0.03]",
-                                live.keyIndex === i
-                                    ? "!bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 shadow-[0_0_6px_rgba(6,182,212,0.2)]"
-                                    : "text-white/35 border border-transparent hover:bg-white/[0.06]")}>
-                            {label}
-                        </button>
+                            <button key={i} onClick={() => live.setKey(i)}
+                                title={label}
+                                className={cn("py-1.5 rounded-md text-[10px] font-medium transition-all cursor-pointer",
+                                    note.includes("#") ? "bg-gray-900" : "bg-white/[0.03]",
+                                    live.keyIndex === i
+                                        ? "!bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 shadow-[0_0_6px_rgba(6,182,212,0.2)]"
+                                        : "text-white/35 border border-transparent hover:bg-white/[0.06]")}>
+                                {label}
+                            </button>
                         );
                     })}
                 </div>
@@ -1501,6 +1931,33 @@ function RecommendationsPanel() {
             <LiveRecommendationsWidget className="!border-0 !bg-transparent" />
         </Section>
     );
+}
+
+function InstrumentPanel() {
+    return (
+        <Section title="Instrument" accent="#10b981" icon={<Music2 className="w-3.5 h-3.5 text-emerald-400/60" />}>
+            <LiveInstrumentWidget />
+        </Section>
+    );
+}
+
+// Memoized provider so the context VALUE is stable across parent re-renders
+// (otherwise every consumer re-renders every frame and any consumer effect
+// depending on the slot object would tear down + re-run synchronously, which
+// can cascade into "Maximum update depth exceeded" via AutoSize).
+function WidgetSlotProvider({ opts, children }: {
+    opts: { collapsed: boolean; onToggleCollapse: () => void; dragHandleClass: string; locked: boolean; autoResize: boolean; requestAutoHeight: (px: number) => void };
+    children: React.ReactNode;
+}) {
+    const value = useMemo(() => ({
+        collapsed: opts.collapsed,
+        onToggleCollapse: opts.onToggleCollapse,
+        dragHandleClass: opts.dragHandleClass,
+        fillHeight: true,
+        autoResize: opts.autoResize,
+        requestAutoHeight: opts.requestAutoHeight,
+    }), [opts.collapsed, opts.onToggleCollapse, opts.dragHandleClass, opts.autoResize, opts.requestAutoHeight]);
+    return <LiveWidgetSlotContext.Provider value={value}>{children}</LiveWidgetSlotContext.Provider>;
 }
 
 // ─── Performance widget with text-size scaling ──────────────────────────────
@@ -1598,7 +2055,7 @@ function LivePerfSection() {
     );
 }
 
-type WidgetId = "voice" | "keyScale" | "backing" | "tuner" | "looper" | "pads" | "stream" | "perf" | "recommendations" | "visualizer" | "eq";
+type WidgetId = "voice" | "keyScale" | "backing" | "tuner" | "looper" | "pads" | "stream" | "perf" | "recommendations" | "visualizer" | "eq" | "instrument";
 
 const WIDGET_RENDERERS: Record<WidgetId, () => React.ReactElement> = {
     voice: () => <VoicePanel />,
@@ -1612,6 +2069,7 @@ const WIDGET_RENDERERS: Record<WidgetId, () => React.ReactElement> = {
     stream: () => <StreamPanel />,
     perf: () => <LivePerfSection />,
     recommendations: () => <RecommendationsPanel />,
+    instrument: () => <InstrumentPanel />,
 };
 
 // ─── Widget metadata: defaults, min sizes, max sizes ────────────────────────
@@ -1683,11 +2141,18 @@ const WIDGET_META: WidgetMeta<WidgetId>[] = [
         defaults: { lg: { x: 5, y: 29, w: 4, h: 13 }, md: { x: 5, y: 47, w: 5, h: 13 }, sm: { x: 0, y: 101, w: 6, h: 13 }, xs: { x: 0, y: 101, w: 4, h: 13 }, xxs: { x: 0, y: 101, w: 2, h: 13 } },
         minW: 3, minH: 8,
     },
+    {
+        id: "instrument", title: "Instrument",
+        icon: Music2, accent: "#10b981", description: "Re-voice the mic as piano/violin/strings/...",
+        defaults: { lg: { x: 5, y: 42, w: 4, h: 18 }, md: { x: 5, y: 60, w: 5, h: 18 }, sm: { x: 0, y: 114, w: 6, h: 18 }, xs: { x: 0, y: 114, w: 4, h: 18 }, xxs: { x: 0, y: 114, w: 2, h: 18 } },
+        minW: 3, minH: 10, autoResize: true,
+    },
 ];
 
 const LAYOUT_STORAGE_KEY = "live-widget-grid-v1";
 
 export function LivePage() {
+    useRenderCount("LivePage");
     const live = useLive();
 
     // Keyboard shortcuts
@@ -1718,16 +2183,9 @@ export function LivePage() {
     const renderWidget = useCallback((id: WidgetId, opts: { collapsed: boolean; onToggleCollapse: () => void; dragHandleClass: string; locked: boolean; autoResize: boolean; requestAutoHeight: (px: number) => void }) => {
         const Renderer = WIDGET_RENDERERS[id];
         return (
-            <LiveWidgetSlotContext.Provider value={{
-                collapsed: opts.collapsed,
-                onToggleCollapse: opts.onToggleCollapse,
-                dragHandleClass: opts.dragHandleClass,
-                fillHeight: true,
-                autoResize: opts.autoResize,
-                requestAutoHeight: opts.requestAutoHeight,
-            }}>
+            <WidgetSlotProvider opts={opts}>
                 <Renderer />
-            </LiveWidgetSlotContext.Provider>
+            </WidgetSlotProvider>
         );
     }, []);
 

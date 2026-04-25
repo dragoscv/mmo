@@ -10,6 +10,7 @@ import {
     useMemo,
     type ReactNode,
 } from "react";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     MixerEngine,
     DEFAULT_DECK_STATE,
@@ -37,6 +38,7 @@ import {
 import type { Track } from "@/db/schema";
 import { getTrackById } from "@/actions/tracks";
 import { audioPreloadCache } from "@/lib/audio-preload-cache";
+import { setDeckTime, getDeckTime, resetAllDeckTimes } from "@/lib/mixer-time-store";
 import { getPersonalization } from "@/hooks/use-personalization";
 import { requestConfirmLoad } from "./confirm-load-dialog";
 import { uploadRecording } from "@/lib/upload-recording";
@@ -252,7 +254,7 @@ function loadPersistedState(): Partial<MixerState> | null {
     } catch { return null; }
 }
 
-function serializeDeck(deck: DeckState): PersistedDeckState {
+function serializeDeck(deck: DeckState, liveTime: number): PersistedDeckState {
     return {
         trackId: deck.trackId,
         trackTitle: deck.trackTitle,
@@ -284,7 +286,10 @@ function serializeDeck(deck: DeckState): PersistedDeckState {
         loopEnd: deck.loopEnd,
         loopBeats: deck.loopBeats,
         hotCues: deck.hotCues,
-        currentTime: deck.currentTime,
+        // currentTime is sourced live from the external time store rather
+        // than React state (state's `deck.currentTime` was removed from the
+        // per-tick update path and is stale).
+        currentTime: liveTime,
         duration: deck.duration,
         headphoneCue: deck.headphoneCue,
         padMode: deck.padMode,
@@ -296,10 +301,10 @@ function serializeDeck(deck: DeckState): PersistedDeckState {
 function savePersistedState(state: MixerState) {
     try {
         const persisted: PersistedMixerState = {
-            deckA: serializeDeck(state.deckA),
-            deckB: serializeDeck(state.deckB),
-            deckC: serializeDeck(state.deckC),
-            deckD: serializeDeck(state.deckD),
+            deckA: serializeDeck(state.deckA, getDeckTime("A")),
+            deckB: serializeDeck(state.deckB, getDeckTime("B")),
+            deckC: serializeDeck(state.deckC, getDeckTime("C")),
+            deckD: serializeDeck(state.deckD, getDeckTime("D")),
             deckMode: state.deckMode,
             crossfader: state.crossfader,
             crossfaderCurve: state.crossfaderCurve,
@@ -322,6 +327,7 @@ const DECK_TRACK_KEY: Record<DeckSide, DeckTrackKey> = { A: "deckATrack", B: "de
 const ALL_SIDES: DeckSide[] = ["A", "B", "C", "D"];
 
 export function MixerProvider({ children }: { children: ReactNode }) {
+    useRenderCount("MixerProvider");
     const engineRef = useRef<MixerEngine | null>(null);
     const recordingTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
     const [state, setState] = useState<MixerState>(() => {
@@ -423,32 +429,15 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         }));
     }, []);
 
-    // Batched time updates: accumulate per-deck times and flush once per frame
-    const pendingTimeUpdates = useRef<Partial<Record<DeckSide, number>>>({});
-    const timeFlushScheduled = useRef(false);
-    const flushTimeUpdates = useCallback(() => {
-        timeFlushScheduled.current = false;
-        const updates = pendingTimeUpdates.current;
-        if (Object.keys(updates).length === 0) return;
-        setState(prev => {
-            let next = prev;
-            for (const [side, time] of Object.entries(updates) as [DeckSide, number][]) {
-                const key = DECK_STATE_KEY[side];
-                next = { ...next, [key]: { ...(next[key] as DeckState), currentTime: time } };
-            }
-            return next;
-        });
-        pendingTimeUpdates.current = {};
-    }, []);
-
+    // Live playback time is broadcast through an external `useSyncExternalStore`
+    // so only leaf components that actually display a clock re-render on
+    // every tick. The 4 Hz `onTimeUpdate` emitter used to go through
+    // `setState` which forced the whole provider + MixerView tree to
+    // reconcile — measurements showed ~400 renders across 6 minutes of idle
+    // playback. Now: zero React re-renders for time ticks.
     const batchTimeUpdate = useCallback((deck: DeckSide, time: number) => {
-        pendingTimeUpdates.current[deck] = time;
-        if (!timeFlushScheduled.current) {
-            timeFlushScheduled.current = true;
-            // Use queueMicrotask for same-frame batching (faster than rAF)
-            queueMicrotask(flushTimeUpdates);
-        }
-    }, [flushTimeUpdates]);
+        setDeckTime(deck, time);
+    }, []);
 
     const getDeckEngine = useCallback((deck: DeckSide) => {
         if (!engineRef.current) return null;
@@ -488,6 +477,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
         engineRef.current?.destroy();
         engineRef.current = null;
+        resetAllDeckTimes();
         setState(prev => ({
             deckA: { ...DEFAULT_DECK_STATE },
             deckB: { ...DEFAULT_DECK_STATE },
@@ -555,15 +545,16 @@ export function MixerProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const handleBeforeUnload = () => {
             const engine = engineRef.current;
-            const s = stateRef.current;
-            const finalState = { ...s };
             if (engine) {
+                // Push the engine's authoritative time into the store first
+                // so `savePersistedState` (which now reads from the store)
+                // captures the most accurate final position.
                 for (const side of ALL_SIDES) {
-                    const key = DECK_STATE_KEY[side] as "deckA" | "deckB" | "deckC" | "deckD";
-                    finalState[key] = { ...s[key], currentTime: engine.getDeck(side).getCurrentTime() || s[key].currentTime };
+                    const t = engine.getDeck(side).getCurrentTime();
+                    if (t > 0) setDeckTime(side, t);
                 }
             }
-            savePersistedState(finalState);
+            savePersistedState(stateRef.current);
         };
         window.addEventListener("beforeunload", handleBeforeUnload);
         return () => window.removeEventListener("beforeunload", handleBeforeUnload);
@@ -673,7 +664,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
                     existingOnLoaded?.(duration);
                     if (savedTime > 0 && savedTime < duration) {
                         eng.seek(savedTime);
-                        updateDeck(side, { currentTime: savedTime, duration, isLoaded: true });
+                        updateDeck(side, { duration, isLoaded: true });
+                        setDeckTime(side, savedTime);
                     }
                     if (deck.loopEnabled && deck.loopStart >= 0 && deck.loopEnd > deck.loopStart) {
                         eng.enableLoop(deck.loopStart, deck.loopEnd);
@@ -838,34 +830,53 @@ export function MixerProvider({ children }: { children: ReactNode }) {
 
     const seek = useCallback((deck: DeckSide, time: number) => {
         getDeckEngine(deck)?.seek(time);
-        updateDeck(deck, { currentTime: time });
-    }, [getDeckEngine, updateDeck]);
+        // Mirror to the time store so every subscriber sees the jump
+        // immediately — the next engine tick would only arrive 250 ms later.
+        setDeckTime(deck, time);
+    }, [getDeckEngine]);
 
     const beatJump = useCallback((deck: DeckSide, beats: number) => {
         const key = DECK_STATE_KEY[deck];
-        setState(prev => {
-            const deckState = prev[key];
-            const beatDuration = 60 / deckState.bpm;
-            let targetTime = deckState.currentTime + beats * beatDuration;
-            // If quantize is on, snap to beat grid
-            if (deckState.quantize) {
-                targetTime = getDeckEngine(deck)?.quantizeTime(targetTime, deckState.bpm) ?? targetTime;
-            }
-            targetTime = Math.max(0, Math.min(targetTime, deckState.duration));
-            getDeckEngine(deck)?.seek(targetTime);
-            return { ...prev, [key]: { ...deckState, currentTime: targetTime } };
-        });
+        const prev = stateRef.current[key] as DeckState;
+        const beatDuration = 60 / prev.bpm;
+        const base = getDeckTime(deck);
+        let targetTime = base + beats * beatDuration;
+        if (prev.quantize) {
+            targetTime = getDeckEngine(deck)?.quantizeTime(targetTime, prev.bpm) ?? targetTime;
+        }
+        targetTime = Math.max(0, Math.min(targetTime, prev.duration));
+        getDeckEngine(deck)?.seek(targetTime);
+        setDeckTime(deck, targetTime);
     }, [getDeckEngine]);
 
-    const nudge = useCallback((deck: DeckSide, ms: number) => {
-        // ms is now treated as a direction/strength indicator:
-        // positive = speed up, negative = slow down
-        // Convert ms to a pitch bend strength (larger ms = stronger bend)
-        const strength = Math.min(0.08, Math.abs(ms) / 1000);
-        getDeckEngine(deck)?.nudgeBurst(ms > 0 ? 1 : -1, strength);
+    // Per-deck auto-release timers for continuous jog nudge: when MIDI ticks
+    // stop arriving the bend decays back to base. Without this the playback
+    // rate would stay offset forever after the last jog tick.
+    const nudgeReleaseTimers = useRef<Map<DeckSide, ReturnType<typeof setTimeout>>>(new Map());
+
+    const nudge = useCallback((deck: DeckSide, intensity: number) => {
+        // `intensity` is a signed strength in roughly -1..+1.
+        // Positive = speed up, negative = slow down. Maps to ±15% pitch bend
+        // (matches DeckEngine's internal clamp).
+        const eng = getDeckEngine(deck);
+        if (!eng) return;
+        const clamped = Math.max(-1, Math.min(1, intensity));
+        eng.nudge(clamped * 0.15);
+
+        // Auto-release if no further jog tick arrives within 200 ms (jog stopped).
+        const timers = nudgeReleaseTimers.current;
+        const prev = timers.get(deck);
+        if (prev) clearTimeout(prev);
+        timers.set(deck, setTimeout(() => {
+            eng.releaseNudge();
+            timers.delete(deck);
+        }, 200));
     }, [getDeckEngine]);
 
     const nudgeRelease = useCallback((deck: DeckSide) => {
+        const timers = nudgeReleaseTimers.current;
+        const prev = timers.get(deck);
+        if (prev) { clearTimeout(prev); timers.delete(deck); }
         getDeckEngine(deck)?.releaseNudge();
     }, [getDeckEngine]);
 
@@ -982,7 +993,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
             const deckState = prev[key];
             const beatDuration = 60 / deckState.bpm;
             const loopLength = beatDuration * beats;
-            let loopStart = deckState.currentTime;
+            let loopStart = getDeckTime(deck);
             // Quantize loop start to beat grid if quantize is on
             if (deckState.quantize && deckState.bpm > 0) {
                 loopStart = getDeckEngine(deck)?.quantizeTime(loopStart, deckState.bpm) ?? loopStart;
@@ -1006,7 +1017,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
             } else {
                 const beatDuration = 60 / deckState.bpm;
                 const loopLength = beatDuration * deckState.loopBeats;
-                let loopStart = deckState.currentTime;
+                let loopStart = getDeckTime(deck);
                 if (deckState.quantize && deckState.bpm > 0) {
                     loopStart = getDeckEngine(deck)?.quantizeTime(loopStart, deckState.bpm) ?? loopStart;
                 }
@@ -1041,7 +1052,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         setState(prev => {
             const deckState = prev[key];
             const hotCues = [...deckState.hotCues];
-            let cueTime = deckState.currentTime;
+            let cueTime = getDeckTime(deck);
             // Quantize hot cue position to beat grid if quantize is on
             if (deckState.quantize && deckState.bpm > 0) {
                 cueTime = getDeckEngine(deck)?.quantizeTime(cueTime, deckState.bpm) ?? cueTime;
@@ -1053,15 +1064,12 @@ export function MixerProvider({ children }: { children: ReactNode }) {
 
     const jumpHotCue = useCallback((deck: DeckSide, index: number) => {
         const key = DECK_STATE_KEY[deck];
-        setState(prev => {
-            const deckState = prev[key];
-            const time = deckState.hotCues[index];
-            if (time != null) {
-                getDeckEngine(deck)?.seek(time);
-                return { ...prev, [key]: { ...deckState, currentTime: time } };
-            }
-            return prev;
-        });
+        const deckState = stateRef.current[key] as DeckState;
+        const time = deckState.hotCues[index];
+        if (time != null) {
+            getDeckEngine(deck)?.seek(time);
+            setDeckTime(deck, time);
+        }
     }, [getDeckEngine]);
 
     const clearHotCue = useCallback((deck: DeckSide, index: number) => {

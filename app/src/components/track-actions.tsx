@@ -63,7 +63,7 @@ import {
     moveTrackInPlaylist,
 } from "@/actions/playlists";
 import { usePlayer } from "@/components/player-context";
-import { useMixer } from "@/components/mixer-context";
+import { useMixerActions } from "@/components/mixer-context";
 import { toast } from "sonner";
 import { getRadioMix } from "@/actions/recommendations";
 import type { Track } from "@/db/schema";
@@ -216,7 +216,7 @@ function TrackMenuItems({
     Separator: React.ComponentType;
 }) {
     const { track, playlistId, showReorder, hideDeckActions, onOpenDetail, onEdit } = config;
-    const mixer = useMixer();
+    const mixer = useMixerActions();
 
     return (
         <>

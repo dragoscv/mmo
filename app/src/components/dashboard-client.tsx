@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, type ReactNode } from "react";
 import Link from "next/link";
+import { useRenderCount } from "@/lib/dev-debugger";
 import {
     Music,
     CheckCircle,
@@ -636,6 +637,7 @@ function formatTotalDuration(seconds: number) {
 // ── Main Dashboard ───────────────────────────────────────────────
 
 export function DashboardClient({ stats, recommendedCategories, recentScans }: DashboardClientProps) {
+    useRenderCount("Page:/");
     const greeting = getGreeting();
 
     return (

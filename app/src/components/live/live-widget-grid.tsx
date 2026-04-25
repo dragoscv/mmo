@@ -20,6 +20,7 @@ import { Responsive, WidthProvider, type Layout, type LayoutItem, type Responsiv
 import { Lock, Unlock, RotateCcw, Minimize2, Maximize2, LayoutGrid, Eye, EyeOff, ChevronDown, ChevronRight, Crosshair, Square } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import "react-grid-layout/css/styles.css";
 
 // `WidthProvider(Responsive)` is the v1-style HOC; the legacy types from RGL v2
@@ -184,6 +185,7 @@ export interface LiveWidgetGridProps<Id extends string> {
 export function LiveWidgetGrid<Id extends string>({
     storageKey, widgets, renderWidget, toolbarExtra, className,
 }: LiveWidgetGridProps<Id>) {
+    useRenderCount("LiveWidgetGrid");
     const defaultLayouts = useMemo(() => buildDefaultLayouts(widgets), [widgets]);
     const widgetIds = useMemo(() => widgets.map(w => w.id), [widgets]);
 
@@ -194,6 +196,7 @@ export function LiveWidgetGrid<Id extends string>({
     const [locked, setLocked] = useState(false);
     const [currentBp, setCurrentBp] = useState<Breakpoint>("lg");
     const [hydrated, setHydrated] = useState(false);
+    const [settled, setSettled] = useState(false);
     const [focusFlash, setFocusFlash] = useState<string | null>(null);
 
     // Hydrate from storage (after mount to avoid SSR mismatch)
@@ -228,6 +231,11 @@ export function LiveWidgetGrid<Id extends string>({
             setHydrated(true);
         };
         load();
+        // After hydration paints, give the layout a brief settle window during
+        // which (a) all CSS transitions are disabled and (b) auto-resize is
+        // ignored. This prevents the visible jitter where widgets snap to
+        // saved positions, then briefly resize to fit content, then settle.
+        const settleTimer = window.setTimeout(() => setSettled(true), 350);
         // Cross-tab/cross-device sync via the native storage event (does not fire
         // for changes made in the same window, so no feedback loop with our own
         // savePersisted dispatches).
@@ -235,14 +243,21 @@ export function LiveWidgetGrid<Id extends string>({
         window.addEventListener("storage", onStorage);
         return () => {
             window.removeEventListener("storage", onStorage);
+            window.clearTimeout(settleTimer);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [storageKey]);
 
-    // Persist on change
+    // Persist on change (debounced 400ms). Coalesces bursts of layout updates
+    // (e.g. during an auto-resize cascade) into a single localStorage write +
+    // single `mmo-preference-changed` event — prevents downstream listeners
+    // (preferences-sync → DB writes) from firing on every micro change.
     useEffect(() => {
         if (!hydrated) return;
-        savePersisted(storageKey, { layouts, collapsed, locked, expandedH, hidden });
+        const t = setTimeout(() => {
+            savePersisted(storageKey, { layouts, collapsed, locked, expandedH, hidden });
+        }, 400);
+        return () => clearTimeout(t);
     }, [layouts, collapsed, locked, expandedH, hidden, hydrated, storageKey]);
 
     // Apply collapsed state to rendered layouts (force h=COLLAPSED_H, lock h)
@@ -414,6 +429,11 @@ export function LiveWidgetGrid<Id extends string>({
 
     const requestAutoHeight = useCallback((id: string, pixels: number) => {
         if (locked || collapsed[id]) return;
+        // During the settle window the layout is still snapping into its saved
+        // shape — ignore content measurements until widgets have stopped moving,
+        // otherwise the very first paint triggers a height-jump animation that
+        // looks like a flicker.
+        if (!settled) return;
         const meta = metaById.get(id);
         if (!meta?.autoResize) return;
         if (manualResizeRef.current.has(id)) return; // user took control
@@ -429,12 +449,11 @@ export function LiveWidgetGrid<Id extends string>({
             const bpLayout = prev[currentBp] ?? [];
             const cur = bpLayout.find(l => l.i === id);
             if (!cur) return prev;
-            // Grow OR shrink — but require a delta of at least 1 row to avoid
-            // ping-pong from sub-pixel ResizeObserver fluctuations. Shrinking
-            // also needs to clear an extra dead-zone row so a tiny content
-            // change won't yo-yo height.
+            // Hysteresis: grow on any ≥1-row delta, shrink only on ≥2-row delta.
+            // This kills oscillation around the boundary while still letting
+            // the widget genuinely shrink when content is removed.
             if (neededH === cur.h) return prev;
-            if (neededH < cur.h && cur.h - neededH < 1) return prev;
+            if (neededH < cur.h && cur.h - neededH < 2) return prev;
             lastAutoHRef.current.set(id, neededH);
             return {
                 ...prev,
@@ -443,7 +462,7 @@ export function LiveWidgetGrid<Id extends string>({
         });
         // Suppress unused warning for cellPixelHeight (kept for clarity / debug).
         void cellPixelHeight;
-    }, [locked, collapsed, metaById, currentBp, cellPixelHeight]);
+    }, [locked, collapsed, settled, metaById, currentBp, cellPixelHeight]);
 
     return (
         <div className={cn("flex flex-col h-full min-h-0", className)}>
@@ -492,7 +511,18 @@ export function LiveWidgetGrid<Id extends string>({
             </div>
 
             {/* Grid */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div
+                className={cn(
+                    "flex-1 min-h-0 overflow-y-auto live-widget-grid-host",
+                    !settled && "live-widget-grid-settling",
+                )}
+                // Hide until hydration is complete so users don't see a flash
+                // of the default layout snapping to their saved layout. After
+                // hydration we still keep transitions OFF for ~350ms (settle
+                // window) and fade the grid in — so the user sees a smooth
+                // appearance instead of items rearranging.
+                style={hydrated ? { opacity: 1 } : { visibility: "hidden", opacity: 0 }}
+            >
                 <ResponsiveGridLayout
                     className="live-widget-grid"
                     layouts={(() => {
@@ -506,7 +536,7 @@ export function LiveWidgetGrid<Id extends string>({
                     margin={MARGIN}
                     containerPadding={PADDING}
                     onLayoutChange={handleLayoutChange}
-                    onResizeStop={(_layout, _old, item) => {
+                    onResizeStop={(_layout: Layout, _old: LayoutItem, item: LayoutItem) => {
                         // RGL only fires onResizeStop for user-driven resizes,
                         // so any call here means the user took manual control:
                         // freeze this widget out of further auto-height updates
@@ -555,8 +585,18 @@ export function LiveWidgetGrid<Id extends string>({
 }
 
 const GRID_THEME_CSS = `
+.live-widget-grid-host {
+    transition: opacity 320ms cubic-bezier(0.2, 0, 0, 1);
+}
 .live-widget-grid .react-grid-item {
-    transition: transform 200ms cubic-bezier(0.2, 0, 0, 1), width 200ms cubic-bezier(0.2, 0, 0, 1), height 200ms cubic-bezier(0.2, 0, 0, 1);
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), width 220ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+}
+/* During the settle window after hydration: snap items into place with no
+   animation so the user never sees them slide / resize on first paint. */
+.live-widget-grid-settling .react-grid-item,
+.live-widget-grid-settling .react-grid-item.cssTransforms {
+    transition: none !important;
 }
 .live-widget-grid .react-grid-item.react-grid-placeholder {
     background: rgba(244, 63, 94, 0.18);
@@ -580,6 +620,15 @@ const GRID_THEME_CSS = `
 .live-widget-grid .react-grid-item > .live-grid-item {
     width: 100%;
     height: 100%;
+}
+/* Soft fade-in for widget bodies on first mount. The settling window keeps
+   item POSITIONS stable; this animates only opacity, never layout. */
+.live-widget-grid .react-grid-item > .live-grid-item {
+    animation: liveWidgetItemIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes liveWidgetItemIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 .live-widget-grid .live-widget-focus-flash {
     animation: liveWidgetFocusFlash 1.4s ease-out;

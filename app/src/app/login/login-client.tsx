@@ -2,8 +2,10 @@
 
 import Image from "next/image";
 import { LoginForm } from "@/components/login-form";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 export function LoginPageClient() {
+    useRenderCount("Page:/login");
     return (
         <div className="flex min-h-full items-center justify-center px-4">
             <div className="w-full max-w-sm space-y-8">

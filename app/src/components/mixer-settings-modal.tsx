@@ -26,6 +26,7 @@ import {
     saveBeatGridEnabled,
 } from "./mixer-waveforms";
 import { useMixer } from "./mixer-context";
+import { ConsoleTab } from "./mixer-settings-console-tab";
 import type { CrossfaderCurve, EQMode, WaveformMode, DeckSide } from "@/lib/mixer-engine";
 import {
     DropdownMenu,
@@ -72,6 +73,7 @@ import {
     Disc,
     AlertTriangle,
     Clock,
+    Gamepad2,
 } from "lucide-react";
 import {
     usePersonalization,
@@ -170,6 +172,27 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
             setAudioPermission("denied");
         }
     }, []);
+
+    // Manual refresh — re-enumerate audio devices on demand.
+    const refreshAudioDevices = useCallback(async () => {
+        try {
+            const devs = await navigator.mediaDevices.enumerateDevices();
+            setAudioDevices(devs.filter(d => d.kind === "audiooutput"));
+        } catch {
+            /* ignore */
+        }
+    }, []);
+
+    // Hot-plug: re-enumerate whenever the OS reports a device change.
+    // (Only while the modal is open; we don't need to listen otherwise.)
+    useEffect(() => {
+        if (!open) return;
+        const md = navigator.mediaDevices;
+        if (!md?.addEventListener) return;
+        const onChange = () => { void refreshAudioDevices(); };
+        md.addEventListener("devicechange", onChange);
+        return () => md.removeEventListener("devicechange", onChange);
+    }, [open, refreshAudioDevices]);
 
     // Wire settings to mixer engine on open + check permissions
     useEffect(() => {
@@ -468,6 +491,10 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                         <TabsTrigger value="personalize" className="text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white gap-1.5">
                             <Palette className="h-3 w-3" />
                             Personalize
+                        </TabsTrigger>
+                        <TabsTrigger value="console" className="text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white gap-1.5">
+                            <Gamepad2 className="h-3 w-3" />
+                            Console
                         </TabsTrigger>
                     </TabsList>
 
@@ -1375,6 +1402,14 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                 <div className="flex items-center gap-1.5 mb-2">
                                     <Volume2 className="w-3 h-3 text-white/30" />
                                     <span className="text-[10px] uppercase tracking-wider text-white/25">Audio Output</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => { void refreshAudioDevices(); }}
+                                        title="Refresh device list"
+                                        className="ml-auto inline-flex items-center justify-center w-5 h-5 rounded text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors cursor-pointer"
+                                    >
+                                        <RefreshCw className="w-3 h-3" />
+                                    </button>
                                 </div>
 
                                 {audioPermission === "denied" ? (
@@ -1424,7 +1459,7 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                             ))}
                                         </select>
                                         <p className="text-[9px] text-white/20 mt-1.5">
-                                            Select the audio output device for playback.
+                                            Select the audio output device for playback. The list refreshes automatically when devices are plugged in or removed; use the icon above to refresh manually.
                                         </p>
                                     </>
                                 )}
@@ -2032,6 +2067,11 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                     ))}
                                 </div>
                             </div>
+                        </TabsContent>
+
+                        {/* ── Console Tab ── */}
+                        <TabsContent value="console" className="mt-0 space-y-4">
+                            <ConsoleTab />
                         </TabsContent>
                     </div>
                 </Tabs>

@@ -1,6 +1,7 @@
 "use client";
 
 import type { DeckSide } from "./mixer-engine";
+import { dlog } from "@/lib/dev-debugger";
 
 /**
  * Web MIDI API Engine for DJ Controller Support
@@ -43,7 +44,11 @@ export type MidiAction =
     // Shift
     | "shift"
     // Beat FX
-    | "fx-select" | "fx-on-off" | "fx-level"
+    | "fx-select" | "fx-select-prev" | "fx-on-off" | "fx-level"
+    | "fx-channel-1" | "fx-channel-2" | "fx-beats-up" | "fx-beats-down"
+    | "fx-disable-all"
+    // Quantize / Slip / Censor
+    | "quantize" | "slip-mode" | "censor"
     // Color FX
     | "color-fx-level" | "color-fx-select"
     // Master
@@ -91,6 +96,8 @@ export interface MidiDevice {
     manufacturer: string;
     input: MIDIInput;
     output: MIDIOutput | null;
+    /** True for output-only devices that don't expose a real MIDI input. */
+    outputOnly?: boolean;
 }
 
 export interface MidiMessage {
@@ -164,12 +171,16 @@ export class MidiEngine {
     // 14-bit CC accumulator
     private cc14BitAccum: Map<string, number> = new Map();
 
+    // Diagnostic: throttle unmapped-message logs to one per unique key.
+    private unmappedSeen: Set<string> = new Set();
+
     onDeviceChange?: (devices: MidiDevice[]) => void;
     onMessage?: (msg: MidiMessage) => void;
 
     async init(): Promise<boolean> {
         if (!navigator.requestMIDIAccess) {
             console.warn("[MIDI] Web MIDI API not supported in this browser");
+            dlog("midi", "Web MIDI API not supported", undefined, "warn");
             return false;
         }
 
@@ -246,23 +257,128 @@ export class MidiEngine {
 
         console.log(`[MIDI] refreshDevices: ${inputs.size} inputs, ${outputs.size} outputs`);
 
-        // Build output lookup — include ALL outputs (not just connected)
+        // Build output lookups. Windows tends to mangle port names —
+        //   input  "MIDIIN2 (DDJ-FLX4)"  ↔  output "MIDIOUT2 (DDJ-FLX4)"
+        //   input  "DDJ-FLX4"            ↔  output "Out DDJ-FLX4 1"
+        // …so we extract a "canonical core" token (anything inside the
+        // first parenthesis, falling back to the whole name with the
+        // MIDI direction prefix stripped) and index outputs by that.
+        const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+        const canonicalCore = (raw: string): string => {
+            if (!raw) return "";
+            const paren = raw.match(/\(([^)]+)\)/);
+            const core = paren ? paren[1] : raw
+                .replace(/^\s*(midiin|midi in|in|midiout|midi out|out)\s*\d*[\s:_-]*/i, "")
+                .replace(/[\s:_-]*\d+\s*$/, "");
+            return norm(core);
+        };
+
         const outputsByName = new Map<string, MIDIOutput>();
+        const outputsByNormName = new Map<string, MIDIOutput>();
+        const outputsByCore = new Map<string, MIDIOutput[]>();
+        const outputsByManufacturer = new Map<string, MIDIOutput[]>();
         outputs.forEach((output) => {
+            console.log(`[MIDI] Output port: "${output.name}" manufacturer="${output.manufacturer}" state=${output.state}`);
             if (output.name) {
                 outputsByName.set(output.name, output);
+                const k = norm(output.name);
+                if (k && !outputsByNormName.has(k)) outputsByNormName.set(k, output);
+                const core = canonicalCore(output.name);
+                if (core) {
+                    const arr = outputsByCore.get(core) ?? [];
+                    arr.push(output);
+                    outputsByCore.set(core, arr);
+                }
+            }
+            if (output.manufacturer) {
+                const m = norm(output.manufacturer);
+                const arr = outputsByManufacturer.get(m) ?? [];
+                arr.push(output);
+                outputsByManufacturer.set(m, arr);
             }
         });
 
         // Open ALL inputs (not just state=connected — some devices report "disconnected" until opened)
         const openPromises: Promise<void>[] = [];
+        const usedOutputs = new Set<MIDIOutput>();
         inputs.forEach((input) => {
-            console.log(`[MIDI] Attempting to open input: "${input.name}" state=${input.state} connection=${input.connection}`);
+            console.log(`[MIDI] Attempting to open input: "${input.name}" manufacturer="${input.manufacturer}" state=${input.state} connection=${input.connection}`);
 
             openPromises.push(
-                input.open().then(() => {
+                input.open().then(async () => {
                     console.log(`[MIDI] Opened input: "${input.name}" state=${input.state} connection=${input.connection}`);
-                    const matchingOutput = (input.name ? outputsByName.get(input.name) : null) ?? null;
+                    let matchingOutput: MIDIOutput | null = null;
+                    let matchReason = "";
+                    if (input.name) {
+                        // 1. Exact name match (rare but cheap to check)
+                        matchingOutput = outputsByName.get(input.name) ?? null;
+                        if (matchingOutput) matchReason = "exact-name";
+
+                        // 2. Canonical core match (handles MIDIIN2 (X) ↔ MIDIOUT2 (X))
+                        if (!matchingOutput) {
+                            const core = canonicalCore(input.name);
+                            const candidates = (outputsByCore.get(core) ?? []).filter(o => !usedOutputs.has(o));
+                            if (candidates.length > 0) {
+                                matchingOutput = candidates[0];
+                                matchReason = `canonical-core "${core}"`;
+                            }
+                        }
+
+                        // 3. Normalised-name fallback (full-string)
+                        if (!matchingOutput) {
+                            const k = norm(input.name);
+                            matchingOutput = outputsByNormName.get(k) ?? null;
+                            if (matchingOutput) matchReason = "norm-name";
+                        }
+
+                        // 4. Substring match (either way)
+                        if (!matchingOutput) {
+                            const k = norm(input.name);
+                            if (k) {
+                                for (const [outKey, out] of outputsByNormName) {
+                                    if (usedOutputs.has(out)) continue;
+                                    if (outKey.includes(k) || k.includes(outKey)) {
+                                        matchingOutput = out;
+                                        matchReason = "substring";
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 5. Manufacturer fallback — pair with the only un-used
+                    //    output from the same manufacturer.
+                    if (!matchingOutput && input.manufacturer) {
+                        const m = norm(input.manufacturer);
+                        const candidates = (outputsByManufacturer.get(m) ?? []).filter(o => !usedOutputs.has(o));
+                        if (candidates.length === 1) {
+                            matchingOutput = candidates[0];
+                            matchReason = `manufacturer "${input.manufacturer}"`;
+                        }
+                    }
+
+                    // 6. Last-ditch: if there's exactly one input AND exactly
+                    //    one output total, they almost certainly belong to
+                    //    the same device.
+                    if (!matchingOutput && inputs.size === 1 && outputs.size === 1) {
+                        outputs.forEach(o => { matchingOutput = o; });
+                        if (matchingOutput) matchReason = "single-input-single-output";
+                    }
+
+                    if (matchingOutput) {
+                        usedOutputs.add(matchingOutput);
+                        console.log(`[MIDI] Paired output for "${input.name}" → "${matchingOutput.name}" (via ${matchReason})`);
+                        // Explicitly open the output. The Web MIDI spec auto-
+                        // opens on first send(), but on Windows some drivers
+                        // refuse the implicit open — safer to await it now.
+                        try { await matchingOutput.open(); } catch (err) {
+                            console.warn(`[MIDI] Failed to open output "${matchingOutput.name}"`, err);
+                        }
+                    } else {
+                        console.warn(`[MIDI] No matching output found for input "${input.name}" — LEDs / motorised feedback disabled. ` +
+                            `Available outputs: ${Array.from(outputs.values()).map(o => `"${o.name}"`).join(", ") || "(none)"}`);
+                    }
 
                     const device: MidiDevice = {
                         id: input.id,
@@ -279,6 +395,18 @@ export class MidiEngine {
                         if (!e.data) return;
                         const msg = parseMidiMessage(new Uint8Array(e.data));
                         if (!msg) return;
+
+                        // One-time "first message from this port" log so we
+                        // can prove the device is actually emitting MIDI.
+                        if (process.env.NODE_ENV !== "production") {
+                            const seen = (this as unknown as { _firstSeen?: Set<string> })._firstSeen ?? new Set<string>();
+                            (this as unknown as { _firstSeen?: Set<string> })._firstSeen = seen;
+                            if (!seen.has(input.id)) {
+                                seen.add(input.id);
+                                // eslint-disable-next-line no-console
+                                console.info(`[MIDI] First message from "${input.name}": status=0x${msg.status.toString(16)} data1=0x${msg.note.toString(16)} value=${msg.value} type=${msg.type}`);
+                            }
+                        }
 
                         this.onMessage?.(msg);
 
@@ -304,6 +432,26 @@ export class MidiEngine {
         });
 
         await Promise.allSettled(openPromises);
+
+        // Expose any output port that wasn't paired with an input as a
+        // standalone, output-only "device" so the UI can list it (and
+        // controller drivers can still target it).
+        outputs.forEach((output) => {
+            if (usedOutputs.has(output)) return;
+            const id = `out:${output.id}`;
+            console.log(`[MIDI] Output without matching input: "${output.name}" → exposing as standalone device`);
+            try { void output.open(); } catch { /* ignore */ }
+            newDevices.set(id, {
+                id,
+                name: output.name || "Unknown MIDI Output",
+                manufacturer: output.manufacturer || "",
+                // Output-only stub: re-use the output here so the type holds.
+                // We never call any input-only methods on `outputOnly` devices.
+                input: output as unknown as MIDIInput,
+                output,
+                outputOnly: true,
+            });
+        });
 
         console.log(`[MIDI] refreshDevices complete: ${newDevices.size} devices`);
         newDevices.forEach((d) => {
@@ -345,10 +493,16 @@ export class MidiEngine {
         this.activeMapping = preset;
         this.mappingLookup.clear();
         this.cc14BitAccum.clear();
+        this.unmappedSeen.clear();
 
         for (const m of preset.mappings) {
             const key = `${m.status}:${m.midino}`;
             this.mappingLookup.set(key, m);
+        }
+
+        if (process.env.NODE_ENV !== "production") {
+            // eslint-disable-next-line no-console
+            console.info(`[MIDI] Active preset → "${preset.name}" (${preset.mappings.length} mappings, ${this.mappingLookup.size} unique status:note keys)`);
         }
     }
 
@@ -378,9 +532,29 @@ export class MidiEngine {
 
         // Try exact status:note match
         const key = `${msg.status}:${msg.note}`;
-        const mapping = this.mappingLookup.get(key);
+        let mapping = this.mappingLookup.get(key);
 
-        if (!mapping) return;
+        // Fallback: some controllers send real Note Off (0x8x) for button
+        // releases instead of "Note On with velocity 0". Our presets only
+        // store the Note On variant (0x9x), so retry with the matching
+        // Note On status byte before giving up.
+        if (!mapping && msg.type === "noteOff" && (msg.status & 0xF0) === 0x80) {
+            const noteOnStatus = 0x90 | (msg.status & 0x0F);
+            mapping = this.mappingLookup.get(`${noteOnStatus}:${msg.note}`);
+        }
+
+        if (!mapping) {
+            if (process.env.NODE_ENV !== "production") {
+                // Surface unmapped messages so users can diagnose missing
+                // preset entries. Throttled to one log per unique key.
+                if (!this.unmappedSeen.has(key)) {
+                    this.unmappedSeen.add(key);
+                    // eslint-disable-next-line no-console
+                    console.debug(`[MIDI] unmapped ${msg.type} status=0x${msg.status.toString(16)} data1=0x${msg.note.toString(16)} value=${msg.value}`);
+                }
+            }
+            return;
+        }
 
         if (mapping.type === "cc-14bit-msb") {
             // Store MSB, wait for LSB
@@ -410,16 +584,38 @@ export class MidiEngine {
     /** Send a message to the controller (for LED feedback) */
     sendToDevice(deviceId: string, data: number[]) {
         const device = this.devices.get(deviceId);
-        if (device?.output) {
+        if (!device?.output) return;
+        try {
             device.output.send(new Uint8Array(data));
+        } catch (err) {
+            // SysEx (0xF0) rejected when sysexEnabled=false is the most
+            // common cause. Log once per device so the user can see why
+            // their controller isn't lighting up / responding.
+            const isSysex = data[0] === 0xF0;
+            const sysexOk = this.midiAccess?.sysexEnabled ?? false;
+            const seen = (this as unknown as { _sendErrSeen?: Set<string> })._sendErrSeen ?? new Set<string>();
+            (this as unknown as { _sendErrSeen?: Set<string> })._sendErrSeen = seen;
+            const key = `${deviceId}:${isSysex ? "sysex" : "midi"}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                // eslint-disable-next-line no-console
+                console.warn(`[MIDI] send to "${device.name}" failed (sysex=${isSysex}, sysexEnabled=${sysexOk}):`, err);
+                if (isSysex && !sysexOk) {
+                    // eslint-disable-next-line no-console
+                    console.warn(`[MIDI] ⚠  This controller ("${device.name}") needs SysEx to wake up. Re-grant SysEx permission for this site.`);
+                }
+            }
         }
     }
 
     /** Send LED feedback to all connected output devices */
     sendToAllDevices(data: number[]) {
         this.devices.forEach((device) => {
-            if (device.output) {
+            if (!device.output) return;
+            try {
                 device.output.send(new Uint8Array(data));
+            } catch {
+                // Per-device error already logged via sendToDevice path.
             }
         });
     }
@@ -562,8 +758,10 @@ export class MidiEngine {
 
     destroy() {
         this.devices.forEach(d => {
-            d.input.onmidimessage = null;
-            try { d.input.close(); } catch { /* ignore */ }
+            if (!d.outputOnly) {
+                d.input.onmidimessage = null;
+                try { d.input.close(); } catch { /* ignore */ }
+            }
             try { d.output?.close(); } catch { /* ignore */ }
         });
         this.devices.clear();
@@ -705,8 +903,25 @@ export const PIONEER_DDJ_FLX4_PRESET: MidiPreset = {
 
         // Beat FX
         { status: 0x94, midino: 0x63, action: "fx-select", deck: null, type: "note", description: "FX Select" },
+        { status: 0x94, midino: 0x64, action: "fx-select-prev", deck: null, type: "note", description: "FX Select (Shift = previous)" },
         { status: 0x94, midino: 0x47, action: "fx-on-off", deck: null, type: "note", description: "FX On/Off" },
+        { status: 0x95, midino: 0x47, action: "fx-on-off", deck: null, type: "note", description: "FX On/Off (CH2 mode)" },
+        { status: 0x94, midino: 0x43, action: "fx-disable-all", deck: null, type: "note", description: "FX Disable All (Shift)" },
         { status: 0xB4, midino: 0x02, action: "fx-level", deck: null, type: "cc", description: "FX Level/Depth" },
+        // Beat FX channel routing (which deck the FX bus targets)
+        { status: 0x94, midino: 0x10, action: "fx-channel-1", deck: null, type: "note", description: "FX Channel: Deck A" },
+        { status: 0x95, midino: 0x11, action: "fx-channel-2", deck: null, type: "note", description: "FX Channel: Deck B" },
+        // Beat FX < / > (cycle FX unit / beats)
+        { status: 0x94, midino: 0x4A, action: "fx-beats-down", deck: null, type: "note", description: "FX Beats / Prev Unit" },
+        { status: 0x94, midino: 0x4B, action: "fx-beats-up", deck: null, type: "note", description: "FX Beats / Next Unit" },
+
+        // ── Quantize toggle (Shift + Cue, per deck) ─────────────
+        { status: 0x90, midino: 0x68, action: "quantize", deck: "A", type: "note", description: "Toggle Quantize" },
+        { status: 0x91, midino: 0x68, action: "quantize", deck: "B", type: "note", description: "Toggle Quantize" },
+
+        // ── Censor / Reverse Roll (Shift + Play) ────────────────
+        { status: 0x90, midino: 0x0E, action: "censor", deck: "A", type: "note", description: "Reverse Roll (Censor)" },
+        { status: 0x91, midino: 0x0E, action: "censor", deck: "B", type: "note", description: "Reverse Roll (Censor)" },
 
         // ── BROWSER / LOAD ──────────────────────────
         // Browse encoder (rotate & press)

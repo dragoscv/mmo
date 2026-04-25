@@ -5,12 +5,14 @@ import { useDAW } from "./daw-context";
 import { cn } from "@/lib/utils";
 import type { SynthConfig, SynthOscillator } from "@/lib/daw-engine";
 import { useScrollAdjust } from "./daw-ui-utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 
 const OSC_TYPES: OscillatorType[] = ["sine", "triangle", "sawtooth", "square"];
 const FILTER_TYPES: BiquadFilterType[] = ["lowpass", "highpass", "bandpass", "notch"];
 const LFO_TARGETS = ["pitch", "filter", "amp"] as const;
 
 export function DAWSynthesizer() {
+    useRenderCount("DAWSynthesizer");
     const daw = useDAW();
     const config = daw.synthConfig;
     const [activeKeys, setActiveKeys] = useState<Set<number>>(new Set());
@@ -69,10 +71,10 @@ export function DAWSynthesizer() {
                 <span className="text-[9px] text-white/20 ml-auto">Use Z-M and Q-U keys to play</span>
             </div>
 
-            {/* Main synth panel */}
-            <div className="flex-1 flex overflow-hidden">
+            {/* Main synth panel — scrolls horizontally on mobile so all sections stay reachable */}
+            <div className="flex-1 flex overflow-x-auto overflow-y-hidden">
                 {/* Oscillators */}
-                <div className="flex-1 p-2 border-r border-white/5">
+                <div className="flex-shrink-0 w-[280px] sm:flex-1 sm:w-auto p-2 border-r border-white/5">
                     <SectionLabel>Oscillators</SectionLabel>
                     <div className="flex gap-3 mt-1">
                         {([0, 1, 2] as const).map(i => {
@@ -143,7 +145,7 @@ export function DAWSynthesizer() {
                 </div>
 
                 {/* Filter */}
-                <div className="w-[140px] p-2 border-r border-white/5">
+                <div className="w-[140px] flex-shrink-0 p-2 border-r border-white/5">
                     <SectionLabel>Filter</SectionLabel>
                     <div className="flex gap-0.5 mb-2 mt-1">
                         {FILTER_TYPES.map(type => (
@@ -169,7 +171,7 @@ export function DAWSynthesizer() {
                 </div>
 
                 {/* ADSR */}
-                <div className="w-[160px] p-2 border-r border-white/5">
+                <div className="w-[160px] flex-shrink-0 p-2 border-r border-white/5">
                     <SectionLabel>Amp Envelope (ADSR)</SectionLabel>
                     <div className="mt-1">
                         <ADSRDisplay a={config.ampAttack} d={config.ampDecay} s={config.ampSustain} r={config.ampRelease} />
@@ -188,7 +190,7 @@ export function DAWSynthesizer() {
                 </div>
 
                 {/* LFO */}
-                <div className="w-[130px] p-2">
+                <div className="w-[130px] flex-shrink-0 p-2">
                     <SectionLabel>LFO</SectionLabel>
                     <div className="flex gap-0.5 mb-2 mt-1">
                         {OSC_TYPES.map(type => (
@@ -258,9 +260,11 @@ export function DAWSynthesizer() {
                                     "h-[60%] w-[12px] -mx-[6px] z-10 rounded-b-sm cursor-pointer transition-all",
                                     isActive ? "bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "bg-[var(--daw-surface)] hover:bg-[var(--daw-surface-2)]"
                                 )}
-                                onMouseDown={onDown}
-                                onMouseUp={onUp}
-                                onMouseLeave={onLeave}
+                                style={{ touchAction: "none" }}
+                                onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); onDown(); }}
+                                onPointerUp={onUp}
+                                onPointerCancel={onUp}
+                                onPointerLeave={onLeave}
                             />
                         );
                     }
@@ -273,9 +277,11 @@ export function DAWSynthesizer() {
                                 isActive ? "bg-purple-500/30" : "bg-[#22223a] hover:bg-[#2a2a40]",
                                 pitch % 12 === 0 && "border-l border-l-white/20"
                             )}
-                            onMouseDown={onDown}
-                            onMouseUp={onUp}
-                            onMouseLeave={onLeave}
+                            style={{ touchAction: "none" }}
+                            onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); onDown(); }}
+                            onPointerUp={onUp}
+                            onPointerCancel={onUp}
+                            onPointerLeave={onLeave}
                         >
                             {pitch % 12 === 0 && (
                                 <span className="text-[7px] text-white/20">C{Math.floor(pitch / 12) - 1}</span>

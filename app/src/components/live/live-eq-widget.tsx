@@ -19,8 +19,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLive } from "./live-context";
+import { subscribeRaf, getSharedFrequencyData } from "@/lib/raf-scheduler";
 import { cn } from "@/lib/utils";
-import { Power, Settings2, RotateCcw, Sliders, ChevronRight, ChevronDown } from "lucide-react";
+import { useRenderCount } from "@/lib/dev-debugger";
+import { Power, Settings2, RotateCcw, Sliders, ChevronRight, ChevronDown, BarChart3 } from "lucide-react";
 import type { FxInsert } from "@/lib/audio-fx-engine";
 import { FX_DEFAULTS } from "@/lib/audio-fx-engine";
 import { useLiveSettings } from "@/hooks/use-live-settings";
@@ -269,6 +271,8 @@ interface EqCanvasProps {
     /** AnalyserNode to draw spectrum from (master fft). May be null. */
     analyser: AnalyserNode | null;
     sampleRate: number;
+    /** Number of vertical spectrum bars (16..192). */
+    spectrumBars: number;
     /** Called when a band's freq/gain is dragged. */
     onBandChange: (idx: number, patch: Partial<Pick<Band, "freq" | "gain" | "q">>) => void;
     /** Selected band index (drives knob color highlight). */
@@ -283,7 +287,7 @@ interface EqCanvasProps {
     onRemoveBand: ((idx: number) => void) | null;
 }
 
-function EqCanvas({ bands, enabled, accent, analyser, sampleRate, onBandChange, selectedBand, onSelectBand, onAddBand, onRemoveBand }: EqCanvasProps) {
+function EqCanvas({ bands, enabled, accent, analyser, sampleRate, spectrumBars, onBandChange, selectedBand, onSelectBand, onAddBand, onRemoveBand }: EqCanvasProps) {
     const wrapRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sizeRef = useRef({ w: 0, h: 0 });
@@ -292,10 +296,12 @@ function EqCanvas({ bands, enabled, accent, analyser, sampleRate, onBandChange, 
     const enabledRef = useRef(enabled);
     const accentRef = useRef(accent);
     const selRef = useRef(selectedBand);
+    const spectrumBarsRef = useRef(spectrumBars);
     bandsRef.current = bands;
     enabledRef.current = enabled;
     accentRef.current = accent;
     selRef.current = selectedBand;
+    spectrumBarsRef.current = spectrumBars;
 
     // Smoothed spectrum buffer for nicer animation.
     const spectrumSmoothRef = useRef<Float32Array | null>(null);
@@ -327,16 +333,12 @@ function EqCanvas({ bands, enabled, accent, analyser, sampleRate, onBandChange, 
         if (!canvas) return;
         const ctx2 = canvas.getContext("2d");
         if (!ctx2) return;
-        let raf = 0;
         let alive = true;
 
         const draw = () => {
             if (!alive) return;
             const { w, h } = sizeRef.current;
-            if (w === 0 || h === 0) {
-                raf = requestAnimationFrame(draw);
-                return;
-            }
+            if (w === 0 || h === 0) return;
             const padL = 28, padR = 8, padT = 8, padB = 16;
             const innerW = Math.max(1, w - padL - padR);
             const innerH = Math.max(1, h - padT - padB);
@@ -390,11 +392,10 @@ function EqCanvas({ bands, enabled, accent, analyser, sampleRate, onBandChange, 
                 ctx2.fillText(label, x, padT + innerH + 2);
             }
 
-            // ── Spectrum (background fill)
+            // ── Spectrum (background bars, log-frequency)
             if (analyser) {
-                const bins = analyser.frequencyBinCount;
-                const buf = new Uint8Array(new ArrayBuffer(bins));
-                analyser.getByteFrequencyData(buf);
+                const buf = getSharedFrequencyData(analyser);
+                const bins = buf.length;
                 if (!spectrumSmoothRef.current || spectrumSmoothRef.current.length !== bins) {
                     spectrumSmoothRef.current = new Float32Array(bins);
                 }
@@ -404,27 +405,33 @@ function EqCanvas({ bands, enabled, accent, analyser, sampleRate, onBandChange, 
                     const target = buf[i] / 255;
                     smooth[i] = target > smooth[i] ? smooth[i] * 0.5 + target * 0.5 : smooth[i] * 0.85 + target * 0.15;
                 }
-                // Build path along log frequency
-                ctx2.beginPath();
-                ctx2.moveTo(padL, padT + innerH);
-                const N = 96;
-                for (let i = 0; i <= N; i++) {
-                    const xn = i / N;
-                    const f = xToFreq(xn);
-                    const bin = Math.min(bins - 1, Math.max(0, Math.round((f / (sampleRate / 2)) * bins)));
-                    const v = smooth[bin] || 0;
-                    const x = padL + xn * innerW;
-                    const y = padT + innerH - v * innerH * 0.85;
-                    ctx2.lineTo(x, y);
-                }
-                ctx2.lineTo(padL + innerW, padT + innerH);
-                ctx2.closePath();
+                // Discrete vertical bars across the log frequency axis. Each bar
+                // averages the FFT bins inside its own log-freq slice.
+                const N = Math.max(8, Math.min(192, Math.round(spectrumBarsRef.current)));
+                const gap = N <= 32 ? 2 : N <= 64 ? 1.5 : 1;
+                const slotW = innerW / N;
+                const barW = Math.max(1, slotW - gap);
                 const grad = ctx2.createLinearGradient(0, padT, 0, padT + innerH);
                 grad.addColorStop(0, accentRef.current + "55");
                 grad.addColorStop(0.5, accentRef.current + "20");
                 grad.addColorStop(1, accentRef.current + "08");
                 ctx2.fillStyle = grad;
-                ctx2.fill();
+                for (let i = 0; i < N; i++) {
+                    const xn0 = i / N;
+                    const xn1 = (i + 1) / N;
+                    const f0 = xToFreq(xn0);
+                    const f1 = xToFreq(xn1);
+                    const b0 = Math.min(bins - 1, Math.max(0, Math.round((f0 / (sampleRate / 2)) * bins)));
+                    const b1 = Math.min(bins - 1, Math.max(b0, Math.round((f1 / (sampleRate / 2)) * bins)));
+                    let acc = 0;
+                    let count = 0;
+                    for (let b = b0; b <= b1; b++) { acc += smooth[b] || 0; count++; }
+                    const v = count > 0 ? acc / count : 0;
+                    const bh = v * innerH * 0.85;
+                    const x = padL + xn0 * innerW + gap / 2;
+                    const y = padT + innerH - bh;
+                    ctx2.fillRect(x, y, barW, bh);
+                }
             }
 
             // ── EQ response curve
@@ -499,22 +506,27 @@ function EqCanvas({ bands, enabled, accent, analyser, sampleRate, onBandChange, 
                 ctx2.fillText(b.label, x, y - r - 3);
             }
 
-            raf = requestAnimationFrame(draw);
         };
-        raf = requestAnimationFrame(draw);
+
+        // 30 fps is plenty for an EQ spectrum overlay; pause when tab is hidden.
+        let unsub: (() => void) | null = null;
+        const start = () => {
+            if (unsub) return;
+            unsub = subscribeRaf(draw, { fps: 30 });
+        };
+        const stop = () => {
+            if (unsub) { unsub(); unsub = null; }
+        };
+        start();
 
         const onVis = () => {
-            if (document.hidden) {
-                cancelAnimationFrame(raf);
-            } else {
-                raf = requestAnimationFrame(draw);
-            }
+            if (document.hidden) stop(); else start();
         };
         document.addEventListener("visibilitychange", onVis);
 
         return () => {
             alive = false;
-            cancelAnimationFrame(raf);
+            stop();
             document.removeEventListener("visibilitychange", onVis);
         };
     }, [analyser, sampleRate]);
@@ -663,6 +675,7 @@ interface Props {
 }
 
 export function LiveEqWidget({ className }: Props) {
+    useRenderCount("LiveEqWidget");
     const live = useLive();
     const settings = useLiveSettings();
     const accent = ACCENT_COLORS[settings.accent] ?? ACCENT_COLORS.rose;
@@ -698,6 +711,19 @@ export function LiveEqWidget({ className }: Props) {
     const enabled = hasEq && eqInserts.every(i => i.enabled);
     const bands = bandsFromInserts(eqInserts, mode);
     const [selectedBand, setSelectedBand] = useState(0);
+
+    // Number of vertical spectrum bars in the EQ canvas (16..192). Persisted.
+    const [spectrumBars, setSpectrumBars] = useState<number>(() => {
+        try {
+            const raw = localStorage.getItem("live-eq-spectrum-bars");
+            const n = raw ? parseInt(raw, 10) : NaN;
+            if (Number.isFinite(n)) return Math.max(16, Math.min(192, n));
+        } catch { /* ignore */ }
+        return 64;
+    });
+    useEffect(() => {
+        try { localStorage.setItem("live-eq-spectrum-bars", String(spectrumBars)); } catch { /* ignore */ }
+    }, [spectrumBars]);
 
     const sampleRate = live.engine?.ctx.sampleRate ?? 48000;
     const analyser = live.engine?.masterAnalyser ?? null;
@@ -845,6 +871,23 @@ export function LiveEqWidget({ className }: Props) {
                 </span>
 
                 <div className="ml-auto flex items-center gap-1" data-no-drag>
+                    <div
+                        className="hidden md:flex items-center gap-1.5 px-1.5 py-0.5 rounded-md bg-black/40 border border-white/[0.06]"
+                        title={`Spectrum bars: ${spectrumBars}`}
+                    >
+                        <BarChart3 className="w-3 h-3 text-white/40" />
+                        <input
+                            type="range"
+                            min={16}
+                            max={192}
+                            step={4}
+                            value={spectrumBars}
+                            onChange={e => setSpectrumBars(parseInt(e.target.value, 10))}
+                            className="w-16 accent-white/70 cursor-pointer"
+                            aria-label="Spectrum bar count"
+                        />
+                        <span className="text-[9px] text-white/50 tabular-nums w-6 text-right">{spectrumBars}</span>
+                    </div>
                     {/* Mode switcher */}
                     <div className="flex bg-black/40 rounded-lg p-0.5 border border-white/[0.06]">
                         <button onClick={() => handleModeSwitch("simple")}
@@ -889,52 +932,53 @@ export function LiveEqWidget({ className }: Props) {
             </div>
 
             {!slot?.collapsed && (
-            <>
-            {/* Canvas */}
-            <div className="flex-1 min-h-[120px] p-2">
-                <EqCanvas
-                    bands={bands}
-                    enabled={enabled}
-                    accent={accent}
-                    analyser={analyser}
-                    sampleRate={sampleRate}
-                    onBandChange={handleBandChange}
-                    selectedBand={selectedBand}
-                    onSelectBand={setSelectedBand}
-                    onAddBand={mode === "advanced" ? handleAddBand : null}
-                    onRemoveBand={mode === "advanced" ? handleRemoveBand : null}
-                />
-            </div>
+                <>
+                    {/* Canvas */}
+                    <div className="flex-1 min-h-[120px] p-2">
+                        <EqCanvas
+                            bands={bands}
+                            enabled={enabled}
+                            accent={accent}
+                            analyser={analyser}
+                            sampleRate={sampleRate}
+                            spectrumBars={spectrumBars}
+                            onBandChange={handleBandChange}
+                            selectedBand={selectedBand}
+                            onSelectBand={setSelectedBand}
+                            onAddBand={mode === "advanced" ? handleAddBand : null}
+                            onRemoveBand={mode === "advanced" ? handleRemoveBand : null}
+                        />
+                    </div>
 
-            {/* Knobs row */}
-            <div className="px-3 pb-3">
-                {mode === "simple" ? (
-                    <SimpleKnobs bands={bands} onChange={handleBandChange} accent={accent} disabled={!enabled} />
-                ) : (
-                    <AdvancedKnobs
-                        bands={bands}
-                        onChange={handleBandChange}
-                        selectedBand={selectedBand}
-                        onSelectBand={setSelectedBand}
-                        accent={accent}
-                        disabled={!enabled}
-                    />
-                )}
-                <div className="mt-1 flex items-center gap-2 text-[8.5px] text-white/25">
-                    <ChevronRight className="w-2.5 h-2.5" />
-                    <span>
-                        {mode === "advanced"
-                            ? `Drag points • Shift+drag = Q • Wheel = Q • Right-click empty = add band (max ${MAX_BANDS}) • Right-click band = remove (min ${MIN_BANDS})`
-                            : "Drag points on the curve. Shift+drag adjusts Q. Wheel over a point also tweaks Q."}
-                    </span>
-                    {hasEq && (
-                        <button onClick={handleRemove} className="ml-auto text-white/30 hover:text-red-400/70 cursor-pointer text-[9px]">
-                            Remove from chain
-                        </button>
-                    )}
-                </div>
-            </div>
-            </>
+                    {/* Knobs row */}
+                    <div className="px-3 pb-3">
+                        {mode === "simple" ? (
+                            <SimpleKnobs bands={bands} onChange={handleBandChange} accent={accent} disabled={!enabled} />
+                        ) : (
+                            <AdvancedKnobs
+                                bands={bands}
+                                onChange={handleBandChange}
+                                selectedBand={selectedBand}
+                                onSelectBand={setSelectedBand}
+                                accent={accent}
+                                disabled={!enabled}
+                            />
+                        )}
+                        <div className="mt-1 flex items-center gap-2 text-[8.5px] text-white/25">
+                            <ChevronRight className="w-2.5 h-2.5" />
+                            <span>
+                                {mode === "advanced"
+                                    ? `Drag points • Shift+drag = Q • Wheel = Q • Right-click empty = add band (max ${MAX_BANDS}) • Right-click band = remove (min ${MIN_BANDS})`
+                                    : "Drag points on the curve. Shift+drag adjusts Q. Wheel over a point also tweaks Q."}
+                            </span>
+                            {hasEq && (
+                                <button onClick={handleRemove} className="ml-auto text-white/30 hover:text-red-400/70 cursor-pointer text-[9px]">
+                                    Remove from chain
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </>
             )}
         </div>
     );

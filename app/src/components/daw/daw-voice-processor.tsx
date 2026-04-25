@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import {
     Mic, MicOff, Volume2, VolumeX, Settings2, ChevronDown, Plus, Trash2,
     Power, GripVertical, Save, FolderOpen, RotateCcw, Music, Activity,
-    Gauge, Radio, Waves, Zap, Loader2, Sparkles,
+    Gauge, Radio, Waves, Zap, Loader2, Sparkles, Wand2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -279,6 +279,25 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
     const [selectedKey, setSelectedKey] = useState(0);                      // 0=C .. 11=B
     const [selectedQuality, setSelectedQuality] = useState<"major" | "minor">("major");
     const [selectedScale, setSelectedScale] = useState(1);                  // index in MUSICAL_SCALES
+    // Auto-correct toggle: when on, we ensure an `autotune` insert is part of
+    // the FX chain and the metering loop continuously updates its pitch ratio
+    // so the detected note is snapped to the nearest in-scale note.
+    const [autoCorrectOn, setAutoCorrectOn] = useState<boolean>(() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem("mmo-voice-autocorrect") === "1";
+    });
+    const [autoCorrectAmount, setAutoCorrectAmount] = useState<number>(() => {
+        if (typeof window === "undefined") return 1;
+        const raw = localStorage.getItem("mmo-voice-autocorrect-amount");
+        const n = raw ? parseFloat(raw) : NaN;
+        return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 1;
+    });
+    const [autoCorrectSpeed, setAutoCorrectSpeed] = useState<number>(() => {
+        if (typeof window === "undefined") return 0.05;
+        const raw = localStorage.getItem("mmo-voice-autocorrect-speed");
+        const n = raw ? parseFloat(raw) : NaN;
+        return Number.isFinite(n) ? Math.max(0.005, Math.min(0.5, n)) : 0.05;
+    });
     const [recommendations, setRecommendations] = useState<Recommendation[]>([
         { type: "info", text: "Press the microphone button to start. Select your key and scale for personalized guidance." },
     ]);
@@ -291,6 +310,14 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
     meterRef.current = meter;
     const noteNotationsRef = useRef(noteNotations);
     noteNotationsRef.current = noteNotations;
+
+    // Auto-correct refs (for the rAF loop, which can't depend on render-time
+    // state without re-subscribing every frame).
+    const autoCorrectOnRef = useRef(false);
+    const autoCorrectSpeedRef = useRef(0.05);
+    const autotuneInsertIdRef = useRef<string | null>(null);
+    autoCorrectOnRef.current = autoCorrectOn;
+    autoCorrectSpeedRef.current = autoCorrectSpeed;
 
     // ─── Init Engine ─────────────────────────────────────────────────
 
@@ -332,6 +359,64 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
         }
     }, [monitorEnabled, destinationNode]);
 
+    // ─── Auto-correct: ensure an `autotune` insert is in the chain ───
+    // Adds / removes / updates a single managed autotune insert based on the
+    // toggle. The insert ID is tracked in a ref so the metering loop can push
+    // live pitch corrections to it via the worklet node.
+    useEffect(() => {
+        try {
+            localStorage.setItem("mmo-voice-autocorrect", autoCorrectOn ? "1" : "0");
+            localStorage.setItem("mmo-voice-autocorrect-amount", String(autoCorrectAmount));
+            localStorage.setItem("mmo-voice-autocorrect-speed", String(autoCorrectSpeed));
+            window.dispatchEvent(new Event("mmo-preference-changed"));
+        } catch { /* */ }
+
+        const engine = engineRef.current;
+        if (!engine) return;
+
+        // Make sure the worklet is loaded so the insert actually shifts.
+        void engine.ensurePitchWorkletLoaded();
+
+        const existingIdx = chain.findIndex((i) => i.id === autotuneInsertIdRef.current);
+
+        if (autoCorrectOn) {
+            const params = {
+                speed: autoCorrectSpeed,
+                amount: autoCorrectAmount,
+                key: selectedKey,
+                scale: selectedScale,
+            };
+            if (existingIdx >= 0) {
+                const next = chain.map((ins, i) =>
+                    i === existingIdx ? { ...ins, enabled: true, params: { ...ins.params, ...params } } : ins,
+                );
+                setChain(next);
+                engine.setChain(next);
+            } else {
+                const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                autotuneInsertIdRef.current = id;
+                const insert: FxInsert = {
+                    id,
+                    type: "autotune",
+                    enabled: true,
+                    params: { ...FX_DEFAULTS.autotune, ...params },
+                };
+                const next = [...chain, insert];
+                setChain(next);
+                engine.setChain(next);
+            }
+        } else if (existingIdx >= 0) {
+            // Toggle the managed insert off (keep it in the chain so the user
+            // can still find it under FX, but disabled).
+            const next = chain.map((ins, i) =>
+                i === existingIdx ? { ...ins, enabled: false } : ins,
+            );
+            setChain(next);
+            engine.setChain(next);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoCorrectOn, autoCorrectAmount, autoCorrectSpeed, selectedKey, selectedScale]);
+
     // ─── Metering Loop ───────────────────────────────────────────────
 
     useEffect(() => {
@@ -344,6 +429,57 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
             if (!running) return;
             const data = engine.getMeterData();
             setMeter(data);
+
+            // ── Auto-correct: snap detected pitch to nearest in-scale note
+            // by setting the pitch-shifter worklet's pitchRatio. The shifter
+            // smooths the parameter via setTargetAtTime so a fast `speed`
+            // value gives hard "T-Pain" snap, slow values give natural drift.
+            if (autoCorrectOnRef.current && autotuneInsertIdRef.current) {
+                const node = engine.getPitchShifterNode(autotuneInsertIdRef.current);
+                if (node) {
+                    const ratioParam = node.parameters.get("pitchRatio");
+                    if (ratioParam) {
+                        const p = data.pitch;
+                        let ratio = 1;
+                        if (p.confidence > 0.5 && p.frequency > 0) {
+                            const detectedMidi =
+                                12 * Math.log2(p.frequency / 440) + 69; // float
+                            const pc = ((Math.round(detectedMidi) % 12) + 12) % 12;
+                            const scaleNotes = getScaleNotes(
+                                selectedKeyRef.current,
+                                selectedScaleRef.current,
+                            );
+                            // Find the in-scale note nearest to the detected
+                            // float MIDI (handles the "between notes" case).
+                            let bestMidi = Math.round(detectedMidi);
+                            if (!scaleNotes.has(pc)) {
+                                let bestDelta = Infinity;
+                                for (let off = 1; off <= 6; off++) {
+                                    const up = ((pc + off) % 12 + 12) % 12;
+                                    const down = (((pc - off) % 12) + 12) % 12;
+                                    if (scaleNotes.has(up)) {
+                                        const cand = Math.round(detectedMidi) + off;
+                                        const d = Math.abs(cand - detectedMidi);
+                                        if (d < bestDelta) { bestDelta = d; bestMidi = cand; }
+                                    }
+                                    if (scaleNotes.has(down)) {
+                                        const cand = Math.round(detectedMidi) - off;
+                                        const d = Math.abs(cand - detectedMidi);
+                                        if (d < bestDelta) { bestDelta = d; bestMidi = cand; }
+                                    }
+                                    if (bestDelta < Infinity && off >= 2) break;
+                                }
+                            }
+                            const semis = bestMidi - detectedMidi;
+                            ratio = Math.pow(2, semis / 12);
+                            // Clamp to worklet's parameter range.
+                            ratio = Math.max(0.5, Math.min(2, ratio));
+                        }
+                        const tau = Math.max(0.005, autoCorrectSpeedRef.current);
+                        ratioParam.setTargetAtTime(ratio, engine.audioContext.currentTime, tau);
+                    }
+                }
+            }
 
             // Track pitch history (last 60 values)
             if (data.pitch.confidence > 0.5) {
@@ -888,17 +1024,69 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
 
                 {/* Musical Key & Scale Selection */}
                 <div className="px-3 pb-2">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-2 gap-2">
                         <span className="text-[9px] text-white/30 uppercase tracking-wider flex items-center gap-1">
                             <Music className="w-3 h-3" /> Musical Key
                         </span>
-                        <button
-                            onClick={handleAutoDetect}
-                            className="flex items-center gap-1 h-5 px-2 text-[9px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300/80 rounded-full hover:from-purple-500/30 hover:to-pink-500/30 transition-all border border-purple-500/20 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)]"
-                        >
-                            <Sparkles className="w-3 h-3" /> Auto
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                onClick={() => setAutoCorrectOn((v) => !v)}
+                                title={
+                                    autoCorrectOn
+                                        ? `Auto-correct ON — snapping to ${MUSICAL_SCALES[selectedScale]?.name ?? "selected"} scale`
+                                        : "Snap detected pitch to the nearest note in the selected scale"
+                                }
+                                className={cn(
+                                    "flex items-center gap-1 h-5 px-2 text-[9px] rounded-full transition-all border",
+                                    autoCorrectOn
+                                        ? "bg-emerald-500/25 text-emerald-200 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+                                        : "bg-white/[0.04] text-white/45 border-white/10 hover:text-white/80 hover:bg-white/[0.08]",
+                                )}
+                            >
+                                <Wand2 className="w-3 h-3" />
+                                {autoCorrectOn ? "Auto-correct ON" : "Auto-correct"}
+                            </button>
+                            <button
+                                onClick={handleAutoDetect}
+                                className="flex items-center gap-1 h-5 px-2 text-[9px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300/80 rounded-full hover:from-purple-500/30 hover:to-pink-500/30 transition-all border border-purple-500/20 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)]"
+                            >
+                                <Sparkles className="w-3 h-3" /> Auto
+                            </button>
+                        </div>
                     </div>
+
+                    {autoCorrectOn && (
+                        <div className="mb-2 rounded-md border border-emerald-500/15 bg-emerald-500/[0.04] p-2 space-y-1.5">
+                            <div className="flex items-center justify-between text-[9px] text-emerald-300/80">
+                                <span className="uppercase tracking-wider">Speed</span>
+                                <span className="tabular-nums">
+                                    {autoCorrectSpeed < 0.02 ? "Hard snap" : autoCorrectSpeed < 0.1 ? "Fast" : autoCorrectSpeed < 0.25 ? "Natural" : "Slow"}
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min={0.005}
+                                max={0.5}
+                                step={0.005}
+                                value={autoCorrectSpeed}
+                                onChange={(e) => setAutoCorrectSpeed(parseFloat(e.target.value))}
+                                className="w-full accent-emerald-400"
+                            />
+                            <div className="flex items-center justify-between text-[9px] text-emerald-300/80">
+                                <span className="uppercase tracking-wider">Amount</span>
+                                <span className="tabular-nums">{Math.round(autoCorrectAmount * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min={0}
+                                max={1}
+                                step={0.01}
+                                value={autoCorrectAmount}
+                                onChange={(e) => setAutoCorrectAmount(parseFloat(e.target.value))}
+                                className="w-full accent-emerald-400"
+                            />
+                        </div>
+                    )}
 
                     {/* Key buttons */}
                     <div className="grid grid-cols-12 gap-0.5 mb-2">
@@ -1233,11 +1421,11 @@ function AddEffectMenu({ onAdd, onClose, anchorRef }: { onAdd: (type: FxType) =>
     const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
     useEffect(() => {
-        const handler = (e: MouseEvent) => {
+        const handler = (e: PointerEvent) => {
             if (ref.current && !ref.current.contains(e.target as Node)) onClose();
         };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
+        document.addEventListener("pointerdown", handler);
+        return () => document.removeEventListener("pointerdown", handler);
     }, [onClose]);
 
     useEffect(() => {
@@ -1283,11 +1471,11 @@ function PresetMenu({ presets, selectedId, onSelect, onClose, anchorRef }: {
     const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
     useEffect(() => {
-        const handler = (e: MouseEvent) => {
+        const handler = (e: PointerEvent) => {
             if (ref.current && !ref.current.contains(e.target as Node)) onClose();
         };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
+        document.addEventListener("pointerdown", handler);
+        return () => document.removeEventListener("pointerdown", handler);
     }, [onClose]);
 
     useEffect(() => {
@@ -1373,14 +1561,14 @@ function DropdownSelect({ value, onChange, options, className, placeholder }: {
 
     useEffect(() => {
         if (!open) return;
-        const handler = (e: MouseEvent) => {
+        const handler = (e: PointerEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
                 btnRef.current && !btnRef.current.contains(e.target as Node)) {
                 setOpen(false);
             }
         };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
+        document.addEventListener("pointerdown", handler);
+        return () => document.removeEventListener("pointerdown", handler);
     }, [open]);
 
     useEffect(() => {

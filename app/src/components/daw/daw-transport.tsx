@@ -6,11 +6,13 @@ import {
     Repeat, LayoutGrid, ListMusic,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRenderCount } from "@/lib/dev-debugger";
 import { useScrollAdjust } from "./daw-ui-utils";
 import { useContextMenu, type MenuEntry } from "./daw-context-menu";
 import { useCallback } from "react";
 
 export function DAWTransport() {
+    useRenderCount("DAWTransport");
     const daw = useDAW();
     const ctxMenu = useContextMenu();
 
@@ -44,10 +46,14 @@ export function DAWTransport() {
     const tick = Math.floor((beats % 1) * 960);
 
     return (
-        <div className="h-12 bg-[var(--daw-bg)] border-b border-[var(--daw-border)] flex items-center px-3 gap-3 daw-animate-in daw-stagger-1" onContextMenu={handleTransportContextMenu}>
+        <div
+            className="h-12 bg-[var(--daw-bg)] border-b border-[var(--daw-border)] flex items-stretch overflow-hidden daw-animate-in daw-stagger-1"
+            onContextMenu={handleTransportContextMenu}
+        >
+            <div className="daw-scroll-x daw-scroll-x-fade flex-1 flex items-center px-2 sm:px-3 gap-2 sm:gap-3 [&>*]:shrink-0">
             {/* Position display */}
-            <div className="flex items-center bg-[var(--daw-surface)] rounded-lg px-3 py-1.5 gap-0.5 font-mono min-w-[150px] border border-[var(--daw-border)]">
-                <span className="text-[9px] text-[var(--daw-text-dim)] mr-1.5 uppercase tracking-widest">Pos</span>
+            <div className="flex items-center bg-[var(--daw-surface)] rounded-lg px-2 sm:px-3 py-1.5 gap-0.5 font-mono min-w-[130px] sm:min-w-[150px] border border-[var(--daw-border)]">
+                <span className="hidden sm:inline text-[9px] text-[var(--daw-text-dim)] mr-1.5 uppercase tracking-widest">Pos</span>
                 <span className="text-lg font-bold text-[var(--daw-green)] tabular-nums leading-none">{bar}</span>
                 <span className="text-[var(--daw-text-dim)] mx-0.5 text-sm">·</span>
                 <span className="text-lg font-bold text-[var(--daw-green)] tabular-nums leading-none">{beat}</span>
@@ -80,7 +86,7 @@ export function DAWTransport() {
 
             {/* Tempo */}
             <div className="flex items-center gap-1.5">
-                <span className="text-[9px] text-[var(--daw-text-dim)] uppercase tracking-widest">BPM</span>
+                <span className="hidden sm:inline text-[9px] text-[var(--daw-text-dim)] uppercase tracking-widest">BPM</span>
                 <input
                     type="number"
                     min={20}
@@ -93,7 +99,7 @@ export function DAWTransport() {
             </div>
 
             {/* Time signature */}
-            <div className="flex items-center gap-1">
+            <div className="hidden sm:flex items-center gap-1">
                 <select
                     value={daw.project.timeSignature.numerator}
                     onChange={e => daw.setTimeSignature(Number(e.target.value), daw.project.timeSignature.denominator)}
@@ -176,11 +182,11 @@ export function DAWTransport() {
                 </button>
             </div>
 
-            <div className="flex-1" />
+            <div className="flex-1 min-w-2" />
 
             {/* Master level meters + volume */}
-            <div className="flex items-center gap-2 bg-[var(--daw-surface)] rounded-lg px-3 py-1.5 border border-[var(--daw-border)]">
-                <span className="text-[9px] text-[var(--daw-text-dim)] uppercase tracking-widest">Master</span>
+            <div className="flex items-center gap-2 bg-[var(--daw-surface)] rounded-lg px-2 sm:px-3 py-1.5 border border-[var(--daw-border)]">
+                <span className="hidden md:inline text-[9px] text-[var(--daw-text-dim)] uppercase tracking-widest">Master</span>
                 <div className="flex gap-0.5">
                     <MeterBar value={daw.masterPeakL} />
                     <MeterBar value={daw.masterPeakR} />
@@ -193,11 +199,12 @@ export function DAWTransport() {
                     step={0.01}
                     value={daw.project.masterTrack.volume}
                     onChange={e => daw.setMasterVolume(Number(e.target.value))}
-                    className="daw-slider daw-slider-accent w-16"
+                    className="daw-slider daw-slider-accent w-12 sm:w-16"
                 />
                 <span className="text-[10px] text-[var(--daw-text-dim)] w-8 text-right font-mono tabular-nums">
                     {(daw.project.masterTrack.volume * 100).toFixed(0)}%
                 </span>
+            </div>
             </div>
         </div>
     );

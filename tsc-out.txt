@@ -1,0 +1,13 @@
+src/components/daw/daw-voice-processor.tsx(855,17): error TS2322: Type '(type: FxType) => void' is not assignable to type '(type: string) => void'.
+  Types of parameters 'type' and 'type' are incompatible.
+    Type 'string' is not assignable to type 'FxType'.
+src/components/remote/use-remote-editor-host.ts(72,52): error TS2345: Argument of type '"select" | "draw" | "fade" | "trim"' is not assignable to parameter of type 'EditorTool'.
+  Type '"draw"' is not assignable to type 'EditorTool'.
+src/components/remote/use-remote-mixer-host.ts(144,71): error TS2345: Argument of type 'string' is not assignable to parameter of type 'ColorFxType'.
+src/components/remote/use-remote-mixer-host.ts(146,61): error TS2345: Argument of type 'string' is not assignable to parameter of type 'BeatFxType'.
+src/components/remote/use-remote-mixer-host.ts(149,69): error TS2345: Argument of type 'string' is not assignable to parameter of type 'FilterType'.
+src/components/remote/use-remote-mixer-host.ts(164,63): error TS2345: Argument of type 'string' is not assignable to parameter of type 'PadMode'.
+src/components/remote/use-remote-mixer-host.ts(165,81): error TS2345: Argument of type 'string' is not assignable to parameter of type 'CrossfaderAssign'.
+src/components/remote/use-remote-mixer-host.ts(168,73): error TS2345: Argument of type 'string' is not assignable to parameter of type 'CrossfaderCurve'.
+src/components/remote/use-remote-mixer-host.ts(169,55): error TS2345: Argument of type 'string' is not assignable to parameter of type 'EQMode'.
+src/components/remote/use-remote-mixer-host.ts(171,59): error TS2345: Argument of type 'string' is not assignable to parameter of type 'DeckMode'.

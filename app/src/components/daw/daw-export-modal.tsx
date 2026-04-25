@@ -310,9 +310,9 @@ export function DAWExportModal() {
     if (!daw.showExportModal) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={handleClose}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4" onClick={handleClose}>
             <div
-                className="w-[560px] max-h-[90vh] bg-[var(--daw-bg)] border border-[var(--daw-border)] rounded-xl shadow-2xl flex flex-col overflow-hidden"
+                className="w-full max-w-[560px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] bg-[var(--daw-bg)] border border-[var(--daw-border)] rounded-xl shadow-2xl flex flex-col overflow-hidden"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
