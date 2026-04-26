@@ -286,3 +286,26 @@ export async function getDeviceTrackCount(deviceId: string): Promise<number> {
         .get();
     return result?.count || 0;
 }
+
+// ─── Local companion (for native low-latency audio) ────────────────────────
+//
+// Returns credentials for a companion running on localhost. The web app uses
+// these to drive the native audio engine (mic in -> DSP -> speakers out)
+// directly through the companion's HTTP+WS API, bypassing Web Audio for
+// the lowest possible round-trip latency.
+
+export async function getLocalCompanion(): Promise<{ apiUrl: string; token: string; deviceId: string } | null> {
+    const session = await auth();
+    if (!session?.user?.id) return null;
+
+    const localPrefixes = ["http://localhost:", "http://127.0.0.1:"];
+    const all = db
+        .select()
+        .from(devices)
+        .where(eq(devices.userId, session.user.id))
+        .all();
+    const local = all.find(d => d.apiUrl && localPrefixes.some(p => d.apiUrl!.startsWith(p)));
+    if (!local || !local.token || !local.apiUrl) return null;
+    return { apiUrl: local.apiUrl, token: local.token, deviceId: local.id };
+}
+

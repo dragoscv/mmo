@@ -3,3 +3,9 @@
 downloads/
 node_modules/
 /server/node_modules/
+
+# Build outputs
+/server/dist/
+/server/release/
+/app/.next/
+*.tsbuildinfo

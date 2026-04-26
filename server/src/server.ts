@@ -9,6 +9,14 @@ import { EventEmitter } from "node:events";
 import { WebSocketServer, WebSocket } from "ws";
 import { store, getSettings, updateSettings } from "./store";
 import { parseFile } from "music-metadata";
+import {
+    NativeAudioEngine,
+    listBackends,
+    listDevices,
+    type AudioBackend,
+    type EngineConfig,
+} from "./audio/native-engine";
+import type { ScaleConfig } from "./audio/pitch-dsp";
 
 const AUDIO_EXTENSIONS = new Set([
     ".mp3", ".flac", ".wav", ".aac", ".ogg", ".m4a", ".wma", ".aiff", ".aif", ".alac", ".opus",
@@ -31,6 +39,19 @@ let httpServer: http.Server | null = null;
 let wss: WebSocketServer | null = null;
 let serverPort = 17899;
 const wsClients = new Set<WebSocket>();
+
+// ─── Native Audio Engine (singleton) ─────────────────────────────────────────
+//
+// One process = one mic + one speakers. The engine is created lazily on
+// the first /audio/native/start request and torn down on /audio/native/stop
+// (or on process exit). All control flows through the HTTP API; the
+// realtime audio path lives entirely inside the engine's RtAudio thread.
+const nativeEngine = new NativeAudioEngine();
+let nativePitchUnsub: (() => void) | null = null;
+// Pitch is published over WS at most every PITCH_PUSH_MIN_MS to avoid
+// flooding the wire (the DSP fires onPitch every 2.67 ms = 374 Hz).
+const PITCH_PUSH_MIN_MS = 25;            // ~40 Hz throttled push
+let lastPitchPushAt = 0;
 
 // ─── Auth State Management ───────────────────────────────────────────────────
 
@@ -57,6 +78,107 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
         res.status(401).json({ error: "Unauthorized" });
         return;
     }
+    next();
+}
+
+// ─── Localhost-only middleware (no auth required) ────────────────────────────
+//
+// Used for the realtime audio routes (/audio/native/*). The threat model:
+//
+//   - The companion binds to 0.0.0.0 (so other devices on the LAN can use
+//     the music-library proxy), so a naive "no auth" route would let
+//     anyone on the network turn on the user's mic.
+//   - Random websites the user visits could try to hit
+//     http://localhost:17899/* via fetch from their browser. Browsers block
+//     that with CORS BUT only if we set the right headers — and DNS
+//     rebinding can defeat origin checks if Host isn't validated.
+//
+// Defense in depth:
+//
+//   1. Connection MUST come from a loopback address (127.0.0.1, ::1).
+//      Drops every LAN/internet attacker.
+//   2. Host header MUST be "localhost" or "127.0.0.1" (any port).
+//      Mitigates DNS rebinding (an attacker tricks the browser into
+//      resolving evil.com → 127.0.0.1 to bypass SOP).
+//   3. Origin header MUST be in the configured allowlist OR be a localhost
+//      origin. Configurable per-install in companion settings.
+//
+// If all three pass, the route is treated as authentic — no token needed.
+// This is what lets the web app's /live page Just Work after a fresh
+// companion install, with zero sign-in.
+
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+function isLoopbackAddress(addr: string | undefined): boolean {
+    if (!addr) return false;
+    // Express may report ::ffff:127.0.0.1 (IPv4-mapped IPv6), ::1, 127.0.0.1
+    return (
+        addr === "127.0.0.1" ||
+        addr === "::1" ||
+        addr === "::ffff:127.0.0.1" ||
+        addr.startsWith("127.")
+    );
+}
+
+function isAllowedOrigin(origin: string | undefined): boolean {
+    if (!origin) return true; // Same-origin requests have no Origin header
+    try {
+        const u = new URL(origin);
+        if (u.hostname === "localhost" || u.hostname === "127.0.0.1") return true;
+
+        // Allowlist from companion settings. Defaults to common dev + prod
+        // origins for the MMO web app. Users can extend this in settings.
+        const settings = getSettings();
+        const allowlist = settings.audioOriginAllowlist ?? [];
+        for (const pattern of allowlist) {
+            if (pattern === "*") return true;
+            if (pattern === origin) return true;
+            // Simple wildcard suffix support: "https://*.brivio.ro"
+            if (pattern.startsWith("https://*.") || pattern.startsWith("http://*.")) {
+                const proto = pattern.startsWith("https://") ? "https:" : "http:";
+                const suffix = pattern.slice(pattern.indexOf("*.") + 1); // ".brivio.ro"
+                if (u.protocol === proto && u.hostname.endsWith(suffix)) return true;
+            }
+        }
+        // Also allow the configured webAppUrl exactly (set during OAuth).
+        if (settings.webAppUrl) {
+            try {
+                const w = new URL(settings.webAppUrl);
+                if (u.origin === w.origin) return true;
+            } catch { /* malformed webAppUrl in store, ignore */ }
+        }
+        return false;
+    } catch {
+        return false;
+    }
+}
+
+function publicLocalhostMiddleware(
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+) {
+    // 1. Loopback only.
+    const remote = req.socket.remoteAddress ?? req.ip;
+    if (!isLoopbackAddress(remote)) {
+        res.status(403).json({ error: "Forbidden: non-loopback origin" });
+        return;
+    }
+
+    // 2. Host header check.
+    const host = (req.headers.host ?? "").split(":")[0];
+    if (!LOOPBACK_HOSTS.has(host)) {
+        res.status(403).json({ error: "Forbidden: invalid host" });
+        return;
+    }
+
+    // 3. Origin header check (mitigates same-host browser attacks).
+    const origin = req.headers.origin as string | undefined;
+    if (!isAllowedOrigin(origin)) {
+        res.status(403).json({ error: "Forbidden: origin not allowed" });
+        return;
+    }
+
     next();
 }
 
@@ -305,6 +427,123 @@ export async function startServer(): Promise<void> {
         res.json(results);
     });
 
+    // ─── Native low-latency audio engine ─────────────────────────────────
+    //
+    // These routes intentionally use `publicLocalhostMiddleware` instead of
+    // `authMiddleware`. Rationale: the /live page in the web app needs to
+    // discover the companion + drive realtime audio without forcing a
+    // sign-in. The middleware enforces loopback-only + Host check + Origin
+    // allowlist, which together provide equivalent (or stronger) security
+    // for what is fundamentally a localhost-only feature.
+
+    app.get("/audio/native/probe", publicLocalhostMiddleware, (_req, res) => {
+        // Cheap presence beacon — used by the web app to detect "is the
+        // companion installed and running?" without any credentials.
+        res.json({
+            ok: true,
+            product: "MMOCompanion",
+            version: "0.3.0",
+            platform: process.platform,
+            capabilities: ["audio.native"],
+        });
+    });
+
+    app.get("/audio/native/info", publicLocalhostMiddleware, (_req, res) => {
+        try {
+            res.json({
+                supported: true,
+                platform: process.platform,
+                backends: listBackends(),
+                running: nativeEngine.isRunning(),
+                metrics: nativeEngine.metrics(),
+            });
+        } catch (err) {
+            res.status(500).json({
+                supported: false,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
+    });
+
+    app.get("/audio/native/devices", publicLocalhostMiddleware, (req, res) => {
+        try {
+            const backend = (req.query.backend as AudioBackend | undefined) ?? "auto";
+            res.json(listDevices(backend));
+        } catch (err) {
+            res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+        }
+    });
+
+    app.post("/audio/native/start", publicLocalhostMiddleware, (req, res) => {
+        try {
+            const cfg = req.body as EngineConfig;
+            // Wire the DSP pitch callback to all connected WS clients.
+            nativePitchUnsub?.();
+            nativePitchUnsub = nativeEngine.addPitchListener((p) => {
+                const now = Date.now();
+                if (now - lastPitchPushAt < PITCH_PUSH_MIN_MS) return;
+                lastPitchPushAt = now;
+                const status = nativeEngine.lastStatus();
+                const msg = JSON.stringify({
+                    type: "audio.pitch",
+                    pitch: p,
+                    status,
+                });
+                for (const client of wsClients) {
+                    if (client.readyState === WebSocket.OPEN) client.send(msg);
+                }
+            });
+            const metrics = nativeEngine.start(cfg);
+            res.json({ success: true, metrics });
+        } catch (err) {
+            res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+        }
+    });
+
+    app.post("/audio/native/stop", publicLocalhostMiddleware, (_req, res) => {
+        try {
+            nativePitchUnsub?.();
+            nativePitchUnsub = null;
+            nativeEngine.stop();
+            res.json({ success: true });
+        } catch (err) {
+            res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+        }
+    });
+
+    app.get("/audio/native/metrics", publicLocalhostMiddleware, (_req, res) => {
+        res.json({
+            running: nativeEngine.isRunning(),
+            metrics: nativeEngine.metrics(),
+            status: nativeEngine.lastStatus(),
+            lastPitch: nativeEngine.lastPitch(),
+        });
+    });
+
+    app.post("/audio/native/scale", publicLocalhostMiddleware, (req, res) => {
+        try {
+            const scale = req.body as ScaleConfig;
+            nativeEngine.setScale(scale);
+            res.json({ success: true });
+        } catch (err) {
+            res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+        }
+    });
+
+    app.post("/audio/native/autocorrect", publicLocalhostMiddleware, (req, res) => {
+        try {
+            const { enabled, formantPreserve } = req.body as {
+                enabled?: boolean;
+                formantPreserve?: boolean;
+            };
+            if (typeof enabled === "boolean") nativeEngine.setAutoCorrectEnabled(enabled);
+            if (typeof formantPreserve === "boolean") nativeEngine.setFormantPreserve(formantPreserve);
+            res.json({ success: true });
+        } catch (err) {
+            res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+        }
+    });
+
     // ─── Start HTTP server ───────────────────────────────────────────────
 
     httpServer = http.createServer(app);
@@ -342,6 +581,10 @@ export async function startServer(): Promise<void> {
 }
 
 export async function stopServer(): Promise<void> {
+    nativePitchUnsub?.();
+    nativePitchUnsub = null;
+    try { nativeEngine.stop(); } catch { /* ignore */ }
+
     for (const client of wsClients) {
         client.close();
     }

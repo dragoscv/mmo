@@ -1,6 +1,6 @@
 {
   "name": "mmo-companion",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MMO Companion Server — serves local music files to MMO web app",
   "main": "dist/main.js",
   "author": {
@@ -71,6 +71,7 @@
     }
   },
   "dependencies": {
+    "audify": "^1.10.1",
     "cors": "^2.8.5",
     "electron-store": "^8.2.0",
     "electron-updater": "^6.6.2",
@@ -85,5 +86,13 @@
     "electron": "^34.3.0",
     "electron-builder": "^26.0.0",
     "typescript": "^5.8.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "audify",
+      "electron",
+      "electron-winstaller"
+    ]
   }
 }
+

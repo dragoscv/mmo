@@ -20,7 +20,8 @@ import { useLive } from "./live-context";
 import { useFocusMode } from "@/components/focus-mode-context";
 import { cn } from "@/lib/utils";
 import { useRenderCount } from "@/lib/dev-debugger";
-import { Mic, MicOff, Square, Circle, Play, Pause, Volume2, VolumeX,
+import {
+    Mic, MicOff, Square, Circle, Play, Pause, Volume2, VolumeX,
     Music, Power, Plus, Trash2, ChevronDown, ChevronRight, Sparkles,
     Repeat, Upload, X, Maximize2, Minimize2, Activity,
     Settings2, Headphones, Disc3, GripVertical, Radio, Wifi, WifiOff,
@@ -47,6 +48,13 @@ import { formatNoteMulti, formatPitch } from "@/lib/note-notation";
 import type { NoteNotation } from "@/lib/note-notation";
 import { LiveSettingsModal } from "@/components/live/live-settings-modal";
 import { Settings as SettingsIcon } from "lucide-react";
+import {
+    NativeCompanionClient,
+    probeCompanion,
+    type NativePitch,
+    type NativeStatus,
+    type NativeMetrics,
+} from "@/lib/native-companion";
 
 // ─── Drag context: makes the Section title bar a drag handle when inside a Reorder.Item ─
 
@@ -1612,6 +1620,57 @@ function KeyScalePanel() {
     const scaleName = MUSICAL_SCALES[live.scaleIndex]?.name ?? "";
     const quality: "major" | "minor" = /major/i.test(scaleName) ? "major" : "minor";
 
+    // ── Native low-latency mode ───────────────────────────────────────
+    //
+    // When `nativeMode` is ON and a local companion is reachable, the
+    // mic→DSP→speakers path runs ENTIRELY in the Electron companion
+    // (RtAudio + native PitchDsp). The browser audio engine still owns
+    // the deck/master path; only the autocorrect bypass changes.
+    //
+    // When OFF (or when the companion is not available), we fall back
+    // to the AudioWorklet path that already exists below.
+    //
+    // The toggle is persisted in localStorage so it survives reloads.
+    const [nativeMode, setNativeMode] = useState<boolean>(() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem("mmo-live-keyscale-native") === "1";
+    });
+    const [nativeAvailable, setNativeAvailable] = useState<boolean>(false);
+    const [nativeRunning, setNativeRunning] = useState<boolean>(false);
+    const [nativeError, setNativeError] = useState<string | null>(null);
+    const [nativeMetrics, setNativeMetrics] = useState<NativeMetrics | null>(null);
+    const nativeClientRef = useRef<NativeCompanionClient | null>(null);
+    const nativePitchRef = useRef<{ pitch: NativePitch; status: NativeStatus | null } | null>(null);
+
+    // Probe + acquire credentials. Runs once on mount and on URL/credential
+    // refreshes (the localhost device's token doesn't change at runtime,
+    // so a single probe per page-load is enough).
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                // Public localhost probe — no auth required. The companion
+                // enforces loopback-only + Origin allowlist on its side.
+                const beacon = await probeCompanion();
+                if (cancelled) return;
+                if (!beacon) {
+                    setNativeAvailable(false);
+                    return;
+                }
+                nativeClientRef.current = new NativeCompanionClient();
+                setNativeAvailable(true);
+            } catch {
+                setNativeAvailable(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    // Persist the toggle preference.
+    useEffect(() => {
+        try { localStorage.setItem("mmo-live-keyscale-native", nativeMode ? "1" : "0"); } catch { /* */ }
+    }, [nativeMode]);
+
     // ── Auto-correct (live re-tune) ──────────────────────────────────
     const [autoCorrectOn, setAutoCorrectOn] = useState<boolean>(() => {
         if (typeof window === "undefined") return false;
@@ -1673,6 +1732,13 @@ function KeyScalePanel() {
     useEffect(() => {
         const engine = live.engine;
         if (!engine) return;
+        // When native mode is requested AND a companion is reachable, the
+        // browser audio path stays disabled — the autocorrect runs entirely
+        // inside the companion. Don't engage the worklet shifter.
+        if (nativeMode && nativeAvailable) {
+            void engine.voice.setAutoCorrectEnabled(false);
+            return;
+        }
         let cancelled = false;
         void engine.voice.setAutoCorrectEnabled(autoCorrectOn).then((node) => {
             if (cancelled) return;
@@ -1681,15 +1747,16 @@ function KeyScalePanel() {
             engine.voice.setAutoCorrectFormantPreserve(autoCorrectFormant);
         });
         return () => { cancelled = true; };
-    }, [autoCorrectOn, live.engine, autoCorrectFormant]);
+    }, [autoCorrectOn, live.engine, autoCorrectFormant, nativeMode, nativeAvailable]);
 
     // Push formant-preserve flag separately so toggling it without re-creating
     // the worklet still takes effect (otherwise we'd recreate the audio node).
     useEffect(() => {
         const engine = live.engine;
         if (!engine || !autoCorrectOn) return;
+        if (nativeMode && nativeAvailable) return;
         engine.voice.setAutoCorrectFormantPreserve(autoCorrectFormant);
-    }, [autoCorrectFormant, autoCorrectOn, live.engine]);
+    }, [autoCorrectFormant, autoCorrectOn, live.engine, nativeMode, nativeAvailable]);
 
     // Tear-down: always disable the shifter when the panel unmounts so we
     // don't leave an orphan correction node in the audio path.
@@ -1708,6 +1775,7 @@ function KeyScalePanel() {
     useEffect(() => {
         const engine = live.engine;
         if (!engine || !autoCorrectOn) return;
+        if (nativeMode && nativeAvailable) return;
         const scale = MUSICAL_SCALES[live.scaleIndex];
         // Root-lock collapses the allowed pitch-class set to the tonic
         // alone (intervals=[0]) so the shifter snaps every input to the
@@ -1720,10 +1788,113 @@ function KeyScalePanel() {
             amount: autoCorrectAmount,
             speed: autoCorrectSpeed,
         });
-    }, [autoCorrectOn, autoCorrectSpeed, autoCorrectAmount, autoCorrectRootLock, live.keyIndex, live.scaleIndex, live.engine]);
+    }, [autoCorrectOn, autoCorrectSpeed, autoCorrectAmount, autoCorrectRootLock, live.keyIndex, live.scaleIndex, live.engine, nativeMode, nativeAvailable]);
+
+    // ── Native engine lifecycle ───────────────────────────────────────
+    //
+    // Driven from the same toggles as the browser path, but goes to the
+    // companion's HTTP+WS API. When `autoCorrectOn` flips OFF while in
+    // native mode we keep the engine running with autocorrect bypassed
+    // (so the user can hear monitor with no DSP for free, dirty-passthrough).
+    useEffect(() => {
+        const client = nativeClientRef.current;
+        if (!nativeMode || !nativeAvailable || !client) {
+            // If we previously started, stop now.
+            if (nativeRunning && client) {
+                void client.stop().catch(() => { /* ignore */ });
+                client.disconnectWs();
+                setNativeRunning(false);
+            }
+            return;
+        }
+        let cancelled = false;
+        const scale = MUSICAL_SCALES[live.scaleIndex];
+        const intervals = autoCorrectRootLock ? [0] : (scale?.intervals ?? []);
+        (async () => {
+            try {
+                setNativeError(null);
+                client.connectWs();
+                const res = await client.start({
+                    autoCorrect: autoCorrectOn,
+                    formantPreserve: autoCorrectFormant,
+                    scale: { keyIndex: live.keyIndex, intervals, amount: autoCorrectAmount },
+                    sampleRate: 48000,
+                    frameSize: 128,
+                    minimizeLatency: true,
+                    realtimeSchedule: true,
+                });
+                if (cancelled) return;
+                setNativeMetrics(res.metrics);
+                setNativeRunning(true);
+            } catch (err) {
+                if (cancelled) return;
+                setNativeError(err instanceof Error ? err.message : String(err));
+                setNativeRunning(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [nativeMode, nativeAvailable]);
+
+    // Push native scale/autocorrect changes when in native mode.
+    useEffect(() => {
+        const client = nativeClientRef.current;
+        if (!nativeMode || !nativeAvailable || !client || !nativeRunning) return;
+        const scale = MUSICAL_SCALES[live.scaleIndex];
+        const intervals = autoCorrectRootLock ? [0] : (scale?.intervals ?? []);
+        void client.setScale({ keyIndex: live.keyIndex, intervals, amount: autoCorrectAmount }).catch(() => { /* ignore */ });
+    }, [nativeMode, nativeAvailable, nativeRunning, live.keyIndex, live.scaleIndex, autoCorrectRootLock, autoCorrectAmount]);
+
+    useEffect(() => {
+        const client = nativeClientRef.current;
+        if (!nativeMode || !nativeAvailable || !client || !nativeRunning) return;
+        void client.setAutoCorrect({
+            enabled: autoCorrectOn,
+            formantPreserve: autoCorrectFormant,
+        }).catch(() => { /* ignore */ });
+    }, [nativeMode, nativeAvailable, nativeRunning, autoCorrectOn, autoCorrectFormant]);
+
+    // Stop native engine on panel unmount.
+    useEffect(() => {
+        return () => {
+            const client = nativeClientRef.current;
+            if (!client) return;
+            void client.stop().catch(() => { /* */ });
+            client.disconnectWs();
+        };
+    }, []);
+
+    // Subscribe to native pitch (WS-pushed) when in native mode.
+    useEffect(() => {
+        const client = nativeClientRef.current;
+        if (!nativeMode || !nativeAvailable || !client) return;
+        const off = client.addPitchListener((p, s) => {
+            nativePitchRef.current = { pitch: p, status: s };
+        });
+        return () => { off(); };
+    }, [nativeMode, nativeAvailable]);
+
+    // Refresh native metrics every second (for UI readout).
+    useEffect(() => {
+        const client = nativeClientRef.current;
+        if (!nativeMode || !nativeAvailable || !client || !nativeRunning) return;
+        let alive = true;
+        const tick = async () => {
+            try {
+                const m = await client.metrics();
+                if (alive) setNativeMetrics(m.metrics);
+            } catch { /* ignore */ }
+        };
+        const id = setInterval(tick, 1000);
+        return () => { alive = false; clearInterval(id); };
+    }, [nativeMode, nativeAvailable, nativeRunning]);
 
     // Subscribe to engine's live auto-correct status (60 Hz internal loop).
     // We poll instead of pushing to keep the engine free of UI deps.
+    // When in native mode, status is sourced from `nativePitchRef` (filled
+    // by WS messages from the companion) instead.
     const [acStatus, setAcStatus] = useState<{
         rms: number; freq: number; note: string; semis: number; ratio: number; conf: number;
         sourceMidi: number | null; targetMidi: number | null;
@@ -1731,31 +1902,107 @@ function KeyScalePanel() {
     useEffect(() => {
         if (!autoCorrectOn) return;
         const engine = live.engine;
-        if (!engine) return;
+        const useNative = nativeMode && nativeAvailable && nativeRunning;
+        if (!useNative && !engine) return;
         let raf = 0;
         let alive = true;
         const tick = () => {
             if (!alive) return;
-            const s = engine.voice.getAutoCorrectStatus();
-            setAcStatus({
-                rms: s.rms,
-                freq: s.pitch.frequency,
-                note: s.pitch.note,
-                semis: s.semitones,
-                ratio: s.ratio,
-                conf: s.pitch.confidence,
-                sourceMidi: s.sourceMidi,
-                targetMidi: s.targetMidi,
-            });
+            if (useNative) {
+                const np = nativePitchRef.current;
+                if (np) {
+                    const p = np.pitch;
+                    const s = np.status;
+                    const noteName = p.midi >= 0
+                        ? formatPitch(((p.midi % 12) + 12) % 12, settings.noteNotations[0] ?? "anglo", quality)
+                        : "—";
+                    const semis = s && s.targetMidi !== null && s.sourceMidi !== null
+                        ? (s.targetMidi - s.sourceMidi)
+                        : 0;
+                    setAcStatus({
+                        rms: p.rms,
+                        freq: p.frequency,
+                        note: noteName,
+                        semis,
+                        ratio: s?.ratio ?? 1,
+                        conf: p.confidence,
+                        sourceMidi: s?.sourceMidi ?? null,
+                        targetMidi: s?.targetMidi ?? null,
+                    });
+                }
+            } else if (engine) {
+                const s = engine.voice.getAutoCorrectStatus();
+                setAcStatus({
+                    rms: s.rms,
+                    freq: s.pitch.frequency,
+                    note: s.pitch.note,
+                    semis: s.semitones,
+                    ratio: s.ratio,
+                    conf: s.pitch.confidence,
+                    sourceMidi: s.sourceMidi,
+                    targetMidi: s.targetMidi,
+                });
+            }
             raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
         return () => { alive = false; if (raf) cancelAnimationFrame(raf); };
-    }, [autoCorrectOn, live.engine]);
+    }, [autoCorrectOn, live.engine, nativeMode, nativeAvailable, nativeRunning, settings.noteNotations, quality]);
 
     return (
         <Section title="Key & Scale" accent="#06b6d4" icon={<Settings2 className="w-3.5 h-3.5 text-cyan-400/60" />}>
             <div className="space-y-2">
+                {/* Native low-latency mode row */}
+                <div className="flex items-center justify-between gap-2">
+                    <button
+                        onClick={() => {
+                            if (!nativeAvailable) return;
+                            setNativeMode(v => !v);
+                        }}
+                        disabled={!nativeAvailable}
+                        title={
+                            !nativeAvailable
+                                ? "MMO Companion not detected. Install + sign in on this device to enable native low-latency audio."
+                                : nativeMode
+                                    ? "Native mode ON — mic and speakers handled by the companion (RtAudio direct). Browser is bypassed for the autocorrect path."
+                                    : "Browser mode — Web Audio worklet (~25 ms total round-trip on Windows, ~12 ms on macOS). Enable native for the lowest possible latency."
+                        }
+                        className={cn(
+                            "flex items-center gap-1.5 h-6 px-2 text-[10px] rounded-full transition-all border cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
+                            nativeMode && nativeAvailable
+                                ? "bg-purple-500/25 text-purple-200 border-purple-500/40 shadow-[0_0_10px_rgba(168,85,247,0.25)]"
+                                : "bg-white/[0.04] text-white/45 border-white/10 hover:text-white/80 hover:bg-white/[0.08]",
+                        )}
+                    >
+                        <span className="text-[10px]">⚡</span>
+                        <span>
+                            Native {nativeMode && nativeAvailable ? "ON" : "OFF"}
+                        </span>
+                    </button>
+                    <span className="text-[9px] tabular-nums text-white/60">
+                        {!nativeAvailable
+                            ? <span className="text-white/30">no companion</span>
+                            : !nativeMode
+                                ? <span className="text-white/40">browser ~25ms</span>
+                                : !nativeRunning
+                                    ? nativeError
+                                        ? <span className="text-rose-400/80">err</span>
+                                        : <span className="text-white/40">starting…</span>
+                                    : nativeMetrics
+                                        ? <span className="text-purple-300">
+                                            {nativeMetrics.streamLatencyMs.toFixed(1)}ms
+                                            <span className="text-white/40"> + {nativeMetrics.dspBlockAvgMs.toFixed(1)}ms dsp</span>
+                                        </span>
+                                        : <span className="text-white/40">running</span>
+                        }
+                    </span>
+                </div>
+                {nativeError && nativeMode && (
+                    <div className="text-[9px] text-rose-400/80 leading-tight">
+                        {nativeError}
+                    </div>
+                )}
+
                 {/* Auto-correct toggle row */}
                 <div className="flex items-center justify-between gap-2">
                     <button

@@ -1,0 +1,118 @@
+name: Companion — build & release
+
+# Cross-platform builder for the MMO Companion (Electron). Triggered by
+# pushing a tag like `companion-v0.2.0`, or manually via the Actions tab.
+# Produces:
+#   - Windows: NSIS installer (.exe) + latest.yml (electron-updater feed)
+#   - macOS:   DMG (.dmg) + latest-mac.yml
+# All artifacts are uploaded to a GitHub Release named after the tag.
+#
+# The web app's /api/companion/download route reads the latest release
+# and redirects browsers to the appropriate installer for their OS.
+
+on:
+  push:
+    tags:
+      - "companion-v*"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to GitHub Release (true) or just build artifacts (false)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: write   # needed to publish releases
+  id-token: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: server/pnpm-lock.yaml
+
+      - name: Install dependencies
+        # The `pnpm.onlyBuiltDependencies` array in server/package.json already
+        # whitelists `audify`, so prebuild-install runs automatically.
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Approve native build scripts (audify, electron)
+        # pnpm v10 requires explicit approval for postinstall scripts even
+        # when listed in onlyBuiltDependencies; this rebuilds the prebuilt
+        # binaries downloaded by prebuild-install.
+        run: pnpm rebuild
+
+      - name: Build TypeScript
+        run: pnpm build
+
+      # Publish flag: tag pushes always publish; workflow_dispatch publishes
+      # only when the input is "true". Otherwise we just build artifacts.
+      - name: Determine publish flag
+        id: pub
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "flag=--publish always" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.inputs.publish }}" == "true" ]]; then
+            echo "flag=--publish always" >> $GITHUB_OUTPUT
+          else
+            echo "flag=--publish never" >> $GITHUB_OUTPUT
+          fi
+
+      # ── Windows ────────────────────────────────────────────────────────
+      - name: Build Windows installer
+        if: matrix.os == 'windows-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm exec electron-builder --win --x64 ${{ steps.pub.outputs.flag }}
+
+      # ── macOS ──────────────────────────────────────────────────────────
+      # Unsigned build (no Apple developer certificate). Users will see a
+      # Gatekeeper warning on first run; right-click → Open or
+      # `xattr -dr com.apple.quarantine /Applications/MMO\ Companion.app`
+      # works around it.
+      - name: Build macOS DMG (unsigned, x64 + arm64)
+        if: matrix.os == 'macos-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: pnpm exec electron-builder --mac --x64 --arm64 ${{ steps.pub.outputs.flag }}
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-${{ matrix.os }}
+          path: |
+            server/release/*.exe
+            server/release/*.dmg
+            server/release/*.zip
+            server/release/latest*.yml
+          if-no-files-found: warn
+          retention-days: 14

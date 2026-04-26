@@ -7,6 +7,10 @@ export interface CompanionSettings {
     serverPort: number;
     scanFolders: string[];
     webAppUrl: string;
+    /** Origins allowed to call the public /audio/native/* routes without
+     *  a device token. Loopback origins are always allowed. Supports
+     *  wildcards in the form "https://*.example.com". */
+    audioOriginAllowlist: string[];
 }
 
 const DEFAULTS: CompanionSettings = {
@@ -16,6 +20,12 @@ const DEFAULTS: CompanionSettings = {
     serverPort: 17899,
     scanFolders: [],
     webAppUrl: "http://localhost:3000",
+    audioOriginAllowlist: [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://app.brivio.ro",
+        "https://*.brivio.ro",
+    ],
 };
 
 export const store = new Store({
@@ -37,6 +47,7 @@ export function getSettings(): CompanionSettings {
         serverPort: store.get("serverPort") as number,
         scanFolders: store.get("scanFolders") as string[],
         webAppUrl: store.get("webAppUrl") as string,
+        audioOriginAllowlist: (store.get("audioOriginAllowlist") as string[] | undefined) ?? DEFAULTS.audioOriginAllowlist,
     };
 }
 
