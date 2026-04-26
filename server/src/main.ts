@@ -2,8 +2,99 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, shell } f
 import { autoUpdater } from "electron-updater";
 import path from "node:path";
 import os from "node:os";
-import { startServer, stopServer, getServerPort, authEvents, generateAuthState } from "./server";
+import fs from "node:fs";
 import { store, getSettings, updateSettings, type CompanionSettings } from "./store";
+
+// ─── Crash logging ─────────────────────────────────────────────────────────────
+//
+// Writes diagnostic output to a known file on disk so we can debug
+// startup crashes that happen before any window appears (especially on
+// macOS where Console.app sometimes misses very-early failures).
+//
+// Path:
+//   macOS:   ~/Library/Logs/MMO Companion/main.log
+//   Windows: %APPDATA%\MMO Companion\logs\main.log
+//   Linux:   ~/.config/MMO Companion/logs/main.log
+//
+// We also surface uncaught exceptions in a dialog so the user can copy
+// the error text out instead of staring at a window-that-never-appears.
+
+const LOG_DIR = path.join(
+    app.getPath("logs"), // resolves to the platform-appropriate log dir
+);
+try {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+} catch { /* ignore */ }
+const LOG_FILE = path.join(LOG_DIR, "main.log");
+
+function logLine(level: "info" | "warn" | "error", ...args: unknown[]): void {
+    const line = `[${new Date().toISOString()}] [${level}] ${args
+        .map((a) => (a instanceof Error ? `${a.stack ?? a.message}` : typeof a === "string" ? a : JSON.stringify(a)))
+        .join(" ")}\n`;
+    try {
+        fs.appendFileSync(LOG_FILE, line);
+    } catch { /* ignore */ }
+    // Also print to stderr so "open -a 'MMO Companion' --stderr" shows it
+    process.stderr.write(line);
+}
+
+logLine("info", "main.ts loaded", {
+    platform: process.platform,
+    arch: process.arch,
+    electron: process.versions.electron,
+    node: process.versions.node,
+    appVersion: app.getVersion(),
+    execPath: process.execPath,
+});
+
+process.on("uncaughtException", (err) => {
+    logLine("error", "uncaughtException:", err);
+    try {
+        dialog.showErrorBox(
+            "MMO Companion: uncaught exception",
+            `${err.message}\n\nFull log: ${LOG_FILE}\n\n${err.stack ?? ""}`,
+        );
+    } catch { /* ignore */ }
+});
+
+process.on("unhandledRejection", (reason) => {
+    logLine("error", "unhandledRejection:", reason as Error);
+});
+
+// ─── Lazy-loaded server module ─────────────────────────────────────────────────
+//
+// We defer requiring "./server" until after the window has been created
+// and shown. Reason: server.ts pulls in audify (native module) which
+// can crash the main process at require-time if the prebuilt .node
+// binary is incompatible with the host's architecture or is missing a
+// dynamic dependency (e.g. libopus on macOS). With lazy loading, a
+// failure shows a dialog and disables the audio engine but leaves the
+// rest of the UI working.
+
+type ServerModule = typeof import("./server");
+let serverModule: ServerModule | null = null;
+let serverError: Error | null = null;
+
+async function loadServerModule(): Promise<ServerModule | null> {
+    if (serverModule) return serverModule;
+    if (serverError) return null;
+    try {
+        logLine("info", "loading ./server module");
+        serverModule = await import("./server");
+        logLine("info", "./server loaded ok");
+        return serverModule;
+    } catch (err) {
+        serverError = err as Error;
+        logLine("error", "./server failed to load:", err);
+        try {
+            dialog.showErrorBox(
+                "MMO Companion: audio engine unavailable",
+                `Could not initialize the local server / native audio engine.\n\nThe app will continue running but audio features will be disabled.\n\nLog: ${LOG_FILE}\n\n${(err as Error)?.message ?? err}`,
+            );
+        } catch { /* ignore */ }
+        return null;
+    }
+}
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -29,8 +120,8 @@ if (!gotTheLock) {
             createWindow();
         }
         // macOS: ensure the dock icon is visible and brings the app forward
-        app.dock?.show().catch(() => {});
-        app.focus({ steal: true });
+        try { app.dock?.show(); } catch { /* ignore */ }
+        try { app.focus({ steal: true }); } catch { /* ignore */ }
     });
 }
 
@@ -127,7 +218,7 @@ function createTray() {
         },
         { type: "separator" },
         {
-            label: `Server on port ${getServerPort()}`,
+            label: serverModule ? `Server on port ${serverModule.getServerPort()}` : "Server unavailable",
             enabled: false,
         },
         { type: "separator" },
@@ -165,7 +256,8 @@ function setupIPC() {
     });
 
     ipcMain.handle("get-status", () => ({
-        port: getServerPort(),
+        port: serverModule?.getServerPort() ?? 0,
+        serverError: serverError?.message ?? null,
         authenticated: !!store.get("deviceToken"),
         deviceId: store.get("deviceId") || null,
         userName: store.get("userName") || null,
@@ -210,12 +302,16 @@ function setupIPC() {
     ipcMain.handle("get-version", () => app.getVersion());
 
     ipcMain.handle("open-auth-in-browser", async (_event, webAppUrl: string) => {
+        if (!serverModule) {
+            dialog.showErrorBox("Server unavailable", "Cannot start auth flow because the local server failed to start.");
+            return null;
+        }
         const hostname = os.hostname();
         const platform = process.platform;
-        const port = getServerPort();
+        const port = serverModule.getServerPort();
         const localIp = getLocalIp();
         const apiUrl = `http://${localIp}:${port}`;
-        const state = generateAuthState();
+        const state = serverModule.generateAuthState();
         const callbackUrl = `http://localhost:${port}/auth/callback`;
 
         const params = new URLSearchParams({
@@ -233,7 +329,7 @@ function setupIPC() {
         // Wait for auth callback (max 5 minutes)
         return new Promise((resolve) => {
             const timeout = setTimeout(() => {
-                authEvents.removeListener("authenticated", handler);
+                serverModule?.authEvents.removeListener("authenticated", handler);
                 resolve(null);
             }, 5 * 60 * 1000);
 
@@ -242,7 +338,7 @@ function setupIPC() {
                 resolve(data);
             }
 
-            authEvents.once("authenticated", handler);
+            serverModule!.authEvents.once("authenticated", handler);
         });
     });
 }
@@ -318,23 +414,37 @@ function setupAutoUpdater() {
 // ─── App lifecycle ───────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
+    logLine("info", "app whenReady — creating window");
     setupIPC();
     createWindow();
     createTray();
-    // Start server AFTER window so a slow port-bind never delays UI
-    startServer().catch((err) => console.error("[main] startServer failed:", err));
+
+    // Lazy-load the server. Failures here will NOT close the window;
+    // they show an error dialog and disable the audio engine.
+    void loadServerModule().then((mod) => {
+        if (!mod) return;
+        try {
+            mod.startServer();
+            logLine("info", "server started");
+        } catch (err) {
+            logLine("error", "startServer threw:", err as Error);
+        }
+    });
+
     setupAutoUpdater();
 
-    // Apply saved auto-launch setting
     const settings = getSettings();
     app.setLoginItemSettings({
         openAtLogin: settings.startAtLogin,
         openAsHidden: true,
     });
 
-    // macOS: ensure the dock icon is visible (may be hidden if the app was
-    // previously launched via tray-only mode)
-    app.dock?.show().catch(() => {});
+    // macOS: ensure the dock icon is visible and the app comes forward
+    try {
+        app.dock?.show();
+    } catch (err) {
+        logLine("warn", "app.dock.show() failed:", err as Error);
+    }
 });
 
 app.on("window-all-closed", () => {
@@ -343,7 +453,13 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", async () => {
     isQuitting = true;
-    await stopServer();
+    if (serverModule) {
+        try {
+            await serverModule.stopServer();
+        } catch (err) {
+            logLine("warn", "stopServer threw:", err as Error);
+        }
+    }
 });
 
 app.on("activate", () => {
