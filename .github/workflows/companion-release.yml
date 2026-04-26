@@ -13,6 +13,10 @@ name: Companion — build & release
 on:
   push:
     tags:
+      # electron-builder publishes to a release tagged with package.json#version
+      # (e.g. "v0.3.0"). We trigger on either the simple v* tag or our
+      # explicit companion-v* prefix for clarity.
+      - "v*"
       - "companion-v*"
   workflow_dispatch:
     inputs:

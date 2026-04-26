@@ -24,7 +24,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 const REPO_OWNER = process.env.COMPANION_REPO_OWNER ?? "dragoscv";
 const REPO_NAME = process.env.COMPANION_REPO_NAME ?? "rekordbox-mwrty";
-const TAG_PREFIX = "companion-v";
+// electron-builder creates releases tagged with the bare version ("v0.3.0")
+// based on package.json#version, ignoring any custom git tag we push. So we
+// match the simple "v" prefix; no other release tags exist on this repo.
+const TAG_PREFIX = "v";
 
 interface GhReleaseAsset {
     name: string;
@@ -92,7 +95,17 @@ async function fetchLatestCompanionRelease(): Promise<GhRelease | null> {
 
     const list = (await res.json()) as GhRelease[];
     const found = list
-        .filter((r) => !r.draft && !r.prerelease && r.tag_name.startsWith(TAG_PREFIX))
+        .filter(
+            (r) =>
+                !r.draft &&
+                !r.prerelease &&
+                r.tag_name.startsWith(TAG_PREFIX) &&
+                // exclude unrelated tags (e.g. internal release tags from
+                // other components) by requiring at least one expected asset.
+                r.assets.some((a) =>
+                    /\.(exe|dmg|appimage|deb)$/i.test(a.name),
+                ),
+        )
         .sort((a, b) => b.published_at.localeCompare(a.published_at))[0];
 
     if (found) {
@@ -120,7 +133,7 @@ function detectArchFromUA(ua: string, os: Os): Arch {
 }
 
 function pickAsset(release: GhRelease, os: Os, arch: Arch): ResolvedAsset | null {
-    const version = release.tag_name.replace(/^companion-v/, "");
+    const version = release.tag_name.replace(/^v/, "");
 
     // Filename heuristics. electron-builder default names look like:
     //   MMO Companion-Setup-0.3.0.exe          (Windows NSIS)
@@ -188,7 +201,7 @@ export async function GET(req: NextRequest) {
             {
                 error: `No installer available for os=${os} arch=${arch}.`,
                 releaseUrl: release.html_url,
-                version: release.tag_name.replace(/^companion-v/, ""),
+                version: release.tag_name.replace(/^v/, ""),
             },
             { status: 404 },
         );

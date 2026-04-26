@@ -9,3 +9,6 @@ node_modules/
 /server/release/
 /app/.next/
 *.tsbuildinfo
+
+# Downloaded CI artifacts (local-only)
+/artifacts/
