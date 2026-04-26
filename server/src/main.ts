@@ -16,10 +16,21 @@ if (!gotTheLock) {
     app.quit();
 } else {
     app.on("second-instance", () => {
+        // Always force the window to be visible + focused. The previous
+        // implementation only handled `isMinimized()`, which left the user
+        // stuck if `mainWindow.show()` had silently failed (e.g. window
+        // hidden behind other apps on macOS, or `ready-to-show` never fired).
         if (mainWindow) {
             if (mainWindow.isMinimized()) mainWindow.restore();
+            if (!mainWindow.isVisible()) mainWindow.show();
             mainWindow.focus();
+            mainWindow.moveTop();
+        } else {
+            createWindow();
         }
+        // macOS: ensure the dock icon is visible and brings the app forward
+        app.dock?.show().catch(() => {});
+        app.focus({ steal: true });
     });
 }
 
@@ -38,17 +49,37 @@ function createWindow() {
             contextIsolation: true,
             nodeIntegration: false,
         },
+        // hiddenInset on macOS gives a native frameless look but keeps the
+        // traffic-light buttons. On other platforms electron ignores this.
         titleBarStyle: "hiddenInset",
         backgroundColor: "#0a0a0a",
-        show: false,
+        // Show the window immediately. The previous `show: false` +
+        // `ready-to-show` pattern caused the window to never appear if the
+        // event didn't fire (observed on macOS with the ad-hoc signed build).
+        show: true,
+        center: true,
     });
 
-    mainWindow.loadFile(path.join(__dirname, "../ui/index.html"));
+    const indexPath = path.join(__dirname, "../ui/index.html");
+    mainWindow.loadFile(indexPath).catch((err) => {
+        console.error("[main] Failed to load UI:", err);
+        // Surface the error visibly so the user isn't stuck staring at a
+        // blank window.
+        dialog.showErrorBox(
+            "MMO Companion failed to start",
+            `Could not load UI from:\n${indexPath}\n\n${err?.message ?? err}`,
+        );
+    });
+
+    mainWindow.webContents.on("did-fail-load", (_e, code, desc, url) => {
+        console.error(`[main] webContents did-fail-load ${code} ${desc} ${url}`);
+    });
 
     mainWindow.once("ready-to-show", () => {
         const settings = getSettings();
         if (!settings.startMinimized) {
             mainWindow?.show();
+            mainWindow?.focus();
         }
     });
 
@@ -290,7 +321,8 @@ app.whenReady().then(async () => {
     setupIPC();
     createWindow();
     createTray();
-    await startServer();
+    // Start server AFTER window so a slow port-bind never delays UI
+    startServer().catch((err) => console.error("[main] startServer failed:", err));
     setupAutoUpdater();
 
     // Apply saved auto-launch setting
@@ -299,6 +331,10 @@ app.whenReady().then(async () => {
         openAtLogin: settings.startAtLogin,
         openAsHidden: true,
     });
+
+    // macOS: ensure the dock icon is visible (may be hidden if the app was
+    // previously launched via tray-only mode)
+    app.dock?.show().catch(() => {});
 });
 
 app.on("window-all-closed", () => {
@@ -311,8 +347,11 @@ app.on("before-quit", async () => {
 });
 
 app.on("activate", () => {
+    // Triggered on macOS when the dock icon is clicked.
     if (mainWindow) {
-        mainWindow.show();
+        if (!mainWindow.isVisible()) mainWindow.show();
+        mainWindow.focus();
+        mainWindow.moveTop();
     } else {
         createWindow();
     }
