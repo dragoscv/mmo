@@ -442,7 +442,7 @@ export async function startServer(): Promise<void> {
         res.json({
             ok: true,
             product: "MMOCompanion",
-            version: "0.3.0",
+            version: "0.3.1",
             platform: process.platform,
             capabilities: ["audio.native"],
         });

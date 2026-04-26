@@ -135,26 +135,32 @@ function detectArchFromUA(ua: string, os: Os): Arch {
 function pickAsset(release: GhRelease, os: Os, arch: Arch): ResolvedAsset | null {
     const version = release.tag_name.replace(/^v/, "");
 
-    // Filename heuristics. electron-builder default names look like:
-    //   MMO Companion-Setup-0.3.0.exe          (Windows NSIS)
-    //   MMO Companion-0.3.0.dmg                (macOS Intel)
-    //   MMO Companion-0.3.0-arm64.dmg          (macOS Apple Silicon)
-    //   MMO Companion-0.3.0.AppImage           (Linux)
-    //   mmo-companion_0.3.0_amd64.deb          (Linux .deb)
+    // Filename heuristics for our electron-builder config:
+    //   MMO-Companion-Setup-X.Y.Z.exe          (Windows NSIS, x64)
+    //   MMO-Companion-X.Y.Z-x64.dmg            (macOS Intel)
+    //   MMO-Companion-X.Y.Z-arm64.dmg          (macOS Apple Silicon)
+    //   MMO-Companion-X.Y.Z-x64.zip            (macOS Intel auto-update)
+    //   MMO-Companion-X.Y.Z-arm64.zip          (macOS Apple Silicon auto-update)
+    //   MMO-Companion-X.Y.Z.AppImage           (Linux)
+    //   mmo-companion_X.Y.Z_amd64.deb          (Linux .deb)
     const matchers: Record<Os, (name: string) => boolean> = {
         win: (n) => n.toLowerCase().endsWith(".exe"),
         mac: (n) => {
             if (!n.toLowerCase().endsWith(".dmg")) return false;
             const isArm = /arm64/i.test(n);
-            return arch === "arm64" ? isArm : !isArm;
+            const isX64 = /(?<![a-z])x64(?![a-z])/i.test(n);
+            if (arch === "arm64") return isArm;
+            // For Intel: prefer files explicitly tagged x64; fall back to
+            // anything not arm64 (handles older builds without arch suffix).
+            return isX64 || !isArm;
         },
         linux: (n) => /\.(appimage|deb)$/i.test(n),
     };
 
     const matcher = matchers[os];
     let asset = release.assets.find((a) => matcher(a.name));
-    if (!asset && os === "mac" && arch === "arm64") {
-        // fall back to Intel DMG if no arm64 build available
+    if (!asset && os === "mac") {
+        // Final fallback: any .dmg in the release.
         asset = release.assets.find((a) => /\.dmg$/i.test(a.name));
     }
     if (!asset) return null;
