@@ -156,21 +156,49 @@ export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boo
     }
 
     if (status.kind === "available") {
+        const isMac = status.info.os === "mac";
         return (
-            <a
-                href={status.info.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2 rounded-md border border-sidebar-border bg-sidebar px-2 py-1.5 text-[11px] text-sidebar-foreground hover:bg-muted transition-colors"
-                title={`${status.info.name} (${formatMB(status.info.size)})`}
-            >
-                <Download className="h-3.5 w-3.5" />
-                <span className="flex-1 truncate">
-                    Download Companion
-                    <span className="text-muted-foreground/60"> · {osLabel(status.info.os)}</span>
-                </span>
-                <span className="text-muted-foreground/40">{formatMB(status.info.size)}</span>
-            </a>
+            <div className="space-y-1">
+                <a
+                    href={status.info.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 rounded-md border border-sidebar-border bg-sidebar px-2 py-1.5 text-[11px] text-sidebar-foreground hover:bg-muted transition-colors"
+                    title={`${status.info.name} (${formatMB(status.info.size)})`}
+                >
+                    <Download className="h-3.5 w-3.5" />
+                    <span className="flex-1 truncate">
+                        Download Companion
+                        <span className="text-muted-foreground/60"> · {osLabel(status.info.os)}</span>
+                    </span>
+                    <span className="text-muted-foreground/40">{formatMB(status.info.size)}</span>
+                </a>
+                {isMac && (
+                    // macOS-specific install hint. The build is ad-hoc signed
+                    // (no Apple Developer ID), so first-launch shows
+                    // "developer cannot be verified". Two paths exist:
+                    //   1. Right-click → Open in Finder
+                    //   2. Strip quarantine flag via Terminal
+                    // We surface both as a tiny inline note.
+                    <details className="group rounded-md border border-amber-500/20 bg-amber-500/5 px-2 py-1 text-[10px] text-amber-300/80">
+                        <summary className="cursor-pointer text-[10px] font-medium">
+                            macOS install help (unsigned build)
+                        </summary>
+                        <div className="mt-1.5 space-y-1 leading-relaxed text-amber-200/70">
+                            <p>
+                                Right-click the app in <code>/Applications</code> → <strong>Open</strong>,
+                                then click <strong>Open</strong> on the warning dialog.
+                            </p>
+                            <p className="text-[9px] text-amber-200/50">
+                                Or run this in Terminal:
+                            </p>
+                            <code className="block break-all rounded bg-black/30 p-1 text-[9px] text-amber-100">
+                                xattr -dr com.apple.quarantine &quot;/Applications/MMO Companion.app&quot;
+                            </code>
+                        </div>
+                    </details>
+                )}
+            </div>
         );
     }
 
