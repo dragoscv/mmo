@@ -6,7 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 > Web app and companion are versioned independently:
 > - **Web app** (`app/`): see [`app/package.json`](app/package.json) — currently `0.2.0`
-> - **MMO Companion** (`server/`): see [`server/package.json`](server/package.json) — currently `0.3.7`, releases at [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
+> - **MMO Companion** (`server/`): see [`server/package.json`](server/package.json) — currently `0.9.5`, releases at [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
 
 ---
 

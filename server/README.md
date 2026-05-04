@@ -33,7 +33,7 @@ Companion-ul va porni cu o fereastră (UI minimal în `ui/`) și un server HTTP 
 Verifică că funcționează:
 ```bash
 curl http://127.0.0.1:17899/healthz
-# → { "ok": true, "version": "0.3.7", "capabilities": [...] }
+# → { "ok": true, "version": "0.9.5", "capabilities": [...] }
 ```
 
 ---
@@ -123,14 +123,14 @@ server/
 
 ## 🚢 Release flow
 
-1. Bump versiunea în `server/package.json` (`0.3.7` → `0.3.8`)
+1. Bump versiunea în `server/package.json` (`0.9.5` → `0.9.6`)
 2. Commit + push pe `main`
 3. Trigger workflow GitHub Actions: `.github/workflows/companion-release.yml`
    - Build pentru toate platformele
    - Upload în GitHub Releases la `dragoscv/mmo`
 4. Utilizatorii primesc notificare auto-update la următoarea pornire (sau în 24h)
 
-> **Notă**: electron-builder folosește versiunea din `package.json` ca tag git (`v0.3.8`), nu un custom prefix.
+> **Notă**: electron-builder folosește versiunea din `package.json` ca tag git (`v0.9.6`), nu un custom prefix.
 
 ---
 
