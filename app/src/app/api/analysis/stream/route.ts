@@ -18,11 +18,11 @@ export async function GET(request: Request) {
             };
 
             // Send initial state
-            send({ ...analysisManager.getStatus() });
+            send({ ...analysisManager.getStatus() } as Record<string, unknown>);
 
             // Subscribe to live events
             const unsubscribe = analysisManager.subscribe((event) => {
-                send(event);
+                send(event as unknown as Record<string, unknown>);
             });
 
             // Heartbeat every 15s to keep connection alive

@@ -324,6 +324,18 @@ export class DAWEngine {
         // the OS default if the hint can't be honoured.
         this.ctx = new AudioContext({ latencyHint: "interactive" });
 
+        // Audio keep-alive: see live-engine.ts for full rationale. Inaudible
+        // ConstantSourceNode → 0-gain → destination keeps Chrome's tab
+        // throttler off our back when the user tabs away to VS Code etc.
+        try {
+            const ka = this.ctx.createConstantSource();
+            ka.offset.value = 0;
+            const sink = this.ctx.createGain();
+            sink.gain.value = 0;
+            ka.connect(sink); sink.connect(this.ctx.destination);
+            ka.start();
+        } catch { /* older browsers — non-fatal */ }
+
         // Master chain: gain → compressor → limiter → analyser → destination
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.value = 0.85;

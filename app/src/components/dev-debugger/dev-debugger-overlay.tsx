@@ -438,21 +438,95 @@ function NetworkTab() {
 }
 
 function LogsTab() {
-    const cl = getCustomLogs(200);
-    const cs = getConsole(200);
-    const merged = [...cl.map(e => ({ ...e, src: "custom" })), ...cs.map(e => ({ ...e, src: "console" }))]
-        .sort((a, b) => a.t - b.t).slice(-300);
+    const cl = getCustomLogs(500);
+    const cs = getConsole(500);
+    const merged = [...cl.map(e => ({ ...e, src: "custom" as const })), ...cs.map(e => ({ ...e, src: "console" as const }))]
+        .sort((a, b) => a.t - b.t).slice(-600);
+
+    const [filter, setFilter] = useState("");
+    const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+
+    // Build the filtered view. Filter matches against category, level OR
+    // message text — gives the user one box that does what they expect.
+    const visible = filter.trim()
+        ? merged.filter(e => {
+            const f = filter.toLowerCase();
+            return e.category.toLowerCase().includes(f)
+                || e.level.toLowerCase().includes(f)
+                || e.msg.toLowerCase().includes(f);
+        })
+        : merged;
+
+    // Format for clipboard. Uses wall-clock + relative timestamp so the
+    // user can correlate with their own observations ("at 2:14:35 the
+    // sound changed"). `data` is JSON-stringified inline on one line so
+    // the export pastes cleanly into bug reports / chat.
+    const exportText = (entries: typeof merged) => entries
+        .map(e => {
+            const wall = e.wallTs ? new Date(e.wallTs).toISOString() : "";
+            const rel = `+${(e.t / 1000).toFixed(2)}s`;
+            const data = (e as { data?: unknown }).data !== undefined
+                ? ` ${JSON.stringify((e as { data?: unknown }).data)}`
+                : "";
+            return `${wall} ${rel.padStart(10)} ${e.level.toUpperCase().padEnd(5)} [${e.category}] ${e.msg}${data}`;
+        })
+        .join("\n");
+
+    const onCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(exportText(visible));
+            setCopyState("copied");
+            setTimeout(() => setCopyState("idle"), 1500);
+        } catch {
+            // Clipboard API blocked — fall back to a textarea select+copy.
+            const ta = document.createElement("textarea");
+            ta.value = exportText(visible);
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand("copy"); setCopyState("copied"); setTimeout(() => setCopyState("idle"), 1500); }
+            catch { /* give up */ }
+            document.body.removeChild(ta);
+        }
+    };
+
     if (merged.length === 0) return <Empty>No log entries.</Empty>;
+
     return (
-        <div className="space-y-0.5">
-            {merged.slice().reverse().map((e, i) => (
-                <div key={i} className="flex gap-2 px-1 py-0.5 hover:bg-white/[0.03] rounded">
-                    <span className="text-white/30 text-[9px] w-12 shrink-0">{(e.t / 1000).toFixed(1)}s</span>
-                    <span className={`text-[9px] w-10 shrink-0 ${levelColor(e.level)}`}>{e.level}</span>
-                    <span className="text-white/40 text-[9px] w-14 shrink-0">[{e.category}]</span>
-                    <span className="text-white/80 text-[10px] break-all">{e.msg}</span>
-                </div>
-            ))}
+        <div className="space-y-1">
+            <div className="sticky top-0 z-10 flex items-center gap-2 bg-black/60 backdrop-blur-md p-1 rounded -mx-1">
+                <input
+                    type="text"
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    placeholder="Filter by category, level, or text…"
+                    className="flex-1 px-2 py-1 text-[10px] bg-white/[0.04] border border-white/[0.08] rounded outline-none focus:border-white/20 text-white/80 placeholder:text-white/25 font-mono"
+                />
+                <span className="text-[9px] text-white/40 tabular-nums shrink-0">
+                    {visible.length}/{merged.length}
+                </span>
+                <button
+                    type="button"
+                    onClick={onCopy}
+                    className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+                        copyState === "copied"
+                            ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                            : "bg-white/[0.05] border-white/[0.1] text-white/70 hover:bg-white/[0.1]"
+                    }`}
+                    title="Copy filtered logs to clipboard"
+                >
+                    {copyState === "copied" ? "Copied!" : "Copy"}
+                </button>
+            </div>
+            <div className="space-y-0.5">
+                {visible.slice().reverse().map((e, i) => (
+                    <div key={i} className="flex gap-2 px-1 py-0.5 hover:bg-white/[0.03] rounded">
+                        <span className="text-white/30 text-[9px] w-12 shrink-0">{(e.t / 1000).toFixed(1)}s</span>
+                        <span className={`text-[9px] w-10 shrink-0 ${levelColor(e.level)}`}>{e.level}</span>
+                        <span className="text-white/40 text-[9px] w-20 shrink-0 truncate" title={e.category}>[{e.category}]</span>
+                        <span className="text-white/80 text-[10px] break-all">{e.msg}</span>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }

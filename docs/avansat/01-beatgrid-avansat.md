@@ -1,5 +1,7 @@
 # 🟡 Beatgrid Avansat — Corectare Manuală
 
+> ⚠️ **Context**: ghid avansat **rekordbox**. Pentru MMO → [`docs/aplicatie/`](../aplicatie/README.md).
+
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../README.md#-avansat)
 
 | ← Prev | Next → |

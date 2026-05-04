@@ -218,4 +218,78 @@
 
 ---
 
+## 🌐 Termeni MMO (Web / Desktop / Extension)
+
+> Termeni introdusi de suita MMO (web app, Companion Electron, Browser Extension, infrastructură).
+
+### A-C
+
+| Termen | Definiție |
+|--------|----------|
+| **AudioWorklet** | API Web Audio pentru procesare audio low-latency într-un thread dedicat (folosit de FX engine MMO) |
+| **AGENTS.md** | Fișier convenție pentru a documenta agenții AI/automatizări dintr-un repo |
+| **App Router** | Arhitectura de routing din Next.js 13+ (folder-based, RSC by default) |
+| **Auth.js** | Bibliotecă de autentificare modernă (succesor NextAuth) — folosită de MMO |
+| **Beatgrid auto** | Calcul automat al beatgrid-ului în Companion (engine `audio-analyzer`) |
+| **Better-sqlite3** | Driver Node.js sincron pentru SQLite — folosit ca DB local |
+| **Bundler** | Tool care împachetează modulele JS pentru browser (Turbopack în Next.js 16) |
+| **Cache Components** | Feature Next.js 16 pentru caching opt-in cu directive `"use cache"` |
+| **Camelot** | Sistem de notare a tonalităților (1A-12B) — vezi mai sus la "Camelot Wheel" |
+| **chokidar** | Bibliotecă Node.js pentru watch foldere (folosită de Companion) |
+| **CORS** | Cross-Origin Resource Sharing — control browser pentru cereri către alte domenii |
+| **Companion** | App-ul desktop Electron al MMO — pereche pentru web app, expune APIs locale |
+
+### D-G
+
+| Termen | Definiție |
+|--------|----------|
+| **DAW** | Digital Audio Workstation — definit mai sus, MMO are unul integrat la `/daw` |
+| **Drizzle ORM** | ORM TypeScript SQL-first folosit de MMO |
+| **Electron** | Framework pentru a rula web apps ca desktop apps (Companion folosește Electron) |
+| **electron-builder** | Tool pentru build & packaging Electron apps cu auto-update |
+| **Express** | Framework HTTP minim Node.js — folosit de Companion pentru API loopback |
+| **FFT** | Fast Fourier Transform — analiză spectrală audio (folosită pentru vizualizări + key detect) |
+| **GitHub Releases** | Mecanism de distribuție binară (Companion downloads + auto-update) |
+
+### H-M
+
+| Termen | Definiție |
+|--------|----------|
+| **HMAC-SHA1** | Algoritm de semnare folosit pentru TURN credentials ephemeral |
+| **HTTP loopback** | Server HTTP doar pe `127.0.0.1` (nu accesibil din rețea) — Companion `:17899` |
+| **ICE** | Interactive Connectivity Establishment — protocol WebRTC pentru găsire path P2P |
+| **MIDI CC** | Control Change — mesaj MIDI pentru controlere continue (knob, fader) |
+| **MIDI Clock** | Definit mai sus — MMO folosește pentru sync cu controllere |
+| **Manifest V3** | Versiunea curentă a manifestului pentru Chrome extensions (service worker) |
+
+### N-R
+
+| Termen | Definiție |
+|--------|----------|
+| **Next.js** | Framework React full-stack (App Router, RSC, Server Actions) — baza MMO web app |
+| **next-auth** | Vezi Auth.js |
+| **Opus** | Codec audio low-bitrate optim pentru voice/streaming (folosit de WebRTC) |
+| **P2P** | Peer-to-peer — comunicare directă între dispozitive, fără server intermediar |
+| **proxy.ts** | Convenție Next.js 16 — înlocuiește middleware.ts (deprecated) pentru route interception |
+| **Range request** | HTTP feature pentru streaming parțial (folosit la `/api/audio/[id]`) |
+| **RSC** | React Server Components — rendering pe server, payload mai mic la client |
+
+### S-Z
+
+| Termen | Definiție |
+|--------|----------|
+| **Server Action** | Funcție React 19 marcată `"use server"` — apelabilă direct din client cu type safety |
+| **Shadcn/ui** | Bibliotecă de componente accesibile (Radix UI + Tailwind) — folosită de MMO |
+| **SSE** | Server-Sent Events — streaming uni-direcțional server→client (folosit pentru WebRTC signaling) |
+| **Stems** | Track separat pe instrumente (drums / bass / vocals / other) — engine `stems-engine.ts` |
+| **STUN** | Session Traversal Utilities for NAT — server pentru a descoperi IP-ul public |
+| **Tailwind CSS** | Framework CSS utility-first (v4 cu `@theme`) — stilul MMO |
+| **Turbopack** | Bundler Next.js 16 (înlocuiește webpack) — mai rapid în dev |
+| **TURN** | Traversal Using Relays around NAT — relay server când P2P direct nu funcționează (Coturn) |
+| **WebRTC** | Web Real-Time Communication — standard pentru P2P audio/video/data în browser |
+| **WebSocket** | Protocol pentru comunicare bidirecțională persistentă (folosit de Companion ↔ web) |
+| **yt-dlp** | Tool CLI pentru download de pe YouTube/SoundCloud/etc. (folosit de modulul Download) |
+
+---
+
 [🏠 Home](../README.md)

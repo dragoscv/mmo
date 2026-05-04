@@ -1,55 +1,41 @@
 "use server";
 
-import { db } from "@/db";
-import { tracks, scanLogs, settings } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { moveTrackToGenreFolder } from "@/lib/organizer";
+/**
+ * Move a track on disk into a per-genre folder, then update the
+ * companion's library row to reflect the new path. Filesystem move is
+ * still done from this Node process (the web app has direct access to
+ * the user's drives via @/lib/organizer); only the DB write is proxied.
+ */
+
 import { revalidatePath } from "next/cache";
+import { moveTrackToGenreFolder } from "@/lib/organizer";
+import { companionLibrary, getCompanionLink } from "@/lib/companion-library";
+import { getSetting } from "@/actions/settings";
 
 export async function organizeTrack(trackId: number, genre: string) {
-    const track = db.select().from(tracks).where(eq(tracks.id, trackId)).get();
+    const link = await getCompanionLink();
+    if (!link) return { success: false, error: "Companion not connected" };
+
+    const track = await companionLibrary.getTrackById(link, trackId);
     if (!track) return { success: false, error: "Track not found" };
 
-    // Get music root and genre folders from settings
-    const musicRootSetting = db
-        .select()
-        .from(settings)
-        .where(eq(settings.key, "music_root"))
-        .get();
-    const genreFoldersSetting = db
-        .select()
-        .from(settings)
-        .where(eq(settings.key, "genre_folders"))
-        .get();
-
-    const musicRoot = musicRootSetting?.value || "H:\\Music";
-    const genreFolders: Record<string, string> = genreFoldersSetting?.value
-        ? JSON.parse(genreFoldersSetting.value)
-        : {};
+    const musicRoot = (await getSetting("music_root")) || "H:\\Music";
+    let genreFolders: Record<string, string> = {};
+    try {
+        const raw = await getSetting("genre_folders");
+        if (raw) genreFolders = JSON.parse(raw);
+    } catch { /* ignore */ }
 
     const targetFolder = genreFolders[genre] || `DJ/${genre}`;
     const result = moveTrackToGenreFolder(track.filepath, musicRoot, targetFolder);
 
     if (result.success) {
-        // Update track in DB
-        db.update(tracks)
-            .set({
-                filepath: result.newPath,
-                filename: result.newPath.split(/[\\/]/).pop() || track.filename,
-                genre,
-                isProcessed: true,
-            })
-            .where(eq(tracks.id, trackId))
-            .run();
-
-        db.insert(scanLogs)
-            .values({
-                action: "moved",
-                filepath: result.newPath,
-                details: `Moved to ${targetFolder}: ${track.artist || "Unknown"} - ${track.title || track.filename}`,
-            })
-            .run();
-
+        await companionLibrary.updateTrack(link, trackId, {
+            filepath: result.newPath,
+            filename: result.newPath.split(/[\\/]/).pop() || track.filename,
+            genre,
+            isProcessed: true,
+        });
         revalidatePath("/library");
         revalidatePath("/scanner");
         revalidatePath("/");
@@ -60,12 +46,18 @@ export async function organizeTrack(trackId: number, genre: string) {
 
 export async function organizeMultipleTracks(
     trackIds: number[],
-    genre: string
-) {
-    const results = [];
+    genre: string,
+): Promise<{ moved: number; errors: number }> {
+    let moved = 0;
+    let errors = 0;
     for (const id of trackIds) {
-        const result = await organizeTrack(id, genre);
-        results.push({ id, ...result });
+        try {
+            const r = await organizeTrack(id, genre);
+            if (r.success) moved++;
+            else errors++;
+        } catch {
+            errors++;
+        }
     }
-    return results;
+    return { moved, errors };
 }

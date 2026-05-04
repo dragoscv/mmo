@@ -320,6 +320,16 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
         const handleMidiMessage = (e: Event) => {
             const detail = (e as CustomEvent).detail;
             if (!detail) return;
+            // Only react to messages that actually came from THIS Circuit
+            // Tracks port. Otherwise notes from other connected controllers
+            // (e.g. DDJ-FLX4 transport on ch 0/1) would light up phantom
+            // CT pads and corrupt mixer/macro state.
+            // System Real-Time messages (start/stop/clock) are global \u2014
+            // accept those regardless so transport sync still works even
+            // if the engine couldn't tag them with a sourceId.
+            const isSystemRT = detail.type === "start" || detail.type === "stop"
+                || detail.type === "continue" || detail.type === "clock";
+            if (!isSystemRT && detail.sourceId && detail.sourceId !== device.id) return;
             const { channel, type, note, value } = detail;
 
             // ── Transport: Start / Stop / Continue ──
@@ -430,7 +440,7 @@ export const CircuitTracksPanel = memo(function CircuitTracksPanel({
 
         window.addEventListener("circuit-tracks-midi", handleMidiMessage);
         return () => window.removeEventListener("circuit-tracks-midi", handleMidiMessage);
-    }, [profile.tracks, syncMode]);
+    }, [profile.tracks, syncMode, device.id]);
 
     // Drag handlers
     const handleDragStart = useCallback((e: React.PointerEvent) => {

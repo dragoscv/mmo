@@ -11,6 +11,7 @@ import { EFFECT_TYPES, DEFAULT_EFFECT_PARAMS, type EffectType, type InsertEffect
 import { useContextMenu, type MenuEntry } from "./daw-context-menu";
 import { useScrollAdjust } from "./daw-ui-utils";
 import { useRenderCount } from "@/lib/dev-debugger";
+import { PluginRack, type PluginChainSlot } from "@/components/plugins/plugin-rack";
 
 export function DAWEffectsRack() {
     useRenderCount("DAWEffectsRack");
@@ -18,6 +19,11 @@ export function DAWEffectsRack() {
     const ctxMenu = useContextMenu();
     const track = daw.project.tracks.find(t => t.id === daw.selectedTrackId);
     const [selectedFx, setSelectedFx] = useState<string | null>(null);
+    // Per-track VST/AU/LV2 chain. Stored in component state for now;
+    // persisting into project state lives in a follow-up PR — keeping
+    // this map in-memory keeps the chain across re-renders without
+    // disturbing the existing project schema.
+    const [pluginChains, setPluginChains] = useState<Record<string, PluginChainSlot[]>>({});
 
     const handleInsertContextMenu = useCallback((e: React.MouseEvent, insert: InsertEffect, idx: number) => {
         e.preventDefault();
@@ -147,6 +153,17 @@ export function DAWEffectsRack() {
                             />
                         </div>
                     ))}
+                </div>
+
+                {/* VST / AU / LV2 plugin rack — companion-hosted, offline render */}
+                <div className="border-t border-white/10 p-1.5">
+                    <PluginRack
+                        mode="compact"
+                        role="track"
+                        title="Plugins"
+                        chain={pluginChains[track.id] ?? []}
+                        onChange={(next) => setPluginChains((prev) => ({ ...prev, [track.id]: next }))}
+                    />
                 </div>
             </div>
 

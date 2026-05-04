@@ -1,5 +1,7 @@
 # 🟢 Primul Mix — DDJ-FLX4 + Rekordbox
 
+> ⚠️ **Context**: mix în **rekordbox**. MMO are mixer integrat (browser, suport DDJ-FLX4) → [`docs/aplicatie/mixer.md`](../aplicatie/mixer.md).
+
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../README.md#-începător)
 
 | ← Prev | Next → |

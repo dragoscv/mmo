@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import {
     Download, Search, Music, Video, FileAudio, Loader2, CheckCircle2,
     AlertCircle, Library, ExternalLink, X, ChevronDown, ChevronUp,
     Globe, Clock, User, Play, HardDrive, FolderOpen, Settings2,
     Trash2, History, Sparkles, Image, MicVocal, Tag,
     ListMusic, CheckSquare, Square, CheckCheck, XSquare, FolderPlus, Plus,
+    Link as LinkIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -15,6 +16,15 @@ import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useRenderCount } from "@/lib/dev-debugger";
+import {
+    ProviderSearchPanel,
+} from "@/components/provider-search-panel";
+import {
+    LatestDownloadsList,
+    useLatestDownloads,
+} from "@/components/latest-downloads-list";
+import { DownloadSidebar } from "@/components/download-sidebar";
+import { getTrackById, getTracks } from "@/actions/tracks";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -393,11 +403,63 @@ function FolderPicker({ currentPath, onSelect, onClose }: {
 export function DownloadClient() {
     useRenderCount("Page:/download");
     const searchParams = useSearchParams();
+    const pathname = usePathname();
+    const router = useRouter();
     const initialUrl = searchParams.get("url") || "";
     const autoDownload = searchParams.get("auto") === "1";
+    const initialTab = searchParams.get("tab") === "search" ? "search" : "url";
+    const initialSearchQuery = searchParams.get("q") || "";
+    const initialExpanded = useMemo(() => {
+        const raw = searchParams.get("expanded");
+        return raw
+            ? new Set(raw.split(",").map(s => s.trim()).filter(Boolean))
+            : new Set<string>();
+        // Parse once on mount; subsequent changes are pushed via router.replace.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const [url, setUrl] = useState(initialUrl);
     const [status, setStatus] = useState<DownloadStatus>("idle");
+    // Input mode: "url" = paste URL, "search" = search across providers
+    const [inputMode, setInputMode] = useState<"url" | "search">(
+        initialUrl ? "url" : (initialTab === "search" ? "search" : "url")
+    );
+    // Live mirror of the search query so we can sync it into the URL.
+    const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+    const [expandedProviders, setExpandedProviders] = useState<Set<string>>(initialExpanded);
+
+    // Sync `tab`, `q`, `expanded` to the URL (without adding history entries).
+    // Skips updating when nothing actually changed to avoid pointless replaces.
+    useEffect(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        // Tab — only persist when it differs from the default.
+        if (inputMode === "search") {
+            params.set("tab", "search");
+        } else {
+            params.delete("tab");
+        }
+        // Search query — only when on the search tab.
+        if (inputMode === "search" && searchQuery.trim()) {
+            params.set("q", searchQuery.trim());
+        } else {
+            params.delete("q");
+        }
+        // Expanded providers (sorted for stability).
+        if (inputMode === "search" && expandedProviders.size > 0) {
+            params.set("expanded", [...expandedProviders].sort().join(","));
+        } else {
+            params.delete("expanded");
+        }
+        const next = params.toString();
+        const current = searchParams.toString();
+        if (next !== current) {
+            router.replace(`${pathname}${next ? `?${next}` : ""}`, { scroll: false });
+        }
+    }, [inputMode, searchQuery, expandedProviders, pathname, router, searchParams]);
+    // Latest-downloads side panel — accumulates tracks added in this session
+    // (and seeds with a few recent rows from the library on mount).
+    const latestDownloads = useLatestDownloads();
+    const latestDownloadsSeededRef = useRef(false);
     const [mediaInfo, setMediaInfo] = useState<MediaInfo | null>(null);
     const [progress, setProgress] = useState<DownloadProgress | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -424,8 +486,13 @@ export function DownloadClient() {
 
     // History
     const [history, setHistory] = useState<DownloadHistoryItem[]>([]);
-    const [showHistory, setShowHistory] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
+
+    // Right sidebar state — collapsible, with two tabs (Latest / History).
+    // Default open on desktop; the user can toggle with the header buttons or
+    // the sidebar's own close button.
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarTab, setSidebarTab] = useState<"latest" | "history">("latest");
 
     // Analysis result display
     const [analysisResults, setAnalysisResults] = useState<Record<string, string> | null>(null);
@@ -455,6 +522,51 @@ export function DownloadClient() {
                 }
             })
             .catch(() => { });
+    }, []);
+
+    // Seed the "Latest Downloads" panel once on mount with the most recently
+    // added library tracks that came from a download (i.e. have a sourceUrl).
+    useEffect(() => {
+        if (latestDownloadsSeededRef.current) return;
+        latestDownloadsSeededRef.current = true;
+        getTracks({
+            pageSize: 5,
+            sort: "addedAt",
+            order: "desc",
+        })
+            .then((res) => {
+                const seeded = res.tracks.filter((t) => !!t.sourceUrl);
+                if (seeded.length > 0) latestDownloads.setInitial(seeded);
+            })
+            .catch(() => {
+                /* non-fatal */
+            });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Helper: fetch a full Track row by id and prepend it to the latest list.
+    const pushTrackToLatest = useCallback(async (trackId: number) => {
+        try {
+            const t = await getTrackById(trackId);
+            if (t) latestDownloads.addTrack(t);
+        } catch {
+            /* non-fatal */
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const pushTracksToLatest = useCallback(async (trackIds: number[]) => {
+        if (trackIds.length === 0) return;
+        try {
+            const fetched = await Promise.all(
+                trackIds.map((id) => getTrackById(id).catch(() => null))
+            );
+            const valid = fetched.filter((t): t is NonNullable<typeof t> => !!t);
+            if (valid.length > 0) latestDownloads.addTracks(valid);
+        } catch {
+            /* non-fatal */
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Auto-fetch info when URL is provided via query param
@@ -495,6 +607,30 @@ export function DownloadClient() {
         await fetch(`/api/download/history?id=${id}`, { method: "DELETE" });
         setHistory(prev => prev.filter(h => h.id !== id));
     }, []);
+
+    // Auto-load history the first time the user opens the History tab.
+    const historyLoadedRef = useRef(false);
+    useEffect(() => {
+        if (
+            sidebarOpen &&
+            sidebarTab === "history" &&
+            !historyLoadedRef.current
+        ) {
+            historyLoadedRef.current = true;
+            loadHistory();
+        }
+    }, [sidebarOpen, sidebarTab, loadHistory]);
+
+    // Refresh history whenever a track is added during the session, so the
+    // History tab stays in sync with new entries even if the user is busy
+    // looking at "Latest".
+    const refreshHistorySoon = useCallback(() => {
+        if (!historyLoadedRef.current) return;
+        // Tiny delay so the server has time to flush the row.
+        setTimeout(() => {
+            void loadHistory();
+        }, 400);
+    }, [loadHistory]);
 
     const saveSetting = useCallback(async (key: string, value: string) => {
         await fetch("/api/download/settings", {
@@ -766,6 +902,7 @@ export function DownloadClient() {
             if (res.status === 409) {
                 setAddedTrackId(data.trackId);
                 setStatus("added");
+                if (data.trackId) void pushTrackToLatest(data.trackId);
                 toast.info("Track already in library");
                 return;
             }
@@ -774,6 +911,7 @@ export function DownloadClient() {
 
             setAddedTrackId(data.trackId);
             setStatus("added");
+            if (data.trackId) void pushTrackToLatest(data.trackId);
             toast.success("Added to library & analyzed!");
 
             // Show what was enriched from analysis
@@ -946,13 +1084,16 @@ export function DownloadClient() {
                                                 toast.success(`Added ${addData.added} tracks to library${addData.existing ? ` (${addData.existing} already existed)` : ""}`);
                                                 // Update batch results with library IDs
                                                 if (addData.results) {
+                                                    const addedIds: number[] = [];
                                                     setBatchResults(prev => prev.map(r => {
                                                         const match = addData.results.find((ar: { filePath: string; trackId?: number; error?: string }) => ar.filePath === r.file);
                                                         if (match) {
+                                                            if (match.trackId) addedIds.push(match.trackId);
                                                             return { ...r, addedTrackId: match.trackId, addError: match.error };
                                                         }
                                                         return r;
                                                     }));
+                                                    if (addedIds.length > 0) void pushTracksToLatest(addedIds);
                                                 }
                                             }
                                         } catch {
@@ -1015,11 +1156,16 @@ export function DownloadClient() {
             if (res.ok) {
                 toast.success(`Added ${data.added} tracks to library`);
                 if (data.results) {
+                    const addedIds: number[] = [];
                     setBatchResults(prev => prev.map(r => {
                         const match = data.results.find((ar: { filePath: string; trackId?: number; error?: string }) => ar.filePath === r.file);
-                        if (match) return { ...r, addedTrackId: match.trackId, addError: match.error };
+                        if (match) {
+                            if (match.trackId) addedIds.push(match.trackId);
+                            return { ...r, addedTrackId: match.trackId, addError: match.error };
+                        }
                         return r;
                     }));
+                    if (addedIds.length > 0) void pushTracksToLatest(addedIds);
                 }
             } else {
                 toast.error(data.error || "Failed to add tracks");
@@ -1049,6 +1195,17 @@ export function DownloadClient() {
         setAnalysisResults(null);
     }, []);
 
+    // Provider search panel handles inline downloads itself; we only need to
+    // mirror successfully-added tracks into the "Latest Downloads" panel and
+    // the download history. The view never switches away from "Search".
+    const handleProviderTrackAdded = useCallback(
+        (trackId: number) => {
+            void pushTrackToLatest(trackId);
+            refreshHistorySoon();
+        },
+        [pushTrackToLatest, refreshHistorySoon]
+    );
+
     // Group formats
     const audioFormats = mediaInfo?.formats.filter(f => f.type === "audio")
         .sort((a, b) => (b.abr || 0) - (a.abr || 0)) || [];
@@ -1073,135 +1230,122 @@ export function DownloadClient() {
 
     return (
         <div className="flex flex-col h-full overflow-y-auto">
-            <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-                            <Download className="h-5 w-5 text-purple-500" />
-                            Media Downloader
-                        </h1>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            Download audio from YouTube, SoundCloud, Spotify, and 1800+ sites
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}
-                            className={cn(
-                                "p-2 rounded-lg text-xs transition-colors cursor-pointer",
-                                showHistory ? "bg-purple-500/20 text-purple-400" : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                            )}
-                            title="Download History"
-                        >
-                            <History className="h-4 w-4" />
-                        </button>
-                        <button
-                            onClick={() => setShowSettings(!showSettings)}
-                            className={cn(
-                                "p-2 rounded-lg text-xs transition-colors cursor-pointer",
-                                showSettings ? "bg-purple-500/20 text-purple-400" : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                            )}
-                            title="Download Settings"
-                        >
-                            <Settings2 className="h-4 w-4" />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Settings Panel */}
-                {showSettings && (
-                    <div className="rounded-xl bg-card border border-border p-4 space-y-4">
-                        <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
-                            <Settings2 className="h-3.5 w-3.5 text-purple-500" />
-                            Download Settings
-                        </h3>
-
-                        {/* Download Folder */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs text-muted-foreground font-medium">Download Folder</label>
-                            <div className="flex items-center gap-2">
-                                <div className="flex-1 px-3 py-2 rounded-lg bg-muted/30 border border-border text-xs font-mono text-muted-foreground truncate">
-                                    {downloadFolder || "Default (app/data/downloads)"}
-                                </div>
-                                <button
-                                    onClick={() => setShowFolderPicker(true)}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent hover:bg-accent/80 border border-border text-xs text-foreground transition-colors cursor-pointer"
-                                >
-                                    <FolderOpen className="h-3.5 w-3.5" />
-                                    Browse
-                                </button>
-                                {downloadFolder && (
-                                    <button
-                                        onClick={() => {
-                                            setDownloadFolder("");
-                                            saveSetting("downloadFolder", "");
-                                        }}
-                                        className="p-2 rounded-lg text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
-                                        title="Reset to default"
-                                    >
-                                        <X className="h-3.5 w-3.5" />
-                                    </button>
+            <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-6 flex flex-col lg:flex-row gap-6">
+                {/* Main column */}
+                <div className="flex-1 min-w-0 space-y-6">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+                                <Download className="h-5 w-5 text-purple-500" />
+                                Media Downloader
+                            </h1>
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Download audio from YouTube, SoundCloud, Spotify, and 1800+ sites
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => {
+                                    if (sidebarOpen && sidebarTab === "latest") {
+                                        setSidebarOpen(false);
+                                    } else {
+                                        setSidebarOpen(true);
+                                        setSidebarTab("latest");
+                                    }
+                                }}
+                                className={cn(
+                                    "p-2 rounded-lg text-xs transition-colors cursor-pointer",
+                                    sidebarOpen && sidebarTab === "latest"
+                                        ? "bg-purple-500/20 text-purple-400"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
                                 )}
-                            </div>
+                                title="Latest Downloads"
+                            >
+                                <Sparkles className="h-4 w-4" />
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (sidebarOpen && sidebarTab === "history") {
+                                        setSidebarOpen(false);
+                                    } else {
+                                        setSidebarOpen(true);
+                                        setSidebarTab("history");
+                                    }
+                                }}
+                                className={cn(
+                                    "p-2 rounded-lg text-xs transition-colors cursor-pointer",
+                                    sidebarOpen && sidebarTab === "history"
+                                        ? "bg-purple-500/20 text-purple-400"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                                )}
+                                title="Download History"
+                            >
+                                <History className="h-4 w-4" />
+                            </button>
+                            <button
+                                onClick={() => setShowSettings(!showSettings)}
+                                className={cn(
+                                    "p-2 rounded-lg text-xs transition-colors cursor-pointer",
+                                    showSettings ? "bg-purple-500/20 text-purple-400" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                                )}
+                                title="Download Settings"
+                            >
+                                <Settings2 className="h-4 w-4" />
+                            </button>
                         </div>
+                    </div>
 
-                        {/* Audio Quality + Format */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground">Audio Quality</Label>
-                                <Select
-                                    value={audioQuality}
-                                    onChange={(e) => {
-                                        setAudioQuality(e.target.value);
-                                        saveSetting("audioQuality", e.target.value);
-                                    }}
-                                    size="sm"
-                                >
-                                    {AUDIO_QUALITIES.map(q => (
-                                        <option key={q.value} value={q.value}>
-                                            {q.label}
-                                        </option>
-                                    ))}
-                                </Select>
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label className="text-xs text-muted-foreground">Audio Format</Label>
-                                <Select
-                                    value={audioFormat}
-                                    onChange={(e) => {
-                                        setAudioFormat(e.target.value);
-                                        saveSetting("audioFormat", e.target.value);
-                                    }}
-                                    size="sm"
-                                >
-                                    {AUDIO_FORMATS.map(f => (
-                                        <option key={f.value} value={f.value}>
-                                            {f.label}
-                                        </option>
-                                    ))}
-                                </Select>
-                            </div>
-                        </div>
+                    {/* Settings Panel */}
+                    {showSettings && (
+                        <div className="rounded-xl bg-card border border-border p-4 space-y-4">
+                            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
+                                <Settings2 className="h-3.5 w-3.5 text-purple-500" />
+                                Download Settings
+                            </h3>
 
-                        {/* Conversion Settings */}
-                        <div className="pt-3 border-t border-border/50">
-                            <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                                <FileAudio className="h-3 w-3 text-blue-400" />
-                                Conversion Settings
-                            </h4>
+                            {/* Download Folder */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs text-muted-foreground font-medium">Download Folder</label>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1 px-3 py-2 rounded-lg bg-muted/30 border border-border text-xs font-mono text-muted-foreground truncate">
+                                        {downloadFolder || "Default (app/data/downloads)"}
+                                    </div>
+                                    <button
+                                        onClick={() => setShowFolderPicker(true)}
+                                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent hover:bg-accent/80 border border-border text-xs text-foreground transition-colors cursor-pointer"
+                                    >
+                                        <FolderOpen className="h-3.5 w-3.5" />
+                                        Browse
+                                    </button>
+                                    {downloadFolder && (
+                                        <button
+                                            onClick={() => {
+                                                setDownloadFolder("");
+                                                saveSetting("downloadFolder", "");
+                                            }}
+                                            className="p-2 rounded-lg text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
+                                            title="Reset to default"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Audio Quality + Format */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs text-muted-foreground">Convert Quality</Label>
+                                    <Label className="text-xs text-muted-foreground">Audio Quality</Label>
                                     <Select
-                                        value={conversionQuality}
+                                        value={audioQuality}
                                         onChange={(e) => {
-                                            setConversionQuality(e.target.value);
-                                            saveSetting("conversionQuality", e.target.value);
+                                            setAudioQuality(e.target.value);
+                                            saveSetting("audioQuality", e.target.value);
                                         }}
                                         size="sm"
                                     >
-                                        {CONVERSION_QUALITIES.map(q => (
+                                        {AUDIO_QUALITIES.map(q => (
                                             <option key={q.value} value={q.value}>
                                                 {q.label}
                                             </option>
@@ -1209,16 +1353,16 @@ export function DownloadClient() {
                                     </Select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs text-muted-foreground">Convert Format</Label>
+                                    <Label className="text-xs text-muted-foreground">Audio Format</Label>
                                     <Select
-                                        value={conversionFormat}
+                                        value={audioFormat}
                                         onChange={(e) => {
-                                            setConversionFormat(e.target.value);
-                                            saveSetting("conversionFormat", e.target.value);
+                                            setAudioFormat(e.target.value);
+                                            saveSetting("audioFormat", e.target.value);
                                         }}
                                         size="sm"
                                     >
-                                        {CONVERSION_FORMATS.map(f => (
+                                        {AUDIO_FORMATS.map(f => (
                                             <option key={f.value} value={f.value}>
                                                 {f.label}
                                             </option>
@@ -1226,839 +1370,865 @@ export function DownloadClient() {
                                     </Select>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Parallel Processing Settings */}
-                        <div className="pt-3 border-t border-border/50">
-                            <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                                <Sparkles className="h-3 w-3 text-orange-400" />
-                                Parallel Processing
-                            </h4>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs text-muted-foreground">Parallel Downloads</Label>
-                                    <Select
-                                        value={String(parallelDownloads)}
-                                        onChange={(e) => {
-                                            const v = Number(e.target.value);
-                                            setParallelDownloads(v);
-                                            saveSetting("parallelDownloads", e.target.value);
-                                        }}
-                                        size="sm"
-                                    >
-                                        {[1, 2, 3, 4, 5, 6, 8].map(n => (
-                                            <option key={n} value={n}>
-                                                {n === 1 ? "1 (Sequential)" : `${n} simultaneous`}
-                                            </option>
-                                        ))}
-                                    </Select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs text-muted-foreground">Parallel Conversions</Label>
-                                    <Select
-                                        value={String(parallelConversions)}
-                                        onChange={(e) => {
-                                            const v = Number(e.target.value);
-                                            setParallelConversions(v);
-                                            saveSetting("parallelConversions", e.target.value);
-                                        }}
-                                        size="sm"
-                                    >
-                                        {[1, 2, 3, 4, 5, 6, 8].map(n => (
-                                            <option key={n} value={n}>
-                                                {n === 1 ? "1 (Sequential)" : `${n} simultaneous`}
-                                            </option>
-                                        ))}
-                                    </Select>
+                            {/* Conversion Settings */}
+                            <div className="pt-3 border-t border-border/50">
+                                <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <FileAudio className="h-3 w-3 text-blue-400" />
+                                    Conversion Settings
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs text-muted-foreground">Convert Quality</Label>
+                                        <Select
+                                            value={conversionQuality}
+                                            onChange={(e) => {
+                                                setConversionQuality(e.target.value);
+                                                saveSetting("conversionQuality", e.target.value);
+                                            }}
+                                            size="sm"
+                                        >
+                                            {CONVERSION_QUALITIES.map(q => (
+                                                <option key={q.value} value={q.value}>
+                                                    {q.label}
+                                                </option>
+                                            ))}
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs text-muted-foreground">Convert Format</Label>
+                                        <Select
+                                            value={conversionFormat}
+                                            onChange={(e) => {
+                                                setConversionFormat(e.target.value);
+                                                saveSetting("conversionFormat", e.target.value);
+                                            }}
+                                            size="sm"
+                                        >
+                                            {CONVERSION_FORMATS.map(f => (
+                                                <option key={f.value} value={f.value}>
+                                                    {f.label}
+                                                </option>
+                                            ))}
+                                        </Select>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <p className="text-[10px] text-muted-foreground/40">
-                            Settings are persisted and apply to all future downloads
-                        </p>
-                    </div>
-                )}
-
-                {/* History Panel */}
-                {showHistory && (
-                    <div className="rounded-xl bg-card border border-border overflow-hidden">
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-2">
-                                <History className="h-3.5 w-3.5 text-purple-500" />
-                                Download History
-                                {history.length > 0 && (
-                                    <span className="text-muted-foreground font-normal">({history.length})</span>
-                                )}
-                            </h3>
-                            {history.length > 0 && (
-                                <button
-                                    onClick={clearHistory}
-                                    className="text-[10px] text-muted-foreground hover:text-red-400 transition-colors cursor-pointer flex items-center gap-1"
-                                >
-                                    <Trash2 className="h-3 w-3" />
-                                    Clear all
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="max-h-80 overflow-y-auto">
-                            {historyLoading ? (
-                                <div className="flex items-center justify-center py-8">
-                                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            {/* Parallel Processing Settings */}
+                            <div className="pt-3 border-t border-border/50">
+                                <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <Sparkles className="h-3 w-3 text-orange-400" />
+                                    Parallel Processing
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs text-muted-foreground">Parallel Downloads</Label>
+                                        <Select
+                                            value={String(parallelDownloads)}
+                                            onChange={(e) => {
+                                                const v = Number(e.target.value);
+                                                setParallelDownloads(v);
+                                                saveSetting("parallelDownloads", e.target.value);
+                                            }}
+                                            size="sm"
+                                        >
+                                            {[1, 2, 3, 4, 5, 6, 8].map(n => (
+                                                <option key={n} value={n}>
+                                                    {n === 1 ? "1 (Sequential)" : `${n} simultaneous`}
+                                                </option>
+                                            ))}
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs text-muted-foreground">Parallel Conversions</Label>
+                                        <Select
+                                            value={String(parallelConversions)}
+                                            onChange={(e) => {
+                                                const v = Number(e.target.value);
+                                                setParallelConversions(v);
+                                                saveSetting("parallelConversions", e.target.value);
+                                            }}
+                                            size="sm"
+                                        >
+                                            {[1, 2, 3, 4, 5, 6, 8].map(n => (
+                                                <option key={n} value={n}>
+                                                    {n === 1 ? "1 (Sequential)" : `${n} simultaneous`}
+                                                </option>
+                                            ))}
+                                        </Select>
+                                    </div>
                                 </div>
-                            ) : history.length === 0 ? (
-                                <p className="text-xs text-muted-foreground/50 text-center py-8">No downloads yet</p>
-                            ) : (
-                                <div className="divide-y divide-border">
-                                    {history.map(item => (
-                                        <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/30 transition-colors group">
+                            </div>
+
+                            <p className="text-[10px] text-muted-foreground/40">
+                                Settings are persisted and apply to all future downloads
+                            </p>
+                        </div>
+                    )}
+
+                    {/* History panel moved to right sidebar */}
+
+                    {/* Input Mode Tabs */}
+                    <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/30 border border-border w-fit">
+                        <button
+                            type="button"
+                            onClick={() => setInputMode("url")}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+                                inputMode === "url"
+                                    ? "bg-card text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <LinkIcon className="h-3.5 w-3.5" />
+                            Paste URL
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setInputMode("search")}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+                                inputMode === "search"
+                                    ? "bg-card text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <Search className="h-3.5 w-3.5" />
+                            Search Providers
+                        </button>
+                    </div>
+
+                    {/* Search Providers Panel */}
+                    {inputMode === "search" && (
+                        <ProviderSearchPanel
+                            onTrackAdded={handleProviderTrackAdded}
+                            initialQuery={initialSearchQuery}
+                            onQueryChange={setSearchQuery}
+                            initialExpanded={expandedProviders}
+                            onExpandedChange={setExpandedProviders}
+                            downloadSettings={{
+                                downloadFolder,
+                                audioQuality,
+                                audioFormat,
+                                conversionFormat,
+                                conversionQuality,
+                            }}
+                        />
+                    )}
+
+                    {/* URL Input */}
+                    {inputMode === "url" && (
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+                                <input
+                                    type="url"
+                                    value={url}
+                                    onChange={(e) => setUrl(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") fetchInfo(); }}
+                                    placeholder="Paste URL from YouTube, SoundCloud, Spotify, etc."
+                                    className="w-full pl-10 pr-10 py-3 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/50 transition-all text-sm"
+                                    disabled={status === "downloading"}
+                                />
+                                {url && (
+                                    <button
+                                        onClick={() => { setUrl(""); reset(); }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground cursor-pointer"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => fetchInfo()}
+                                disabled={!url.trim() || status === "fetching-info" || status === "downloading"}
+                                className={cn(
+                                    "px-5 py-3 rounded-xl font-medium text-sm transition-all cursor-pointer flex items-center gap-2",
+                                    "bg-purple-500 hover:bg-purple-600 text-white",
+                                    "disabled:opacity-40 disabled:cursor-not-allowed"
+                                )}
+                            >
+                                {status === "fetching-info" ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Search className="h-4 w-4" />
+                                )}
+                                Analyze
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Active quality indicator when not in settings */}
+                    {!showSettings && (
+                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground/50">
+                            <span className="flex items-center gap-1">
+                                <HardDrive className="h-3 w-3" />
+                                {downloadFolder ? downloadFolder.split(/[\\/]/).pop() : "Default folder"}
+                            </span>
+                            <span>•</span>
+                            <span>{AUDIO_FORMATS.find(f => f.value === audioFormat)?.label || "Auto"}</span>
+                            <span>•</span>
+                            <span>{AUDIO_QUALITIES.find(q => q.value === audioQuality)?.label || "Auto"}</span>
+                            <span className="text-blue-400/50">|</span>
+                            <span className="text-blue-400/50">Convert: {resolvedConversionLabel}</span>
+                        </div>
+                    )}
+
+                    {/* Latest Downloads moved to right sidebar */}
+
+                    {/* Error */}
+                    {error && (
+                        <div className="flex items-start gap-3 rounded-xl bg-red-500/10 border border-red-500/20 p-4">
+                            <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-sm font-medium text-red-400">Error</p>
+                                <p className="text-sm text-red-400/80 mt-0.5">{error}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Media Info Card (single track) */}
+                    {mediaInfo && !playlistInfo && (
+                        <div className="rounded-xl bg-card border border-border overflow-hidden">
+                            <div className="flex gap-4 p-4">
+                                {/* Thumbnail */}
+                                {mediaInfo.thumbnail && (
+                                    <div className="shrink-0 w-48 h-28 rounded-lg overflow-hidden bg-muted">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={mediaInfo.thumbnail}
+                                            alt={mediaInfo.title}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Info */}
+                                <div className="flex-1 min-w-0">
+                                    <h2 className="text-base font-semibold text-foreground truncate" title={mediaInfo.title}>
+                                        {getPlatformIcon(mediaInfo.extractor)} {mediaInfo.title}
+                                    </h2>
+                                    <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                                        <span className="flex items-center gap-1">
+                                            <User className="h-3 w-3" />
+                                            {mediaInfo.uploader || "Unknown"}
+                                        </span>
+                                        {mediaInfo.duration > 0 && (
+                                            <span className="flex items-center gap-1">
+                                                <Clock className="h-3 w-3" />
+                                                {formatDuration(mediaInfo.duration)}
+                                            </span>
+                                        )}
+                                        <span className="flex items-center gap-1 text-purple-400">
+                                            <Globe className="h-3 w-3" />
+                                            {mediaInfo.extractor}
+                                        </span>
+                                    </div>
+                                    {mediaInfo.description && (
+                                        <p className="text-xs text-muted-foreground/60 mt-2 line-clamp-2">
+                                            {mediaInfo.description}
+                                        </p>
+                                    )}
+
+                                    {/* Quick Actions */}
+                                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                                        {status === "added" ? (
+                                            <>
+                                                <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-medium">
+                                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                                    Already in Library{addedTrackId ? ` (ID: ${addedTrackId})` : ""}
+                                                </div>
+                                            </>
+                                        ) : status === "complete" && downloadedFile ? (
+                                            <>
+                                                <button
+                                                    onClick={addToLibrary}
+                                                    disabled={status !== "complete"}
+                                                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    <Library className="h-3.5 w-3.5" />
+                                                    Add to Library &amp; Analyze
+                                                </button>
+                                            </>
+                                        ) : status === "adding-to-library" ? (
+                                            <>
+                                                <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-medium">
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                    Adding &amp; Analyzing...
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    onClick={() => startDownload(undefined, true, undefined, true)}
+                                                    disabled={status === "downloading"}
+                                                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    <FileAudio className="h-3.5 w-3.5" />
+                                                    Download &amp; Convert ({resolvedConversionLabel})
+                                                </button>
+                                                <button
+                                                    onClick={() => startDownload(undefined, true)}
+                                                    disabled={status === "downloading"}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    <Download className="h-3.5 w-3.5" />
+                                                    Original ({resolvedFormatLabel})
+                                                </button>
+                                            </>
+                                        )}
+                                        <a
+                                            href={mediaInfo.webpage_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                        >
+                                            <ExternalLink className="h-3 w-3" />
+                                            Open source
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Formats */}
+                            <div className="border-t border-border">
+                                <button
+                                    onClick={() => setShowAllFormats(!showAllFormats)}
+                                    className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                >
+                                    <span className="font-medium">
+                                        Available formats ({audioFormats.length} audio, {videoFormats.length} video)
+                                    </span>
+                                    {showAllFormats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                </button>
+
+                                {showAllFormats && (
+                                    <div className="px-4 pb-4 space-y-3">
+                                        {audioFormats.length > 0 && (
+                                            <div>
+                                                <h3 className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mb-1.5 flex items-center gap-1.5">
+                                                    <FileAudio className="h-3 w-3" /> Audio Formats
+                                                </h3>
+                                                <div className="grid gap-1">
+                                                    {audioFormats.map((f) => (
+                                                        <div key={f.formatId} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
+                                                            <div className="flex items-center gap-3 text-xs">
+                                                                <span className="font-mono text-muted-foreground/60 w-10">{f.ext}</span>
+                                                                <span className="text-foreground/80">{f.acodec}</span>
+                                                                {f.abr && <span className="text-muted-foreground">{f.abr}kbps</span>}
+                                                                <span className="text-muted-foreground/50">{formatFileSize(f.filesize || f.filesizeApprox)}</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => startDownload(undefined, false, f.formatId)}
+                                                                disabled={status === "downloading"}
+                                                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-all cursor-pointer disabled:opacity-40"
+                                                            >
+                                                                <Download className="h-2.5 w-2.5" />
+                                                                Download
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {videoFormats.length > 0 && (
+                                            <div>
+                                                <h3 className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mb-1.5 flex items-center gap-1.5">
+                                                    <Video className="h-3 w-3" /> Video Formats
+                                                </h3>
+                                                <div className="grid gap-1">
+                                                    {videoFormats.slice(0, 10).map((f) => (
+                                                        <div key={f.formatId} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
+                                                            <div className="flex items-center gap-3 text-xs">
+                                                                <span className="font-mono text-muted-foreground/60 w-10">{f.ext}</span>
+                                                                <span className="text-foreground/80">{f.resolution}</span>
+                                                                {f.fps && <span className="text-muted-foreground">{f.fps}fps</span>}
+                                                                <span className="text-muted-foreground/50">{f.vcodec !== "none" ? f.vcodec : ""}</span>
+                                                                <span className="text-muted-foreground/50">{formatFileSize(f.filesize || f.filesizeApprox)}</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => startDownload(undefined, false, f.formatId)}
+                                                                disabled={status === "downloading"}
+                                                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-all cursor-pointer disabled:opacity-40"
+                                                            >
+                                                                <Download className="h-2.5 w-2.5" />
+                                                                Download
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Playlist Card */}
+                    {playlistInfo && (
+                        <div className="rounded-xl bg-card border border-border overflow-hidden">
+                            {/* Playlist Header */}
+                            <div className="flex gap-4 p-4 border-b border-border">
+                                {playlistInfo.thumbnail && (
+                                    <div className="shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-muted">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={playlistInfo.thumbnail} alt={playlistInfo.title} className="w-full h-full object-cover" />
+                                    </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <h2 className="text-base font-semibold text-foreground flex items-center gap-2 truncate">
+                                        <ListMusic className="h-4 w-4 text-purple-500 shrink-0" />
+                                        {getPlatformIcon(playlistInfo.extractor)} {playlistInfo.title}
+                                    </h2>
+                                    <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                                        <span className="flex items-center gap-1">
+                                            <User className="h-3 w-3" />
+                                            {playlistInfo.uploader || "Unknown"}
+                                        </span>
+                                        <span className="flex items-center gap-1 text-purple-400">
+                                            <Globe className="h-3 w-3" />
+                                            {playlistInfo.extractor}
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            <Music className="h-3 w-3" />
+                                            {playlistInfo.entryCount} tracks
+                                        </span>
+                                    </div>
+                                    {playlistInfo.description && (
+                                        <p className="text-xs text-muted-foreground/60 mt-2 line-clamp-2">{playlistInfo.description}</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Controls bar */}
+                            <div className="flex items-center justify-between px-4 py-2.5 bg-muted/20 border-b border-border">
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => setSelectedTracks(new Set(playlistInfo.entries.map(e => e.id)))}
+                                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                    >
+                                        <CheckCheck className="h-3.5 w-3.5 text-green-400" />
+                                        Select All
+                                    </button>
+                                    {Object.keys(duplicateMap).length > 0 && (
+                                        <button
+                                            onClick={() => {
+                                                const dupIds = new Set(Object.keys(duplicateMap));
+                                                setSelectedTracks(new Set(playlistInfo.entries.filter(e => !dupIds.has(e.id)).map(e => e.id)));
+                                            }}
+                                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                        >
+                                            <Sparkles className="h-3.5 w-3.5 text-blue-400" />
+                                            New Only
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setSelectedTracks(new Set())}
+                                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                    >
+                                        <XSquare className="h-3.5 w-3.5 text-red-400" />
+                                        Deselect All
+                                    </button>
+                                    <span className="text-[10px] text-muted-foreground/50">
+                                        {selectedTracks.size} / {playlistInfo.entries.length} selected
+                                        {Object.keys(duplicateMap).length > 0 && (
+                                            <span className="text-blue-400 ml-1">
+                                                ({Object.keys(duplicateMap).length} in library)
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
+
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <Checkbox
+                                        checked={autoAddToLibrary}
+                                        onChange={e => setAutoAddToLibrary(e.target.checked)}
+                                        className="h-3.5 w-3.5"
+                                    />
+                                    <span className="text-xs text-muted-foreground">Auto-add to library</span>
+                                </label>
+                            </div>
+
+                            {/* Track list */}
+                            <div className="max-h-96 overflow-y-auto divide-y divide-border/50">
+                                {playlistInfo.entries.map((entry, idx) => {
+                                    const isSelected = selectedTracks.has(entry.id);
+                                    const batchResult = batchResults.find(r => r.trackIndex === idx);
+                                    const isDownloading = status === "batch-downloading" && activeDownloads.has(idx);
+                                    const duplicate = duplicateMap[entry.id];
+                                    return (
+                                        <div
+                                            key={`${entry.id}-${idx}`}
+                                            className={cn(
+                                                "flex items-center gap-3 px-4 py-2 transition-colors group",
+                                                isSelected ? "bg-purple-500/5" : "bg-transparent",
+                                                isDownloading && "bg-purple-500/10",
+                                                batchResult?.error && "bg-red-500/5",
+                                                batchResult && !batchResult.error && "bg-green-500/5",
+                                                duplicate && !isSelected && "opacity-50",
+                                            )}
+                                        >
+                                            {/* Checkbox */}
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedTracks(prev => {
+                                                        const next = new Set(prev);
+                                                        if (next.has(entry.id)) next.delete(entry.id);
+                                                        else next.add(entry.id);
+                                                        return next;
+                                                    });
+                                                }}
+                                                disabled={status === "batch-downloading" || status === "batch-adding"}
+                                                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0 disabled:opacity-40"
+                                            >
+                                                {isSelected ? (
+                                                    <CheckSquare className="h-4 w-4 text-purple-500" />
+                                                ) : (
+                                                    <Square className="h-4 w-4" />
+                                                )}
+                                            </button>
+
+                                            {/* Index */}
+                                            <span className="text-[10px] text-muted-foreground/40 w-5 text-right shrink-0">
+                                                {idx + 1}
+                                            </span>
+
                                             {/* Thumbnail */}
-                                            {item.thumbnail ? (
-                                                <div className="w-10 h-10 rounded shrink-0 overflow-hidden bg-muted">
+                                            {entry.thumbnail ? (
+                                                <div className="w-8 h-8 rounded shrink-0 overflow-hidden bg-muted">
                                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                    <img src={item.thumbnail} alt="" className="w-full h-full object-cover" />
+                                                    <img src={entry.thumbnail} alt="" className="w-full h-full object-cover" />
                                                 </div>
                                             ) : (
-                                                <div className="w-10 h-10 rounded shrink-0 bg-muted flex items-center justify-center">
-                                                    <Music className="h-4 w-4 text-muted-foreground/40" />
+                                                <div className="w-8 h-8 rounded shrink-0 bg-muted flex items-center justify-center">
+                                                    <Music className="h-3 w-3 text-muted-foreground/30" />
                                                 </div>
                                             )}
 
                                             {/* Info */}
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-medium text-foreground truncate">
-                                                    {item.title || "Unknown"}
-                                                </p>
+                                                <p className="text-xs font-medium text-foreground truncate">{entry.title || "Unknown"}</p>
                                                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                                    {item.artist && <span>{item.artist}</span>}
-                                                    {item.extractor && <span className="text-purple-400/60">{item.extractor}</span>}
-                                                    <span>{timeAgo(item.downloadedAt)}</span>
+                                                    {entry.uploader && <span>{entry.uploader}</span>}
+                                                    {entry.duration > 0 && <span>{formatDuration(entry.duration)}</span>}
                                                 </div>
                                             </div>
 
-                                            {/* Status badge */}
-                                            <span className={cn(
-                                                "text-[10px] px-1.5 py-0.5 rounded-full shrink-0",
-                                                item.status === "complete" && "bg-green-500/10 text-green-400",
-                                                item.status === "added" && "bg-blue-500/10 text-blue-400",
-                                                item.status === "error" && "bg-red-500/10 text-red-400",
-                                                item.status === "downloading" && "bg-yellow-500/10 text-yellow-400",
-                                                item.status === "pending" && "bg-muted text-muted-foreground",
-                                            )}>
-                                                {item.status === "added" ? `Library #${item.trackId}` : item.status}
-                                            </span>
-
-                                            {/* Re-download */}
-                                            <button
-                                                onClick={() => { setUrl(item.url); setShowHistory(false); fetchInfo(item.url); }}
-                                                className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-purple-400 transition-all cursor-pointer"
-                                                title="Re-download"
-                                            >
-                                                <Download className="h-3.5 w-3.5" />
-                                            </button>
-
-                                            {/* Delete */}
-                                            <button
-                                                onClick={() => deleteHistoryItem(item.id)}
-                                                className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-red-400 transition-all cursor-pointer"
-                                                title="Remove from history"
-                                            >
-                                                <Trash2 className="h-3 w-3" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* URL Input */}
-                <div className="flex gap-2">
-                    <div className="relative flex-1">
-                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-                        <input
-                            type="url"
-                            value={url}
-                            onChange={(e) => setUrl(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === "Enter") fetchInfo(); }}
-                            placeholder="Paste URL from YouTube, SoundCloud, Spotify, etc."
-                            className="w-full pl-10 pr-10 py-3 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/50 transition-all text-sm"
-                            disabled={status === "downloading"}
-                        />
-                        {url && (
-                            <button
-                                onClick={() => { setUrl(""); reset(); }}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground cursor-pointer"
-                            >
-                                <X className="h-4 w-4" />
-                            </button>
-                        )}
-                    </div>
-                    <button
-                        onClick={() => fetchInfo()}
-                        disabled={!url.trim() || status === "fetching-info" || status === "downloading"}
-                        className={cn(
-                            "px-5 py-3 rounded-xl font-medium text-sm transition-all cursor-pointer flex items-center gap-2",
-                            "bg-purple-500 hover:bg-purple-600 text-white",
-                            "disabled:opacity-40 disabled:cursor-not-allowed"
-                        )}
-                    >
-                        {status === "fetching-info" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Search className="h-4 w-4" />
-                        )}
-                        Analyze
-                    </button>
-                </div>
-
-                {/* Active quality indicator when not in settings */}
-                {!showSettings && (
-                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground/50">
-                        <span className="flex items-center gap-1">
-                            <HardDrive className="h-3 w-3" />
-                            {downloadFolder ? downloadFolder.split(/[\\/]/).pop() : "Default folder"}
-                        </span>
-                        <span>•</span>
-                        <span>{AUDIO_FORMATS.find(f => f.value === audioFormat)?.label || "Auto"}</span>
-                        <span>•</span>
-                        <span>{AUDIO_QUALITIES.find(q => q.value === audioQuality)?.label || "Auto"}</span>
-                        <span className="text-blue-400/50">|</span>
-                        <span className="text-blue-400/50">Convert: {resolvedConversionLabel}</span>
-                    </div>
-                )}
-
-                {/* Error */}
-                {error && (
-                    <div className="flex items-start gap-3 rounded-xl bg-red-500/10 border border-red-500/20 p-4">
-                        <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-                        <div>
-                            <p className="text-sm font-medium text-red-400">Error</p>
-                            <p className="text-sm text-red-400/80 mt-0.5">{error}</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Media Info Card (single track) */}
-                {mediaInfo && !playlistInfo && (
-                    <div className="rounded-xl bg-card border border-border overflow-hidden">
-                        <div className="flex gap-4 p-4">
-                            {/* Thumbnail */}
-                            {mediaInfo.thumbnail && (
-                                <div className="shrink-0 w-48 h-28 rounded-lg overflow-hidden bg-muted">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                        src={mediaInfo.thumbnail}
-                                        alt={mediaInfo.title}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                            )}
-
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                                <h2 className="text-base font-semibold text-foreground truncate" title={mediaInfo.title}>
-                                    {getPlatformIcon(mediaInfo.extractor)} {mediaInfo.title}
-                                </h2>
-                                <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-                                    <span className="flex items-center gap-1">
-                                        <User className="h-3 w-3" />
-                                        {mediaInfo.uploader || "Unknown"}
-                                    </span>
-                                    {mediaInfo.duration > 0 && (
-                                        <span className="flex items-center gap-1">
-                                            <Clock className="h-3 w-3" />
-                                            {formatDuration(mediaInfo.duration)}
-                                        </span>
-                                    )}
-                                    <span className="flex items-center gap-1 text-purple-400">
-                                        <Globe className="h-3 w-3" />
-                                        {mediaInfo.extractor}
-                                    </span>
-                                </div>
-                                {mediaInfo.description && (
-                                    <p className="text-xs text-muted-foreground/60 mt-2 line-clamp-2">
-                                        {mediaInfo.description}
-                                    </p>
-                                )}
-
-                                {/* Quick Actions */}
-                                <div className="flex items-center gap-2 mt-3 flex-wrap">
-                                    {status === "added" ? (
-                                        <>
-                                            <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-medium">
-                                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                                Already in Library{addedTrackId ? ` (ID: ${addedTrackId})` : ""}
+                                            {/* Status indicator */}
+                                            <div className="shrink-0 text-right">
+                                                {duplicate && !isDownloading && !batchResult && (
+                                                    <span className="flex items-center gap-1 text-[10px] text-blue-400 justify-end" title={duplicate.reason}>
+                                                        <Library className="h-3 w-3" />
+                                                        In Library
+                                                    </span>
+                                                )}
+                                                {isDownloading && (
+                                                    <span className="flex items-center gap-1 text-[10px] text-purple-400 justify-end">
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                        {progress ? `${progress.percent.toFixed(0)}%` : "..."}
+                                                    </span>
+                                                )}
+                                                {batchResult && !batchResult.error && (
+                                                    <span className="flex items-center gap-1 text-[10px] text-green-400 justify-end">
+                                                        <CheckCircle2 className="h-3 w-3" />
+                                                        {batchResult.addedTrackId ? `#${batchResult.addedTrackId}` : "Done"}
+                                                    </span>
+                                                )}
+                                                {batchResult?.error && (
+                                                    <span className="flex items-center gap-1 text-[10px] text-red-400 justify-end" title={batchResult.error}>
+                                                        <AlertCircle className="h-3 w-3" />
+                                                        Failed
+                                                    </span>
+                                                )}
                                             </div>
-                                        </>
-                                    ) : status === "complete" && downloadedFile ? (
-                                        <>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20">
+                                {status === "batch-downloading" ? (
+                                    <div className="flex items-center gap-3 flex-1">
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                                <span>{batchResults.length} / {selectedTracks.size}{activeDownloads.size > 0 && ` · ${activeDownloads.size} active`}</span>
+                                                {progress && <span>{progress.speed}</span>}
+                                            </div>
+                                            <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                                                <div
+                                                    className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                                                    style={{ width: `${(batchResults.length / selectedTracks.size) * 100}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={cancelDownload}
+                                            className="text-xs text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                ) : status === "batch-adding" ? (
+                                    <div className="flex items-center gap-2 text-xs text-purple-400">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Adding tracks to library & analyzing...
+                                    </div>
+                                ) : status === "batch-complete" ? (
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <CheckCircle2 className="h-4 w-4 text-green-400" />
+                                            <span className="text-green-400">{batchResults.filter(r => !r.error).length} downloaded</span>
+                                            {batchResults.some(r => r.error) && (
+                                                <span className="text-red-400">{batchResults.filter(r => r.error).length} failed</span>
+                                            )}
+                                            {batchResults.some(r => r.addedTrackId) && (
+                                                <span className="text-blue-400">{batchResults.filter(r => r.addedTrackId).length} in library</span>
+                                            )}
+                                        </div>
+                                        {!autoAddToLibrary && batchResults.some(r => !r.error && !r.addedTrackId) && (
                                             <button
-                                                onClick={addToLibrary}
-                                                disabled={status !== "complete"}
-                                                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                                onClick={batchAddToLibrary}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs font-medium transition-colors cursor-pointer"
                                             >
                                                 <Library className="h-3.5 w-3.5" />
-                                                Add to Library &amp; Analyze
+                                                Add All to Library
                                             </button>
-                                        </>
-                                    ) : status === "adding-to-library" ? (
-                                        <>
-                                            <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-medium">
+                                        )}
+                                        <button
+                                            onClick={() => { setUrl(""); reset(); }}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                        >
+                                            <Play className="h-3 w-3" />
+                                            New Download
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => startBatchDownload(true)}
+                                            disabled={selectedTracks.size === 0}
+                                            className="flex items-center gap-2 px-5 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            <FileAudio className="h-4 w-4" />
+                                            Convert {selectedTracks.size} ({resolvedConversionLabel})
+                                        </button>
+                                        <button
+                                            onClick={() => startBatchDownload()}
+                                            disabled={selectedTracks.size === 0}
+                                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card hover:bg-accent border border-border text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            <Download className="h-4 w-4" />
+                                            Original {selectedTracks.size}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Download Progress */}
+                    {status === "downloading" && (
+                        <div className="rounded-xl bg-card border border-border p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+                                    Downloading...
+                                </h3>
+                                <button
+                                    onClick={cancelDownload}
+                                    className="text-xs text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+
+                            {progress && (
+                                <>
+                                    <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                                        <div
+                                            className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                                            style={{ width: `${Math.min(100, progress.percent)}%` }}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                        <span>{progress.percent.toFixed(1)}%</span>
+                                        <span>{progress.speed} · {progress.totalSize}</span>
+                                        <span>ETA {progress.eta}</span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Complete */}
+                    {(status === "complete" || status === "adding-to-library" || status === "added") && downloadedFile && (
+                        <div className="rounded-xl bg-card border border-green-500/20 p-4 space-y-3">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                <h3 className="text-sm font-medium text-foreground">Download Complete</h3>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+                                <HardDrive className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate font-mono">{downloadedFile}</span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                {status === "added" ? (
+                                    <div className="flex items-center gap-2 text-xs text-green-400">
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        <span>Added to library & analyzed{addedTrackId ? ` (ID: ${addedTrackId})` : ""}</span>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={addToLibrary}
+                                        disabled={status === "adding-to-library"}
+                                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                                    >
+                                        {status === "adding-to-library" ? (
+                                            <>
                                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                Adding &amp; Analyzing...
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => startDownload(undefined, true, undefined, true)}
-                                                disabled={status === "downloading"}
-                                                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                            >
-                                                <FileAudio className="h-3.5 w-3.5" />
-                                                Download &amp; Convert ({resolvedConversionLabel})
-                                            </button>
-                                            <button
-                                                onClick={() => startDownload(undefined, true)}
-                                                disabled={status === "downloading"}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                            >
-                                                <Download className="h-3.5 w-3.5" />
-                                                Original ({resolvedFormatLabel})
-                                            </button>
-                                        </>
-                                    )}
-                                    <a
-                                        href={mediaInfo.webpage_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                    >
-                                        <ExternalLink className="h-3 w-3" />
-                                        Open source
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Formats */}
-                        <div className="border-t border-border">
-                            <button
-                                onClick={() => setShowAllFormats(!showAllFormats)}
-                                className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                            >
-                                <span className="font-medium">
-                                    Available formats ({audioFormats.length} audio, {videoFormats.length} video)
-                                </span>
-                                {showAllFormats ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                            </button>
-
-                            {showAllFormats && (
-                                <div className="px-4 pb-4 space-y-3">
-                                    {audioFormats.length > 0 && (
-                                        <div>
-                                            <h3 className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mb-1.5 flex items-center gap-1.5">
-                                                <FileAudio className="h-3 w-3" /> Audio Formats
-                                            </h3>
-                                            <div className="grid gap-1">
-                                                {audioFormats.map((f) => (
-                                                    <div key={f.formatId} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
-                                                        <div className="flex items-center gap-3 text-xs">
-                                                            <span className="font-mono text-muted-foreground/60 w-10">{f.ext}</span>
-                                                            <span className="text-foreground/80">{f.acodec}</span>
-                                                            {f.abr && <span className="text-muted-foreground">{f.abr}kbps</span>}
-                                                            <span className="text-muted-foreground/50">{formatFileSize(f.filesize || f.filesizeApprox)}</span>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => startDownload(undefined, false, f.formatId)}
-                                                            disabled={status === "downloading"}
-                                                            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-all cursor-pointer disabled:opacity-40"
-                                                        >
-                                                            <Download className="h-2.5 w-2.5" />
-                                                            Download
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {videoFormats.length > 0 && (
-                                        <div>
-                                            <h3 className="text-[10px] uppercase tracking-wider text-muted-foreground/50 mb-1.5 flex items-center gap-1.5">
-                                                <Video className="h-3 w-3" /> Video Formats
-                                            </h3>
-                                            <div className="grid gap-1">
-                                                {videoFormats.slice(0, 10).map((f) => (
-                                                    <div key={f.formatId} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
-                                                        <div className="flex items-center gap-3 text-xs">
-                                                            <span className="font-mono text-muted-foreground/60 w-10">{f.ext}</span>
-                                                            <span className="text-foreground/80">{f.resolution}</span>
-                                                            {f.fps && <span className="text-muted-foreground">{f.fps}fps</span>}
-                                                            <span className="text-muted-foreground/50">{f.vcodec !== "none" ? f.vcodec : ""}</span>
-                                                            <span className="text-muted-foreground/50">{formatFileSize(f.filesize || f.filesizeApprox)}</span>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => startDownload(undefined, false, f.formatId)}
-                                                            disabled={status === "downloading"}
-                                                            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-all cursor-pointer disabled:opacity-40"
-                                                        >
-                                                            <Download className="h-2.5 w-2.5" />
-                                                            Download
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Playlist Card */}
-                {playlistInfo && (
-                    <div className="rounded-xl bg-card border border-border overflow-hidden">
-                        {/* Playlist Header */}
-                        <div className="flex gap-4 p-4 border-b border-border">
-                            {playlistInfo.thumbnail && (
-                                <div className="shrink-0 w-24 h-24 rounded-lg overflow-hidden bg-muted">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={playlistInfo.thumbnail} alt={playlistInfo.title} className="w-full h-full object-cover" />
-                                </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                                <h2 className="text-base font-semibold text-foreground flex items-center gap-2 truncate">
-                                    <ListMusic className="h-4 w-4 text-purple-500 shrink-0" />
-                                    {getPlatformIcon(playlistInfo.extractor)} {playlistInfo.title}
-                                </h2>
-                                <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-                                    <span className="flex items-center gap-1">
-                                        <User className="h-3 w-3" />
-                                        {playlistInfo.uploader || "Unknown"}
-                                    </span>
-                                    <span className="flex items-center gap-1 text-purple-400">
-                                        <Globe className="h-3 w-3" />
-                                        {playlistInfo.extractor}
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                        <Music className="h-3 w-3" />
-                                        {playlistInfo.entryCount} tracks
-                                    </span>
-                                </div>
-                                {playlistInfo.description && (
-                                    <p className="text-xs text-muted-foreground/60 mt-2 line-clamp-2">{playlistInfo.description}</p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Controls bar */}
-                        <div className="flex items-center justify-between px-4 py-2.5 bg-muted/20 border-b border-border">
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => setSelectedTracks(new Set(playlistInfo.entries.map(e => e.id)))}
-                                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                                >
-                                    <CheckCheck className="h-3.5 w-3.5 text-green-400" />
-                                    Select All
-                                </button>
-                                {Object.keys(duplicateMap).length > 0 && (
-                                    <button
-                                        onClick={() => {
-                                            const dupIds = new Set(Object.keys(duplicateMap));
-                                            setSelectedTracks(new Set(playlistInfo.entries.filter(e => !dupIds.has(e.id)).map(e => e.id)));
-                                        }}
-                                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                                    >
-                                        <Sparkles className="h-3.5 w-3.5 text-blue-400" />
-                                        New Only
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => setSelectedTracks(new Set())}
-                                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                                >
-                                    <XSquare className="h-3.5 w-3.5 text-red-400" />
-                                    Deselect All
-                                </button>
-                                <span className="text-[10px] text-muted-foreground/50">
-                                    {selectedTracks.size} / {playlistInfo.entries.length} selected
-                                    {Object.keys(duplicateMap).length > 0 && (
-                                        <span className="text-blue-400 ml-1">
-                                            ({Object.keys(duplicateMap).length} in library)
-                                        </span>
-                                    )}
-                                </span>
-                            </div>
-
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <Checkbox
-                                    checked={autoAddToLibrary}
-                                    onChange={e => setAutoAddToLibrary(e.target.checked)}
-                                    className="h-3.5 w-3.5"
-                                />
-                                <span className="text-xs text-muted-foreground">Auto-add to library</span>
-                            </label>
-                        </div>
-
-                        {/* Track list */}
-                        <div className="max-h-96 overflow-y-auto divide-y divide-border/50">
-                            {playlistInfo.entries.map((entry, idx) => {
-                                const isSelected = selectedTracks.has(entry.id);
-                                const batchResult = batchResults.find(r => r.trackIndex === idx);
-                                const isDownloading = status === "batch-downloading" && activeDownloads.has(idx);
-                                const duplicate = duplicateMap[entry.id];
-                                return (
-                                    <div
-                                        key={`${entry.id}-${idx}`}
-                                        className={cn(
-                                            "flex items-center gap-3 px-4 py-2 transition-colors group",
-                                            isSelected ? "bg-purple-500/5" : "bg-transparent",
-                                            isDownloading && "bg-purple-500/10",
-                                            batchResult?.error && "bg-red-500/5",
-                                            batchResult && !batchResult.error && "bg-green-500/5",
-                                            duplicate && !isSelected && "opacity-50",
-                                        )}
-                                    >
-                                        {/* Checkbox */}
-                                        <button
-                                            onClick={() => {
-                                                setSelectedTracks(prev => {
-                                                    const next = new Set(prev);
-                                                    if (next.has(entry.id)) next.delete(entry.id);
-                                                    else next.add(entry.id);
-                                                    return next;
-                                                });
-                                            }}
-                                            disabled={status === "batch-downloading" || status === "batch-adding"}
-                                            className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0 disabled:opacity-40"
-                                        >
-                                            {isSelected ? (
-                                                <CheckSquare className="h-4 w-4 text-purple-500" />
-                                            ) : (
-                                                <Square className="h-4 w-4" />
-                                            )}
-                                        </button>
-
-                                        {/* Index */}
-                                        <span className="text-[10px] text-muted-foreground/40 w-5 text-right shrink-0">
-                                            {idx + 1}
-                                        </span>
-
-                                        {/* Thumbnail */}
-                                        {entry.thumbnail ? (
-                                            <div className="w-8 h-8 rounded shrink-0 overflow-hidden bg-muted">
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={entry.thumbnail} alt="" className="w-full h-full object-cover" />
-                                            </div>
+                                                Adding & Analyzing...
+                                            </>
                                         ) : (
-                                            <div className="w-8 h-8 rounded shrink-0 bg-muted flex items-center justify-center">
-                                                <Music className="h-3 w-3 text-muted-foreground/30" />
-                                            </div>
+                                            <>
+                                                <Library className="h-3.5 w-3.5" />
+                                                Add to Library & Analyze
+                                            </>
                                         )}
-
-                                        {/* Info */}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-medium text-foreground truncate">{entry.title || "Unknown"}</p>
-                                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                                {entry.uploader && <span>{entry.uploader}</span>}
-                                                {entry.duration > 0 && <span>{formatDuration(entry.duration)}</span>}
-                                            </div>
-                                        </div>
-
-                                        {/* Status indicator */}
-                                        <div className="shrink-0 text-right">
-                                            {duplicate && !isDownloading && !batchResult && (
-                                                <span className="flex items-center gap-1 text-[10px] text-blue-400 justify-end" title={duplicate.reason}>
-                                                    <Library className="h-3 w-3" />
-                                                    In Library
-                                                </span>
-                                            )}
-                                            {isDownloading && (
-                                                <span className="flex items-center gap-1 text-[10px] text-purple-400 justify-end">
-                                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                                    {progress ? `${progress.percent.toFixed(0)}%` : "..."}
-                                                </span>
-                                            )}
-                                            {batchResult && !batchResult.error && (
-                                                <span className="flex items-center gap-1 text-[10px] text-green-400 justify-end">
-                                                    <CheckCircle2 className="h-3 w-3" />
-                                                    {batchResult.addedTrackId ? `#${batchResult.addedTrackId}` : "Done"}
-                                                </span>
-                                            )}
-                                            {batchResult?.error && (
-                                                <span className="flex items-center gap-1 text-[10px] text-red-400 justify-end" title={batchResult.error}>
-                                                    <AlertCircle className="h-3 w-3" />
-                                                    Failed
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20">
-                            {status === "batch-downloading" ? (
-                                <div className="flex items-center gap-3 flex-1">
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                                            <span>{batchResults.length} / {selectedTracks.size}{activeDownloads.size > 0 && ` · ${activeDownloads.size} active`}</span>
-                                            {progress && <span>{progress.speed}</span>}
-                                        </div>
-                                        <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                                            <div
-                                                className="h-full bg-purple-500 rounded-full transition-all duration-300"
-                                                style={{ width: `${(batchResults.length / selectedTracks.size) * 100}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={cancelDownload}
-                                        className="text-xs text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
-                                    >
-                                        Cancel
                                     </button>
-                                </div>
-                            ) : status === "batch-adding" ? (
-                                <div className="flex items-center gap-2 text-xs text-purple-400">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Adding tracks to library & analyzing...
-                                </div>
-                            ) : status === "batch-complete" ? (
-                                <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-2 text-xs">
-                                        <CheckCircle2 className="h-4 w-4 text-green-400" />
-                                        <span className="text-green-400">{batchResults.filter(r => !r.error).length} downloaded</span>
-                                        {batchResults.some(r => r.error) && (
-                                            <span className="text-red-400">{batchResults.filter(r => r.error).length} failed</span>
-                                        )}
-                                        {batchResults.some(r => r.addedTrackId) && (
-                                            <span className="text-blue-400">{batchResults.filter(r => r.addedTrackId).length} in library</span>
-                                        )}
-                                    </div>
-                                    {!autoAddToLibrary && batchResults.some(r => !r.error && !r.addedTrackId) && (
-                                        <button
-                                            onClick={batchAddToLibrary}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs font-medium transition-colors cursor-pointer"
-                                        >
-                                            <Library className="h-3.5 w-3.5" />
-                                            Add All to Library
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => { setUrl(""); reset(); }}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                                    >
-                                        <Play className="h-3 w-3" />
-                                        New Download
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => startBatchDownload(true)}
-                                        disabled={selectedTracks.size === 0}
-                                        className="flex items-center gap-2 px-5 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        <FileAudio className="h-4 w-4" />
-                                        Convert {selectedTracks.size} ({resolvedConversionLabel})
-                                    </button>
-                                    <button
-                                        onClick={() => startBatchDownload()}
-                                        disabled={selectedTracks.size === 0}
-                                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card hover:bg-accent border border-border text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        <Download className="h-4 w-4" />
-                                        Original {selectedTracks.size}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Download Progress */}
-                {status === "downloading" && (
-                    <div className="rounded-xl bg-card border border-border p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-                                <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
-                                Downloading...
-                            </h3>
-                            <button
-                                onClick={cancelDownload}
-                                className="text-xs text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-
-                        {progress && (
-                            <>
-                                <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-                                    <div
-                                        className="h-full bg-purple-500 rounded-full transition-all duration-300"
-                                        style={{ width: `${Math.min(100, progress.percent)}%` }}
-                                    />
-                                </div>
-                                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                    <span>{progress.percent.toFixed(1)}%</span>
-                                    <span>{progress.speed} · {progress.totalSize}</span>
-                                    <span>ETA {progress.eta}</span>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {/* Complete */}
-                {(status === "complete" || status === "adding-to-library" || status === "added") && downloadedFile && (
-                    <div className="rounded-xl bg-card border border-green-500/20 p-4 space-y-3">
-                        <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                            <h3 className="text-sm font-medium text-foreground">Download Complete</h3>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
-                            <HardDrive className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate font-mono">{downloadedFile}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            {status === "added" ? (
-                                <div className="flex items-center gap-2 text-xs text-green-400">
-                                    <CheckCircle2 className="h-4 w-4" />
-                                    <span>Added to library & analyzed{addedTrackId ? ` (ID: ${addedTrackId})` : ""}</span>
-                                </div>
-                            ) : (
+                                )}
                                 <button
-                                    onClick={addToLibrary}
-                                    disabled={status === "adding-to-library"}
-                                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                                    onClick={() => { setUrl(""); reset(); }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                 >
-                                    {status === "adding-to-library" ? (
-                                        <>
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                            Adding & Analyzing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Library className="h-3.5 w-3.5" />
-                                            Add to Library & Analyze
-                                        </>
-                                    )}
+                                    <Play className="h-3 w-3" />
+                                    Download Another
                                 </button>
-                            )}
-                            <button
-                                onClick={() => { setUrl(""); reset(); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                            >
-                                <Play className="h-3 w-3" />
-                                Download Another
-                            </button>
-                        </div>
+                            </div>
 
-                        {/* Analysis results */}
-                        {analysisResults && Object.keys(analysisResults).length > 0 && (
-                            <div className="mt-2 rounded-lg bg-purple-500/5 border border-purple-500/10 p-3">
-                                <h4 className="text-[10px] uppercase tracking-wider text-purple-400/80 font-semibold mb-2 flex items-center gap-1.5">
-                                    <Sparkles className="h-3 w-3" />
-                                    Analysis Results
-                                </h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                    {Object.entries(analysisResults).map(([key, val]) => (
-                                        <div key={key} className="flex items-center gap-1.5 text-xs">
-                                            {key === "Artwork" && <Image className="h-3 w-3 text-green-400" />}
-                                            {key === "Genre" && <Tag className="h-3 w-3 text-blue-400" />}
-                                            {key === "BPM" && <Music className="h-3 w-3 text-orange-400" />}
-                                            {key === "Lyrics" && <MicVocal className="h-3 w-3 text-pink-400" />}
-                                            {key === "Key" && <Music className="h-3 w-3 text-cyan-400" />}
-                                            {!["Artwork", "Genre", "BPM", "Lyrics", "Key"].includes(key) && <Sparkles className="h-3 w-3 text-purple-400" />}
-                                            <span className="text-muted-foreground">{key}:</span>
-                                            <span className="text-foreground font-medium truncate">{val}</span>
-                                        </div>
-                                    ))}
+                            {/* Analysis results */}
+                            {analysisResults && Object.keys(analysisResults).length > 0 && (
+                                <div className="mt-2 rounded-lg bg-purple-500/5 border border-purple-500/10 p-3">
+                                    <h4 className="text-[10px] uppercase tracking-wider text-purple-400/80 font-semibold mb-2 flex items-center gap-1.5">
+                                        <Sparkles className="h-3 w-3" />
+                                        Analysis Results
+                                    </h4>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        {Object.entries(analysisResults).map(([key, val]) => (
+                                            <div key={key} className="flex items-center gap-1.5 text-xs">
+                                                {key === "Artwork" && <Image className="h-3 w-3 text-green-400" />}
+                                                {key === "Genre" && <Tag className="h-3 w-3 text-blue-400" />}
+                                                {key === "BPM" && <Music className="h-3 w-3 text-orange-400" />}
+                                                {key === "Lyrics" && <MicVocal className="h-3 w-3 text-pink-400" />}
+                                                {key === "Key" && <Music className="h-3 w-3 text-cyan-400" />}
+                                                {!["Artwork", "Genre", "BPM", "Lyrics", "Key"].includes(key) && <Sparkles className="h-3 w-3 text-purple-400" />}
+                                                <span className="text-muted-foreground">{key}:</span>
+                                                <span className="text-foreground font-medium truncate">{val}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {status === "adding-to-library" && (
-                            <p className="text-[10px] text-muted-foreground/50">
-                                Fetching metadata from MusicBrainz, iTunes, Deezer, LRCLIB...
-                            </p>
-                        )}
-                    </div>
-                )}
+                            {status === "adding-to-library" && (
+                                <p className="text-[10px] text-muted-foreground/50">
+                                    Fetching metadata from MusicBrainz, iTunes, Deezer, LRCLIB...
+                                </p>
+                            )}
+                        </div>
+                    )}
 
-                {/* Logs */}
-                {logs.length > 0 && (
-                    <div>
-                        <button
-                            onClick={() => setShowLogs(!showLogs)}
-                            className="flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors cursor-pointer"
-                        >
-                            {showLogs ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                            Logs ({logs.length})
-                        </button>
-                        {showLogs && (
-                            <div className="mt-2 rounded-lg bg-black/50 border border-border p-3 max-h-48 overflow-y-auto font-mono text-[10px] text-muted-foreground/60 space-y-0.5">
-                                {logs.map((log, i) => (
-                                    <div key={i}>{log}</div>
-                                ))}
-                                <div ref={logsEndRef} />
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Supported Platforms */}
-                {status === "idle" && !mediaInfo && !playlistInfo && (
-                    <div className="rounded-xl bg-card/50 border border-border/50 p-6 text-center space-y-4">
-                        <div className="text-3xl">🎧</div>
+                    {/* Logs */}
+                    {logs.length > 0 && (
                         <div>
-                            <h3 className="text-sm font-medium text-foreground">Supported Platforms</h3>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Paste a URL from any of these platforms to download audio
+                            <button
+                                onClick={() => setShowLogs(!showLogs)}
+                                className="flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors cursor-pointer"
+                            >
+                                {showLogs ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                Logs ({logs.length})
+                            </button>
+                            {showLogs && (
+                                <div className="mt-2 rounded-lg bg-black/50 border border-border p-3 max-h-48 overflow-y-auto font-mono text-[10px] text-muted-foreground/60 space-y-0.5">
+                                    {logs.map((log, i) => (
+                                        <div key={i}>{log}</div>
+                                    ))}
+                                    <div ref={logsEndRef} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Supported Platforms */}
+                    {status === "idle" && !mediaInfo && !playlistInfo && (
+                        <div className="rounded-xl bg-card/50 border border-border/50 p-6 text-center space-y-4">
+                            <div className="text-3xl">🎧</div>
+                            <div>
+                                <h3 className="text-sm font-medium text-foreground">Supported Platforms</h3>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Paste a URL from any of these platforms to download audio
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap justify-center gap-2">
+                                {[
+                                    "YouTube", "YouTube Music", "SoundCloud", "Spotify",
+                                    "Bandcamp", "Vimeo", "TikTok", "Twitter/X",
+                                    "Instagram", "Facebook", "Twitch", "Mixcloud",
+                                    "Dailymotion", "Deezer", "1800+ more",
+                                ].map(p => (
+                                    <span key={p} className="px-2.5 py-1 rounded-full bg-muted text-[10px] text-muted-foreground border border-border/50">
+                                        {p}
+                                    </span>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground/40">
+                                Requires <code className="text-purple-400/60">yt-dlp</code> installed on this machine
                             </p>
                         </div>
-                        <div className="flex flex-wrap justify-center gap-2">
-                            {[
-                                "YouTube", "YouTube Music", "SoundCloud", "Spotify",
-                                "Bandcamp", "Vimeo", "TikTok", "Twitter/X",
-                                "Instagram", "Facebook", "Twitch", "Mixcloud",
-                                "Dailymotion", "Deezer", "1800+ more",
-                            ].map(p => (
-                                <span key={p} className="px-2.5 py-1 rounded-full bg-muted text-[10px] text-muted-foreground border border-border/50">
-                                    {p}
-                                </span>
-                            ))}
-                        </div>
-                        <p className="text-[10px] text-muted-foreground/40">
-                            Requires <code className="text-purple-400/60">yt-dlp</code> installed on this machine
-                        </p>
-                    </div>
+                    )}
+                </div>
+                {/* End of main column */}
+
+                {/* Right Sidebar — Latest Downloads & Download History */}
+                {sidebarOpen && (
+                    <DownloadSidebar
+                        latestTracks={latestDownloads.tracks}
+                        freshIds={latestDownloads.freshIds}
+                        onRemoveLatest={latestDownloads.removeTrack}
+                        history={history}
+                        historyLoading={historyLoading}
+                        onClearHistory={clearHistory}
+                        onDeleteHistoryItem={deleteHistoryItem}
+                        onRedownload={(historyUrl) => {
+                            setUrl(historyUrl);
+                            setInputMode("url");
+                            fetchInfo(historyUrl);
+                        }}
+                        activeTab={sidebarTab}
+                        onTabChange={setSidebarTab}
+                        onClose={() => setSidebarOpen(false)}
+                    />
+                )}
+
+                {/* Folder Picker Modal */}
+                {showFolderPicker && (
+                    <FolderPicker
+                        currentPath={downloadFolder}
+                        onSelect={(path) => {
+                            setDownloadFolder(path);
+                            saveSetting("downloadFolder", path);
+                            setShowFolderPicker(false);
+                            toast.success(`Download folder set to ${path}`);
+                        }}
+                        onClose={() => setShowFolderPicker(false)}
+                    />
                 )}
             </div>
-
-            {/* Folder Picker Modal */}
-            {showFolderPicker && (
-                <FolderPicker
-                    currentPath={downloadFolder}
-                    onSelect={(path) => {
-                        setDownloadFolder(path);
-                        saveSetting("downloadFolder", path);
-                        setShowFolderPicker(false);
-                        toast.success(`Download folder set to ${path}`);
-                    }}
-                    onClose={() => setShowFolderPicker(false)}
-                />
-            )}
         </div>
     );
 }

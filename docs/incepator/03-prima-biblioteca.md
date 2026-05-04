@@ -1,5 +1,7 @@
 # 🟢 Prima Bibliotecă — Import Muzică
 
+> ⚠️ **Context**: ghid pentru **rekordbox**. Pentru biblioteca în MMO → [`docs/aplicatie/biblioteca.md`](../aplicatie/biblioteca.md).
+
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../README.md#-începător)
 
 | ← Prev | Next → |

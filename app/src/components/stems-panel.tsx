@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useReducer, memo } from "react";
+import { subscribeRaf } from "@/lib/raf-scheduler";
 import {
     type StemType,
     type StemConfig,
@@ -57,8 +58,10 @@ function useStemLevels(processor: RealtimeStemProcessor | null) {
     const [levels, setLevels] = useState<Record<StemType, number>>({
         vocals: 0, drums: 0, bass: 0, melody: 0,
     });
-    const rafRef = useRef(0);
     const dataRef = useRef(new Float32Array(128));
+    const lastRef = useRef<Record<StemType, number>>({
+        vocals: 0, drums: 0, bass: 0, melody: 0,
+    });
 
     useEffect(() => {
         if (!processor?.isActive) {
@@ -67,7 +70,9 @@ function useStemLevels(processor: RealtimeStemProcessor | null) {
         }
 
         const update = () => {
-            const newLevels: Record<StemType, number> = { vocals: 0, drums: 0, bass: 0, melody: 0 };
+            let changed = false;
+            const last = lastRef.current;
+            const next: Record<StemType, number> = { ...last };
 
             for (const stem of STEM_TYPES) {
                 const analyser = processor.getAnalyser(stem);
@@ -79,19 +84,28 @@ function useStemLevels(processor: RealtimeStemProcessor | null) {
                 analyser.getFloatTimeDomainData(dataRef.current);
 
                 let max = 0;
-                for (let i = 0; i < dataRef.current.length; i++) {
-                    const abs = Math.abs(dataRef.current[i]);
+                const buf = dataRef.current;
+                for (let i = 0; i < buf.length; i += 2) {  // sample every other point
+                    const abs = Math.abs(buf[i]);
                     if (abs > max) max = abs;
                 }
-                newLevels[stem] = max;
+                // Skip writes when nothing visibly changed (cheap early exit).
+                if (Math.abs(max - last[stem]) > 0.015) {
+                    next[stem] = max;
+                    changed = true;
+                }
             }
 
-            setLevels(newLevels);
-            rafRef.current = requestAnimationFrame(update);
+            if (changed) {
+                lastRef.current = next;
+                setLevels(next);
+            }
         };
 
-        rafRef.current = requestAnimationFrame(update);
-        return () => cancelAnimationFrame(rafRef.current);
+        // 30 fps is plenty for a level-meter ring; halves the React re-render
+        // cost compared to the previous unthrottled rAF, and the shared
+        // scheduler avoids spinning up a private rAF loop per processor.
+        return subscribeRaf(update, { fps: 30 });
     }, [processor, processor?.isActive]);
 
     return levels;

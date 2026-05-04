@@ -1,43 +1,53 @@
 "use server";
 
-import { db } from "@/db";
-import { tracks, scanLogs } from "@/db/schema";
-import { scanFolder } from "@/lib/scanner";
-import { eq, sql } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+/**
+ * Folder scan → ingest into companion library DB.
+ *
+ * The scanning itself still runs in this Node process via @/lib/scanner
+ * (it walks the filesystem the web server has access to). The resulting
+ * track rows are pushed to the companion's /library/tracks/ingest
+ * endpoint instead of the local SQLite. Scan logs also live on the
+ * companion now.
+ */
 
-export async function scanFolderAction(folderPath: string) {
+import { revalidatePath } from "next/cache";
+import { scanFolder } from "@/lib/scanner";
+import {
+    companionLibrary,
+    getCompanionLink,
+    type ScanLogEntry,
+} from "@/lib/companion-library";
+
+export interface ScanResult {
+    totalFiles: number;
+    audioFiles: number;
+    inserted: number;
+    skipped: number;
+    errors: string[];
+}
+
+export async function scanFolderAction(folderPath: string): Promise<ScanResult> {
+    const link = await getCompanionLink();
+    if (!link) {
+        return {
+            totalFiles: 0, audioFiles: 0, inserted: 0, skipped: 0,
+            errors: ["No companion connected. Sign in and link a companion to scan folders."],
+        };
+    }
+
     const result = await scanFolder(folderPath, true);
+    const errors = [...result.errors];
 
     let inserted = 0;
     let skipped = 0;
 
-    for (const track of result.tracks) {
+    if (result.tracks.length > 0) {
         try {
-            // Check if track already exists
-            const existing = db
-                .select()
-                .from(tracks)
-                .where(eq(tracks.filepath, track.filepath))
-                .get();
-
-            if (existing) {
-                skipped++;
-                continue;
-            }
-
-            db.insert(tracks).values(track).run();
-            inserted++;
-
-            db.insert(scanLogs)
-                .values({
-                    action: "added",
-                    filepath: track.filepath,
-                    details: `Scanned: ${track.artist || "Unknown"} - ${track.title || track.filename}`,
-                })
-                .run();
-        } catch {
-            result.errors.push(`DB insert failed for: ${track.filepath}`);
+            const r = await companionLibrary.ingestTracks(link, result.tracks);
+            inserted = r.inserted;
+            skipped = r.skipped;
+        } catch (err) {
+            errors.push(`Companion ingest failed: ${err instanceof Error ? err.message : "unknown"}`);
         }
     }
 
@@ -50,15 +60,16 @@ export async function scanFolderAction(folderPath: string) {
         audioFiles: result.audioFiles,
         inserted,
         skipped,
-        errors: result.errors,
+        errors,
     };
 }
 
-export async function getRecentScans(limit: number = 20) {
-    return db
-        .select()
-        .from(scanLogs)
-        .orderBy(sql`${scanLogs.scannedAt} DESC`)
-        .limit(limit)
-        .all();
+export async function getRecentScans(limit = 20): Promise<ScanLogEntry[]> {
+    const link = await getCompanionLink();
+    if (!link) return [];
+    try { return await companionLibrary.getScanLogs(link, limit); }
+    catch (err) {
+        console.warn("[scan] getRecentScans failed:", err);
+        return [];
+    }
 }

@@ -195,34 +195,76 @@ export const JogWheel = memo(function JogWheel({ side, deck, color }: JogWheelPr
         return () => clearInterval(interval);
     }, [isWarning, warningIntensity > 0.5]);
 
-    // ── Jog drag (scratch / nudge) ───────────────────────────────────
-    const getAngle = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    // ── Jog drag (scratch / nudge / seek) ────────────────────────────
+    // Behaviour: dragging the wheel does TWO things at once so it feels
+    // like a real DJ jog wheel and is never silent —
+    //   1. **Always seek** the audio by an amount proportional to the
+    //      angular delta. One full revolution moves the playhead by
+    //      `secondsPerRev` (default 1.8 s, scaled by `jogSensitivity`).
+    //      This makes scrubbing through cue points possible while paused
+    //      and adds a tactile "scratch" feel while playing.
+    //   2. **Pitch-bend** the deck while playing so other decks audibly
+    //      react to the push/pull, matching CDJ behaviour.
+    // The previous implementation only called `mixer.nudge`, which is
+    // a no-op while the deck is paused (playbackRate has no effect on a
+    // paused HTMLAudioElement) — that's why "moving the wheel did
+    // nothing" when the deck wasn't playing.
+    //
+    // We use Pointer Events with setPointerCapture so the drag keeps
+    // tracking even if the cursor leaves the (small) wheel — the old
+    // mouse-event implementation called `onEnd` on `onMouseLeave`,
+    // which made fast drags appear unresponsive on the 64×64 platter.
+    const dragStartTimeRef = useRef(0);
+    const dragAccumRef = useRef(0); // accumulated radians, signed
+    const SECONDS_PER_REV = 1.8;
+
+    const getAngleFromPointer = useCallback((clientX: number, clientY: number) => {
         const el = containerRef.current;
         if (!el) return 0;
         const rect = el.getBoundingClientRect();
-        const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-        const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
         return Math.atan2(clientY - rect.top - rect.height / 2, clientX - rect.left - rect.width / 2);
     }, []);
 
-    const onStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        // Only respond to primary button / single touch.
+        if (e.button !== 0 && e.pointerType === "mouse") return;
+        e.currentTarget.setPointerCapture(e.pointerId);
         isDragging.current = true;
-        lastAngle.current = getAngle(e);
-    }, [getAngle]);
+        lastAngle.current = getAngleFromPointer(e.clientX, e.clientY);
+        dragAccumRef.current = 0;
+        dragStartTimeRef.current = mixer.getDeckCurrentTime(side);
+    }, [getAngleFromPointer, mixer, side]);
 
-    const onMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
         if (!isDragging.current) return;
-        const angle = getAngle(e);
+        const angle = getAngleFromPointer(e.clientX, e.clientY);
         let delta = angle - lastAngle.current;
         if (delta > Math.PI) delta -= Math.PI * 2;
         if (delta < -Math.PI) delta += Math.PI * 2;
         lastAngle.current = angle;
+
+        // Accumulate angular displacement and convert to a time delta.
+        // jogSensitivity (default 1.0) scales how far the wheel travels
+        // per revolution; >1 = more sensitive (faster scrub).
+        dragAccumRef.current += delta;
+        const sens = personalization.jogSensitivity || 1;
+        const secondsPerRev = SECONDS_PER_REV / sens;
+        const target = dragStartTimeRef.current + (dragAccumRef.current / (2 * Math.PI)) * secondsPerRev;
+        const clamped = Math.max(0, Math.min(target, deck.duration || target));
+        mixer.seek(side, clamped);
+
+        // Apply a pitch-bend proportional to the instantaneous angular
+        // velocity so other decks hear the push/pull while playing.
+        // (Harmless when paused — playbackRate has no audible effect.)
         const strength = Math.min(0.08, Math.abs(delta) * 0.3);
         mixer.nudge(side, delta > 0 ? strength * 1000 : -strength * 1000);
-    }, [getAngle, mixer, side]);
+    }, [getAngleFromPointer, mixer, side, personalization.jogSensitivity, deck.duration]);
 
-    const onEnd = useCallback(() => {
+    const onPointerEnd = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        if (!isDragging.current) return;
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* */ }
         isDragging.current = false;
+        dragAccumRef.current = 0;
         mixer.nudgeRelease(side);
     }, [mixer, side]);
 
@@ -252,9 +294,12 @@ export const JogWheel = memo(function JogWheel({ side, deck, color }: JogWheelPr
     return (
         <div
             ref={containerRef}
-            className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 xl:w-28 xl:h-28 shrink-0 relative cursor-grab active:cursor-grabbing select-none"
-            onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
-            onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
+            className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 xl:w-28 xl:h-28 shrink-0 relative cursor-grab active:cursor-grabbing select-none touch-none"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerEnd}
+            onPointerCancel={onPointerEnd}
+            style={{ touchAction: "none" }}
         >
             {/* Layer 1: Rotating platter (CSS animation — GPU composited) */}
             <div

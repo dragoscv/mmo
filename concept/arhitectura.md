@@ -1,205 +1,177 @@
-# 🏗️ Arhitectura Tehnică — Music Organizer
+# 🏗️ Arhitectură MMO — Privire de ansamblu
 
-[🏠 Home](../README.md) · [📱 App](README.md)
+> Acest document descrie arhitectura **suite-ului MMO** (toate componentele).
+> Pentru detalii tehnice pe componente → vezi `docs/arhitectura/`.
+> Vechea arhitectură monolitică (doar app web) → [legacy-arhitectura.md](legacy-arhitectura.md).
+
+[🏠 Home](../README.md) · [📋 Concept](README.md)
 
 ---
 
-## 🗺️ Arhitectură Overview
+## 🌐 Diagramă suite
 
 ```mermaid
-graph TD
-    subgraph CLIENT["🖥️ Frontend (Next.js)"]
-        DASH["📊 Dashboard"]
-        SCAN_UI["🔍 Scanner View"]
-        LIB_UI["📚 Library View"]
-        DRV_UI["💿 Drive Manager View"]
-        SET_UI["⚙️ Settings"]
+flowchart TB
+    subgraph Frontend["Frontend (browser)"]
+        WebApp["Next.js 16 Web App<br/>RSC + Server Actions<br/>React 19.2 + Tailwind v4"]
+        Ext["Chrome Extension MV3<br/>15 content scripts<br/>+ background SW"]
     end
-    
-    subgraph SERVER["⚙️ Backend (Server Actions)"]
-        SCAN_SA["scanFiles()"]
-        ORG_SA["organizeFile()"]
-        TAG_SA["tagTrack()"]
-        EXP_SA["exportUSB()"]
-        SYNC_SA["syncRekordbox()"]
+
+    subgraph Native["Native (desktop)"]
+        Companion["MMO Companion<br/>Electron + TS<br/>Express local + IPC"]
     end
-    
-    subgraph DATA["💾 Data Layer"]
-        DB["📦 SQLite/PostgreSQL"]
-        FS["📂 File System"]
-        XML["📄 Rekordbox XML"]
+
+    subgraph Storage["Storage"]
+        SQLite[(SQLite local<br/>better-sqlite3)]
+        Postgres[(Postgres prod)]
+        FS["File System<br/>music root, USB-uri"]
     end
-    
-    CLIENT --> SERVER
-    SERVER --> DATA
-    
-    style CLIENT fill:#60a5fa,stroke:#2563eb,color:#000
-    style SERVER fill:#facc15,stroke:#ca8a04,color:#000
-    style DATA fill:#4ade80,stroke:#16a34a,color:#000
+
+    subgraph Cloud["Cloud"]
+        TURN["Coturn TURN/STUN<br/>GCP e2-micro<br/>europe-west1"]
+        Releases["GitHub Releases<br/>auto-update DMG/EXE"]
+    end
+
+    subgraph HW["Hardware DJ"]
+        DDJ["DDJ-FLX4"]
+        CT["Circuit Tracks"]
+        MIDI["MIDI Keyboard"]
+    end
+
+    WebApp -->|Drizzle ORM| SQLite
+    WebApp -->|Drizzle ORM| Postgres
+    WebApp <-->|HTTP loopback :17899| Companion
+    WebApp <-->|WebRTC peer-to-peer| WebApp
+    WebApp -->|/api/turn-credentials| TURN
+
+    Ext -->|push tracks| WebApp
+    Ext -.->|fallback| Companion
+
+    Companion -->|read/write| FS
+    Companion -->|Web MIDI / native| HW
+    Companion -->|electron-updater| Releases
+
+    style WebApp fill:#667eea,stroke:#764ba2,color:#fff
+    style Companion fill:#10b981,stroke:#047857,color:#fff
+    style Ext fill:#f59e0b,stroke:#d97706,color:#fff
+    style TURN fill:#ef4444,stroke:#dc2626,color:#fff
 ```
 
 ---
 
-## 📊 Schema Database
+## 🔑 Principii arhitecturale
 
-```mermaid
-erDiagram
-    TRACK {
-        int id PK
-        string filepath
-        string filename
-        string artist
-        string title
-        string remix
-        string label
-        float bpm
-        string key_camelot
-        string key_musical
-        int energy
-        string genre
-        string subgenre
-        string mood
-        string color
-        string vocal_type
-        string set_position
-        int mixability
-        boolean is_processed
-        timestamp added_at
-        timestamp analyzed_at
-    }
-    
-    DRIVE {
-        int id PK
-        string path
-        string label
-        string type
-        string format
-        bigint capacity
-        bigint used
-        boolean is_active
-    }
-    
-    PLAYLIST {
-        int id PK
-        string name
-        string description
-        string type
-        timestamp created_at
-    }
-    
-    PLAYLIST_TRACK {
-        int playlist_id FK
-        int track_id FK
-        int position
-    }
-    
-    SCAN_LOG {
-        int id PK
-        int drive_id FK
-        string action
-        string filepath
-        timestamp scanned_at
-    }
-    
-    TRACK ||--o{ PLAYLIST_TRACK : "in"
-    PLAYLIST ||--o{ PLAYLIST_TRACK : "contains"
-    DRIVE ||--o{ SCAN_LOG : "logged"
-```
+1. **Browser-first, native-optional** — web app-ul funcționează singur; companion-ul aduce features extra când e instalat.
+2. **Server Actions > REST** — mutările folosesc Server Actions Next.js; REST e doar pentru webhooks, streaming audio/SSE și clienți non-web (companion, extension).
+3. **Local data, cloud auth** — fișierele audio și DB rămân local (SQLite + FS); doar autentificarea și TURN-ul sunt cloud.
+4. **WebRTC peer-to-peer** — colaborarea remote nu trece prin server (latență minimă); TURN doar fallback când NAT e strict.
+5. **Companion = bridge subțire** — companion-ul **nu** dublează logica web app-ului; doar expune file system + MIDI + audio nativ.
+6. **Extension = capture-only** — extensia doar detectează & trimite metadate la web app; download-ul efectiv rulează în companion sau în web app.
+7. **Schema deschisă** — DB folosește Drizzle (SQL standard); orice utilizator avansat poate citi/migra cu unelte standard.
 
 ---
 
-## 📂 Structura Proiect
+## 🧩 Componente — responsabilități
 
-```
-music-organizer/
-├── apps/
-│   └── web/                    # Next.js 16 app
-│       ├── app/
-│       │   ├── layout.tsx
-│       │   ├── page.tsx        # Dashboard
-│       │   ├── library/
-│       │   │   └── page.tsx    # Library view
-│       │   ├── scanner/
-│       │   │   └── page.tsx    # Scanner view
-│       │   ├── drives/
-│       │   │   └── page.tsx    # Drive manager
-│       │   └── settings/
-│       │       └── page.tsx    # Settings
-│       ├── components/
-│       │   ├── ui/             # shadcn/ui
-│       │   ├── track-table.tsx
-│       │   ├── drive-card.tsx
-│       │   └── scanner-status.tsx
-│       └── actions/
-│           ├── scan.ts
-│           ├── organize.ts
-│           └── export.ts
-├── packages/
-│   ├── db/                     # Drizzle schema
-│   ├── audio/                  # Audio analysis
-│   └── fs-watcher/             # File system watcher
-├── pnpm-workspace.yaml
-└── turbo.json
-```
+### 🌐 Web App (`app/`)
+- **Routing & UI**: Next.js 16 App Router, ~17 rute (`/library`, `/mixer`, `/daw`, `/live`, `/remote`, `/visualizations`, `/download`, `/scanner`, `/drives`, `/playlists`, `/recordings`, `/devices`, `/settings`, `/profile`, `/login`, `/`)
+- **Auth**: Auth.js v5 cu Drizzle adapter
+- **DB**: Drizzle ORM peste SQLite (dev) / Postgres (prod) — 13 tabele (users, tracks, drives, playlists, scanLogs, analysisJobs, etc.)
+- **Audio engine** (browser): Web Audio API + worklets (`public/worklets/`); engine-uri în `src/lib/`: `audio-fx-engine`, `eq-engine`, `mixer-engine`, `daw-engine`, `live-engine`, `stems-engine`
+- **WebRTC**: `webrtc-audio-bridge`, `remote-relay`, `ice-servers`
+- **APIs**: ~35 REST/SSE endpoints sub `/api/*`
+- **Server Actions**: 17 action files pentru CRUD (`tracks`, `playlists`, `drives`, `recordings`, etc.)
+
+### 🖥️ MMO Companion (`server/`)
+- **Electron main**: window management, system tray, menu
+- **Express local**: HTTP pe `localhost:17899` — endpoints pentru audio streaming, file ops
+- **IPC bridge**: `preload.ts` expune API-uri sigure renderer → main
+- **File watch**: chokidar pe folderele configurate
+- **Auto-update**: electron-updater → GitHub Releases (`dragoscv/mmo`)
+- **Build**: electron-builder → DMG/EXE/AppImage/deb
+
+### 🧩 Browser Extension (`extension/`)
+- **Manifest V3** cu service worker (`background.js`)
+- **Content scripts** pentru 15 platforme: YouTube, YouTube Music, SoundCloud, Spotify, Bandcamp, Mixcloud, Vimeo, TikTok, Twitter/X, Instagram, Facebook, Twitch, Dailymotion, Deezer
+- **Storage**: `chrome.storage.local` pentru config + queue
+- **Comunicare cu web app**: `postMessage` / `fetch` la `localhost:3000` sau companion `:17899`
+
+### ☁️ Infrastructură (`infra/terraform/`)
+- **Coturn** pe e2-micro Debian 12, static IP eu-west1 (PREMIUM tier)
+- **Firewall**: 3478/UDP+TCP (STUN), 49160-49200/UDP (relay)
+- **Auth**: ephemeral REST credentials (HMAC-SHA1, fără DB pe server)
+- **Capacitate**: ~150 concurrent Opus relays @ 96 kbps
+- **Cost**: ~$7.5/lună
 
 ---
 
-## 🔄 Flow-uri Principale
+## 🔄 Fluxuri de date principale
 
-### 1. Scan Flow
+### 1. User adaugă un track local
 ```
-chokidar watch → new file detected → read metadata (ID3) → 
-analyze BPM/Key → suggest genre → insert DB → notify UI
-```
-
-### 2. Organize Flow
-```
-track in _Inbox → auto-detect genre → suggest folder → 
-user confirms/changes → move file → update DB → update RB XML
+User → Web App /library → Server Action `tracks.add`
+                        → Drizzle INSERT tracks
+                        → background: analysisJob queued
+                        → SSE /api/analysis/stream → UI live update
 ```
 
-### 3. Export Flow
+### 2. User mixează cu controller MIDI
 ```
-select playlist → check USB format → copy files → 
-generate PIONEER/ structure → write rekordbox XML → verify → eject
+DDJ-FLX4 → Web MIDI API (browser) → mixer-engine → Web Audio API
+                                                  ↘ stream la /api/audio/[id] (companion sau Next.js)
 ```
+
+### 3. User descarcă din YouTube prin extensie
+```
+Browser tab YouTube → content script detectează video
+                    → background SW notifică user (badge)
+                    → user click "Download" → POST la /api/download/start (web app)
+                                            → web app cere companion (dacă există) să facă yt-dlp
+                                            → file ajunge în music root → scanner îl pickup
+```
+
+### 4. Doi DJ-i fac un mix remote
+```
+DJ A: Web App /remote → init RTCPeerConnection
+                      → /api/turn-credentials → primește cred TURN
+                      → schimb SDP via signaling (TBD: WebSocket sau Firestore)
+DJ B: la fel
+DJ A → audio stream (Opus) → P2P → DJ B (sau prin TURN dacă NAT blochează)
+```
+
+→ Detalii complete: [docs/arhitectura/04-fluxuri-date.md](../docs/arhitectura/04-fluxuri-date.md)
 
 ---
 
-## 🔌 Rekordbox Integration
+## 📐 Decizii arhitecturale (pe scurt)
 
-### Cum comunicăm cu rekordbox:
-rekordbox folosește un **XML database** care poate fi import/export:
-
-1. **Export din RB:** File → Library → Export as XML
-2. **Modificare XML:** App-ul nostru citește/scrie XML-ul
-3. **Import în RB:** File → Library → Import XML
-
-```xml
-<!-- Structura rekordbox XML -->
-<DJ_PLAYLISTS Version="1.0.0">
-  <PRODUCT Name="rekordbox" />
-  <COLLECTION Entries="1234">
-    <TRACK TrackID="1" 
-           Name="Track Title" 
-           Artist="Artist Name"
-           Tonality="Am" 
-           AverageBpm="128.00"
-           Location="file://localhost/H:/Music/DJ/Techno/track.mp3">
-      <TEMPO Inizio="0.123" Bpm="128.00" />
-      <POSITION_MARK Name="Hot Cue A" Type="0" Start="32.456" Num="0" Red="255" />
-    </TRACK>
-  </COLLECTION>
-  <PLAYLISTS>
-    <NODE Type="0" Name="root">
-      <NODE Type="1" Name="My Playlist" Entries="10">
-        <TRACK Key="1" />
-      </NODE>
-    </NODE>
-  </PLAYLISTS>
-</DJ_PLAYLISTS>
-```
+| Decizie | Alegere | De ce |
+|---|---|---|
+| Framework web | Next.js 16 App Router | RSC + Server Actions reduc API surface; Turbopack rapid în dev |
+| ORM | Drizzle | SQL-first, type-safe, fără vendor lock-in (vs Prisma) |
+| DB local | SQLite (better-sqlite3) | Zero-config pentru utilizatori; portabil |
+| DB prod | Postgres | Multi-tenant, concurrent writes, full-text search |
+| Auth | Auth.js v5 + Drizzle | Self-hosted, multi-provider, fără vendor |
+| Desktop bridge | Electron | Cross-platform, comunitate mare, auto-update solid |
+| Audio browser | Web Audio API + worklets | Standard, low-latency, fără pluginuri |
+| Realtime | WebRTC + SSE | P2P pentru audio, SSE pentru job updates (mai simplu ca WebSockets) |
+| TURN | Coturn self-hosted pe GCP | Cost predictibil, control complet, fără vendor |
+| UI | Tailwind v4 + shadcn/ui | Owned components, customizable, fast |
+| State | Zustand + TanStack Query | Minimal, type-safe; nu Redux |
+| i18n | TBD (next-intl recomandat) | Web app momentan EN-only în UI; docs RO/EN |
 
 ---
 
-[🏠 Home](../README.md) · [📱 App](README.md)
+## 🔮 Direcții viitoare (high-level)
+
+- **Mobile app** (React Native sau Capacitor wrap) pentru remote control & browse
+- **Cloud sync opțional** — backup bibliotecă encrypted-at-rest
+- **AI features** — auto-tagging, recommendations, stem separation server-side
+- **Streaming integration** — push live mix la Twitch/YT prin companion (low-latency Opus → RTMP)
+- **Marketplace** — utilizatori publică playlisturi, sample packs, FX presets
+
+→ Vezi [functionalitati.md](functionalitati.md) pentru roadmap detaliat.
+
+---
+
+[🏠 Home](../README.md) · [📋 Concept](README.md) · [📜 Versiune legacy](legacy-arhitectura.md)

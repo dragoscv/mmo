@@ -31,6 +31,23 @@ export const DEFAULT_COMPANION_URL =
         ? process.env.NEXT_PUBLIC_COMPANION_URL
         : `http://localhost:${DEFAULT_COMPANION_PORT}`;
 
+/**
+ * Candidate ports tried by `discoverCompanion()` when probing the local
+ * machine. The companion's stored port is user-configurable (older builds
+ * defaulted to 9876, current build defaults to 17899). We probe both so
+ * users with legacy installs don't have to reconfigure.
+ */
+export const COMPANION_CANDIDATE_PORTS: readonly number[] = [17899, 9876] as const;
+/**
+ * Hosts tried in parallel for each port. `127.0.0.1` is required on
+ * Windows because Chromium often resolves `localhost` to IPv6 `::1`
+ * first, but the companion server binds to IPv4 (`0.0.0.0`) only — so a
+ * pure `localhost` probe times out / connection-refuses while the app is
+ * actually reachable on `127.0.0.1`.
+ */
+export const COMPANION_CANDIDATE_HOSTS: readonly string[] = ["127.0.0.1", "localhost"] as const;
+const COMPANION_URL_CACHE_KEY = "mmo-companion-url";
+
 
 export type AudioBackend = "auto" | "asio" | "wasapi" | "coreaudio" | "alsa" | "jack" | "pulse";
 
@@ -80,11 +97,66 @@ export interface NativeMetrics {
     dspBlockAvgMs: number;
     underruns: number;
     callbackCount: number;
+    /** Smoothed input peak (0..1). Available on companion ≥ 0.5.4. */
+    inPeak?: number;
+    /** Smoothed output peak (0..1). */
+    outPeak?: number;
+    /** Smoothed input RMS (0..1). */
+    inRms?: number;
+    /** Smoothed output RMS (0..1). */
+    outRms?: number;
+}
+
+/** Realtime audio levels pushed over WS at ~30 Hz while the engine runs. */
+export interface NativeLevels {
+    inPeak: number;
+    outPeak: number;
+    inRms: number;
+    outRms: number;
+}
+
+/** Realtime engine perf snapshot pushed alongside `NativeLevels`. */
+export interface NativePerf {
+    streamLatencyMs: number;
+    dspBlockAvgMs: number;
+    dspBlockMaxMs: number;
+    underruns: number;
+}
+
+/** FX types the native engine implements. Inserts of any other type
+ *  are silently dropped server-side when pushed via setFxChain(). The
+ *  browser keeps its full effect catalogue and continues running those
+ *  in the Web Audio path when native mode is OFF; in native mode they
+ *  simply don't take effect. */
+export type NativeFxType =
+    | "gate"
+    | "noiseSuppression"
+    | "compressor"
+    | "limiter"
+    | "eq3"
+    | "delay"
+    | "reverb";
+
+export interface NativeFxChainItem {
+    /** Stable insert id — the engine reuses DSP instances by id when
+     *  the type doesn't change, preserving state (delay buffers, comb
+     *  histories, envelope followers) across knob tweaks. */
+    id: string;
+    type: NativeFxType;
+    enabled: boolean;
+    params: Record<string, number>;
 }
 
 export interface NativeStartConfig {
     inputDeviceId?: number;
     outputDeviceId?: number;
+    /** Stable name reference resolved server-side at start time. Survives
+     *  reboots / hot-plug, unlike RtAudio's numeric ids. When both an id
+     *  and a name are provided, the explicit id wins. */
+    inputDeviceName?: string;
+    inputBackend?: AudioBackend;
+    outputDeviceName?: string;
+    outputBackend?: AudioBackend;
     sampleRate?: number;
     frameSize?: number;
     backend?: AudioBackend;
@@ -93,6 +165,9 @@ export interface NativeStartConfig {
     scale?: { keyIndex: number; intervals: number[] | null; amount?: number };
     minimizeLatency?: boolean;
     realtimeSchedule?: boolean;
+    /** Request exclusive access to the audio device (WASAPI exclusive on
+     *  Windows). Bypasses the OS mixer; saves ~2 ms. Locks the device. */
+    exclusiveMode?: boolean;
 }
 
 export interface NativeCompanionCredentials {
@@ -128,12 +203,74 @@ export async function probeCompanion(
     }
 }
 
+/**
+ * Discover a running companion on this machine. Tries (in order):
+ *   1. `NEXT_PUBLIC_COMPANION_URL` env override (only that URL)
+ *   2. The URL last seen working (cached in localStorage)
+ *   3. Each port in `COMPANION_CANDIDATE_PORTS` on http://localhost
+ *
+ * Returns the working URL + beacon, or null. Persists the winning URL so
+ * subsequent page loads short-circuit straight to the right port.
+ */
+export async function discoverCompanion(
+    signal?: AbortSignal,
+): Promise<{ apiUrl: string; beacon: { version: string; platform: string; capabilities: string[] } } | null> {
+    const tried = new Set<string>();
+    const tryOne = async (apiUrl: string) => {
+        if (tried.has(apiUrl)) return null;
+        tried.add(apiUrl);
+        const beacon = await probeCompanion(apiUrl, signal);
+        return beacon ? { apiUrl, beacon } : null;
+    };
+
+    // 1. Env override wins outright.
+    const envUrl = typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_COMPANION_URL : undefined;
+    if (envUrl) {
+        const hit = await tryOne(envUrl);
+        if (hit) return hit;
+    }
+
+    // 2. Cached URL from a previous session.
+    if (typeof window !== "undefined") {
+        try {
+            const cached = window.localStorage.getItem(COMPANION_URL_CACHE_KEY);
+            if (cached) {
+                const hit = await tryOne(cached);
+                if (hit) return hit;
+                // Cached URL no longer works — purge it so we don't keep
+                // trying it first on every probe (e.g. after the user's
+                // OS resolver flips `localhost` from IPv4 to IPv6).
+                try { window.localStorage.removeItem(COMPANION_URL_CACHE_KEY); } catch { /* ignore */ }
+            }
+        } catch { /* localStorage may be unavailable */ }
+    }
+
+    // 3. Brute-force the candidate hosts × ports in parallel — first to
+    //    answer wins. Probing both 127.0.0.1 AND localhost is REQUIRED on
+    //    Windows where Chromium resolves `localhost` to IPv6 `::1` first
+    //    while the companion only binds to IPv4 — making the localhost
+    //    probe fail even though the app is reachable on 127.0.0.1.
+    const candidates: string[] = [];
+    for (const host of COMPANION_CANDIDATE_HOSTS) {
+        for (const port of COMPANION_CANDIDATE_PORTS) {
+            candidates.push(`http://${host}:${port}`);
+        }
+    }
+    const results = await Promise.all(candidates.map((u) => tryOne(u)));
+    const hit = results.find((r) => r !== null);
+    if (hit && typeof window !== "undefined") {
+        try { window.localStorage.setItem(COMPANION_URL_CACHE_KEY, hit.apiUrl); } catch { /* ignore */ }
+    }
+    return hit ?? null;
+}
+
 export class NativeCompanionClient {
     private apiUrl: string;
     private ws: WebSocket | null = null;
     private wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private wsClosed = true;
     private pitchListeners = new Set<(p: NativePitch, s: NativeStatus | null) => void>();
+    private levelListeners = new Set<(l: NativeLevels, p: NativePerf) => void>();
     private connectionListeners = new Set<(connected: boolean) => void>();
 
     constructor(creds: NativeCompanionCredentials = {}) {
@@ -169,7 +306,27 @@ export class NativeCompanionClient {
     }
 
     devices(backend: AudioBackend = "auto") {
-        return this.req<{ backend: string; devices: NativeDeviceInfo[] }>(
+        return this.req<{
+            backend: string;
+            devices: NativeDeviceInfo[];
+            /** All supported backends with their devices. Newer companions
+             *  return this so the client can match an `authorized` entry
+             *  against its source backend (e.g. WASAPI authorizations while
+             *  `backend` auto-picked ASIO). Absent on older builds. */
+            backends?: Array<{
+                backend: string;
+                available: boolean;
+                devices: NativeDeviceInfo[];
+            }>;
+            /** Devices the user has authorized in the desktop UI. May be absent
+             *  on older companion builds. */
+            authorized?: Array<{
+                name: string;
+                direction: "input" | "output";
+                backend: string;
+                preferredSampleRate?: number;
+            }>;
+        }>(
             `/audio/native/devices?backend=${encodeURIComponent(backend)}`,
         );
     }
@@ -185,6 +342,32 @@ export class NativeCompanionClient {
 
     stop() {
         return this.req<{ success: true }>("/audio/native/stop", { method: "POST" });
+    }
+
+    /**
+     * Fire-and-forget stop using `navigator.sendBeacon`. Intended for use
+     * inside `pagehide` / `beforeunload` handlers, where the regular
+     * `stop()` Promise is killed by the page unload before the request
+     * actually leaves the renderer (which is exactly the bug that lets
+     * sound keep playing after closing or refreshing the tab).
+     *
+     * `sendBeacon` is the only HTTP transport the browser guarantees to
+     * deliver during unload. Returns true on successful queueing; if it
+     * returns false the caller has nothing to do — the next companion
+     * start request will reset the engine anyway.
+     */
+    stopBeacon(): boolean {
+        if (typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function") {
+            return false;
+        }
+        try {
+            // sendBeacon ignores Content-Type unless we wrap the body in a
+            // Blob; an empty body is fine for /audio/native/stop.
+            const blob = new Blob([], { type: "application/json" });
+            return navigator.sendBeacon(`${this.apiUrl}/audio/native/stop`, blob);
+        } catch {
+            return false;
+        }
     }
 
     metrics() {
@@ -212,6 +395,25 @@ export class NativeCompanionClient {
         });
     }
 
+    /**
+     * Replace the engine's FX chain. Mirrors the user's browser voice
+     * chain into the native engine so they hear the same processed sound
+     * at the lower native latency. Browser-only effect types (chorus,
+     * pingPongDelay, vocoderLite, …) are silently dropped server-side;
+     * this method always succeeds when the companion is reachable.
+     *
+     * Items must use STABLE ids — the engine reuses existing FX
+     * instances by id when their type doesn't change, preserving DSP
+     * state (delay buffers, reverb tails, envelope followers). That's
+     * what makes per-knob automation glitch-free.
+     */
+    setFxChain(items: NativeFxChainItem[]) {
+        return this.req<{ success: true; count: number }>("/audio/native/chain", {
+            method: "POST",
+            body: JSON.stringify({ items }),
+        });
+    }
+
     // ── WebSocket telemetry ─────────────────────────────────────────
 
     connectWs(): void {
@@ -220,6 +422,11 @@ export class NativeCompanionClient {
         const wsUrl = this.apiUrl.replace(/^http/, "ws") + "/ws";
         try {
             const ws = new WebSocket(wsUrl);
+            // Receive binary level frames (32 B Float32Array) as ArrayBuffer
+            // so we can read them with zero copies and skip JSON.parse on
+            // the hot path. The default would give us a Blob, which forces
+            // an async .arrayBuffer() round-trip per frame.
+            ws.binaryType = "arraybuffer";
             this.ws = ws;
             ws.onopen = () => {
                 for (const fn of this.connectionListeners) fn(true);
@@ -233,10 +440,35 @@ export class NativeCompanionClient {
             };
             ws.onerror = () => { /* close handler does the cleanup */ };
             ws.onmessage = (ev) => {
+                // Companion ≥ 0.7.0 ships levels as a 32-byte binary frame:
+                //   Float32 [inPeak, outPeak, inRms, outRms,
+                //            streamLatencyMs, dspAvgMs, dspMaxMs, underruns]
+                // Older companions (< 0.7.0) still send JSON; the string
+                // branch below handles both pitch + the old levels shape.
+                if (ev.data instanceof ArrayBuffer) {
+                    if (ev.data.byteLength < 32) return;
+                    const v = new Float32Array(ev.data, 0, 8);
+                    const levels: NativeLevels = {
+                        inPeak: v[0], outPeak: v[1], inRms: v[2], outRms: v[3],
+                    };
+                    const perf: NativePerf = {
+                        streamLatencyMs: v[4],
+                        dspBlockAvgMs: v[5],
+                        dspBlockMaxMs: v[6],
+                        underruns: v[7],
+                    };
+                    for (const fn of this.levelListeners) fn(levels, perf);
+                    return;
+                }
                 try {
                     const msg = JSON.parse(typeof ev.data === "string" ? ev.data : "");
                     if (msg && msg.type === "audio.pitch" && msg.pitch) {
                         for (const fn of this.pitchListeners) fn(msg.pitch, msg.status ?? null);
+                    } else if (msg && msg.type === "audio.levels" && msg.levels) {
+                        const perf: NativePerf = msg.perf ?? {
+                            streamLatencyMs: 0, dspBlockAvgMs: 0, dspBlockMaxMs: 0, underruns: 0,
+                        };
+                        for (const fn of this.levelListeners) fn(msg.levels, perf);
                     }
                 } catch { /* ignore malformed */ }
             };
@@ -263,6 +495,13 @@ export class NativeCompanionClient {
     addPitchListener(fn: (p: NativePitch, s: NativeStatus | null) => void): () => void {
         this.pitchListeners.add(fn);
         return () => this.pitchListeners.delete(fn);
+    }
+
+    /** Subscribe to ~30 Hz level + perf snapshots pushed while the engine
+     *  is running. Cheap to subscribe; auto-stops when the engine stops. */
+    addLevelListener(fn: (l: NativeLevels, p: NativePerf) => void): () => void {
+        this.levelListeners.add(fn);
+        return () => this.levelListeners.delete(fn);
     }
 
     addConnectionListener(fn: (connected: boolean) => void): () => void {

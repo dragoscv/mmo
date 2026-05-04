@@ -1,5 +1,7 @@
 # 🟡 Playlisturi Inteligente & Collection Radar
 
+> ⚠️ **Context**: ghid **rekordbox**. Playlist-uri smart în MMO → [`docs/aplicatie/playlists.md`](../aplicatie/playlists.md).
+
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../README.md#-avansat)
 
 | ← Prev | Next → |

@@ -107,6 +107,12 @@ export interface MidiMessage {
     note: number; // note or CC number (or program number for PC)
     value: number; // velocity or CC value (0 for PC/system)
     raw: Uint8Array;
+    /** ID of the input port that produced this message. Set by the engine,
+     *  not by the parser — used to filter messages coming from external
+     *  devices (grooveboxes, synths) so they don't accidentally trigger
+     *  controller-preset deck actions, and so per-device panels can
+     *  reject messages from unrelated controllers. */
+    sourceId?: string;
 }
 
 // ─── MIDI Message Parser ─────────────────────────────────────────────────
@@ -173,6 +179,13 @@ export class MidiEngine {
 
     // Diagnostic: throttle unmapped-message logs to one per unique key.
     private unmappedSeen: Set<string> = new Set();
+
+    /** Input-port IDs whose MIDI messages must NOT be routed through the
+     *  active controller preset (e.g. Circuit Tracks, other grooveboxes
+     *  / synths). Their messages are still parsed and forwarded to
+     *  `onMessage` listeners and to MIDI Learn — only the
+     *  preset-driven `routeMessage` step is skipped. */
+    private externalInputIds: Set<string> = new Set();
 
     onDeviceChange?: (devices: MidiDevice[]) => void;
     onMessage?: (msg: MidiMessage) => void;
@@ -391,18 +404,20 @@ export class MidiEngine {
                     newDevices.set(input.id, device);
 
                     // Attach message handler
+                    const sourceId = input.id;
                     input.onmidimessage = (e: MIDIMessageEvent) => {
                         if (!e.data) return;
                         const msg = parseMidiMessage(new Uint8Array(e.data));
                         if (!msg) return;
+                        msg.sourceId = sourceId;
 
                         // One-time "first message from this port" log so we
                         // can prove the device is actually emitting MIDI.
                         if (process.env.NODE_ENV !== "production") {
                             const seen = (this as unknown as { _firstSeen?: Set<string> })._firstSeen ?? new Set<string>();
                             (this as unknown as { _firstSeen?: Set<string> })._firstSeen = seen;
-                            if (!seen.has(input.id)) {
-                                seen.add(input.id);
+                            if (!seen.has(sourceId)) {
+                                seen.add(sourceId);
                                 // eslint-disable-next-line no-console
                                 console.info(`[MIDI] First message from "${input.name}": status=0x${msg.status.toString(16)} data1=0x${msg.note.toString(16)} value=${msg.value} type=${msg.type}`);
                             }
@@ -414,6 +429,14 @@ export class MidiEngine {
                             this.learnCallback(msg);
                             return;
                         }
+
+                        // Skip preset-driven action routing for inputs that
+                        // belong to recognised external devices (Circuit
+                        // Tracks etc.). Otherwise their notes would collide
+                        // with the active controller preset (e.g. CT Synth 1
+                        // note C#5 would trigger Deck A reloop on the
+                        // Pioneer DDJ-FLX4 mapping).
+                        if (this.externalInputIds.has(sourceId)) return;
 
                         this.routeMessage(msg);
                     };
@@ -715,6 +738,19 @@ export class MidiEngine {
             }
         }
         return found;
+    }
+
+    /** Mark a set of input-port IDs as belonging to external devices
+     *  (Circuit Tracks, other grooveboxes / synths). Messages from these
+     *  ports are still parsed and forwarded to `onMessage` listeners but
+     *  bypass the active controller preset's action routing. */
+    setExternalInputIds(ids: Iterable<string>) {
+        this.externalInputIds = new Set(ids);
+    }
+
+    /** Whether a given input-port ID is currently flagged as external. */
+    isExternalInput(id: string): boolean {
+        return this.externalInputIds.has(id);
     }
 
     /** Send a CC message to a specific device */

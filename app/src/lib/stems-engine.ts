@@ -90,7 +90,92 @@ const STEM_BANDS: Record<StemType, FrequencyBand> = {
     melody: { lowFreq: 200, highFreq: 12000, label: "Melodic" },
 };
 
-// ─── Core Stem Separation (Offline) ──────────────────────────────────────────
+// ─── Real-stems loader (companion analyzer pre-computed WAVs) ───────────────
+//
+// Preferred path. When the companion's Python analyzer (BS-Roformer /
+// Mel-Roformer / Demucs v4) has already separated the track, the stem
+// WAVs live on the companion at `/library/stems/<trackId>/<stem>.wav`.
+// Fetching + decoding them yields an order-of-magnitude better
+// separation quality than the band-pass fallback in `separateStems`.
+//
+// The web app ships URLs through here rather than ever sending raw
+// audio data — the companion authenticates with the device token and
+// streams with HTTP range support, so the four stems decode in
+// parallel and the browser never touches the original file.
+
+export interface RealStemsLoadOptions {
+    /** Per-stem URL. Caller (`useStems`) builds these via
+     *  `companionAnalyzer.stemUrl(link, trackId, stem)`. Stems whose
+     *  URL is missing fall back to silence in the result. */
+    urls: Partial<Record<"vocals" | "drums" | "bass" | "other", string>>;
+    /** Auth headers to include — typically `{ "X-Device-Token": …,
+     *  "X-User-Id": … }` matching the companion-library client. */
+    headers?: Record<string, string>;
+    /** Optional AudioContext to decode into. Avoids resample by reusing
+     *  the same ctx the engine plays through. */
+    audioContext?: AudioContext;
+    /** Progress 0..1 (one tick per stem decoded). */
+    onProgress?: StemProgressCallback;
+}
+
+export async function loadCompanionStems(
+    opts: RealStemsLoadOptions,
+): Promise<StemSeparationResult> {
+    const ctx = opts.audioContext
+        ?? new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const fetched: Record<"vocals" | "drums" | "bass" | "other", AudioBuffer | null> = {
+        vocals: null, drums: null, bass: null, other: null,
+    };
+    const stems = (Object.keys(opts.urls) as Array<keyof typeof opts.urls>)
+        .filter((k) => !!opts.urls[k]);
+
+    let done = 0;
+    await Promise.all(stems.map(async (stem) => {
+        const url = opts.urls[stem]!;
+        try {
+            const res = await fetch(url, { headers: opts.headers, cache: "force-cache" });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const buf = await res.arrayBuffer();
+            fetched[stem] = await ctx.decodeAudioData(buf);
+            done++;
+            opts.onProgress?.({
+                stage: "isolating",
+                progress: done / stems.length,
+                currentStem: stem === "other" ? "melody" : stem,
+                message: `Loaded ${stem} stem`,
+            });
+        } catch (e) {
+            // Soft-fail per stem — the consumer can still play the rest.
+            // The DJ panel will show a "missing" badge for any null one.
+            console.warn(`[stems] failed to load ${stem} from ${url}:`, e);
+        }
+    }));
+
+    // Reference any non-null buffer for shape info.
+    const ref = fetched.vocals ?? fetched.drums ?? fetched.bass ?? fetched.other;
+    if (!ref) {
+        throw new Error("No companion stems were available to load.");
+    }
+    opts.onProgress?.({ stage: "complete", progress: 1, message: "Stems loaded." });
+    return {
+        // Map UVR's "other" naming to our canonical "melody" so the
+        // Mixer/Sound Editor/DAW don't need to learn a second taxonomy.
+        vocals: fetched.vocals,
+        drums: fetched.drums,
+        bass: fetched.bass,
+        melody: fetched.other,
+        duration: ref.duration,
+        sampleRate: ref.sampleRate,
+    };
+}
+
+// ─── Core Stem Separation (Offline, fallback band-pass) ─────────────────────
+//
+// Fallback. Used when the companion analyzer hasn't yet processed the
+// track (or Python deps aren't installed). This is purely band-pass
+// filtering — DO NOT mistake it for real source separation. It exists
+// so the Mixer / DAW / Sound Editor never break when a track was just
+// imported and stems aren't ready yet.
 
 /**
  * Separates an AudioBuffer into stems using spectral filtering.

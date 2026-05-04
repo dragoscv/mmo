@@ -49,6 +49,10 @@ interface InlineDownloadProps {
     track: TrackDownloadInfo;
     targetDeck: DeckSide;
     onLoadToDeck: (trackId: number, deck: DeckSide) => void;
+    /** Fired after the track is added to the library (or detected as already there)
+     *  with the freshly-created/found trackId. Parent uses this to refetch its
+     *  track list so the new entry shows up immediately. */
+    onAddedToLibrary?: (trackId: number) => void;
     onClose: () => void;
     open: boolean;
 }
@@ -69,7 +73,7 @@ const PROGRESS_RE = /\[download\]\s+([\d.]+)%\s+of\s+~?([\d.]+\w+)\s+at\s+([\d.]
 
 // ─── Component ───────────────────────────────────────────────────────────
 
-export function InlineDownloadModal({ track, targetDeck, onLoadToDeck, onClose, open }: InlineDownloadProps) {
+export function InlineDownloadModal({ track, targetDeck, onLoadToDeck, onAddedToLibrary, onClose, open }: InlineDownloadProps) {
     const [state, setState] = useState<DownloadState>({
         stage: "idle",
         progress: 0,
@@ -216,13 +220,18 @@ export function InlineDownloadModal({ track, targetDeck, onLoadToDeck, onClose, 
                 filePath: downloadedFile,
             }));
             addLog("Track ready!");
+            // Notify parent so the library list / load-to-deck buttons see the
+            // new (or freshly-detected duplicate) track immediately.
+            if (typeof addResult.trackId === "number") {
+                onAddedToLibrary?.(addResult.trackId);
+            }
         } catch (err) {
             if ((err as Error).name === "AbortError") return;
             const message = err instanceof Error ? err.message : "Download failed";
             setState(prev => ({ ...prev, stage: "error", error: message }));
             addLog(`Error: ${message}`);
         }
-    }, [track, addLog]);
+    }, [track, addLog, onAddedToLibrary]);
 
     // Auto-start on open
     if (open && state.stage === "idle" && !hasStarted.current) {

@@ -1,89 +1,73 @@
-# 📱 Music Organizer App — Concept
+# 💡 Concept — MMO Multi Media Organizer
 
-[🏠 Home](../README.md)
+> **Scopul acestei secțiuni:** capturăm deciziile produs și arhitecturale care definesc MMO ca **suite**, nu doar ca aplicație web.
 
----
-
-> **Pe scurt:** Conceptul pentru o aplicație Music Organizer care lucrează
-> în tandem cu rekordbox — automatizează scanare, organizare, tagging,
-> și pregătire USB.
+[🏠 Home](../README.md) · [🗺️ Navigare](../NAVIGARE.md)
 
 ---
 
-## 🎯 Problema
+## 🎯 Viziunea pe scurt
 
-Rekordbox e excelent pentru DJ, dar **organizarea** e manuală:
-- Trebuie să muți fișiere manual în foldere
-- Trebuie să setezi taguri manual
-- Nu monitorizează foldere noi automat
-- Nu sugerează gen/energie/mood automat
-- Export USB e manual
+MMO = un **ecosistem deschis** pentru DJ-i și producători care vor:
+
+1. **Să dețină** propria bibliotecă (no vendor lock-in, fișiere locale, schemă deschisă)
+2. **Să combine** workflow rekordbox cu unelte moderne (web, AI, colaborare remote)
+3. **Să cânte live** flexibil (DJ + DAW + sample triggers + MIDI hardware)
+4. **Să rămână self-hostable** (web app + companion + TURN se pot rula independent)
+
+Componentele lucrează împreună, dar **fiecare are sens singură** — poți folosi doar web app-ul, doar companion-ul, doar extensia, sau toate.
 
 ---
 
-## 💡 Soluția: Music Organizer
+## 🧱 Componente (din perspectivă produs)
 
-```mermaid
-graph TD
-    subgraph APP["📱 MUSIC ORGANIZER"]
-        SCAN["🔍 Scanner<br/>Watch folders"]
-        ORG["📁 Organizer<br/>Auto-sort"]
-        TAG["🏷️ Tagger<br/>Auto-tag"]
-        DRV["💿 Drive Manager<br/>Multi-drive"]
-        EXP["💾 Export<br/>USB prep"]
-        UI["🖥️ Dashboard<br/>Overview"]
-    end
-    
-    FS["📂 H:\Music"] --> SCAN
-    SCAN --> ORG
-    ORG --> TAG
-    TAG --> RB["🎧 Rekordbox XML"]
-    DRV --> EXP
-    EXP --> USB["💾 USB"]
-    UI --> APP
-    
-    style APP fill:#667eea,stroke:#764ba2,color:#fff
-    style RB fill:#fb923c,stroke:#ea580c,color:#000
+| Componentă | Rol în experiența utilizatorului | Audiență primară |
+|---|---|---|
+| **Web App** ([`app/`](../app/)) | Centrul experienței: bibliotecă, mixaj, DAW, live, settings, recordings | Toți DJ-ii / producătorii |
+| **MMO Companion** ([`server/`](../server/)) | "Punte" nativă pentru audio/MIDI/file system care nu funcționează în browser | Useri pro care vor latență joasă, hardware MIDI, watch folders OS-level |
+| **Browser Extension** ([`extension/`](../extension/)) | "One-click capture" din 15+ platforme streaming în bibliotecă | Curatori, crate-diggeri, oameni care descoperă tracks online |
+| **Infra TURN** ([`infra/terraform/`](../infra/terraform/)) | Relay WebRTC pentru remote/colaborare când peers sunt în spatele NAT-uri stricte | Useri care fac mixuri colaborative, B2B, lecții remote |
+
+---
+
+## 📚 Documente în această secțiune
+
+| Document | Subiect |
+|----------|---------|
+| [arhitectura.md](arhitectura.md) | Arhitectura tehnică umbrella (web + companion + extension + infra) |
+| [functionalitati.md](functionalitati.md) | Feature matrix complet + roadmap versiuni |
+| [ui-ux.md](ui-ux.md) | Sistem design vizual (paletă, typography, layout, dark mode) |
+| [drive-manager.md](drive-manager.md) | Modul Drive Manager — detectare, format, export USB CDJ |
+| [scanner.md](scanner.md) | Modul Scanner — watch folders, formate suportate, pipeline analiză |
+
+### Documente legacy (păstrate ca referință istorică)
+
+| Document | De ce e legacy |
+|----------|----------------|
+| [legacy-app-readme.md](legacy-app-readme.md) | Vechiul `concept/README.md` — vorbește doar de "music organizer app" (înainte de DAW/live/remote/companion/extension) |
+| [legacy-arhitectura.md](legacy-arhitectura.md) | Vechea arhitectură doar pentru web app monolit — payload util pentru istorie ERD/Drizzle |
+
+---
+
+## 🔄 Cum se leagă această secțiune de restul docs
+
+```
+concept/  ─── DE CE & CE construim ────────────►  produsul
+   │
+   ▼
+docs/arhitectura/  ─── CUM se conectează componentele
+   │
+   ▼
+docs/aplicatie/, docs/companion/, docs/extension/  ─── CUM le folosești
+   │
+   ▼
+app/README.md, server/README.md, extension/README.md  ─── CUM le rulezi în dev
 ```
 
----
-
-## 📋 Module
-
-| Modul | Funcție | Documentație |
-|-------|---------|-------------|
-| **Scanner** | Watch folders, detect new files | [scanner.md](scanner.md) |
-| **Drive Manager** | Manage multiple drives & paths | [drive-manager.md](drive-manager.md) |
-| **Arhitectură** | Technical architecture | [arhitectura.md](arhitectura.md) |
-| **UI/UX** | Interface design | [ui-ux.md](ui-ux.md) |
-| **Funcționalități** | Complete feature list | [functionalitati.md](functionalitati.md) |
-
----
-
-## 🛠️ Tech Stack Propus
-
-| Componentă | Tehnologie |
-|-----------|-----------|
-| **Framework** | Next.js 16 (App Router) |
-| **UI** | shadcn/ui + Tailwind CSS v4 |
-| **Database** | SQLite (local) sau PostgreSQL (cloud) |
-| **Audio Analysis** | Web Audio API + ffprobe |
-| **File System** | Node.js fs/chokidar (watch) |
-| **Rekordbox Integration** | XML export/import |
-| **Desktop** | Electron sau Tauri (opțional) |
-
----
-
-## 🗺️ Roadmap
-
-| Fază | Ce | Când |
-|------|-----|------|
-| **v0.1** | Scanner + folder monitor | MVP |
-| **v0.2** | Auto-organize (move to genre folders) | +2 săpt |
-| **v0.3** | BPM/Key analysis display | +2 săpt |
-| **v0.4** | Rekordbox XML integration | +2 săpt |
-| **v0.5** | Drive manager + USB export | +2 săpt |
-| **v1.0** | Dashboard complet + auto-tag | Release |
+Dacă vrei să **înțelegi viziunea** → rămâi aici (`concept/`).
+Dacă vrei să **înțelegi codul** → mergi la `docs/arhitectura/`.
+Dacă vrei să **înveți să folosești** → mergi la `docs/aplicatie/` (sau `docs/companion/`, `docs/extension/`).
+Dacă vrei să **contribui** → mergi la README-ul componentei (ex. `app/README.md`).
 
 ---
 

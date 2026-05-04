@@ -130,6 +130,10 @@ export function MidiProvider({ children }: { children: ReactNode }) {
             // Auto-detect external devices
             const found = engine.autoDetectExternalDevices(EXTERNAL_DEVICE_PROFILES);
             setExternalDevices(found);
+            // Tell the engine to bypass preset-driven action routing for
+            // these inputs so external grooveboxes/synths (Circuit Tracks)
+            // don't accidentally trigger DDJ-FLX4 deck actions.
+            engine.setExternalInputIds(found.map(f => f.device.id));
         };
 
         // Fan-out messages to all subscribers
@@ -152,6 +156,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
                 // Auto-detect external devices on init
                 const found = engine.autoDetectExternalDevices(EXTERNAL_DEVICE_PROFILES);
                 setExternalDevices(found);
+                engine.setExternalInputIds(found.map(f => f.device.id));
 
                 // Auto-detect and load preset
                 const saved = loadSettings();
@@ -244,6 +249,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
             setDevices(devs);
             const found = engine.autoDetectExternalDevices(EXTERNAL_DEVICE_PROFILES);
             setExternalDevices(found);
+            engine.setExternalInputIds(found.map(f => f.device.id));
         };
 
         engine.onMessage = (msg) => {
@@ -259,6 +265,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
             setDevices(engine.getDevices());
             const found = engine.autoDetectExternalDevices(EXTERNAL_DEVICE_PROFILES);
             setExternalDevices(found);
+            engine.setExternalInputIds(found.map(f => f.device.id));
 
             // Restore active preset
             const saved = loadSettings();

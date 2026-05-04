@@ -20,8 +20,9 @@
  */
 
 import { useEffect, useState } from "react";
-import { Download, Check, Loader2 } from "lucide-react";
-import { probeCompanion, DEFAULT_COMPANION_URL } from "@/lib/native-companion";
+import { Download, Loader2 } from "lucide-react";
+import { discoverCompanion } from "@/lib/native-companion";
+import { CompanionStatusCard } from "./companion-status-card";
 
 interface CompanionInfo {
     os: "win" | "mac" | "linux";
@@ -35,7 +36,7 @@ interface CompanionInfo {
 
 type Status =
     | { kind: "probing" }
-    | { kind: "connected"; version: string }
+    | { kind: "connected"; apiUrl: string; version: string; platform: string; capabilities: string[] }
     | { kind: "available"; info: CompanionInfo }
     | { kind: "no-release" }
     | { kind: "error"; message: string };
@@ -57,13 +58,21 @@ export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boo
         const timeout = setTimeout(() => ctrl.abort(), 1500);
 
         (async () => {
-            // First — is the companion already running locally?
-            const beacon = await probeCompanion(DEFAULT_COMPANION_URL, ctrl.signal);
+            // First — is the companion already running locally? Use the
+            // full discovery (env override → cached URL → port scan) so a
+            // companion bound to a non-default port still gets picked up.
+            const found = await discoverCompanion(ctrl.signal);
             clearTimeout(timeout);
             if (cancelled) return;
 
-            if (beacon) {
-                setStatus({ kind: "connected", version: beacon.version });
+            if (found) {
+                setStatus({
+                    kind: "connected",
+                    apiUrl: found.apiUrl,
+                    version: found.beacon.version,
+                    platform: found.beacon.platform,
+                    capabilities: found.beacon.capabilities,
+                });
                 return;
             }
 
@@ -101,12 +110,13 @@ export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boo
     if (collapsed) {
         if (status.kind === "connected") {
             return (
-                <div
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-500"
-                    title={`Companion connected (v${status.version})`}
-                >
-                    <Check className="h-4 w-4" />
-                </div>
+                <CompanionStatusCard
+                    apiUrl={status.apiUrl}
+                    version={status.version}
+                    platform={status.platform}
+                    capabilities={status.capabilities}
+                    collapsed
+                />
             );
         }
         if (status.kind === "available") {
@@ -144,14 +154,12 @@ export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boo
 
     if (status.kind === "connected") {
         return (
-            <div
-                className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-400"
-                title="Native low-latency audio engine ready"
-            >
-                <Check className="h-3 w-3" />
-                <span className="flex-1">Companion connected</span>
-                <span className="text-emerald-400/60">v{status.version}</span>
-            </div>
+            <CompanionStatusCard
+                apiUrl={status.apiUrl}
+                version={status.version}
+                platform={status.platform}
+                capabilities={status.capabilities}
+            />
         );
     }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ScanSearch, FileDown, FolderOpen, Sparkles, Loader2, Eye } from "lucide-react";
+import { ScanSearch, FileDown, FolderOpen, Sparkles, Loader2, Eye, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAnalysisContext } from "@/hooks/analysis-context";
@@ -15,9 +15,11 @@ export function DashboardActions() {
         const result = await exportRekordboxXml();
         if (result.success) {
             toast.success(
-                `Exported ${result.trackCount} tracks, ${result.playlistCount} playlists`,
-                { description: result.path }
+                `Exported ${result.count} tracks`,
+                { description: result.outputPath ?? undefined }
             );
+        } else {
+            toast.error(result.error || "Export failed");
         }
     }
 
@@ -59,6 +61,13 @@ export function DashboardActions() {
                 <Button variant="outline" className="w-full justify-start gap-3">
                     <ScanSearch className="h-4 w-4" />
                     Scan Folder
+                </Button>
+            </Link>
+
+            <Link href="/analysis" className="block">
+                <Button variant="outline" className="w-full justify-start gap-3">
+                    <Activity className="h-4 w-4 text-emerald-400" />
+                    Analysis Console
                 </Button>
             </Link>
 

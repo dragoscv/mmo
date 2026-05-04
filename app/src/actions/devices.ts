@@ -1,10 +1,22 @@
 "use server";
 
 import { db } from "@/db";
-import { devices, deviceFolders, tracks } from "@/db/schema";
+import { devices, deviceFolders } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
+import { companionLibrary, getCompanionLink, getCompanionLinkForDevice } from "@/lib/companion-library";
+import {
+    companionControl,
+    type AuthorizedAudioDevice,
+    type CompanionFolder,
+    type CompanionAudioInventory,
+    type CompanionScanJob,
+} from "@/lib/companion-control";
+
+// NOTE: Next.js 16 forbids re-exporting types from `"use server"` files —
+// every export must be an async function. Client components import the
+// type definitions directly from `@/lib/companion-control` instead.
 
 // ─── Get all devices for current user ───────────────────────────────────────
 
@@ -187,40 +199,38 @@ export async function scanDeviceFolder(deviceId: string, folderPath: string) {
             count: number;
         };
 
-        // Insert scanned tracks into DB
+        // Ingest scanned tracks into the companion's library DB.
+        // The companion ingest is idempotent on (user_id, filepath), so we
+        // forward everything and let it dedupe.
+        const link = await getCompanionLinkForDevice(deviceId);
         let inserted = 0;
         let skipped = 0;
-
-        for (const t of data.tracks) {
-            const existing = db
-                .select({ id: tracks.id })
-                .from(tracks)
-                .where(eq(tracks.filepath, t.filepath))
-                .get();
-
-            if (existing) {
-                skipped++;
-                continue;
+        if (link) {
+            try {
+                const r = await companionLibrary.ingestTracks(link, data.tracks.map((t) => ({
+                    filepath: t.filepath,
+                    filename: t.filename,
+                    artist: t.artist ?? null,
+                    title: t.title ?? null,
+                    album: t.album ?? null,
+                    bpm: t.bpm ?? null,
+                    keyCamelot: t.key ?? null,
+                    duration: t.duration ?? null,
+                    genre: t.genre ?? null,
+                    format: t.format ?? null,
+                    bitrate: t.bitrate ?? null,
+                    sampleRate: t.sampleRate ?? null,
+                    fileSize: t.fileSize,
+                    year: t.year ?? null,
+                    deviceId,
+                })));
+                inserted = r.inserted;
+                skipped = r.skipped;
+            } catch (e) {
+                return { error: `Companion ingest failed: ${e instanceof Error ? e.message : String(e)}` };
             }
-
-            await db.insert(tracks).values({
-                filepath: t.filepath,
-                filename: t.filename,
-                artist: t.artist,
-                title: t.title,
-                album: t.album,
-                bpm: t.bpm,
-                keyCamelot: t.key,
-                duration: t.duration,
-                genre: t.genre,
-                format: t.format,
-                bitrate: t.bitrate,
-                sampleRate: t.sampleRate,
-                fileSize: t.fileSize,
-                year: t.year,
-                deviceId: deviceId,
-            });
-            inserted++;
+        } else {
+            return { error: "Companion not connected — cannot persist scanned tracks." };
         }
 
         // Update folder stats
@@ -279,12 +289,16 @@ export async function pingDevice(deviceId: string): Promise<{ online: boolean; i
 // ─── Get track count per device ─────────────────────────────────────────────
 
 export async function getDeviceTrackCount(deviceId: string): Promise<number> {
-    const result = db
-        .select({ count: sql<number>`count(*)` })
-        .from(tracks)
-        .where(eq(tracks.deviceId, deviceId))
-        .get();
-    return result?.count || 0;
+    // Track counts now live on the companion. We approximate by paging
+    // /library/tracks (companion has no per-device count endpoint yet).
+    const link = await getCompanionLinkForDevice(deviceId);
+    if (!link) return 0;
+    try {
+        // Use a small page just to read `total`, then JS-filter by deviceId
+        // from a wider sample. Acceptable for the device list UI.
+        const r = await companionLibrary.getTracks(link, { page: 1, pageSize: 500 });
+        return r.tracks.filter((t) => t.deviceId === deviceId).length;
+    } catch { return 0; }
 }
 
 // ─── Local companion (for native low-latency audio) ────────────────────────
@@ -309,3 +323,225 @@ export async function getLocalCompanion(): Promise<{ apiUrl: string; token: stri
     return { apiUrl: local.apiUrl, token: local.token, deviceId: local.id };
 }
 
+// ─── Companion-owned folders ───────────────────────────────────────────────
+//
+// Folders live ON the companion (truth = scanFolders in electron-store).
+// The web app no longer mirrors them in its own DB — these actions are
+// thin proxies. The legacy `deviceFolders` table is kept only for stale
+// per-folder stats; new flows ignore it.
+
+export async function getCompanionFolders(deviceId: string): Promise<CompanionFolder[]> {
+    try { return await companionControl.listFolders(deviceId); }
+    catch { return []; }
+}
+
+/** Triggers the companion's native OS folder picker. Returns the new
+ *  full list (or `canceled: true`). The web action does NOT take a path
+ *  argument — that's the whole point: no manual entry. */
+export async function pickCompanionFolder(
+    deviceId: string,
+): Promise<
+    | { canceled: true }
+    | { canceled: false; picked: string; folders: CompanionFolder[] }
+    | { error: string }
+> {
+    try {
+        const r = await companionControl.pickFolder(deviceId);
+        if (r.canceled) return { canceled: true };
+        return { canceled: false, picked: r.picked!, folders: r.folders };
+    } catch (e) {
+        return { error: e instanceof Error ? e.message : String(e) };
+    }
+}
+
+export async function removeCompanionFolder(
+    deviceId: string,
+    folderPath: string,
+): Promise<CompanionFolder[]> {
+    try { return await companionControl.removeFolder(deviceId, folderPath); }
+    catch { return []; }
+}
+
+/**
+ * Toggle the chokidar-backed watcher on a folder. When enabled the
+ * companion streams new-file events that the web app picks up via
+ * `pollCompanionWatchEvents` and ingests through `companionLibrary`.
+ */
+export async function setCompanionFolderWatch(
+    deviceId: string,
+    folderPath: string,
+    watch: boolean,
+): Promise<{ success: true; folders: CompanionFolder[] } | { error: string }> {
+    try {
+        const folders = await companionControl.setFolderWatch(deviceId, folderPath, watch);
+        return { success: true, folders };
+    } catch (e) {
+        return { error: e instanceof Error ? e.message : String(e) };
+    }
+}
+
+// ─── Async scan jobs (refresh-resilient progress) ──────────────────────────
+
+/** Kick off a scan. Returns the freshly-created job (status:"pending"). */
+export async function startCompanionScan(
+    deviceId: string,
+    folderPath: string,
+): Promise<{ success: true; job: CompanionScanJob } | { error: string }> {
+    try {
+        const job = await companionControl.startScan(deviceId, folderPath);
+        return { success: true, job };
+    } catch (e) {
+        return { error: e instanceof Error ? e.message : String(e) };
+    }
+}
+
+/** Poll a job for progress / completion. */
+export async function getCompanionScanJob(
+    deviceId: string,
+    jobId: string,
+): Promise<{ success: true; job: CompanionScanJob } | { error: string }> {
+    try {
+        const job = await companionControl.getScanJob(deviceId, jobId);
+        return { success: true, job };
+    } catch (e) {
+        return { error: e instanceof Error ? e.message : String(e) };
+    }
+}
+
+/** List all scan jobs known to this companion. Used on devices-page mount
+ *  to recover in-flight scans after a tab refresh. */
+export async function listCompanionScanJobs(
+    deviceId: string,
+): Promise<CompanionScanJob[]> {
+    try { return await companionControl.listScanJobs(deviceId); }
+    catch { return []; }
+}
+
+/**
+ * Drain a completed scan job: pulls its tracks payload + ingests into the
+ * companion library DB through the normal /library/tracks/ingest path,
+ * then ACKs the job so the companion can free memory.
+ *
+ * Returns ingest stats. Idempotent on (user_id, filepath) — re-calling
+ * for the same job is safe (companion just returns 404 after the ack).
+ */
+export async function ingestCompanionScanJob(
+    deviceId: string,
+    jobId: string,
+): Promise<
+    | { success: true; inserted: number; skipped: number; total: number }
+    | { error: string }
+> {
+    try {
+        const job = await companionControl.getScanJob(deviceId, jobId);
+        if (job.status !== "complete" || !job.tracks) return { error: "Job not complete" };
+        // Per-device lookup (not getCompanionLink) so this works for
+        // LAN/Tailscale companions whose api_url isn't on localhost.
+        const link = await getCompanionLinkForDevice(deviceId);
+        if (!link) return { error: "Companion not connected — cannot persist scanned tracks." };
+        const r = await companionLibrary.ingestTracks(link, job.tracks.map((t) => ({
+            filepath: t.filepath,
+            filename: t.filename,
+            artist: t.artist ?? null,
+            title: t.title ?? null,
+            album: t.album ?? null,
+            bpm: t.bpm ?? null,
+            keyCamelot: t.key ?? null,
+            duration: t.duration ?? null,
+            genre: t.genre ?? null,
+            format: t.format ?? null,
+            bitrate: t.bitrate ?? null,
+            sampleRate: t.sampleRate ?? null,
+            fileSize: t.fileSize,
+            year: t.year ?? null,
+            deviceId,
+        })));
+        // Best-effort ack — failure here is harmless (the GC will clean up).
+        try { await companionControl.ackScanJob(deviceId, jobId); } catch { /* ignore */ }
+        // Update folder stats so the existing UI/legacy table stays warm.
+        await db
+            .update(deviceFolders)
+            .set({
+                trackCount: job.tracks.length,
+                lastScannedAt: new Date().toISOString(),
+            })
+            .where(and(
+                eq(deviceFolders.deviceId, deviceId),
+                eq(deviceFolders.path, job.folder),
+            ));
+        revalidatePath("/devices");
+        revalidatePath("/library");
+        return { success: true, inserted: r.inserted, skipped: r.skipped, total: job.tracks.length };
+    } catch (e) {
+        return { error: e instanceof Error ? e.message : String(e) };
+    }
+}
+
+/**
+ * Drain queued watcher events from the companion and ingest each as a
+ * single-track add. Returns the new highWatermark so the caller can
+ * paginate forward without re-ingesting events it has already seen.
+ *
+ * For `unlink` events we currently no-op (track stays in library, just
+ * marked as offline by the existing /check-files reconciliation flow).
+ */
+export async function pollCompanionWatchEvents(
+    deviceId: string,
+    since: number,
+): Promise<
+    | { success: true; processed: number; highWatermark: number }
+    | { error: string }
+> {
+    try {
+        const { events, highWatermark } = await companionControl.pollWatchEvents(deviceId, since);
+        const adds = events.filter((e) => (e.kind === "add" || e.kind === "change") && e.payload);
+        if (adds.length === 0) return { success: true, processed: 0, highWatermark };
+        const link = await getCompanionLinkForDevice(deviceId);
+        if (!link) return { error: "Companion not connected" };
+        await companionLibrary.ingestTracks(link, adds.map((e) => {
+            const t = e.payload!;
+            return {
+                filepath: t.filepath,
+                filename: t.filename,
+                artist: t.artist ?? null,
+                title: t.title ?? null,
+                album: t.album ?? null,
+                bpm: t.bpm ?? null,
+                keyCamelot: t.key ?? null,
+                duration: t.duration ?? null,
+                genre: t.genre ?? null,
+                format: t.format ?? null,
+                bitrate: t.bitrate ?? null,
+                sampleRate: t.sampleRate ?? null,
+                fileSize: t.fileSize,
+                year: t.year ?? null,
+                deviceId,
+            };
+        }));
+        revalidatePath("/library");
+        return { success: true, processed: adds.length, highWatermark };
+    } catch (e) {
+        return { error: e instanceof Error ? e.message : String(e) };
+    }
+}
+
+// ─── Companion audio device authorization ──────────────────────────────────
+
+export async function getCompanionAudioInventory(
+    deviceId: string,
+): Promise<CompanionAudioInventory | { error: string }> {
+    try { return await companionControl.getAudioInventory(deviceId); }
+    catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
+}
+
+export async function setCompanionAuthorizedAudioDevices(
+    deviceId: string,
+    list: AuthorizedAudioDevice[],
+): Promise<{ success: true; authorized: AuthorizedAudioDevice[] } | { error: string }> {
+    try {
+        const authorized = await companionControl.setAuthorizedAudioDevices(deviceId, list);
+        return { success: true, authorized };
+    } catch (e) {
+        return { error: e instanceof Error ? e.message : String(e) };
+    }
+}

@@ -1,4 +1,25 @@
-import type { Track } from "@/db/schema";
+// Structural type — keeps this helper independent of where the track row
+// physically lives (was @/db/schema, now @/lib/companion-library).
+export interface RekordboxXmlTrack {
+    id: number;
+    filepath: string;
+    filename: string;
+    title: string | null;
+    artist: string | null;
+    album: string | null;
+    genre: string | null;
+    keyMusical: string | null;
+    bpm: number | null;
+    duration: number | null;
+    bitrate: number | null;
+    sampleRate: number | null;
+    energy: number | null;
+    mood: string | null;
+    setPosition: string | null;
+    color: string | null;
+}
+
+type Track = RekordboxXmlTrack;
 
 export function generateRekordboxXml(
     tracks: Track[],

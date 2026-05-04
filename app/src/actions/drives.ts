@@ -1,39 +1,42 @@
 "use server";
 
-import { db } from "@/db";
-import { drives } from "@/db/schema";
-import { eq } from "drizzle-orm";
+/**
+ * Drive detection — system-level call, no DB. Drive persistence has
+ * moved to the companion (drives are inherently local to a machine).
+ * `getSavedDrives` / `addDrive` / `removeDrive` are kept as no-ops so
+ * existing imports don't break; full implementation requires a
+ * /library/drives companion endpoint which isn't shipped yet.
+ */
+
 import { getConnectedDrives, type DriveInfo } from "@/lib/drives";
-import { revalidatePath } from "next/cache";
 
 export async function detectDrives(): Promise<DriveInfo[]> {
     return getConnectedDrives();
 }
 
-export async function getSavedDrives() {
-    return db.select().from(drives).all();
-}
-
-export async function addDrive(data: {
+export interface SavedDrive {
+    id: number;
     path: string;
-    label: string;
+    label: string | null;
     type: string;
-    format?: string;
-}) {
-    db.insert(drives)
-        .values({
-            path: data.path,
-            label: data.label,
-            type: data.type,
-            format: data.format,
-        })
-        .run();
-    revalidatePath("/drives");
-    return { success: true };
+    format: string | null;
+    isActive: boolean | null;
 }
 
-export async function removeDrive(id: number) {
-    db.delete(drives).where(eq(drives.id, id)).run();
-    revalidatePath("/drives");
-    return { success: true };
+export async function getSavedDrives(): Promise<SavedDrive[]> {
+    // TODO(companion): expose /library/drives. Returning empty keeps the
+    // drives page rendering without a crash.
+    return [];
+}
+
+export async function addDrive(_data: {
+    path: string; label: string; type: string; format?: string;
+}): Promise<{ success: boolean; error?: string }> {
+    void _data;
+    return { success: false, error: "Drive persistence requires the companion drives API (not yet shipped)" };
+}
+
+export async function removeDrive(_id: number): Promise<{ success: boolean; error?: string }> {
+    void _id;
+    return { success: false, error: "Drive persistence requires the companion drives API (not yet shipped)" };
 }

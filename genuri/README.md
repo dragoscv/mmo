@@ -1,5 +1,7 @@
 # 🎵 Genuri — Ghid Complet per Gen Muzical
 
+> ℹ️ Ghidurile de gen sunt **agnostice de tool** — se aplică indiferent dacă folosești MMO, rekordbox, Serato sau Traktor. În MMO găsești filtrul după gen în [`docs/aplicatie/biblioteca.md`](../docs/aplicatie/biblioteca.md) și mapping gen→folder în [`docs/aplicatie/settings.md`](../docs/aplicatie/settings.md).
+
 [🏠 Home](../README.md)
 
 ---

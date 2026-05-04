@@ -1,256 +1,305 @@
-# 🎧 Rekordbox — Ghid Complet pentru DJ & Live Performance
+# 🎧 MMO — Multi Media Organizer
 
-> **mwrty** — De la zero la DJ/Live Performer profesionist.
-> Organizare muzică, workflow rekordbox 7, export USB, integrare Circuit Tracks + DDJ-FLX4.
+> **Suite open-source pentru DJ-i, producători și pasionați de muzică.**
+> Web app · desktop companion · extensie browser · infrastructură live.
+> Domeniu live: [muzicai.ro](https://muzicai.ro) · Cod sursă: [github.com/dragoscv/mmo](https://github.com/dragoscv/mmo)
+
+[![Status](https://img.shields.io/badge/status-active%20development-orange.svg)](https://github.com/dragoscv/mmo)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Companion](https://img.shields.io/github/v/release/dragoscv/mmo?label=companion)](https://github.com/dragoscv/mmo/releases)
+
+🇷🇴 **Română** (acest fișier) · [🇬🇧 English](README.en.md)
 
 ---
 
-## 🗺️ Navigare Principală
+## ⚡ Ce este MMO?
+
+MMO (**Multi Media Organizer**) este o suită completă pentru organizarea, analiza, mixajul și performance-ul live cu muzică. Pornit ca ghid personal pentru rekordbox, a evoluat într-un ecosistem cu mai multe componente care lucrează împreună:
+
+| Componentă | Ce face | Cale |
+|---|---|---|
+| 🌐 **Web App** | Bibliotecă, mixer, DAW, live, scanner, recordings, vizualizări | [`app/`](app/) |
+| 🖥️ **MMO Companion** | App Electron desktop — server local audio + bridge nativ | [`server/`](server/) |
+| 🧩 **Browser Extension** | Detectează & descarcă audio din 15+ platforme streaming | [`extension/`](extension/) |
+| ☁️ **Infrastructură** | Server TURN/STUN pe GCP pentru WebRTC remote | [`infra/terraform/`](infra/terraform/) |
+| 📚 **Documentație** | Ghiduri DJ rekordbox, organizare, genuri, echipament | [`docs/`](docs/), [`organizare/`](organizare/), [`genuri/`](genuri/), [`echipament/`](echipament/) |
+
+---
+
+## 🗺️ Arhitectura suitei
 
 ```mermaid
-graph TD
-    START["📖 START AICI"] --> INCEPATOR
-    START --> AVANSAT
-    START --> PRO
-    
-    INCEPATOR["🟢 ÎNCEPĂTOR<br/>Ce este rekordbox?<br/>Primul import & mix"]
-    AVANSAT["🟡 AVANSAT<br/>Harmonic mixing<br/>Cue-uri inteligente"]
-    PRO["🔴 PROFESIONAL<br/>Workflow complet<br/>Live hybrid setup"]
-    
-    INCEPATOR --> ORGANIZARE
-    AVANSAT --> ORGANIZARE
-    PRO --> ORGANIZARE
-    
-    ORGANIZARE["📁 ORGANIZARE<br/>Foldere, taguri,<br/>drive-uri, scanare"]
-    
-    ORGANIZARE --> GENURI
-    ORGANIZARE --> EXPORT
-    
-    GENURI["🎵 GENURI<br/>Techno, Bounce,<br/>Manele, Latino..."]
-    EXPORT["💾 EXPORT USB<br/>Pregătire &<br/>export corect"]
-    
-    GENURI --> ECHIPAMENT
-    EXPORT --> ECHIPAMENT
-    
-    ECHIPAMENT["🔌 ECHIPAMENT<br/>DDJ-FLX4, CT,<br/>MIDI, upgrade"]
-    
-    ECHIPAMENT --> APP
-    
-    APP["💻 APLICAȚIA<br/>Music Organizer<br/>UI/UX & arhitectură"]
-    
-    style START fill:#667eea,stroke:#764ba2,color:#fff
-    style INCEPATOR fill:#4ade80,stroke:#16a34a,color:#000
-    style AVANSAT fill:#facc15,stroke:#ca8a04,color:#000
-    style PRO fill:#ef4444,stroke:#dc2626,color:#fff
-    style ORGANIZARE fill:#60a5fa,stroke:#2563eb,color:#000
-    style GENURI fill:#c084fc,stroke:#9333ea,color:#000
-    style EXPORT fill:#fb923c,stroke:#ea580c,color:#000
-    style ECHIPAMENT fill:#2dd4bf,stroke:#0d9488,color:#000
-    style APP fill:#f472b6,stroke:#ec4899,color:#000
+flowchart LR
+    subgraph User["💻 Utilizator"]
+        Browser[🌐 Browser]
+        Desktop[🖥️ Desktop OS]
+    end
+
+    subgraph MMO["🎧 MMO Suite"]
+        WebApp[Web App<br/>Next.js 16]
+        Companion[MMO Companion<br/>Electron]
+        Extension[Browser Extension<br/>Chrome MV3]
+    end
+
+    subgraph Hardware["🎚️ Hardware DJ"]
+        DDJ[DDJ-FLX4]
+        CT[Circuit Tracks]
+        MIDI[MIDI Keyboard]
+    end
+
+    subgraph Cloud["☁️ Cloud"]
+        TURN[Coturn STUN/TURN<br/>GCP europe-west1]
+        DB[(Postgres / SQLite)]
+        GitHub[GitHub Releases<br/>Auto-update]
+    end
+
+    Browser -->|HTTPS| WebApp
+    Desktop -->|launch| Companion
+    Browser -->|install| Extension
+
+    Extension -->|audio detected| WebApp
+    Companion <-->|HTTP local + WebRTC| WebApp
+    Companion -->|MIDI / audio| Hardware
+
+    WebApp <-->|WebRTC ICE| TURN
+    WebApp -->|Drizzle ORM| DB
+    Companion -->|check updates| GitHub
+
+    style WebApp fill:#667eea,stroke:#764ba2,color:#fff
+    style Companion fill:#10b981,stroke:#047857,color:#fff
+    style Extension fill:#f59e0b,stroke:#d97706,color:#fff
+    style TURN fill:#ef4444,stroke:#dc2626,color:#fff
 ```
 
 ---
 
-## 🚀 Setup Rapid — De Unde Începi?
+## 🎯 Pentru cine este?
 
-| # | Situație | Link Direct |
-|---|----------|-------------|
-| 1 | **Complet nou?** Începe aici | [Ce este Rekordbox](docs/incepator/01-ce-este-rekordbox.md) |
-| 2 | **Am rekordbox**, vreau să organizez | [Sistem de Organizare](organizare/README.md) |
-| 3 | **Am muzică**, vreau să export pe USB | [Export USB Complet](organizare/export-usb.md) |
-| 4 | **Vreau să mixez** cu DDJ-FLX4 | [Ghid DDJ-FLX4](echipament/ddj-flx4.md) |
-| 5 | **Circuit Tracks** + Rekordbox? | [Integrare CT](echipament/circuit-tracks.md) |
-| 6 | **Ce gen** ar trebui să mixez? | [Harta Genurilor](genuri/README.md) |
-| 7 | **Nu înțeleg** un termen? | [Glosar Complet](glosar/glosar.md) |
-| 8 | **Vreau aplicația** de organizat | [App Music Organizer](app/README.md) |
+### 🎧 Utilizatori finali — DJ-i & Producători
 
----
+- **Organizezi** o bibliotecă mare de muzică (BPM, key, energie, taguri, foldere inteligente)
+- **Mixezi** live cu DDJ-FLX4 sau alt controller MIDI
+- **Înregistrezi** mixuri și colaborezi remote (WebRTC peer-to-peer)
+- **Pregătești** USB-uri pentru CDJ-uri / XDJ în club
+- **Descarci** muzică din YouTube, SoundCloud, Bandcamp etc. direct în bibliotecă
+- **Înveți** rekordbox, organizare profesională, mixaj armonic
 
-## 📚 Documentație pe Nivel
+→ Începe cu [Ghid Utilizator](#-ghid-utilizator)
 
-### 🟢 Începător
+### 👨‍💻 Contributors & Dezvoltatori
 
-| # | Lecție | Descriere |
-|---|--------|-----------|
-| 1 | [Ce este Rekordbox](docs/incepator/01-ce-este-rekordbox.md) | Software-ul, moduri, licențe, ce face |
-| 2 | [Instalare & Configurare](docs/incepator/02-instalare-configurare.md) | Setup pas cu pas pe Windows |
-| 3 | [Prima Bibliotecă](docs/incepator/03-prima-biblioteca.md) | Import muzică, foldere, analiza automată |
-| 4 | [Analiza Melodiilor](docs/incepator/04-analiza-melodiilor.md) | BPM, beatgrid, key, waveform |
-| 5 | [Organizare Bazică](docs/incepator/05-organizare-bazica.md) | Playlisturi, foldere, taguri simple |
-| 6 | [Primul Mix](docs/incepator/06-primul-mix.md) | Primul mix cu DDJ-FLX4 |
-| 7 | [Export USB — Bazic](docs/incepator/07-export-usb-basic.md) | Primul export pe USB |
+- Contribuți la web app (Next.js 16 / React 19 / Drizzle / Auth.js v5)
+- Lucrezi la companion-ul Electron (audio nativ, IPC, auto-update)
+- Adaugi suport pentru o platformă nouă în extensia browser
+- Configurezi infrastructura (Terraform / GCP / coturn)
 
-### 🟡 Avansat
-
-| # | Lecție | Descriere |
-|---|--------|-----------|
-| 1 | [Beatgrid Avansat](docs/avansat/01-beatgrid-avansat.md) | Corectare manuală, grile complexe |
-| 2 | [Hot Cues & Memory](docs/avansat/02-hot-cues-memory.md) | Cue-uri strategice, Intelligent Cues |
-| 3 | [Playlisturi Inteligente](docs/avansat/03-playlisti-inteligente.md) | Smart playlists, filtre avansate |
-| 4 | [Mixaj Armonic](docs/avansat/04-mixaj-armonic.md) | Camelot wheel, harmonic mixing |
-| 5 | [Efecte Avansate](docs/avansat/05-efecte-avansate.md) | FX chains, performance pads |
-| 6 | [Organizare Avansată](docs/avansat/06-organizare-avansata.md) | Tag system complex, My Tag |
-| 7 | [Înregistrare Mix](docs/avansat/07-inregistrare-mix.md) | Recording și export |
-
-### 🔴 Profesional
-
-| # | Lecție | Descriere |
-|---|--------|-----------|
-| 1 | [Workflow Profesional](docs/profesional/01-workflow-pro.md) | De la descoperire la performance |
-| 2 | [Pregătire Set](docs/profesional/02-pregatire-set.md) | Set profesional pas cu pas |
-| 3 | [Multi-Device Setup](docs/profesional/03-multi-device.md) | CDJ, XDJ, DDJ — toate setup-urile |
-| 4 | [Live Hybrid](docs/profesional/04-live-hybrid.md) | Rekordbox + Circuit Tracks live |
-| 5 | [Backup & Recovery](docs/profesional/05-backup-disaster.md) | Backup, recovery, migrare |
-| 6 | [Streaming & Recording](docs/profesional/06-streaming-live.md) | Streaming live, recording pro |
-| 7 | [Pregătire Club/Festival](docs/profesional/07-preparare-club.md) | Checklist pentru gig real |
+→ Sari la [Ghid Contributor](#-ghid-contributor)
 
 ---
 
-## 📁 Organizare Muzică
+## 🚀 Quick Start
 
-| Document | Ce Găsești |
-|----------|-----------|
-| [📁 Structură Foldere](organizare/structura-foldere.md) | Cum structurezi H:\Music și alte drive-uri |
-| [🏷️ Sistem Taguri](organizare/sistem-taguri.md) | Tag system complet pentru rekordbox |
-| [📝 Convenții Fișiere](organizare/conventii-fisiere.md) | Naming conventions pentru track-uri |
-| [🔍 Workflow Scanare](organizare/workflow-scanare.md) | Scanare automată, watch folders |
-| [💿 Gestionare Drive-uri](organizare/gestionare-drive-uri.md) | Multiple drive-uri, surse, export-uri |
-| [💾 Export USB Complet](organizare/export-usb.md) | Export USB pas cu pas |
-| [📊 BPM / Key / Energy](organizare/bpm-key-energy.md) | Categorizare completă |
+### Pentru utilizatori
 
----
+```bash
+# 1. Deschide web app în browser
+open https://muzicai.ro            # producție
+# sau pornește local:
+cd app && pnpm install && pnpm dev # → http://localhost:3000
 
-## 🎵 Genuri Muzicale
+# 2. Instalează MMO Companion (opțional, pentru audio nativ)
+# Descarcă din: https://github.com/dragoscv/mmo/releases/latest
+#  - MMO-Companion-Setup-X.Y.Z.exe (Windows)
+#  - MMO-Companion-X.Y.Z-arm64.dmg (macOS Apple Silicon)
+#  - MMO-Companion-X.Y.Z-x64.dmg (macOS Intel)
+#  - MMO-Companion-X.Y.Z.AppImage (Linux)
 
-| Gen | BPM | Vibe | Link |
-|-----|-----|------|------|
-| ⚫ Techno | 125–145 | Dark, industrial, repetitiv | [techno.md](genuri/techno.md) |
-| 🟤 Tech House | 122–128 | Groovy, funky, dans | [tech-house.md](genuri/tech-house.md) |
-| 🟣 Acid | 125–140 | 303, squelchy, hypnotic | [acid.md](genuri/acid.md) |
-| 🟠 Psytrance | 138–150 | Psychedelic, intense, trippy | [psytrance.md](genuri/psytrance.md) |
-| 🔴 Bounce | 150–165 | High energy, donk, euphoric | [bounce.md](genuri/bounce.md) |
-| 🟡 Manele | 85–130 | Românesc, emoțional, dans | [manele.md](genuri/manele.md) |
-| 🟢 Populară | 80–140 | Tradițional, hora, sârba | [populara.md](genuri/populara.md) |
-| 🔵 Balkanică | 90–160 | Energic, brass, percuție | [balkanica.md](genuri/balkanica.md) |
-| 🟠 Latino | 85–130 | Reggaeton, salsa, cumbia | [latino.md](genuri/latino.md) |
-| 🌈 Fuziune | variabil | Combinații creative | [fuziune.md](genuri/fuziune.md) |
-
----
-
-## 🔌 Echipament
-
-| Document | Ce Găsești |
-|----------|-----------|
-| [🎛️ DDJ-FLX4](echipament/ddj-flx4.md) | Ghid complet controller-ul tău |
-| [🎹 Circuit Tracks](echipament/circuit-tracks.md) | Integrare cu rekordbox |
-| [🎹 MIDI Keyboard](echipament/midi-keyboard.md) | Claviatură MIDI live |
-| [📈 Drumul de Upgrade](echipament/upgrade-path.md) | Ce cumperi și când |
-| [🛒 Catalog Echipamente](echipament/echipament-complet.md) | Toate echipamentele pe categorii |
-| [🔌 Cabluri & Conexiuni](echipament/cabluri-conexiuni.md) | Signal flow, cabluri |
-| [🎚️ Setup-uri Recomandate](echipament/setup-uri.md) | Setup per nivel |
-
----
-
-## 💻 Aplicația Music Organizer
-
-| Document | Ce Găsești |
-|----------|-----------|
-| [📋 Overview](app/README.md) | Ce este și de ce |
-| [🏗️ Arhitectură](app/arhitectura.md) | Arhitectura tehnică |
-| [🎨 UI/UX Design](app/ui-ux.md) | Design complet interfață |
-| [📋 Funcționalități](app/functionalitati.md) | Lista completă de features |
-| [💿 Drive Manager](app/drive-manager.md) | Modul management drive-uri |
-| [🔍 Scanner Muzical](app/scanner.md) | Modul scanner & watch |
-
----
-
-## 📖 Glosar & Referință
-
-| Document | Ce Găsești |
-|----------|-----------|
-| [📖 Glosar Complet A-Z](glosar/glosar.md) | Toți termenii explicați |
-| [🗺️ Navigare Completă](NAVIGARE.md) | Hartă completă a repo-ului |
-
----
-
-## 🎯 Setup-ul Meu Actual
-
-```
-┌─────────────────────────────────────────────────────┐
-│  🎧 mwrty — DJ & Live Performer Setup               │
-│                                                      │
-│  🎛️ DDJ-FLX4          — Controller DJ (rekordbox)   │
-│  🎹 Circuit Tracks     — Groovebox (synths + drums) │
-│  🎹 MIDI Keyboard      — Piano live (ocazional)     │
-│  💻 Laptop + rekordbox 7                             │
-│  📁 H:\Music           — Folder principal muzică    │
-│                                                      │
-│  🎵 Genuri preferate:                                │
-│     Bounce · Techno · Acid · Psy · Tech House       │
-│     Manele · Populară · Balkanică · Latino           │
-└─────────────────────────────────────────────────────┘
+# 3. Instalează Extensia Chrome (opțional, pentru download)
+# Încarcă folderul `extension/` ca extensie nepachetată în chrome://extensions
 ```
 
----
+### Pentru contributors
 
-## 📂 Structura Repository
+```bash
+# Clonează & instalează
+git clone https://github.com/dragoscv/mmo.git
+cd mmo
 
-```
-rekordbox-mwrty/
-├── README.md                    ← Ești aici
-├── NAVIGARE.md                  ← Hartă completă
-│
-├── docs/
-│   ├── incepator/               ← 🟢 7 lecții pentru începători
-│   ├── avansat/                 ← 🟡 7 lecții avansate
-│   └── profesional/             ← 🔴 7 lecții profesionale
-│
-├── organizare/                  ← 📁 Sistem de organizare muzică
-│   ├── structura-foldere.md
-│   ├── sistem-taguri.md
-│   ├── conventii-fisiere.md
-│   ├── workflow-scanare.md
-│   ├── gestionare-drive-uri.md
-│   ├── export-usb.md
-│   └── bpm-key-energy.md
-│
-├── genuri/                      ← 🎵 Ghiduri per gen muzical
-│   ├── techno.md
-│   ├── tech-house.md
-│   ├── acid.md
-│   ├── psytrance.md
-│   ├── bounce.md
-│   ├── manele.md
-│   ├── populara.md
-│   ├── balkanica.md
-│   ├── latino.md
-│   └── fuziune.md
-│
-├── echipament/                  ← 🔌 Ghiduri echipament
-│   ├── ddj-flx4.md
-│   ├── circuit-tracks.md
-│   ├── midi-keyboard.md
-│   ├── upgrade-path.md
-│   ├── echipament-complet.md
-│   ├── cabluri-conexiuni.md
-│   └── setup-uri.md
-│
-├── app/                         ← 💻 Aplicația Music Organizer
-│   ├── README.md
-│   ├── arhitectura.md
-│   ├── ui-ux.md
-│   ├── functionalitati.md
-│   ├── drive-manager.md
-│   └── scanner.md
-│
-└── glosar/                      ← 📖 Glosar A-Z
-    └── glosar.md
+# Web app
+cd app
+pnpm install
+cp .env.example .env.local         # editează secretele
+pnpm db:generate && pnpm db:migrate
+pnpm dev                            # → http://localhost:3000
+
+# Companion (Electron)
+cd ../server
+pnpm install
+pnpm dev                            # pornește Electron în dev mode
+
+# Extension
+# Încarcă folderul `extension/` ca extensie nepachetată în Chrome
 ```
 
----
-
-> **Repo companion:** [circuit-tracks-mwrty](../circuit-tracks-mwrty/) — Ghid complet Circuit Tracks
+→ Detalii complete: [docs/arhitectura/02-componente-suite.md](docs/arhitectura/02-componente-suite.md)
 
 ---
 
-*Creat de **mwrty** (Dragos) — DJ & Live Performer*
+## 📚 Ghid Utilizator
+
+### Aplicație web — pe module
+
+| Modul | Ce face | Doc |
+|---|---|---|
+| 📚 **Bibliotecă** | Track-uri, filtre (BPM, key, energie, gen, taguri), căutare | [docs/aplicatie/biblioteca.md](docs/aplicatie/biblioteca.md) |
+| 🎚️ **Mixer** | Mixer DJ 2-deck cu waveform, EQ, FX, jog, sync | [docs/aplicatie/mixer.md](docs/aplicatie/mixer.md) |
+| 🎛️ **DAW / Editor** | Timeline arrangement, clip editing, fade, slice | [docs/aplicatie/daw-editor.md](docs/aplicatie/daw-editor.md) |
+| 🎤 **Live** | Mod performance live (controllere + sample triggers) | [docs/aplicatie/live.md](docs/aplicatie/live.md) |
+| 📡 **Remote** | Colaborare audio peer-to-peer (WebRTC + TURN) | [docs/aplicatie/remote.md](docs/aplicatie/remote.md) |
+| 🌈 **Visualizations** | Vizualizări audio-reactive (waveform, FFT, shaders) | [docs/aplicatie/visualizations.md](docs/aplicatie/visualizations.md) |
+| ⬇️ **Download** | Descărcare YouTube/SoundCloud/Bandcamp/etc. | [docs/aplicatie/download.md](docs/aplicatie/download.md) |
+| 🔍 **Scanner** | Watch folders, auto-import, analiză BPM/key/gen | [docs/aplicatie/scanner.md](docs/aplicatie/scanner.md) |
+| 💿 **Drive Manager** | Detectare drive-uri, format, export USB pentru CDJ | [docs/aplicatie/drive-manager.md](docs/aplicatie/drive-manager.md) |
+| 📋 **Playlists** | Playlisturi manuale & smart, recomandări | [docs/aplicatie/playlists.md](docs/aplicatie/playlists.md) |
+| 🎙️ **Recordings** | Salvare, redare, arhivare mixuri | [docs/aplicatie/recordings.md](docs/aplicatie/recordings.md) |
+| 🔌 **Devices** | Înregistrare & sync cu MMO Companion | [docs/aplicatie/devices.md](docs/aplicatie/devices.md) |
+| ⚙️ **Settings** | Watch folders, music root, preferințe | [docs/aplicatie/settings.md](docs/aplicatie/settings.md) |
+
+### Componente externe
+
+- 🖥️ **MMO Companion** — [docs/companion/](docs/companion/) (instalare, IPC, audio pipeline, auto-update)
+- 🧩 **Extensia Chrome** — [docs/extension/](docs/extension/) (instalare, platforme suportate, troubleshooting)
+
+### Cunoștințe DJ (rekordbox + organizare + genuri + echipament)
+
+| Categorie | Conținut |
+|---|---|
+| 🟢 [Începător](docs/incepator/) | Ce e rekordbox, instalare, prima bibliotecă, primul mix, export USB de bază |
+| 🟡 [Avansat](docs/avansat/) | Beatgrid, hot cues, smart playlists, mixaj armonic, FX, recording |
+| 🔴 [Profesional](docs/profesional/) | Workflow pro, multi-device, live hybrid, backup, streaming, gig prep |
+| 📁 [Organizare](organizare/) | Structură foldere, sistem taguri, naming, watch, drive-uri, USB |
+| 🎵 [Genuri](genuri/) | Techno, tech-house, acid, psy, bounce, manele, populară, balkanică, latino, fuziune |
+| 🔌 [Echipament](echipament/) | DDJ-FLX4, Circuit Tracks, MIDI, cabluri, setup-uri, upgrade path |
+| 📖 [Glosar](glosar/glosar.md) | Toți termenii A-Z (BPM, key, cue, FX, stems, etc.) |
+
+---
+
+## 👨‍💻 Ghid Contributor
+
+### Stack tehnologic
+
+**Web App** ([app/](app/))
+- Next.js 16 (App Router, RSC, Server Actions, Turbopack, React Compiler)
+- React 19.2 + TypeScript 5.8 strict
+- Drizzle ORM + better-sqlite3 (local) / Postgres (prod)
+- Auth.js v5 (next-auth beta) + Drizzle adapter
+- Tailwind CSS v4 + shadcn/ui + Radix + framer-motion
+- Audio: music-metadata, node-id3, Web Audio API, recharts
+- Realtime: SSE + WebRTC (ice-servers ↔ coturn)
+
+**Companion** ([server/](server/))
+- Electron + TypeScript + electron-builder
+- Express HTTP local + IPC bridge
+- Audio nativ + watch folders (chokidar)
+- Auto-update prin GitHub Releases
+
+**Extension** ([extension/](extension/))
+- Chrome Manifest V3
+- Content scripts pentru 15 platforme
+- Service worker background
+
+**Infrastructură** ([infra/terraform/](infra/terraform/))
+- Terraform → GCP (e2-micro VM Debian 12 + static IP)
+- coturn STUN/TURN (3478 UDP/TCP, 49160-49200 UDP relay)
+- Cost: ~$7.5/lună
+
+### Documentație tehnică
+
+| Doc | Subiect |
+|---|---|
+| [docs/arhitectura/01-prezentare-generala.md](docs/arhitectura/01-prezentare-generala.md) | Privire de ansamblu suite |
+| [docs/arhitectura/02-componente-suite.md](docs/arhitectura/02-componente-suite.md) | Cum se conectează componentele |
+| [docs/arhitectura/03-stack-tehnologic.md](docs/arhitectura/03-stack-tehnologic.md) | Lista completă tooling + de ce |
+| [docs/arhitectura/04-fluxuri-date.md](docs/arhitectura/04-fluxuri-date.md) | Web ↔ Companion ↔ Extension ↔ TURN |
+| [docs/arhitectura/05-securitate-auth.md](docs/arhitectura/05-securitate-auth.md) | Auth.js, TURN credentials, CORS, CSP |
+| [app/README.md](app/README.md) | Setup web app dev |
+| [server/README.md](server/README.md) | Setup companion dev |
+| [extension/README.md](extension/README.md) | Setup extensie dev |
+| [infra/terraform/README.md](infra/terraform/README.md) | Provisioning infrastructură |
+
+### Convenții repo
+
+- **Limbă**: comentarii cod în EN, docs principale în RO (mirror EN pentru cele importante)
+- **Commits**: [Conventional Commits](https://www.conventionalcommits.org/) — `feat:`, `fix:`, `chore:`, `docs:`, etc.
+- **Branch**: `main` protejat; PR-uri prin feature branches
+- **Versionare**: SemVer; companion auto-tag-uit `v0.x.y` de electron-builder
+- **CI/CD**: GitHub Actions — `companion-release.yml` build + publish pe tag
+
+→ Detalii: [docs/arhitectura/](docs/arhitectura/)
+
+---
+
+## 🗺️ Navigare completă
+
+Pentru harta completă a documentației: [**NAVIGARE.md**](NAVIGARE.md)
+
+---
+
+## 📂 Structura repository
+
+```
+mmo/
+├── app/                    🌐 Web app Next.js 16
+├── server/                 🖥️ MMO Companion (Electron)
+├── extension/              🧩 Browser extension
+├── infra/terraform/        ☁️ Coturn TURN/STUN pe GCP
+├── docs/                   📚 Documentație tehnică & user guides
+│   ├── arhitectura/        Arhitectură umbrella
+│   ├── aplicatie/          User guides per modul web app
+│   ├── companion/          Ghid Companion desktop
+│   ├── extension/          Ghid Extensie browser
+│   ├── incepator/          🟢 Rekordbox 101
+│   ├── avansat/            🟡 Rekordbox tehnici avansate
+│   └── profesional/        🔴 Rekordbox workflow pro
+├── concept/                💡 Concept produs & decizii
+├── organizare/             📁 Sistem organizare muzică
+├── genuri/                 🎵 Ghiduri per gen muzical
+├── echipament/             🔌 Hardware DJ
+├── glosar/                 📖 Termeni A-Z
+├── artifacts/              📦 Build-uri releases (DMG/EXE/AppImage)
+├── README.md               👈 Ești aici
+├── README.en.md            English mirror
+├── NAVIGARE.md             Sitemap complet
+└── CHANGELOG.md            Release notes
+```
+
+---
+
+## 🤝 Contribuții
+
+Contribuțiile sunt binevenite! Vezi [CONTRIBUTING.md](CONTRIBUTING.md) (TBD) pentru ghid.
+
+Înainte să deschizi un PR:
+1. Citește [docs/arhitectura/](docs/arhitectura/) pentru context
+2. Rulează `pnpm typecheck` și `pnpm lint` (CI le rulează oricum)
+3. Conventional commit pentru titlul PR-ului
+4. Update docs dacă schimbi comportament user-facing
+
+---
+
+## 📄 Licență
+
+MIT © 2024-2026 Dragoș Cătălin Vlăduțescu (`mwrty`)
+
+---
+
+## 🔗 Linkuri utile
+
+- 🌐 **Live**: [muzicai.ro](https://muzicai.ro)
+- 📦 **Releases**: [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
+- 🐛 **Issues**: [github.com/dragoscv/mmo/issues](https://github.com/dragoscv/mmo/issues)
+- 📚 **Docs**: această pagină + [NAVIGARE.md](NAVIGARE.md)
+
+---
+
+*Built with ❤️ în România — by **mwrty** (DJ + dev)*

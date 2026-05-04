@@ -26,7 +26,7 @@ import {
     Repeat, Upload, X, Maximize2, Minimize2, Activity,
     Settings2, Headphones, Disc3, GripVertical, Radio, Wifi, WifiOff,
     Save, RotateCcw, Sliders, KeyRound, Zap, Eye, BarChart3,
-    ZoomIn, ZoomOut, Type, Music2,
+    ZoomIn, ZoomOut, Type, Music2, Plug,
 } from "lucide-react";
 import { Reorder, useDragControls, type DragControls } from "framer-motion";
 import { FX_DEFAULTS, FX_CATEGORIES, MUSICAL_SCALES, NOTE_NAMES, AudioFxEngine, type FxType, type FxPreset } from "@/lib/audio-fx-engine";
@@ -37,10 +37,12 @@ import { LiveRecommendationsWidget } from "@/components/live/live-recommendation
 import { LiveVisualizerWidget } from "@/components/live/live-visualizer-widget";
 import { LiveEqWidget } from "@/components/live/live-eq-widget";
 import { LiveAudioStatsCard } from "@/components/live/live-audio-stats-card";
+import { AudioDiagnosticsLogger } from "@/components/live/audio-diagnostics-logger";
 import { LiveInstrumentWidget } from "@/components/live/live-instrument-widget";
+import { LivePluginsWidget } from "@/components/live/live-plugins-widget";
 import { LiveWidgetSlotContext, useLiveWidgetSlot, AutoSize } from "@/components/live/live-widget-slot";
 import { LiveWidgetGrid, type WidgetMeta } from "@/components/live/live-widget-grid";
-import { useLiveMetersField } from "@/components/live/live-meters-store";
+import { useLiveMetersField, liveMetersStore } from "@/components/live/live-meters-store";
 import { useUIRefreshHz, UI_REFRESH_HZ_MIN, UI_REFRESH_HZ_MAX } from "@/lib/use-ui-refresh-rate";
 import { useLiveSettings } from "@/hooks/use-live-settings";
 import { useStableValue } from "@/hooks/use-stable-value";
@@ -48,12 +50,15 @@ import { formatNoteMulti, formatPitch } from "@/lib/note-notation";
 import type { NoteNotation } from "@/lib/note-notation";
 import { LiveSettingsModal } from "@/components/live/live-settings-modal";
 import { Settings as SettingsIcon } from "lucide-react";
+import { AudioDeviceSelect } from "@/components/ui/audio-device-select";
+import { encodeNativeValue } from "@/hooks/use-audio-devices";
 import {
     NativeCompanionClient,
-    probeCompanion,
+    discoverCompanion,
     type NativePitch,
     type NativeStatus,
     type NativeMetrics,
+    type NativeDeviceInfo,
 } from "@/lib/native-companion";
 
 // ─── Drag context: makes the Section title bar a drag handle when inside a Reorder.Item ─
@@ -165,6 +170,115 @@ function VoiceMeters() {
             <VerticalMeter peak={peakL} />
             <VerticalMeter peak={peakR} />
         </>
+    );
+}
+
+/**
+ * Feature flag — the native (companion-side) low-latency engine path.
+ * When ON, the Voice Processor shows live levels next to the input/output
+ * knobs and a one-line perf row (latency / DSP / underruns) sourced from
+ * the companion's WS push at ~30 Hz. Set to false to hide the entire
+ * native UI surface (DSP + plumbing stay in place).
+ */
+const NATIVE_ENGINE_UI_ENABLED = true;
+
+/**
+ * Tiny shared-state hook for boolean settings persisted in localStorage.
+ * Used by the Voice Processor's perf toggles + the KeyScale engine
+ * lifecycle effect so both can read/write the same value without
+ * threading the state through props or a context. Uses a custom window
+ * event for cross-component sync (the native `storage` event fires only
+ * for OTHER tabs, not the same tab that wrote the value).
+ */
+function useSharedLocalStorageBool(key: string, defaultValue: boolean): [boolean, (next: boolean) => void] {
+    const [value, setValue] = useState<boolean>(() => {
+        if (typeof window === "undefined") return defaultValue;
+        const raw = window.localStorage.getItem(key);
+        return raw === null ? defaultValue : raw === "1";
+    });
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const eventName = `mmo-shared-bool-${key}`;
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<{ value: boolean }>).detail;
+            if (detail) setValue(detail.value);
+        };
+        window.addEventListener(eventName, handler);
+        return () => window.removeEventListener(eventName, handler);
+    }, [key]);
+    const update = useCallback((next: boolean) => {
+        if (typeof window === "undefined") return;
+        try { window.localStorage.setItem(key, next ? "1" : "0"); } catch { /* ignore */ }
+        setValue(next);
+        window.dispatchEvent(new CustomEvent(`mmo-shared-bool-${key}`, { detail: { value: next } }));
+    }, [key]);
+    return [value, update];
+}
+
+/**
+ * Native input/output meter pair shown next to the corresponding gain knob
+ * inside the Voice Processor. Two thin vertical bars (RMS + peak overlay)
+ * driven by the companion's WS push at ~30 Hz. Renders nothing when the
+ * native engine is not running so the layout stays compact in the common
+ * "browser-only" case.
+ */
+function NativeKnobMeter({ direction }: { direction: "input" | "output" }) {
+    const running = useLiveMetersField(s => s.nativeRunning);
+    const peak = useLiveMetersField(s => direction === "input" ? s.nativeInPeak : s.nativeOutPeak);
+    const rms = useLiveMetersField(s => direction === "input" ? s.nativeInRms : s.nativeOutRms);
+    if (!NATIVE_ENGINE_UI_ENABLED) return null;
+    if (!running) return null;
+    // Convert linear → dBFS-ish normalized 0..1 for the bar height.
+    const norm = (v: number) => {
+        const db = v > 0 ? 20 * Math.log10(v) : -60;
+        return Math.max(0, Math.min(1, (db + 60) / 60));
+    };
+    const peakN = norm(peak);
+    const rmsN = norm(rms);
+    return (
+        <div className="flex items-end gap-0.5 h-12" title={`Native ${direction} ${(peak * 100).toFixed(0)}%`}>
+            {/* RMS bar — solid colour, transitions smoothly */}
+            <div className="w-1 h-12 bg-white/[0.04] rounded-full overflow-hidden flex items-end relative">
+                <div className="w-full rounded-full transition-[height] duration-75"
+                    style={{
+                        height: `${rmsN * 100}%`,
+                        background: "linear-gradient(to top, #22c55e, #facc15 70%, #ef4444 95%)",
+                    }} />
+                {/* Peak hold marker */}
+                <div className="absolute left-0 right-0 h-[2px] bg-white/80"
+                    style={{ bottom: `${peakN * 100}%`, transition: "bottom 80ms linear" }} />
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Compact one-line perf readout for the Voice Processor. Only renders while
+ * the companion engine is actively running; otherwise this is invisible.
+ */
+function NativeEnginePerfRow({ visible }: { visible: boolean }) {
+    const running = useLiveMetersField(s => s.nativeRunning);
+    const lat = useLiveMetersField(s => s.nativeStreamLatencyMs);
+    const dspAvg = useLiveMetersField(s => s.nativeDspAvgMs);
+    const dspMax = useLiveMetersField(s => s.nativeDspMaxMs);
+    const underruns = useLiveMetersField(s => s.nativeUnderruns);
+    if (!NATIVE_ENGINE_UI_ENABLED) return null;
+    if (!visible || !running) return null;
+    const cls = lat <= 8 ? "text-emerald-400" : lat <= 20 ? "text-amber-400" : "text-rose-400";
+    return (
+        <div className="flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg bg-emerald-500/[0.04] border border-emerald-500/10 text-[9px] tabular-nums">
+            <span className="flex items-center gap-1 text-emerald-400/70 uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Native Engine
+            </span>
+            <span className="flex items-center gap-3 text-white/60">
+                <span><span className="text-white/35">Lat </span><span className={cls}>{lat.toFixed(2)}ms</span></span>
+                <span><span className="text-white/35">DSP </span>{dspAvg.toFixed(2)}/{dspMax.toFixed(2)}ms</span>
+                <span className={underruns > 0 ? "text-rose-400" : "text-white/35"}>
+                    {underruns > 0 ? `${underruns} xrun` : "0 xrun"}
+                </span>
+            </span>
+        </div>
     );
 }
 
@@ -539,20 +653,20 @@ function MasterBar() {
     }, [live]);
 
     return (
-        <div className="flex items-stretch gap-3 px-4 py-3 bg-black/40 backdrop-blur-xl border-b border-white/[0.06]">
+        <div className="flex flex-wrap items-stretch gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-black/40 backdrop-blur-xl border-b border-white/[0.06]">
             {/* App identity */}
-            <div className="flex items-center gap-2 pr-3 border-r border-white/[0.04]">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500/20 to-rose-600/10 border border-rose-500/30 flex items-center justify-center shadow-[0_0_12px_rgba(244,63,94,0.15)]">
+            <div className="flex items-center gap-2 pr-3 border-r border-white/[0.04] shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500/20 to-rose-600/10 border border-rose-500/30 flex items-center justify-center shadow-[0_0_12px_rgba(244,63,94,0.15)] shrink-0">
                     <Mic className="w-5 h-5 text-rose-400" />
                 </div>
-                <div>
+                <div className="hidden sm:block">
                     <div className="text-sm font-bold text-white/80 leading-none">Live</div>
                     <div className="text-[9px] text-white/30 uppercase tracking-wider mt-0.5">Performance</div>
                 </div>
             </div>
 
             {/* BPM + Tap */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
                 <div className="flex flex-col items-center justify-center px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] min-w-[78px]">
                     <input type="number" min={20} max={300} step={0.1} value={live.tempo.toFixed(1)}
                         onChange={e => live.setTempo(parseFloat(e.target.value) || 120)}
@@ -568,60 +682,60 @@ function MasterBar() {
             </div>
 
             {/* Key & Scale display */}
-            <KeyScaleDisplay />
+            <div className="shrink-0"><KeyScaleDisplay /></div>
 
             {/* Master meters */}
-            <MasterMeterPair />
+            <div className="shrink-0"><MasterMeterPair /></div>
 
             {/* Master volume */}
-            <div className="flex items-center gap-2 px-2">
-                <Volume2 className="w-3.5 h-3.5 text-white/40" />
+            <div className="flex items-center gap-2 px-2 shrink-0">
+                <Volume2 className="w-3.5 h-3.5 text-white/40 shrink-0" />
                 <input type="range" min={0} max={2} step={0.01} value={live.masterVolume}
                     onChange={e => live.setMasterVolume(parseFloat(e.target.value))}
-                    className="w-24 accent-rose-500" />
-                <span className="text-[10px] tabular-nums text-white/40 w-8">{Math.round(live.masterVolume * 100)}</span>
+                    className="w-20 md:w-24 accent-rose-500" />
+                <span className="text-[10px] tabular-nums text-white/40 w-8 hidden md:inline">{Math.round(live.masterVolume * 100)}</span>
             </div>
 
             {/* Monitor volume */}
-            <div className="flex items-center gap-2 px-2 border-l border-white/[0.04]">
-                <Headphones className="w-3.5 h-3.5 text-white/40" />
+            <div className="flex items-center gap-2 px-2 border-l border-white/[0.04] shrink-0">
+                <Headphones className="w-3.5 h-3.5 text-white/40 shrink-0" />
                 <input type="range" min={0} max={2} step={0.01} value={live.monitorVolume}
                     onChange={e => live.setMonitorVolume(parseFloat(e.target.value))}
-                    className="w-20 accent-cyan-500" />
+                    className="w-16 md:w-20 accent-cyan-500" />
             </div>
 
             {/* Metronome */}
             <button onClick={live.toggleMetronome}
-                className={cn("flex items-center gap-1.5 px-3 rounded-xl border transition-all cursor-pointer text-xs font-medium",
+                className={cn("flex items-center gap-1.5 px-3 rounded-xl border transition-all cursor-pointer text-xs font-medium shrink-0",
                     live.isMetronomeOn
                         ? "bg-blue-500/20 text-blue-400 border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.2)]"
                         : "bg-white/[0.03] text-white/40 hover:bg-white/[0.06] border-white/[0.06]")}>
                 <span className={cn("text-base leading-none", live.isMetronomeOn && "animate-pulse")}>🔔</span>
-                Metro
+                <span className="hidden sm:inline">Metro</span>
                 {live.metronomeMonitorOnly && live.isMetronomeOn && (
                     <span className="text-[8px] uppercase opacity-60">cue</span>
                 )}
             </button>
 
-            {/* Recording */}
-            <button onClick={live.toggleRecording}
-                className={cn("flex items-center gap-2 px-3 rounded-xl border transition-all cursor-pointer text-xs font-bold ml-auto",
-                    live.isRecording
-                        ? "bg-red-500/20 text-red-400 border-red-500/40 shadow-[0_0_12px_rgba(239,68,68,0.3)]"
-                        : "bg-white/[0.03] text-white/50 hover:bg-red-500/10 hover:text-red-400 border-white/[0.06]")}>
-                <Circle className={cn("w-3 h-3", live.isRecording && "fill-red-400 animate-pulse")} />
-                {live.isRecording ? <RecordTimerLabel /> : "Record"}
-            </button>
+            {/* Right-aligned trio: Record / Settings / Focus. Wraps as a unit. */}
+            <div className="ml-auto flex items-stretch gap-2 shrink-0">
+                <button onClick={live.toggleRecording}
+                    className={cn("flex items-center gap-2 px-3 rounded-xl border transition-all cursor-pointer text-xs font-bold",
+                        live.isRecording
+                            ? "bg-red-500/20 text-red-400 border-red-500/40 shadow-[0_0_12px_rgba(239,68,68,0.3)]"
+                            : "bg-white/[0.03] text-white/50 hover:bg-red-500/10 hover:text-red-400 border-white/[0.06]")}>
+                    <Circle className={cn("w-3 h-3", live.isRecording && "fill-red-400 animate-pulse")} />
+                    <span className="hidden sm:inline">{live.isRecording ? <RecordTimerLabel /> : "Record"}</span>
+                </button>
 
-            {/* Settings */}
-            <LiveSettingsButton />
+                <LiveSettingsButton />
 
-            {/* Focus toggle */}
-            <button onClick={toggleFocusMode}
-                className="flex items-center justify-center w-9 rounded-xl bg-white/[0.03] text-white/40 hover:bg-white/[0.06] border border-white/[0.06] transition-colors cursor-pointer"
-                title={isFocusMode ? "Exit focus mode" : "Focus mode (hide app shell)"}>
-                {isFocusMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
+                <button onClick={toggleFocusMode}
+                    className="flex items-center justify-center w-9 rounded-xl bg-white/[0.03] text-white/40 hover:bg-white/[0.06] border border-white/[0.06] transition-colors cursor-pointer"
+                    title={isFocusMode ? "Exit focus mode" : "Focus mode (hide app shell)"}>
+                    {isFocusMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+            </div>
         </div>
     );
 }
@@ -691,7 +805,7 @@ function TunerPanel() {
     const freqRaw = useLiveMetersField(s => s.tunerFrequency);
     // Auto-correct fields. When acActive is true the corrector is steering
     // the input towards `targetMidi`; we surface BOTH notes in the tuner.
-    const acActive = useLiveMetersField(s => s.autoCorrectActive);
+    const acActiveRaw = useLiveMetersField(s => s.autoCorrectActive);
     const acTargetMidi = useLiveMetersField(s => s.autoCorrectTargetMidi);
     const acSourceMidi = useLiveMetersField(s => s.autoCorrectSourceMidi);
     // Stickiness: hold each displayed value for at least N ms so the user can
@@ -700,6 +814,15 @@ function TunerPanel() {
     const cents = useStableValue(Math.round(centsRaw), settings.tunerStickinessMs);
     const freq = useStableValue(Math.round(freqRaw * 10) / 10, settings.tunerStickinessMs);
     const stickyTarget = useStableValue(acTargetMidi, settings.tunerStickinessMs);
+    // Hold acActive much longer than the per-value stickiness: this flag
+    // controls which *layout branch* renders (single big readout vs the
+    // In→Out grid). When the input has gaps (silence between notes) the
+    // corrector toggles on/off many times per second; without a long hold
+    // the entire widget swaps layouts and visibly resizes, causing a
+    // strobing/flashing effect. 1.5s is short enough to feel responsive
+    // when the user actually engages/disengages auto-correct, but long
+    // enough to ride out normal speech/singing pauses.
+    const acActive = useStableValue(acActiveRaw, Math.max(1500, settings.tunerStickinessMs * 2));
     // Format the held note via the user's chosen notation(s). The tuner shows
     // a sounding pitch (with octave for Anglo/Solfège, code-only for Camelot).
     const inputNote = noteIdx >= 0
@@ -726,7 +849,10 @@ function TunerPanel() {
         <Section title="Tuner" accent="#10b981" icon={<Activity className="w-3.5 h-3.5 text-emerald-400/60" />}>
             <div className="flex flex-col items-center gap-2">
                 {/* Auto-correct active: stack input → output. Otherwise
-                    keep the classic single big note display. */}
+                    keep the classic single big note display. Both branches
+                    share the same min-height so the layout never reflows
+                    when acActive toggles. */}
+                <div className="w-full min-h-[68px] flex items-center justify-center">
                 {acActive && outputNote ? (
                     <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                         <div className="text-center">
@@ -763,6 +889,7 @@ function TunerPanel() {
                         </div>
                     </div>
                 )}
+                </div>
 
                 {/* Tuning dial */}
                 <div className="relative w-full h-12 flex items-center justify-center mt-1">
@@ -1019,11 +1146,86 @@ function LiveVoicePresetMenu({ presets, selectedId, onSelect, onDelete, onClose,
 
 function VoicePanel() {
     const live = useLive();
+    const settings = useLiveSettings();
     const [showAddFx, setShowAddFx] = useState(false);
     const [presets, setPresets] = useState<FxPreset[]>([]);
     const [selectedPresetId, setSelectedPresetId] = useState<string>("");
     const [showPresetMenu, setShowPresetMenu] = useState(false);
     const presetBtnRef = useRef<HTMLButtonElement>(null);
+    // Native engine perf toggles \u2014 the source of truth lives in
+    // localStorage and is read by KeyScalePanel's start config too.
+    const [nativeUltraLowLatency, setNativeUltraLowLatency] = useSharedLocalStorageBool("mmo-live-native-ultra-latency", false);
+    const [nativeExclusiveMode, setNativeExclusiveMode] = useSharedLocalStorageBool("mmo-live-native-exclusive", false);
+    // Native engine state, mirrored from KeyScalePanel via the meters store.
+    const nativeRunning = useLiveMetersField(s => s.nativeRunning);
+    const nativeAvailable = useLiveMetersField(s => s.nativeAvailable);
+    const nativeError = useLiveMetersField(s => s.nativeError);
+    const nativeLatencyMs = useLiveMetersField(s => s.nativeMetricsLatencyMs);
+    const nativeDspAvgMs = useLiveMetersField(s => s.nativeMetricsDspAvgMs);
+    // Source-of-truth for the "is native mode requested" toggle. Shared
+    // with KeyScalePanel via localStorage + a custom event so either panel
+    // can flip it; KeyScalePanel still owns the engine lifecycle.
+    const [nativeMode, setNativeMode] = useSharedLocalStorageBool("mmo-live-keyscale-native", false);
+
+    // Mirror the native input device id (lives in localStorage so other
+    // panels — Key & Scale — can share it). We need real React state so
+    // that `<AudioDeviceSelect value={…}>` re-renders when the user picks
+    // a new native device; reading localStorage inline does not trigger
+    // a re-render and was the cause of the trigger label staying stuck on
+    // "Default Input" after a successful native pick.
+    const [voiceNativeInputId, setVoiceNativeInputId] = useState<number | null>(() => {
+        if (typeof window === "undefined") return null;
+        try {
+            const raw = window.localStorage.getItem("mmo-live-native-input-device");
+            if (!raw) return null;
+            const n = parseInt(raw, 10);
+            return Number.isFinite(n) ? n : null;
+        } catch { return null; }
+    });
+    useEffect(() => {
+        const onChange = (e: Event) => {
+            const detail = (e as CustomEvent<{ id: number | null }>).detail;
+            setVoiceNativeInputId(detail?.id ?? null);
+        };
+        window.addEventListener("mmo-live-native-input-changed", onChange);
+        return () => window.removeEventListener("mmo-live-native-input-changed", onChange);
+    }, []);
+
+    // Same pattern for the native output device id. The actual engine
+    // restart with the new output is done by KeyScalePanel which owns the
+    // companion client; we just persist + dispatch.
+    const [voiceNativeOutputId, setVoiceNativeOutputId] = useState<number | null>(() => {
+        if (typeof window === "undefined") return null;
+        try {
+            const raw = window.localStorage.getItem("mmo-live-native-output-device");
+            if (!raw) return null;
+            const n = parseInt(raw, 10);
+            return Number.isFinite(n) ? n : null;
+        } catch { return null; }
+    });
+    useEffect(() => {
+        const onChange = (e: Event) => {
+            const detail = (e as CustomEvent<{ id: number | null }>).detail;
+            setVoiceNativeOutputId(detail?.id ?? null);
+        };
+        window.addEventListener("mmo-live-native-output-changed", onChange);
+        return () => window.removeEventListener("mmo-live-native-output-changed", onChange);
+    }, []);
+
+    const handleBrowserOutputChange = useCallback(async (deviceId: string) => {
+        settings.update({ audioOutputDeviceId: deviceId });
+        // Mirror the same setSinkId fan-out as the Live settings modal so the
+        // Voice Processor's output selector swaps the active sink in-place.
+        const ctx = (window as unknown as { __mmo_live_ctx?: AudioContext }).__mmo_live_ctx;
+        if (ctx && "setSinkId" in ctx) {
+            try { await (ctx as AudioContext & { setSinkId: (id: string) => Promise<void> }).setSinkId(deviceId); } catch { /* unsupported */ }
+        }
+        for (const audio of document.querySelectorAll("audio")) {
+            if ("setSinkId" in audio) {
+                try { await (audio as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> }).setSinkId(deviceId); } catch { /* unsupported */ }
+            }
+        }
+    }, [settings]);
 
     // Load presets on mount + listen for cross-tab/window changes.
     useEffect(() => {
@@ -1079,29 +1281,199 @@ function VoicePanel() {
                 </button>
             }>
             <div className="space-y-3">
+                {/* Native low-latency mode toggle. Drives the companion
+                    engine via shared localStorage + custom event;
+                    KeyScalePanel owns the engine lifecycle and mirrors
+                    its state back through the meters store. */}
+                {NATIVE_ENGINE_UI_ENABLED && (
+                    <div className="flex items-center justify-between gap-2">
+                        <button
+                            onClick={() => {
+                                if (!nativeAvailable || !live.voiceActive) return;
+                                setNativeMode(!nativeMode);
+                            }}
+                            disabled={!nativeAvailable || !live.voiceActive}
+                            title={
+                                !nativeAvailable
+                                    ? "MMO Companion not detected. Install + sign in on this device to enable native low-latency audio."
+                                    : !live.voiceActive
+                                        ? "Turn the Voice Processor ON first to enable the native engine."
+                                        : nativeMode
+                                            ? "Native mode ON — mic and speakers handled by the companion (RtAudio direct). Browser is bypassed for the autocorrect path."
+                                            : "Browser mode — Web Audio worklet (~25 ms total round-trip on Windows, ~12 ms on macOS). Enable native for the lowest possible latency."
+                            }
+                            className={cn(
+                                "flex items-center gap-1.5 h-6 px-2 text-[10px] rounded-full transition-all border cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
+                                nativeMode && nativeAvailable && live.voiceActive
+                                    ? "bg-purple-500/25 text-purple-200 border-purple-500/40 shadow-[0_0_10px_rgba(168,85,247,0.25)]"
+                                    : "bg-white/[0.04] text-white/45 border-white/10 hover:text-white/80 hover:bg-white/[0.08]",
+                            )}
+                        >
+                            <span className="text-[10px]">⚡</span>
+                            <span>Native {nativeMode && nativeAvailable && live.voiceActive ? "ON" : "OFF"}</span>
+                        </button>
+                        <span className="text-[9px] tabular-nums text-white/60">
+                            {!nativeAvailable
+                                ? <span className="text-white/30">no companion</span>
+                                : !live.voiceActive
+                                    ? <span className="text-white/30">voice off</span>
+                                    : !nativeMode
+                                        ? <span className="text-white/40">browser ~25ms</span>
+                                        : !nativeRunning
+                                            ? nativeError
+                                                ? <span className="text-rose-400/80">err</span>
+                                                : <span className="text-white/40">starting…</span>
+                                            : nativeLatencyMs > 0
+                                                ? <span className="text-purple-300">
+                                                    {nativeLatencyMs.toFixed(1)}ms
+                                                    <span className="text-white/40"> + {nativeDspAvgMs.toFixed(1)}ms dsp</span>
+                                                </span>
+                                                : <span className="text-white/40">running</span>
+                            }
+                        </span>
+                    </div>
+                )}
+                {nativeError && nativeMode && live.voiceActive && (
+                    <div className="text-[9px] text-rose-400/80 leading-tight">
+                        {nativeError}
+                    </div>
+                )}
+
                 {/* Device selector + gains */}
                 <div className="flex items-center gap-2">
-                    <select value={live.voiceInputDeviceId}
-                        onChange={e => void live.voiceSetInputDevice(e.target.value)}
-                        className="flex-1 h-8 px-2 text-[10px] bg-black/40 border border-white/[0.06] rounded-lg text-white/60 focus:outline-none focus:border-rose-500/30">
-                        <option value="default">Default Input</option>
-                        {live.voiceInputDevices.map(d => (
-                            <option key={d.deviceId} value={d.deviceId}>
-                                {d.label || `Input ${d.deviceId.slice(0, 8)}`}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="flex-1 min-w-0">
+                        <AudioDeviceSelect
+                            kind="input"
+                            size="sm"
+                            value={
+                                voiceNativeInputId !== null && live.voiceInputDeviceId === "default"
+                                    ? encodeNativeValue(voiceNativeInputId)
+                                    : live.voiceInputDeviceId
+                            }
+                            onValueChange={(change) => {
+                                if (change.source === "native" && change.nativeId !== null) {
+                                    // Bridge to the Key & Scale native engine: pick the device,
+                                    // turn native mode ON, and notify the panel.
+                                    try {
+                                        window.localStorage.setItem("mmo-live-native-input-device", String(change.nativeId));
+                                        window.localStorage.setItem("mmo-live-keyscale-native", "1");
+                                    } catch { /* ignore */ }
+                                    setVoiceNativeInputId(change.nativeId);
+                                    window.dispatchEvent(new CustomEvent("mmo-live-native-input-changed", {
+                                        detail: { id: change.nativeId, autoEnable: true },
+                                    }));
+                                    // Reset the browser path to default so we don't capture mic twice.
+                                    void live.voiceSetInputDevice("default");
+                                } else {
+                                    try { window.localStorage.removeItem("mmo-live-native-input-device"); } catch { /* ignore */ }
+                                    setVoiceNativeInputId(null);
+                                    window.dispatchEvent(new CustomEvent("mmo-live-native-input-changed", {
+                                        detail: { id: null, autoEnable: false },
+                                    }));
+                                    void live.voiceSetInputDevice(change.value || "default");
+                                }
+                            }}
+                            placeholder="Default Input"
+                            showPermissionHint
+                        />
+                    </div>
                     <VoiceMeters />
                 </div>
 
                 <div className="flex items-center justify-around gap-2 py-1">
-                    <LiveKnob value={live.voiceInputGain} min={0} max={2} color="#f43f5e" label="Input"
-                        onChange={live.voiceSetInputGain} onDoubleClick={() => live.voiceSetInputGain(1)}
-                        format={v => `${Math.round(v * 100)}%`} />
-                    <LiveKnob value={live.voiceOutputGain} min={0} max={2} color="#f43f5e" label="Output"
-                        onChange={live.voiceSetOutputGain} onDoubleClick={() => live.voiceSetOutputGain(0.85)}
-                        format={v => `${Math.round(v * 100)}%`} />
+                    <div className="flex items-center gap-2">
+                        <LiveKnob value={live.voiceInputGain} min={0} max={2} color="#f43f5e" label="Input"
+                            onChange={live.voiceSetInputGain} onDoubleClick={() => live.voiceSetInputGain(1)}
+                            format={v => `${Math.round(v * 100)}%`} />
+                        <NativeKnobMeter direction="input" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <NativeKnobMeter direction="output" />
+                        <LiveKnob value={live.voiceOutputGain} min={0} max={2} color="#f43f5e" label="Output"
+                            onChange={live.voiceSetOutputGain} onDoubleClick={() => live.voiceSetOutputGain(0.85)}
+                            format={v => `${Math.round(v * 100)}%`} />
+                    </div>
                 </div>
+
+                {/* Output device picker — mirrors the one in the settings modal
+                    so the user can swap sinks without leaving the panel. The
+                    unified picker handles both browser sinks (setSinkId) and
+                    companion-side native outputs. */}
+                <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                        <AudioDeviceSelect
+                            kind="output"
+                            size="sm"
+                            value={
+                                voiceNativeOutputId !== null
+                                    ? encodeNativeValue(voiceNativeOutputId)
+                                    : (settings.audioOutputDeviceId || "default")
+                            }
+                            onValueChange={(change) => {
+                                if (change.source === "native" && change.nativeId !== null) {
+                                    try {
+                                        window.localStorage.setItem("mmo-live-native-output-device", String(change.nativeId));
+                                    } catch { /* ignore */ }
+                                    setVoiceNativeOutputId(change.nativeId);
+                                    window.dispatchEvent(new CustomEvent("mmo-live-native-output-changed", {
+                                        detail: { id: change.nativeId },
+                                    }));
+                                } else {
+                                    try { window.localStorage.removeItem("mmo-live-native-output-device"); } catch { /* ignore */ }
+                                    setVoiceNativeOutputId(null);
+                                    window.dispatchEvent(new CustomEvent("mmo-live-native-output-changed", {
+                                        detail: { id: null },
+                                    }));
+                                    void handleBrowserOutputChange(change.value || "default");
+                                }
+                            }}
+                            placeholder="System Default Output"
+                        />
+                    </div>
+                </div>
+
+                {/* Native engine perf row + controls — visible whenever
+                    the engine is actively running OR a native device is
+                    selected. Both gated on `nativeRunning` so the row
+                    doesn't flash on/off when only the device picker has
+                    a value but the engine hasn't started yet. */}
+                <NativeEnginePerfRow visible={nativeRunning} />
+
+                {NATIVE_ENGINE_UI_ENABLED && nativeRunning && (
+                    <div className="flex items-center gap-3 px-2.5 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] text-[9px]">
+                        <span className="text-white/40 uppercase tracking-wider">Native perf</span>
+                        <label className="flex items-center gap-1.5 cursor-pointer text-white/70 hover:text-white"
+                            title="Use a 64-sample buffer (~1.3 ms) instead of 128 (~2.7 ms). May cause clicks on weaker drivers. Applies on next engine start.">
+                            <input type="checkbox" className="accent-emerald-400 w-3 h-3"
+                                checked={nativeUltraLowLatency}
+                                onChange={(e) => {
+                                    const next = e.target.checked;
+                                    setNativeUltraLowLatency(next);
+                                    // Ultra-low latency on WASAPI shared is unreliable
+                                    // (mixer period is ~10 ms). Pair the toggle with
+                                    // exclusive mode so the user actually gets the
+                                    // latency they asked for AND focus-stable audio.
+                                    // One-way: enabling ultra enables exclusive;
+                                    // disabling ultra leaves exclusive as-is so power
+                                    // users keep their preferred config.
+                                    if (next && !nativeExclusiveMode) {
+                                        setNativeExclusiveMode(true);
+                                    }
+                                }} />
+                            Ultra-low latency (64f)
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer text-white/70 hover:text-white"
+                            title="Request exclusive access to the device (WASAPI exclusive on Windows). Saves ~2 ms but blocks other apps from playing through the same device. Applies on next engine start.">
+                            <input type="checkbox" className="accent-amber-400 w-3 h-3"
+                                checked={nativeExclusiveMode}
+                                onChange={(e) => setNativeExclusiveMode(e.target.checked)} />
+                            Exclusive mode
+                        </label>
+                        {nativeRunning && (
+                            <span className="ml-auto text-emerald-400/60">applies on next start</span>
+                        )}
+                    </div>
+                )}
 
                 {/* Preset selector */}
                 <div className="flex items-center gap-1.5">
@@ -1617,6 +1989,10 @@ function AutoCorrectLedMeter({
 function KeyScalePanel() {
     const live = useLive();
     const settings = useLiveSettings();
+    // User-controlled UI refresh rate — governs how often we mirror native
+    // pitch / level data into the meter store and update acStatus. Without
+    // this throttle the WS push runs at ~30–40 Hz and bypassed the slider.
+    const [hz] = useUIRefreshHz();
     const scaleName = MUSICAL_SCALES[live.scaleIndex]?.name ?? "";
     const quality: "major" | "minor" = /major/i.test(scaleName) ? "major" : "minor";
 
@@ -1630,46 +2006,177 @@ function KeyScalePanel() {
     // When OFF (or when the companion is not available), we fall back
     // to the AudioWorklet path that already exists below.
     //
-    // The toggle is persisted in localStorage so it survives reloads.
-    const [nativeMode, setNativeMode] = useState<boolean>(() => {
-        if (typeof window === "undefined") return false;
-        return localStorage.getItem("mmo-live-keyscale-native") === "1";
-    });
+    // The toggle is persisted in localStorage and shared with VoicePanel
+    // via a custom window event so either panel can drive it. While
+    // `NATIVE_ENGINE_UI_ENABLED` is false the UI is hidden everywhere
+    // and the auto-init below clears any stale "1" so the engine never
+    // starts headlessly.
+    const [nativeMode, setNativeMode] = useSharedLocalStorageBool("mmo-live-keyscale-native", false);
+    useEffect(() => {
+        if (!NATIVE_ENGINE_UI_ENABLED && nativeMode) setNativeMode(false);
+    }, [nativeMode, setNativeMode]);
     const [nativeAvailable, setNativeAvailable] = useState<boolean>(false);
     const [nativeRunning, setNativeRunning] = useState<boolean>(false);
     const [nativeError, setNativeError] = useState<string | null>(null);
     const [nativeMetrics, setNativeMetrics] = useState<NativeMetrics | null>(null);
+    const [nativeInputDevices, setNativeInputDevices] = useState<NativeDeviceInfo[]>([]);
+
+    // Performance toggles: shared with VoicePanel via localStorage + a
+    // custom window event so the user's checkboxes there feed straight
+    // into the start config here. Read via a ref so toggling does NOT
+    // re-trigger the start effect (auto-restart on every checkbox click
+    // would fire RtAudio's sync openStream, blocking the main thread for
+    // 0.5–2 s and causing visible UI flashes). The hint "applies on next
+    // start" matches this behaviour: the user toggles native off→on, or
+    // changes a device, to apply.
+    const [nativeUltraLowLatency] = useSharedLocalStorageBool("mmo-live-native-ultra-latency", false);
+    const [nativeExclusiveMode, setNativeExclusiveModeShared] = useSharedLocalStorageBool("mmo-live-native-exclusive", false);
+    const nativePerfRef = useRef({ ultra: nativeUltraLowLatency, exclusive: nativeExclusiveMode });
+    useEffect(() => {
+        nativePerfRef.current = { ultra: nativeUltraLowLatency, exclusive: nativeExclusiveMode };
+    }, [nativeUltraLowLatency, nativeExclusiveMode]);
+
+    // Forced restart counter — bumped by the "Switch to Exclusive" hint
+    // (and any other UI affordance that explicitly wants the engine
+    // re-opened with new settings). Wired into the start effect's deps
+    // so a +1 here triggers a clean stop-then-start cycle. We deliberately
+    // do NOT auto-restart on every nativeExclusiveMode change — the
+    // checkboxes use the "applies on next start" pattern to keep
+    // toggling cheap. This counter is the explicit "do it now" path.
+    const [nativeRestartGen, setNativeRestartGen] = useState(0);
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<{ exclusive?: boolean; ultra?: boolean }>).detail;
+            if (detail?.exclusive === true) setNativeExclusiveModeShared(true);
+            if (detail?.exclusive === false) setNativeExclusiveModeShared(false);
+            // Bump on next tick so the localStorage write + ref mirror
+            // effect have flushed before the start effect re-runs.
+            window.setTimeout(() => setNativeRestartGen(g => g + 1), 0);
+        };
+        window.addEventListener("mmo-live-native-restart", handler);
+        return () => window.removeEventListener("mmo-live-native-restart", handler);
+    }, [setNativeExclusiveModeShared]);
+    // Persist the last selected native input device id (RtAudio numeric id).
+    // The id space is platform/backend-specific so it's not portable across
+    // machines, but it's stable across reboots on the same setup.
+    const [nativeInputDeviceId, setNativeInputDeviceIdState] = useState<number | null>(() => {
+        if (typeof window === "undefined") return null;
+        const raw = localStorage.getItem("mmo-live-native-input-device");
+        if (raw == null) return null;
+        const n = parseInt(raw, 10);
+        return Number.isFinite(n) ? n : null;
+    });
+    const setNativeInputDeviceId = useCallback((id: number | null) => {
+        setNativeInputDeviceIdState(id);
+        try {
+            if (id == null) localStorage.removeItem("mmo-live-native-input-device");
+            else localStorage.setItem("mmo-live-native-input-device", String(id));
+        } catch { /* ignore */ }
+    }, []);
+    // Bridge: the Voice Processor's unified device picker can request a native
+    // input + auto-engage native mode. Listen for that and mirror state here so
+    // both panels stay in sync without extra plumbing.
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<{ id: number | null; autoEnable?: boolean }>).detail;
+            if (!detail) return;
+            setNativeInputDeviceIdState(detail.id);
+            if (detail.autoEnable) setNativeMode(true);
+        };
+        window.addEventListener("mmo-live-native-input-changed", handler);
+        return () => window.removeEventListener("mmo-live-native-input-changed", handler);
+    }, []);
+    // Same bridge for the output device. Persisted under its own key so the
+    // engine restart effect can include it in the start config.
+    const [nativeOutputDeviceId, setNativeOutputDeviceIdState] = useState<number | null>(() => {
+        if (typeof window === "undefined") return null;
+        const raw = localStorage.getItem("mmo-live-native-output-device");
+        if (raw == null) return null;
+        const n = parseInt(raw, 10);
+        return Number.isFinite(n) ? n : null;
+    });
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<{ id: number | null }>).detail;
+            if (!detail) return;
+            setNativeOutputDeviceIdState(detail.id);
+        };
+        window.addEventListener("mmo-live-native-output-changed", handler);
+        return () => window.removeEventListener("mmo-live-native-output-changed", handler);
+    }, []);
     const nativeClientRef = useRef<NativeCompanionClient | null>(null);
     const nativePitchRef = useRef<{ pitch: NativePitch; status: NativeStatus | null } | null>(null);
 
-    // Probe + acquire credentials. Runs once on mount and on URL/credential
-    // refreshes (the localhost device's token doesn't change at runtime,
-    // so a single probe per page-load is enough).
+    // Probe + acquire credentials. Runs on mount and then keeps re-probing
+    // until a companion is reachable, so launching the app AFTER the /live
+    // tab is already open flips the "no companion" state to "available"
+    // automatically. Also re-probes on tab focus + when the browser regains
+    // network connectivity, so the user doesn't have to refresh the page.
     useEffect(() => {
         let cancelled = false;
-        (async () => {
+        let retryTimer: ReturnType<typeof setTimeout> | null = null;
+        // Retry interval grows from 2 s → 10 s with a small jitter so we
+        // don't hammer the localhost ports if the user never installs the
+        // companion. Once a companion is found we stop polling entirely.
+        let nextDelayMs = 2000;
+        const probe = async () => {
+            if (cancelled) return;
             try {
-                // Public localhost probe — no auth required. The companion
-                // enforces loopback-only + Origin allowlist on its side.
-                const beacon = await probeCompanion();
+                const hit = await discoverCompanion();
                 if (cancelled) return;
-                if (!beacon) {
+                if (!hit) {
                     setNativeAvailable(false);
+                    schedule();
                     return;
                 }
-                nativeClientRef.current = new NativeCompanionClient();
+                nativeClientRef.current = new NativeCompanionClient({ apiUrl: hit.apiUrl });
                 setNativeAvailable(true);
+                // Fetch device list once we know a companion is reachable
+                // so the UI dropdown can populate even before native mode
+                // is on.
+                try {
+                    const { devices } = await nativeClientRef.current.devices("auto");
+                    if (cancelled) return;
+                    const inputs = devices.filter((d) => d.inputChannels > 0);
+                    setNativeInputDevices(inputs);
+                    if (nativeInputDeviceId != null && !inputs.some((d) => d.id === nativeInputDeviceId)) {
+                        setNativeInputDeviceId(null);
+                    }
+                } catch { /* device list is best-effort */ }
             } catch {
+                if (cancelled) return;
                 setNativeAvailable(false);
+                schedule();
             }
-        })();
-        return () => { cancelled = true; };
+        };
+        const schedule = () => {
+            if (cancelled) return;
+            const jitter = Math.random() * 500;
+            retryTimer = setTimeout(probe, nextDelayMs + jitter);
+            nextDelayMs = Math.min(10_000, Math.round(nextDelayMs * 1.5));
+        };
+        // Re-probe immediately when the tab regains focus or the network
+        // comes back \u2014 covers the common flow of installing/launching the
+        // companion while the /live tab is open in the background.
+        const onFocus = () => {
+            if (!nativeClientRef.current) {
+                nextDelayMs = 2000;
+                void probe();
+            }
+        };
+        window.addEventListener("focus", onFocus);
+        window.addEventListener("online", onFocus);
+        void probe();
+        return () => {
+            cancelled = true;
+            if (retryTimer) clearTimeout(retryTimer);
+            window.removeEventListener("focus", onFocus);
+            window.removeEventListener("online", onFocus);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Persist the toggle preference.
-    useEffect(() => {
-        try { localStorage.setItem("mmo-live-keyscale-native", nativeMode ? "1" : "0"); } catch { /* */ }
-    }, [nativeMode]);
+    // (nativeMode is persisted by useSharedLocalStorageBool above.)
 
     // ── Auto-correct (live re-tune) ──────────────────────────────────
     const [autoCorrectOn, setAutoCorrectOn] = useState<boolean>(() => {
@@ -1798,7 +2305,10 @@ function KeyScalePanel() {
     // (so the user can hear monitor with no DSP for free, dirty-passthrough).
     useEffect(() => {
         const client = nativeClientRef.current;
-        if (!nativeMode || !nativeAvailable || !client) {
+        // Native engine is gated on the Voice Processor master switch:
+        // if voice is off, the user expects silence — don't run the
+        // companion DSP either. Stops cleanly when `voiceActive` flips off.
+        if (!nativeMode || !nativeAvailable || !client || !live.voiceActive) {
             // If we previously started, stop now.
             if (nativeRunning && client) {
                 void client.stop().catch(() => { /* ignore */ });
@@ -1815,13 +2325,24 @@ function KeyScalePanel() {
                 setNativeError(null);
                 client.connectWs();
                 const res = await client.start({
+                    inputDeviceId: nativeInputDeviceId ?? undefined,
+                    outputDeviceId: nativeOutputDeviceId ?? undefined,
                     autoCorrect: autoCorrectOn,
                     formantPreserve: autoCorrectFormant,
                     scale: { keyIndex: live.keyIndex, intervals, amount: autoCorrectAmount },
                     sampleRate: 48000,
-                    frameSize: 128,
-                    minimizeLatency: true,
+                    // frameSize 0 = "let the engine pick the best value
+                    // for the resolved backend + exclusive-mode combo".
+                    // The native engine knows that WASAPI shared can't go
+                    // below the OS mixer period (~10ms / 480 frames) but
+                    // ASIO and WASAPI exclusive can hit ~64–128 frames
+                    // reliably. Ultra mode forces the absolute minimum
+                    // (128) regardless of backend — only safe when the
+                    // user has also enabled exclusive mode or has ASIO.
+                    frameSize: nativePerfRef.current.ultra ? 128 : 0,
+                    minimizeLatency: nativePerfRef.current.ultra,
                     realtimeSchedule: true,
+                    exclusiveMode: nativePerfRef.current.exclusive,
                 });
                 if (cancelled) return;
                 setNativeMetrics(res.metrics);
@@ -1836,7 +2357,7 @@ function KeyScalePanel() {
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [nativeMode, nativeAvailable]);
+    }, [nativeMode, nativeAvailable, nativeInputDeviceId, nativeOutputDeviceId, live.voiceActive, nativeRestartGen]);
 
     // Push native scale/autocorrect changes when in native mode.
     useEffect(() => {
@@ -1856,6 +2377,24 @@ function KeyScalePanel() {
         }).catch(() => { /* ignore */ });
     }, [nativeMode, nativeAvailable, nativeRunning, autoCorrectOn, autoCorrectFormant]);
 
+    // Mirror the user's voice FX chain into the native engine while
+    // native mode is active. Browser-only insert types are dropped
+    // server-side, so we don't need to filter here. Stable insert ids
+    // mean an in-place knob change reuses the existing native DSP
+    // instance — no buffer flush, no clicks. Runs on every chain
+    // mutation (add / remove / reorder / toggle / param tweak).
+    useEffect(() => {
+        const client = nativeClientRef.current;
+        if (!nativeMode || !nativeAvailable || !client || !nativeRunning) return;
+        const items = live.voiceChain.map(i => ({
+            id: i.id,
+            type: i.type as never,    // engine filters unsupported types
+            enabled: i.enabled,
+            params: i.params,
+        }));
+        void client.setFxChain(items).catch(() => { /* ignore */ });
+    }, [nativeMode, nativeAvailable, nativeRunning, live.voiceChain]);
+
     // Stop native engine on panel unmount.
     useEffect(() => {
         return () => {
@@ -1866,7 +2405,33 @@ function KeyScalePanel() {
         };
     }, []);
 
-    // Subscribe to native pitch (WS-pushed) when in native mode.
+    // Stop the companion engine when the page is being unloaded (tab
+    // close, refresh, navigation away). React cleanup is unreliable here
+    // because the renderer is torn down before async fetches resolve, so
+    // we use `sendBeacon` which the browser guarantees to deliver during
+    // unload. Without this, sound keeps playing on the user's speakers
+    // until they manually quit the companion app. We listen for both
+    // `pagehide` (the modern unload signal, fires for bfcache too) and
+    // `beforeunload` (older but still required by some browsers).
+    useEffect(() => {
+        const fire = () => {
+            const client = nativeClientRef.current;
+            if (!client) return;
+            client.stopBeacon();
+        };
+        window.addEventListener("pagehide", fire);
+        window.addEventListener("beforeunload", fire);
+        return () => {
+            window.removeEventListener("pagehide", fire);
+            window.removeEventListener("beforeunload", fire);
+        };
+    }, []);
+
+    // Subscribe to native pitch (WS-pushed) when in native mode. The
+    // listener just stashes the latest payload into a ref — the throttled
+    // mirror effect below decides when to push it into the React store /
+    // local acStatus, so the WS rate (~40 Hz) doesn't bypass the user's
+    // refresh slider.
     useEffect(() => {
         const client = nativeClientRef.current;
         if (!nativeMode || !nativeAvailable || !client) return;
@@ -1875,6 +2440,140 @@ function KeyScalePanel() {
         });
         return () => { off(); };
     }, [nativeMode, nativeAvailable]);
+
+    // Bridge native level + perf push into the live meters store so VoicePanel
+    // (and any other meter consumer) can render bars/numbers without owning
+    // a WebSocket subscription itself. The handler stashes the latest payload
+    // into a ref — the actual store patch is done by the throttled mirror
+    // effect below at the user's UI hz, so a 30 Hz WS push doesn't bypass
+    // a 1 Hz slider setting.
+    const nativeLevelsRef = useRef<{ levels: NativeLevels; perf: NativePerf } | null>(null);
+    useEffect(() => {
+        const client = nativeClientRef.current;
+        if (!nativeMode || !nativeAvailable || !client) {
+            nativeLevelsRef.current = null;
+            liveMetersStore.patch({
+                nativeInPeak: 0, nativeOutPeak: 0,
+                nativeInRms: 0, nativeOutRms: 0,
+                nativeStreamLatencyMs: 0, nativeDspAvgMs: 0,
+                nativeDspMaxMs: 0, nativeUnderruns: 0,
+            });
+            return;
+        }
+        const off = client.addLevelListener((l, p) => {
+            nativeLevelsRef.current = { levels: l, perf: p };
+        });
+        return () => {
+            off();
+            nativeLevelsRef.current = null;
+            liveMetersStore.patch({
+                nativeInPeak: 0, nativeOutPeak: 0,
+                nativeInRms: 0, nativeOutRms: 0,
+            });
+        };
+    }, [nativeMode, nativeAvailable]);
+
+    // Throttled mirror: takes whatever native pitch/level data the WS
+    // listeners have stashed in refs and patches the meter store + local
+    // acStatus exactly `hz` times per second. Because the browser meter
+    // loop in live-context.tsx skips voice/tuner publish when
+    // `nativeRunning` is true, we are the sole writer for those fields
+    // while native is active — so the user's hz slider fully controls the
+    // perceived UI rate of the Tuner, Audio Engine card and Realtime Coach.
+    useEffect(() => {
+        if (!nativeMode || !nativeAvailable || !nativeRunning) return;
+        const interval = Math.max(33, Math.round(1000 / hz));
+        const tick = () => {
+            const lv = nativeLevelsRef.current;
+            const np = nativePitchRef.current;
+            const patch: Partial<{
+                nativeInPeak: number; nativeOutPeak: number;
+                nativeInRms: number; nativeOutRms: number;
+                nativeStreamLatencyMs: number; nativeDspAvgMs: number;
+                nativeDspMaxMs: number; nativeUnderruns: number;
+                voicePeakL: number; voicePeakR: number; voiceRms: number;
+                masterPeakL: number; masterPeakR: number;
+                tunerNote: string; tunerNoteIndex: number; tunerCents: number;
+                tunerFrequency: number; tunerConfidence: number;
+                autoCorrectActive: boolean;
+                autoCorrectSourceMidi: number; autoCorrectTargetMidi: number;
+            }> = {};
+            if (lv) {
+                const { levels: l, perf: p } = lv;
+                patch.nativeInPeak = l.inPeak;
+                patch.nativeOutPeak = l.outPeak;
+                patch.nativeInRms = l.inRms;
+                patch.nativeOutRms = l.outRms;
+                patch.nativeStreamLatencyMs = p.streamLatencyMs;
+                patch.nativeDspAvgMs = p.dspBlockAvgMs;
+                patch.nativeDspMaxMs = p.dspBlockMaxMs;
+                patch.nativeUnderruns = p.underruns;
+                // Mirror into the standard meter fields so the Audio Engine
+                // stats card, master meters and Voice meters reflect the
+                // native signal (the browser engine sees silence when
+                // native owns the mic).
+                patch.voicePeakL = l.inPeak;
+                patch.voicePeakR = l.inPeak;
+                patch.voiceRms = l.inRms;
+                patch.masterPeakL = l.outPeak;
+                patch.masterPeakR = l.outPeak;
+            }
+            if (np) {
+                const p = np.pitch;
+                const s = np.status;
+                if (p.confidence >= 0.3 && p.frequency > 0) {
+                    const noteIdx = ((Math.round(p.midi) % 12) + 12) % 12;
+                    patch.tunerNote = formatPitch(noteIdx, settings.noteNotations[0] ?? "anglo", quality);
+                    patch.tunerNoteIndex = noteIdx;
+                    patch.tunerCents = Math.round(p.cents);
+                    patch.tunerFrequency = p.frequency;
+                    patch.tunerConfidence = p.confidence;
+                } else {
+                    // Low-confidence frame — surface as "no signal" so the
+                    // tuner/coach don't latch on to stale notes.
+                    patch.tunerNote = "—";
+                    patch.tunerNoteIndex = -1;
+                    patch.tunerCents = 0;
+                    patch.tunerFrequency = 0;
+                    patch.tunerConfidence = p.confidence;
+                }
+                if (s) {
+                    patch.autoCorrectActive = autoCorrectOn;
+                    patch.autoCorrectSourceMidi = s.sourceMidi ?? NaN;
+                    patch.autoCorrectTargetMidi = s.targetMidi ?? -1;
+                }
+            }
+            if (Object.keys(patch).length > 0) liveMetersStore.patch(patch);
+        };
+        tick();
+        const id = window.setInterval(tick, interval);
+        return () => { window.clearInterval(id); };
+    }, [nativeMode, nativeAvailable, nativeRunning, hz, autoCorrectOn, settings.noteNotations, quality]);
+
+    // Mirror local native lifecycle state into the meters store so the
+    // Voice Processor panel can render its Native ON/OFF button + status
+    // text without owning the companion client. These flip on actual
+    // start/stop — not on every WS frame — so they are flicker-free.
+    useEffect(() => {
+        liveMetersStore.patch({
+            nativeRunning,
+            nativeAvailable,
+            nativeError,
+            nativeMetricsLatencyMs: nativeMetrics?.streamLatencyMs ?? 0,
+            nativeMetricsDspAvgMs: nativeMetrics?.dspBlockAvgMs ?? 0,
+            // Audio Engine perf card uses these to render device-truth
+            // values when native is the active path. Uptime is derived
+            // from callback count so it tracks the audio thread, not
+            // wall-clock — matches what an "AUDIO" card should show.
+            nativeSampleRate: nativeMetrics?.sampleRate ?? 0,
+            nativeFrameSize: nativeMetrics?.frameSize ?? 0,
+            nativeBackend: nativeMetrics?.backend ?? "",
+            nativeUptimeSec: (nativeMetrics?.callbackCount && nativeMetrics?.frameSize && nativeMetrics?.sampleRate)
+                ? (nativeMetrics.callbackCount * nativeMetrics.frameSize) / nativeMetrics.sampleRate
+                : 0,
+            nativeExclusiveMode,
+        });
+    }, [nativeRunning, nativeAvailable, nativeError, nativeMetrics]);
 
     // Refresh native metrics every second (for UI readout).
     useEffect(() => {
@@ -1894,7 +2593,8 @@ function KeyScalePanel() {
     // Subscribe to engine's live auto-correct status (60 Hz internal loop).
     // We poll instead of pushing to keep the engine free of UI deps.
     // When in native mode, status is sourced from `nativePitchRef` (filled
-    // by WS messages from the companion) instead.
+    // by WS messages from the companion) instead. Throttled to the user's
+    // UI hz so even at 1 Hz the corrector readout doesn't flicker.
     const [acStatus, setAcStatus] = useState<{
         rms: number; freq: number; note: string; semis: number; ratio: number; conf: number;
         sourceMidi: number | null; targetMidi: number | null;
@@ -1904,8 +2604,8 @@ function KeyScalePanel() {
         const engine = live.engine;
         const useNative = nativeMode && nativeAvailable && nativeRunning;
         if (!useNative && !engine) return;
-        let raf = 0;
         let alive = true;
+        const interval = Math.max(33, Math.round(1000 / hz));
         const tick = () => {
             if (!alive) return;
             if (useNative) {
@@ -1914,7 +2614,7 @@ function KeyScalePanel() {
                     const p = np.pitch;
                     const s = np.status;
                     const noteName = p.midi >= 0
-                        ? formatPitch(((p.midi % 12) + 12) % 12, settings.noteNotations[0] ?? "anglo", quality)
+                        ? formatPitch(((Math.round(p.midi) % 12) + 12) % 12, settings.noteNotations[0] ?? "anglo", quality)
                         : "—";
                     const semis = s && s.targetMidi !== null && s.sourceMidi !== null
                         ? (s.targetMidi - s.sourceMidi)
@@ -1943,65 +2643,18 @@ function KeyScalePanel() {
                     targetMidi: s.targetMidi,
                 });
             }
-            raf = requestAnimationFrame(tick);
         };
-        raf = requestAnimationFrame(tick);
-        return () => { alive = false; if (raf) cancelAnimationFrame(raf); };
-    }, [autoCorrectOn, live.engine, nativeMode, nativeAvailable, nativeRunning, settings.noteNotations, quality]);
+        tick();
+        const id = window.setInterval(tick, interval);
+        return () => { alive = false; window.clearInterval(id); };
+    }, [autoCorrectOn, live.engine, nativeMode, nativeAvailable, nativeRunning, hz, settings.noteNotations, quality]);
 
     return (
         <Section title="Key & Scale" accent="#06b6d4" icon={<Settings2 className="w-3.5 h-3.5 text-cyan-400/60" />}>
             <div className="space-y-2">
-                {/* Native low-latency mode row */}
-                <div className="flex items-center justify-between gap-2">
-                    <button
-                        onClick={() => {
-                            if (!nativeAvailable) return;
-                            setNativeMode(v => !v);
-                        }}
-                        disabled={!nativeAvailable}
-                        title={
-                            !nativeAvailable
-                                ? "MMO Companion not detected. Install + sign in on this device to enable native low-latency audio."
-                                : nativeMode
-                                    ? "Native mode ON — mic and speakers handled by the companion (RtAudio direct). Browser is bypassed for the autocorrect path."
-                                    : "Browser mode — Web Audio worklet (~25 ms total round-trip on Windows, ~12 ms on macOS). Enable native for the lowest possible latency."
-                        }
-                        className={cn(
-                            "flex items-center gap-1.5 h-6 px-2 text-[10px] rounded-full transition-all border cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
-                            nativeMode && nativeAvailable
-                                ? "bg-purple-500/25 text-purple-200 border-purple-500/40 shadow-[0_0_10px_rgba(168,85,247,0.25)]"
-                                : "bg-white/[0.04] text-white/45 border-white/10 hover:text-white/80 hover:bg-white/[0.08]",
-                        )}
-                    >
-                        <span className="text-[10px]">⚡</span>
-                        <span>
-                            Native {nativeMode && nativeAvailable ? "ON" : "OFF"}
-                        </span>
-                    </button>
-                    <span className="text-[9px] tabular-nums text-white/60">
-                        {!nativeAvailable
-                            ? <span className="text-white/30">no companion</span>
-                            : !nativeMode
-                                ? <span className="text-white/40">browser ~25ms</span>
-                                : !nativeRunning
-                                    ? nativeError
-                                        ? <span className="text-rose-400/80">err</span>
-                                        : <span className="text-white/40">starting…</span>
-                                    : nativeMetrics
-                                        ? <span className="text-purple-300">
-                                            {nativeMetrics.streamLatencyMs.toFixed(1)}ms
-                                            <span className="text-white/40"> + {nativeMetrics.dspBlockAvgMs.toFixed(1)}ms dsp</span>
-                                        </span>
-                                        : <span className="text-white/40">running</span>
-                        }
-                    </span>
-                </div>
-                {nativeError && nativeMode && (
-                    <div className="text-[9px] text-rose-400/80 leading-tight">
-                        {nativeError}
-                    </div>
-                )}
+                {/* Native low-latency mode UI lives in the Voice Processor
+                    panel now — KeyScalePanel still owns the engine
+                    lifecycle but renders no native controls of its own. */}
 
                 {/* Auto-correct toggle row */}
                 <div className="flex items-center justify-between gap-2">
@@ -2302,7 +2955,7 @@ function LivePerfSection() {
     );
 }
 
-type WidgetId = "voice" | "keyScale" | "backing" | "tuner" | "looper" | "pads" | "stream" | "perf" | "recommendations" | "visualizer" | "eq" | "instrument";
+type WidgetId = "voice" | "keyScale" | "backing" | "tuner" | "looper" | "pads" | "stream" | "perf" | "recommendations" | "visualizer" | "eq" | "instrument" | "plugins";
 
 const WIDGET_RENDERERS: Record<WidgetId, () => React.ReactElement> = {
     voice: () => <VoicePanel />,
@@ -2317,6 +2970,7 @@ const WIDGET_RENDERERS: Record<WidgetId, () => React.ReactElement> = {
     perf: () => <LivePerfSection />,
     recommendations: () => <RecommendationsPanel />,
     instrument: () => <InstrumentPanel />,
+    plugins: () => <LivePluginsWidget />,
 };
 
 // ─── Widget metadata: defaults, min sizes, max sizes ────────────────────────
@@ -2394,6 +3048,12 @@ const WIDGET_META: WidgetMeta<WidgetId>[] = [
         defaults: { lg: { x: 5, y: 42, w: 4, h: 18 }, md: { x: 5, y: 60, w: 5, h: 18 }, sm: { x: 0, y: 114, w: 6, h: 18 }, xs: { x: 0, y: 114, w: 4, h: 18 }, xxs: { x: 0, y: 114, w: 2, h: 18 } },
         minW: 3, minH: 10, autoResize: true,
     },
+    {
+        id: "plugins", title: "Plugin FX",
+        icon: Plug, accent: "#a78bfa", description: "VST3 / AU / LV2 master rack (offline render)",
+        defaults: { lg: { x: 5, y: 60, w: 4, h: 16 }, md: { x: 5, y: 78, w: 5, h: 16 }, sm: { x: 0, y: 132, w: 6, h: 16 }, xs: { x: 0, y: 132, w: 4, h: 16 }, xxs: { x: 0, y: 132, w: 2, h: 16 } },
+        minW: 3, minH: 8, autoResize: true,
+    },
 ];
 
 const LAYOUT_STORAGE_KEY = "live-widget-grid-v1";
@@ -2438,6 +3098,7 @@ export function LivePage() {
 
     return (
         <div className="flex flex-col h-full bg-[oklch(0.10_0.01_260)] text-white overflow-hidden select-none">
+            <AudioDiagnosticsLogger />
             <MasterBar />
             <MetroSettings />
 

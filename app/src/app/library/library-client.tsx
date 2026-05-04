@@ -41,6 +41,7 @@ import {
     cn,
 } from "@/lib/utils";
 import { useDAWSettings } from "@/hooks/use-daw-settings";
+import { useSessionDownloads, downloadTrackFile } from "@/hooks/use-session-downloads";
 import {
     Play,
     Pause,
@@ -57,6 +58,7 @@ import {
     ListPlus,
     Check,
     EyeOff,
+    Download,
 } from "lucide-react";
 import Link from "next/link";
 import type { Track } from "@/db/schema";
@@ -111,6 +113,7 @@ export function LibraryClient({
     const player = usePlayer();
     const selection = useSelection();
     const { noteNotations } = useDAWSettings();
+    const { savedIds } = useSessionDownloads();
     const pageTrackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
     const allPageSelected = pageTrackIds.length > 0 && pageTrackIds.every((id) => selection.isSelected(id));
 
@@ -582,6 +585,7 @@ export function LibraryClient({
                                     const isCurrentTrack =
                                         player.currentTrack?.id === track.id;
                                     const isPlayingThis = isCurrentTrack && player.isPlaying;
+                                    const isSavedThisSession = savedIds.has(track.id);
                                     const tags: string[] = track.tags
                                         ? JSON.parse(track.tags)
                                         : [];
@@ -607,7 +611,9 @@ export function LibraryClient({
                                                     selection.isSelected(track.id) && "bg-purple-500/5",
                                                     isCurrentTrack
                                                         ? "bg-purple-500/10 border-l-2 border-l-purple-500"
-                                                        : harmonicColor
+                                                        : isSavedThisSession
+                                                            ? "bg-sky-500/[0.07] border-l-2 border-l-sky-500/60"
+                                                            : harmonicColor
                                                 )}
                                                 onClick={() => {
                                                     setSelectedTrack(track);
@@ -791,14 +797,29 @@ export function LibraryClient({
                                                     className="p-0"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    <TrackActions
-                                                        track={track}
-                                                        onOpenDetail={() => {
-                                                            setSelectedTrack(track);
-                                                            setModalOpen(true);
-                                                        }}
-                                                        onMutate={() => router.refresh()}
-                                                    />
+                                                    <div className="flex items-center justify-end gap-0.5 pr-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => downloadTrackFile(track.id, `${track.artist || "Unknown"} - ${track.title || `track-${track.id}`}`)}
+                                                            title={isSavedThisSession ? "Saved this session \u2014 download again" : "Download to PC"}
+                                                            className={cn(
+                                                                "h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors cursor-pointer",
+                                                                isSavedThisSession
+                                                                    ? "text-sky-400 hover:bg-sky-500/15 opacity-100"
+                                                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/40 opacity-0 group-hover:opacity-100"
+                                                            )}
+                                                        >
+                                                            <Download className="h-3.5 w-3.5" />
+                                                        </button>
+                                                        <TrackActions
+                                                            track={track}
+                                                            onOpenDetail={() => {
+                                                                setSelectedTrack(track);
+                                                                setModalOpen(true);
+                                                            }}
+                                                            onMutate={() => router.refresh()}
+                                                        />
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         </TrackContextMenu>

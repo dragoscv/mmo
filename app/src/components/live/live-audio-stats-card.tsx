@@ -20,7 +20,7 @@ import {
     Cpu, Headphones, Radio, Layers,
 } from "lucide-react";
 import { useLive } from "./live-context";
-import { useLiveMetersField } from "./live-meters-store";
+import { useLiveMetersField, liveMetersStore } from "./live-meters-store";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -158,6 +158,20 @@ export const LiveAudioStatsCard = memo(function LiveAudioStatsCard({ className }
     }, []);
     void tick;
 
+    // Page Visibility → meters store. When the tab is hidden, browser
+    // AudioContext can be throttled by Chrome's background-tab policy.
+    // The keep-alive ConstantSourceNode in live-engine.ts mostly prevents
+    // this, but the user should still see WHY a glitch happened if one
+    // does sneak through. Cheap to wire: 1 listener, no per-frame cost.
+    useEffect(() => {
+        const update = () => {
+            liveMetersStore.patch({ documentHidden: document.hidden });
+        };
+        update();
+        document.addEventListener("visibilitychange", update);
+        return () => document.removeEventListener("visibilitychange", update);
+    }, []);
+
     if (!engine) {
         return (
             <div className={cn("rounded-lg bg-white/[0.03] border border-white/[0.06] p-2 w-[220px] lg:w-[260px] xl:w-[300px]", className)}>
@@ -178,6 +192,50 @@ export const LiveAudioStatsCard = memo(function LiveAudioStatsCard({ className }
     const uptimeMin = Math.floor(currentTime / 60);
     const uptimeSec = Math.floor(currentTime % 60);
 
+    // ── Native engine takeover ──────────────────────────────────────────
+    // When the user has switched to the companion's native engine, the
+    // browser AudioContext is just a passthrough (its mic input is
+    // stopped, voiceMonitor is muted). Showing AudioContext stats in
+    // that mode would lie about the actual signal path, so we branch
+    // every Engine-column row on `nativeRunning` and show device truth
+    // sourced from the companion's RtAudio /metrics endpoint.
+    const nativeRunning = useLiveMetersField(s => s.nativeRunning);
+    const nativeSampleRate = useLiveMetersField(s => s.nativeSampleRate);
+    const nativeFrameSize = useLiveMetersField(s => s.nativeFrameSize);
+    const nativeBackend = useLiveMetersField(s => s.nativeBackend);
+    const nativeUptimeSec = useLiveMetersField(s => s.nativeUptimeSec);
+    const nativeStreamLatencyMs = useLiveMetersField(s => s.nativeStreamLatencyMs);
+    const nativeDspAvgMs = useLiveMetersField(s => s.nativeDspAvgMs);
+    const nativeDspMaxMs = useLiveMetersField(s => s.nativeDspMaxMs);
+    const nativeUnderruns = useLiveMetersField(s => s.nativeUnderruns);
+
+    const showNative = nativeRunning && nativeSampleRate > 0;
+    // Per-block latency = frameSize / sampleRate. This is the dominant
+    // term of the user's monitoring delay when running native. The
+    // /metrics streamLatencyMs already includes the input + output
+    // buffers, so we display that as the headline Latency and the block
+    // value as Quantum (matches the browser column's labels).
+    const nativeQuantumMs = nativeSampleRate > 0
+        ? (nativeFrameSize / nativeSampleRate) * 1000
+        : 0;
+
+    const engineSampleRate = showNative ? nativeSampleRate : sampleRate;
+    const engineLatencyMs = showNative ? nativeStreamLatencyMs : totalLatencyMs;
+    const engineBufferSamples = showNative ? nativeFrameSize : bufferSamples;
+    const engineQuantumMs = showNative ? nativeQuantumMs : renderQuantumMs;
+    const engineUptimeMin = showNative
+        ? Math.floor(nativeUptimeSec / 60)
+        : uptimeMin;
+    const engineUptimeSec = showNative
+        ? Math.floor(nativeUptimeSec % 60)
+        : uptimeSec;
+    const engineState = showNative ? "native" : ctxState;
+    const engineStateColor = showNative
+        ? "text-rose-400"
+        : ctxState === "running" ? "text-emerald-400"
+            : ctxState === "suspended" ? "text-amber-400"
+                : "text-rose-400";
+
     const voiceFxCount = live.voiceChain.length;
     const voiceFxEnabled = live.voiceChain.filter(i => i.enabled).length;
     const activeLoopers = engine.state.loopers.filter(l => l.state === "playing" || l.state === "overdubbing").length;
@@ -186,15 +244,53 @@ export const LiveAudioStatsCard = memo(function LiveAudioStatsCard({ className }
     const playingPads = engine.state.pads.filter(p => p.isPlaying).length;
     const loadedPads = engine.state.pads.filter(p => p.buffer !== null).length;
 
-    const ctxStateColor =
-        ctxState === "running" ? "text-emerald-400"
-            : ctxState === "suspended" ? "text-amber-400"
-                : "text-rose-400";
+    const ctxStateColor = engineStateColor;
 
     const latencyColor =
-        totalLatencyMs > 30 ? "text-rose-400"
-            : totalLatencyMs > 15 ? "text-amber-400"
+        engineLatencyMs > 30 ? "text-rose-400"
+            : engineLatencyMs > 15 ? "text-amber-400"
                 : "text-emerald-400/80";
+
+    // ── Derived performance indicators ─────────────────────────────
+    // DSP load %: how much of the per-block budget the DSP chain is
+    // burning on average. >70% means we're at risk of underrunning if
+    // the OS gets distracted; >90% basically guarantees xruns under
+    // load. Only meaningful in native mode where we measure block time.
+    const dspLoadPct = showNative && engineQuantumMs > 0
+        ? Math.min(999, (nativeDspAvgMs / engineQuantumMs) * 100)
+        : 0;
+    const dspLoadColor =
+        dspLoadPct > 90 ? "text-rose-400"
+            : dspLoadPct > 70 ? "text-amber-400"
+                : "text-emerald-400/80";
+
+    // Latency grade — a single visual badge so the user gets a one-glance
+    // verdict without doing the math. Thresholds chosen for live vocal
+    // monitoring (where >20ms feels late). For DAW playback the bar is
+    // higher, but this card is on the Live page.
+    const latencyGrade =
+        engineLatencyMs <= 7 ? { label: "EXCELLENT", color: "text-emerald-400" }
+            : engineLatencyMs <= 15 ? { label: "GOOD", color: "text-emerald-400/70" }
+                : engineLatencyMs <= 25 ? { label: "FAIR", color: "text-amber-400" }
+                    : { label: "POOR", color: "text-rose-400" };
+
+    // Visibility warning — only show when relevant (browser-side audio is
+    // playing). When the user is purely on native mic, a hidden tab
+    // doesn't affect them at all.
+    const documentHidden = useLiveMetersField(s => s.documentHidden);
+    const browserPlaying = live.backingIsPlaying || activeLoopers > 0 || playingPads > 0;
+    const showHiddenTabWarning = documentHidden && browserPlaying;
+
+    // WASAPI shared-mode hint — when the native engine is on Windows
+    // WASAPI in shared mode, the Windows audio engine routes the stream
+    // through the system mixer which dynamically resamples and ducks on
+    // focus changes / communications-device priority. Exclusive mode
+    // bypasses this entirely. We only nudge if the user hasn't already
+    // turned it on.
+    const nativeExclusiveMode = useLiveMetersField(s => s.nativeExclusiveMode);
+    const showWasapiSharedHint = showNative
+        && /wasapi/i.test(nativeBackend)
+        && !nativeExclusiveMode;
 
     return (
         <div className={cn(
@@ -204,28 +300,87 @@ export const LiveAudioStatsCard = memo(function LiveAudioStatsCard({ className }
             <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1">
                     <Radio className="h-2.5 w-2.5 text-rose-400/60" />
-                    <span className="text-[8px] lg:text-[9px] uppercase tracking-wider text-white/35">Audio Engine</span>
+                    <span className="text-[8px] lg:text-[9px] uppercase tracking-wider text-white/35">
+                        {showNative ? `Audio Engine · ${nativeBackend || "native"}` : "Audio Engine"}
+                    </span>
                 </div>
-                <div className={cn("h-1.5 w-1.5 rounded-full",
-                    ctxState === "running" ? "bg-emerald-500" : ctxState === "suspended" ? "bg-amber-500" : "bg-rose-500",
-                )} title={`AudioContext: ${ctxState}`} />
+                <div className="flex items-center gap-1.5">
+                    <span className={cn(
+                        "text-[6px] uppercase tracking-widest font-medium",
+                        latencyGrade.color,
+                    )} title={`End-to-end latency: ${engineLatencyMs.toFixed(1)} ms`}>
+                        {latencyGrade.label}
+                    </span>
+                    <div className={cn("h-1.5 w-1.5 rounded-full",
+                        showNative
+                            ? "bg-rose-500"
+                            : ctxState === "running" ? "bg-emerald-500"
+                                : ctxState === "suspended" ? "bg-amber-500"
+                                    : "bg-rose-500",
+                    )} title={showNative ? `Native engine: ${nativeBackend}` : `AudioContext: ${ctxState}`} />
+                </div>
             </div>
+
+            {showHiddenTabWarning ? (
+                <div className="mb-1.5 -mt-0.5 px-1.5 py-1 rounded bg-amber-500/10 border border-amber-500/20">
+                    <span className="text-[7px] uppercase tracking-wider text-amber-300/90">
+                        Tab hidden — browser audio may glitch
+                    </span>
+                </div>
+            ) : null}
+
+            {showWasapiSharedHint ? (
+                <div className="mb-1.5 -mt-0.5 px-1.5 py-1 rounded bg-sky-500/10 border border-sky-500/20 flex items-center gap-1.5" title="WASAPI shared mode goes through the Windows audio mixer, which can shift balance / resample on window focus. Exclusive mode bypasses the mixer for stable, focus-independent audio.">
+                    <span className="text-[7px] uppercase tracking-wider text-sky-300/90 flex-1 min-w-0">
+                        WASAPI shared — sound may shift on focus
+                    </span>
+                    <button
+                        type="button"
+                        className="text-[7px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-100 transition-colors shrink-0 cursor-pointer"
+                        onClick={() => {
+                            // Persist the toggle (mirrors the Voice Processor
+                            // checkbox) AND ask LivePage to bounce the engine
+                            // immediately. The shared-bool event keeps both UI
+                            // surfaces in sync; the restart event triggers the
+                            // start effect on the next tick.
+                            try { window.localStorage.setItem("mmo-live-native-exclusive", "1"); } catch { /* ignore */ }
+                            window.dispatchEvent(new CustomEvent("mmo-shared-bool-mmo-live-native-exclusive", { detail: { value: true } }));
+                            window.dispatchEvent(new CustomEvent("mmo-live-native-restart", { detail: { exclusive: true } }));
+                        }}
+                        title="Restart the native engine in WASAPI exclusive mode (~2 ms lower latency, focus-stable)"
+                    >
+                        Switch
+                    </button>
+                </div>
+            ) : null}
 
             <div className="grid grid-cols-2 gap-x-2.5 gap-y-0">
                 {/* ── Left Column: Engine ── */}
                 <div className="flex flex-col gap-1">
                     <span className="text-[6px] uppercase tracking-widest text-white/15 mb-0.5">Engine</span>
-                    <Row icon={Cpu} label="State" value={ctxState} color={ctxStateColor} />
-                    <Row icon={Gauge} label="Sample Rate" value={fmtKhz(sampleRate)} mono />
+                    <Row icon={Cpu} label="State" value={engineState} color={ctxStateColor} />
+                    <Row icon={Gauge} label="Sample Rate" value={fmtKhz(engineSampleRate)} mono />
                     <Row icon={Activity} label="Latency"
-                        value={`${totalLatencyMs.toFixed(1)}ms`}
+                        value={`${engineLatencyMs.toFixed(1)}ms`}
                         color={latencyColor} mono />
-                    <Row icon={Layers} label="Buffer" value={`${bufferSamples} smp`} mono />
-                    <Row icon={Gauge} label="Quantum" value={`${renderQuantumMs.toFixed(2)}ms`} mono />
-                    <Row icon={Headphones} label="Out Lat" value={fmtMs(outputLatency)} mono />
+                    <Row icon={Layers} label="Buffer" value={`${engineBufferSamples} smp`} mono />
+                    <Row icon={Gauge} label="Quantum" value={`${engineQuantumMs.toFixed(2)}ms`} mono />
+                    {showNative ? (
+                        <Row icon={Cpu} label="DSP Load"
+                            value={`${dspLoadPct.toFixed(0)}% · ${nativeDspMaxMs.toFixed(2)}ms`}
+                            color={dspLoadColor}
+                            mono />
+                    ) : (
+                        <Row icon={Headphones} label="Out Lat" value={fmtMs(outputLatency)} mono />
+                    )}
                     <Row icon={Activity} label="Uptime"
-                        value={`${uptimeMin}m ${String(uptimeSec).padStart(2, "0")}s`}
+                        value={`${engineUptimeMin}m ${String(engineUptimeSec).padStart(2, "0")}s`}
                         mono />
+                    {showNative && nativeUnderruns > 0 ? (
+                        <Row icon={Activity} label="XRuns"
+                            value={String(nativeUnderruns)}
+                            color="text-rose-400" mono />
+                    ) : null}
                 </div>
 
                 {/* ── Right Column: Signal ── */}

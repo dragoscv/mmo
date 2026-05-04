@@ -18,12 +18,13 @@
             display: flex; flex-direction: column; overflow: hidden;
         }
         button, input, a { -webkit-app-region: no-drag; }
+        .content, .login-box, .section, .profile-card { -webkit-app-region: no-drag; }
         .titlebar {
             height: 32px; display: flex; align-items: center; justify-content: center;
             font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border);
             flex-shrink: 0;
         }
-        .content { flex: 1; overflow-y: auto; padding: 20px; }
+        .content { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; }
         .profile-card {
             display: flex; align-items: center; gap: 14px; padding: 16px;
             background: var(--card); border: 1px solid var(--border);
@@ -122,13 +123,283 @@
             color: var(--text); font-size: 13px; outline: none;
         }
         .input-group input:focus { border-color: var(--purple); }
+
+        /* ─── Audio devices section ──────────────────────────────────────────────────────────────────────── */
+        .audio-loading {
+            display: flex; align-items: center; justify-content: center;
+            padding: 16px; color: var(--muted); font-size: 12px; gap: 8px;
+        }
+        .audio-spinner {
+            width: 14px; height: 14px; border-radius: 50%;
+            border: 2px solid #333; border-top-color: var(--purple);
+            animation: spin 0.8s linear infinite;
+        }
+        .backend-group { margin-top: 12px; }
+        .backend-group:first-child { margin-top: 0; }
+        .backend-header {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--muted); padding: 6px 4px; border-bottom: 1px solid var(--border);
+            margin-bottom: 8px; cursor: pointer; user-select: none;
+            border-radius: 6px 6px 0 0; transition: background 0.12s;
+        }
+        .backend-header:hover { background: rgba(255,255,255,0.03); }
+        .backend-header .chev {
+            display: inline-block; width: 10px; margin-right: 6px;
+            transition: transform 0.18s ease;
+            color: var(--muted);
+        }
+        .backend-group.collapsed .chev { transform: rotate(-90deg); }
+        .backend-group.collapsed .backend-header { margin-bottom: 0; border-bottom-color: transparent; }
+        .backend-body {
+            overflow: hidden;
+            transition: max-height 0.22s ease, opacity 0.18s ease;
+            max-height: 4000px; opacity: 1;
+        }
+        .backend-group.collapsed .backend-body { max-height: 0; opacity: 0; }
+        .backend-pill {
+            font-size: 9px; padding: 2px 6px; border-radius: 6px;
+            background: rgba(34, 197, 94, 0.12); color: var(--green);
+        }
+        .backend-pill.unavailable { background: #1f1f1f; color: var(--muted); }
+        /* ─── Live latency widget ─────────────────────────────────────── */
+        .latency-widget {
+            margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+            background: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(34,197,94,0.05));
+            border: 1px solid rgba(168,85,247,0.18); font-size: 11px;
+        }
+        .latency-widget.idle {
+            background: rgba(255,255,255,0.02); border-color: var(--border);
+            color: var(--muted);
+        }
+        .latency-widget.idle .lw-dot { background: #555; box-shadow: none; }
+        .latency-widget .lw-head {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+            font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--muted);
+        }
+        .lw-dot {
+            width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+            box-shadow: 0 0 6px rgba(34,197,94,0.7);
+            animation: lw-pulse 1.6s ease-in-out infinite;
+        }
+        @keyframes lw-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+        .lw-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px;
+            font-variant-numeric: tabular-nums;
+        }
+        .lw-item { display: flex; flex-direction: column; gap: 2px; }
+        .lw-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+        .lw-value { font-size: 14px; font-weight: 600; color: var(--text); }
+        .lw-value .lw-unit { font-size: 10px; color: var(--muted); margin-left: 2px; font-weight: 400; }
+        .lw-value.warn { color: #f59e0b; }
+        .lw-value.bad { color: var(--red); }
+        .lw-bar {
+            height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px;
+            overflow: hidden; margin-top: 6px;
+        }
+        .lw-bar-fill {
+            height: 100%; background: linear-gradient(90deg, var(--green), var(--purple));
+            transition: width 0.3s ease, background 0.3s ease;
+        }
+        .lw-bar-fill.warn { background: linear-gradient(90deg, #facc15, #f59e0b); }
+        .lw-bar-fill.bad { background: linear-gradient(90deg, #f59e0b, var(--red)); }
+        .lw-foot { margin-top: 6px; font-size: 10px; color: var(--muted); display: flex; justify-content: space-between; }
+        /* Live in/out level meters inside the latency widget. */
+        .lw-meters {
+            margin-top: 8px;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+        }
+        .lw-meter { display: flex; flex-direction: column; gap: 3px; }
+        .lw-meter-label {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px;
+            color: var(--muted);
+        }
+        .lw-meter-label .lw-meter-db { color: var(--text); font-variant-numeric: tabular-nums; }
+        .lw-meter-bar {
+            position: relative; height: 8px; background: rgba(255,255,255,0.05);
+            border-radius: 3px; overflow: hidden;
+        }
+        .lw-meter-bar .rms {
+            position: absolute; left: 0; top: 0; bottom: 0;
+            background: linear-gradient(90deg, #22c55e 0%, #facc15 70%, #ef4444 95%);
+            transition: width 80ms linear;
+        }
+        .lw-meter-bar .peak {
+            position: absolute; top: 0; bottom: 0; width: 2px;
+            background: rgba(255,255,255,0.85);
+            transition: left 80ms linear;
+        }
+        .dir-label {
+            display: flex; align-items: center; gap: 6px; font-size: 11px;
+            color: var(--muted); margin: 8px 0 4px;
+        }
+        .device-row {
+            display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px;
+            background: var(--bg); border: 1px solid transparent; border-radius: 8px;
+            margin-bottom: 4px; cursor: pointer; transition: border-color 0.12s;
+        }
+        .device-row:hover { border-color: #333; }
+        .device-row.checked { border-color: rgba(168, 85, 247, 0.4); background: rgba(168, 85, 247, 0.06); }
+        .device-row input[type="checkbox"] {
+            margin-top: 2px; width: 14px; height: 14px; accent-color: var(--purple);
+            cursor: pointer; flex-shrink: 0;
+        }
+        .device-info { flex: 1; min-width: 0; }
+        .device-name {
+            font-size: 12px; font-weight: 500; line-height: 1.3;
+            overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+            -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+        }
+        .device-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+        .device-default-badge {
+            display: inline-block; padding: 1px 5px; border-radius: 4px;
+            background: rgba(168, 85, 247, 0.15); color: var(--purple);
+            font-size: 9px; margin-left: 4px; vertical-align: middle;
+        }
+        .audio-empty { padding: 12px; text-align: center; color: var(--muted); font-size: 12px; }
         .version { text-align: center; font-size: 11px; color: #444; padding: 8px; flex-shrink: 0; }
         #view-auth, #view-main { display: none; }
-        #view-auth.active, #view-main.active { display: flex; flex-direction: column; flex: 1; }
+        /* Critical: this is a flex parent of `.content` whose child uses
+           `flex:1; min-height:0; overflow-y:auto`. Without `min-height:0`
+           HERE TOO the parent grows to fit content and scrolling breaks. */
+        #view-auth.active, #view-main.active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ─── Splash overlay ────────────────────────────────────────────
+           Painted before any IPC roundtrip, fades out once the renderer
+           has loaded its first view. The container background is set
+           inline (from `prefers-color-scheme`) so there is zero flash
+           between the OS-level window background and this layer.
+
+           Animation choreography (~900 ms total):
+             0 ms   logo + ring fade in
+             150 ms wordmark slides up from below
+             900 ms entire splash fades + scales out
+        */
+        .splash {
+            position: fixed; inset: 0; z-index: 1000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 18px;
+            background:
+                radial-gradient(circle at 50% 35%, rgba(168, 85, 247, 0.18), transparent 55%),
+                radial-gradient(circle at 50% 80%, rgba(124, 58, 237, 0.10), transparent 60%),
+                var(--splash-bg, #0a0a0a);
+            transition: opacity 380ms ease, transform 380ms ease, visibility 380ms;
+            -webkit-app-region: drag;
+        }
+        .splash.hide {
+            opacity: 0;
+            transform: scale(1.03);
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .splash-logo {
+            position: relative;
+            width: 84px; height: 84px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 22px;
+            background: linear-gradient(135deg, #a855f7, #7c3aed 60%, #5b21b6);
+            box-shadow:
+                0 12px 40px rgba(168, 85, 247, 0.35),
+                0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+            font-size: 38px;
+            opacity: 0; transform: translateY(6px) scale(0.92);
+            animation: splash-pop 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .splash-logo::before {
+            /* Animated ring orbiting the logo */
+            content: ""; position: absolute; inset: -10px;
+            border-radius: 28px;
+            border: 2px solid transparent;
+            border-top-color: rgba(168, 85, 247, 0.8);
+            border-right-color: rgba(168, 85, 247, 0.35);
+            animation: spin 1.4s linear infinite;
+            opacity: 0;
+            animation: splash-ring-fadein 600ms ease 200ms forwards, spin 1.4s linear 200ms infinite;
+        }
+        .splash-text {
+            text-align: center;
+            opacity: 0; transform: translateY(8px);
+            animation: splash-rise 520ms cubic-bezier(0.16, 1, 0.3, 1) 150ms forwards;
+        }
+        .splash-title {
+            font-size: 18px; font-weight: 700; letter-spacing: 0.2px;
+            background: linear-gradient(180deg, #fafafa, #c4b5fd);
+            -webkit-background-clip: text; background-clip: text;
+            color: transparent;
+        }
+        .splash-sub {
+            margin-top: 4px; font-size: 11px; color: var(--muted);
+            letter-spacing: 0.4px; text-transform: uppercase;
+        }
+        .splash-dots {
+            display: flex; gap: 6px; margin-top: 6px;
+            opacity: 0;
+            animation: splash-rise 420ms ease 320ms forwards;
+        }
+        .splash-dots span {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: rgba(168, 85, 247, 0.7);
+            animation: splash-bounce 1.1s ease-in-out infinite;
+        }
+        .splash-dots span:nth-child(2) { animation-delay: 0.15s; }
+        .splash-dots span:nth-child(3) { animation-delay: 0.30s; }
+        @keyframes splash-pop {
+            from { opacity: 0; transform: translateY(8px) scale(0.9); }
+            to   { opacity: 1; transform: translateY(0)   scale(1); }
+        }
+        @keyframes splash-rise {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes splash-ring-fadein {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        @keyframes splash-bounce {
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.55; }
+            40%           { transform: translateY(-5px); opacity: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .splash, .splash-logo, .splash-text, .splash-dots, .splash-dots span,
+            .splash-logo::before {
+                animation: none !important;
+                transition: opacity 200ms ease !important;
+                opacity: 1 !important;
+                transform: none !important;
+            }
+        }
     </style>
+    <script>
+        // Pick a sensible splash background BEFORE the document body
+        // paints, so there is no white flash on light-themed Windows
+        // installs. The main process repaints the BrowserWindow
+        // backgroundColor on theme change; this just keeps the in-DOM
+        // splash in sync until the renderer is ready.
+        (function () {
+            try {
+                const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+                document.documentElement.style.setProperty("--splash-bg", dark ? "#0a0a0a" : "#0f1117");
+            } catch { /* ignore */ }
+        })();
+    </script>
 </head>
 <body>
+    <!-- SPLASH OVERLAY ─ first paint. Removed once init() has loaded the
+         user's status + initial settings (so the user never sees a flash
+         of the auth/main view before its data is in place). -->
+    <div id="splash" class="splash" role="status" aria-label="MMO Companion is starting">
+        <div class="splash-logo">🎵</div>
+        <div class="splash-text">
+            <div class="splash-title">MMO Companion</div>
+            <div class="splash-sub">Low-latency audio bridge</div>
+        </div>
+        <div class="splash-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    </div>
+
     <div class="titlebar">MMO Companion Server</div>
 
     <!-- AUTH VIEW -->
@@ -198,6 +469,35 @@
                 </button>
             </div>
 
+            <!-- Audio Devices -->
+            <div class="section">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <div class="section-title" style="margin-bottom:0">Audio Devices</div>
+                    <button class="btn" id="btn-refresh-audio" onclick="loadAudioDevices(true)" style="padding:4px 8px;font-size:11px">↻ Refresh</button>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.4">
+                    Toggle which physical inputs / outputs the web app's low-latency engine can use. Default devices are marked.
+                </div>
+                <div id="audio-devices-container">
+                    <div class="audio-loading"><span class="audio-spinner"></span> Loading audio devices…</div>
+                </div>
+                <!-- Live engine metrics — updates every 500ms while engine is running. -->
+                <div id="latency-widget" class="latency-widget idle">
+                    <div class="lw-head" style="display:flex;align-items:center;gap:8px">
+                        <span class="lw-dot"></span>
+                        <span id="lw-title" style="flex:1">Engine idle</span>
+                        <button class="btn" id="btn-kill-engine" onclick="killAudioEngine()"
+                            title="Stop the audio engine immediately. Use when sound is stuck on after closing a browser tab."
+                            style="padding:4px 10px;font-size:11px;background:#5a1a1a;border-color:#8a2a2a;color:#ffd5d5">
+                            ■ Stop
+                        </button>
+                    </div>
+                    <div id="lw-body" style="font-size:11px;color:var(--muted)">
+                        Start the low-latency engine from the web app to see realtime stats.
+                    </div>
+                </div>
+            </div>
+
             <!-- Settings -->
             <div class="section">
                 <div class="section-title">Settings</div>
@@ -224,25 +524,84 @@
                 </div>
             </div>
 
+            <!-- Debug -->
+            <div class="section">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <div class="section-title" style="margin-bottom:0">Debug log</div>
+                    <div style="display:flex;gap:6px">
+                        <button class="btn" id="btn-debug-refresh" onclick="loadDebugLog()" style="padding:4px 8px;font-size:11px">↻ Refresh</button>
+                        <button class="btn" id="btn-debug-copy" onclick="copyDebugLog()" style="padding:4px 8px;font-size:11px">⧉ Copy</button>
+                        <button class="btn" id="btn-debug-clear" onclick="clearDebugLog()" style="padding:4px 8px;font-size:11px">✕ Clear</button>
+                    </div>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4">
+                    Latest 500 log lines + environment. Paste this into a bug report.
+                </div>
+                <pre id="debug-log-output" style="background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:8px;font-size:10px;line-height:1.4;color:#bbb;max-height:200px;overflow:auto;white-space:pre;font-family:'Consolas','Courier New',monospace;margin:0;display:none"></pre>
+                <div id="debug-log-empty" style="font-size:11px;color:var(--muted);font-style:italic">Click Refresh to load.</div>
+            </div>
+
             <!-- Disconnect -->
             <button class="btn danger full" onclick="handleDisconnect()" style="margin-top:4px">
                 Disconnect Account
             </button>
         </div>
-        <div class="version" id="version-text">MMO Companion v0.1.0</div>
+        <div class="version" id="version-text">MMO Companion</div>
     </div>
 
     <script>
-        async function init() {
-            const status = await window.mmo.getStatus();
-            const version = await window.mmo.getVersion();
-            document.getElementById("version-text").textContent = `MMO Companion v${version}`;
+        // Hide the splash overlay once the renderer has decided which view
+        // to show. The splash uses opacity + visibility transitions so the
+        // fade is rendered by the compositor and never blocks the main
+        // thread; we remove the node entirely a bit later to keep the DOM
+        // tidy. The minimum visible time keeps the animation from
+        // flickering on a fast cold-start.
+        const splashStartedAt = Date.now();
+        const SPLASH_MIN_MS = 650;
+        function hideSplash() {
+            const el = document.getElementById("splash");
+            if (!el) return;
+            const elapsed = Date.now() - splashStartedAt;
+            const wait = Math.max(0, SPLASH_MIN_MS - elapsed);
+            setTimeout(() => {
+                el.classList.add("hide");
+                setTimeout(() => { el.parentNode && el.parentNode.removeChild(el); }, 500);
+            }, wait);
+        }
 
-            if (status.authenticated) {
-                showMainView(status);
-            } else {
-                showAuthView();
+        // Subscribe to OS theme changes so the splash background (still in
+        // the DOM during early startup) tracks the user's setting.
+        try {
+            if (window.mmo?.onThemeUpdated) {
+                window.mmo.onThemeUpdated(({ dark }) => {
+                    document.documentElement.style.setProperty("--splash-bg", dark ? "#0a0a0a" : "#0f1117");
+                });
             }
+        } catch { /* ignore */ }
+
+        async function init() {
+            try {
+                const status = await window.mmo.getStatus();
+                renderVersion(status);
+
+                if (status.authenticated) {
+                    await showMainView(status);
+                } else {
+                    showAuthView();
+                }
+            } finally {
+                // Always hide the splash, even if init() threw — better to
+                // expose a half-rendered UI than a forever-spinning splash.
+                hideSplash();
+            }
+        }
+
+        function renderVersion(status) {
+            const appV = status.appVersion || "?";
+            const srvV = status.serverVersion || appV;
+            const el = document.getElementById("version-text");
+            el.textContent = `App v${appV} \u00b7 Server v${srvV}`;
+            el.style.color = "";
         }
 
         function showAuthView() {
@@ -272,6 +631,12 @@
             updateToggles(settings);
             renderFolders(settings.scanFolders || []);
             document.getElementById("stat-folders").textContent = (settings.scanFolders || []).length;
+
+            // Audio devices (deferred so the main view paints first)
+            setTimeout(loadAudioDevices, 50);
+
+            // Live engine metrics widget — polls every 500 ms.
+            startLatencyPolling();
         }
 
         function updateToggles(settings) {
@@ -281,15 +646,21 @@
         }
 
         function renderFolders(folders) {
+            // `folders` may be an array of `{path, watch}` objects (current
+            // shape from server-side store) or plain strings (legacy). Normalize
+            // before rendering so we don't end up with [object Object] in the UI.
+            const normalized = (folders || []).map(f =>
+                typeof f === "string" ? { path: f, watch: false } : f
+            );
             const list = document.getElementById("folder-list");
-            list.innerHTML = folders.map(f =>
+            list.innerHTML = normalized.map(f =>
                 `<li class="folder-item">
                     <span>📁</span>
-                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f}</span>
-                    <button class="remove" onclick="removeFolder('${f.replace(/\\/g, "\\\\")}')">×</button>
+                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(f.path)}</span>
+                    <button class="remove" onclick="removeFolder('${f.path.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}')">×</button>
                 </li>`
             ).join("");
-            document.getElementById("stat-folders").textContent = folders.length;
+            document.getElementById("stat-folders").textContent = normalized.length;
         }
 
         async function handleGoogleSignIn() {
@@ -333,9 +704,11 @@
             const folder = await window.mmo.selectFolder();
             if (!folder) return;
             const settings = await window.mmo.getSettings();
-            const folders = settings.scanFolders || [];
-            if (!folders.includes(folder)) {
-                folders.push(folder);
+            const folders = (settings.scanFolders || []).map(f =>
+                typeof f === "string" ? { path: f, watch: false } : f
+            );
+            if (!folders.some(f => f.path === folder)) {
+                folders.push({ path: folder, watch: false });
                 await window.mmo.updateSettings({ scanFolders: folders });
                 renderFolders(folders);
             }
@@ -343,12 +716,399 @@
 
         async function removeFolder(folder) {
             const settings = await window.mmo.getSettings();
-            const folders = (settings.scanFolders || []).filter(f => f !== folder);
+            const folders = (settings.scanFolders || [])
+                .map(f => typeof f === "string" ? { path: f, watch: false } : f)
+                .filter(f => f.path !== folder);
             await window.mmo.updateSettings({ scanFolders: folders });
             renderFolders(folders);
         }
 
+        // ─── Audio devices ───────────────────────────────────────────────────────────
+        // Authorization is keyed on (backend, direction, name) since the
+        // RtAudio numeric id changes across reboots / hot-plug.
+        function authKey(d) { return d.backend + "::" + d.direction + "::" + d.name; }
+
+        let audioInventoryCache = null;
+        // Tracks which backend groups the user has manually expanded this
+        // session. Survives re-renders triggered by checkbox toggles so the
+        // group doesn't snap shut after each click.
+        const audioGroupExpanded = new Set();
+
+        async function loadAudioDevices(force = false) {
+            const container = document.getElementById("audio-devices-container");
+            // Only show the spinner placeholder when we have no cached data
+            // yet. Re-renders triggered by background pushes preserve the
+            // existing list so the user doesn't see a flash to "Loading…".
+            if (!audioInventoryCache) {
+                container.innerHTML = '<div class="audio-loading"><span class="audio-spinner"></span> Loading audio devices…</div>';
+            }
+            try {
+                const inv = await window.mmo.getAudioDevices(force ? { force: true } : undefined);
+                if (inv && inv.error && !audioInventoryCache) {
+                    container.innerHTML = '<div class="audio-empty" style="color:var(--red)">' + escapeHtml(inv.error) + '</div>';
+                    return;
+                }
+                // The IPC may return an empty inventory immediately while the
+                // background refresh is still running. In that case the cached
+                // result will arrive via `audio-devices-updated` shortly; keep
+                // the spinner up rather than flashing "No audio backends.".
+                const isEmpty = !inv || !Array.isArray(inv.backends) || inv.backends.length === 0;
+                if (isEmpty && inv && inv.initialLoadComplete === false) {
+                    return;
+                }
+                audioInventoryCache = inv;
+                renderAudioDevices(inv);
+            } catch (err) {
+                if (!audioInventoryCache) {
+                    container.innerHTML = '<div class="audio-empty" style="color:var(--red)">Failed: ' + escapeHtml(String(err.message || err)) + '</div>';
+                }
+            }
+        }
+
+        // Subscribe once to push-based inventory updates so the list
+        // refreshes the instant the main process finishes (re-)probing
+        // RtAudio. Falls back gracefully if the preload version is older.
+        if (window.mmo && typeof window.mmo.onAudioDevicesUpdated === "function") {
+            window.mmo.onAudioDevicesUpdated((data) => {
+                if (!data) return;
+                // Merge with current authorized list — the push always carries
+                // the canonical authorized array, so just replace.
+                audioInventoryCache = {
+                    backends: data.backends || [],
+                    authorized: data.authorized || [],
+                };
+                renderAudioDevices(audioInventoryCache);
+            });
+        }
+
+        function renderAudioDevices(inv) {
+            const container = document.getElementById("audio-devices-container");
+            const authorized = new Set((inv.authorized || []).map(authKey));
+            if (!inv.backends || inv.backends.length === 0) {
+                container.innerHTML = '<div class="audio-empty">No audio backends detected.</div>';
+                return;
+            }
+            const html = inv.backends.map(group => {
+                const inputs = (group.devices || []).filter(d => d.inputChannels > 0);
+                const outputs = (group.devices || []).filter(d => d.outputChannels > 0);
+                const pillClass = group.available ? "backend-pill" : "backend-pill unavailable";
+                // Collapsed by default so the page stays compact; the user
+                // expands the backends they care about. Persisted state isn't
+                // needed — the list is short and refreshed on every visit.
+                // BUT: preserve any in-session expansion so toggling a device
+                // checkbox (which re-renders the whole list) doesn't snap the
+                // group shut on the user.
+                const safeId = encodeURIComponent(group.backend).replace(/%/g, "-");
+                const initiallyCollapsed = !audioGroupExpanded.has(safeId);
+                const groupCls = "backend-group" + (initiallyCollapsed ? " collapsed" : "");
+                const headerId = "bk-h-" + safeId;
+                const bodyId = "bk-b-" + safeId;
+                let bodyHtml;
+                if (!group.available) {
+                    bodyHtml = '<div class="audio-empty">Backend not available on this machine.</div>';
+                } else if (group.devices.length === 0) {
+                    bodyHtml = '<div class="audio-empty">No devices.</div>';
+                } else {
+                    bodyHtml =
+                        renderDirection("🎙️ Inputs", inputs, group.backend, "input", authorized) +
+                        renderDirection("🎧 Outputs", outputs, group.backend, "output", authorized);
+                }
+                const meta = group.available
+                    ? `${inputs.length} in · ${outputs.length} out`
+                    : "Unavailable";
+                return `<div class="${groupCls}" id="grp-${safeId}">
+                    <div class="backend-header" id="${headerId}" role="button" tabindex="0"
+                         aria-controls="${bodyId}" aria-expanded="${!initiallyCollapsed}"
+                         onclick="toggleBackendGroup('${safeId}')"
+                         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBackendGroup('${safeId}');}">
+                        <span style="display:flex;align-items:center;gap:0">
+                            <span class="chev">▾</span>
+                            <span>${escapeHtml(group.apiName)}</span>
+                        </span>
+                        <span class="${pillClass}">${meta}</span>
+                    </div>
+                    <div class="backend-body" id="${bodyId}" role="region" aria-labelledby="${headerId}">${bodyHtml}</div>
+                </div>`;
+            }).join("");
+            container.innerHTML = html;
+        }
+
+        function toggleBackendGroup(safeId) {
+            const grp = document.getElementById("grp-" + safeId);
+            if (!grp) return;
+            const collapsed = grp.classList.toggle("collapsed");
+            const header = document.getElementById("bk-h-" + safeId);
+            if (header) header.setAttribute("aria-expanded", String(!collapsed));
+            // Remember user's choice so the next re-render (triggered by
+            // toggling a device checkbox, refresh, etc.) doesn't snap this
+            // group shut.
+            if (collapsed) audioGroupExpanded.delete(safeId);
+            else audioGroupExpanded.add(safeId);
+        }
+
+        function renderDirection(label, devices, backend, direction, authorizedSet) {
+            if (devices.length === 0) {
+                return `<div class="dir-label">${label}<span style="margin-left:auto">none</span></div>`;
+            }
+            const rows = devices.map(d => {
+                const auth = { backend: backend, direction: direction, name: d.name, preferredSampleRate: d.preferredSampleRate };
+                const k = authKey(auth);
+                const checked = authorizedSet.has(k);
+                const isDefault = direction === "input" ? d.isDefaultInput : d.isDefaultOutput;
+                const channels = direction === "input" ? d.inputChannels : d.outputChannels;
+                const payload = encodeURIComponent(JSON.stringify(auth));
+                return `<label class="device-row${checked ? ' checked' : ''}">
+                    <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleAudioAuth('${payload}', this.checked)">
+                    <div class="device-info">
+                        <div class="device-name">${escapeHtml(d.name)}${isDefault ? '<span class="device-default-badge">default</span>' : ''}</div>
+                        <div class="device-meta">${channels} ch · ${d.preferredSampleRate} Hz</div>
+                    </div>
+                </label>`;
+            }).join("");
+            return `<div class="dir-label">${label}<span style="margin-left:auto">${devices.length}</span></div>${rows}`;
+        }
+
+        async function toggleAudioAuth(payload, checked) {
+            if (!audioInventoryCache) return;
+            const dev = JSON.parse(decodeURIComponent(payload));
+            const k = authKey(dev);
+            const current = (audioInventoryCache.authorized || []).slice();
+            const next = checked
+                ? (current.some(a => authKey(a) === k) ? current : current.concat(dev))
+                : current.filter(a => authKey(a) !== k);
+            try {
+                const result = await window.mmo.setAuthorizedAudioDevices(next);
+                if (result && result.authorized) {
+                    audioInventoryCache.authorized = result.authorized;
+                    renderAudioDevices(audioInventoryCache);
+                }
+            } catch (err) {
+                alert("Failed to save: " + (err.message || err));
+                renderAudioDevices(audioInventoryCache); // restore
+            }
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+            }[c]));
+        }
+
+        // ─── Live latency widget ─────────────────────────────────────────
+        // Polls `get-audio-native-metrics` every 100 ms while the main view
+        // is visible. The engine is started/stopped from the web app, so we
+        // simply reflect whatever state we observe.
+        let latencyPollHandle = null;
+        function startLatencyPolling() {
+            if (latencyPollHandle) return;
+            const tick = async () => {
+                try {
+                    const r = await window.mmo.getAudioNativeMetrics();
+                    renderLatencyWidget(r);
+                } catch {
+                    renderLatencyWidget({ running: false });
+                }
+            };
+            tick();
+            // 4 Hz is enough — the meters are smoothed server-side via EMA
+            // and 10 Hz was overkill (each tick is a synchronous IPC call
+            // hopping the renderer ↔ main boundary). Higher rates correlated
+            // with renderer freezes when other IPC traffic was in flight.
+            latencyPollHandle = setInterval(tick, 250);
+        }
+        function stopLatencyPolling() {
+            if (latencyPollHandle) { clearInterval(latencyPollHandle); latencyPollHandle = null; }
+        }
+        function classifyLatency(ms) {
+            if (ms == null) return "";
+            if (ms <= 8) return "";          // green
+            if (ms <= 20) return "warn";     // amber
+            return "bad";                     // red
+        }
+        function renderLatencyWidget(r) {
+            const widget = document.getElementById("latency-widget");
+            const title = document.getElementById("lw-title");
+            const body = document.getElementById("lw-body");
+            if (!widget) return;
+            if (!r || !r.running || !r.metrics) {
+                widget.classList.add("idle");
+                title.textContent = "Engine idle";
+                body.innerHTML = "Start the low-latency engine from the web app to see realtime stats.";
+                return;
+            }
+            widget.classList.remove("idle");
+            const m = r.metrics;
+            const status = r.status || {};
+            const streamMs = typeof m.streamLatencyMs === "number" ? m.streamLatencyMs : 0;
+            const dspAvg = typeof m.dspBlockAvgMs === "number" ? m.dspBlockAvgMs : 0;
+            const dspMax = typeof m.dspBlockMaxMs === "number" ? m.dspBlockMaxMs : 0;
+            const underruns = m.underruns || 0;
+            const callbacks = m.callbackCount || 0;
+            const sr = status.sampleRate || (m.streamLatencyFrames && streamMs > 0
+                ? Math.round(m.streamLatencyFrames * 1000 / streamMs) : null);
+            const cls = classifyLatency(streamMs);
+            // Audify push-mode duplex accumulates real latency in its own
+            // queue when input/output device clocks drift. Show it next to
+            // the device-reported number so the user can see when the
+            // engine is auto-flushing to bound delay.
+            const bufMs = typeof m.outputBufferDepthMs === "number" ? m.outputBufferDepthMs : 0;
+            const flushes = m.bufferFlushes || 0;
+            const bufCls = classifyLatency(bufMs);
+            // Bar fills against a 30 ms reference (target zone: < 8 ms).
+            const pct = Math.min(100, Math.max(2, (streamMs / 30) * 100));
+            title.textContent = sr ? `Engine running · ${sr} Hz` : "Engine running";
+            // Live levels — map linear 0..1 to a percentage and convert peak
+            // to dBFS for the small numeric readout. -inf displayed as "-∞".
+            const inPeak = Math.max(0, Math.min(1, m.inPeak ?? 0));
+            const outPeak = Math.max(0, Math.min(1, m.outPeak ?? 0));
+            const inRms = Math.max(0, Math.min(1, m.inRms ?? 0));
+            const outRms = Math.max(0, Math.min(1, m.outRms ?? 0));
+            const toDb = (v) => v > 0 ? (20 * Math.log10(v)).toFixed(1) + " dB" : "-∞";
+            body.innerHTML = `
+                <div class="lw-grid">
+                    <div class="lw-item">
+                        <span class="lw-label">Stream latency</span>
+                        <span class="lw-value ${cls}">${streamMs.toFixed(2)}<span class="lw-unit">ms</span></span>
+                    </div>
+                    <div class="lw-item">
+                        <span class="lw-label">Buffer depth</span>
+                        <span class="lw-value ${bufCls}">${bufMs.toFixed(1)}<span class="lw-unit">ms</span></span>
+                    </div>
+                    <div class="lw-item">
+                        <span class="lw-label">DSP avg</span>
+                        <span class="lw-value ${classifyLatency(dspAvg)}">${dspAvg.toFixed(2)}<span class="lw-unit">ms</span></span>
+                    </div>
+                    <div class="lw-item">
+                        <span class="lw-label">DSP peak</span>
+                        <span class="lw-value ${classifyLatency(dspMax)}">${dspMax.toFixed(2)}<span class="lw-unit">ms</span></span>
+                    </div>
+                    <div class="lw-item">
+                        <span class="lw-label">Underruns</span>
+                        <span class="lw-value ${underruns > 0 ? 'bad' : ''}">${underruns}</span>
+                    </div>
+                    <div class="lw-item">
+                        <span class="lw-label">Flushes</span>
+                        <span class="lw-value ${flushes > 0 ? 'warn' : ''}">${flushes}</span>
+                    </div>
+                </div>
+                <div class="lw-bar"><div class="lw-bar-fill ${cls}" style="width:${pct.toFixed(1)}%"></div></div>
+                <div class="lw-meters">
+                    <div class="lw-meter">
+                        <div class="lw-meter-label"><span>Input</span><span class="lw-meter-db">${toDb(inPeak)}</span></div>
+                        <div class="lw-meter-bar">
+                            <div class="rms" style="width:${(inRms * 100).toFixed(1)}%"></div>
+                            <div class="peak" style="left:${(inPeak * 100).toFixed(1)}%"></div>
+                        </div>
+                    </div>
+                    <div class="lw-meter">
+                        <div class="lw-meter-label"><span>Output</span><span class="lw-meter-db">${toDb(outPeak)}</span></div>
+                        <div class="lw-meter-bar">
+                            <div class="rms" style="width:${(outRms * 100).toFixed(1)}%"></div>
+                            <div class="peak" style="left:${(outPeak * 100).toFixed(1)}%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="lw-foot">
+                    <span>${callbacks.toLocaleString()} callbacks</span>
+                    <span>target &lt; 8 ms</span>
+                </div>
+            `;
+        }
+        // Pause polling when the window is hidden to save battery.
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) stopLatencyPolling();
+            else if (document.getElementById("view-main").classList.contains("active")) startLatencyPolling();
+        });
+
+        // Kick off loading after main view is ready.
         init();
+
+        // ─── Debug log panel ───────────────────────────────────────────
+        // Pulls a snapshot from main's in-memory ring on demand. Cheap to
+        // call; rendered into a <pre> the user can select and copy. Three
+        // explicit buttons (Refresh / Copy / Clear) keep this out of the
+        // hot path — the panel is only populated when the user looks.
+        async function loadDebugLog() {
+            const out = document.getElementById("debug-log-output");
+            const empty = document.getElementById("debug-log-empty");
+            try {
+                const r = await window.mmo.getDebugLog();
+                const env = r.env || {};
+                const header =
+                    `# MMO Companion debug snapshot\n` +
+                    `# app=${env.appVersion} electron=${env.electron} node=${env.node}\n` +
+                    `# platform=${env.platform}/${env.arch} uptime=${env.uptimeSec}s rss=${env.rssMB}MB\n` +
+                    `# log file: ${r.logFile}\n` +
+                    `# ${(r.lines || []).length} log lines (most recent first)\n` +
+                    `\n`;
+                const body = (r.lines || []).slice().reverse().join("\n");
+                out.textContent = header + body;
+                out.style.display = "block";
+                empty.style.display = "none";
+            } catch (err) {
+                empty.textContent = "Failed: " + (err.message || err);
+                empty.style.display = "";
+                out.style.display = "none";
+            }
+        }
+        async function copyDebugLog() {
+            const out = document.getElementById("debug-log-output");
+            // If panel hasn't been loaded yet, load first so Copy is
+            // single-click for users who just want "the latest log".
+            if (out.style.display === "none" || !out.textContent) {
+                await loadDebugLog();
+            }
+            try {
+                await navigator.clipboard.writeText(out.textContent);
+                const btn = document.getElementById("btn-debug-copy");
+                const orig = btn.textContent;
+                btn.textContent = "✓ Copied";
+                setTimeout(() => { btn.textContent = orig; }, 1500);
+            } catch (err) {
+                alert("Copy failed: " + (err.message || err));
+            }
+        }
+        async function clearDebugLog() {
+            try {
+                await window.mmo.clearDebugLog();
+                const out = document.getElementById("debug-log-output");
+                const empty = document.getElementById("debug-log-empty");
+                out.textContent = "";
+                out.style.display = "none";
+                empty.textContent = "Cleared. New log lines will appear after Refresh.";
+                empty.style.display = "";
+            } catch (err) {
+                alert("Clear failed: " + (err.message || err));
+            }
+        }
+
+        // Hard kill switch — calls the main process to force-stop the audio
+        // engine. Useful when sound is stuck because a web tab closed
+        // without its stop request reaching us. Visible feedback so the
+        // user knows the click registered.
+        async function killAudioEngine() {
+            const btn = document.getElementById("btn-kill-engine");
+            const orig = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = "… Stopping";
+            try {
+                const r = await window.mmo.killAudioEngine();
+                if (r && r.success) {
+                    btn.textContent = r.wasRunning ? "✓ Stopped" : "• Was idle";
+                } else {
+                    btn.textContent = "✗ Failed";
+                    console.warn("kill-audio-engine:", r);
+                }
+            } catch (err) {
+                btn.textContent = "✗ Failed";
+                console.warn("kill-audio-engine threw:", err);
+            } finally {
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = orig;
+                }, 1500);
+            }
+        }
 
         // Listen for auto-update notifications
         if (window.mmo.onUpdateStatus) {

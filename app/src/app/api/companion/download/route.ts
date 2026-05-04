@@ -23,7 +23,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const REPO_OWNER = process.env.COMPANION_REPO_OWNER ?? "dragoscv";
-const REPO_NAME = process.env.COMPANION_REPO_NAME ?? "rekordbox-mwrty";
+const REPO_NAME = process.env.COMPANION_REPO_NAME ?? "mmo";
 // electron-builder creates releases tagged with the bare version ("v0.3.0")
 // based on package.json#version, ignoring any custom git tag we push. So we
 // match the simple "v" prefix; no other release tags exist on this repo.
@@ -62,10 +62,21 @@ interface ResolvedAsset {
 let cachedAt = 0;
 let cachedRelease: GhRelease | null = null;
 const CACHE_TTL_MS = 5 * 60 * 1000;
+// Negative cache: when the GitHub API returns 404 (private repo without a
+// token, or no releases yet) or a network error, we remember that for a
+// while so we don't hammer the API on every page load. Without this, dev
+// mode's StrictMode double-mount + every navigation re-triggers the call
+// and floods the console with the same error.
+let negCachedAt = 0;
+const NEG_CACHE_TTL_MS = 10 * 60 * 1000;
+let warnedOnce = false;
 
 async function fetchLatestCompanionRelease(): Promise<GhRelease | null> {
     if (cachedRelease && Date.now() - cachedAt < CACHE_TTL_MS) {
         return cachedRelease;
+    }
+    if (!cachedRelease && negCachedAt && Date.now() - negCachedAt < NEG_CACHE_TTL_MS) {
+        return null;
     }
 
     // GitHub's `/releases/latest` returns the most-recent NON-prerelease
@@ -85,11 +96,29 @@ async function fetchLatestCompanionRelease(): Promise<GhRelease | null> {
     try {
         res = await fetch(url, { headers, cache: "no-store" });
     } catch (err) {
-        console.error("[companion/download] GitHub fetch failed", err);
+        if (!warnedOnce) {
+            console.warn("[companion/download] GitHub fetch failed (network)", err);
+            warnedOnce = true;
+        }
+        negCachedAt = Date.now();
         return cachedRelease; // serve stale on network error
     }
     if (!res.ok) {
-        console.error("[companion/download] GitHub responded", res.status, await res.text().catch(() => ""));
+        if (!warnedOnce) {
+            const body = await res.text().catch(() => "");
+            const hint =
+                res.status === 404
+                    ? " (repo may be private — set GITHUB_TOKEN or COMPANION_REPO_OWNER/NAME)"
+                    : res.status === 403
+                        ? " (rate-limited — set GITHUB_TOKEN)"
+                        : "";
+            console.warn(
+                `[companion/download] GitHub responded ${res.status}${hint}`,
+                body.slice(0, 200),
+            );
+            warnedOnce = true;
+        }
+        negCachedAt = Date.now();
         return cachedRelease;
     }
 
@@ -111,6 +140,10 @@ async function fetchLatestCompanionRelease(): Promise<GhRelease | null> {
     if (found) {
         cachedRelease = found;
         cachedAt = Date.now();
+        negCachedAt = 0;
+        warnedOnce = false;
+    } else {
+        negCachedAt = Date.now();
     }
     return found ?? null;
 }

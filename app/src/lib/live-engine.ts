@@ -240,6 +240,30 @@ export class LiveEngine {
         this.masterLimiter.connect(this.masterGain);
         this.masterGain.connect(this.ctx.destination);
 
+        // Audio keep-alive: feed an inaudible DC signal into the destination
+        // so Chrome counts the tab as "playing audio". Without this, when
+        // the user tabs away (e.g. to VS Code), Chrome throttles the
+        // AudioContext — backing track, loopers, pads and the instrument
+        // sampler glitch even though the native mic path keeps running
+        // perfectly inside the companion. ConstantSourceNode with offset=0
+        // produces literal silence (no output, no DC offset, zero CPU)
+        // but the browser's "playing audio" heuristic still sees an
+        // active source connected to destination. This is a well-known
+        // technique for pro-audio Web apps that need to survive tab
+        // backgrounding.
+        try {
+            const keepAlive = this.ctx.createConstantSource();
+            keepAlive.offset.value = 0;
+            const keepAliveSink = this.ctx.createGain();
+            keepAliveSink.gain.value = 0;
+            keepAlive.connect(keepAliveSink);
+            keepAliveSink.connect(this.ctx.destination);
+            keepAlive.start();
+        } catch (err) {
+            // Non-fatal — older browsers may not have ConstantSourceNode.
+            dlog("live", "audio keep-alive not available", err);
+        }
+
         // Parallel: limiter → meters
         this.masterLimiter.connect(this.masterSplitter);
         this.masterSplitter.connect(this.masterAnalyserL, 0);

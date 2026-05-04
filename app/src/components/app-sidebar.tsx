@@ -26,6 +26,8 @@ import {
     Monitor,
     Smartphone,
     CircleDot,
+    Activity,
+    Plug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
@@ -39,10 +41,12 @@ import { CompanionDownloadButton } from "./sidebar/companion-download-button";
 const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/library", label: "Library", icon: Library },
+    { href: "/analysis", label: "Analysis", icon: Activity },
     { href: "/playlists", label: "Playlists", icon: ListMusic },
     { href: "/mixer", label: "Mixer", icon: Disc3 },
     { href: "/daw", label: "DAW", icon: Piano },
     { href: "/editor", label: "Sound Editor", icon: Waves },
+    { href: "/plugins", label: "Plugins", icon: Plug },
     { href: "/live", label: "Live", icon: Mic },
     { href: "/recordings", label: "Recordings", icon: CircleDot },
     { href: "/download", label: "Download", icon: Download },

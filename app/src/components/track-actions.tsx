@@ -31,6 +31,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AddToPlaylistModal } from "@/components/add-to-playlist-modal";
+import { TrackDetailModal } from "@/components/track-detail-modal";
 import { cn } from "@/lib/utils";
 import {
     MoreHorizontal,
@@ -55,9 +56,11 @@ import {
     Piano,
     RefreshCcw,
     Layers,
+    Download,
 } from "lucide-react";
 import { toggleFavorite, deleteTrack, hideTracks } from "@/actions/tracks";
 import { reanalyzeTracks } from "@/actions/stems";
+import { downloadTrackFile } from "@/hooks/use-session-downloads";
 import {
     removeTrackFromPlaylist,
     moveTrackInPlaylist,
@@ -88,6 +91,7 @@ function useTrackActionHandlers(config: TrackActionConfig) {
     const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+    const [detailModalOpen, setDetailModalOpen] = useState(false);
 
     const artist = track.artist || "Unknown";
     const title = track.title || track.filename;
@@ -177,6 +181,15 @@ function useTrackActionHandlers(config: TrackActionConfig) {
         toast.success("Copied to clipboard", { description: info });
     }
 
+    function handleDownloadFile() {
+        // Trigger a browser download via a hidden anchor. The audio API
+        // route returns Content-Disposition: attachment when ?download=1.
+        // Also marks this track ID as saved-this-session so the UI can
+        // highlight it in the sidebar / latest-downloads list.
+        downloadTrackFile(track.id, `${artist} - ${title}`);
+        toast.success("Download started", { description: trackLabel });
+    }
+
     return {
         isPending,
         trackLabel,
@@ -188,6 +201,8 @@ function useTrackActionHandlers(config: TrackActionConfig) {
         setDeleteDialogOpen,
         removeDialogOpen,
         setRemoveDialogOpen,
+        detailModalOpen,
+        setDetailModalOpen,
         handlePlay,
         handleAddToQueue,
         handleRadioMix,
@@ -196,6 +211,7 @@ function useTrackActionHandlers(config: TrackActionConfig) {
         handleMoveTrack,
         handleDeleteTrack,
         handleCopyInfo,
+        handleDownloadFile,
         handleHideTrack,
         router,
     };
@@ -320,13 +336,15 @@ function TrackMenuItems({
                 <Copy className="h-3.5 w-3.5 mr-2" />
                 Copy Track Info
             </Item>
+            <Item onClick={handlers.handleDownloadFile}>
+                <Download className="h-3.5 w-3.5 mr-2 text-sky-400" />
+                Download File
+            </Item>
 
-            {onOpenDetail && (
-                <Item onClick={onOpenDetail}>
-                    <Info className="h-3.5 w-3.5 mr-2" />
-                    Track Details
-                </Item>
-            )}
+            <Item onClick={onOpenDetail ?? (() => handlers.setDetailModalOpen(true))}>
+                <Info className="h-3.5 w-3.5 mr-2" />
+                View Track Info
+            </Item>
             {onEdit && (
                 <Item onClick={onEdit}>
                     <Pencil className="h-3.5 w-3.5 mr-2" />
@@ -369,10 +387,24 @@ function TrackDialogs({
     config: TrackActionConfig;
     handlers: ReturnType<typeof useTrackActionHandlers>;
 }) {
-    const { track, playlistId } = config;
+    const { track, playlistId, onOpenDetail, onMutate } = config;
 
     return (
         <>
+            {/* Internal Track Detail modal — only mounted when the parent
+              * doesn't already manage its own (i.e. no `onOpenDetail` prop). */}
+            {!onOpenDetail && (
+                <TrackDetailModal
+                    track={track}
+                    open={handlers.detailModalOpen}
+                    onOpenChange={handlers.setDetailModalOpen}
+                    onTrackUpdated={() => {
+                        onMutate?.();
+                        handlers.router.refresh();
+                    }}
+                />
+            )}
+
             <AddToPlaylistModal
                 open={handlers.playlistModalOpen}
                 onOpenChange={handlers.setPlaylistModalOpen}

@@ -42,8 +42,9 @@ import {
     Minus,
     Plus,
 } from "lucide-react";
-import { getAnalysisScope } from "@/actions/analyze";
+import { getAnalysisScope, getAnalyzerHealth, startBulkDspAnalysis, getAnalyzerStatus } from "@/actions/analyze";
 import type { AnalysisScope } from "@/actions/analyze";
+import type { AnalyzerHealth, AnalyzerStatus } from "@/lib/companion-library";
 import { useAnalysisContext } from "@/hooks/analysis-context";
 import type { AnalysisChange } from "@/hooks/use-analysis";
 
@@ -77,6 +78,10 @@ interface FetchOptions {
     lyrics: boolean;
     bpmKey: boolean;
     stems: boolean;
+    /** Companion: librosa BPM/key/loudness/chords/energy. */
+    dsp: boolean;
+    /** Companion: AcoustID fingerprint. */
+    fingerprint: boolean;
     skipAnalyzedDays: number | null;
     workers: number;
 }
@@ -109,9 +114,24 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
         lyrics: true,
         bpmKey: true,
         stems: false,
+        dsp: false,
+        fingerprint: false,
         skipAnalyzedDays: 7,
         workers: 1,
     });
+
+    // Companion analyzer health + live status — surfaced inline at the
+    // top of the config view so users can tell at a glance whether DSP /
+    // stems / fingerprint options will actually run, without needing a
+    // separate "analyzer panel" card.
+    const [companion, setCompanion] = useState<AnalyzerHealth | null>(null);
+    const [companionStatus, setCompanionStatus] = useState<AnalyzerStatus | null>(null);
+    // How many consecutive probe failures we've seen since the last
+    // healthy response. Lets us tolerate transient blips (cold-start
+    // server actions, brief network hiccups, the python sidecar
+    // restarting after a stems job finishes) without flipping the UI
+    // to red on every refresh.
+    const [companionMisses, setCompanionMisses] = useState(0);
 
     // Changes for review (loaded from DB)
     const [changes, setChanges] = useState<AnalysisChange[]>([]);
@@ -182,14 +202,90 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
         }
     }, [open]);
 
+    // Probe the companion when the config view is open. Re-probe every
+    // 8 s in the background so users see the badge flip green as soon
+    // as the companion comes online (handy when launching the app).
+    //
+    // Probe is tolerant: a single failed response does NOT flip us to
+    // "offline" if we were healthy a moment ago. We require two back-
+    // to-back failures before showing the install banner. This avoids
+    // false alarms during cold-start of the companion process, brief
+    // network hiccups, or while a heavy stems job has the python
+    // sidecar momentarily busy.
+    useEffect(() => {
+        if (!open || view !== "config") return;
+        let cancelled = false;
+        const probe = async () => {
+            const h = await getAnalyzerHealth();
+            if (cancelled) return;
+            if (h.ok) {
+                setCompanion(h);
+                setCompanionMisses(0);
+            } else {
+                setCompanionMisses((prev) => {
+                    const next = prev + 1;
+                    // First miss after a healthy state — keep showing
+                    // "online" but record the miss; next probe in 8 s
+                    // will either clear it or confirm the outage.
+                    if (next < 2 && companion?.ok) return next;
+                    setCompanion(h);
+                    return next;
+                });
+            }
+        };
+        probe();
+        // Faster cadence right after a miss so recovery is detected
+        // quickly. Otherwise 8 s is plenty.
+        const interval = companionMisses > 0 ? 3000 : 8000;
+        const id = setInterval(probe, interval);
+        return () => {
+            cancelled = true;
+            clearInterval(id);
+        };
+    }, [open, view, companion?.ok, companionMisses]);
+
+    // Poll the companion analyzer queue while the modal is open so we
+    // can show a slim in-flight progress strip without a separate panel.
+    useEffect(() => {
+        if (!open) return;
+        let cancelled = false;
+        const tick = async () => {
+            const s = await getAnalyzerStatus();
+            if (cancelled) return;
+            setCompanionStatus("error" in s ? null : s);
+        };
+        tick();
+        const id = setInterval(tick, 2000);
+        return () => {
+            cancelled = true;
+            clearInterval(id);
+        };
+    }, [open]);
+
     // ─── Actions ─────────────────────────────────────────────────────────
 
     const startAnalysis = useCallback(async () => {
         setLocalView(null);
         setChanagesLoaded(false);
         setChanges([]);
+        // Kick the textual / metadata pipeline (always — the backend
+        // ignores fields whose flag is false).
         await analysis.start(mode, options);
-    }, [analysis, mode, options]);
+        // Kick the companion-side pipeline in parallel for any options
+        // that need the Python sidecar. We pick the narrowest scope
+        // ("missing-*") that still covers everything that's checked.
+        const wantDsp = options.dsp;
+        const wantStems = options.stems;
+        const wantFp = options.fingerprint;
+        if ((wantDsp || wantStems || wantFp) && companion?.ok) {
+            const filter: "all" | "missing-dsp" | "missing-stems" =
+                mode === "full" ? "all" : wantStems ? "missing-stems" : "missing-dsp";
+            await startBulkDspAnalysis(
+                { dsp: wantDsp, stems: wantStems, fingerprint: wantFp },
+                filter,
+            );
+        }
+    }, [analysis, mode, options, companion]);
 
     const handlePause = useCallback(async () => {
         await analysis.pause();
@@ -342,7 +438,7 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+            <DialogContent className="max-w-5xl w-[min(92vw,1100px)] max-h-[92vh] flex flex-col gap-0 p-0 overflow-hidden">
                 {/* Header */}
                 <DialogHeader className="px-6 pt-6 pb-4 border-b border-[var(--border)] shrink-0">
                     <DialogTitle className="flex items-center gap-2">
@@ -380,6 +476,71 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                     {/* ─── Config ─── */}
                     {view === "config" && (
                         <div className="space-y-6">
+                            {/* Inline companion-status strip. No card,
+                                no duplicate analyzer panel — just a thin
+                                row that explains why DSP/Stems/Fingerprint
+                                are enabled or disabled in the grid below. */}
+                            <div
+                                className={cn(
+                                    "flex items-start gap-3 rounded-md border px-3 py-2 text-xs",
+                                    companion?.ok
+                                        ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-200"
+                                        : "border-amber-500/30 bg-amber-500/5 text-amber-200",
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        "mt-1 h-2 w-2 shrink-0 rounded-full",
+                                        companion?.ok ? "bg-emerald-400" : "bg-amber-400",
+                                    )}
+                                />
+                                <div className="flex-1 min-w-0">
+                                    {companion?.ok ? (
+                                        <span>
+                                            Companion analyzer ready — DSP, Stems and AcoustID
+                                            options are available.{" "}
+                                            <a
+                                                href="/analysis"
+                                                className="font-medium text-emerald-300 underline-offset-2 hover:underline"
+                                            >
+                                                Open the Analysis page →
+                                            </a>
+                                        </span>
+                                    ) : (
+                                        <span>
+                                            <strong className="font-semibold">Companion analyzer offline.</strong>{" "}
+                                            {companion?.reason ?? "probing…"} — install with{" "}
+                                            <code className="rounded bg-black/40 px-1 py-0.5 text-[10px] text-amber-100">
+                                                pip install audio-separator[cpu] librosa pyloudnorm pyacoustid soundfile numpy
+                                            </code>
+                                        </span>
+                                    )}
+                                    {/* Slim live-progress strip when the companion has work in flight. */}
+                                    {companionStatus?.current && (
+                                        <div className="mt-2 space-y-1">
+                                            <div className="flex items-center justify-between text-[10px] text-white/70">
+                                                <span className="truncate">
+                                                    Track {companionStatus.current.trackId} — {companionStatus.current.stage}
+                                                    {companionStatus.current.message ? ` · ${companionStatus.current.message}` : ""}
+                                                </span>
+                                                <span>{Math.round((companionStatus.current.progress ?? 0) * 100)}%</span>
+                                            </div>
+                                            <div className="h-1 w-full overflow-hidden rounded bg-white/10">
+                                                <div
+                                                    className="h-full bg-emerald-400 transition-all"
+                                                    style={{ width: `${Math.round((companionStatus.current.progress ?? 0) * 100)}%` }}
+                                                />
+                                            </div>
+                                            {companionStatus.queue.length > 0 && (
+                                                <div className="text-[10px] text-white/50">
+                                                    {companionStatus.queue.length} job{companionStatus.queue.length === 1 ? "" : "s"} queued
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             {/* Scope Stats */}
                             {scope && (
                                 <div className="grid grid-cols-3 gap-3">
@@ -498,55 +659,79 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                     </label>
                                     <div className="flex gap-1">
                                         <button
-                                            onClick={() => setOptions(prev => ({ ...prev, metadata: true, artwork: true, lyrics: true, bpmKey: true, stems: true }))}
+                                            onClick={() => setOptions(prev => ({ ...prev, metadata: true, artwork: true, lyrics: true, bpmKey: true, stems: true, dsp: true, fingerprint: true }))}
                                             className="text-[10px] text-purple-400 hover:text-purple-300 cursor-pointer transition-colors"
                                         >
                                             Select All
                                         </button>
                                         <span className="text-[10px] text-[var(--muted-foreground)]">·</span>
                                         <button
-                                            onClick={() => setOptions(prev => ({ ...prev, metadata: false, artwork: false, lyrics: false, bpmKey: false, stems: false }))}
+                                            onClick={() => setOptions(prev => ({ ...prev, metadata: false, artwork: false, lyrics: false, bpmKey: false, stems: false, dsp: false, fingerprint: false }))}
                                             className="text-[10px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer transition-colors"
                                         >
                                             None
                                         </button>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                     {[
                                         {
                                             key: "metadata" as const,
                                             label: "Metadata",
                                             desc: "Genre, album, year, label, ISRC",
                                             icon: Globe,
+                                            companion: false,
                                         },
                                         {
                                             key: "artwork" as const,
                                             label: "Artwork",
                                             desc: "Album covers from multiple sources",
                                             icon: Image,
+                                            companion: false,
                                         },
                                         {
                                             key: "lyrics" as const,
                                             label: "Lyrics",
                                             desc: "Plain + synced lyrics from LRCLIB",
                                             icon: Music2,
+                                            companion: false,
                                         },
                                         {
                                             key: "bpmKey" as const,
-                                            label: "BPM",
+                                            label: "BPM (web)",
                                             desc: "BPM data from Deezer",
                                             icon: Disc3,
+                                            companion: false,
+                                        },
+                                        {
+                                            key: "dsp" as const,
+                                            label: "DSP analysis",
+                                            desc: "BPM, key, loudness, chords, energy",
+                                            icon: Sparkles,
+                                            companion: true,
                                         },
                                         {
                                             key: "stems" as const,
                                             label: "Stems",
-                                            desc: "Separate vocals, drums, bass & melody",
+                                            desc: "Vocals / drums / bass / other (Demucs)",
                                             icon: Layers,
+                                            companion: true,
                                         },
-                                    ].map((opt) => (
+                                        {
+                                            key: "fingerprint" as const,
+                                            label: "Fingerprint",
+                                            desc: "AcoustID audio fingerprint",
+                                            icon: ScanSearch,
+                                            companion: true,
+                                        },
+                                    ].map((opt) => {
+                                        const blocked = opt.companion && !companion?.ok;
+                                        const checked = !!options[opt.key] && !blocked;
+                                        return (
                                         <button
                                             key={opt.key}
+                                            disabled={blocked}
+                                            title={blocked ? "Requires companion analyzer" : undefined}
                                             onClick={() =>
                                                 setOptions((prev) => ({
                                                     ...prev,
@@ -554,35 +739,44 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                                 }))
                                             }
                                             className={cn(
-                                                "flex items-start gap-3 rounded-lg border p-3 text-left transition-all cursor-pointer",
-                                                options[opt.key]
+                                                "flex items-start gap-3 rounded-lg border p-3 text-left transition-all",
+                                                blocked
+                                                    ? "border-[var(--border)] opacity-40 cursor-not-allowed"
+                                                    : "cursor-pointer",
+                                                checked
                                                     ? "border-purple-500/50 bg-purple-500/5"
-                                                    : "border-[var(--border)] opacity-60"
+                                                    : !blocked && "border-[var(--border)] opacity-60"
                                             )}
                                         >
                                             <div
                                                 className={cn(
                                                     "mt-0.5 flex h-4 w-4 items-center justify-center rounded border transition-colors shrink-0",
-                                                    options[opt.key]
+                                                    checked
                                                         ? "bg-purple-500 border-purple-500"
                                                         : "border-[var(--border)]"
                                                 )}
                                             >
-                                                {options[opt.key] && (
+                                                {checked && (
                                                     <Check className="h-3 w-3 text-white" />
                                                 )}
                                             </div>
-                                            <div>
+                                            <div className="min-w-0">
                                                 <div className="text-sm font-medium flex items-center gap-1.5">
                                                     <opt.icon className="h-3.5 w-3.5" />
                                                     {opt.label}
+                                                    {opt.companion && (
+                                                        <span className="ml-auto rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-emerald-300">
+                                                            companion
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div className="text-[10px] text-[var(--muted-foreground)]">
                                                     {opt.desc}
                                                 </div>
                                             </div>
                                         </button>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 
@@ -1314,7 +1508,9 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                     !options.artwork &&
                                     !options.lyrics &&
                                     !options.bpmKey &&
-                                    !options.stems
+                                    !options.stems &&
+                                    !options.dsp &&
+                                    !options.fingerprint
                                 }
                                 className="gap-2 bg-purple-600 hover:bg-purple-700 text-white cursor-pointer"
                             >

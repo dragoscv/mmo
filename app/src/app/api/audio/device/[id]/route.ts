@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { tracks, devices } from "@/db/schema";
+import { devices } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { companionLibrary, getCompanionLink } from "@/lib/companion-library";
 
 export async function GET(
     request: NextRequest,
@@ -14,11 +15,11 @@ export async function GET(
         return NextResponse.json({ error: "Invalid track ID" }, { status: 400 });
     }
 
-    const track = db
-        .select()
-        .from(tracks)
-        .where(eq(tracks.id, trackId))
-        .get();
+    const link = await getCompanionLink();
+    if (!link) {
+        return NextResponse.json({ error: "Companion not connected" }, { status: 503 });
+    }
+    const track = await companionLibrary.getTrackById(link, trackId);
 
     if (!track) {
         return NextResponse.json({ error: "Track not found" }, { status: 404 });

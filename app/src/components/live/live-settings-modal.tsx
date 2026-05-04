@@ -16,6 +16,7 @@ import {
     requestAudioPermission,
 } from "@/hooks/use-daw-settings";
 import { NOTATION_LABELS, type NoteNotation } from "@/lib/note-notation";
+import { AudioDeviceSelect } from "@/components/ui/audio-device-select";
 
 type Tab = "audio" | "display" | "performance";
 
@@ -159,23 +160,25 @@ function AudioTab() {
         <div className="space-y-4">
             <Section title="Audio Output">
                 <Row label="Output Device" hint="Where the live mix is heard">
-                    {permission !== "granted" && outputs.length === 0 ? (
-                        <button onClick={handlePermission}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium bg-rose-500/20 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 cursor-pointer">
-                            <Volume2 className="w-3 h-3" /> Grant Permission
-                        </button>
-                    ) : (
-                        <select value={settings.audioOutputDeviceId}
-                            onChange={e => handleOutputChange(e.target.value)}
-                            className="h-7 bg-black/30 border border-white/10 rounded text-xs px-2 text-white/70 focus:outline-none min-w-[200px]">
-                            <option value="default">System Default</option>
-                            {outputs.map(d => (
-                                <option key={d.deviceId} value={d.deviceId}>
-                                    {d.label || `Output ${d.deviceId.slice(0, 8)}`}
-                                </option>
-                            ))}
-                        </select>
-                    )}
+                    <div className="min-w-[260px]">
+                        <AudioDeviceSelect
+                            kind="output"
+                            size="sm"
+                            value={settings.audioOutputDeviceId}
+                            onValueChange={(change) => {
+                                if (change.source === "native") {
+                                    // Native output routing belongs to Live's native engine; just persist the choice.
+                                    settings.update({ audioOutputDeviceId: change.value });
+                                } else {
+                                    void handleOutputChange(change.value);
+                                }
+                            }}
+                            placeholder="System Default"
+                            nativeDisabled
+                            nativeDisabledHint="Native output uses Live's engine"
+                            showPermissionHint={permission !== "granted"}
+                        />
+                    </div>
                 </Row>
             </Section>
 

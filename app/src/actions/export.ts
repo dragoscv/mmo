@@ -1,47 +1,57 @@
 "use server";
 
-import { db } from "@/db";
-import { tracks } from "@/db/schema";
-import { generateRekordboxXml } from "@/lib/rekordbox-xml";
-import { sql } from "drizzle-orm";
+/**
+ * Export the user's full library as a rekordbox-compatible XML.
+ * Tracks are pulled from the companion in pages, then grouped by genre
+ * for the playlists section.
+ */
+
 import fs from "node:fs";
 import path from "node:path";
+import { generateRekordboxXml } from "@/lib/rekordbox-xml";
+import { companionLibrary, getCompanionLink } from "@/lib/companion-library";
 
 export async function exportRekordboxXml(outputPath?: string) {
-    const allTracks = db
-        .select()
-        .from(tracks)
-        .orderBy(sql`${tracks.genre}, ${tracks.artist}, ${tracks.title}`)
-        .all();
-
-    // Group tracks by genre for playlists
-    const genreMap = new Map<string, number[]>();
-    for (const track of allTracks) {
-        const genre = track.genre || "Uncategorized";
-        if (!genreMap.has(genre)) {
-            genreMap.set(genre, []);
-        }
-        genreMap.get(genre)!.push(track.id);
+    const link = await getCompanionLink();
+    if (!link) {
+        return {
+            success: false,
+            error: "Companion not connected",
+            outputPath: null,
+            count: 0,
+        };
     }
 
-    const playlists = Array.from(genreMap.entries()).map(
-        ([name, trackIds]) => ({
-            name,
-            trackIds,
-        })
-    );
+    // Pull all tracks (paged). Cap at 100k to keep memory bounded.
+    const PAGE = 1000;
+    const MAX = 100_000;
+    const all: Awaited<ReturnType<typeof companionLibrary.getTracks>>["tracks"] = [];
+    let page = 1;
+    while (all.length < MAX) {
+        const r = await companionLibrary.getTracks(link, {
+            page, pageSize: PAGE, sort: "genre", order: "asc",
+        });
+        all.push(...r.tracks);
+        if (page >= r.totalPages || r.tracks.length === 0) break;
+        page++;
+    }
 
-    const xml = generateRekordboxXml(allTracks, playlists);
+    const genreMap = new Map<string, number[]>();
+    for (const t of all) {
+        const g = t.genre || "Uncategorized";
+        if (!genreMap.has(g)) genreMap.set(g, []);
+        genreMap.get(g)!.push(t.id);
+    }
+    const playlists = Array.from(genreMap.entries()).map(([name, trackIds]) => ({
+        name, trackIds,
+    }));
 
-    const output =
-        outputPath || path.join(process.cwd(), "data", "rekordbox-export.xml");
+    // generateRekordboxXml expects the legacy Track shape; cast carefully.
+    const xml = generateRekordboxXml(all as unknown as Parameters<typeof generateRekordboxXml>[0], playlists);
 
+    const output = outputPath || path.join(process.cwd(), "data", "rekordbox-export.xml");
+    fs.mkdirSync(path.dirname(output), { recursive: true });
     fs.writeFileSync(output, xml, "utf-8");
 
-    return {
-        success: true,
-        path: output,
-        trackCount: allTracks.length,
-        playlistCount: playlists.length,
-    };
+    return { success: true, outputPath: output, count: all.length };
 }

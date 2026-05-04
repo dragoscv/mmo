@@ -12,3 +12,20 @@ node_modules/
 
 # Downloaded CI artifacts (local-only)
 /artifacts/
+
+# Stale build / typecheck logs
+/tsc-out.txt
+/server/dist-win.log
+/app/tsc-errors.log
+/app/tsc-report.txt
+
+# SQLite WAL / SHM sidecar files (data/music-organizer.db itself is dev-only too)
+*.db-shm
+*.db-wal
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Stale backups
+*.legacy.bak

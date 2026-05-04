@@ -1,327 +1,249 @@
 "use server";
 
-import { db, sqlite } from "@/db";
-import { playlists, playlistTracks, tracks } from "@/db/schema";
-import { eq, sql, and, inArray } from "drizzle-orm";
+/**
+ * Playlist server actions — thin client over the companion's
+ * /library/playlists/* API.
+ *
+ * Same auth model as `tracks.ts`: no companion → empty reads, error
+ * writes. Recommended-playlist catalog is static and lives in this
+ * file (no DB needed).
+ */
+
 import { revalidatePath } from "next/cache";
+import {
+    companionLibrary,
+    getCompanionLink,
+    type PaginatedPlaylistTracks,
+    type PlaylistSummary,
+} from "@/lib/companion-library";
 
-export async function getPlaylists() {
-    const result = db
-        .select({
-            id: playlists.id,
-            name: playlists.name,
-            description: playlists.description,
-            type: playlists.type,
-            createdAt: playlists.createdAt,
-            trackCount: sql<number>`(
-        SELECT COUNT(*) FROM playlist_tracks 
-        WHERE playlist_tracks.playlist_id = playlists.id
-      )`.mapWith(Number),
-        })
-        .from(playlists)
-        .orderBy(playlists.name)
-        .all();
+export type { PlaylistSummary, PaginatedPlaylistTracks } from "@/lib/companion-library";
 
-    return result;
+const EMPTY_PAGED_PLAYLIST: PaginatedPlaylistTracks = {
+    tracks: [], total: 0, page: 1, pageSize: 50, totalPages: 0,
+};
+
+// ─── Reads ──────────────────────────────────────────────────────────────────
+
+export async function getPlaylists(): Promise<PlaylistSummary[]> {
+    const link = await getCompanionLink();
+    if (!link) return [];
+    try { return await companionLibrary.getPlaylists(link); }
+    catch (err) {
+        console.warn("[playlists] getPlaylists failed:", err);
+        return [];
+    }
 }
 
 export async function getPlaylistTracks(
     playlistId: number,
-    page: number = 1,
-    pageSize: number = 50
-) {
-    const offset = (page - 1) * pageSize;
-
-    const [countResult] = db
-        .select({ count: sql<number>`count(*)` })
-        .from(playlistTracks)
-        .where(eq(playlistTracks.playlistId, playlistId))
-        .all();
-
-    const total = countResult?.count ?? 0;
-
-    const result = db
-        .select({
-            id: tracks.id,
-            filepath: tracks.filepath,
-            filename: tracks.filename,
-            artist: tracks.artist,
-            title: tracks.title,
-            album: tracks.album,
-            remix: tracks.remix,
-            label: tracks.label,
-            bpm: tracks.bpm,
-            keyCamelot: tracks.keyCamelot,
-            keyMusical: tracks.keyMusical,
-            duration: tracks.duration,
-            energy: tracks.energy,
-            genre: tracks.genre,
-            subgenre: tracks.subgenre,
-            mood: tracks.mood,
-            color: tracks.color,
-            vocalType: tracks.vocalType,
-            setPosition: tracks.setPosition,
-            mixability: tracks.mixability,
-            isProcessed: tracks.isProcessed,
-            fileSize: tracks.fileSize,
-            format: tracks.format,
-            bitrate: tracks.bitrate,
-            sampleRate: tracks.sampleRate,
-            addedAt: tracks.addedAt,
-            analyzedAt: tracks.analyzedAt,
-            rating: tracks.rating,
-            isFavorite: tracks.isFavorite,
-            tags: tracks.tags,
-            artworkUrl: tracks.artworkUrl,
-            musicbrainzId: tracks.musicbrainzId,
-            releaseMbid: tracks.releaseMbid,
-            year: tracks.year,
-            comment: tracks.comment,
-            position: playlistTracks.position,
-        })
-        .from(playlistTracks)
-        .innerJoin(tracks, eq(playlistTracks.trackId, tracks.id))
-        .where(eq(playlistTracks.playlistId, playlistId))
-        .orderBy(playlistTracks.position)
-        .limit(pageSize)
-        .offset(offset)
-        .all();
-
-    return {
-        tracks: result,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-    };
+    page = 1,
+    pageSize = 50,
+): Promise<PaginatedPlaylistTracks> {
+    const link = await getCompanionLink();
+    if (!link) return EMPTY_PAGED_PLAYLIST;
+    try {
+        return await companionLibrary.getPlaylistTracks(link, playlistId, page, pageSize);
+    } catch (err) {
+        console.warn("[playlists] getPlaylistTracks failed:", err);
+        return EMPTY_PAGED_PLAYLIST;
+    }
 }
 
-export async function createPlaylist(name: string, description?: string) {
-    const result = db
-        .insert(playlists)
-        .values({ name, description, type: "manual" })
-        .returning()
-        .get();
+/** Returns playlists the given track is currently a member of. Currently
+ *  derived client-side from the full playlist list — the per-track lookup
+ *  endpoint is not yet exposed by the companion. */
+export async function getPlaylistsForTrack(
+    trackId: number,
+): Promise<{ id: number; name: string }[]> {
+    const link = await getCompanionLink();
+    if (!link) return [];
+    try {
+        const playlists = await companionLibrary.getPlaylists(link);
+        const memberOf: { id: number; name: string }[] = [];
+        // Walk playlists; bail out as soon as we find membership entries.
+        // Bounded by playlist count, not track count.
+        for (const pl of playlists) {
+            const r = await companionLibrary.getPlaylistTracks(link, pl.id, 1, 500);
+            if (r.tracks.some((t) => t.id === trackId)) {
+                memberOf.push({ id: pl.id, name: pl.name });
+            }
+        }
+        return memberOf;
+    } catch {
+        return [];
+    }
+}
+
+// ─── Writes ─────────────────────────────────────────────────────────────────
+
+export async function createPlaylist(
+    name: string,
+    description?: string,
+): Promise<PlaylistSummary> {
+    const link = await getCompanionLink();
+    if (!link) throw new Error("Companion not connected");
+    const pl = await companionLibrary.createPlaylist(link, name, description);
     revalidatePath("/playlists");
-    return result;
+    return pl;
 }
 
 export async function updatePlaylist(
     id: number,
-    data: { name?: string; description?: string }
-) {
-    db.update(playlists).set(data).where(eq(playlists.id, id)).run();
-    revalidatePath("/playlists");
-    return { success: true };
+    data: { name?: string; description?: string },
+): Promise<{ success: boolean; error?: string }> {
+    const link = await getCompanionLink();
+    if (!link) return { success: false, error: "Companion not connected" };
+    try {
+        await companionLibrary.updatePlaylist(link, id, data);
+        revalidatePath("/playlists");
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Update failed" };
+    }
 }
 
-export async function deletePlaylist(id: number) {
-    db.delete(playlistTracks).where(eq(playlistTracks.playlistId, id)).run();
-    db.delete(playlists).where(eq(playlists.id, id)).run();
-    revalidatePath("/playlists");
-    return { success: true };
+export async function deletePlaylist(
+    id: number,
+): Promise<{ success: boolean; error?: string }> {
+    const link = await getCompanionLink();
+    if (!link) return { success: false, error: "Companion not connected" };
+    try {
+        await companionLibrary.deletePlaylist(link, id);
+        revalidatePath("/playlists");
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Delete failed" };
+    }
 }
 
 export async function addTracksToPlaylist(
     playlistId: number,
-    trackIds: number[]
-) {
-    // Get current max position
-    const maxPos = db
-        .select({ maxPos: sql<number>`COALESCE(MAX(position), 0)` })
-        .from(playlistTracks)
-        .where(eq(playlistTracks.playlistId, playlistId))
-        .get();
-
-    let position = (maxPos?.maxPos ?? 0) + 1;
-
-    // Filter out tracks already in playlist
-    const existing = db
-        .select({ trackId: playlistTracks.trackId })
-        .from(playlistTracks)
-        .where(
-            and(
-                eq(playlistTracks.playlistId, playlistId),
-                inArray(playlistTracks.trackId, trackIds)
-            )
-        )
-        .all()
-        .map((r) => r.trackId);
-
-    const newTrackIds = trackIds.filter((id) => !existing.includes(id));
-
-    for (const trackId of newTrackIds) {
-        db.insert(playlistTracks)
-            .values({ playlistId, trackId, position })
-            .run();
-        position++;
+    trackIds: number[],
+): Promise<{ success: boolean; added: number; error?: string }> {
+    const link = await getCompanionLink();
+    if (!link) return { success: false, added: 0, error: "Companion not connected" };
+    try {
+        const r = await companionLibrary.addTracksToPlaylist(link, playlistId, trackIds);
+        revalidatePath("/playlists");
+        return { success: true, added: r.added };
+    } catch (err) {
+        return { success: false, added: 0, error: err instanceof Error ? err.message : "Add failed" };
     }
-
-    revalidatePath("/playlists");
-    return { success: true, added: newTrackIds.length };
 }
 
 export async function removeTrackFromPlaylist(
     playlistId: number,
-    trackId: number
-) {
-    db.delete(playlistTracks)
-        .where(
-            and(
-                eq(playlistTracks.playlistId, playlistId),
-                eq(playlistTracks.trackId, trackId)
-            )
-        )
-        .run();
-    revalidatePath("/playlists");
-    return { success: true };
-}
-
-export async function getPlaylistsForTrack(trackId: number) {
-    const result = db
-        .select({
-            id: playlists.id,
-            name: playlists.name,
-        })
-        .from(playlistTracks)
-        .innerJoin(playlists, eq(playlistTracks.playlistId, playlists.id))
-        .where(eq(playlistTracks.trackId, trackId))
-        .all();
-    return result;
-}
-
-export async function duplicatePlaylist(playlistId: number) {
-    const original = db
-        .select()
-        .from(playlists)
-        .where(eq(playlists.id, playlistId))
-        .get();
-    if (!original) throw new Error("Playlist not found");
-
-    const newPlaylist = db
-        .insert(playlists)
-        .values({
-            name: `${original.name} (Copy)`,
-            description: original.description,
-            type: "manual",
-        })
-        .returning()
-        .get();
-
-    const originalTracks = db
-        .select()
-        .from(playlistTracks)
-        .where(eq(playlistTracks.playlistId, playlistId))
-        .orderBy(playlistTracks.position)
-        .all();
-
-    for (const pt of originalTracks) {
-        db.insert(playlistTracks)
-            .values({
-                playlistId: newPlaylist.id,
-                trackId: pt.trackId!,
-                position: pt.position,
-            })
-            .run();
+    trackId: number,
+): Promise<{ success: boolean; error?: string }> {
+    const link = await getCompanionLink();
+    if (!link) return { success: false, error: "Companion not connected" };
+    try {
+        await companionLibrary.removeTrackFromPlaylist(link, playlistId, trackId);
+        revalidatePath("/playlists");
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Remove failed" };
     }
-
-    revalidatePath("/playlists");
-    return newPlaylist;
 }
 
 export async function moveTrackInPlaylist(
-    playlistId: number,
-    trackId: number,
-    direction: "up" | "down"
-) {
-    const allTracks = db
-        .select()
-        .from(playlistTracks)
-        .where(eq(playlistTracks.playlistId, playlistId))
-        .orderBy(playlistTracks.position)
-        .all();
-
-    const idx = allTracks.findIndex((t) => t.trackId === trackId);
-    if (idx === -1) return { success: false };
-
-    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= allTracks.length) return { success: false };
-
-    const currentPos = allTracks[idx].position;
-    const swapPos = allTracks[swapIdx].position;
-
-    db.update(playlistTracks)
-        .set({ position: swapPos })
-        .where(eq(playlistTracks.id, allTracks[idx].id))
-        .run();
-    db.update(playlistTracks)
-        .set({ position: currentPos })
-        .where(eq(playlistTracks.id, allTracks[swapIdx].id))
-        .run();
-
-    revalidatePath("/playlists");
-    return { success: true };
+    _playlistId: number,
+    _trackId: number,
+    _direction: "up" | "down",
+): Promise<{ success: boolean; error?: string }> {
+    void _playlistId; void _trackId; void _direction;
+    // TODO(companion): move-position endpoint. Not blocking for v1.
+    return { success: false, error: "Reordering not yet supported via companion" };
 }
 
-export async function clearPlaylist(playlistId: number) {
-    db.delete(playlistTracks)
-        .where(eq(playlistTracks.playlistId, playlistId))
-        .run();
+export async function clearPlaylist(
+    playlistId: number,
+): Promise<{ success: boolean; error?: string }> {
+    const link = await getCompanionLink();
+    if (!link) return { success: false, error: "Companion not connected" };
+    try {
+        const { tracks } = await companionLibrary.getPlaylistTracks(link, playlistId, 1, 1000);
+        for (const t of tracks) {
+            await companionLibrary.removeTrackFromPlaylist(link, playlistId, t.id);
+        }
+        revalidatePath("/playlists");
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Clear failed" };
+    }
+}
+
+export async function duplicatePlaylist(
+    playlistId: number,
+): Promise<PlaylistSummary> {
+    const link = await getCompanionLink();
+    if (!link) throw new Error("Companion not connected");
+    const all = await companionLibrary.getPlaylists(link);
+    const original = all.find((p) => p.id === playlistId);
+    if (!original) throw new Error("Playlist not found");
+
+    const copy = await companionLibrary.createPlaylist(
+        link,
+        `${original.name} (Copy)`,
+        original.description ?? undefined,
+    );
+    const { tracks } = await companionLibrary.getPlaylistTracks(link, playlistId, 1, 100000);
+    if (tracks.length > 0) {
+        await companionLibrary.addTracksToPlaylist(link, copy.id, tracks.map((t) => t.id));
+    }
     revalidatePath("/playlists");
-    return { success: true };
+    return copy;
+}
+
+// ─── XML export (rekordbox compatible) ──────────────────────────────────────
+
+function escapeXml(str: string): string {
+    return str
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
 function encodeRekordboxLocation(filepath: string): string {
-    // Convert Windows path to rekordbox file://localhost/ format
-    const normalized = filepath.replace(/\\\\/g, "/");
-    const encoded = normalized
-        .split("/")
-        .map((part) => encodeURIComponent(part))
-        .join("/");
-    return `file://localhost/${encoded}`;
+    const normalized = filepath.replace(/\\/g, "/");
+    return "file://localhost/" + normalized.split("/").map(encodeURIComponent).join("/");
 }
 
 export async function exportPlaylistToXml(playlistId: number): Promise<string> {
-    const playlist = db
-        .select()
-        .from(playlists)
-        .where(eq(playlists.id, playlistId))
-        .get();
+    const link = await getCompanionLink();
+    if (!link) throw new Error("Companion not connected");
+    const all = await companionLibrary.getPlaylists(link);
+    const playlist = all.find((p) => p.id === playlistId);
     if (!playlist) throw new Error("Playlist not found");
 
-    const { tracks: playlistTrackList } = await getPlaylistTracks(playlistId, 1, 100000);
+    const { tracks } = await companionLibrary.getPlaylistTracks(link, playlistId, 1, 100000);
 
-    // Build rekordbox XML
-    const xmlTracks = playlistTrackList
-        .map((t) => {
-            const attrs = [
-                `TrackID="${t.id}"`,
-                `Name="${escapeXml(t.title || t.filename)}"`,
-                `Artist="${escapeXml(t.artist || "")}"`,
-                `Album="${escapeXml(t.album || "")}"`,
-                `Genre="${escapeXml(t.genre || "")}"`,
-                `Location="${escapeXml(encodeRekordboxLocation(t.filepath))}"`,
-            ];
-            if (t.bpm) attrs.push(`AverageBpm="${t.bpm.toFixed(2)}"`);
-            if (t.keyCamelot) attrs.push(`Tonality="${escapeXml(t.keyCamelot)}"`);
-            if (t.duration) attrs.push(`TotalTime="${t.duration}"`);
-            return `    <TRACK ${attrs.join(" ")} />`;
-        })
-        .join("\n");
+    const xmlTracks = tracks.map((t) => {
+        const attrs = [
+            `TrackID="${t.id}"`,
+            `Name="${escapeXml(t.title || t.filename)}"`,
+            `Artist="${escapeXml(t.artist || "")}"`,
+            `Album="${escapeXml(t.album || "")}"`,
+            `Genre="${escapeXml(t.genre || "")}"`,
+            `Location="${escapeXml(encodeRekordboxLocation(t.filepath))}"`,
+        ];
+        if (t.bpm) attrs.push(`AverageBpm="${t.bpm.toFixed(2)}"`);
+        if (t.keyCamelot) attrs.push(`Tonality="${escapeXml(t.keyCamelot)}"`);
+        if (t.duration) attrs.push(`TotalTime="${t.duration}"`);
+        return `    <TRACK ${attrs.join(" ")} />`;
+    }).join("\n");
 
-    const xmlPlaylistTracks = playlistTrackList
-        .map((t) => `        <TRACK Key="${t.id}" />`)
-        .join("\n");
+    const xmlPlaylistTracks = tracks.map((t) => `        <TRACK Key="${t.id}" />`).join("\n");
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <DJ_PLAYLISTS Version="1.0.0">
-  <PRODUCT Name="MusicOrganizer" Version="1.0" Company="MusicOrganizer"/>
-  <COLLECTION Entries="${playlistTrackList.length}">
+  <PRODUCT Name="MMO" Version="1.0" Company="MMO"/>
+  <COLLECTION Entries="${tracks.length}">
 ${xmlTracks}
   </COLLECTION>
   <PLAYLISTS>
     <NODE Type="0" Name="ROOT" Count="1">
-      <NODE Name="${escapeXml(playlist.name)}" Type="1" KeyType="0" Entries="${playlistTrackList.length}">
+      <NODE Name="${escapeXml(playlist.name)}" Type="1" KeyType="0" Entries="${tracks.length}">
 ${xmlPlaylistTracks}
       </NODE>
     </NODE>
@@ -330,55 +252,47 @@ ${xmlPlaylistTracks}
 }
 
 export async function exportAllPlaylistsToXml(): Promise<string> {
-    const allPlaylists = await getPlaylists();
+    const link = await getCompanionLink();
+    if (!link) throw new Error("Companion not connected");
+    const playlists = await companionLibrary.getPlaylists(link);
 
-    // Collect all unique tracks across all playlists
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allTracks = new Map<number, any>();
-    const playlistData: Array<{
-        name: string;
-        trackIds: number[];
-    }> = [];
+    type AnyTrack = NonNullable<Awaited<ReturnType<typeof companionLibrary.getPlaylistTracks>>>["tracks"][number];
+    const allTracks = new Map<number, AnyTrack>();
+    const playlistData: { name: string; trackIds: number[] }[] = [];
 
-    for (const pl of allPlaylists) {
-        const { tracks: plTracks } = await getPlaylistTracks(pl.id, 1, 100000);
+    for (const pl of playlists) {
+        const { tracks } = await companionLibrary.getPlaylistTracks(link, pl.id, 1, 100000);
         const trackIds: number[] = [];
-        for (const t of plTracks) {
+        for (const t of tracks) {
             allTracks.set(t.id, t);
             trackIds.push(t.id);
         }
         playlistData.push({ name: pl.name, trackIds });
     }
 
-    const xmlTracks = Array.from(allTracks.values())
-        .map((t) => {
-            const attrs = [
-                `TrackID="${t.id}"`,
-                `Name="${escapeXml(t.title || t.filename)}"`,
-                `Artist="${escapeXml(t.artist || "")}"`,
-                `Album="${escapeXml(t.album || "")}"`,
-                `Genre="${escapeXml(t.genre || "")}"`,
-                `Location="${escapeXml(encodeRekordboxLocation(t.filepath))}"`,
-            ];
-            if (t.bpm) attrs.push(`AverageBpm="${t.bpm.toFixed(2)}"`);
-            if (t.keyCamelot) attrs.push(`Tonality="${escapeXml(t.keyCamelot)}"`);
-            if (t.duration) attrs.push(`TotalTime="${t.duration}"`);
-            return `    <TRACK ${attrs.join(" ")} />`;
-        })
-        .join("\n");
+    const xmlTracks = Array.from(allTracks.values()).map((t) => {
+        const attrs = [
+            `TrackID="${t.id}"`,
+            `Name="${escapeXml(t.title || t.filename)}"`,
+            `Artist="${escapeXml(t.artist || "")}"`,
+            `Album="${escapeXml(t.album || "")}"`,
+            `Genre="${escapeXml(t.genre || "")}"`,
+            `Location="${escapeXml(encodeRekordboxLocation(t.filepath))}"`,
+        ];
+        if (t.bpm) attrs.push(`AverageBpm="${t.bpm.toFixed(2)}"`);
+        if (t.keyCamelot) attrs.push(`Tonality="${escapeXml(t.keyCamelot)}"`);
+        if (t.duration) attrs.push(`TotalTime="${t.duration}"`);
+        return `    <TRACK ${attrs.join(" ")} />`;
+    }).join("\n");
 
-    const xmlPlaylists = playlistData
-        .map((pl) => {
-            const trackNodes = pl.trackIds
-                .map((id) => `        <TRACK Key="${id}" />`)
-                .join("\n");
-            return `      <NODE Name="${escapeXml(pl.name)}" Type="1" KeyType="0" Entries="${pl.trackIds.length}">\n${trackNodes}\n      </NODE>`;
-        })
-        .join("\n");
+    const xmlPlaylists = playlistData.map((pl) => {
+        const trackNodes = pl.trackIds.map((id) => `        <TRACK Key="${id}" />`).join("\n");
+        return `      <NODE Name="${escapeXml(pl.name)}" Type="1" KeyType="0" Entries="${pl.trackIds.length}">\n${trackNodes}\n      </NODE>`;
+    }).join("\n");
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <DJ_PLAYLISTS Version="1.0.0">
-  <PRODUCT Name="MusicOrganizer" Version="1.0" Company="MusicOrganizer"/>
+  <PRODUCT Name="MMO" Version="1.0" Company="MMO"/>
   <COLLECTION Entries="${allTracks.size}">
 ${xmlTracks}
   </COLLECTION>
@@ -390,16 +304,7 @@ ${xmlPlaylists}
 </DJ_PLAYLISTS>`;
 }
 
-function escapeXml(str: string): string {
-    return str
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&apos;");
-}
-
-// ─── Recommended Playlists ──────────────────────────────────────────────────
+// ─── Recommended Playlists (static catalog, no DB) ──────────────────────────
 
 export interface RecommendedPlaylist {
     name: string;
@@ -418,49 +323,35 @@ export interface RecommendedCategory {
     totalCount: number;
 }
 
-const RECOMMENDED_PLAYLISTS: Array<{
-    name: string;
-    description: string;
-    category: string;
-    icon: string;
-}> = [
-        // ── Per Genre ──
-        { name: "Techno", description: "Techno tracks, 125-145 BPM", category: "Per Genre", icon: "🎵" },
-        { name: "Tech House", description: "Tech House grooves, 122-128 BPM", category: "Per Genre", icon: "🎵" },
-        { name: "Acid", description: "Acid sounds, 125-140 BPM", category: "Per Genre", icon: "🎵" },
-        { name: "Psytrance", description: "Psytrance, 138-150 BPM", category: "Per Genre", icon: "🎵" },
-        { name: "Bounce", description: "Bounce & hard dance, 150-165 BPM", category: "Per Genre", icon: "🎵" },
-        { name: "Manele", description: "Manele tracks, 85-130 BPM", category: "Per Genre", icon: "🎵" },
-        { name: "Populară", description: "Muzică populară românească, 80-140 BPM", category: "Per Genre", icon: "🎵" },
-        { name: "Balkanică", description: "Balkan beats, 90-160 BPM", category: "Per Genre", icon: "🎵" },
-        { name: "Latino", description: "Latin & reggaeton, 85-130 BPM", category: "Per Genre", icon: "🎵" },
-        { name: "House", description: "House music, 120-130 BPM", category: "Per Genre", icon: "🎵" },
-        { name: "Progressive House", description: "Progressive house, 126-132 BPM", category: "Per Genre", icon: "🎵" },
-
-        // ── Per Energy ──
-        { name: "1-Warmup", description: "Chill, intro tracks — low energy openers", category: "Per Energy", icon: "⚡" },
-        { name: "2-Build", description: "Building energy — crescendo tracks", category: "Per Energy", icon: "⚡" },
-        { name: "3-Peak", description: "Maximum energy — peak time bangers", category: "Per Energy", icon: "⚡" },
-        { name: "4-Cooldown", description: "Winding down — closing & emotional", category: "Per Energy", icon: "⚡" },
-
-        // ── Fusions ──
-        { name: "Techno × Manele", description: "Fusion bridge tracks: Techno meets Manele", category: "Fusions", icon: "🔥" },
-        { name: "Bounce × Balkan", description: "Fusion bridge tracks: Bounce meets Balkan", category: "Fusions", icon: "🔥" },
-        { name: "Tech House × Latino", description: "Tribal tech & Latin house crossovers", category: "Fusions", icon: "🔥" },
-        { name: "Acid × Psytrance", description: "Acid psy crossovers", category: "Fusions", icon: "🔥" },
-        { name: "Balkan × Techno", description: "Balkan beats meets techno", category: "Fusions", icon: "🔥" },
-
-        // ── Set Building ──
-        { name: "Practice 001", description: "First practice set", category: "Set Building", icon: "📅" },
-        { name: "Practice 002", description: "Second practice set", category: "Set Building", icon: "📅" },
-        { name: "Live Event 001", description: "First live event set", category: "Set Building", icon: "📅" },
-
-        // ── Specials ──
-        { name: "Top Favourites", description: "Your all-time favourite tracks", category: "Specials", icon: "⭐" },
-        { name: "Recent Adds", description: "Recently added tracks (last 30 days)", category: "Specials", icon: "⭐" },
-        { name: "Clasice / Evergreen", description: "Timeless classics that always work", category: "Specials", icon: "⭐" },
-        { name: "5 Star Only", description: "Secret weapons — your best rated tracks", category: "Specials", icon: "⭐" },
-    ];
+const RECOMMENDED_PLAYLISTS: { name: string; description: string; category: string; icon: string }[] = [
+    { name: "Techno", description: "Techno tracks, 125-145 BPM", category: "Per Genre", icon: "🎵" },
+    { name: "Tech House", description: "Tech House grooves, 122-128 BPM", category: "Per Genre", icon: "🎵" },
+    { name: "Acid", description: "Acid sounds, 125-140 BPM", category: "Per Genre", icon: "🎵" },
+    { name: "Psytrance", description: "Psytrance, 138-150 BPM", category: "Per Genre", icon: "🎵" },
+    { name: "Bounce", description: "Bounce & hard dance, 150-165 BPM", category: "Per Genre", icon: "🎵" },
+    { name: "Manele", description: "Manele tracks, 85-130 BPM", category: "Per Genre", icon: "🎵" },
+    { name: "Populară", description: "Muzică populară românească, 80-140 BPM", category: "Per Genre", icon: "🎵" },
+    { name: "Balkanică", description: "Balkan beats, 90-160 BPM", category: "Per Genre", icon: "🎵" },
+    { name: "Latino", description: "Latin & reggaeton, 85-130 BPM", category: "Per Genre", icon: "🎵" },
+    { name: "House", description: "House music, 120-130 BPM", category: "Per Genre", icon: "🎵" },
+    { name: "Progressive House", description: "Progressive house, 126-132 BPM", category: "Per Genre", icon: "🎵" },
+    { name: "1-Warmup", description: "Chill, intro tracks — low energy openers", category: "Per Energy", icon: "⚡" },
+    { name: "2-Build", description: "Building energy — crescendo tracks", category: "Per Energy", icon: "⚡" },
+    { name: "3-Peak", description: "Maximum energy — peak time bangers", category: "Per Energy", icon: "⚡" },
+    { name: "4-Cooldown", description: "Winding down — closing & emotional", category: "Per Energy", icon: "⚡" },
+    { name: "Techno × Manele", description: "Fusion bridge tracks: Techno meets Manele", category: "Fusions", icon: "🔥" },
+    { name: "Bounce × Balkan", description: "Fusion bridge tracks: Bounce meets Balkan", category: "Fusions", icon: "🔥" },
+    { name: "Tech House × Latino", description: "Tribal tech & Latin house crossovers", category: "Fusions", icon: "🔥" },
+    { name: "Acid × Psytrance", description: "Acid psy crossovers", category: "Fusions", icon: "🔥" },
+    { name: "Balkan × Techno", description: "Balkan beats meets techno", category: "Fusions", icon: "🔥" },
+    { name: "Practice 001", description: "First practice set", category: "Set Building", icon: "📅" },
+    { name: "Practice 002", description: "Second practice set", category: "Set Building", icon: "📅" },
+    { name: "Live Event 001", description: "First live event set", category: "Set Building", icon: "📅" },
+    { name: "Top Favourites", description: "Your all-time favourite tracks", category: "Specials", icon: "⭐" },
+    { name: "Recent Adds", description: "Recently added tracks (last 30 days)", category: "Specials", icon: "⭐" },
+    { name: "Clasice / Evergreen", description: "Timeless classics that always work", category: "Specials", icon: "⭐" },
+    { name: "5 Star Only", description: "Secret weapons — your best rated tracks", category: "Specials", icon: "⭐" },
+];
 
 const CATEGORY_META: Record<string, { icon: string; description: string }> = {
     "Per Genre": { icon: "🎵", description: "One playlist per genre for easy browsing" },
@@ -471,19 +362,19 @@ const CATEGORY_META: Record<string, { icon: string; description: string }> = {
 };
 
 export async function getRecommendedPlaylists(): Promise<RecommendedCategory[]> {
-    const existing = db
-        .select({ name: playlists.name })
-        .from(playlists)
-        .all();
-    const existingNames = new Set(existing.map((p) => p.name.toLowerCase()));
+    const link = await getCompanionLink();
+    let existingNames = new Set<string>();
+    if (link) {
+        try {
+            const existing = await companionLibrary.getPlaylists(link);
+            existingNames = new Set(existing.map((p) => p.name.toLowerCase()));
+        } catch { /* keep empty set */ }
+    }
 
     const categorized = new Map<string, RecommendedPlaylist[]>();
     for (const rec of RECOMMENDED_PLAYLISTS) {
         const list = categorized.get(rec.category) ?? [];
-        list.push({
-            ...rec,
-            exists: existingNames.has(rec.name.toLowerCase()),
-        });
+        list.push({ ...rec, exists: existingNames.has(rec.name.toLowerCase()) });
         categorized.set(rec.category, list);
     }
 
@@ -491,188 +382,47 @@ export async function getRecommendedPlaylists(): Promise<RecommendedCategory[]> 
     for (const [category, items] of categorized) {
         const meta = CATEGORY_META[category] ?? { icon: "📋", description: "" };
         categories.push({
-            category,
-            icon: meta.icon,
-            description: meta.description,
+            category, icon: meta.icon, description: meta.description,
             playlists: items,
             existingCount: items.filter((p) => p.exists).length,
             totalCount: items.length,
         });
     }
-
     return categories;
 }
 
 export async function createRecommendedPlaylists(
-    names: string[]
-): Promise<{ created: number }> {
-    const valid = RECOMMENDED_PLAYLISTS.filter((r) =>
-        names.includes(r.name)
-    );
-
-    const existing = db
-        .select({ name: playlists.name })
-        .from(playlists)
-        .all();
-    const existingNames = new Set(existing.map((p) => p.name.toLowerCase()));
-
-    let created = 0;
-    for (const rec of valid) {
-        if (!existingNames.has(rec.name.toLowerCase())) {
-            db.insert(playlists)
-                .values({
-                    name: rec.name,
-                    description: rec.description,
-                    type: "manual",
-                })
-                .run();
-            created++;
+    names: string[],
+): Promise<{ created: number; error?: string }> {
+    const link = await getCompanionLink();
+    if (!link) return { created: 0, error: "Companion not connected" };
+    try {
+        const valid = RECOMMENDED_PLAYLISTS.filter((r) => names.includes(r.name));
+        const existing = await companionLibrary.getPlaylists(link);
+        const existingNames = new Set(existing.map((p) => p.name.toLowerCase()));
+        let created = 0;
+        for (const rec of valid) {
+            if (!existingNames.has(rec.name.toLowerCase())) {
+                await companionLibrary.createPlaylist(link, rec.name, rec.description);
+                created++;
+            }
         }
+        revalidatePath("/playlists");
+        return { created };
+    } catch (err) {
+        return { created: 0, error: err instanceof Error ? err.message : "Create failed" };
     }
-
-    revalidatePath("/playlists");
-    return { created };
 }
 
-// ─── Similar Tracks ─────────────────────────────────────────────────────────
+// ─── Similar tracks (deferred — needs a companion endpoint) ─────────────────
 
-export async function getSimilarTracks(playlistId: number, limit = 50) {
-    const playlist = db
-        .select()
-        .from(playlists)
-        .where(eq(playlists.id, playlistId))
-        .get();
-    if (!playlist) return [];
-
-    // IDs already in playlist
-    const existingIds = db
-        .select({ trackId: playlistTracks.trackId })
-        .from(playlistTracks)
-        .where(eq(playlistTracks.playlistId, playlistId))
-        .all()
-        .map((r) => r.trackId!)
-        .filter(Boolean);
-
-    // Profile of existing tracks
-    const existingTracks = existingIds.length > 0
-        ? db
-            .select({
-                genre: tracks.genre,
-                subgenre: tracks.subgenre,
-                bpm: tracks.bpm,
-                energy: tracks.energy,
-                keyCamelot: tracks.keyCamelot,
-            })
-            .from(tracks)
-            .where(inArray(tracks.id, existingIds))
-            .all()
-        : [];
-
-    // Build scoring expression parts
-    const scoreParts: string[] = [];
-
-    if (existingTracks.length > 0) {
-        const genres = [...new Set(existingTracks.map((t) => t.genre).filter(Boolean))];
-        const subgenres = [...new Set(existingTracks.map((t) => t.subgenre).filter(Boolean))];
-        const bpms = existingTracks.map((t) => t.bpm).filter(Boolean) as number[];
-        const energies = existingTracks.map((t) => t.energy).filter(Boolean) as number[];
-        const keys = [...new Set(existingTracks.map((t) => t.keyCamelot).filter(Boolean))];
-
-        if (genres.length > 0) {
-            const escaped = genres.map((g) => `'${g!.replace(/'/g, "''")}'`).join(",");
-            scoreParts.push(`(CASE WHEN genre IN (${escaped}) THEN 30 ELSE 0 END)`);
-        }
-        if (subgenres.length > 0) {
-            const escaped = subgenres.map((s) => `'${s!.replace(/'/g, "''")}'`).join(",");
-            scoreParts.push(`(CASE WHEN subgenre IN (${escaped}) THEN 10 ELSE 0 END)`);
-        }
-        if (bpms.length > 0) {
-            const minBpm = Math.min(...bpms) - 8;
-            const maxBpm = Math.max(...bpms) + 8;
-            scoreParts.push(`(CASE WHEN bpm BETWEEN ${minBpm} AND ${maxBpm} THEN 20 ELSE 0 END)`);
-        }
-        if (energies.length > 0) {
-            const minE = Math.max(1, Math.min(...energies) - 1);
-            const maxE = Math.min(10, Math.max(...energies) + 1);
-            scoreParts.push(`(CASE WHEN energy BETWEEN ${minE} AND ${maxE} THEN 15 ELSE 0 END)`);
-        }
-        if (keys.length > 0) {
-            const escaped = keys.map((k) => `'${k!.replace(/'/g, "''")}'`).join(",");
-            scoreParts.push(`(CASE WHEN key_camelot IN (${escaped}) THEN 10 ELSE 0 END)`);
-        }
-    }
-
-    // Match on playlist name (genre names, keywords)
-    const esc = (s: string) => s.replace(/'/g, "''");
-    const nameLower = esc(playlist.name.toLowerCase());
-    scoreParts.push(`(CASE WHEN LOWER(genre) = '${nameLower}' THEN 25 ELSE 0 END)`);
-    scoreParts.push(`(CASE WHEN LOWER(subgenre) = '${nameLower}' THEN 15 ELSE 0 END)`);
-    scoreParts.push(`(CASE WHEN LOWER(genre) LIKE '%${nameLower}%' THEN 10 ELSE 0 END)`);
-    scoreParts.push(`(CASE WHEN LOWER(title) LIKE '%${nameLower}%' THEN 5 ELSE 0 END)`);
-    scoreParts.push(`(CASE WHEN LOWER(artist) LIKE '%${nameLower}%' THEN 5 ELSE 0 END)`);
-
-    const scoreExpr = scoreParts.join(" + ");
-    const excludeClause = existingIds.length > 0
-        ? `WHERE tracks.id NOT IN (${existingIds.join(",")})`
-        : "";
-
-    const rawSql = `
-        SELECT * FROM (
-            SELECT 
-                tracks.id, tracks.filepath, tracks.filename,
-                tracks.artist, tracks.title, tracks.album,
-                tracks.bpm, tracks.key_camelot, tracks.duration,
-                tracks.energy, tracks.genre, tracks.subgenre,
-                tracks.mood, tracks.rating, tracks.is_favorite,
-                tracks.artwork_url, tracks.tags,
-                (${scoreExpr}) as score
-            FROM tracks
-            ${excludeClause}
-        )
-        WHERE score > 0
-        ORDER BY score DESC, COALESCE(rating, 0) DESC
-        LIMIT ?
-    `;
-
-    const result = sqlite.prepare(rawSql).all(limit) as Array<{
-        id: number;
-        filepath: string;
-        filename: string;
-        artist: string | null;
-        title: string | null;
-        album: string | null;
-        bpm: number | null;
-        key_camelot: string | null;
-        duration: number | null;
-        energy: number | null;
-        genre: string | null;
-        subgenre: string | null;
-        mood: string | null;
-        rating: number | null;
-        is_favorite: number | null;
-        artwork_url: string | null;
-        tags: string | null;
-        score: number;
-    }>;
-
-    return result.map((r) => ({
-        id: r.id,
-        filepath: r.filepath,
-        filename: r.filename,
-        artist: r.artist,
-        title: r.title,
-        album: r.album,
-        bpm: r.bpm,
-        keyCamelot: r.key_camelot,
-        duration: r.duration,
-        energy: r.energy,
-        genre: r.genre,
-        subgenre: r.subgenre,
-        mood: r.mood,
-        rating: r.rating,
-        isFavorite: !!r.is_favorite,
-        artworkUrl: r.artwork_url,
-        tags: r.tags,
-        score: r.score,
-    }));
+/** TODO(companion): expose a /library/playlists/:id/similar endpoint that
+ *  runs the SQL profile-matching logic. For now returns an empty list
+ *  rather than crashing — UI handles empty state. */
+export async function getSimilarTracks(
+    _playlistId: number,
+    _limit = 50,
+): Promise<unknown[]> {
+    void _playlistId; void _limit;
+    return [];
 }

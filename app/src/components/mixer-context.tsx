@@ -42,6 +42,7 @@ import { setDeckTime, getDeckTime, resetAllDeckTimes } from "@/lib/mixer-time-st
 import { getPersonalization } from "@/hooks/use-personalization";
 import { requestConfirmLoad } from "./confirm-load-dialog";
 import { uploadRecording } from "@/lib/upload-recording";
+import { musicalKeyToCamelot } from "@/lib/genre-suggest";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -429,6 +430,71 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         }));
     }, []);
 
+    // ─── rAF-coalesced state patches ─────────────────────────────────────
+    // High-frequency continuous controls (knobs, faders, crossfader) used to
+    // call `setState` once per pointermove — on a high-DPI mouse that's
+    // ~120 Hz of full-context-tree re-renders, which is exactly why
+    // mid-range Intel laptops felt laggy when dragging the crossfader.
+    //
+    // The fix: the audio engine is still called synchronously on every event
+    // (audio stays buttery), but React state patches are merged into a
+    // single setState per animation frame. This caps React's render cost at
+    // the display refresh rate regardless of input event frequency.
+    //
+    // `engineRef` calls remain outside this — audio must not be deferred.
+    const pendingGlobalRef = useRef<Partial<MixerState> | null>(null);
+    const pendingDeckRef = useRef<Partial<Record<DeckSide, Partial<DeckState>>>>({});
+    const flushRafRef = useRef<number | null>(null);
+
+    const flushPending = useCallback(() => {
+        flushRafRef.current = null;
+        const globalPatch = pendingGlobalRef.current;
+        const deckPatch = pendingDeckRef.current;
+        pendingGlobalRef.current = null;
+        pendingDeckRef.current = {};
+        const hasDeck = (Object.keys(deckPatch) as DeckSide[]).length > 0;
+        if (!globalPatch && !hasDeck) return;
+        setState(prev => {
+            let next = prev;
+            if (globalPatch) next = { ...next, ...globalPatch };
+            if (hasDeck) {
+                const merged: Partial<MixerState> = {};
+                for (const side of Object.keys(deckPatch) as DeckSide[]) {
+                    const k = DECK_STATE_KEY[side];
+                    merged[k] = { ...(next[k] as DeckState), ...deckPatch[side] };
+                }
+                next = { ...next, ...merged };
+            }
+            return next;
+        });
+    }, []);
+
+    const scheduleFlush = useCallback(() => {
+        if (flushRafRef.current != null) return;
+        if (typeof requestAnimationFrame === "undefined") {
+            // SSR / non-DOM env — flush synchronously.
+            flushPending();
+            return;
+        }
+        flushRafRef.current = requestAnimationFrame(flushPending);
+    }, [flushPending]);
+
+    /** Coalesce a global state patch into the next animation frame. */
+    const patchGlobal = useCallback((patch: Partial<MixerState>) => {
+        pendingGlobalRef.current = { ...pendingGlobalRef.current, ...patch };
+        scheduleFlush();
+    }, [scheduleFlush]);
+
+    /** Coalesce a per-deck patch into the next animation frame. */
+    const patchDeck = useCallback((deck: DeckSide, patch: Partial<DeckState>) => {
+        pendingDeckRef.current[deck] = { ...pendingDeckRef.current[deck], ...patch };
+        scheduleFlush();
+    }, [scheduleFlush]);
+
+    useEffect(() => () => {
+        if (flushRafRef.current != null) cancelAnimationFrame(flushRafRef.current);
+    }, []);
+
     // Live playback time is broadcast through an external `useSyncExternalStore`
     // so only leaf components that actually display a clock re-render on
     // every tick. The 4 Hz `onTimeUpdate` emitter used to go through
@@ -659,9 +725,17 @@ export function MixerProvider({ children }: { children: ReactNode }) {
                 if (deck.bpm > 0 && deck.originalBpm > 0 && deck.bpm !== deck.originalBpm) {
                     eng.setTempo(deck.bpm / deck.originalBpm);
                 }
-                const existingOnLoaded = eng.onLoaded;
+                // One-shot wrapper: restore-time / restore-loop must run only on
+                // THIS track's first `loadedmetadata`. We unwrap immediately so
+                // that subsequent loads (a new track on the same deck, or a
+                // blob-URL upgrade firing `loadedmetadata` again) don't replay
+                // the captured persisted loop state — which would silently
+                // re-enable the previous loop on the new track and produce a
+                // "ghost loop" the user can't see in the UI.
+                const baseOnLoaded = eng.onLoaded;
                 eng.onLoaded = (duration) => {
-                    existingOnLoaded?.(duration);
+                    eng.onLoaded = baseOnLoaded;
+                    baseOnLoaded?.(duration);
                     if (savedTime > 0 && savedTime < duration) {
                         eng.seek(savedTime);
                         updateDeck(side, { duration, isLoaded: true });
@@ -709,10 +783,17 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         eng.loadTrack(track.id);
         // Add to session history
         engineRef.current?.addToHistory({ title: track.title || track.filename, artist: track.artist || "Unknown" }, deck);
-        // Auto-gain: use track's gain/loudness metadata if available, else measure peak
-        const existingOnLoaded = eng.onLoaded;
+        // Auto-gain: use track's gain/loudness metadata if available, else measure peak.
+        // One-shot wrapper: must unwrap before invoking inner work so that any
+        // subsequent `loadedmetadata` (e.g., the blob-URL upgrade fired by
+        // `audioPreloadCache.preload(...).then(...)` swapping audio.src) does
+        // NOT re-run auto-gain measurement and, more importantly, does not
+        // accumulate a chain of stale wrappers that could replay state from
+        // a previous track load.
+        const baseOnLoaded = eng.onLoaded;
         eng.onLoaded = (duration) => {
-            existingOnLoaded?.(duration);
+            eng.onLoaded = baseOnLoaded;
+            baseOnLoaded?.(duration);
             // Simple auto-gain: measure peak in first 10 seconds via analyser
             // Target -14 LUFS (roughly 0.2 linear RMS for typical music)
             const analyserNode = eng.analyser;
@@ -758,8 +839,17 @@ export function MixerProvider({ children }: { children: ReactNode }) {
             duration: 0,
             bpm: track.bpm || 120,
             originalBpm: track.bpm || 120,
-            key: track.keyCamelot || "",
-            originalKey: track.keyCamelot || "",
+            // Prefer the Camelot code; fall back to deriving it from the
+            // musical key (e.g. "Am" → "8A") so tracks imported with only
+            // a musical-key tag still display a key in the mixer. As a
+            // last resort, keep the raw musical-key string so the user
+            // sees *something* instead of an empty placeholder.
+            key: track.keyCamelot
+                || (track.keyMusical && (musicalKeyToCamelot(track.keyMusical) || track.keyMusical))
+                || "",
+            originalKey: track.keyCamelot
+                || (track.keyMusical && (musicalKeyToCamelot(track.keyMusical) || track.keyMusical))
+                || "",
             keyShift: 0,
             loopEnabled: false,
             loopStart: 0,
@@ -882,14 +972,14 @@ export function MixerProvider({ children }: { children: ReactNode }) {
 
     const setVolume = useCallback((deck: DeckSide, vol: number) => {
         getDeckEngine(deck)?.setVolume(vol);
-        updateDeck(deck, { volume: vol });
-    }, [getDeckEngine, updateDeck]);
+        patchDeck(deck, { volume: vol });
+    }, [getDeckEngine, patchDeck]);
 
     const setEQ = useCallback((deck: DeckSide, band: "low" | "mid" | "hi", gain: number) => {
         getDeckEngine(deck)?.setEQ(band, gain);
         const update = band === "low" ? { eqLow: gain } : band === "mid" ? { eqMid: gain } : { eqHi: gain };
-        updateDeck(deck, update);
-    }, [getDeckEngine, updateDeck]);
+        patchDeck(deck, update);
+    }, [getDeckEngine, patchDeck]);
 
     const toggleEQKill = useCallback((deck: DeckSide, band: "low" | "mid" | "hi") => {
         const key = DECK_STATE_KEY[deck];
@@ -911,14 +1001,15 @@ export function MixerProvider({ children }: { children: ReactNode }) {
     }, [getDeckEngine]);
 
     const setBpm = useCallback((deck: DeckSide, bpm: number) => {
-        const key = DECK_STATE_KEY[deck];
-        setState(prev => {
-            const deckState = prev[key];
-            const ratio = bpm / deckState.originalBpm;
-            getDeckEngine(deck)?.setTempo(ratio);
-            return { ...prev, [key]: { ...deckState, bpm } };
-        });
-    }, [getDeckEngine]);
+        // Read originalBpm from the ref (cheap & current) and the engine call
+        // happens immediately so audio stays smooth even at 120 Hz pointer
+        // events; React state coalesces to one update per frame.
+        const deckState = stateRef.current[DECK_STATE_KEY[deck]] as DeckState;
+        const originalBpm = pendingDeckRef.current[deck]?.originalBpm ?? deckState.originalBpm;
+        const ratio = bpm / originalBpm;
+        getDeckEngine(deck)?.setTempo(ratio);
+        patchDeck(deck, { bpm });
+    }, [getDeckEngine, patchDeck]);
 
     const syncBpm = useCallback((deck: DeckSide) => {
         // Sync pairs: A↔B, C↔D
@@ -952,13 +1043,11 @@ export function MixerProvider({ children }: { children: ReactNode }) {
     }, [getDeckEngine]);
 
     const setFilterAction = useCallback((deck: DeckSide, value: number) => {
-        const key = DECK_STATE_KEY[deck];
-        setState(prev => {
-            const deckState = prev[key];
-            getDeckEngine(deck)?.setFilter(value, deckState.filterType);
-            return { ...prev, [key]: { ...deckState, filter: value } };
-        });
-    }, [getDeckEngine]);
+        const filterType = pendingDeckRef.current[deck]?.filterType
+            ?? (stateRef.current[DECK_STATE_KEY[deck]] as DeckState).filterType;
+        getDeckEngine(deck)?.setFilter(value, filterType);
+        patchDeck(deck, { filter: value });
+    }, [getDeckEngine, patchDeck]);
 
     const setFilterType = useCallback((deck: DeckSide, type: FilterType) => {
         const key = DECK_STATE_KEY[deck];
@@ -970,13 +1059,11 @@ export function MixerProvider({ children }: { children: ReactNode }) {
     }, [getDeckEngine]);
 
     const setColorFxAction = useCallback((deck: DeckSide, value: number) => {
-        const key = DECK_STATE_KEY[deck];
-        setState(prev => {
-            const deckState = prev[key];
-            getDeckEngine(deck)?.setColorFx(value, deckState.colorFxType);
-            return { ...prev, [key]: { ...deckState, colorFx: value } };
-        });
-    }, [getDeckEngine]);
+        const colorFxType = pendingDeckRef.current[deck]?.colorFxType
+            ?? (stateRef.current[DECK_STATE_KEY[deck]] as DeckState).colorFxType;
+        getDeckEngine(deck)?.setColorFx(value, colorFxType);
+        patchDeck(deck, { colorFx: value });
+    }, [getDeckEngine, patchDeck]);
 
     const setColorFxType = useCallback((deck: DeckSide, type: ColorFxType) => {
         const key = DECK_STATE_KEY[deck];
@@ -1193,8 +1280,8 @@ export function MixerProvider({ children }: { children: ReactNode }) {
 
     const setCrossfader = useCallback((value: number) => {
         engineRef.current?.setCrossfader(value);
-        setState(prev => ({ ...prev, crossfader: value }));
-    }, []);
+        patchGlobal({ crossfader: value });
+    }, [patchGlobal]);
 
     const setCrossfaderCurve = useCallback((curve: CrossfaderCurve) => {
         engineRef.current?.setCrossfaderCurve(curve);
@@ -1203,18 +1290,18 @@ export function MixerProvider({ children }: { children: ReactNode }) {
 
     const setMasterVolume = useCallback((value: number) => {
         engineRef.current?.setMasterVolume(value);
-        setState(prev => ({ ...prev, masterVolume: value }));
-    }, []);
+        patchGlobal({ masterVolume: value });
+    }, [patchGlobal]);
 
     const setHeadphoneVolume = useCallback((value: number) => {
         engineRef.current?.setHeadphoneVolume(value);
-        setState(prev => ({ ...prev, headphoneVolume: value }));
-    }, []);
+        patchGlobal({ headphoneVolume: value });
+    }, [patchGlobal]);
 
     const setHeadphoneMix = useCallback((mix: number) => {
         engineRef.current?.setHeadphoneMix(mix);
-        setState(prev => ({ ...prev, headphoneMix: mix }));
-    }, []);
+        patchGlobal({ headphoneMix: mix });
+    }, [patchGlobal]);
 
     const setEQModeAction = useCallback((mode: EQMode) => {
         engineRef.current?.deckA.setEQMode(mode);

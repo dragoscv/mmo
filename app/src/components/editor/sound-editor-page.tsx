@@ -25,6 +25,8 @@ import { useFocusMode } from "@/components/focus-mode-context";
 import { usePerformanceStats } from "@/hooks/use-performance-stats";
 import Link from "next/link";
 import { VoiceProcessor } from "@/components/daw/daw-voice-processor";
+import { EditorPluginsPanel } from "@/components/editor/editor-plugins-panel";
+import { AudioDeviceSelect } from "@/components/ui/audio-device-select";
 import {
     useDAWSettings,
     enumerateAudioOutputs,
@@ -213,8 +215,11 @@ function SoundEditorInner() {
 
                 {/* FX / Voice Processor sidebar */}
                 {showFxPanel && (
-                    <div className="w-[340px] border-l border-[oklch(1_0_0/0.08)] flex-shrink-0 overflow-hidden">
+                    <div className="w-[340px] border-l border-[oklch(1_0_0/0.08)] flex-shrink-0 overflow-y-auto">
                         <VoiceProcessor compact />
+                        <div className="p-2 border-t border-[oklch(1_0_0/0.08)]">
+                            <EditorPluginsPanel />
+                        </div>
                     </div>
                 )}
             </div>
@@ -897,59 +902,41 @@ function EditorSettingsModal({ onClose }: { onClose: () => void }) {
                         <>
                             <EditorSettingsSection title="Audio Output">
                                 <EditorSettingsRow label="Output Device" description="Select audio playback device">
-                                    {audioPermission !== "granted" ? (
-                                        <button
-                                            onClick={handleRequestPermission}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium bg-[oklch(0.62_0.19_250/0.2)] border border-[oklch(0.62_0.19_250/0.3)] text-[oklch(0.75_0.15_250)] hover:bg-[oklch(0.62_0.19_250/0.3)] transition-colors cursor-pointer"
-                                        >
-                                            <Volume2 className="w-3 h-3" />
-                                            Grant Permission
-                                        </button>
-                                    ) : (
-                                        <select
+                                    <div className="min-w-[220px]">
+                                        <AudioDeviceSelect
+                                            kind="output"
+                                            size="sm"
                                             value={s.audioOutputDeviceId}
-                                            onChange={(e) => handleOutputChange(e.target.value)}
-                                            className="h-7 bg-black/30 border border-[oklch(1_0_0/0.1)] rounded text-xs px-2 text-[oklch(1_0_0/0.6)] focus:outline-none min-w-[180px]"
-                                        >
-                                            {audioDevices.length === 0 && (
-                                                <option value="default">Default</option>
-                                            )}
-                                            {audioDevices.map(d => (
-                                                <option key={d.deviceId} value={d.deviceId}>
-                                                    {d.label || `Output ${d.deviceId.slice(0, 8)}`}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    )}
+                                            onValueChange={(change) => {
+                                                if (change.source === "native") {
+                                                    s.update({ audioOutputDeviceId: change.value });
+                                                } else {
+                                                    void handleOutputChange(change.value);
+                                                }
+                                            }}
+                                            placeholder="System Default"
+                                            nativeDisabled
+                                            nativeDisabledHint="Native routing belongs to Live's engine"
+                                            showPermissionHint={audioPermission !== "granted"}
+                                        />
+                                    </div>
                                 </EditorSettingsRow>
                             </EditorSettingsSection>
 
                             <EditorSettingsSection title="Audio Input">
                                 <EditorSettingsRow label="Input Device" description="Microphone / line input for voice processor">
-                                    {audioPermission !== "granted" ? (
-                                        <button
-                                            onClick={handleRequestPermission}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium bg-[oklch(0.62_0.19_250/0.2)] border border-[oklch(0.62_0.19_250/0.3)] text-[oklch(0.75_0.15_250)] hover:bg-[oklch(0.62_0.19_250/0.3)] transition-colors cursor-pointer"
-                                        >
-                                            <Mic className="w-3 h-3" />
-                                            Grant Permission
-                                        </button>
-                                    ) : (
-                                        <select
+                                    <div className="min-w-[220px]">
+                                        <AudioDeviceSelect
+                                            kind="input"
+                                            size="sm"
                                             value={s.audioInputDeviceId}
-                                            onChange={(e) => s.update({ audioInputDeviceId: e.target.value })}
-                                            className="h-7 bg-black/30 border border-[oklch(1_0_0/0.1)] rounded text-xs px-2 text-[oklch(1_0_0/0.6)] focus:outline-none min-w-[180px]"
-                                        >
-                                            {inputDevices.length === 0 && (
-                                                <option value="default">Default</option>
-                                            )}
-                                            {inputDevices.map(d => (
-                                                <option key={d.deviceId} value={d.deviceId}>
-                                                    {d.label || `Input ${d.deviceId.slice(0, 8)}`}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    )}
+                                            onValueChange={(change) => s.update({ audioInputDeviceId: change.value })}
+                                            placeholder="Default Input"
+                                            nativeDisabled
+                                            nativeDisabledHint="Native input belongs to Live's engine"
+                                            showPermissionHint={audioPermission !== "granted"}
+                                        />
+                                    </div>
                                 </EditorSettingsRow>
                             </EditorSettingsSection>
                         </>

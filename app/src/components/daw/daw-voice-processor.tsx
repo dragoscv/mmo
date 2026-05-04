@@ -25,6 +25,7 @@ import { formatNoteIndex, formatNoteMulti, type NoteNotation } from "@/lib/note-
 import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { useDAW } from "@/components/daw/daw-context";
 import type { VPBridge, VPRemoteState, VPCommandHandlers } from "@/components/daw/daw-context";
+import { AudioDeviceSelect } from "@/components/ui/audio-device-select";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -895,15 +896,18 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
                 </div>
 
                 {/* Input device selector */}
-                <DropdownSelect
-                    value={selectedDevice}
-                    onChange={handleDeviceChange}
-                    options={[
-                        { value: "default", label: "Default Microphone" },
-                        ...inputDevices.map(d => ({ value: d.deviceId, label: d.label || `Input ${d.deviceId.slice(0, 8)}` })),
-                    ]}
-                    className="max-w-[160px]"
-                />
+                <div className="max-w-[220px] flex-1 min-w-0">
+                    <AudioDeviceSelect
+                        kind="input"
+                        size="sm"
+                        value={selectedDevice}
+                        onValueChange={(change) => void handleDeviceChange(change.value)}
+                        placeholder="Default Microphone"
+                        nativeDisabled
+                        nativeDisabledHint="Native input belongs to Live's engine"
+                        showPermissionHint
+                    />
+                </div>
 
                 {/* Monitor toggle */}
                 <button

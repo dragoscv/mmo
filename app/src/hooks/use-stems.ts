@@ -10,7 +10,9 @@ import {
     STEM_TYPES,
     createDefaultStemConfigs,
     separateStems,
+    loadCompanionStems,
 } from "@/lib/stems-engine";
+import { getCompanionStemsAccess } from "@/actions/analyze";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +26,9 @@ export interface UseStemsReturn {
 
     // Actions
     separate: (buffer: AudioBuffer) => Promise<StemSeparationResult | null>;
+    /** Prefer real (companion-computed) stems for `trackId`; falls back
+     *  to band-pass `separate(buffer)` if not yet available. */
+    separateForTrack: (trackId: number, fallbackBuffer: AudioBuffer, audioContext?: AudioContext) => Promise<StemSeparationResult | null>;
     cancel: () => void;
     reset: () => void;
 
@@ -82,6 +87,48 @@ export function useStems(): UseStemsReturn {
         setProgress(null);
     }, []);
 
+    /** Try to load real (companion-computed) stems for `trackId`;
+     *  on failure or unavailability fall back to band-pass `separate`. */
+    const separateForTrack = useCallback(async (
+        trackId: number,
+        fallbackBuffer: AudioBuffer,
+        audioContext?: AudioContext,
+    ): Promise<StemSeparationResult | null> => {
+        setIsProcessing(true);
+        setError(null);
+        setResult(null);
+        cancelRef.current = false;
+        const onProgress: StemProgressCallback = (p) => {
+            if (cancelRef.current) return;
+            setProgress(p);
+        };
+        try {
+            onProgress({ stage: "loading", progress: 0, message: "Checking for pre-computed stems..." });
+            const access = await getCompanionStemsAccess(trackId);
+            if (access.available) {
+                const real = await loadCompanionStems({
+                    urls: access.urls, headers: access.headers, audioContext, onProgress,
+                });
+                if (cancelRef.current) return null;
+                setResult(real);
+                setIsProcessing(false);
+                return real;
+            }
+            onProgress({ stage: "loading", progress: 0, message: `${access.reason} — using fallback DSP` });
+            const stemResult = await separateStems(fallbackBuffer, onProgress);
+            if (cancelRef.current) return null;
+            setResult(stemResult);
+            setIsProcessing(false);
+            return stemResult;
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Stem separation failed";
+            setError(msg);
+            setIsProcessing(false);
+            setProgress({ stage: "error", progress: 0, message: msg });
+            return null;
+        }
+    }, []);
+
     const reset = useCallback(() => {
         cancelRef.current = true;
         setIsProcessing(false);
@@ -128,6 +175,7 @@ export function useStems(): UseStemsReturn {
         result,
         error,
         separate,
+        separateForTrack,
         cancel,
         reset,
         setStemVolume,

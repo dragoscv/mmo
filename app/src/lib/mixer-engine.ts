@@ -543,6 +543,15 @@ export class DeckEngine {
 
     loadTrack(trackId: number) {
         dlog("deck", `loadTrack id=${trackId}`, { trackId });
+        // Loop markers are time-positions of the previously-loaded track and
+        // are meaningless for a new one. If we don't clear them, the RAF
+        // time-tracking loop will silently snap playback back to the old
+        // loopStart once the new track passes the old loopEnd ("ghost loop").
+        // Session restore re-enables loops in its `onLoaded` callback, which
+        // fires after this call, so it is unaffected.
+        this.audio.dataset.loopEnabled = "false";
+        delete this.audio.dataset.loopStart;
+        delete this.audio.dataset.loopEnd;
         // Use cached blob URL if available, start preloading in background
         this.audio.src = audioPreloadCache.getUrl(trackId);
         this.audio.load();
@@ -1190,6 +1199,18 @@ export class MixerEngine {
         // ~10–30 ms on Windows/macOS.
         this.ctx = new AudioContext({ latencyHint: "interactive" });
         dlog("audio", `AudioContext created sr=${this.ctx.sampleRate}Hz state=${this.ctx.state}`, { sampleRate: this.ctx.sampleRate, baseLatency: this.ctx.baseLatency });
+
+        // Audio keep-alive: see live-engine.ts for full rationale. Stops
+        // Chrome from throttling the mixer's AudioContext when the user
+        // switches to another window — beat FX, sync and cue stay crisp.
+        try {
+            const ka = this.ctx.createConstantSource();
+            ka.offset.value = 0;
+            const sink = this.ctx.createGain();
+            sink.gain.value = 0;
+            ka.connect(sink); sink.connect(this.ctx.destination);
+            ka.start();
+        } catch { /* older browsers — non-fatal */ }
 
         // Expose AudioContext globally for performance monitoring
         if (typeof window !== "undefined") {

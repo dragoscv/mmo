@@ -15,6 +15,8 @@ export interface SearchResult {
     extractor: string;
     album?: string;
     viewCount?: number;
+    /** ISO 8601 date string (YYYY-MM-DD or full ISO). Best-effort across providers. */
+    publishedAt?: string;
     /** Playlist results only */
     isPlaylist?: boolean;
     trackCount?: number;
@@ -92,7 +94,24 @@ function parseYtDlpResult(data: Record<string, unknown>): SearchResult {
         url: String(data.webpage_url || data.url || ""),
         extractor: String(data.extractor_key || data.extractor || ""),
         viewCount: typeof data.view_count === "number" ? data.view_count : undefined,
+        publishedAt: ytDlpDate(data),
     };
+}
+
+/** Extract a published / upload date from a yt-dlp record.
+ *  yt-dlp exposes several candidate fields depending on the extractor:
+ *    - `upload_date`  / `release_date`  (string "YYYYMMDD")
+ *    - `timestamp`    / `release_timestamp` (unix seconds) */
+function ytDlpDate(data: Record<string, unknown>): string | undefined {
+    const dateStr = (data.release_date || data.upload_date) as string | undefined;
+    if (typeof dateStr === "string" && /^\d{8}$/.test(dateStr)) {
+        return `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
+    }
+    const ts = (data.release_timestamp || data.timestamp) as number | undefined;
+    if (typeof ts === "number" && ts > 0) {
+        return new Date(ts * 1000).toISOString().slice(0, 10);
+    }
+    return undefined;
 }
 
 // ─── yt-dlp provider search ─────────────────────────────────────────────
@@ -165,6 +184,7 @@ async function searchYtDlpProvider(
                         url: String(e.url || e.webpage_url || ""),
                         extractor: "YoutubeMusic",
                         viewCount: typeof e.view_count === "number" ? e.view_count : undefined,
+                        publishedAt: ytDlpDate(e),
                         ...(isPlaylistMode ? { isPlaylist: true, trackCount: typeof e.playlist_count === "number" ? e.playlist_count : undefined } : {}),
                     }));
                 return { provider, results };
@@ -286,6 +306,7 @@ async function searchDeezer(query: string, limit: number, searchType: SearchType
                 downloadUrl: `ytsearch1:${artist} - ${title}`,
                 extractor: "Deezer",
                 album: String(album?.title || ""),
+                publishedAt: typeof album?.release_date === "string" ? album.release_date as string : undefined,
             };
         });
 
@@ -329,6 +350,7 @@ async function searchAppleMusic(query: string, limit: number, searchType: Search
                 downloadUrl: `ytsearch1:${artist} - ${title}`,
                 extractor: "AppleMusic",
                 album: String(t.collectionName || ""),
+                publishedAt: typeof t.releaseDate === "string" ? (t.releaseDate as string).slice(0, 10) : undefined,
             };
         });
 
@@ -510,6 +532,7 @@ async function searchSpotifyViaAPI(token: string, query: string, limit: number, 
             downloadUrl: `ytsearch1:${artist} - ${title}`,
             extractor: "Spotify",
             album: String(albumData?.name || ""),
+            publishedAt: typeof albumData?.release_date === "string" ? albumData.release_date as string : undefined,
         };
     });
 }
@@ -572,7 +595,7 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const query = body?.query;
         const providers: string[] = body?.providers || ["youtube"];
-        const limit = Math.min(Math.max(Number(body?.limit) || 10, 1), 25);
+        const limit = Math.min(Math.max(Number(body?.limit) || 10, 1), 50);
         const searchType: SearchType = body?.searchType === "playlists" ? "playlists" : "tracks";
 
         if (!query || typeof query !== "string" || query.trim().length < 2) {

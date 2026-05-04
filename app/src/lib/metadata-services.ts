@@ -10,7 +10,7 @@
  * - LRCLIB: plain + synced lyrics
  */
 
-const USER_AGENT = "MusicOrganizer/0.2.0 (https://github.com/rekordbox-mwrty)";
+const USER_AGENT = "MusicOrganizer/0.2.0 (https://github.com/dragoscv/mmo)";
 
 // ─── Rate Limiting ───────────────────────────────────────────────────────────
 

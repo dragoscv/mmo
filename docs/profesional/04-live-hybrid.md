@@ -1,5 +1,7 @@
 # 🔴 Live Hybrid — Rekordbox + Circuit Tracks + MIDI
 
+> ⚠️ **Context**: hybrid live cu **rekordbox**. MMO are mod live integrat → [`docs/aplicatie/live.md`](../aplicatie/live.md) + [`docs/aplicatie/daw-editor.md`](../aplicatie/daw-editor.md).
+
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../README.md#-profesional)
 
 | ← Prev | Next → |

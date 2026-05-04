@@ -9,6 +9,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { AudioDeviceSelect } from "@/components/ui/audio-device-select";
 import {
     BUILTIN_PRESETS,
     importPreset,
@@ -1416,29 +1417,22 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                     <div className="text-[10px] text-red-400/70 bg-red-500/[0.06] border border-red-500/10 rounded px-2 py-2">
                                         Audio permission denied. Please allow microphone access in your browser settings to select output devices.
                                     </div>
-                                ) : audioPermission === "prompt" ? (
-                                    <div className="space-y-2">
-                                        <button
-                                            onClick={requestAudioPermission}
-                                            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-md text-[10px] font-medium bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 transition-colors cursor-pointer"
-                                        >
-                                            <Volume2 className="w-3 h-3" />
-                                            Grant Audio Permission
-                                        </button>
-                                        <p className="text-[9px] text-white/20">
-                                            Browser permission is required to list and select audio output devices.
-                                        </p>
-                                    </div>
                                 ) : (
                                     <>
-                                        <select
+                                        <AudioDeviceSelect
+                                            kind="output"
+                                            size="sm"
                                             value={selectedAudioDevice}
-                                            onChange={async (e) => {
-                                                const deviceId = e.target.value;
+                                            onValueChange={async (change) => {
+                                                const deviceId = change.value;
                                                 setSelectedAudioDevice(deviceId);
+                                                if (change.source === "native") {
+                                                    // Persist preference; native routing requires the Live engine.
+                                                    try { localStorage.setItem("mmo-audio-output", deviceId); } catch { /* ignore */ }
+                                                    return;
+                                                }
                                                 try {
                                                     localStorage.setItem("mmo-audio-output", deviceId);
-                                                    // Set sink on all audio elements
                                                     const audios = document.querySelectorAll("audio");
                                                     for (const audio of audios) {
                                                         if ("setSinkId" in audio) {
@@ -1447,19 +1441,13 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                                     }
                                                 } catch { /* setSinkId not supported */ }
                                             }}
-                                            className="w-full text-[10px] bg-black/30 border border-white/[0.08] rounded px-2 py-1.5 text-white/70 outline-none cursor-pointer hover:bg-black/40 transition-colors"
-                                        >
-                                            {audioDevices.length === 0 && (
-                                                <option value="default">Default</option>
-                                            )}
-                                            {audioDevices.map(d => (
-                                                <option key={d.deviceId} value={d.deviceId}>
-                                                    {d.label || `Output ${d.deviceId.slice(0, 8)}`}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            placeholder="System Default"
+                                            nativeDisabled
+                                            nativeDisabledHint="Native routing belongs to Live's engine"
+                                            showPermissionHint={audioPermission === "prompt"}
+                                        />
                                         <p className="text-[9px] text-white/20 mt-1.5">
-                                            Select the audio output device for playback. The list refreshes automatically when devices are plugged in or removed; use the icon above to refresh manually.
+                                            Select the audio output device for playback. Browser devices set the playback sink; native devices appear when the MMO Companion is running and route through Live's engine.
                                         </p>
                                     </>
                                 )}

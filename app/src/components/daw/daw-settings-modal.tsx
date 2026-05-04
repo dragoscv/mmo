@@ -22,6 +22,7 @@ import {
     EDITOR_WAVEFORM_COLORS,
 } from "@/hooks/use-daw-settings";
 import { NOTATION_LABELS, type NoteNotation } from "@/lib/note-notation";
+import { AudioDeviceSelect } from "@/components/ui/audio-device-select";
 
 type SettingsTab = "audio" | "display" | "personalize" | "shortcuts";
 
@@ -140,30 +141,24 @@ function AudioSettings() {
         <div className="space-y-4">
             <SettingsSection title="Audio Output">
                 <SettingsRow label="Output Device" description="Select audio playback device">
-                    {audioPermission !== "granted" ? (
-                        <button
-                            onClick={handleRequestPermission}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 transition-colors cursor-pointer"
-                        >
-                            <Volume2 className="w-3 h-3" />
-                            Grant Permission
-                        </button>
-                    ) : (
-                        <select
+                    <div className="min-w-[240px]">
+                        <AudioDeviceSelect
+                            kind="output"
+                            size="sm"
                             value={settings.audioOutputDeviceId}
-                            onChange={(e) => handleOutputChange(e.target.value)}
-                            className="h-7 bg-black/30 border border-white/10 rounded text-xs px-2 text-white/60 focus:outline-none min-w-[180px]"
-                        >
-                            {audioDevices.length === 0 && (
-                                <option value="default">Default</option>
-                            )}
-                            {audioDevices.map(d => (
-                                <option key={d.deviceId} value={d.deviceId}>
-                                    {d.label || `Output ${d.deviceId.slice(0, 8)}`}
-                                </option>
-                            ))}
-                        </select>
-                    )}
+                            onValueChange={(change) => {
+                                if (change.source === "native") {
+                                    settings.update({ audioOutputDeviceId: change.value });
+                                } else {
+                                    void handleOutputChange(change.value);
+                                }
+                            }}
+                            placeholder="System Default"
+                            nativeDisabled
+                            nativeDisabledHint="Native routing belongs to Live's engine"
+                            showPermissionHint={audioPermission !== "granted"}
+                        />
+                    </div>
                 </SettingsRow>
             </SettingsSection>
 
@@ -194,30 +189,18 @@ function AudioSettings() {
 
             <SettingsSection title="Recording">
                 <SettingsRow label="Input Device" description="Audio input source (microphone / line in)">
-                    {audioPermission !== "granted" ? (
-                        <button
-                            onClick={handleRequestPermission}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 transition-colors cursor-pointer"
-                        >
-                            <Mic className="w-3 h-3" />
-                            Grant Permission
-                        </button>
-                    ) : (
-                        <select
+                    <div className="min-w-[240px]">
+                        <AudioDeviceSelect
+                            kind="input"
+                            size="sm"
                             value={settings.audioInputDeviceId}
-                            onChange={(e) => settings.update({ audioInputDeviceId: e.target.value })}
-                            className="h-7 bg-black/30 border border-white/10 rounded text-xs px-2 text-white/60 focus:outline-none min-w-[180px]"
-                        >
-                            {inputDevices.length === 0 && (
-                                <option value="default">Default Input</option>
-                            )}
-                            {inputDevices.map(d => (
-                                <option key={d.deviceId} value={d.deviceId}>
-                                    {d.label || `Input ${d.deviceId.slice(0, 8)}`}
-                                </option>
-                            ))}
-                        </select>
-                    )}
+                            onValueChange={(change) => settings.update({ audioInputDeviceId: change.value })}
+                            placeholder="Default Input"
+                            nativeDisabled
+                            nativeDisabledHint="Native input belongs to Live's engine"
+                            showPermissionHint={audioPermission !== "granted"}
+                        />
+                    </div>
                 </SettingsRow>
                 <SettingsRow label="Monitoring" description="Monitor input while recording">
                     <ToggleSwitch checked={settings.inputMonitorEnabled} onChange={(v) => settings.update({ inputMonitorEnabled: v })} />

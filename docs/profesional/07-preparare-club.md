@@ -1,5 +1,7 @@
 # 🔴 Pregătire Club/Festival — Checklist Gig
 
+> ⚠️ **Context**: preparare cu **rekordbox + CDJ**. Aplicabil și cu MMO + USB export → [`docs/aplicatie/playlists.md`](../aplicatie/playlists.md).
+
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../README.md#-profesional)
 
 | ← Prev | Next → |

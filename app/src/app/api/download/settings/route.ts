@@ -1,37 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
-import { settings } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
+import { getSettings, updateSetting } from "@/actions/settings";
 
-const DOWNLOAD_SETTINGS_KEYS = ["downloadFolder", "audioQuality", "audioFormat", "conversionFormat", "conversionQuality", "parallelDownloads", "parallelConversions"];
-
-// GET — load download settings
+/** Download settings now live in the per-user `userPreferences` table. */
 export async function GET() {
-    const result: Record<string, string> = {};
-    for (const key of DOWNLOAD_SETTINGS_KEYS) {
-        const row = db.select().from(settings).where(eq(settings.key, `download.${key}`)).get();
-        if (row) result[key] = row.value;
-    }
-    return NextResponse.json(result);
+    const all = await getSettings();
+    return NextResponse.json({
+        download_folder: all["download_folder"] ?? "",
+        default_format: all["default_format"] ?? "mp3",
+        default_quality: all["default_quality"] ?? "320",
+    });
 }
 
-// POST — save a download setting
-export async function POST(request: NextRequest) {
-    const body = await request.json();
-    const { key, value } = body as { key?: string; value?: string };
-
-    if (!key || typeof key !== "string" || !DOWNLOAD_SETTINGS_KEYS.includes(key)) {
-        return NextResponse.json({ error: "Invalid setting key" }, { status: 400 });
+export async function POST(request: Request) {
+    const body = await request.json().catch(() => ({}));
+    if (typeof body !== "object" || body === null) {
+        return NextResponse.json({ error: "Invalid body" }, { status: 400 });
     }
-
-    const dbKey = `download.${key}`;
-    const existing = db.select().from(settings).where(eq(settings.key, dbKey)).get();
-
-    if (existing) {
-        db.update(settings).set({ value: value || "" }).where(eq(settings.key, dbKey)).run();
-    } else {
-        db.insert(settings).values({ key: dbKey, value: value || "" }).run();
+    for (const [key, value] of Object.entries(body)) {
+        if (typeof value === "string") {
+            await updateSetting(key, value);
+        }
     }
-
     return NextResponse.json({ success: true });
 }

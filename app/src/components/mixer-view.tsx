@@ -1891,14 +1891,19 @@ export function MixerView() {
             case "crossfader":
                 mixer.setCrossfader(value);
                 break;
+            // EQ knobs (DDJ-FLX4 / Pioneer convention):
+            //   full-left  (0)   = -26 dB
+            //   center     (0.5) =   0 dB
+            //   full-right (1)   =  +6 dB
+            // Use a piecewise-linear mapping so 12 o'clock is exactly 0 dB.
             case "eq-hi":
-                if (deck) mixer.setEQ(deck, "hi", (value - 0.5) * 52 - 20); // map 0-1 to -46..+6
+                if (deck) mixer.setEQ(deck, "hi", value < 0.5 ? value * 52 - 26 : (value - 0.5) * 12);
                 break;
             case "eq-mid":
-                if (deck) mixer.setEQ(deck, "mid", (value - 0.5) * 52 - 20);
+                if (deck) mixer.setEQ(deck, "mid", value < 0.5 ? value * 52 - 26 : (value - 0.5) * 12);
                 break;
             case "eq-low":
-                if (deck) mixer.setEQ(deck, "low", (value - 0.5) * 52 - 20);
+                if (deck) mixer.setEQ(deck, "low", value < 0.5 ? value * 52 - 26 : (value - 0.5) * 12);
                 break;
             case "filter":
                 if (deck) mixer.setFilter(deck, (value - 0.5) * 2); // map 0-1 to -1..+1

@@ -1,9 +1,10 @@
 "use server";
 
 import { db } from "@/db";
-import { recordings, settings, type Recording } from "@/db/schema";
+import { recordings, type Recording } from "@/db/schema";
 import { auth } from "@/auth";
 import { desc, eq, and } from "drizzle-orm";
+import { getSetting, updateSetting } from "@/actions/settings";
 import { revalidatePath } from "next/cache";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -25,14 +26,14 @@ const SOURCE_LABELS: Record<RecordingSource, string> = {
  * Resolves and creates the folder if it doesn't exist.
  */
 export async function getRecordingsFolder(): Promise<string> {
-    const explicit = db.select().from(settings).where(eq(settings.key, "recordings_folder")).get();
-    if (explicit?.value) {
-        await fs.mkdir(explicit.value, { recursive: true });
-        return explicit.value;
+    const explicit = await getSetting("recordings_folder");
+    if (explicit) {
+        await fs.mkdir(explicit, { recursive: true });
+        return explicit;
     }
 
-    const musicRoot = db.select().from(settings).where(eq(settings.key, "music_root")).get();
-    const base = musicRoot?.value || path.join(os.homedir(), "Music");
+    const musicRoot = await getSetting("music_root");
+    const base = musicRoot || path.join(os.homedir(), "Music");
     const folder = path.join(base, "Recordings");
     await fs.mkdir(folder, { recursive: true });
     return folder;
@@ -42,12 +43,8 @@ export async function setRecordingsFolder(folder: string): Promise<{ success: bo
     if (!folder?.trim()) return { success: false, error: "Folder path required" };
     try {
         await fs.mkdir(folder, { recursive: true });
-        const exists = db.select().from(settings).where(eq(settings.key, "recordings_folder")).get();
-        if (exists) {
-            db.update(settings).set({ value: folder }).where(eq(settings.key, "recordings_folder")).run();
-        } else {
-            db.insert(settings).values({ key: "recordings_folder", value: folder }).run();
-        }
+        const r = await updateSetting("recordings_folder", folder);
+        if (!r.success) return { success: false, error: r.error || "Failed to save" };
         revalidatePath("/settings");
         revalidatePath("/recordings");
         return { success: true };

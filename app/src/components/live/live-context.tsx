@@ -23,7 +23,7 @@ import { useRenderCount } from "@/lib/dev-debugger";
 import { FX_DEFAULTS } from "@/lib/audio-fx-engine";
 import { useWebRTCAudioStream, type WebRTCAudioStreamApi } from "@/components/remote/use-webrtc-audio-stream";
 import { uploadRecording } from "@/lib/upload-recording";
-import { liveMetersStore } from "@/components/live/live-meters-store";
+import { liveMetersStore, type LiveMetersSnapshot } from "@/components/live/live-meters-store";
 
 const REFRESH_HZ_STORAGE_KEY = "live-ui-refresh-hz";
 const REFRESH_HZ_EVENT = "mmo-ui-refresh-hz-changed";
@@ -211,24 +211,37 @@ export function LiveProvider({ children }: { children: ReactNode }) {
                 voicePeaksRef.current.peakR = m.voiceMeter.peakR;
                 const s = engine.state;
                 const ac = engine.voice.getAutoCorrectStatus();
-                liveMetersStore.publish({
-                    masterPeakL: s.masterPeakL,
-                    masterPeakR: s.masterPeakR,
+                // When the native (companion) engine is running it is the
+                // sole writer for the voice / master / tuner fields below.
+                // The browser engine sees silence in that case, and writing
+                // its zeros at the same Hz as the native mirror would race
+                // and visibly flicker the meters / tuner. We always publish
+                // recording + backing positions (the browser engine still
+                // owns those paths even in native mode).
+                const nativeRunning = liveMetersStore.getSnapshot().nativeRunning;
+                const base: Partial<LiveMetersSnapshot> = {
                     isLimiting: s.isLimiting,
-                    voicePeakL: m.voiceMeter.peakL,
-                    voicePeakR: m.voiceMeter.peakR,
-                    voiceRms: m.voiceMeter.rms,
-                    tunerNote: s.tunerNote,
-                    tunerNoteIndex: m.voiceMeter.pitch.noteIndex,
-                    tunerCents: s.tunerCents,
-                    tunerFrequency: s.tunerFrequency,
-                    tunerConfidence: s.tunerConfidence,
                     autoCorrectTargetMidi: ac.targetMidi ?? -1,
                     autoCorrectSourceMidi: ac.sourceMidi ?? NaN,
                     autoCorrectActive: ac.active,
                     recordingDuration: s.recordingDuration,
                     backingPosition: s.backingPosition,
-                });
+                };
+                if (!nativeRunning) {
+                    Object.assign(base, {
+                        masterPeakL: s.masterPeakL,
+                        masterPeakR: s.masterPeakR,
+                        voicePeakL: m.voiceMeter.peakL,
+                        voicePeakR: m.voiceMeter.peakR,
+                        voiceRms: m.voiceMeter.rms,
+                        tunerNote: s.tunerNote,
+                        tunerNoteIndex: m.voiceMeter.pitch.noteIndex,
+                        tunerCents: s.tunerCents,
+                        tunerFrequency: s.tunerFrequency,
+                        tunerConfidence: s.tunerConfidence,
+                    });
+                }
+                liveMetersStore.publish(base);
             }
             raf = requestAnimationFrame(loop);
         };
@@ -352,6 +365,67 @@ export function LiveProvider({ children }: { children: ReactNode }) {
             await engineRef.current?.voice.startInput(id);
         }
     }, [voiceActive]);
+
+    // ── Native takeover ──────────────────────────────────────────────
+    //
+    // When the native (companion) audio engine is running, the browser's
+    // voice path MUST step out of the way so the user hears ONE sound,
+    // consistently, regardless of which window has focus.
+    //
+    // Two distinct browser-side audio sources can leak through if we're
+    // not careful:
+    //
+    //   1. MIC CAPTURE — the browser's MediaStream still routes the same
+    //      physical input to the FX chain → speakers. Two consumers of
+    //      the same mic = two slightly out-of-phase processed copies.
+    //
+    //   2. FX CHAIN MONITOR PATH — even after we stop the mic, the
+    //      browser's FX chain (Noise Suppression, Compressor, Reverb,
+    //      etc.) is still wired voice.output → voiceMonitorGain →
+    //      mainBus → speakers. Reverb tails, compressor noise floor and
+    //      makeup gain on the empty signal still produce audible
+    //      artefacts that change with focus because Chromium adjusts
+    //      worklet message-port scheduling for hidden / occluded tabs.
+    //
+    // We close BOTH leaks while native is running:
+    //   - stopInput() → release the mic device (also avoids the dual
+    //     capture problem on the OS side).
+    //   - setVoiceMonitor(false) → ramp voiceMonitorGain to zero so the
+    //     FX chain output is muted at the bus. The FX chain itself
+    //     keeps running (so it stays warm and the user can A/B native
+    //     vs browser instantly with no glitch), but contributes zero
+    //     signal to the speakers. Loopers + backing tracks are
+    //     UNAFFECTED — they connect to mainBus on different paths.
+    //
+    // Note: native engine only does pitch correction. The browser FX
+    // chain (Noise Sup, Compressor, Reverb) is intentionally bypassed
+    // when native is on; that's the latency / fidelity trade-off the
+    // user has explicitly opted into by clicking Native ON.
+    useEffect(() => {
+        if (!voiceActive) return;
+        let prevNative = false;
+        const apply = async (running: boolean) => {
+            if (running === prevNative) return;
+            prevNative = running;
+            const e = engineRef.current;
+            if (!e) return;
+            if (running) {
+                // Native took over — close both browser audio paths.
+                try { await e.voice.stopInput(); } catch { /* ignore */ }
+                try { e.setVoiceMonitor(false); } catch { /* ignore */ }
+            } else {
+                // Native released — restore both browser paths.
+                try { e.setVoiceMonitor(true); } catch { /* ignore */ }
+                try { await e.voice.startInput(voiceInputDeviceId); } catch { /* ignore */ }
+            }
+        };
+        // Apply current state on mount / re-run.
+        void apply(liveMetersStore.getSnapshot().nativeRunning);
+        const unsub = liveMetersStore.subscribe(() => {
+            void apply(liveMetersStore.getSnapshot().nativeRunning);
+        });
+        return () => { unsub(); };
+    }, [voiceActive, voiceInputDeviceId]);
 
     const voiceSetInputGain = useCallback((v: number) => {
         const e = engineRef.current;

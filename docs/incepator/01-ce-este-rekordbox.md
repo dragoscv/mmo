@@ -1,5 +1,7 @@
 # 🟢 Ce este Rekordbox?
 
+> ⚠️ **Context**: acest ghid acoperă **rekordbox** — software-ul Pioneer DJ extern. Pentru ghiduri **MMO** (suita noastră) → vezi [`docs/aplicatie/`](../aplicatie/README.md).
+
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../README.md#-începător)
 
 | ← Prev | Next → |

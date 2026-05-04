@@ -1,5 +1,7 @@
 # 🔴 Workflow Profesional — De la Descoperire la Performance
 
+> ⚠️ **Context**: workflow cu **rekordbox + CDJ**. Suplimentar/alternativ în MMO → [`docs/aplicatie/`](../aplicatie/README.md).
+
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../README.md#-profesional)
 
 | ← Prev | Next → |

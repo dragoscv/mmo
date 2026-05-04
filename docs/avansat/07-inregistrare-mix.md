@@ -1,5 +1,7 @@
 # 🟡 Înregistrare Mix — Recording & Export
 
+> ⚠️ **Context**: înregistrare în **rekordbox**. MMO înregistrează nativ → [`docs/aplicatie/recordings.md`](../aplicatie/recordings.md).
+
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../README.md#-avansat)
 
 | ← Prev | Next → |

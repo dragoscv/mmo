@@ -126,6 +126,13 @@ export function MixerBrowserModal({
     // ── Provider state ───────────────────────────────────────────────────
     const [enabledProviders, setEnabledProviders] = useState<Set<string>>(new Set());
     const [providerStates, setProviderStates] = useState<Record<string, ProviderState>>({});
+    // Mirror of `providerStates` kept in a ref so callbacks (esp. the
+    // debounced search effect) can read the latest value without re-creating
+    // their identity on every state update. Without this, `searchProviders`
+    // changes on every successful search → its dependent useEffect fires
+    // again → another search → infinite refresh loop while typing stays idle.
+    const providerStatesRef = useRef(providerStates);
+    useEffect(() => { providerStatesRef.current = providerStates; }, [providerStates]);
     const [showProviderPicker, setShowProviderPicker] = useState(false);
 
     // ── Download modal state ─────────────────────────────────────────────
@@ -159,11 +166,12 @@ export function MixerBrowserModal({
         if (!query.trim() || providers.size === 0) return;
 
         const activeProviders = Array.from(providers);
+        const currentStates = providerStatesRef.current;
 
         // Group providers by their search mode (or use override for all)
         const providersByMode = new Map<SearchType, string[]>();
         for (const p of activeProviders) {
-            const mode = searchTypeOverride || (providerStates[p]?.searchMode ?? "tracks");
+            const mode = searchTypeOverride || (currentStates[p]?.searchMode ?? "tracks");
             const list = providersByMode.get(mode) || [];
             list.push(p);
             providersByMode.set(mode, list);
@@ -252,7 +260,10 @@ export function MixerBrowserModal({
                 });
             }
         }
-    }, [providerStates]);
+        // No state deps — we read latest via providerStatesRef so the debounced
+        // search effect doesn't loop. setProviderStates updaters use `prev`.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // ── Check duplicates against library ──────────────────────────────────
     const checkDuplicates = useCallback(async (results: SearchResult[]) => {
@@ -377,9 +388,14 @@ export function MixerBrowserModal({
         const track = await getTrackById(trackId);
         if (track) {
             mixer.loadTrack(deck, track);
+            // Refresh local library list so the just-loaded track shows up if
+            // the user re-opens the picker.
+            void fetchTracks(search);
             onOpenChange(false);
+        } else {
+            console.warn("[mixer-browser] handleLoadToDeck: track not found in DB", trackId);
         }
-    }, [mixer, onOpenChange]);
+    }, [mixer, onOpenChange, fetchTracks, search]);
 
     // ── Provider section collapse toggle ─────────────────────────────────
     const toggleProviderCollapse = useCallback((id: string) => {
@@ -412,7 +428,7 @@ export function MixerBrowserModal({
         }));
 
         // If we don't have results for this mode yet, fetch them
-        const state = providerStates[providerId];
+        const state = providerStatesRef.current[providerId];
         const hasResults = mode === "playlists"
             ? (state?.playlistResults?.length ?? 0) > 0
             : (state?.trackResults?.length ?? 0) > 0;
@@ -420,7 +436,7 @@ export function MixerBrowserModal({
         if (!hasResults && search.trim()) {
             searchProviders(search, new Set([providerId]), mode);
         }
-    }, [providerStates, search, searchProviders]);
+    }, [search, searchProviders]);
 
     // ── Helper: count visible local tracks ───────────────────────────────
     const visibleLocalTracks = localCollapsed ? [] : tracks.slice(0, localVisibleCount);
@@ -864,6 +880,13 @@ export function MixerBrowserModal({
                     track={downloadTrack}
                     targetDeck={targetDeck}
                     onLoadToDeck={handleLoadToDeck}
+                    onAddedToLibrary={() => {
+                        // Refresh local library so the new track is searchable
+                        // and appears in the list as soon as the download +
+                        // analyze pipeline finishes — even before the user
+                        // clicks "Load to Deck".
+                        void fetchTracks(search);
+                    }}
                     onClose={() => {
                         setDownloadModalOpen(false);
                         setDownloadTrack(null);

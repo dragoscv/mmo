@@ -1,5 +1,7 @@
 # 🔴 Streaming & Recording Profesional
 
+> ⚠️ **Context**: streaming cu **rekordbox + OBS**. MMO are vizualizări auto-reactive perfect pentru OBS Browser Source → [`docs/aplicatie/visualizations.md`](../aplicatie/visualizations.md).
+
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../README.md#-profesional)
 
 | ← Prev | Next → |

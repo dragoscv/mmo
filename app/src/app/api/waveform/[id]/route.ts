@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
-import { tracks } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import fs from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 import os from "node:os";
+import { companionLibrary, getCompanionLink } from "@/lib/companion-library";
 
 const execFileAsync = promisify(execFile);
 
@@ -78,7 +76,9 @@ export async function GET(
         );
     }
 
-    const track = db.select().from(tracks).where(eq(tracks.id, trackId)).get();
+    const link = await getCompanionLink();
+    if (!link) return NextResponse.json({ error: "Companion not connected" }, { status: 503 });
+    const track = await companionLibrary.getTrackById(link, trackId);
     if (!track) {
         return NextResponse.json({ error: "Track not found" }, { status: 404 });
     }
