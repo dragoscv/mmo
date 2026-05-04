@@ -69,8 +69,12 @@ jobs:
       - name: Approve native build scripts (audify, electron)
         # pnpm v10 requires explicit approval for postinstall scripts even
         # when listed in onlyBuiltDependencies; this rebuilds the prebuilt
-        # binaries downloaded by prebuild-install.
-        run: pnpm rebuild
+        # binaries downloaded by prebuild-install. Scoped to the deps we
+        # actually need — an unscoped `pnpm rebuild` also fires
+        # electron-winstaller's install script which calls `node` from a
+        # subshell that doesn't inherit PATH on the windows runner and
+        # fails the build (we use NSIS via electron-builder, not Squirrel).
+        run: pnpm rebuild audify electron better-sqlite3
 
       - name: Build TypeScript
         run: pnpm build
