@@ -1,6 +1,6 @@
 {
   "name": "mmo-companion",
-  "version": "0.9.10",
+  "version": "0.9.11",
   "description": "MMO Companion Server — serves local music files to MMO web app",
   "main": "dist/main.js",
   "author": {
@@ -33,7 +33,8 @@
       {
         "provider": "github",
         "owner": "dragoscv",
-        "repo": "mmo"
+        "repo": "mmo",
+        "releaseType": "release"
       }
     ],
     "directories": {
