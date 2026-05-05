@@ -174,19 +174,34 @@ export class MacOSVirtualAudioAdapter implements IVirtualDeviceAdapter {
 
     /** Force the CoreAudio daemon to reload all HAL plug-ins. Required
      *  after install / uninstall / Info.plist patch — without this,
-     *  the device only appears after a logout/login cycle. */
+     *  the device only appears after a logout/login cycle.
+     *
+     *  We try `launchctl kickstart` first (works in a logged-in user
+     *  session). Under some SIP configurations or when launched via
+     *  sudo from a non-aqua context, that returns
+     *  "Operation not permitted while System Integrity Protection
+     *  is engaged"; in that case we fall back to `killall coreaudiod`
+     *  via osascript, which launchd will respawn automatically.
+     *  Both paths are best-effort — if they fail the user just needs
+     *  to log out + back in. */
     private async kickstartCoreAudio(): Promise<void> {
-        // No admin needed for kickstart of a system service the user
-        // owns; falls back silently if launchctl is busy.
-        await new Promise<void>(resolve => {
+        const ok = await new Promise<boolean>(resolve => {
             const child = spawn("launchctl", [
                 "kickstart",
                 "-k",
                 "system/com.apple.audio.coreaudiod",
             ], { stdio: "ignore" });
-            child.on("exit", () => resolve());
-            child.on("error", () => resolve());
+            child.on("exit", code => resolve(code === 0));
+            child.on("error", () => resolve(false));
         });
+        if (ok) return;
+        // Fallback: ask launchd to respawn coreaudiod by killing it.
+        // Requires admin; we surface the same auth dialog already used
+        // for the installer, so the UX is one prompt back-to-back.
+        await exec("osascript", [
+            "-e",
+            'do shell script "killall coreaudiod" with administrator privileges',
+        ], { timeout: 30_000 }).catch(() => undefined);
     }
 
     private async readPlistKey(driverBundlePath: string, key: string): Promise<string> {
