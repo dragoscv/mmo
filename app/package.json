@@ -2,7 +2,6 @@
   "name": "music-organizer",
   "version": "0.2.0",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "next dev -p 13789",
     "build": "next build",
