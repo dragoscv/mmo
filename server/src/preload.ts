@@ -9,6 +9,11 @@ contextBridge.exposeInMainWorld("mmo", {
     selectFolder: () => ipcRenderer.invoke("select-folder"),
     getVersion: () => ipcRenderer.invoke("get-version"),
     openAuthInBrowser: (webAppUrl: string) => ipcRenderer.invoke("open-auth-in-browser", webAppUrl),
+    /** Cancel an in-flight auth flow (user closed the browser tab without
+     *  completing the OAuth round-trip). Resolves the pending
+     *  `openAuthInBrowser` promise with `null` so the UI can re-enable the
+     *  Sign-in button. Safe to call when no flow is active — it's a no-op. */
+    cancelAuth: () => ipcRenderer.invoke("cancel-auth-flow"),
     /** Get the current cached audio inventory. Pass `{ force: true }` to
      *  bypass the freshness window and trigger a full re-enumeration. */
     getAudioDevices: (opts?: { force?: boolean }) => ipcRenderer.invoke("get-audio-devices", opts),

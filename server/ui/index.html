@@ -1233,8 +1233,26 @@
 
             const btn = document.getElementById("btn-signin");
             const originalHTML = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2px solid #444;border-top:2px solid #a855f7;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle"></span> Opening browser...';
+            const originalOnClick = btn.onclick;
+
+            // Swap the button into a "waiting / cancel" state. Clicking it
+            // again aborts the in-flight IPC so the user can retry without
+            // restarting the app — handy if they accidentally closed the
+            // OAuth browser tab before completing the round-trip.
+            const restore = () => {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+                btn.onclick = originalOnClick;
+            };
+
+            btn.disabled = false;
+            btn.onclick = async () => {
+                btn.disabled = true;
+                try { await window.mmo.cancelAuth(); } catch { /* ignore */ }
+                // Promise from openAuthInBrowser resolves to null, which
+                // restores the button via the existing else-branch below.
+            };
+            btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2px solid #444;border-top:2px solid #a855f7;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle"></span> Waiting for browser… (click to cancel)';
 
             try {
                 const result = await window.mmo.openAuthInBrowser(url);
@@ -1242,13 +1260,11 @@
                     const status = await window.mmo.getStatus();
                     showMainView(status);
                 } else {
-                    btn.disabled = false;
-                    btn.innerHTML = originalHTML;
+                    restore();
                 }
             } catch (err) {
                 alert("Connection failed: " + err.message);
-                btn.disabled = false;
-                btn.innerHTML = originalHTML;
+                restore();
             }
         }
 

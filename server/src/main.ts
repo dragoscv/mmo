@@ -301,6 +301,10 @@ async function loadServerModule(): Promise<ServerModule | null> {
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+// Set while a Sign-in-with-Google flow is in progress so the renderer can
+// abort it (e.g. user closed the OAuth tab). Calling it resolves the
+// pending `open-auth-in-browser` promise with `null`.
+let pendingAuthCancel: (() => void) | null = null;
 
 // ─── Post-paint task queue ──────────────────────────────────────────
 //
@@ -727,6 +731,14 @@ function setupIPC() {
             dialog.showErrorBox("Server unavailable", "Cannot start auth flow because the local server failed to start.");
             return null;
         }
+        // Cancel any previous in-flight flow before starting a new one. The
+        // user may have clicked Sign in twice, or hit the button after a
+        // partial timeout — either way we want exactly one pending promise.
+        if (pendingAuthCancel) {
+            try { pendingAuthCancel(); } catch { /* ignore */ }
+            pendingAuthCancel = null;
+        }
+
         const hostname = os.hostname();
         const platform = process.platform;
         const port = serverModule.getServerPort();
@@ -747,20 +759,41 @@ function setupIPC() {
         const authUrl = `${webAppUrl}/api/companion-auth?${params.toString()}`;
         shell.openExternal(authUrl);
 
-        // Wait for auth callback (max 5 minutes)
+        // Wait for auth callback (max 5 minutes) OR explicit cancel from the
+        // renderer (user closed the browser tab without finishing OAuth).
         return new Promise((resolve) => {
-            const timeout = setTimeout(() => {
+            const cleanup = () => {
+                clearTimeout(timeout);
                 serverModule?.authEvents.removeListener("authenticated", handler);
+                pendingAuthCancel = null;
+            };
+
+            const timeout = setTimeout(() => {
+                cleanup();
                 resolve(null);
             }, 5 * 60 * 1000);
 
             function handler(data: Record<string, string>) {
-                clearTimeout(timeout);
+                cleanup();
                 resolve(data);
             }
 
             serverModule!.authEvents.once("authenticated", handler);
+
+            pendingAuthCancel = () => {
+                cleanup();
+                resolve(null);
+            };
         });
+    });
+
+    ipcMain.handle("cancel-auth-flow", () => {
+        if (pendingAuthCancel) {
+            try { pendingAuthCancel(); } catch { /* ignore */ }
+            pendingAuthCancel = null;
+            return true;
+        }
+        return false;
     });
 }
 
