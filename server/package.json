@@ -16,7 +16,8 @@
     "dist": "tsc && electron-builder --win --x64",
     "dist:win": "tsc && electron-builder --win --x64",
     "dist:mac": "tsc && electron-builder --mac",
-    "dist:linux": "tsc && electron-builder --linux"
+    "dist:linux": "tsc && electron-builder --linux",
+    "fetch:virtual-audio": "node scripts/fetch-virtual-audio.mjs"
   },
   "build": {
     "appId": "com.mwrty.mmo-companion",
@@ -56,6 +57,14 @@
         "to": "fpcalc",
         "filter": [
           "**/*"
+        ]
+      },
+      {
+        "from": "assets/virtual-audio",
+        "to": "virtual-audio",
+        "filter": [
+          "**/*",
+          "!**/.gitkeep"
         ]
       }
     ],

@@ -48,4 +48,29 @@ contextBridge.exposeInMainWorld("mmo", {
     onUpdateStatus: (callback: (data: Record<string, unknown>) => void) => {
         ipcRenderer.on("update-status", (_event, data) => callback(data));
     },
+    /**
+     * Virtual Audio Devices — manage the bundled virtual audio driver
+     * (BlackHole on macOS, Virtual-Audio-Driver on Windows, pactl on
+     * Linux). Available pre-auth so the user can configure routing
+     * before signing in.
+     *
+     * Every call resolves with `{ ok: true, data }` on success or
+     * `{ ok: false, error }` on failure (cancelled UAC, missing
+     * binary, driver error, …).
+     */
+    va: {
+        probe: () => ipcRenderer.invoke("va:probe"),
+        install: () => ipcRenderer.invoke("va:install"),
+        uninstall: () => ipcRenderer.invoke("va:uninstall"),
+        list: () => ipcRenderer.invoke("va:list"),
+        create: (opts: {
+            name: string;
+            topology: "independent" | "loopback";
+            channels?: number;
+            sampleRate?: number;
+        }) => ipcRenderer.invoke("va:create", opts),
+        rename: (id: string, name: string) => ipcRenderer.invoke("va:rename", id, name),
+        setEnabled: (id: string, enabled: boolean) => ipcRenderer.invoke("va:set-enabled", id, enabled),
+        remove: (id: string) => ipcRenderer.invoke("va:remove", id),
+    },
 });

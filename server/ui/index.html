@@ -59,6 +59,79 @@
             color: var(--muted);
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
+            position: relative;
+        }
+
+        .titlebar-btn {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+            transition: background 120ms, border-color 120ms, color 120ms;
+        }
+        .titlebar-btn:hover {
+            background: var(--card);
+            border-color: var(--border);
+            color: var(--text);
+        }
+
+        /* ── Virtual Audio panel ── */
+        .va-status {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 6px;
+            background: var(--card); border: 1px solid var(--border);
+            margin-bottom: 12px;
+        }
+        .va-status.ok { border-color: #1e5128; background: #0e1f12; }
+        .va-status.bad { border-color: #6e2222; background: #1f0e0e; }
+        .va-status .va-status-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--muted); flex-shrink: 0;
+        }
+        .va-status.ok .va-status-dot { background: #4ade80; }
+        .va-status.bad .va-status-dot { background: #f87171; }
+        .va-status-text { flex: 1; font-size: 12px; line-height: 1.4; }
+        .va-status-text .va-status-title { font-weight: 600; color: var(--text); }
+        .va-status-text .va-status-sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+        .va-device {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 6px;
+            background: var(--card); border: 1px solid var(--border);
+            margin-bottom: 6px;
+        }
+        .va-device.disabled { opacity: 0.55; }
+        .va-device-info { flex: 1; min-width: 0; }
+        .va-device-name {
+            font-size: 13px; font-weight: 600; color: var(--text);
+            background: transparent; border: none; padding: 0; width: 100%;
+            font-family: inherit;
+        }
+        .va-device-name:focus {
+            outline: 1px solid #3b82f6; border-radius: 3px; padding: 0 2px;
+        }
+        .va-device-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+        .va-device-tag {
+            display: inline-block; padding: 1px 6px; border-radius: 3px;
+            background: #1e293b; color: #94a3b8; font-size: 10px;
+            margin-right: 4px; font-weight: 500;
+        }
+        .va-device-tag.loopback { background: #422006; color: #fbbf24; }
+        .va-device-actions { display: flex; gap: 4px; flex-shrink: 0; }
+        .va-actions-row { display: flex; gap: 6px; margin-top: 8px; }
+        .va-empty {
+            padding: 16px; text-align: center; font-size: 11px;
+            color: var(--muted); font-style: italic;
+            border: 1px dashed var(--border); border-radius: 6px;
         }
 
         .content {
@@ -744,6 +817,20 @@
             min-height: 0;
         }
 
+        /* Virtual-audio view follows the same flex contract; it overlays
+           the other views entirely (auth or main), and remembers which
+           one to return to via a `data-return` attribute set by the
+           opener. */
+        #view-virtual-audio {
+            display: none;
+        }
+        #view-virtual-audio.active {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+
         @keyframes spin {
             to {
                 transform: rotate(360deg);
@@ -958,7 +1045,10 @@
         <div class="splash-dots" aria-hidden="true"><span></span><span></span><span></span></div>
     </div>
 
-    <div class="titlebar">MMO Companion Server</div>
+    <div class="titlebar">
+        MMO Companion Server
+        <button class="titlebar-btn" id="btn-open-va" onclick="showVirtualAudioView()" title="Audio Setup — manage virtual audio devices">⚙ Audio Setup</button>
+    </div>
 
     <!-- AUTH VIEW -->
     <div id="view-auth" class="active">
@@ -1112,6 +1202,56 @@
             </button>
         </div>
         <div class="version" id="version-text">MMO Companion</div>
+    </div>
+
+    <!-- VIRTUAL AUDIO VIEW (accessible from auth + main) -->
+    <div id="view-virtual-audio">
+        <div class="content">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                <button class="btn" onclick="hideVirtualAudioView()" style="padding:4px 10px;font-size:12px">← Back</button>
+                <div style="font-size:14px;font-weight:600;color:var(--text)">Virtual Audio Devices</div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.5">
+                The companion ships with a bundled virtual audio driver so the web app's
+                low-latency engine can route per-deck audio through dedicated, named endpoints.
+                Default set is created on first run: <strong>Master</strong>, <strong>Cue</strong>,
+                <strong>Aux1</strong>, <strong>Aux2</strong> (independent stereo pairs) +
+                <strong>Loopback</strong> (for recording / streaming).
+            </div>
+
+            <div id="va-status" class="va-status">
+                <div class="va-status-dot"></div>
+                <div class="va-status-text">
+                    <div class="va-status-title">Checking driver…</div>
+                    <div class="va-status-sub"></div>
+                </div>
+            </div>
+
+            <div class="va-actions-row" id="va-driver-actions" style="display:none">
+                <button class="btn" id="va-btn-install" onclick="vaInstall()" style="flex:1">Install driver</button>
+                <button class="btn" id="va-btn-uninstall" onclick="vaUninstall()" style="flex:1;display:none">Uninstall</button>
+            </div>
+
+            <div class="section" style="margin-top:18px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <div class="section-title" style="margin-bottom:0">Devices</div>
+                    <div style="display:flex;gap:6px">
+                        <button class="btn" id="va-btn-refresh" onclick="vaRefresh()" style="padding:4px 8px;font-size:11px">↻ Refresh</button>
+                        <button class="btn" id="va-btn-add" onclick="vaPromptAdd()" style="padding:4px 8px;font-size:11px">+ Add</button>
+                    </div>
+                </div>
+                <div id="va-device-list">
+                    <div class="va-empty">No devices yet.</div>
+                </div>
+            </div>
+
+            <div style="font-size:10px;color:var(--muted);margin-top:18px;line-height:1.5;border-top:1px solid var(--border);padding-top:10px">
+                <strong>Drivers:</strong>
+                Linux uses PipeWire/PulseAudio (built-in).
+                macOS uses BlackHole 16ch (GPL-3, by Existential Audio) — admin password required to install.
+                Windows uses Virtual-Audio-Driver (MIT) — UAC consent required to install.
+            </div>
+        </div>
     </div>
 
     <script>
@@ -1705,6 +1845,200 @@
                     ver.style.color = "#22c55e";
                 }
             });
+        }
+
+        // ─── Virtual Audio Devices (pre-auth + post-auth) ─────────────────
+        //
+        // The Audio Setup view overlays whichever view is currently
+        // active (auth or main). It calls window.mmo.va.* IPC handlers
+        // exposed by preload.ts. All handlers return either
+        //   { ok: true, data: <result> }
+        // or
+        //   { ok: false, error: "human readable message" }
+        // and we surface the error directly to the user (no console-only
+        // failures — driver ops involve UAC/sudo and the user needs to
+        // know if they cancelled the dialog).
+
+        let vaPreviousView = "view-auth";
+        let vaProbeCache = null;
+
+        function showVirtualAudioView() {
+            const auth = document.getElementById("view-auth");
+            const main = document.getElementById("view-main");
+            const va = document.getElementById("view-virtual-audio");
+            vaPreviousView = main.classList.contains("active") ? "view-main" : "view-auth";
+            auth.classList.remove("active");
+            main.classList.remove("active");
+            va.classList.add("active");
+            // Hide the gear button while we're already on the panel.
+            const btn = document.getElementById("btn-open-va");
+            if (btn) btn.style.visibility = "hidden";
+            vaRefresh();
+        }
+
+        function hideVirtualAudioView() {
+            document.getElementById("view-virtual-audio").classList.remove("active");
+            document.getElementById(vaPreviousView).classList.add("active");
+            const btn = document.getElementById("btn-open-va");
+            if (btn) btn.style.visibility = "";
+        }
+
+        async function vaRefresh() {
+            await vaRefreshStatus();
+            await vaRefreshList();
+        }
+
+        async function vaRefreshStatus() {
+            const statusEl = document.getElementById("va-status");
+            const titleEl = statusEl.querySelector(".va-status-title");
+            const subEl = statusEl.querySelector(".va-status-sub");
+            const actionsEl = document.getElementById("va-driver-actions");
+            const installBtn = document.getElementById("va-btn-install");
+            const uninstallBtn = document.getElementById("va-btn-uninstall");
+            const addBtn = document.getElementById("va-btn-add");
+
+            statusEl.classList.remove("ok", "bad");
+            titleEl.textContent = "Checking driver…";
+            subEl.textContent = "";
+            actionsEl.style.display = "none";
+
+            const res = await window.mmo.va.probe();
+            if (!res.ok) {
+                statusEl.classList.add("bad");
+                titleEl.textContent = "Driver probe failed";
+                subEl.textContent = res.error;
+                addBtn.disabled = true;
+                return;
+            }
+            vaProbeCache = res.data;
+            const p = res.data;
+            if (p.available) {
+                statusEl.classList.add("ok");
+                titleEl.textContent = "Driver ready";
+                subEl.textContent = (p.version || "") + (p.maxDevices > 0 ? " — up to " + (p.maxDevices === -1 ? "unlimited" : p.maxDevices) + " devices" : "");
+                actionsEl.style.display = "flex";
+                installBtn.style.display = "none";
+                uninstallBtn.style.display = "block";
+                addBtn.disabled = !p.supportsRuntimeCreate;
+            } else {
+                statusEl.classList.add("bad");
+                titleEl.textContent = "Driver not installed";
+                subEl.textContent = p.reason || "";
+                actionsEl.style.display = "flex";
+                installBtn.style.display = "block";
+                uninstallBtn.style.display = "none";
+                addBtn.disabled = true;
+            }
+        }
+
+        async function vaRefreshList() {
+            const listEl = document.getElementById("va-device-list");
+            const res = await window.mmo.va.list();
+            if (!res.ok) {
+                listEl.innerHTML = '<div class="va-empty">' + escapeHtml(res.error) + '</div>';
+                return;
+            }
+            const devices = res.data || [];
+            if (devices.length === 0) {
+                listEl.innerHTML = '<div class="va-empty">No virtual devices yet. Click + Add to create one, or install the driver if it isn\'t installed yet.</div>';
+                return;
+            }
+            listEl.innerHTML = devices.map(d => `
+                <div class="va-device ${d.enabled ? "" : "disabled"}" data-id="${d.id}">
+                    <div class="va-device-info">
+                        <input class="va-device-name" value="${escapeHtml(d.name)}"
+                               onblur="vaRename('${d.id}', this.value)"
+                               onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+                        <div class="va-device-meta">
+                            <span class="va-device-tag ${d.topology}">${d.topology}</span>
+                            ${d.channels}ch · ${(d.sampleRate / 1000).toFixed(1)}kHz
+                        </div>
+                    </div>
+                    <div class="va-device-actions">
+                        <button class="btn" onclick="vaToggle('${d.id}', ${!d.enabled})"
+                                style="padding:4px 8px;font-size:11px"
+                                title="${d.enabled ? "Disable (hide from OS audio picker)" : "Enable"}">
+                            ${d.enabled ? "On" : "Off"}
+                        </button>
+                        <button class="btn danger" onclick="vaRemove('${d.id}', '${escapeAttr(d.name)}')"
+                                style="padding:4px 8px;font-size:11px">×</button>
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        async function vaInstall() {
+            const btn = document.getElementById("va-btn-install");
+            btn.disabled = true;
+            btn.textContent = "Installing…";
+            const res = await window.mmo.va.install();
+            btn.disabled = false;
+            btn.textContent = "Install driver";
+            if (!res.ok) {
+                alert("Install failed:\n\n" + res.error);
+            }
+            await vaRefresh();
+        }
+
+        async function vaUninstall() {
+            if (!confirm("Uninstall the virtual audio driver? All virtual devices will be removed.")) return;
+            const btn = document.getElementById("va-btn-uninstall");
+            btn.disabled = true;
+            btn.textContent = "Uninstalling…";
+            const res = await window.mmo.va.uninstall();
+            btn.disabled = false;
+            btn.textContent = "Uninstall";
+            if (!res.ok) {
+                alert("Uninstall failed:\n\n" + res.error);
+            }
+            await vaRefresh();
+        }
+
+        async function vaPromptAdd() {
+            const name = (prompt("Name for the new virtual device (e.g. \"Deck3\")?", "MMO-Deck") || "").trim();
+            if (!name) return;
+            const topology = confirm("Click OK for an INDEPENDENT device (per-deck routing — recommended).\nClick Cancel for a LOOPBACK device (recording / streaming).") ? "independent" : "loopback";
+            const res = await window.mmo.va.create({ name, topology, channels: 2, sampleRate: 48000 });
+            if (!res.ok) {
+                alert("Create failed:\n\n" + res.error);
+            }
+            await vaRefreshList();
+        }
+
+        async function vaRename(id, newName) {
+            const trimmed = (newName || "").trim();
+            if (!trimmed) { await vaRefreshList(); return; }
+            const res = await window.mmo.va.rename(id, trimmed);
+            if (!res.ok) {
+                alert("Rename failed:\n\n" + res.error);
+                await vaRefreshList();
+            }
+        }
+
+        async function vaToggle(id, enabled) {
+            const res = await window.mmo.va.setEnabled(id, enabled);
+            if (!res.ok) {
+                alert((enabled ? "Enable" : "Disable") + " failed:\n\n" + res.error);
+            }
+            await vaRefreshList();
+        }
+
+        async function vaRemove(id, name) {
+            if (!confirm("Remove virtual device \"" + name + "\"?")) return;
+            const res = await window.mmo.va.remove(id);
+            if (!res.ok) {
+                alert("Remove failed:\n\n" + res.error);
+            }
+            await vaRefreshList();
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+            })[c]);
+        }
+        function escapeAttr(s) {
+            return String(s).replace(/'/g, "\\'");
         }
     </script>
 </body>

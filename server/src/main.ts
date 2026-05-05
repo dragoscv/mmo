@@ -5,6 +5,18 @@ import os from "node:os";
 import fs from "node:fs";
 import { store, getSettings, updateSettings, type CompanionSettings, type AuthorizedAudioDevice } from "./store";
 import { listBackends, listDevices, invalidateAudioInventoryCache, type AudioBackend } from "./audio/native-engine";
+import {
+    probeDriver as probeVirtualAudioDriver,
+    installDriver as installVirtualAudioDriver,
+    uninstallDriver as uninstallVirtualAudioDriver,
+    listDevices as listVirtualAudioDevices,
+    createDevice as createVirtualAudioDevice,
+    renameDevice as renameVirtualAudioDevice,
+    setDeviceEnabled as setVirtualAudioDeviceEnabled,
+    removeDevice as removeVirtualAudioDevice,
+    reconcileOnStartup as reconcileVirtualAudioOnStartup,
+    type CreateVirtualDeviceOptions as VACreateOptions,
+} from "./audio/virtual-devices";
 
 // ─── Low-latency audio host hardening ────────────────────────────────────────
 //
@@ -795,6 +807,47 @@ function setupIPC() {
         }
         return false;
     });
+
+    // ─── Virtual Audio Devices ──────────────────────────────────────────────
+    //
+    // These handlers manage the bundled virtual audio driver
+    // (BlackHole on macOS, Virtual-Audio-Driver on Windows, pactl on
+    // Linux). They are accessible from the pre-auth UI so the user can
+    // set up audio routing before signing in.
+    //
+    // All handlers swallow errors into structured `{ ok: false, error }`
+    // results — driver operations involve admin escalation and shell-out
+    // to system tools, which can fail in many user-friendly ways
+    // (cancelled UAC, sudo timeout, missing binary). The renderer
+    // surfaces those messages directly to the user.
+
+    function vaWrap<TArgs extends unknown[], TRet>(fn: (...args: TArgs) => Promise<TRet>) {
+        return async (...args: TArgs): Promise<{ ok: true; data: TRet } | { ok: false; error: string }> => {
+            try {
+                const data = await fn(...args);
+                return { ok: true, data };
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                logLine("warn", `[virtual-audio] ${fn.name} failed:`, err as Error);
+                return { ok: false, error: msg };
+            }
+        };
+    }
+
+    ipcMain.handle("va:probe", vaWrap((_e: unknown) => probeVirtualAudioDriver()));
+    ipcMain.handle("va:install", vaWrap((_e: unknown) => installVirtualAudioDriver()));
+    ipcMain.handle("va:uninstall", vaWrap(async (_e: unknown) => {
+        await uninstallVirtualAudioDriver();
+        return null;
+    }));
+    ipcMain.handle("va:list", vaWrap((_e: unknown) => listVirtualAudioDevices()));
+    ipcMain.handle("va:create", vaWrap((_e: unknown, opts: VACreateOptions) => createVirtualAudioDevice(opts)));
+    ipcMain.handle("va:rename", vaWrap((_e: unknown, id: string, name: string) => renameVirtualAudioDevice(id, name)));
+    ipcMain.handle("va:set-enabled", vaWrap((_e: unknown, id: string, enabled: boolean) => setVirtualAudioDeviceEnabled(id, enabled)));
+    ipcMain.handle("va:remove", vaWrap(async (_e: unknown, id: string) => {
+        await removeVirtualAudioDevice(id);
+        return null;
+    }));
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -880,6 +933,17 @@ app.whenReady().then(async () => {
     // timeout in 0.7.2.
     runAfterPaint(() => {
         void refreshAudioInventory("app-ready");
+    });
+    // Reconcile virtual audio devices with the OS audio service:
+    //   - first run + driver installed → create the default device set
+    //   - subsequent runs → re-apply the persisted set (PipeWire / pactl
+    //     state is volatile across reboots; BlackHole survives but its
+    //     instance metadata is held in the companion store; Windows VAD
+    //     survives but our per-instance bookkeeping does not).
+    // Run after paint so we don't block the splash; runs entirely off
+    // the main paint thread.
+    runAfterPaint(() => {
+        void reconcileVirtualAudioOnStartup((msg) => logLine("info", msg));
     });
     // NOTE: a periodic background re-probe was tried but each enumeration
     // is a synchronous RtAudio call (~200–800ms per backend on Windows)

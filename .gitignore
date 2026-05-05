@@ -30,4 +30,13 @@ __pycache__/
 # Stale backups
 *.legacy.bak
 
+# Bundled virtual audio drivers — fetched at build time from upstream
+# release URLs with pinned SHA-256s; do not commit binaries.
+/server/assets/virtual-audio/macos/*.pkg
+/server/assets/virtual-audio/windows/*.inf
+/server/assets/virtual-audio/windows/*.sys
+/server/assets/virtual-audio/windows/*.cat
+/server/assets/virtual-audio/windows/*.zip
+/server/assets/virtual-audio/windows/*.exe
+
 .vercel
