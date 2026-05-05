@@ -21,7 +21,11 @@ import { FocusModeProvider } from "@/components/focus-mode-context";
 import { FocusAwareSidebar, FocusAwareMobileHeader, FocusAwareNowPlayingBar } from "@/components/focus-aware-shell";
 import { AuthProvider } from "@/components/auth-provider";
 import { PreferencesSync } from "@/components/preferences-sync";
-import "./globals.css";
+// NOTE: globals.css is pre-compiled by `@tailwindcss/cli` into `public/globals.css`
+// during `prebuild`, then served as a static asset and linked from <head> below.
+// We bypass Next.js' postcss pipeline because @tailwindcss/postcss on Linux
+// (Vercel) emits CSS its own re-parse step can't handle (relative-color
+// inside @supports). Source lives at `src/app/globals.src.css`.
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 import Script from "next/script";
@@ -67,6 +71,7 @@ export default function RootLayout({
         <html lang="ro" className={cn("dark font-sans", inter.variable)} suppressHydrationWarning>
             <head>
                 <meta name="theme-color" content="#a855f7" />
+                <link rel="stylesheet" href="/globals.css" />
             </head>
             <body className="antialiased">
                 <Script id="sw-register" strategy="afterInteractive">
