@@ -1,6 +1,6 @@
 {
   "name": "mmo-companion",
-  "version": "0.9.9",
+  "version": "0.9.10",
   "description": "MMO Companion Server — serves local music files to MMO web app",
   "main": "dist/main.js",
   "author": {

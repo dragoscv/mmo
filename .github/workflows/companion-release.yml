@@ -85,11 +85,13 @@ jobs:
         # express→qs→side-channel→get-intrinsic→es-object-atoms, etc.)
         # unreachable to electron-builder's asar packer. We wipe node_modules
         # after the TypeScript build (which only needs them transiently) and
-        # let npm produce a guaranteed-flat tree for packaging.
+        # let npm produce a guaranteed-flat tree for packaging. We keep
+        # devDependencies so `electron-builder` itself stays available;
+        # electron-builder auto-prunes devDeps when writing app.asar.
         shell: bash
         run: |
           rm -rf node_modules
-          npm install --omit=dev --ignore-scripts --no-audit --no-fund
+          npm install --ignore-scripts --no-audit --no-fund
           # Rebuild only the native module we actually use; ignore the rest
           # to avoid electron-winstaller / postinstall surprises on Windows.
           npm rebuild audify better-sqlite3 || true
