@@ -8,6 +8,11 @@
     "email": "vladulescu.catalin@gmail.com"
   },
   "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/dragoscv/mmo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dragoscv/mmo.git"
+  },
   "scripts": {
     "dev": "tsc && electron dist/main.js",
     "dev:inspect": "tsc && electron --inspect=0.0.0.0:9229 --remote-debugging-port=9222 dist/main.js",
@@ -113,11 +118,71 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "rpm",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "icon": "assets/icon.png",
-      "category": "Audio"
+      "category": "AudioVideo;Audio",
+      "synopsis": "MMO Companion — local music server for the MMO web app",
+      "description": "Electron companion daemon that serves your local music library, recordings, and downloads to the MMO web app. Bundles the BlackHole / pactl virtual-audio adapter so you can route per-deck audio without third-party drivers.",
+      "maintainer": "mwrty <vladulescu.catalin@gmail.com>",
+      "vendor": "mwrty",
+      "desktop": {
+        "entry": {
+          "Name": "MMO Companion",
+          "Comment": "Local music server for the MMO web app",
+          "Categories": "AudioVideo;Audio;"
+        }
+      }
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0 | libgtk-3-0t64",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0 | libatspi2.0-0t64",
+        "libuuid1",
+        "libsecret-1-0",
+        "libasound2 | libasound2t64"
+      ],
+      "recommends": [
+        "pulseaudio-utils | pipewire-pulse"
+      ]
+    },
+    "rpm": {
+      "depends": [
+        "libnotify",
+        "nss",
+        "libXScrnSaver",
+        "libXtst",
+        "xdg-utils",
+        "at-spi2-core",
+        "libsecret",
+        "alsa-lib"
+      ]
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": true,

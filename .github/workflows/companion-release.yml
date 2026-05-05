@@ -5,6 +5,7 @@ name: Companion — build & release
 # Produces:
 #   - Windows: NSIS installer (.exe) + latest.yml (electron-updater feed)
 #   - macOS:   DMG (.dmg) + latest-mac.yml
+#   - Linux:   AppImage + .deb + .rpm + latest-linux.yml
 # All artifacts are uploaded to a GitHub Release named after the tag.
 #
 # The web app's /api/companion/download route reads the latest release
@@ -38,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -47,6 +48,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Linux runners need a few system packages so electron-builder can
+      # produce .deb / .rpm / .AppImage and so the bundled audio adapter
+      # has its dev dependencies (rpmbuild, fakeroot, libarchive-tools).
+      # We also install pulseaudio-utils so a smoke test of `pactl info`
+      # could be wired in later without surprise.
+      - name: Install Linux build dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            rpm \
+            fakeroot \
+            libarchive-tools \
+            dpkg \
+            libnss3 \
+            libxss1 \
+            libgbm1 \
+            libsecret-1-0 \
+            libasound2t64 \
+            pulseaudio-utils
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -128,7 +150,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: pnpm exec electron-builder --mac --x64 --arm64 ${{ steps.pub.outputs.flag }}
-
+      # ── Linux ───────────────────────────────────────────────────
+      # Produces three formats so distros without AppImage support get a
+      # native package: .deb (Ubuntu/Debian/Mint), .rpm (Fedora/openSUSE),
+      # .AppImage (everything else, including Arch). The runtime audio
+      # adapter calls `pactl` from PipeWire's PulseAudio compatibility
+      # layer, which the .deb's `Recommends` line surfaces to the user
+      # but does not hard-require (PipeWire is the default on Ubuntu
+      # 22.10+, Fedora 34+, etc., and the adapter degrades gracefully
+      # to a "driver unavailable" probe result if pactl is missing).
+      - name: Build Linux packages (.deb, .rpm, .AppImage)
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          USE_SYSTEM_FPM: "false"
+        run: pnpm exec electron-builder --linux --x64 ${{ steps.pub.outputs.flag }}
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -138,6 +174,9 @@ jobs:
             server/release/*.exe
             server/release/*.dmg
             server/release/*.zip
+            server/release/*.AppImage
+            server/release/*.deb
+            server/release/*.rpm
             server/release/latest*.yml
           if-no-files-found: warn
           retention-days: 14

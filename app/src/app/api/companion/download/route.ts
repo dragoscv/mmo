@@ -132,7 +132,7 @@ async function fetchLatestCompanionRelease(): Promise<GhRelease | null> {
                 // exclude unrelated tags (e.g. internal release tags from
                 // other components) by requiring at least one expected asset.
                 r.assets.some((a) =>
-                    /\.(exe|dmg|appimage|deb)$/i.test(a.name),
+                    /\.(exe|dmg|appimage|deb|rpm)$/i.test(a.name),
                 ),
         )
         .sort((a, b) => b.published_at.localeCompare(a.published_at))[0];
@@ -176,6 +176,7 @@ function pickAsset(release: GhRelease, os: Os, arch: Arch): ResolvedAsset | null
     //   MMO-Companion-X.Y.Z-arm64.zip          (macOS Apple Silicon auto-update)
     //   MMO-Companion-X.Y.Z.AppImage           (Linux)
     //   mmo-companion_X.Y.Z_amd64.deb          (Linux .deb)
+    //   mmo-companion-X.Y.Z.x86_64.rpm         (Linux .rpm)
     const matchers: Record<Os, (name: string) => boolean> = {
         win: (n) => n.toLowerCase().endsWith(".exe"),
         mac: (n) => {
@@ -187,7 +188,12 @@ function pickAsset(release: GhRelease, os: Os, arch: Arch): ResolvedAsset | null
             // anything not arm64 (handles older builds without arch suffix).
             return isX64 || !isArm;
         },
-        linux: (n) => /\.(appimage|deb)$/i.test(n),
+        // .AppImage is the most universal Linux target (no install
+        // needed), so we prefer it when both AppImage and a packaged
+        // format are available. The user can override via ?os=linux
+        // and we surface .deb / .rpm only as direct GitHub-Releases
+        // links (no auto-redirect heuristic by distro).
+        linux: (n) => /\.appimage$/i.test(n) || /\.(deb|rpm)$/i.test(n),
     };
 
     const matcher = matchers[os];
@@ -195,6 +201,12 @@ function pickAsset(release: GhRelease, os: Os, arch: Arch): ResolvedAsset | null
     if (!asset && os === "mac") {
         // Final fallback: any .dmg in the release.
         asset = release.assets.find((a) => /\.dmg$/i.test(a.name));
+    }
+    if (os === "linux") {
+        // Prefer .AppImage when both AppImage and .deb / .rpm are present
+        // so that the auto-redirect lands on the most universal artifact.
+        const appimage = release.assets.find((a) => /\.appimage$/i.test(a.name));
+        if (appimage) asset = appimage;
     }
     if (!asset) return null;
 

@@ -93,6 +93,36 @@
       }
     },
     {
+      "label": "Companion: Dev on Linux VM",
+      "type": "shell",
+      "command": "pwsh -NoProfile -File ./server/scripts/dev-on-linux.ps1",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Companion: Dev on Linux VM (Watch)",
+      "type": "shell",
+      "command": "pwsh -NoProfile -File ./server/scripts/dev-on-linux.ps1 -Watch",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
       "label": "Companion: Install Dependencies",
       "type": "shell",
       "command": "pnpm install",
