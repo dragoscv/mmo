@@ -76,6 +76,8 @@ export interface PersonalizationSettings {
 
     // Jogwheel
     jogwheelStyle: JogwheelStyle;
+    /** Scrub sensitivity multiplier (default 1.0). >1 = faster, <1 = slower. */
+    jogSensitivity: number;
     endWarningSeconds: number; // 0–60, 0 = disabled
 
     // Performance
@@ -114,6 +116,7 @@ export const DEFAULT_PERSONALIZATION: PersonalizationSettings = {
     uiDensity: "normal",
     knobStyle: "arc",
     jogwheelStyle: "classic",
+    jogSensitivity: 1.0,
     endWarningSeconds: 30,
     reducedAnimations: false,
     performanceStatsPosition: "off" as PerfStatsPosition,

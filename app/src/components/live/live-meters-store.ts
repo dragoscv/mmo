@@ -175,7 +175,7 @@ export function useLiveMeters(): LiveMetersSnapshot {
  * referential equality to work — wrapping object selectors will cause infinite
  * re-renders.
  */
-export function useLiveMetersField<T extends number | string | boolean>(
+export function useLiveMetersField<T extends number | string | boolean | null>(
     selector: (s: LiveMetersSnapshot) => T,
 ): T {
     return useSyncExternalStore(

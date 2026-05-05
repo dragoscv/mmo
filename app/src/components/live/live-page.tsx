@@ -59,6 +59,8 @@ import {
     type NativeStatus,
     type NativeMetrics,
     type NativeDeviceInfo,
+    type NativeLevels,
+    type NativePerf,
 } from "@/lib/native-companion";
 
 // ─── Drag context: makes the Section title bar a drag handle when inside a Reorder.Item ─

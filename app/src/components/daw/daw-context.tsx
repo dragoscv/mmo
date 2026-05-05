@@ -94,13 +94,15 @@ export interface VPRemoteState {
     pitchConfidence: number;
 }
 
+import type { FxType } from "@/lib/audio-fx-engine";
+
 export interface VPCommandHandlers {
     toggleActive: () => void;
     setInputGain: (v: number) => void;
     setOutputGain: (v: number) => void;
     setKey: (k: number) => void;
     setScale: (s: number) => void;
-    addEffect: (type: string) => void;
+    addEffect: (type: FxType) => void;
     removeEffect: (id: string) => void;
     toggleEffect: (id: string) => void;
     updateParam: (insertId: string, param: string, value: number) => void;

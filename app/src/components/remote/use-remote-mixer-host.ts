@@ -141,12 +141,12 @@ export function useRemoteMixerHost() {
                     case "setHeadphoneMix": mixer.setHeadphoneMix(args[0] as number); break;
                     case "toggleHeadphoneCue": mixer.toggleHeadphoneCue(deck); break;
                     case "setColorFx": mixer.setColorFx(deck, args[1] as number); break;
-                    case "setColorFxType": mixer.setColorFxType(deck, args[1] as string); break;
+                    case "setColorFxType": mixer.setColorFxType(deck, args[1] as Parameters<typeof mixer.setColorFxType>[1]); break;
                     case "setBeatFxAmount": mixer.setBeatFxAmount(deck, args[1] as number); break;
-                    case "setBeatFx": mixer.setBeatFx(deck, args[1] as string); break;
+                    case "setBeatFx": mixer.setBeatFx(deck, args[1] as Parameters<typeof mixer.setBeatFx>[1]); break;
                     case "toggleBeatFx": mixer.toggleBeatFx(deck); break;
                     case "setBeatFxBeatDiv": mixer.setBeatFxBeatDiv(deck, args[1] as number); break;
-                    case "setFilterType": mixer.setFilterType(deck, args[1] as string); break;
+                    case "setFilterType": mixer.setFilterType(deck, args[1] as Parameters<typeof mixer.setFilterType>[1]); break;
                     case "jumpHotCue": mixer.jumpHotCue(deck, args[1] as number); break;
                     case "setHotCue": mixer.setHotCue(deck, args[1] as number); break;
                     case "clearHotCue": mixer.clearHotCue(deck, args[1] as number); break;
@@ -161,14 +161,14 @@ export function useRemoteMixerHost() {
                     case "setKeyLock": mixer.setKeyLock(deck, args[1] as boolean); break;
                     case "toggleSlipMode": mixer.toggleSlipMode(deck); break;
                     case "toggleQuantize": mixer.toggleQuantize(deck); break;
-                    case "setPadMode": mixer.setPadMode(deck, args[1] as string); break;
-                    case "setCrossfaderAssign": mixer.setCrossfaderAssign(deck, args[1] as string); break;
+                    case "setPadMode": mixer.setPadMode(deck, args[1] as Parameters<typeof mixer.setPadMode>[1]); break;
+                    case "setCrossfaderAssign": mixer.setCrossfaderAssign(deck, args[1] as Parameters<typeof mixer.setCrossfaderAssign>[1]); break;
                     case "ejectTrack": mixer.ejectTrack(deck); break;
                     // Global
-                    case "setCrossfaderCurve": mixer.setCrossfaderCurve(args[0] as string); break;
-                    case "setEQMode": mixer.setEQMode(args[0] as string); break;
+                    case "setCrossfaderCurve": mixer.setCrossfaderCurve(args[0] as Parameters<typeof mixer.setCrossfaderCurve>[0]); break;
+                    case "setEQMode": mixer.setEQMode(args[0] as Parameters<typeof mixer.setEQMode>[0]); break;
                     case "setTempoRange": mixer.setTempoRange(args[0] as number); break;
-                    case "setDeckMode": mixer.setDeckMode(args[0] as string); break;
+                    case "setDeckMode": mixer.setDeckMode(args[0] as Parameters<typeof mixer.setDeckMode>[0]); break;
                     case "toggleRecording": mixer.toggleRecording(); break;
                     case "toggleAutomix": mixer.toggleAutomix(); break;
                     // Sampler

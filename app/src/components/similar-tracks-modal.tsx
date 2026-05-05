@@ -78,7 +78,7 @@ export function SimilarTracksModal({
         setLoading(true);
         setAddedIds(new Set());
         getSimilarTracks(playlistId)
-            .then(setTracks)
+            .then((rows) => setTracks(rows as SimilarTrack[]))
             .finally(() => setLoading(false));
     }, [open, playlistId]);
 

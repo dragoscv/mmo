@@ -69,7 +69,7 @@ export function useRemoteEditorHost() {
                     case "stop": editor.stop(); break;
                     case "seek": editor.seek(args[0] as number); break;
                     case "setView": editor.setView(args[0] as "waveform" | "spectrogram" | "split"); break;
-                    case "setTool": editor.setTool(args[0] as "select" | "trim" | "fade" | "draw"); break;
+                    case "setTool": editor.setTool(args[0] as Parameters<typeof editor.setTool>[0]); break;
                     case "setZoom": editor.setZoom(args[0] as number); break;
                     case "setSelection": editor.setSelection(args[0] as { start: number; end: number } | null); break;
                     case "addMarker": editor.addMarker(args[0] as number, args[1] as string | undefined); break;

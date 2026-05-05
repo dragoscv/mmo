@@ -204,7 +204,7 @@ export function useRemoteDAWHost() {
                     case "vpSetOutputGain": { const b = daw.getVPBridge(); if (b) b.handlers.setOutputGain(args[0] as number); break; }
                     case "vpSetKey": { const b = daw.getVPBridge(); if (b) b.handlers.setKey(args[0] as number); break; }
                     case "vpSetScale": { const b = daw.getVPBridge(); if (b) b.handlers.setScale(args[0] as number); break; }
-                    case "vpAddEffect": { const b = daw.getVPBridge(); if (b) b.handlers.addEffect(args[0] as string); break; }
+                    case "vpAddEffect": { const b = daw.getVPBridge(); if (b) b.handlers.addEffect(args[0] as Parameters<typeof b.handlers.addEffect>[0]); break; }
                     case "vpRemoveEffect": { const b = daw.getVPBridge(); if (b) b.handlers.removeEffect(args[0] as string); break; }
                     case "vpToggleEffect": { const b = daw.getVPBridge(); if (b) b.handlers.toggleEffect(args[0] as string); break; }
                     case "vpUpdateParam": { const b = daw.getVPBridge(); if (b) b.handlers.updateParam(args[0] as string, args[1] as string, args[2] as number); break; }
