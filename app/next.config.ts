@@ -3,6 +3,30 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
     serverExternalPackages: ["better-sqlite3", "music-metadata"],
 
+    // Keep large local-only assets out of every serverless function bundle.
+    // The recordings/import actions use dynamic path.join() which causes
+    // Next's tracer to pull in the entire project (data/, public/samples/,
+    // .db files) — pushing function size past Vercel's 300MB limit.
+    outputFileTracingExcludes: {
+        "*": [
+            "data/**",
+            "public/samples/**",
+            "public/worklets/**",
+            "drizzle/**",
+            "scripts/**",
+            "**/*.db",
+            "**/*.db-journal",
+            "**/*.wav",
+            "**/*.mp3",
+            "**/*.flac",
+            "**/*.ogg",
+            "**/*.m4a",
+            "**/*.aac",
+            "**/*.aiff",
+            "**/*.webm",
+        ],
+    },
+
     // React Compiler (stable in Next.js 16) — automatic memoization for the
     // entire app. Eliminates most need for manual useMemo/useCallback and
     // removes wasted re-renders. Free perf win.
