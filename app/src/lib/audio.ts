@@ -1,4 +1,3 @@
-import { parseFile } from "music-metadata";
 import path from "node:path";
 import fs from "node:fs";
 import type { NewTrack } from "@/db/schema";
@@ -12,6 +11,11 @@ export async function readAudioMetadata(
         if (!fs.existsSync(filepath)) return null;
 
         const stats = fs.statSync(filepath);
+        // Lazy import keeps the (large, native) `music-metadata` package out
+        // of the serverless function init path. This file is only invoked by
+        // the companion / local file-scanning flows; on Vercel we never hit
+        // this code at request time.
+        const { parseFile } = await import("music-metadata");
         const metadata = await parseFile(filepath);
         const ext = path.extname(filepath).toLowerCase().replace(".", "");
         const filename = path.basename(filepath);
