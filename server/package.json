@@ -1,6 +1,6 @@
 {
   "name": "mmo-companion",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "MMO Companion Server — serves local music files to MMO web app",
   "main": "dist/main.js",
   "author": {
@@ -121,12 +121,14 @@
   "dependencies": {
     "audify": "^1.10.1",
     "better-sqlite3": "^11.7.0",
+    "bindings": "^1.5.0",
     "chokidar": "^4.0.3",
     "cors": "^2.8.5",
     "drizzle-orm": "^0.36.4",
     "electron-store": "^8.2.0",
     "electron-updater": "^6.6.2",
     "express": "^4.21.0",
+    "file-uri-to-path": "^1.0.0",
     "music-metadata": "^10.6.4",
     "ws": "^8.18.0"
   },

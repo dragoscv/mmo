@@ -14,6 +14,9 @@ importers:
       better-sqlite3:
         specifier: ^11.7.0
         version: 11.10.0
+      bindings:
+        specifier: ^1.5.0
+        version: 1.5.0
       chokidar:
         specifier: ^4.0.3
         version: 4.0.3
@@ -32,6 +35,9 @@ importers:
       express:
         specifier: ^4.21.0
         version: 4.22.1
+      file-uri-to-path:
+        specifier: ^1.0.0
+        version: 1.0.0
       music-metadata:
         specifier: ^10.6.4
         version: 10.9.1
