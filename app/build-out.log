@@ -1,0 +1,106 @@
+ΓÇëWARNΓÇë Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.1.0","pnpm":"10.11.0"})
+
+> music-organizer@0.2.0 build E:\gh\rekordbox-mwrty\app
+> next build --webpack
+
+Γû▓ Next.js 16.2.3 (webpack)
+- Environments: .env.local
+- Experiments (use with caution):
+  ┬╖ serverActions
+
+  Creating an optimized production build ...
+ΓÜá Compiled with warnings in 10.4s
+
+./node_modules/.pnpm/systeminformation@5.31.5/node_modules/systeminformation/lib/cpu.js
+Module not found: Can't resolve 'osx-temperature-sensor' in 'E:\gh\rekordbox-mwrty\app\node_modules\.pnpm\systeminformation@5.31.5\node_modules\systeminformation\lib'
+
+Import trace for requested module:
+./node_modules/.pnpm/systeminformation@5.31.5/node_modules/systeminformation/lib/cpu.js
+./node_modules/.pnpm/systeminformation@5.31.5/node_modules/systeminformation/lib/index.js
+./src/app/api/system-stats/route.ts
+
+./node_modules/.pnpm/systeminformation@5.31.5/node_modules/systeminformation/lib/cpu.js
+Module not found: Can't resolve 'macos-temperature-sensor' in 'E:\gh\rekordbox-mwrty\app\node_modules\.pnpm\systeminformation@5.31.5\node_modules\systeminformation\lib'
+
+Import trace for requested module:
+./node_modules/.pnpm/systeminformation@5.31.5/node_modules/systeminformation/lib/cpu.js
+./node_modules/.pnpm/systeminformation@5.31.5/node_modules/systeminformation/lib/index.js
+./src/app/api/system-stats/route.ts
+
+Γ£ô Compiled successfully in 32.8s
+  Running TypeScript ...
+  Finished TypeScript in 12.3s ...
+  Collecting page data using 31 workers ...
+  Generating static pages using 31 workers (0/25) ...
+  Generating static pages using 31 workers (6/25) 
+  Generating static pages using 31 workers (12/25) 
+  Generating static pages using 31 workers (18/25) 
+Γ£ô Generating static pages using 31 workers (25/25) in 462ms
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+Γöî ╞Æ /
+Γö£ Γùï /_not-found
+Γö£ ╞Æ /analysis
+Γö£ ╞Æ /api/analysis/apply
+Γö£ ╞Æ /api/analysis/changes
+Γö£ ╞Æ /api/analysis/control
+Γö£ ╞Æ /api/analysis/start
+Γö£ ╞Æ /api/analysis/status
+Γö£ ╞Æ /api/analysis/stream
+Γö£ ╞Æ /api/audio/[id]
+Γö£ ╞Æ /api/audio/device/[id]
+Γö£ ╞Æ /api/auth/[...nextauth]
+Γö£ ╞Æ /api/billing/checkout
+Γö£ ╞Æ /api/billing/portal
+Γö£ ╞Æ /api/billing/webhook
+Γö£ ╞Æ /api/companion-auth
+Γö£ ╞Æ /api/companion/download
+Γö£ ╞Æ /api/devices/auto-register
+Γö£ ╞Æ /api/devices/heartbeat
+Γö£ ╞Æ /api/devices/validate
+Γö£ ╞Æ /api/download/add-to-library
+Γö£ ╞Æ /api/download/browse-folder
+Γö£ ╞Æ /api/download/check-duplicates
+Γö£ ╞Æ /api/download/history
+Γö£ ╞Æ /api/download/info
+Γö£ ╞Æ /api/download/search
+Γö£ ╞Æ /api/download/search-duplicates
+Γö£ ╞Æ /api/download/settings
+Γö£ ╞Æ /api/download/start
+Γö£ ╞Æ /api/lan-url
+Γö£ ╞Æ /api/recordings/[id]/audio
+Γö£ ╞Æ /api/recordings/save
+Γö£ ╞Æ /api/remote/events
+Γö£ ╞Æ /api/remote/send
+Γö£ ╞Æ /api/sync
+Γö£ ╞Æ /api/system-stats
+Γö£ ╞Æ /api/turn-credentials
+Γö£ ╞Æ /api/waveform-rgb/[id]
+Γö£ ╞Æ /api/waveform/[id]
+Γö£ ╞Æ /daw
+Γö£ ╞Æ /devices
+Γö£ ╞Æ /download
+Γö£ ╞Æ /drives
+Γö£ ╞Æ /editor
+Γö£ ╞Æ /library
+Γö£ ╞Æ /library/hidden
+Γö£ ╞Æ /live
+Γö£ ╞Æ /login
+Γö£ Γùï /mixer
+Γö£ ╞Æ /playlists
+Γö£ ╞Æ /plugins
+Γö£ ╞Æ /profile
+Γö£ ╞Æ /recordings
+Γö£ ╞Æ /remote
+Γö£ ╞Æ /scanner
+Γö£ ╞Æ /settings
+Γöö Γùï /visualizations
+
+
+╞Æ Proxy (Middleware)
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+
