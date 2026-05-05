@@ -78,6 +78,21 @@
       }
     },
     {
+      "label": "Companion: Dev on macOS VM (Watch)",
+      "type": "shell",
+      "command": "pwsh -NoProfile -File ./server/scripts/dev-on-mac.ps1 -Watch",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
       "label": "Companion: Install Dependencies",
       "type": "shell",
       "command": "pnpm install",

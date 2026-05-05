@@ -149,7 +149,18 @@
     "@types/ws": "^8.5.14",
     "electron": "^34.3.0",
     "electron-builder": "^26.0.0",
+    "electronmon": "^2.0.3",
     "typescript": "^5.8.3"
+  },
+  "electronmon": {
+    "patterns": [
+      "dist/**/*",
+      "ui/**/*",
+      "preload.js",
+      "!**/node_modules/**",
+      "!**/release/**"
+    ],
+    "logLevel": "quiet"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
