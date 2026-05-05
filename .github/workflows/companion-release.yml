@@ -101,6 +101,17 @@ jobs:
       - name: Build TypeScript
         run: pnpm build
 
+      - name: Fetch bundled virtual-audio drivers (BlackHole, VirtualAudioDriver)
+        # The Windows .sys/.cat/.inf and macOS .pkg are gitignored to keep the
+        # repo lightweight, so each CI build pulls them from the upstream
+        # releases (with SHA-256 pins enforced by scripts/fetch-virtual-audio.mjs).
+        # Without this step, electron-builder packages an empty
+        # virtual-audio/{macos,windows} layout and the runtime install flow
+        # fails with "installer not bundled". Linux ships no binaries — the
+        # adapter wraps the host's pactl, so the fetch is a no-op there.
+        shell: bash
+        run: pnpm fetch:virtual-audio
+
       - name: Reinstall production deps with npm (flat tree for electron-builder)
         # pnpm's symlinked layout — even with hoisting — leaves transitive
         # dependencies of native packages (audify→bindings→file-uri-to-path,
