@@ -93,7 +93,7 @@ export class CloudSyncClient {
         });
         if (!res.ok) {
             // 402 = paywall; surface so the UI can prompt upgrade.
-            const body = await res.json().catch(() => ({}));
+            const body = await res.json().catch(() => ({})) as { error?: string };
             throw new Error(`push failed: ${res.status} ${body?.error ?? ""}`);
         }
         return changes.length;
