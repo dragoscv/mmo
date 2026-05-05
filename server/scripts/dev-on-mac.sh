@@ -35,8 +35,13 @@ echo "[dev] target: $MAC_USER@$MAC_HOST:$MAC_PORT:$MAC_DIR"
 SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -p "$MAC_PORT")
 SCP_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -P "$MAC_PORT")
 
+# Non-interactive ssh sessions don't source ~/.zshrc, so we prepend the
+# tarball-installed node bin dir explicitly. install-node.sh symlinks
+# node/npm/npx into ~/bin.
+REMOTE_PATH='export PATH=/Users/dragos/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+
 run_remote() {
-  sshpass -p "$MAC_PASS" ssh "${SSH_OPTS[@]}" "$MAC_USER@$MAC_HOST" "$@"
+  sshpass -p "$MAC_PASS" ssh "${SSH_OPTS[@]}" "$MAC_USER@$MAC_HOST" "$REMOTE_PATH; $*"
 }
 
 echo "[dev] ensuring target dir exists"
@@ -65,22 +70,37 @@ run_remote "cd '$MAC_DIR' \
        touch node_modules/.installed; \
      fi"
 
+# Native modules (better-sqlite3, audify) are compiled against Node ABI by
+# default; rebuild against Electron's V8 ABI so dlopen succeeds at runtime.
+run_remote "cd '$MAC_DIR' \
+  && if [ ! -f node_modules/.electron-rebuilt ] || [ package.json -nt node_modules/.electron-rebuilt ]; then \
+       echo '[dev] electron-rebuild (better-sqlite3, audify)'; \
+       npx --no -- electron-rebuild -f -w better-sqlite3 -w audify || exit 1; \
+       touch node_modules/.electron-rebuilt; \
+     fi"
+
 echo "[dev] launching electron with --inspect=0.0.0.0:$INSPECT_PORT"
 echo "[dev] DevTools (renderer): http://127.0.0.1:$DEVTOOLS_PORT"
 echo "[dev] Inspector (main):    chrome://inspect → 127.0.0.1:$INSPECT_PORT"
 echo "[dev] (forward both ports to the host with: ssh -L $INSPECT_PORT:127.0.0.1:$INSPECT_PORT -L $DEVTOOLS_PORT:127.0.0.1:$DEVTOOLS_PORT ...)"
 
+# Kill the installed Companion to free port 17899 (dev binds the same port).
+# We use SIGTERM so the app exits cleanly without rebooting the VM.
+run_remote "pkill -TERM -f '/Applications/MMO Companion.app' 2>/dev/null || true; sleep 2"
+
+# noglob disables zsh's expansion of '*' in --remote-allow-origins=*.
 run_remote "cd '$MAC_DIR' \
   && rm -f /tmp/companion-dev.log \
-  && nohup ./node_modules/.bin/electron \
+  && setopt noglob 2>/dev/null; \
+     nohup ./node_modules/.bin/electron \
        --inspect=0.0.0.0:$INSPECT_PORT \
        --remote-debugging-port=$DEVTOOLS_PORT \
-       --remote-allow-origins=* \
+       '--remote-allow-origins=*' \
        dist/main.js \
        >/tmp/companion-dev.log 2>&1 & \
      disown; \
-     sleep 4; \
+     sleep 6; \
      echo '---LOG---'; \
-     tail -40 /tmp/companion-dev.log; \
+     tail -50 /tmp/companion-dev.log; \
      echo '---PORTS---'; \
      lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -E '(17899|$INSPECT_PORT|$DEVTOOLS_PORT)' || echo '(no listeners yet)'"
