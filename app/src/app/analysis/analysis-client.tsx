@@ -411,9 +411,9 @@ export function AnalysisClient() {
         const etaMs =
             !batch.finishedAt && avgPerJobMs != null && remaining > 0
                 ? Math.max(
-                      0,
-                      avgPerJobMs * (remaining - runningProgress),
-                  )
+                    0,
+                    avgPerJobMs * (remaining - runningProgress),
+                )
                 : null;
         return {
             total,
@@ -911,8 +911,8 @@ function BatchProgressCard({ stats }: { stats: BatchStats | null }) {
                                 stats.finished
                                     ? formatDuration(stats.elapsed)
                                     : stats.etaMs != null
-                                      ? `~${formatDuration(stats.etaMs)}`
-                                      : "calculating…"
+                                        ? `~${formatDuration(stats.etaMs)}`
+                                        : "calculating…"
                             }
                             highlight={!stats.finished && stats.etaMs != null}
                         />
@@ -1419,8 +1419,8 @@ function SystemCard({
                 target === "all"
                     ? "Install onnxruntime-gpu AND torch+CUDA? Downloads can be ~2 GB and may take several minutes. Continue?"
                     : target === "torch"
-                      ? "Install torch+torchaudio CUDA wheels? ~2 GB download. Continue?"
-                      : "Install onnxruntime-gpu? Replaces the CPU build. Continue?",
+                        ? "Install torch+torchaudio CUDA wheels? ~2 GB download. Continue?"
+                        : "Install onnxruntime-gpu? Replaces the CPU build. Continue?",
             )
         ) return;
         setInstalling(target);
@@ -1495,8 +1495,8 @@ function SystemCard({
                             gpu.recommendation === "ready"
                                 ? "border-emerald-500/30 bg-emerald-500/10"
                                 : gpu.recommendation === "no_gpu"
-                                  ? "border-white/10 bg-white/5"
-                                  : "border-purple-500/30 bg-purple-500/10",
+                                    ? "border-white/10 bg-white/5"
+                                    : "border-purple-500/30 bg-purple-500/10",
                         )}
                     >
                         <div className="flex items-center justify-between gap-2">
@@ -1512,13 +1512,13 @@ function SystemCard({
                                 gpu.recommendation === "ready"
                                     ? "bg-emerald-500/20 text-emerald-200"
                                     : gpu.recommendation === "no_gpu"
-                                      ? "bg-white/10 text-white/60"
-                                      : "bg-amber-500/20 text-amber-200",
+                                        ? "bg-white/10 text-white/60"
+                                        : "bg-amber-500/20 text-amber-200",
                             )}>
                                 {gpu.recommendation === "ready" ? "active" :
-                                 gpu.recommendation === "no_gpu" ? "no GPU" :
-                                 gpu.recommendation === "install_onnx_gpu" ? "needs onnx-gpu" :
-                                 "needs CUDA runtime"}
+                                    gpu.recommendation === "no_gpu" ? "no GPU" :
+                                        gpu.recommendation === "install_onnx_gpu" ? "needs onnx-gpu" :
+                                            "needs CUDA runtime"}
                             </span>
                         </div>
                         <div className="mt-1 space-y-0.5 text-[10px] text-white/70">

@@ -37,9 +37,11 @@ function formatBytes(b: number): string {
     return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function formatRelative(iso: string | null): string {
-    if (!iso) return "—";
-    const d = new Date(iso.includes("T") ? iso : iso.replace(" ", "T") + "Z");
+function formatRelative(input: string | Date | null): string {
+    if (!input) return "—";
+    const d = input instanceof Date
+        ? input
+        : new Date(input.includes("T") ? input : input.replace(" ", "T") + "Z");
     const now = Date.now();
     const diff = now - d.getTime();
     if (diff < 60_000) return "just now";

@@ -92,7 +92,7 @@ export async function saveRecording(input: {
         const session = await auth().catch(() => null);
         const userId = session?.user?.id ?? null;
 
-        const inserted = db.insert(recordings).values({
+        const inserted = await db.insert(recordings).values({
             userId,
             source: input.source,
             name: baseName,
@@ -101,8 +101,8 @@ export async function saveRecording(input: {
             mimeType: input.mimeType,
             durationMs: Math.round(input.durationMs),
             sizeBytes: stat.size,
-            metadata: input.metadata ? JSON.stringify(input.metadata) : null,
-        }).returning().all();
+            metadata: input.metadata ?? null,
+        }).returning();
 
         revalidatePath("/recordings");
         return { success: true, recording: inserted[0] };
@@ -123,14 +123,15 @@ export async function listRecordings(opts?: { source?: RecordingSource; limit?: 
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(desc(recordings.createdAt))
         .limit(opts?.limit ?? 200);
-    return q.all();
+    return q;
 }
 
 export async function renameRecording(id: number, name: string): Promise<{ success: boolean; error?: string }> {
     const trimmed = name.trim();
     if (!trimmed) return { success: false, error: "Name required" };
     try {
-        const row = db.select().from(recordings).where(eq(recordings.id, id)).get();
+        const rows = await db.select().from(recordings).where(eq(recordings.id, id)).limit(1);
+        const row = rows[0];
         if (!row) return { success: false, error: "Not found" };
 
         // Rename on disk too — keep extension
@@ -141,11 +142,11 @@ export async function renameRecording(id: number, name: string): Promise<{ succe
             await fs.rename(row.filepath, newPath);
         }
 
-        db.update(recordings).set({
+        await db.update(recordings).set({
             name: trimmed,
             filename: newFilename,
             filepath: newPath,
-        }).where(eq(recordings.id, id)).run();
+        }).where(eq(recordings.id, id));
 
         revalidatePath("/recordings");
         return { success: true };
@@ -156,11 +157,12 @@ export async function renameRecording(id: number, name: string): Promise<{ succe
 
 export async function deleteRecording(id: number): Promise<{ success: boolean; error?: string }> {
     try {
-        const row = db.select().from(recordings).where(eq(recordings.id, id)).get();
+        const rows = await db.select().from(recordings).where(eq(recordings.id, id)).limit(1);
+        const row = rows[0];
         if (!row) return { success: false, error: "Not found" };
         // Best-effort delete from disk; DB row is authoritative
         await fs.unlink(row.filepath).catch(() => { /* file already gone */ });
-        db.delete(recordings).where(eq(recordings.id, id)).run();
+        await db.delete(recordings).where(eq(recordings.id, id));
         revalidatePath("/recordings");
         return { success: true };
     } catch (e) {
@@ -169,10 +171,11 @@ export async function deleteRecording(id: number): Promise<{ success: boolean; e
 }
 
 export async function toggleRecordingFavorite(id: number): Promise<{ success: boolean; isFavorite?: boolean }> {
-    const row = db.select().from(recordings).where(eq(recordings.id, id)).get();
+    const rows = await db.select().from(recordings).where(eq(recordings.id, id)).limit(1);
+    const row = rows[0];
     if (!row) return { success: false };
     const next = !row.isFavorite;
-    db.update(recordings).set({ isFavorite: next }).where(eq(recordings.id, id)).run();
+    await db.update(recordings).set({ isFavorite: next }).where(eq(recordings.id, id));
     revalidatePath("/recordings");
     return { success: true, isFavorite: next };
 }

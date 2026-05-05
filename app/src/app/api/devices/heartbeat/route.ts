@@ -15,26 +15,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Token required" }, { status: 400 });
     }
 
-    const device = db
+    const rows = await db
         .select()
         .from(devices)
         .where(eq(devices.token, body.token))
-        .get();
+        .limit(1);
+    const device = rows[0];
 
     if (!device) {
         return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    db.update(devices)
+    await db.update(devices)
         .set({
             status: "online",
             hostname: body.hostname || device.hostname,
             os: body.os || device.os,
             version: body.version || device.version,
-            lastSeenAt: new Date().toISOString(),
+            lastSeenAt: new Date(),
         })
-        .where(eq(devices.id, device.id))
-        .run();
+        .where(eq(devices.id, device.id));
 
     return NextResponse.json({ ok: true });
 }

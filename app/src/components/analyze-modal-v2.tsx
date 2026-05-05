@@ -728,53 +728,53 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                         const blocked = opt.companion && !companion?.ok;
                                         const checked = !!options[opt.key] && !blocked;
                                         return (
-                                        <button
-                                            key={opt.key}
-                                            disabled={blocked}
-                                            title={blocked ? "Requires companion analyzer" : undefined}
-                                            onClick={() =>
-                                                setOptions((prev) => ({
-                                                    ...prev,
-                                                    [opt.key]: !prev[opt.key],
-                                                }))
-                                            }
-                                            className={cn(
-                                                "flex items-start gap-3 rounded-lg border p-3 text-left transition-all",
-                                                blocked
-                                                    ? "border-[var(--border)] opacity-40 cursor-not-allowed"
-                                                    : "cursor-pointer",
-                                                checked
-                                                    ? "border-purple-500/50 bg-purple-500/5"
-                                                    : !blocked && "border-[var(--border)] opacity-60"
-                                            )}
-                                        >
-                                            <div
+                                            <button
+                                                key={opt.key}
+                                                disabled={blocked}
+                                                title={blocked ? "Requires companion analyzer" : undefined}
+                                                onClick={() =>
+                                                    setOptions((prev) => ({
+                                                        ...prev,
+                                                        [opt.key]: !prev[opt.key],
+                                                    }))
+                                                }
                                                 className={cn(
-                                                    "mt-0.5 flex h-4 w-4 items-center justify-center rounded border transition-colors shrink-0",
+                                                    "flex items-start gap-3 rounded-lg border p-3 text-left transition-all",
+                                                    blocked
+                                                        ? "border-[var(--border)] opacity-40 cursor-not-allowed"
+                                                        : "cursor-pointer",
                                                     checked
-                                                        ? "bg-purple-500 border-purple-500"
-                                                        : "border-[var(--border)]"
+                                                        ? "border-purple-500/50 bg-purple-500/5"
+                                                        : !blocked && "border-[var(--border)] opacity-60"
                                                 )}
                                             >
-                                                {checked && (
-                                                    <Check className="h-3 w-3 text-white" />
-                                                )}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <div className="text-sm font-medium flex items-center gap-1.5">
-                                                    <opt.icon className="h-3.5 w-3.5" />
-                                                    {opt.label}
-                                                    {opt.companion && (
-                                                        <span className="ml-auto rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-emerald-300">
-                                                            companion
-                                                        </span>
+                                                <div
+                                                    className={cn(
+                                                        "mt-0.5 flex h-4 w-4 items-center justify-center rounded border transition-colors shrink-0",
+                                                        checked
+                                                            ? "bg-purple-500 border-purple-500"
+                                                            : "border-[var(--border)]"
+                                                    )}
+                                                >
+                                                    {checked && (
+                                                        <Check className="h-3 w-3 text-white" />
                                                     )}
                                                 </div>
-                                                <div className="text-[10px] text-[var(--muted-foreground)]">
-                                                    {opt.desc}
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-medium flex items-center gap-1.5">
+                                                        <opt.icon className="h-3.5 w-3.5" />
+                                                        {opt.label}
+                                                        {opt.companion && (
+                                                            <span className="ml-auto rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-emerald-300">
+                                                                companion
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] text-[var(--muted-foreground)]">
+                                                        {opt.desc}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </button>
+                                            </button>
                                         );
                                     })}
                                 </div>

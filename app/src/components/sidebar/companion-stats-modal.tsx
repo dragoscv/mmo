@@ -191,7 +191,7 @@ function DeviceCard({ device, isInput, isOutput }: {
                     <span className="text-white/55 font-mono tabular-nums">
                         {device.sampleRates.length
                             ? device.sampleRates.slice(0, 4).map(r => `${(r / 1000).toFixed(0)}k`).join(", ") +
-                              (device.sampleRates.length > 4 ? "…" : "")
+                            (device.sampleRates.length > 4 ? "…" : "")
                             : "—"}
                     </span>
                 </div>

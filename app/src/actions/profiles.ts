@@ -12,8 +12,8 @@ export type ProfileSummary = {
     name: string;
     description: string | null;
     isActive: boolean;
-    createdAt: string | null;
-    updatedAt: string | null;
+    createdAt: Date | null;
+    updatedAt: Date | null;
     entryCount: number;
 };
 
@@ -192,7 +192,7 @@ export async function renameProfile(
         .set({
             name: trimmed,
             description: description?.trim() || null,
-            updatedAt: new Date().toISOString(),
+            updatedAt: new Date(),
         })
         .where(eq(userProfiles.id, profileId));
     return { success: true };
@@ -244,7 +244,7 @@ export async function activateProfile(
         .where(eq(userProfiles.userId, userId));
     await db
         .update(userProfiles)
-        .set({ isActive: true, updatedAt: new Date().toISOString() })
+        .set({ isActive: true, updatedAt: new Date() })
         .where(eq(userProfiles.id, profileId));
     return { success: true };
 }
@@ -317,7 +317,7 @@ export async function saveActiveProfilePreference(
     if (existing.length > 0) {
         await db
             .update(profilePreferences)
-            .set({ value, updatedAt: new Date().toISOString() })
+            .set({ value, updatedAt: new Date() })
             .where(eq(profilePreferences.id, existing[0].id));
     } else {
         await db.insert(profilePreferences).values({ profileId, key, value });
@@ -345,7 +345,7 @@ export async function saveActiveProfilePreferencesBulk(
         if (existing.length > 0) {
             await db
                 .update(profilePreferences)
-                .set({ value, updatedAt: new Date().toISOString() })
+                .set({ value, updatedAt: new Date() })
                 .where(eq(profilePreferences.id, existing[0].id));
         } else {
             await db.insert(profilePreferences).values({ profileId, key, value });

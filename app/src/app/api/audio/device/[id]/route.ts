@@ -31,11 +31,12 @@ export async function GET(
     }
 
     // Get the device
-    const device = db
+    const deviceRows = await db
         .select()
         .from(devices)
         .where(eq(devices.id, track.deviceId))
-        .get();
+        .limit(1);
+    const device = deviceRows[0];
 
     if (!device) {
         return NextResponse.json({ error: "Device not found" }, { status: 404 });

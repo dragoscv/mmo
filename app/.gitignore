@@ -5,3 +5,4 @@ data/*.db-journal
 data/*.db-wal
 .env
 .env.local
+.vercel

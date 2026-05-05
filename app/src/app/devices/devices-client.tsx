@@ -783,9 +783,9 @@ function FolderRow({
                 "group rounded-lg border bg-background transition-colors",
                 isScanning ? "border-purple-500/40 shadow-[0_0_0_1px_rgba(168,85,247,0.15)]"
                     : isComplete ? "border-green-500/40"
-                    : isError ? "border-red-500/40"
-                    : isWatched ? "border-blue-500/30"
-                    : "border-border hover:border-ring",
+                        : isError ? "border-red-500/40"
+                            : isWatched ? "border-blue-500/30"
+                                : "border-border hover:border-ring",
             )}
         >
             <div className="flex items-center gap-2 px-3 py-2">

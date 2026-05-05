@@ -855,42 +855,42 @@ function TunerPanel() {
                     share the same min-height so the layout never reflows
                     when acActive toggles. */}
                 <div className="w-full min-h-[68px] flex items-center justify-center">
-                {acActive && outputNote ? (
-                    <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                        <div className="text-center">
-                            <div className="text-[8px] uppercase tracking-wider text-white/40 mb-0.5">In</div>
-                            <div className="text-2xl font-bold tabular-nums leading-none"
-                                style={{ color: conf > 0.3 ? noteColor : "rgba(255,255,255,0.15)" }}>
-                                {inputNote || "—"}
+                    {acActive && outputNote ? (
+                        <div className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                            <div className="text-center">
+                                <div className="text-[8px] uppercase tracking-wider text-white/40 mb-0.5">In</div>
+                                <div className="text-2xl font-bold tabular-nums leading-none"
+                                    style={{ color: conf > 0.3 ? noteColor : "rgba(255,255,255,0.15)" }}>
+                                    {inputNote || "—"}
+                                </div>
+                                <div className="text-[9px] text-white/40 tabular-nums mt-0.5">
+                                    {freq > 0 ? `${freq.toFixed(1)} Hz` : "—"}
+                                </div>
                             </div>
-                            <div className="text-[9px] text-white/40 tabular-nums mt-0.5">
-                                {freq > 0 ? `${freq.toFixed(1)} Hz` : "—"}
-                            </div>
-                        </div>
-                        <div className="text-emerald-400/60 text-2xl leading-none -mt-2">→</div>
-                        <div className="text-center">
-                            <div className="text-[8px] uppercase tracking-wider text-emerald-400/70 mb-0.5">Out</div>
-                            <div className="text-2xl font-bold tabular-nums leading-none text-emerald-300">
-                                {outputNote}
-                            </div>
-                            <div className="text-[9px] text-emerald-400/50 tabular-nums mt-0.5">
-                                tuned
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="relative w-full">
-                        <div className="text-center">
-                            <div className="text-5xl font-bold tabular-nums tracking-tight"
-                                style={{ color: conf > 0.3 ? noteColor : "rgba(255,255,255,0.15)" }}>
-                                {inputNote || "—"}
-                            </div>
-                            <div className="text-[10px] text-white/40 tabular-nums mt-1">
-                                {freq > 0 ? `${freq.toFixed(1)} Hz` : "—"}
+                            <div className="text-emerald-400/60 text-2xl leading-none -mt-2">→</div>
+                            <div className="text-center">
+                                <div className="text-[8px] uppercase tracking-wider text-emerald-400/70 mb-0.5">Out</div>
+                                <div className="text-2xl font-bold tabular-nums leading-none text-emerald-300">
+                                    {outputNote}
+                                </div>
+                                <div className="text-[9px] text-emerald-400/50 tabular-nums mt-0.5">
+                                    tuned
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    ) : (
+                        <div className="relative w-full">
+                            <div className="text-center">
+                                <div className="text-5xl font-bold tabular-nums tracking-tight"
+                                    style={{ color: conf > 0.3 ? noteColor : "rgba(255,255,255,0.15)" }}>
+                                    {inputNote || "—"}
+                                </div>
+                                <div className="text-[10px] text-white/40 tabular-nums mt-1">
+                                    {freq > 0 ? `${freq.toFixed(1)} Hz` : "—"}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Tuning dial */}

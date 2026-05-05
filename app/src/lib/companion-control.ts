@@ -119,9 +119,10 @@ interface DeviceRow {
 async function resolveDevice(deviceId: string): Promise<DeviceRow | null> {
     const session = await auth();
     if (!session?.user?.id) return null;
-    const row = db.select().from(devices)
+    const rows = await db.select().from(devices)
         .where(and(eq(devices.id, deviceId), eq(devices.userId, session.user.id)))
-        .get();
+        .limit(1);
+    const row = rows[0];
     if (!row || !row.apiUrl || !row.token) return null;
     return { id: row.id, apiUrl: row.apiUrl, token: row.token };
 }

@@ -21,7 +21,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     const id = Number(idStr);
     if (!Number.isFinite(id)) return new NextResponse("Bad id", { status: 400 });
 
-    const row = db.select().from(recordings).where(eq(recordings.id, id)).get();
+    const rows = await db.select().from(recordings).where(eq(recordings.id, id)).limit(1);
+    const row = rows[0];
     if (!row) return new NextResponse("Not found", { status: 404 });
 
     // Authorization: a logged-in user can only access their own recordings.

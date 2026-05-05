@@ -44,9 +44,8 @@ export async function getCompanionLink(): Promise<CompanionLink | null> {
     const userId = session?.user?.id;
     if (!userId) return null;
 
-    const rows = db.select().from(devices)
-        .where(eq(devices.userId, userId))
-        .all();
+    const rows = await db.select().from(devices)
+        .where(eq(devices.userId, userId));
     const usable = rows.filter((d) => d.apiUrl && d.token);
     if (usable.length === 0) return null;
     const local = usable.find((d) =>
@@ -68,9 +67,10 @@ export async function getCompanionLinkForDevice(
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) return null;
-    const row = db.select().from(devices)
+    const rows = await db.select().from(devices)
         .where(and(eq(devices.id, deviceId), eq(devices.userId, userId)))
-        .get();
+        .limit(1);
+    const row = rows[0];
     if (!row || !row.token || !row.apiUrl) return null;
     return { apiUrl: row.apiUrl, token: row.token, deviceId: row.id, userId };
 }

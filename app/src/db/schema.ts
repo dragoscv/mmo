@@ -1,135 +1,323 @@
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
+/**
+ * Postgres schema (Cloud SQL / Neon / local docker postgres).
+ *
+ * This is the source-of-truth schema. The companion app keeps a local
+ * SQLite mirror (see `server/src/library/schema.ts`) for offline work and
+ * for owning the actual audio files on disk; metadata flows up to here via
+ * the `/api/sync` endpoints.
+ *
+ * Tables exported with the SAME names as the previous SQLite schema
+ * (`users`, `accounts`, `sessions`, `verificationTokens`,
+ * `userPreferences`, `userProfiles`, `profilePreferences`,
+ * `devices`, `deviceFolders`, `recordings`) so the rest of the app
+ * compiles unchanged. New tables: `subscriptions`, `tracks`, `playlists`,
+ * `playlistTracks`, `tags`, `trackTags`, `cuepoints`.
+ */
+
+import {
+    pgTable,
+    text,
+    integer,
+    bigint,
+    boolean,
+    timestamp,
+    primaryKey,
+    serial,
+    real,
+    jsonb,
+    uniqueIndex,
+    index,
+} from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // ─── Auth.js Tables ──────────────────────────────────────────────────────────
+// Drizzle's official Auth.js adapter expects these exact table + column names.
 
-export const users = sqliteTable("user", {
+export const users = pgTable("user", {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     name: text("name"),
     email: text("email").unique(),
-    emailVerified: integer("emailVerified", { mode: "timestamp_ms" }),
+    emailVerified: timestamp("emailVerified", { mode: "date" }),
     image: text("image"),
-    createdAt: text("created_at").default(sql`(datetime('now'))`),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
-export const accounts = sqliteTable("account", {
-    userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
-    type: text("type").notNull(),
-    provider: text("provider").notNull(),
-    providerAccountId: text("providerAccountId").notNull(),
-    refresh_token: text("refresh_token"),
-    access_token: text("access_token"),
-    expires_at: integer("expires_at"),
-    token_type: text("token_type"),
-    scope: text("scope"),
-    id_token: text("id_token"),
-    session_state: text("session_state"),
-}, (account) => [
-    primaryKey({ columns: [account.provider, account.providerAccountId] }),
-]);
+export const accounts = pgTable(
+    "account",
+    {
+        userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+        type: text("type").notNull(),
+        provider: text("provider").notNull(),
+        providerAccountId: text("providerAccountId").notNull(),
+        refresh_token: text("refresh_token"),
+        access_token: text("access_token"),
+        expires_at: integer("expires_at"),
+        token_type: text("token_type"),
+        scope: text("scope"),
+        id_token: text("id_token"),
+        session_state: text("session_state"),
+    },
+    (account) => [primaryKey({ columns: [account.provider, account.providerAccountId] })],
+);
 
-export const sessions = sqliteTable("session", {
+export const sessions = pgTable("session", {
     sessionToken: text("sessionToken").primaryKey(),
     userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
-    expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
 });
 
-export const verificationTokens = sqliteTable("verificationToken", {
-    identifier: text("identifier").notNull(),
-    token: text("token").notNull(),
-    expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
-}, (verificationToken) => [
-    primaryKey({ columns: [verificationToken.identifier, verificationToken.token] }),
-]);
+export const verificationTokens = pgTable(
+    "verificationToken",
+    {
+        identifier: text("identifier").notNull(),
+        token: text("token").notNull(),
+        expires: timestamp("expires", { mode: "date" }).notNull(),
+    },
+    (vt) => [primaryKey({ columns: [vt.identifier, vt.token] })],
+);
 
-// ─── User Preferences (also used for misc per-user settings under
-//     `setting:` namespace, see actions/settings.ts) ────────────────────────
+// ─── User preferences & profiles ────────────────────────────────────────────
 
-export const userPreferences = sqliteTable("user_preferences", {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    key: text("key").notNull(),
-    value: text("value").notNull(),
-    updatedAt: text("updated_at").default(sql`(datetime('now'))`),
-});
+export const userPreferences = pgTable(
+    "user_preferences",
+    {
+        id: serial("id").primaryKey(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        key: text("key").notNull(),
+        value: text("value").notNull(),
+        updatedAt: timestamp("updated_at").defaultNow(),
+    },
+    (t) => [uniqueIndex("user_pref_uniq").on(t.userId, t.key)],
+);
 
-// ─── User Profiles (named bundles of UI/app state per user) ─────────────────
-
-export const userProfiles = sqliteTable("user_profiles", {
+export const userProfiles = pgTable("user_profiles", {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     description: text("description"),
-    isActive: integer("is_active", { mode: "boolean" }).notNull().default(false),
-    createdAt: text("created_at").default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").default(sql`(datetime('now'))`),
+    isActive: boolean("is_active").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const profilePreferences = sqliteTable("profile_preferences", {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    profileId: text("profile_id").notNull().references(() => userProfiles.id, { onDelete: "cascade" }),
-    key: text("key").notNull(),
-    value: text("value").notNull(),
-    updatedAt: text("updated_at").default(sql`(datetime('now'))`),
-});
+export const profilePreferences = pgTable(
+    "profile_preferences",
+    {
+        id: serial("id").primaryKey(),
+        profileId: text("profile_id").notNull().references(() => userProfiles.id, { onDelete: "cascade" }),
+        key: text("key").notNull(),
+        value: text("value").notNull(),
+        updatedAt: timestamp("updated_at").defaultNow(),
+    },
+    (t) => [uniqueIndex("profile_pref_uniq").on(t.profileId, t.key)],
+);
 
-// ─── Devices (companion apps registered by the user) ────────────────────────
+// ─── Companion devices ──────────────────────────────────────────────────────
 
-export const devices = sqliteTable("devices", {
+export const devices = pgTable("devices", {
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    os: text("os"), // windows | linux | macos
+    os: text("os"),
     hostname: text("hostname"),
-    apiUrl: text("api_url").notNull(), // e.g. http://192.168.1.100:9876
-    token: text("token").notNull(), // device auth token
-    status: text("status").notNull().default("offline"), // online | offline | syncing
-    lastSeenAt: text("last_seen_at"),
+    apiUrl: text("api_url").notNull(),
+    token: text("token").notNull(),
+    status: text("status").notNull().default("offline"),
+    lastSeenAt: timestamp("last_seen_at"),
     version: text("version"),
-    createdAt: text("created_at").default(sql`(datetime('now'))`),
+    /** Sync cursor — server-side monotonic counter the device has fully consumed. */
+    syncCursor: bigint("sync_cursor", { mode: "number" }).default(0),
+    createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const deviceFolders = sqliteTable("device_folders", {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+export const deviceFolders = pgTable("device_folders", {
+    id: serial("id").primaryKey(),
     deviceId: text("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
     path: text("path").notNull(),
     label: text("label"),
     trackCount: integer("track_count").default(0),
-    totalSize: integer("total_size").default(0),
-    lastScannedAt: text("last_scanned_at"),
-    isEnabled: integer("is_enabled", { mode: "boolean" }).default(true),
-    createdAt: text("created_at").default(sql`(datetime('now'))`),
+    totalSize: bigint("total_size", { mode: "number" }).default(0),
+    lastScannedAt: timestamp("last_scanned_at"),
+    isEnabled: boolean("is_enabled").default(true),
+    createdAt: timestamp("created_at").defaultNow(),
 });
 
-// ─── Recordings (auto-saved sessions from Live, Mixer, DAW, Editor) ─────────
+// ─── Recordings (file body lives in GCS — gcs_object_key) ───────────────────
 
-export const recordings = sqliteTable("recordings", {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+export const recordings = pgTable("recordings", {
+    id: serial("id").primaryKey(),
     userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
-    /** Source app: live | mixer | daw | editor */
     source: text("source").notNull(),
-    /** User-editable display name (defaults to source + timestamp) */
     name: text("name").notNull(),
-    /** Absolute path on disk */
+    /** Legacy: absolute path on the recording machine (companion mode). */
     filepath: text("filepath").notNull(),
-    /** Just the filename (for display + URL) */
+    /** Just the filename (display + URL). */
     filename: text("filename").notNull(),
-    /** MIME type (e.g. audio/webm;codecs=opus) */
+    /** GCS object key when uploaded to cloud storage; null if local-only. */
+    gcsObjectKey: text("gcs_object_key"),
     mimeType: text("mime_type").notNull(),
-    /** Duration in milliseconds */
     durationMs: integer("duration_ms").notNull(),
-    /** File size in bytes */
-    sizeBytes: integer("size_bytes").notNull(),
-    /** Optional snapshot of contextual metadata (JSON: bpm, key, scene name, etc.) */
-    metadata: text("metadata"),
-    /** Optional user notes */
+    sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+    metadata: jsonb("metadata"),
     notes: text("notes"),
-    /** User-favorited */
-    isFavorite: integer("is_favorite", { mode: "boolean" }).default(false),
-    createdAt: text("created_at").default(sql`(datetime('now'))`),
+    isFavorite: boolean("is_favorite").default(false),
+    createdAt: timestamp("created_at").defaultNow(),
 });
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Library (cloud-side mirror of companion tracks) ────────────────────────
+
+export const tracks = pgTable(
+    "tracks",
+    {
+        id: serial("id").primaryKey(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        /** SHA-256 of the audio file content (stable id across devices). */
+        sha256: text("sha256"),
+        /** Companion-side numeric id (per device) for round-tripping during sync. */
+        companionTrackId: integer("companion_track_id"),
+        deviceId: text("device_id").references(() => devices.id, { onDelete: "set null" }),
+        title: text("title"),
+        artist: text("artist"),
+        album: text("album"),
+        remix: text("remix"),
+        label: text("label"),
+        bpm: real("bpm"),
+        keyCamelot: text("key_camelot"),
+        keyMusical: text("key_musical"),
+        durationMs: integer("duration_ms"),
+        energy: real("energy"),
+        genre: text("genre"),
+        subgenre: text("subgenre"),
+        mood: text("mood"),
+        color: text("color"),
+        vocalType: text("vocal_type"),
+        setPosition: text("set_position"),
+        mixability: real("mixability"),
+        rating: integer("rating"),
+        isFavorite: boolean("is_favorite").default(false),
+        isHidden: boolean("is_hidden").default(false),
+        year: integer("year"),
+        comment: text("comment"),
+        artworkUrl: text("artwork_url"),
+        sourceUrl: text("source_url"),
+        sourcePlatform: text("source_platform"),
+        sourceId: text("source_id"),
+        format: text("format"),
+        bitrate: integer("bitrate"),
+        sampleRate: integer("sample_rate"),
+        fileSize: bigint("file_size", { mode: "number" }),
+        addedAt: timestamp("added_at").defaultNow(),
+        analyzedAt: timestamp("analyzed_at"),
+        updatedAt: timestamp("updated_at").defaultNow(),
+        /** Monotonic counter for incremental sync. */
+        syncVersion: bigint("sync_version", { mode: "number" }).default(0),
+    },
+    (t) => [
+        index("tracks_user_idx").on(t.userId),
+        index("tracks_sha_idx").on(t.sha256),
+        index("tracks_sync_idx").on(t.userId, t.syncVersion),
+    ],
+);
+
+export const playlists = pgTable("playlists", {
+    id: serial("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    color: text("color"),
+    parentId: integer("parent_id"),
+    sortOrder: integer("sort_order").default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+    syncVersion: bigint("sync_version", { mode: "number" }).default(0),
+});
+
+export const playlistTracks = pgTable(
+    "playlist_tracks",
+    {
+        playlistId: integer("playlist_id").notNull().references(() => playlists.id, { onDelete: "cascade" }),
+        trackId: integer("track_id").notNull().references(() => tracks.id, { onDelete: "cascade" }),
+        position: integer("position").notNull(),
+        addedAt: timestamp("added_at").defaultNow(),
+    },
+    (t) => [primaryKey({ columns: [t.playlistId, t.trackId] })],
+);
+
+export const tags = pgTable(
+    "tags",
+    {
+        id: serial("id").primaryKey(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        name: text("name").notNull(),
+        color: text("color"),
+        createdAt: timestamp("created_at").defaultNow(),
+    },
+    (t) => [uniqueIndex("tags_user_name_uniq").on(t.userId, t.name)],
+);
+
+export const trackTags = pgTable(
+    "track_tags",
+    {
+        trackId: integer("track_id").notNull().references(() => tracks.id, { onDelete: "cascade" }),
+        tagId: integer("tag_id").notNull().references(() => tags.id, { onDelete: "cascade" }),
+    },
+    (t) => [primaryKey({ columns: [t.trackId, t.tagId] })],
+);
+
+export const cuepoints = pgTable("cuepoints", {
+    id: serial("id").primaryKey(),
+    trackId: integer("track_id").notNull().references(() => tracks.id, { onDelete: "cascade" }),
+    /** Position in milliseconds from start of track. */
+    positionMs: integer("position_ms").notNull(),
+    /** "hot" | "memory" | "loop_in" | "loop_out" */
+    kind: text("kind").notNull(),
+    label: text("label"),
+    color: text("color"),
+    createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ─── Subscriptions (Stripe) ─────────────────────────────────────────────────
+
+export const subscriptions = pgTable("subscriptions", {
+    /** Auth.js user id. */
+    userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+    stripeCustomerId: text("stripe_customer_id").notNull().unique(),
+    stripeSubscriptionId: text("stripe_subscription_id").unique(),
+    /** active | trialing | past_due | canceled | incomplete | incomplete_expired | paused */
+    status: text("status").notNull().default("incomplete"),
+    /** "free" | "pro_monthly" | "pro_yearly" */
+    plan: text("plan").notNull().default("free"),
+    currentPeriodEnd: timestamp("current_period_end"),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ─── Sync-log (per-user, server-side change feed for incremental pull) ──────
+//
+// Every write to a syncable table appends here so the companion can pull
+// only what changed since its `syncCursor`. Cleaned up after 30 days.
+
+export const syncLog = pgTable(
+    "sync_log",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        /** "tracks" | "playlists" | "playlist_tracks" | "tags" | "track_tags" | "cuepoints" */
+        entity: text("entity").notNull(),
+        entityId: text("entity_id").notNull(),
+        /** "upsert" | "delete" */
+        op: text("op").notNull(),
+        /** Snapshot payload for upserts; null for deletes. */
+        payload: jsonb("payload"),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+    },
+    (t) => [
+        index("sync_log_user_idx").on(t.userId, t.id),
+    ],
+);
+
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
@@ -145,12 +333,12 @@ export type DeviceFolder = typeof deviceFolders.$inferSelect;
 export type Recording = typeof recordings.$inferSelect;
 export type NewRecording = typeof recordings.$inferInsert;
 
-// ─── Library Track shape ────────────────────────────────────────────────────
-//
-// Tracks live in the COMPANION's SQLite (see server/src/library/schema.ts).
-// We keep a structural mirror here so the rest of the web app can refer to
-// `Track` / `NewTrack` without a cross-package import. The shape MUST stay
-// in sync with `CompanionTrack` in `@/lib/companion-library`.
+export type Subscription = typeof subscriptions.$inferSelect;
+export type NewSubscription = typeof subscriptions.$inferInsert;
+
+// Track type kept for cross-package compatibility with `companion-library.ts`.
+// Prefer the inferred `typeof tracks.$inferSelect` for code that reads the
+// cloud DB directly.
 export interface Track {
     id: number;
     userId: string;

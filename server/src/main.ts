@@ -828,7 +828,7 @@ function setupAutoUpdater() {
 
     // Check for updates after a short delay
     setTimeout(() => {
-        autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+        autoUpdater.checkForUpdatesAndNotify().catch(() => { });
     }, 5000);
 }
 

@@ -29,3 +29,5 @@ __pycache__/
 
 # Stale backups
 *.legacy.bak
+
+.vercel

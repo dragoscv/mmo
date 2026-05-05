@@ -649,7 +649,7 @@ export class NativeAudioEngine {
         try {
             actualFrameSize = rt.openStream(
                 { deviceId: outputId, nChannels: outChannels, firstChannel: 0 },
-                { deviceId: inputId,  nChannels: inChannels,  firstChannel: 0 },
+                { deviceId: inputId, nChannels: inChannels, firstChannel: 0 },
                 FORMAT,
                 this.cfg.sampleRate,
                 frameSize,

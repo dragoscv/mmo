@@ -977,8 +977,8 @@ class Analyzer extends EventEmitter {
         const before = this.completed.length;
         this.completed = this.completed.filter((j) =>
             filter === "all" ? false :
-            filter === "errored" ? !j.error :
-            !!j.error,
+                filter === "errored" ? !j.error :
+                    !!j.error,
         );
         const persistedRemoved = this.store.clearCompleted(filter);
         return Math.max(before - this.completed.length, persistedRemoved);
@@ -999,7 +999,7 @@ class Analyzer extends EventEmitter {
         // same lane that originally produced the result/error.
         const opts: AnalyzeOptions = original.category === "dsp" ? { dsp: true }
             : original.category === "stems" ? { stems: true, stemsModel: original.options.stemsModel }
-            : { fingerprint: true };
+                : { fingerprint: true };
         return this.enqueue(original.trackId, original.path, opts);
     }
 

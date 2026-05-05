@@ -1,10 +1,17 @@
-# MMO TURN/STUN infrastructure (Terraform / GCP)
+# MMO infrastructure (Terraform / GCP)
+
+Two stacks live here:
+
+1. **TURN/STUN** (`main.tf`, `coturn.sh`) — coturn VM for the WebRTC remote bridge.
+2. **Database & storage** (`database.tf`) — Cloud SQL Postgres + GCS bucket + Secret Manager.
+
+## TURN/STUN — coturn
 
 A single self-managed [coturn](https://github.com/coturn/coturn) instance that
 provides STUN + TURN for the WebRTC audio bridge.  Required because public STUN
 alone fails behind symmetric NATs (most mobile carriers).
 
-## What gets created
+### What gets created
 
 | Resource | Cost (europe-west1) |
 |---|---|
@@ -92,3 +99,86 @@ Removes everything; static IP is released.
   `tls-listening-port`, `cert`, `pkey` lines once you have a cert.
 - **Dual-stack**: add IPv6 with `google_compute_address.ip_version = "IPV6"`.
 - **Auto-update**: cron `unattended-upgrades` is enabled by default on Debian 12.
+
+---
+
+## Database & storage — Cloud SQL Postgres + GCS
+
+Cloud SQL `mmo-pg` (POSTGRES_16, `db-f1-micro`, ~$10/mo + $0.17/GB storage) is
+the source-of-truth for app metadata. The companion app keeps a local SQLite
+cache and owns the actual audio files.
+
+GCS bucket `mmo-user-files-prod` holds anything the user explicitly uploads
+(recording exports, avatars, artwork) — never the raw library tracks.
+
+### Resources (declared in `database.tf`)
+
+| Resource | Cost |
+|---|---|
+| Cloud SQL `db-f1-micro` POSTGRES_16, 10GB HDD, daily backup | ~$10/mo + $0.10/GB-month |
+| GCS bucket `STANDARD` europe-west1 | $0.020/GB-month + egress |
+| Secret Manager (2 secrets) | first 6 versions free |
+| Service account `mmo-web-app` | free |
+
+### First-time import (resources were created via gcloud first)
+
+```pwsh
+cd infra/terraform
+terraform init
+
+# Import existing infra into state — adjust project ID
+terraform import google_sql_database_instance.mmo projects/mmo-mw-prod/instances/mmo-pg
+terraform import google_sql_database.mmo projects/mmo-mw-prod/instances/mmo-pg/databases/mmo
+terraform import google_sql_user.postgres projects/mmo-mw-prod/instances/mmo-pg/postgres
+terraform import google_storage_bucket.user_files mmo-user-files-prod
+terraform import google_secret_manager_secret.db_url projects/mmo-mw-prod/secrets/mmo-database-url
+terraform import google_secret_manager_secret.db_password projects/mmo-mw-prod/secrets/mmo-postgres-password
+terraform import google_project_service.sqladmin mmo-mw-prod/sqladmin.googleapis.com
+terraform import google_project_service.secretmanager mmo-mw-prod/secretmanager.googleapis.com
+terraform import google_project_service.storage mmo-mw-prod/storage.googleapis.com
+
+terraform plan
+```
+
+After the plan is clean (only random_password and the SA + key need creating),
+`terraform apply`. The DB password in Terraform will then become the source of
+truth — rotate it in `random_password` then re-apply.
+
+### Reading secrets
+
+```pwsh
+# DATABASE_URL (paste into app/.env.local and Vercel env)
+gcloud secrets versions access latest --secret=mmo-database-url
+
+# Service account JSON key (post-apply)
+terraform output -raw web_app_sa_key_json | base64 -d > mmo-web-app-sa.json
+```
+
+Put the SA key JSON into Vercel as a single env var (base64-encoded):
+
+```pwsh
+$json = terraform output -raw web_app_sa_key_json
+vercel env add GCP_SERVICE_ACCOUNT_KEY production
+# paste $json (it's already base64)
+```
+
+### Open SQL connection from local dev
+
+The instance is `--require-ssl` and authorized for `0.0.0.0/0`. Use a strong
+password (already done) and connect:
+
+```pwsh
+psql "postgres://postgres:PASSWORD@34.79.95.212:5432/mmo?sslmode=require"
+```
+
+For long-lived dev sessions, use the Cloud SQL Auth Proxy instead:
+
+```pwsh
+cloud-sql-proxy mmo-mw-prod:europe-west1:mmo-pg --port 5432
+psql "postgres://postgres:PASSWORD@127.0.0.1:5432/mmo"
+```
+
+### Tear-down protection
+
+`google_sql_database_instance.mmo` has `deletion_protection = true`. To remove
+the instance you must first set it to false, apply, then destroy.

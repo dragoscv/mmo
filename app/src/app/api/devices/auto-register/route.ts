@@ -22,26 +22,26 @@ export async function POST(request: NextRequest) {
     const apiUrl = body.apiUrl || `http://localhost:${body.port || 17899}`;
 
     // Check for existing device with same hostname for this user (avoid duplicates)
-    const existing = db
+    const existingRows = await db
         .select()
         .from(devices)
         .where(and(
             eq(devices.userId, session.user.id),
             eq(devices.hostname, hostname)
         ))
-        .get();
+        .limit(1);
+    const existing = existingRows[0];
 
     if (existing) {
         // Update and return existing device
-        db.update(devices)
+        await db.update(devices)
             .set({
                 status: "online",
                 apiUrl,
                 os: osName || existing.os,
-                lastSeenAt: new Date().toISOString(),
+                lastSeenAt: new Date(),
             })
-            .where(eq(devices.id, existing.id))
-            .run();
+            .where(eq(devices.id, existing.id));
 
         return NextResponse.json({
             deviceId: existing.id,
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         : osName === "linux" ? "Linux PC"
         : "Device";
 
-    db.insert(devices).values({
+    await db.insert(devices).values({
         id: deviceId,
         userId: session.user.id,
         name: deviceName,
@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
         status: "online",
         hostname,
         os: osName,
-        lastSeenAt: new Date().toISOString(),
-    }).run();
+        lastSeenAt: new Date(),
+    });
 
     return NextResponse.json({
         deviceId,

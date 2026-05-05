@@ -191,9 +191,8 @@ export const DevDebuggerOverlay = memo(function DevDebuggerOverlay({ open, onClo
                     <button
                         key={t.id}
                         onClick={() => setTab(t.id)}
-                        className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors ${
-                            tab === t.id ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"
-                        }`}
+                        className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors ${tab === t.id ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"
+                            }`}
                     >
                         <t.icon className="h-3 w-3" />
                         {t.label}
@@ -225,9 +224,8 @@ function IconBtn({ children, title, onClick, highlight }: {
         <button
             title={title}
             onClick={onClick}
-            className={`flex items-center px-1.5 py-1 rounded text-[10px] transition-colors ${
-                highlight ? "bg-emerald-500/20 text-emerald-300" : "text-white/50 hover:text-white hover:bg-white/10"
-            }`}
+            className={`flex items-center px-1.5 py-1 rounded text-[10px] transition-colors ${highlight ? "bg-emerald-500/20 text-emerald-300" : "text-white/50 hover:text-white hover:bg-white/10"
+                }`}
         >
             {children}
         </button>
@@ -507,11 +505,10 @@ function LogsTab() {
                 <button
                     type="button"
                     onClick={onCopy}
-                    className={`text-[10px] px-2 py-1 rounded border transition-colors ${
-                        copyState === "copied"
+                    className={`text-[10px] px-2 py-1 rounded border transition-colors ${copyState === "copied"
                             ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
                             : "bg-white/[0.05] border-white/[0.1] text-white/70 hover:bg-white/[0.1]"
-                    }`}
+                        }`}
                     title="Copy filtered logs to clipboard"
                 >
                     {copyState === "copied" ? "Copied!" : "Copy"}

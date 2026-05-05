@@ -27,21 +27,21 @@ export async function getDevices() {
     return db
         .select()
         .from(devices)
-        .where(eq(devices.userId, session.user.id))
-        .all();
+        .where(eq(devices.userId, session.user.id));
 }
 
-// ─── Get device by ID ───────────────────────────────────────────────────────
+// ─── Get device by ID ─────────────────────────────────────────────
 
 export async function getDevice(deviceId: string) {
     const session = await auth();
     if (!session?.user?.id) return null;
 
-    return db
+    const rows = await db
         .select()
         .from(devices)
         .where(and(eq(devices.id, deviceId), eq(devices.userId, session.user.id)))
-        .get() || null;
+        .limit(1);
+    return rows[0] ?? null;
 }
 
 // ─── Register a new device ──────────────────────────────────────────────────
@@ -85,7 +85,7 @@ export async function updateDeviceStatus(
         .update(devices)
         .set({
             ...data,
-            lastSeenAt: new Date().toISOString(),
+            lastSeenAt: new Date(),
         })
         .where(eq(devices.id, deviceId));
 }
@@ -125,8 +125,7 @@ export async function getDeviceFolders(deviceId: string) {
     return db
         .select()
         .from(deviceFolders)
-        .where(eq(deviceFolders.deviceId, deviceId))
-        .all();
+        .where(eq(deviceFolders.deviceId, deviceId));
 }
 
 export async function addDeviceFolder(deviceId: string, folderPath: string, label?: string) {
@@ -155,11 +154,12 @@ export async function scanDeviceFolder(deviceId: string, folderPath: string) {
     const session = await auth();
     if (!session?.user?.id) return { error: "Not authenticated" };
 
-    const device = await db
+    const deviceRows = await db
         .select()
         .from(devices)
         .where(and(eq(devices.id, deviceId), eq(devices.userId, session.user.id)))
-        .get();
+        .limit(1);
+    const device = deviceRows[0];
 
     if (!device) return { error: "Device not found" };
 
@@ -238,7 +238,7 @@ export async function scanDeviceFolder(deviceId: string, folderPath: string) {
             .update(deviceFolders)
             .set({
                 trackCount: data.count,
-                lastScannedAt: new Date().toISOString(),
+                lastScannedAt: new Date(),
             })
             .where(and(
                 eq(deviceFolders.deviceId, deviceId),
@@ -256,11 +256,12 @@ export async function scanDeviceFolder(deviceId: string, folderPath: string) {
 // ─── Check device online status ─────────────────────────────────────────────
 
 export async function pingDevice(deviceId: string): Promise<{ online: boolean; info?: Record<string, unknown> }> {
-    const device = await db
+    const rows = await db
         .select()
         .from(devices)
         .where(eq(devices.id, deviceId))
-        .get();
+        .limit(1);
+    const device = rows[0];
 
     if (!device) return { online: false };
 
@@ -313,12 +314,11 @@ export async function getLocalCompanion(): Promise<{ apiUrl: string; token: stri
     if (!session?.user?.id) return null;
 
     const localPrefixes = ["http://localhost:", "http://127.0.0.1:"];
-    const all = db
+    const all = await db
         .select()
         .from(devices)
-        .where(eq(devices.userId, session.user.id))
-        .all();
-    const local = all.find(d => d.apiUrl && localPrefixes.some(p => d.apiUrl!.startsWith(p)));
+        .where(eq(devices.userId, session.user.id));
+    const local = all.find((d) => d.apiUrl && localPrefixes.some((p) => d.apiUrl!.startsWith(p)));
     if (!local || !local.token || !local.apiUrl) return null;
     return { apiUrl: local.apiUrl, token: local.token, deviceId: local.id };
 }
@@ -463,7 +463,7 @@ export async function ingestCompanionScanJob(
             .update(deviceFolders)
             .set({
                 trackCount: job.tracks.length,
-                lastScannedAt: new Date().toISOString(),
+                lastScannedAt: new Date(),
             })
             .where(and(
                 eq(deviceFolders.deviceId, deviceId),

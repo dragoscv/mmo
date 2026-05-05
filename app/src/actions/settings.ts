@@ -21,10 +21,9 @@ const SETTINGS_NS = "setting:";
 export async function getSettings(): Promise<Record<string, string>> {
     const session = await auth();
     if (!session?.user?.id) return {};
-    const rows = db.select({ key: userPreferences.key, value: userPreferences.value })
+    const rows = await db.select({ key: userPreferences.key, value: userPreferences.value })
         .from(userPreferences)
-        .where(eq(userPreferences.userId, session.user.id))
-        .all();
+        .where(eq(userPreferences.userId, session.user.id));
     const out: Record<string, string> = {};
     for (const row of rows) {
         if (row.key.startsWith(SETTINGS_NS)) {
@@ -37,14 +36,14 @@ export async function getSettings(): Promise<Record<string, string>> {
 export async function getSetting(key: string): Promise<string | null> {
     const session = await auth();
     if (!session?.user?.id) return null;
-    const row = db.select({ value: userPreferences.value })
+    const rows = await db.select({ value: userPreferences.value })
         .from(userPreferences)
         .where(and(
             eq(userPreferences.userId, session.user.id),
             eq(userPreferences.key, SETTINGS_NS + key),
         ))
-        .get();
-    return row?.value ?? null;
+        .limit(1);
+    return rows[0]?.value ?? null;
 }
 
 export async function updateSetting(
@@ -54,20 +53,20 @@ export async function updateSetting(
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Not signed in" };
     const ns = SETTINGS_NS + key;
-    const existing = db.select({ id: userPreferences.id }).from(userPreferences)
+    const existingRows = await db.select({ id: userPreferences.id }).from(userPreferences)
         .where(and(
             eq(userPreferences.userId, session.user.id),
             eq(userPreferences.key, ns),
         ))
-        .get();
+        .limit(1);
+    const existing = existingRows[0];
     if (existing) {
-        db.update(userPreferences).set({ value, updatedAt: new Date().toISOString() })
-            .where(eq(userPreferences.id, existing.id))
-            .run();
+        await db.update(userPreferences).set({ value, updatedAt: new Date() })
+            .where(eq(userPreferences.id, existing.id));
     } else {
-        db.insert(userPreferences).values({
+        await db.insert(userPreferences).values({
             userId: session.user.id, key: ns, value,
-        }).run();
+        });
     }
     revalidatePath("/settings");
     return { success: true };

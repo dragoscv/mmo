@@ -11,32 +11,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Find device by token
-    const device = db
+    const deviceRows = await db
         .select()
         .from(devices)
         .where(eq(devices.token, body.token))
-        .get();
+        .limit(1);
+    const device = deviceRows[0];
 
     if (!device) {
         return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
     // Get user info
-    const user = db
+    const userRows = await db
         .select()
         .from(users)
         .where(eq(users.id, device.userId))
-        .get();
+        .limit(1);
+    const user = userRows[0];
 
     // Update device status
-    db.update(devices)
+    await db.update(devices)
         .set({
             status: "online",
             hostname: body.hostname || device.hostname,
-            lastSeenAt: new Date().toISOString(),
+            lastSeenAt: new Date(),
         })
-        .where(eq(devices.id, device.id))
-        .run();
+        .where(eq(devices.id, device.id));
 
     return NextResponse.json({
         deviceId: device.id,
