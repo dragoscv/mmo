@@ -51,12 +51,12 @@ const DEFAULTS: CompanionSettings = {
     startMinimized: false,
     serverPort: 17899,
     scanFolders: [],
-    webAppUrl: "http://localhost:3000",
+    webAppUrl: "https://muzicai.ro",
     audioOriginAllowlist: [
+        "https://muzicai.ro",
+        "https://*.muzicai.ro",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://app.brivio.ro",
-        "https://*.brivio.ro",
     ],
     authorizedAudioDevices: [],
 };
@@ -98,7 +98,7 @@ export function getSettings(): CompanionSettings {
         startMinimized: store.get("startMinimized") as boolean,
         serverPort: store.get("serverPort") as number,
         scanFolders: readScanFolders(),
-        webAppUrl: store.get("webAppUrl") as string,
+        webAppUrl: "https://muzicai.ro",
         audioOriginAllowlist: (store.get("audioOriginAllowlist") as string[] | undefined) ?? DEFAULTS.audioOriginAllowlist,
         authorizedAudioDevices: (store.get("authorizedAudioDevices") as AuthorizedAudioDevice[] | undefined) ?? [],
     };

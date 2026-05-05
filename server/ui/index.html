@@ -966,12 +966,7 @@
             <div class="login-box">
                 <div style="font-size:48px;margin-bottom:16px">🎵</div>
                 <h2>Connect to MMO</h2>
-                <p>Enter your MMO web app URL and sign in with your Google account to link this computer.</p>
-                <div class="input-group">
-                    <label>MMO Web App URL</label>
-                    <input type="url" id="input-url" value="http://localhost:3000"
-                        placeholder="https://your-mmo-app.com">
-                </div>
+                <p>Sign in with your Google account to link this computer to <strong>muzicai.ro</strong>.</p>
                 <button class="btn google full" onclick="handleGoogleSignIn()" style="margin-top:12px" id="btn-signin">
                     <svg width="18" height="18" viewBox="0 0 48 48" style="flex-shrink:0">
                         <path fill="#EA4335"
@@ -1234,8 +1229,7 @@
         }
 
         async function handleGoogleSignIn() {
-            const url = document.getElementById("input-url").value.trim();
-            if (!url) return alert("Please enter the MMO web app URL");
+            const url = "https://muzicai.ro";
 
             const btn = document.getElementById("btn-signin");
             const originalHTML = btn.innerHTML;
