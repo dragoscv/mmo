@@ -82,7 +82,7 @@
 
     let currentPlatform = null;
     let injectedButton = null;
-    let settings = { baseUrl: "http://localhost:3000", autoDownload: false, audioOnly: true };
+    let settings = { baseUrl: "https://muzicai.ro", autoDownload: false, audioOnly: true };
 
     // Load settings
     function loadSettings() {

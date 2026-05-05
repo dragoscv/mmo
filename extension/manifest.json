@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "MMO - Music Media Organizer Downloader",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Detect audio/video on streaming platforms and download to your MMO library",
     "permissions": [
         "storage",
@@ -23,7 +23,10 @@
         "*://*.facebook.com/*",
         "*://*.twitch.tv/*",
         "*://*.dailymotion.com/*",
-        "*://*.deezer.com/*"
+        "*://*.deezer.com/*",
+        "*://muzicai.ro/*",
+        "*://*.muzicai.ro/*",
+        "http://localhost:3000/*"
     ],
     "background": {
         "service_worker": "background.js"

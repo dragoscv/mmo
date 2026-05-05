@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Load saved settings
     chrome.storage.sync.get(["baseUrl", "autoDownload", "audioOnly"], (data) => {
-        baseUrlInput.value = data.baseUrl || "http://localhost:3000";
+        baseUrlInput.value = data.baseUrl || "https://muzicai.ro";
         autoDownloadInput.checked = data.autoDownload || false;
         audioOnlyInput.checked = data.audioOnly !== false; // default true
     });
@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Save settings
     saveBtn.addEventListener("click", () => {
         const settings = {
-            baseUrl: baseUrlInput.value.replace(/\/+$/, "") || "http://localhost:3000",
+            baseUrl: baseUrlInput.value.replace(/\/+$/, "") || "https://muzicai.ro",
             autoDownload: autoDownloadInput.checked,
             audioOnly: audioOnlyInput.checked,
         };

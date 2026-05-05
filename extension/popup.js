@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const settingsLink = document.getElementById("settings-link");
 
     let currentUrl = "";
-    let settings = { baseUrl: "http://localhost:3000", autoDownload: false };
+    let settings = { baseUrl: "https://muzicai.ro", autoDownload: false };
 
     // Supported platforms
     const PLATFORMS = {
@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Load settings
     chrome.storage.sync.get(["baseUrl", "autoDownload"], (data) => {
-        settings.baseUrl = data.baseUrl || "http://localhost:3000";
+        settings.baseUrl = data.baseUrl || "https://muzicai.ro";
         settings.autoDownload = data.autoDownload || false;
         baseUrlLink.textContent = settings.baseUrl.replace(/^https?:\/\//, "");
         baseUrlLink.href = settings.baseUrl;

@@ -1,6 +1,6 @@
 // MMO Extension - Background Service Worker
 
-const DEFAULT_BASE_URL = "http://localhost:3000";
+const DEFAULT_BASE_URL = "https://muzicai.ro";
 
 // Get base URL from storage
 async function getBaseUrl() {
