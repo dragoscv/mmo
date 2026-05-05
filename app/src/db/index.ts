@@ -18,7 +18,14 @@ import * as schema from "./schema";
 import path from "node:path";
 import fs from "node:fs";
 
-const dataDir = path.join(process.cwd(), "data");
+// On Vercel (and any serverless host) the project filesystem is read-only;
+// only `/tmp` is writable, and it's per-invocation/ephemeral. We redirect the
+// SQLite file there so the module can at least load — but persistence is NOT
+// guaranteed across cold starts. The proper fix is migrating to Postgres.
+const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+const dataDir = isServerless
+  ? path.join("/tmp", "mmo-data")
+  : path.join(process.cwd(), "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
