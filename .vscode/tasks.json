@@ -48,6 +48,36 @@
       }
     },
     {
+      "label": "Companion: Dev (Inspect)",
+      "type": "shell",
+      "command": "pnpm dev:inspect",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/server"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Companion: Dev on macOS VM",
+      "type": "shell",
+      "command": "pwsh -NoProfile -File ./server/scripts/dev-on-mac.ps1",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
       "label": "Companion: Install Dependencies",
       "type": "shell",
       "command": "pnpm install",

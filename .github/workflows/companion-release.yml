@@ -79,6 +79,21 @@ jobs:
       - name: Build TypeScript
         run: pnpm build
 
+      - name: Reinstall production deps with npm (flat tree for electron-builder)
+        # pnpm's symlinked layout — even with hoisting — leaves transitive
+        # dependencies of native packages (audify→bindings→file-uri-to-path,
+        # express→qs→side-channel→get-intrinsic→es-object-atoms, etc.)
+        # unreachable to electron-builder's asar packer. We wipe node_modules
+        # after the TypeScript build (which only needs them transiently) and
+        # let npm produce a guaranteed-flat tree for packaging.
+        shell: bash
+        run: |
+          rm -rf node_modules
+          npm install --omit=dev --ignore-scripts --no-audit --no-fund
+          # Rebuild only the native module we actually use; ignore the rest
+          # to avoid electron-winstaller / postinstall surprises on Windows.
+          npm rebuild audify better-sqlite3 || true
+
       # Publish flag: tag pushes always publish; workflow_dispatch publishes
       # only when the input is "true". Otherwise we just build artifacts.
       - name: Determine publish flag
