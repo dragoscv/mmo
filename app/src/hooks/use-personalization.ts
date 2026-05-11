@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
-export type MixerBackground = "blur" | "solid" | "gradient" | "transparent";
+export type MixerBackground = "blur" | "solid" | "gradient" | "transparent" | "cinematic";
 export type AccentColor = "purple" | "blue" | "green" | "red" | "orange" | "pink" | "cyan";
 export type UIDensity = "compact" | "normal" | "spacious";
 export type KnobStyle = "arc" | "dot" | "line";
@@ -227,6 +227,11 @@ export function usePersonalization() {
 
 export function getMixerBackgroundStyle(settings: PersonalizationSettings): React.CSSProperties {
     switch (settings.mixerBackground) {
+        case "cinematic":
+            // Cinematic mode renders an absolutely-positioned canvas/CSS
+            // layer separately; the base style stays transparent so the
+            // scene shows through unobstructed.
+            return { backgroundColor: "transparent" };
         case "solid":
             return {
                 backgroundColor: settings.solidBgColor,

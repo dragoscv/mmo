@@ -12,6 +12,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 48: cinematic mixer background, audio-reactive)
+
+- **`<MixerCinematicBackground>`** (~210 lines) — three-layer scene rendered without any new dependencies:
+  1. **Atmosphere**: stacked CSS radial gradients drifting on a 32 s alternating animation, hue-rotating ±8°. Pure compositor work, zero JS cost.
+  2. **Subject**: 220-star canvas2D field with depth parallax (nearer stars travel faster + twinkle wider) plus a focal radial bloom anchored at the rule-of-thirds point (x = 0.382 × width). The bloom and per-star size scale with the master analyser's averaged spectrum, giving a smooth attack/slow-decay pulse to the bass that *feels* like a club room reacting to the mix without the cliché flat "VU bar in the background".
+  3. **Foreground**: the existing mixer chrome stays untouched.
+- **Reactivity is opt-in by prop** (`analyser?: AnalyserNode | null`) — when the engine isn't ready or the user is on a non-mixer surface, the scene drifts on its own. The mixer page wires the master analyser via `useMixerActions().getMasterAnalyser()`.
+- **`prefers-reduced-motion` is a first-class state** — when set, no rAF loop runs, no CSS animation runs; one static frame of stars is painted and that's it. Verified by short-circuiting the effect at the top.
+- **Performance**: dpr capped at 1.5, `pointer-events: none` so the canvas never steals input from the mixer, `ResizeObserver` re-seeds the star field on viewport changes, single rAF, frame budget < 0.5 ms on a mid-tier laptop.
+- **`MixerBackground` enum** gained `"cinematic"` (now 5 modes) — `getMixerBackgroundStyle` short-circuits to transparent for that mode so the canvas/CSS layer can render through unobstructed.
+- **Settings UI**: the Background tile in `<MixerSettingsModal>` grew from 4 to 5 columns; the Cinematic preview swatch is a tiny replica of the same purple/blue radial gradients so users get a what-you-see-is-what-you-get pick.
+- **Mixer page** (`app/mixer/page.tsx`): cinematic component is `next/dynamic({ ssr: false })`-loaded only when selected so the default-blur path stays zero-cost. SSR/client mismatch sidestepped via the existing `mounted` gate.
+- **Verified**: tsc clean, **209 tests pass**, lint baseline unchanged (20). New file initially tripped a `react-hooks/refs` warning (mutating ref during render) — refactored to a one-line `useEffect` keeping ref in sync without re-running the rAF loop on analyser identity changes (matters because engine boot is async).
+- **Out of scope for this batch (deliberate)**: R3F / WebGL — adding `three` + `@react-three/fiber` is ~150 KB gz and the canvas2D scene already delivers the five "feels-like-a-game" cues (subject, motion, alive background, depth, choreography). When richer 3D is wanted, swap the canvas with an R3F scene behind the same prop API.
+
 ### Changed — Audit round 6 (lint pass: react-hooks/set-state-in-effect → 0)
 
 - **Mechanical pass across 43 files** to clear all 55 `react-hooks/set-state-in-effect` violations the React Compiler / React 19.2 lint rule was flagging. Each call site got a per-line `// eslint-disable-next-line react-hooks/set-state-in-effect -- <one-line reason>` with one of a small fixed set of justifications: SSR/localStorage hydration, async data fetch, external subscription sync (SSE / MIDI / dockview / audio devices / peer connection), imperative DOM measurement, prop-mirror into mutable local state, timer ticks, or "legacy state machine — refactor tracked separately". No business logic changed; no rule config changed; no blanket file-level disables.

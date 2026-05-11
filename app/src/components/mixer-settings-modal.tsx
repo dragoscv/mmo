@@ -1533,11 +1533,12 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                     <Monitor className="w-3 h-3 text-white/30" />
                                     <span className="text-[10px] uppercase tracking-wider text-white/25">Background</span>
                                 </div>
-                                <div className="grid grid-cols-4 gap-1.5 mb-3">
+                                <div className="grid grid-cols-5 gap-1.5 mb-3">
                                     {([
                                         { id: "blur" as MixerBackground, label: "Blur", desc: "Frosted glass" },
                                         { id: "solid" as MixerBackground, label: "Solid", desc: "Flat color" },
                                         { id: "gradient" as MixerBackground, label: "Gradient", desc: "Two-tone" },
+                                        { id: "cinematic" as MixerBackground, label: "Cinematic", desc: "Audio-reactive scene" },
                                         { id: "transparent" as MixerBackground, label: "None", desc: "See-through" },
                                     ]).map(bg => (
                                         <button
@@ -1556,6 +1557,7 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                                 bg.id === "blur" && "bg-purple-900/40 backdrop-blur-sm border border-white/10",
                                                 bg.id === "solid" && "bg-zinc-900 border border-white/10",
                                                 bg.id === "gradient" && "bg-gradient-to-b from-purple-900/60 to-zinc-900 border border-white/10",
+                                                bg.id === "cinematic" && "bg-[radial-gradient(ellipse_at_30%_40%,rgba(168,85,247,0.6),transparent_70%),radial-gradient(ellipse_at_75%_60%,rgba(59,130,246,0.4),transparent_70%),#050511] border border-white/10",
                                                 bg.id === "transparent" && "bg-transparent border border-dashed border-white/20",
                                             )} />
                                             <span className="font-medium">{bg.label}</span>
