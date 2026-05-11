@@ -35,7 +35,7 @@ export function DrivesClient() {
 
     useEffect(() => {
         loadDrives();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);  
 
     return (
         <div className="space-y-6">

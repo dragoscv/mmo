@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import {
     type ClipboardState,
     type ClipboardEntry,
@@ -50,15 +49,12 @@ export function ClipboardPanel({
 }: ClipboardPanelProps) {
     const { entries, activeIndex } = clipboard;
 
-    const timeFormat = useMemo(() => {
-        const now = Date.now();
-        return (ts: number) => {
-            const diff = now - ts;
-            if (diff < 60_000) return "just now";
-            if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-            return `${Math.floor(diff / 3_600_000)}h ago`;
-        };
-    }, []);
+    const timeFormat = (ts: number) => {
+        const diff = Date.now() - ts;
+        if (diff < 60_000) return "just now";
+        if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+        return `${Math.floor(diff / 3_600_000)}h ago`;
+    };
 
     return (
         <div className={cn(

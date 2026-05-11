@@ -181,12 +181,12 @@ export function getRafSchedulerStats() {
  */
 export function useRafCallback(cb: RafCallback, opts: RafSubscribeOptions = {}) {
     const cbRef = useRef(cb);
-    cbRef.current = cb;
+    useEffect(() => { cbRef.current = cb; });
     const { fps, enabled } = opts;
 
     useEffect(() => {
         const wrapped: RafCallback = (now, dt) => cbRef.current(now, dt);
         return subscribeRaf(wrapped, { fps, enabled });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, [fps, enabled]);
 }

@@ -947,6 +947,35 @@ function InfoRow({
 
 // ─── Edit Tab ────────────────────────────────────────────────────────────────
 
+function EditFieldRow({
+    label,
+    type,
+    span,
+    value,
+    onChange,
+}: {
+    label: string;
+    field: string;
+    type: string;
+    span: number;
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    return (
+        <div className={span === 2 ? "col-span-2" : ""}>
+            <label className="text-xs text-muted-foreground mb-1 block">
+                {label}
+            </label>
+            <Input
+                type={type}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="h-8 text-sm"
+            />
+        </div>
+    );
+}
+
 function EditTab({
     track,
     onTrackUpdated,
@@ -976,6 +1005,54 @@ function EditTab({
     });
     const [isPending, startTransition] = useTransition();
     const [saved, setSaved] = useState(false);
+    const [isSuggesting, setIsSuggesting] = useState(false);
+
+    const handleSuggest = async () => {
+        setIsSuggesting(true);
+        try {
+            const { suggestTrackTags } = await import("@/actions/ai-tag");
+            const res = await suggestTrackTags(track.id);
+            if (!res.success || !res.suggestion) {
+                toast.error("AI suggest failed", { description: res.error ?? "Unknown error" });
+                return;
+            }
+            const s = res.suggestion;
+            const filledFields: string[] = [];
+            setForm((f) => {
+                const next = { ...f };
+                const fillIfEmpty = <K extends keyof typeof next>(key: K, value: string | undefined | null) => {
+                    if (value && !next[key]) {
+                        next[key] = value as typeof next[K];
+                        filledFields.push(String(key));
+                    }
+                };
+                fillIfEmpty("genre", s.genre);
+                fillIfEmpty("subgenre", s.subgenre);
+                fillIfEmpty("mood", s.mood);
+                fillIfEmpty("vocalType", s.vocalType);
+                fillIfEmpty("setPosition", s.setPosition);
+                if (typeof s.mixability === "number" && !next.mixability) {
+                    next.mixability = String(s.mixability);
+                    filledFields.push("mixability");
+                }
+                if (typeof s.energy === "number" && !next.energy) {
+                    next.energy = String(s.energy);
+                    filledFields.push("energy");
+                }
+                return next;
+            });
+            const provider = res.provider ? ` via ${res.provider}` : "";
+            if (filledFields.length === 0) {
+                toast.info(`AI ran${provider} — no new fields to fill (all already populated)`);
+            } else {
+                toast.success(`AI filled ${filledFields.length} field${filledFields.length === 1 ? "" : "s"}${provider}`, {
+                    description: filledFields.join(", "),
+                });
+            }
+        } finally {
+            setIsSuggesting(false);
+        }
+    };
 
     useEffect(() => {
         setForm({
@@ -1032,30 +1109,23 @@ function EditTab({
         });
     };
 
-    const Field = ({
-        label,
-        field,
-        type = "text",
-        span = 1,
-    }: {
-        label: string;
-        field: keyof typeof form;
-        type?: string;
-        span?: number;
-    }) => (
-        <div className={span === 2 ? "col-span-2" : ""}>
-            <label className="text-xs text-muted-foreground mb-1 block">
-                {label}
-            </label>
-            <Input
-                type={type}
-                value={form[field]}
-                onChange={(e) =>
-                    setForm((f) => ({ ...f, [field]: e.target.value }))
-                }
-                className="h-8 text-sm"
-            />
-        </div>
+    type EditFormShape = typeof form;
+    type EditField = keyof EditFormShape;
+    const renderField = (
+        label: string,
+        field: EditField,
+        type: string = "text",
+        span: number = 1,
+    ) => (
+        <EditFieldRow
+            key={field}
+            label={label}
+            field={field}
+            type={type}
+            span={span}
+            value={form[field]}
+            onChange={(value) => setForm((f) => ({ ...f, [field]: value }))}
+        />
     );
 
     return (
@@ -1066,12 +1136,12 @@ function EditTab({
                     Basic Information
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
-                    <Field label="Artist" field="artist" />
-                    <Field label="Title" field="title" />
-                    <Field label="Album" field="album" />
-                    <Field label="Remix" field="remix" />
-                    <Field label="Label" field="label" />
-                    <Field label="Year" field="year" type="number" />
+                    {renderField("Artist", "artist")}
+                    {renderField("Title", "title")}
+                    {renderField("Album", "album")}
+                    {renderField("Remix", "remix")}
+                    {renderField("Label", "label")}
+                    {renderField("Year", "year", "number")}
                 </div>
             </div>
 
@@ -1081,12 +1151,12 @@ function EditTab({
                     Musical Properties
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
-                    <Field label="Genre" field="genre" />
-                    <Field label="Subgenre" field="subgenre" />
-                    <Field label="BPM" field="bpm" type="number" />
-                    <Field label="Key (Camelot)" field="keyCamelot" />
-                    <Field label="Key (Musical)" field="keyMusical" />
-                    <Field label="Energy (1-10)" field="energy" type="number" />
+                    {renderField("Genre", "genre")}
+                    {renderField("Subgenre", "subgenre")}
+                    {renderField("BPM", "bpm", "number")}
+                    {renderField("Key (Camelot)", "keyCamelot")}
+                    {renderField("Key (Musical)", "keyMusical")}
+                    {renderField("Energy (1-10)", "energy", "number")}
                 </div>
             </div>
 
@@ -1096,15 +1166,11 @@ function EditTab({
                     DJ Properties
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
-                    <Field label="Mood" field="mood" />
-                    <Field label="Color" field="color" />
-                    <Field label="Vocal Type" field="vocalType" />
-                    <Field label="Set Position" field="setPosition" />
-                    <Field
-                        label="Mixability (1-5)"
-                        field="mixability"
-                        type="number"
-                    />
+                    {renderField("Mood", "mood")}
+                    {renderField("Color", "color")}
+                    {renderField("Vocal Type", "vocalType")}
+                    {renderField("Set Position", "setPosition")}
+                    {renderField("Mixability (1-5)", "mixability", "number")}
                 </div>
             </div>
 
@@ -1123,7 +1189,22 @@ function EditTab({
                 />
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-between gap-2">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleSuggest}
+                    disabled={isSuggesting || isPending}
+                    className="gap-2"
+                    title="Use the AI provider you configured in Settings → AI to suggest genre / mood / energy / etc."
+                >
+                    {isSuggesting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <Sparkles className="h-4 w-4" />
+                    )}
+                    Suggest with AI
+                </Button>
                 <Button
                     onClick={handleSave}
                     disabled={isPending}

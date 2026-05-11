@@ -1,4 +1,5 @@
 import si from "systeminformation";
+import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,12 @@ async function collectStats(gpuIndex: number): Promise<SystemSnapshot> {
 }
 
 export async function GET(request: Request) {
+    // Auth required: previously an unauthenticated SSE that leaked host
+    // CPU/GPU/RAM/temperature continuously to any visitor (host
+    // fingerprinting + free DoS-amplifier — every open connection runs
+    // `systeminformation` polling forever until the client aborts).
+    const session = await auth();
+    if (!session?.user?.id) return new Response("unauthorized", { status: 401 });
     const url = new URL(request.url);
     const gpuIndex = parseInt(url.searchParams.get("gpu") ?? "0", 10) || 0;
     const pollMs = Math.max(2000, Math.min(30000,

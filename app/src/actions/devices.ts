@@ -13,6 +13,7 @@ import {
     type CompanionAudioInventory,
     type CompanionScanJob,
 } from "@/lib/companion-control";
+import { issueDeviceToken, materializeDeviceToken } from "@/lib/device-token";
 
 // NOTE: Next.js 16 forbids re-exporting types from `"use server"` files —
 // every export must be an async function. Client components import the
@@ -53,7 +54,7 @@ export async function registerDevice(data: {
     const session = await auth();
     if (!session?.user?.id) return { error: "Not authenticated" };
 
-    const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+    const issued = issueDeviceToken();
     const deviceId = crypto.randomUUID();
 
     await db.insert(devices).values({
@@ -61,17 +62,27 @@ export async function registerDevice(data: {
         userId: session.user.id,
         name: data.name,
         apiUrl: data.apiUrl,
-        token,
+        tokenHash: issued.hash,
+        tokenEncrypted: issued.encrypted,
         status: "offline",
     });
 
     revalidatePath("/devices");
-    return { deviceId, token };
+    return { deviceId, token: issued.plaintext };
 }
 
-// ─── Update device info (called by companion heartbeat) ─────────────────────
+// ─── Update device info (internal helper for pingDevice) ───────────────────
+//
+// Intentionally NOT exported: it would otherwise be reachable as a server
+// action by any signed-in user with no auth gate and no ownership scope —
+// letting anyone enumerate device IDs and rewrite their `apiUrl` to an
+// attacker-controlled server (which the companion-control client then
+// dutifully calls with the user's session). Internal callers below already
+// hold a session and have scoped the deviceId before reaching us, so the
+// missing checks are safe here; outside callers must go through a
+// dedicated server action that does its own auth + ownership.
 
-export async function updateDeviceStatus(
+async function updateDeviceStatusInternal(
     deviceId: string,
     data: {
         status?: string;
@@ -120,8 +131,29 @@ export async function renameDevice(deviceId: string, name: string) {
 }
 
 // ─── Device Folders ─────────────────────────────────────────────────────────
+//
+// All three helpers gate on `auth()` AND verify the target device belongs to
+// the signed-in user. Without these checks any signed-in caller could:
+//   - enumerate another tenant's folder list (cross-tenant disclosure),
+//   - plant attacker-chosen scan paths on a victim's device row (the victim's
+//     companion would walk them on next refresh — local-FS recon),
+//   - delete folder rows by sequential id enumeration.
+// Same trust-boundary pattern as batches 19 / 22.
+
+async function userOwnsDevice(deviceId: string, userId: string): Promise<boolean> {
+    const rows = await db
+        .select({ id: devices.id })
+        .from(devices)
+        .where(and(eq(devices.id, deviceId), eq(devices.userId, userId)))
+        .limit(1);
+    return rows.length > 0;
+}
 
 export async function getDeviceFolders(deviceId: string) {
+    const session = await auth();
+    if (!session?.user?.id) return [];
+    if (!(await userOwnsDevice(deviceId, session.user.id))) return [];
+
     return db
         .select()
         .from(deviceFolders)
@@ -131,6 +163,7 @@ export async function getDeviceFolders(deviceId: string) {
 export async function addDeviceFolder(deviceId: string, folderPath: string, label?: string) {
     const session = await auth();
     if (!session?.user?.id) return { error: "Not authenticated" };
+    if (!(await userOwnsDevice(deviceId, session.user.id))) return { error: "Device not found" };
 
     await db.insert(deviceFolders).values({
         deviceId,
@@ -143,7 +176,24 @@ export async function addDeviceFolder(deviceId: string, folderPath: string, labe
 }
 
 export async function removeDeviceFolder(folderId: number) {
-    await db.delete(deviceFolders).where(eq(deviceFolders.id, folderId));
+    const session = await auth();
+    if (!session?.user?.id) return { error: "Not authenticated" };
+
+    // Scope the DELETE through a join on devices.userId so the caller can
+    // only remove folders that belong to one of their own devices. Use a
+    // single statement (no read-then-write race) by filtering deviceId
+    // against a sub-select of the user's device IDs.
+    const ownedDeviceIds = db
+        .select({ id: devices.id })
+        .from(devices)
+        .where(eq(devices.userId, session.user.id));
+
+    await db.delete(deviceFolders).where(
+        and(
+            eq(deviceFolders.id, folderId),
+            sql`${deviceFolders.deviceId} IN ${ownedDeviceIds}`,
+        ),
+    );
     revalidatePath("/devices");
     return { success: true };
 }
@@ -163,12 +213,15 @@ export async function scanDeviceFolder(deviceId: string, folderPath: string) {
 
     if (!device) return { error: "Device not found" };
 
+    const bearer = await materializeDeviceToken(device);
+    if (!bearer) return { error: "Device token unavailable" };
+
     try {
         const resp = await fetch(`${device.apiUrl}/scan`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "X-Device-Token": device.token,
+                "X-Device-Token": bearer,
             },
             body: JSON.stringify({ folder: folderPath }),
             signal: AbortSignal.timeout(120_000),
@@ -256,10 +309,18 @@ export async function scanDeviceFolder(deviceId: string, folderPath: string) {
 // ─── Check device online status ─────────────────────────────────────────────
 
 export async function pingDevice(deviceId: string): Promise<{ online: boolean; info?: Record<string, unknown> }> {
+    // Auth + ownership scope: this action issues a server-side fetch to the
+    // device's `apiUrl`, which is user-controlled. Without a session check
+    // any caller could trigger an SSRF against arbitrary URLs and read /health
+    // responses from internal services; without an ownership check a signed-in
+    // user could ping (and probe + reclassify) any other user's device row.
+    const session = await auth();
+    if (!session?.user?.id) return { online: false };
+
     const rows = await db
         .select()
         .from(devices)
-        .where(eq(devices.id, deviceId))
+        .where(and(eq(devices.id, deviceId), eq(devices.userId, session.user.id)))
         .limit(1);
     const device = rows[0];
 
@@ -271,7 +332,7 @@ export async function pingDevice(deviceId: string): Promise<{ online: boolean; i
         });
         if (resp.ok) {
             const info = await resp.json();
-            await updateDeviceStatus(deviceId, {
+            await updateDeviceStatusInternal(deviceId, {
                 status: "online",
                 hostname: info.hostname,
                 os: info.platform,
@@ -283,7 +344,7 @@ export async function pingDevice(deviceId: string): Promise<{ online: boolean; i
         // offline
     }
 
-    await updateDeviceStatus(deviceId, { status: "offline" });
+    await updateDeviceStatusInternal(deviceId, { status: "offline" });
     return { online: false };
 }
 
@@ -319,8 +380,10 @@ export async function getLocalCompanion(): Promise<{ apiUrl: string; token: stri
         .from(devices)
         .where(eq(devices.userId, session.user.id));
     const local = all.find((d) => d.apiUrl && localPrefixes.some((p) => d.apiUrl!.startsWith(p)));
-    if (!local || !local.token || !local.apiUrl) return null;
-    return { apiUrl: local.apiUrl, token: local.token, deviceId: local.id };
+    if (!local || !local.apiUrl) return null;
+    const bearer = await materializeDeviceToken(local);
+    if (!bearer) return null;
+    return { apiUrl: local.apiUrl, token: bearer, deviceId: local.id };
 }
 
 // ─── Companion-owned folders ───────────────────────────────────────────────

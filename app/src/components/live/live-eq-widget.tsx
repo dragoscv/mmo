@@ -297,11 +297,15 @@ function EqCanvas({ bands, enabled, accent, analyser, sampleRate, spectrumBars, 
     const accentRef = useRef(accent);
     const selRef = useRef(selectedBand);
     const spectrumBarsRef = useRef(spectrumBars);
-    bandsRef.current = bands;
-    enabledRef.current = enabled;
-    accentRef.current = accent;
-    selRef.current = selectedBand;
-    spectrumBarsRef.current = spectrumBars;
+    // Mirror current props/state into refs after commit so the rAF render
+    // loop reads consistent values without re-binding listeners every tick.
+    useEffect(() => {
+        bandsRef.current = bands;
+        enabledRef.current = enabled;
+        accentRef.current = accent;
+        selRef.current = selectedBand;
+        spectrumBarsRef.current = spectrumBars;
+    });
 
     // Smoothed spectrum buffer for nicer animation.
     const spectrumSmoothRef = useRef<Float32Array | null>(null);

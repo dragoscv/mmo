@@ -56,7 +56,7 @@ export function DAWMidiBridge() {
 
     // ── Route MIDI controller actions to DAW transport ──────────────────
     const dawRef = useRef(daw);
-    dawRef.current = daw;
+    useEffect(() => { dawRef.current = daw; });
 
     const handleMidiAction: MidiActionHandler = useCallback((action, value, deck) => {
         const d = dawRef.current;

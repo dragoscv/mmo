@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
 import { store, getSettings, updateSettings, type CompanionSettings, type AuthorizedAudioDevice } from "./store";
+import { setTelemetryEnabled } from "./lib/logger";
 import { listBackends, listDevices, invalidateAudioInventoryCache, type AudioBackend } from "./audio/native-engine";
 import {
     probeDriver as probeVirtualAudioDriver,
@@ -437,6 +438,28 @@ function createWindow() {
         console.error(`[main] webContents did-fail-load ${code} ${desc} ${url}`);
     });
 
+    // Lock the renderer to its bundled UI. Without these guards a stray
+    // `<a target="_blank">`, a `window.open(remoteUrl)`, or a navigation
+    // hijack would spawn another BrowserWindow with the same `preload`
+    // attached \u2014 handing the IPC bridge (`window.mmo.va.install()`,
+    // `selectFolder`, etc.) to an arbitrary remote origin.
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        // External links open in the user's default browser; never spawn
+        // another Electron window.
+        if (/^https?:\/\//i.test(url)) {
+            void shell.openExternal(url);
+        }
+        return { action: "deny" };
+    });
+    mainWindow.webContents.on("will-navigate", (event, url) => {
+        // Allow only the bundled file:// UI. Any other scheme/origin is
+        // either a phishing redirect or a compromised dependency.
+        if (!url.startsWith("file://")) {
+            event.preventDefault();
+            if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
+        }
+    });
+
     let shown = false;
     const showOnce = (reason: string) => {
         if (shown || !mainWindow || mainWindow.isDestroyed()) return;
@@ -559,6 +582,9 @@ function setupIPC() {
                 openAtLogin: patch.startAtLogin,
                 openAsHidden: true,
             });
+        }
+        if (patch.telemetryEnabled !== undefined) {
+            setTelemetryEnabled(patch.telemetryEnabled);
         }
         return getSettings();
     });
@@ -866,11 +892,35 @@ function getLocalIp(): string {
 
 // ─── Auto Updater ────────────────────────────────────────────────────────────
 
+/** Re-check for updates every 4 hours so long-running sessions still
+ *  catch new releases without a restart. The official Electron docs
+ *  warn against checking more than once per hour; 4h is the sweet spot
+ *  for a desktop app the user keeps open across DJ sessions. */
+const UPDATE_RECHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+let updateRecheckTimer: NodeJS.Timeout | null = null;
+let lastUpdateCheckTs = 0;
+let lastUpdateError: string | null = null;
+
 function setupAutoUpdater() {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
+    // Quieter electron-updater logs in production — we route to mainWindow.
+    autoUpdater.logger = null;
+
+    autoUpdater.on("checking-for-update", () => {
+        lastUpdateCheckTs = Date.now();
+        mainWindow?.webContents.send("update-status", { status: "checking" });
+    });
+
+    autoUpdater.on("update-not-available", (info) => {
+        mainWindow?.webContents.send("update-status", {
+            status: "current",
+            version: info.version,
+        });
+    });
 
     autoUpdater.on("update-available", (info) => {
+        lastUpdateError = null;
         mainWindow?.webContents.send("update-status", {
             status: "available",
             version: info.version,
@@ -881,6 +931,9 @@ function setupAutoUpdater() {
         mainWindow?.webContents.send("update-status", {
             status: "downloading",
             percent: Math.round(progress.percent),
+            transferred: progress.transferred,
+            total: progress.total,
+            bytesPerSecond: progress.bytesPerSecond,
         });
     });
 
@@ -909,19 +962,61 @@ function setupAutoUpdater() {
     });
 
     autoUpdater.on("error", (err) => {
+        lastUpdateError = err.message;
         console.error("Auto-updater error:", err.message);
+        mainWindow?.webContents.send("update-status", {
+            status: "error",
+            error: err.message,
+        });
     });
 
-    // Check for updates after a short delay
+    // Initial check after a short delay (gives the UI time to mount its
+    // listener) then a recurring re-check every 4 hours.
     setTimeout(() => {
         autoUpdater.checkForUpdatesAndNotify().catch(() => { });
     }, 5000);
+    updateRecheckTimer = setInterval(() => {
+        autoUpdater.checkForUpdatesAndNotify().catch(() => { });
+    }, UPDATE_RECHECK_INTERVAL_MS);
+
+    // Manual "Check for updates" button in Settings → Help. Returns the
+    // last status payload so the renderer can show a spinner without
+    // racing the event stream.
+    ipcMain.handle("updater:check", async () => {
+        try {
+            const result = await autoUpdater.checkForUpdates();
+            return {
+                ok: true,
+                version: result?.updateInfo?.version,
+                lastCheckTs: lastUpdateCheckTs,
+                lastError: lastUpdateError,
+            };
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            lastUpdateError = message;
+            return { ok: false, error: message, lastCheckTs: lastUpdateCheckTs };
+        }
+    });
+
+    ipcMain.handle("updater:status", () => ({
+        currentVersion: app.getVersion(),
+        lastCheckTs: lastUpdateCheckTs,
+        lastError: lastUpdateError,
+    }));
 }
+
+app.on("before-quit", () => {
+    if (updateRecheckTimer) {
+        clearInterval(updateRecheckTimer);
+        updateRecheckTimer = null;
+    }
+});
 
 // ─── App lifecycle ───────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
     logLine("info", "app whenReady — creating window");
+    setTelemetryEnabled(getSettings().telemetryEnabled);
     setupIPC();
     createWindow();
     createTray();
@@ -979,6 +1074,21 @@ app.whenReady().then(async () => {
                 // instead of the stale "Server unavailable" placeholder
                 // built at startup.
                 refreshTrayMenu();
+            }
+        });
+    });
+
+    // Cloud sync loop. Lives in `./sync/` so the CloudSyncClient + the
+    // SQLite-backed SyncStorage share a single instance across the app.
+    // Safe to call before pairing — returns false and is a no-op until a
+    // deviceToken lands in the store via the auth flow.
+    runAfterPaint(() => {
+        void import("./sync/index").then((m) => {
+            try {
+                const started = m.startCloudSync((msg, err) => err ? logLine("warn", msg, err as Error) : logLine("info", msg));
+                if (!started) logLine("info", "cloud sync deferred — waiting on device pairing");
+            } catch (err) {
+                logLine("error", "startCloudSync threw:", err as Error);
             }
         });
     });

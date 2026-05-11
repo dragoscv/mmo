@@ -172,6 +172,21 @@ export const LiveAudioStatsCard = memo(function LiveAudioStatsCard({ className }
         return () => document.removeEventListener("visibilitychange", update);
     }, []);
 
+    // Hooks must run unconditionally — keep all `useLiveMetersField`
+    // subscriptions above the early return so React/React Compiler can
+    // verify a stable hook ordering between renders.
+    const nativeRunning = useLiveMetersField(s => s.nativeRunning);
+    const nativeSampleRate = useLiveMetersField(s => s.nativeSampleRate);
+    const nativeFrameSize = useLiveMetersField(s => s.nativeFrameSize);
+    const nativeBackend = useLiveMetersField(s => s.nativeBackend);
+    const nativeUptimeSec = useLiveMetersField(s => s.nativeUptimeSec);
+    const nativeStreamLatencyMs = useLiveMetersField(s => s.nativeStreamLatencyMs);
+    const nativeDspAvgMs = useLiveMetersField(s => s.nativeDspAvgMs);
+    const nativeDspMaxMs = useLiveMetersField(s => s.nativeDspMaxMs);
+    const nativeUnderruns = useLiveMetersField(s => s.nativeUnderruns);
+    const documentHidden = useLiveMetersField(s => s.documentHidden);
+    const nativeExclusiveMode = useLiveMetersField(s => s.nativeExclusiveMode);
+
     if (!engine) {
         return (
             <div className={cn("rounded-lg bg-white/[0.03] border border-white/[0.06] p-2 w-[220px] lg:w-[260px] xl:w-[300px]", className)}>
@@ -199,15 +214,7 @@ export const LiveAudioStatsCard = memo(function LiveAudioStatsCard({ className }
     // that mode would lie about the actual signal path, so we branch
     // every Engine-column row on `nativeRunning` and show device truth
     // sourced from the companion's RtAudio /metrics endpoint.
-    const nativeRunning = useLiveMetersField(s => s.nativeRunning);
-    const nativeSampleRate = useLiveMetersField(s => s.nativeSampleRate);
-    const nativeFrameSize = useLiveMetersField(s => s.nativeFrameSize);
-    const nativeBackend = useLiveMetersField(s => s.nativeBackend);
-    const nativeUptimeSec = useLiveMetersField(s => s.nativeUptimeSec);
-    const nativeStreamLatencyMs = useLiveMetersField(s => s.nativeStreamLatencyMs);
-    const nativeDspAvgMs = useLiveMetersField(s => s.nativeDspAvgMs);
-    const nativeDspMaxMs = useLiveMetersField(s => s.nativeDspMaxMs);
-    const nativeUnderruns = useLiveMetersField(s => s.nativeUnderruns);
+    // (The `useLiveMetersField` hooks are hoisted above the early return.)
 
     const showNative = nativeRunning && nativeSampleRate > 0;
     // Per-block latency = frameSize / sampleRate. This is the dominant
@@ -276,8 +283,7 @@ export const LiveAudioStatsCard = memo(function LiveAudioStatsCard({ className }
 
     // Visibility warning — only show when relevant (browser-side audio is
     // playing). When the user is purely on native mic, a hidden tab
-    // doesn't affect them at all.
-    const documentHidden = useLiveMetersField(s => s.documentHidden);
+    // doesn't affect them at all. (`documentHidden` is hoisted above.)
     const browserPlaying = live.backingIsPlaying || activeLoopers > 0 || playingPads > 0;
     const showHiddenTabWarning = documentHidden && browserPlaying;
 
@@ -286,8 +292,7 @@ export const LiveAudioStatsCard = memo(function LiveAudioStatsCard({ className }
     // through the system mixer which dynamically resamples and ducks on
     // focus changes / communications-device priority. Exclusive mode
     // bypasses this entirely. We only nudge if the user hasn't already
-    // turned it on.
-    const nativeExclusiveMode = useLiveMetersField(s => s.nativeExclusiveMode);
+    // turned it on. (`nativeExclusiveMode` is hoisted above.)
     const showWasapiSharedHint = showNative
         && /wasapi/i.test(nativeBackend)
         && !nativeExclusiveMode;

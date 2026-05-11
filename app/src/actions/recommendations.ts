@@ -64,6 +64,14 @@ function score(t: { keyCamelot: string | null; bpm: number | null; genre: string
     };
 }
 
+// Cap the requested page size + the radio-mix length. The engine returns
+// O(limit) over a 200-track candidate pool and the radio-mix call expands
+// to O(2 * size) full-track fetches in parallel; both are cheap individually
+// but a 1M-`limit` would balloon RAM and saturate the companion's HTTP keep-
+// alive pool.
+const MAX_LIMIT = 200;
+const MAX_RADIO_SIZE = 200;
+
 export async function getRecommendedTracks(
     currentTrackId: number,
     genre?: string | null,
@@ -71,6 +79,8 @@ export async function getRecommendedTracks(
     keyCamelot?: string | null,
     limit: number = 20,
 ): Promise<RecommendedTrack[]> {
+    const safeLimit = Number.isInteger(limit) && limit > 0
+        ? Math.min(limit, MAX_LIMIT) : 20;
     const link = await getCompanionLink();
     if (!link) return [];
 
@@ -100,13 +110,15 @@ export async function getRecommendedTracks(
         });
 
     scored.sort((a, b) => b.score - a.score);
-    return scored.filter((t) => t.score > 0).slice(0, limit);
+    return scored.filter((t) => t.score > 0).slice(0, safeLimit);
 }
 
 export async function getRadioMix(
     seedTrackId: number,
     size: number = 30,
 ): Promise<RadioTrack[]> {
+    const safeSize = Number.isInteger(size) && size > 0
+        ? Math.min(size, MAX_RADIO_SIZE) : 30;
     const link = await getCompanionLink();
     if (!link) return [];
 
@@ -114,7 +126,7 @@ export async function getRadioMix(
     if (!seed) return [];
 
     const recs = await getRecommendedTracks(
-        seedTrackId, seed.genre, seed.bpm, seed.keyCamelot, size * 2,
+        seedTrackId, seed.genre, seed.bpm, seed.keyCamelot, safeSize * 2,
     );
     if (recs.length === 0) return [seed];
 
@@ -131,7 +143,7 @@ export async function getRadioMix(
     let currentKey = seed.keyCamelot;
     let currentBpm = seed.bpm;
 
-    while (ordered.length < size && remaining.size > 0) {
+    while (ordered.length < safeSize && remaining.size > 0) {
         let bestId: number | null = null;
         let bestScore = -1;
         for (const [id, rec] of remaining) {

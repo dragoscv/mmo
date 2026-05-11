@@ -13,6 +13,7 @@ import { app } from "electron";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
+import { log } from "../lib/logger";
 
 let _sqlite: Database.Database | null = null;
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
@@ -162,6 +163,18 @@ function bootstrap(sqlite: Database.Database) {
         );
 
         CREATE INDEX IF NOT EXISTS idx_downloads_user ON downloads(user_id, downloaded_at);
+
+        CREATE TABLE IF NOT EXISTS saved_drives (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            path TEXT NOT NULL,
+            label TEXT NOT NULL,
+            type TEXT NOT NULL DEFAULT 'removable',
+            format TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_drives_user_path ON saved_drives(user_id, path);
     `);
 
     // ── Idempotent column migrations for existing DBs ──────────────────
@@ -181,7 +194,7 @@ function bootstrap(sqlite: Database.Database) {
             } catch (e) {
                 // Best-effort: log and continue. A failed ADD here is
                 // never a reason to refuse to boot the companion.
-                console.warn(`[db] ALTER ${table} ADD ${name} failed:`, e);
+                log.warn("db.alter_failed", { table, column: name }, e);
             }
         }
     };
@@ -206,7 +219,30 @@ function bootstrap(sqlite: Database.Database) {
         ["chord_progression", "TEXT"],
         ["structure_segments", "TEXT"],
         ["dsp_analyzed_at", "TEXT"],
+        // Cloud sync key. Cloud Postgres `tracks` is uniquely keyed by
+        // (user_id, sha256); mirroring it here lets `pushTrackChange()`
+        // and `/v1/sync` ingest use a stable cross-device id rather than
+        // the SQLite-local autoincrement id. Backfill is best-effort:
+        // we hash on next analysis pass, not as part of this migration.
+        ["sha256", "TEXT"],
+        // Per-field LWW timestamps so partial pushes from any device can
+        // merge without clobbering newer fields. Stored as JSON string
+        // because SQLite has no native jsonb.
+        ["field_versions", "TEXT"],
     ]);
+    ensureColumns("playlists", [
+        // Stable cross-device id. Cloud playlists key on (user_id, external_id).
+        ["external_id", "TEXT"],
+        ["updated_at", "TEXT"],
+    ]);
+    // Best-effort indices for the new sync columns. CREATE INDEX IF NOT
+    // EXISTS is safe to run on every boot.
+    try {
+        sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tracks_user_sha ON tracks(user_id, sha256) WHERE sha256 IS NOT NULL`);
+        sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_playlists_user_ext ON playlists(user_id, external_id) WHERE external_id IS NOT NULL`);
+    } catch (e) {
+        console.warn("[db] sync index creation failed:", e);
+    }
 }
 
 export function getLibraryDb() {

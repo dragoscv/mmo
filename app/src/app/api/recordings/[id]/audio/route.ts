@@ -25,11 +25,17 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     const row = rows[0];
     if (!row) return new NextResponse("Not found", { status: 404 });
 
-    // Authorization: a logged-in user can only access their own recordings.
-    // Anonymous-uploaded recordings (userId=null) are accessible to anyone — they
-    // were created in a single-user dev context.
-    const session = await auth().catch(() => null);
-    if (row.userId && row.userId !== session?.user?.id) {
+    // Auth required, period. The previous logic let any anonymous caller stream
+    // a recording when `row.userId` was null ("legacy / single-user dev"), but
+    // recording ids are sequential serials so any anonymous visitor could
+    // enumerate `/api/recordings/N/audio` and exfiltrate every legacy row that
+    // ever had a null userId (including any that survived migrations or
+    // restores). Now: must be signed in; if the row has a userId, it must
+    // match the session; null-userId rows are accessible to any signed-in
+    // user (matches the recordings-action ownership model).
+    const session = await auth();
+    if (!session?.user?.id) return new NextResponse("Unauthorized", { status: 401 });
+    if (row.userId && row.userId !== session.user.id) {
         return new NextResponse("Forbidden", { status: 403 });
     }
 

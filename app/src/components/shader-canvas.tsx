@@ -87,15 +87,17 @@ export function ShaderCanvas({
     const player = usePlayer();
     const { getAudioData } = useAudioAnalyzer();
     const playerRef = useRef(player);
-    playerRef.current = player;
     const getAudioDataRef = useRef(getAudioData);
-    getAudioDataRef.current = getAudioData;
     const onFpsUpdateRef = useRef(onFpsUpdate);
-    onFpsUpdateRef.current = onFpsUpdate;
     const sensitivityRef = useRef(sensitivity);
-    sensitivityRef.current = sensitivity;
     const qualityRef = useRef(quality);
-    qualityRef.current = quality;
+    useEffect(() => {
+        playerRef.current = player;
+        getAudioDataRef.current = getAudioData;
+        onFpsUpdateRef.current = onFpsUpdate;
+        sensitivityRef.current = sensitivity;
+        qualityRef.current = quality;
+    });
 
     const handleMouseMove = useCallback((e: MouseEvent) => {
         const canvas = canvasRef.current;

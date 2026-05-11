@@ -418,7 +418,7 @@ export class MidiEngine {
                             (this as unknown as { _firstSeen?: Set<string> })._firstSeen = seen;
                             if (!seen.has(sourceId)) {
                                 seen.add(sourceId);
-                                // eslint-disable-next-line no-console
+                                 
                                 console.info(`[MIDI] First message from "${input.name}": status=0x${msg.status.toString(16)} data1=0x${msg.note.toString(16)} value=${msg.value} type=${msg.type}`);
                             }
                         }
@@ -524,7 +524,7 @@ export class MidiEngine {
         }
 
         if (process.env.NODE_ENV !== "production") {
-            // eslint-disable-next-line no-console
+             
             console.info(`[MIDI] Active preset → "${preset.name}" (${preset.mappings.length} mappings, ${this.mappingLookup.size} unique status:note keys)`);
         }
     }
@@ -572,7 +572,7 @@ export class MidiEngine {
                 // preset entries. Throttled to one log per unique key.
                 if (!this.unmappedSeen.has(key)) {
                     this.unmappedSeen.add(key);
-                    // eslint-disable-next-line no-console
+                     
                     console.debug(`[MIDI] unmapped ${msg.type} status=0x${msg.status.toString(16)} data1=0x${msg.note.toString(16)} value=${msg.value}`);
                 }
             }
@@ -621,10 +621,10 @@ export class MidiEngine {
             const key = `${deviceId}:${isSysex ? "sysex" : "midi"}`;
             if (!seen.has(key)) {
                 seen.add(key);
-                // eslint-disable-next-line no-console
+                 
                 console.warn(`[MIDI] send to "${device.name}" failed (sysex=${isSysex}, sysexEnabled=${sysexOk}):`, err);
                 if (isSysex && !sysexOk) {
-                    // eslint-disable-next-line no-console
+                     
                     console.warn(`[MIDI] ⚠  This controller ("${device.name}") needs SysEx to wake up. Re-grant SysEx permission for this site.`);
                 }
             }
@@ -1003,6 +1003,30 @@ export const PIONEER_DDJ_FLX4_PRESET: MidiPreset = {
         { status: 0x99, midino: 0x11, action: "beatjump-fwd-1", deck: "B", type: "note", description: "Beat Jump Fwd 1" },
         { status: 0x99, midino: 0x12, action: "beatjump-back-4", deck: "B", type: "note", description: "Beat Jump Back 4" },
         { status: 0x99, midino: 0x13, action: "beatjump-fwd-4", deck: "B", type: "note", description: "Beat Jump Fwd 4" },
+
+        // ── SAMPLER PADS (Sampler mode, both decks share slots 1-8) ──
+        // Deck A pads 1-8 in sampler mode → notes 0x30..0x37 on ch 0x97
+        { status: 0x97, midino: 0x30, action: "sampler-1", deck: "A", type: "note", description: "Sampler 1" },
+        { status: 0x97, midino: 0x31, action: "sampler-2", deck: "A", type: "note", description: "Sampler 2" },
+        { status: 0x97, midino: 0x32, action: "sampler-3", deck: "A", type: "note", description: "Sampler 3" },
+        { status: 0x97, midino: 0x33, action: "sampler-4", deck: "A", type: "note", description: "Sampler 4" },
+        { status: 0x97, midino: 0x34, action: "sampler-5", deck: "A", type: "note", description: "Sampler 5" },
+        { status: 0x97, midino: 0x35, action: "sampler-6", deck: "A", type: "note", description: "Sampler 6" },
+        { status: 0x97, midino: 0x36, action: "sampler-7", deck: "A", type: "note", description: "Sampler 7" },
+        { status: 0x97, midino: 0x37, action: "sampler-8", deck: "A", type: "note", description: "Sampler 8" },
+        // Deck B pads in sampler mode → same 8 slots (either deck can trigger any sampler)
+        { status: 0x99, midino: 0x30, action: "sampler-1", deck: "B", type: "note", description: "Sampler 1" },
+        { status: 0x99, midino: 0x31, action: "sampler-2", deck: "B", type: "note", description: "Sampler 2" },
+        { status: 0x99, midino: 0x32, action: "sampler-3", deck: "B", type: "note", description: "Sampler 3" },
+        { status: 0x99, midino: 0x33, action: "sampler-4", deck: "B", type: "note", description: "Sampler 4" },
+        { status: 0x99, midino: 0x34, action: "sampler-5", deck: "B", type: "note", description: "Sampler 5" },
+        { status: 0x99, midino: 0x35, action: "sampler-6", deck: "B", type: "note", description: "Sampler 6" },
+        { status: 0x99, midino: 0x36, action: "sampler-7", deck: "B", type: "note", description: "Sampler 7" },
+        { status: 0x99, midino: 0x37, action: "sampler-8", deck: "B", type: "note", description: "Sampler 8" },
+
+        // ── SLIP toggle (per deck, FLX4 hardware button) ─────────────
+        { status: 0x90, midino: 0x40, action: "slip-mode", deck: "A", type: "note", description: "Toggle Slip Mode" },
+        { status: 0x91, midino: 0x40, action: "slip-mode", deck: "B", type: "note", description: "Toggle Slip Mode" },
 
         // ── HEADPHONE ───────────────────────────────
         { status: 0xB6, midino: 0x0D, action: "headphone-mix", deck: null, type: "cc", description: "Headphone Mix" },

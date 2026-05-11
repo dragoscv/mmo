@@ -5,6 +5,9 @@
  * `broadcast()` are forwarded to all SSE-connected clients of that user
  * except the sender.
  *
+ * The internal map is keyed by `${userId}\u0000${peerId}` so a peerId
+ * picked by user B cannot evict user A's stream (cross-tenant kick).
+ *
  * Uses `globalThis` to persist across HMR in development.
  */
 
@@ -15,17 +18,27 @@ export interface RelayClient {
     controller: ReadableStreamDefaultController<Uint8Array>;
 }
 
+function key(userId: string, peerId: string) {
+    return `${userId}\u0000${peerId}`;
+}
+
 class RemoteRelay {
     private clients = new Map<string, RelayClient>();
 
-    /** Register an SSE client */
+    /** Register an SSE client. If the same (userId, peerId) re-registers,
+     *  the previous controller is closed so it doesn't leak. */
     add(client: RelayClient) {
-        this.clients.set(client.id, client);
+        const k = key(client.userId, client.id);
+        const prev = this.clients.get(k);
+        if (prev) {
+            try { prev.controller.close(); } catch { /* already closed */ }
+        }
+        this.clients.set(k, client);
     }
 
-    /** Remove an SSE client */
-    remove(id: string) {
-        this.clients.delete(id);
+    /** Remove an SSE client (scoped to its owning user). */
+    remove(userId: string, peerId: string) {
+        this.clients.delete(key(userId, peerId));
     }
 
     /** Broadcast a message to all clients of the same userId, except sender */
@@ -33,14 +46,14 @@ class RemoteRelay {
         const encoder = new TextEncoder();
         const payload = encoder.encode(`data: ${data}\n\n`);
 
-        for (const client of this.clients.values()) {
+        for (const [k, client] of this.clients) {
             if (client.userId !== userId) continue;
             if (client.id === senderId) continue;
             try {
                 client.controller.enqueue(payload);
             } catch {
                 // Client disconnected — clean up
-                this.clients.delete(client.id);
+                this.clients.delete(k);
             }
         }
     }

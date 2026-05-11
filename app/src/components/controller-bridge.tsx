@@ -107,7 +107,7 @@ function rebuildSnapshot() {
     snapshotVersion++;
     snapshotCache = Array.from(activeControllers.values());
     if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
+         
         console.info(`[ControllerBridge] registry → v${snapshotVersion}, ${snapshotCache.length} active`,
             snapshotCache.map(e => `${e.driver.info.name}@${e.deviceId}`));
     }
@@ -227,7 +227,7 @@ export function runBindDiagnostic(driversRefSize: number = 0): BindDiagnosticRes
 
     if (!liveEngine) {
         notes.push("liveEngine is null — ControllerBridge has not yet captured the engine reference. Reload the page or wait a tick.");
-        // eslint-disable-next-line no-console
+         
         console.warn("[ControllerBridge] diagnose: engine ref not set yet");
         return result;
     }
@@ -271,7 +271,7 @@ export function runBindDiagnostic(driversRefSize: number = 0): BindDiagnosticRes
         result.devices.push(entry);
     }
 
-    // eslint-disable-next-line no-console
+     
     console.info("[ControllerBridge] BIND DIAGNOSTIC", result);
     return result;
 }
@@ -283,28 +283,32 @@ export function ControllerBridge() {
     // Map of device.id → live driver instance.
     const driversRef = useRef<Map<string, ControllerDriver>>(new Map());
     // Live mixer ref so the RAF loop reads the latest snapshot without
-    // re-subscribing on every state change.
+    // re-subscribing on every state change. Mirrored *after* commit.
     const mixerRef = useRef(mixer);
-    mixerRef.current = mixer;
+    useEffect(() => { mixerRef.current = mixer; });
 
     // Mirror engine + devices into module scope so `runBindDiagnostic` can
-    // poke the engine without going through React. Updated every render.
-    liveEngine = midi.engine;
-    liveDevices = midi.devices;
-    bridgeRenderCount++;
-    bridgeLastRenderAt = Date.now();
-    bridgeLastEngineSeen = midi.engine ? "set" : "null";
-    if (process.env.NODE_ENV !== "production" && bridgeRenderCount <= 5) {
-        // eslint-disable-next-line no-console
-        console.info(`[ControllerBridge] render #${bridgeRenderCount}: ` +
-            `engine=${midi.engine ? "OK" : "null"}, devices=${midi.devices.length}`);
-    }
+    // poke the engine without going through React. Updated post-commit so
+    // the React Compiler doesn't see writes to module-scope state during
+    // the render itself.
+    useEffect(() => {
+        liveEngine = midi.engine;
+        liveDevices = midi.devices;
+        bridgeRenderCount++;
+        bridgeLastRenderAt = Date.now();
+        bridgeLastEngineSeen = midi.engine ? "set" : "null";
+        if (process.env.NODE_ENV !== "production" && bridgeRenderCount <= 5) {
 
-    // Re-export the diagnostic with the live driversRef size baked in.
-    if (typeof window !== "undefined") {
-        const dbg = (window as unknown as { __mmoBridge?: Record<string, unknown> }).__mmoBridge;
-        if (dbg) dbg.diagnose = () => runBindDiagnostic(driversRef.current.size);
-    }
+            console.info(`[ControllerBridge] render #${bridgeRenderCount}: ` +
+                `engine=${midi.engine ? "OK" : "null"}, devices=${midi.devices.length}`);
+        }
+
+        // Re-export the diagnostic with the live driversRef size baked in.
+        if (typeof window !== "undefined") {
+            const dbg = (window as unknown as { __mmoBridge?: Record<string, unknown> }).__mmoBridge;
+            if (dbg) dbg.diagnose = () => runBindDiagnostic(driversRef.current.size);
+        }
+    });
 
     // Build the active preset (with optional overrides) once per render.
     const presetId = midi.settings.colorPresetId ?? "rekordbox-classic";
@@ -314,17 +318,17 @@ export function ControllerBridge() {
     useEffect(() => {
         const engine = midi.engine;
         if (!engine) {
-            // eslint-disable-next-line no-console
+             
             console.info(`[ControllerBridge] bind effect skipped — engine not ready (devices=${midi.devices.length})`);
             return;
         }
-        // eslint-disable-next-line no-console
+         
         console.info(`[ControllerBridge] bind effect running — ${midi.devices.length} device(s), ` +
             `engine=ok, alreadyBound=${driversRef.current.size}`);
         const wantedIds = new Set<string>();
         for (const device of midi.devices) {
             if (!device.output) {
-                // eslint-disable-next-line no-console
+                 
                 console.info(`[ControllerBridge] skip "${device.name}" — no output port (input-only)`);
                 continue;
             }
@@ -337,7 +341,7 @@ export function ControllerBridge() {
                     const drv = driversRef.current.get(device.id)!;
                     activeControllers.set(device.id, { deviceId: device.id, deviceName: device.name, driver: drv });
                     rebuildSnapshot();
-                    // eslint-disable-next-line no-console
+                     
                     console.info(`[ControllerBridge] re-registered existing driver for "${device.name}"`);
                 }
                 continue;
@@ -358,10 +362,10 @@ export function ControllerBridge() {
                 liveDriverIds.add(device.id);
                 activeControllers.set(device.id, { deviceId: device.id, deviceName: device.name, driver });
                 rebuildSnapshot();
-                // eslint-disable-next-line no-console
+                 
                 console.info(`[ControllerBridge] BOUND ${driver.info.name} → "${device.name}" (id=${device.id})`);
             } catch (err) {
-                // eslint-disable-next-line no-console
+                 
                 console.error(`[ControllerBridge] init failed for ${device.name}`, err);
             }
         }
@@ -373,7 +377,7 @@ export function ControllerBridge() {
                 liveDriverIds.delete(id);
                 activeControllers.delete(id);
                 rebuildSnapshot();
-                // eslint-disable-next-line no-console
+                 
                 console.info(`[ControllerBridge] unbound (device gone) id=${id}`);
             }
         }
@@ -385,7 +389,7 @@ export function ControllerBridge() {
             const overrides = midi.settings.customColors?.[driver.info.id];
             const preset = applyOverrides(basePreset, overrides);
             try { driver.setPreset(preset); } catch (err) {
-                // eslint-disable-next-line no-console
+                 
                 console.warn(`[ControllerBridge] setPreset failed for ${deviceId}`, err);
             }
         }
@@ -433,7 +437,7 @@ export function ControllerBridge() {
                     };
                     for (const driver of driversRef.current.values()) {
                         try { driver.applyState(snap); } catch (err) {
-                            // eslint-disable-next-line no-console
+                             
                             console.warn("[ControllerBridge] applyState failed", err);
                         }
                     }
@@ -451,12 +455,12 @@ export function ControllerBridge() {
     // ── On unmount, blank every controller ──────────────────────────────
     useEffect(() => {
         bridgeMounted = true;
-        // eslint-disable-next-line no-console
+         
         console.info(`[ControllerBridge] mounted (renderCount=${bridgeRenderCount})`);
         const drivers = driversRef.current;
         return () => {
             bridgeMounted = false;
-            // eslint-disable-next-line no-console
+             
             console.info("[ControllerBridge] unmounted");
             for (const [id, driver] of drivers.entries()) {
                 try { driver.destroy(); } catch { /* ignore */ }
@@ -472,22 +476,22 @@ export function ControllerBridge() {
     useEffect(() => {
         function onIdentify() {
             const drivers = Array.from(driversRef.current.values());
-            // eslint-disable-next-line no-console
+             
             console.info(`[ControllerBridge] identify event → ${drivers.length} driver(s)`,
                 drivers.map(d => d.info.name));
             if (drivers.length === 0) {
-                // eslint-disable-next-line no-console
+                 
                 console.warn("[ControllerBridge] no drivers bound. " +
                     "Check that your controller is connected and shows in the Console tab list.");
             }
             for (const driver of drivers) {
                 if (!driver.runIdentifyAnimation) {
-                    // eslint-disable-next-line no-console
+                     
                     console.warn(`[ControllerBridge] ${driver.info.name} has no identify animation`);
                     continue;
                 }
                 try { driver.runIdentifyAnimation(); } catch (err) {
-                    // eslint-disable-next-line no-console
+                     
                     console.error(`[ControllerBridge] identify failed for ${driver.info.name}`, err);
                 }
             }
@@ -501,7 +505,7 @@ export function ControllerBridge() {
     // bumping a local refresh counter via the midi engine refresh.
     useEffect(() => {
         function onRebind() {
-            // eslint-disable-next-line no-console
+             
             console.info(`[ControllerBridge] force re-bind requested — destroying ${driversRef.current.size} driver(s)`);
             for (const [id, driver] of driversRef.current.entries()) {
                 try { driver.destroy(); } catch { /* ignore */ }

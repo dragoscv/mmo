@@ -1,0 +1,102 @@
+name: web-app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/web-app.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/web-app.yml"
+
+concurrency:
+  group: web-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: typecheck · test · lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      # `lint:check` compares the current ESLint result against the snapshot
+      # in app/.eslint-baseline.json and fails ONLY when a file gains new
+      # errors. Pre-existing errors are tracked but allowed; whittle the
+      # baseline down by re-running `pnpm lint:baseline` after fixes.
+      - name: Lint (no regressions vs baseline)
+        run: pnpm lint:check
+
+  e2e:
+    name: playwright e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: ci
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('app/pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        run: pnpm e2e:install
+
+      - name: Run Playwright smoke suite
+        run: pnpm e2e
+        env:
+          # The smoke suite spawns its own dev server via playwright.config.ts
+          # webServer; no DB required for status endpoints (smoke tests only
+          # assert status<500 + JSON shape, not authenticated content).
+          NODE_ENV: test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: app/playwright-report/
+          retention-days: 14

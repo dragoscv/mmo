@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useSyncRefresh } from "@/hooks/use-sync-refresh";
 import { useRouteMemorySave } from "@/hooks/use-route-memory";
 import { useSessionDownloads, downloadTrackFile } from "@/hooks/use-session-downloads";
 import { useRenderCount } from "@/lib/dev-debugger";
@@ -60,6 +61,7 @@ import {
     updatePlaylist,
     deletePlaylist,
     removeTrackFromPlaylist,
+    reorderPlaylistTracks,
     exportPlaylistToXml,
     exportAllPlaylistsToXml,
     type RecommendedCategory,
@@ -98,6 +100,7 @@ export function PlaylistsClient({
     recommendedCategories,
 }: PlaylistsClientProps) {
     useRenderCount("Page:/playlists");
+    useSyncRefresh(["playlists", "playlist_tracks", "tracks"]);
     const player = usePlayer();
     const { savedIds } = useSessionDownloads();
     const searchParams = useSearchParams();
@@ -119,7 +122,6 @@ export function PlaylistsClient({
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [similarOpen, setSimilarOpen] = useState(false);
-
     // Column management
     const { orderedColumns, visibleColumns, toggleColumn, isVisible, reorderColumns, resetToDefaults } = useColumnConfig("playlist-columns");
 
@@ -193,6 +195,55 @@ export function PlaylistsClient({
             router.refresh();
         });
     }
+
+    // ── Drag-and-drop reorder ─────────────────────────────────────────────
+    // Optimistic-UI reorder. Local order is held in `dragOrder` while the
+    // user is dragging; once they drop we send the full ordered id list
+    // to the companion (which is one transactional UPDATE) and refresh.
+    const [dragOrder, setDragOrder] = useState<number[] | null>(null);
+    const [dragId, setDragId] = useState<number | null>(null);
+    const visibleOrder = dragOrder ?? tracks.map((t) => t.id);
+    const visibleTracks = dragOrder
+        ? (dragOrder.map((id) => tracks.find((t) => t.id === id)).filter(Boolean) as typeof tracks)
+        : tracks;
+
+    function handleDragStart(trackId: number) {
+        setDragId(trackId);
+        setDragOrder(tracks.map((t) => t.id));
+    }
+    function handleDragOverRow(e: React.DragEvent, overId: number) {
+        if (dragId === null || dragId === overId) return;
+        e.preventDefault();
+        setDragOrder((prev) => {
+            const order = prev ?? tracks.map((t) => t.id);
+            const from = order.indexOf(dragId);
+            const to = order.indexOf(overId);
+            if (from < 0 || to < 0 || from === to) return order;
+            const next = order.slice();
+            next.splice(to, 0, next.splice(from, 1)[0]);
+            return next;
+        });
+    }
+    function handleDrop() {
+        if (!activePlaylist || !dragOrder) { setDragId(null); setDragOrder(null); return; }
+        const original = tracks.map((t) => t.id);
+        const changed = dragOrder.length !== original.length
+            || dragOrder.some((id, i) => id !== original[i]);
+        const finalOrder = dragOrder;
+        setDragId(null);
+        if (!changed) { setDragOrder(null); return; }
+        startTransition(async () => {
+            const result = await reorderPlaylistTracks(activePlaylist.id, finalOrder);
+            if (!result.success) {
+                const { toast } = await import("sonner");
+                toast.error("Reorder failed", { description: result.error });
+            }
+            setDragOrder(null);
+            router.refresh();
+        });
+    }
+    function handleDragEnd() { setDragId(null); }
+    void visibleOrder; // referenced via visibleTracks below
 
     async function handleExportPlaylist() {
         if (!activePlaylist) return;
@@ -426,7 +477,7 @@ export function PlaylistsClient({
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {tracks.map((track, idx) => {
+                                            {visibleTracks.map((track, idx) => {
                                                 const isCurrentTrack =
                                                     player.currentTrack?.id === track.id;
                                                 const isPlayingThis =
@@ -435,6 +486,7 @@ export function PlaylistsClient({
                                                 const tags: string[] = track.tags
                                                     ? JSON.parse(track.tags)
                                                     : [];
+                                                const isDragging = dragId === track.id;
 
                                                 return (
                                                     <TrackContextMenu
@@ -450,13 +502,19 @@ export function PlaylistsClient({
                                                     >
                                                         <TableRow
                                                             {...(isCurrentTrack ? { "data-playing-track": true } : {})}
+                                                            draggable={!!activePlaylist}
+                                                            onDragStart={() => handleDragStart(track.id)}
+                                                            onDragOver={(e) => handleDragOverRow(e, track.id)}
+                                                            onDrop={handleDrop}
+                                                            onDragEnd={handleDragEnd}
                                                             className={cn(
                                                                 "group cursor-pointer",
                                                                 isCurrentTrack
                                                                     ? "bg-purple-500/5 border-l-2 border-l-purple-500"
                                                                     : isSavedThisSession
                                                                         ? "bg-sky-500/[0.07] border-l-2 border-l-sky-500/60"
-                                                                        : ""
+                                                                        : "",
+                                                                isDragging && "opacity-50",
                                                             )}
                                                             onClick={() => {
                                                                 setSelectedTrack(track);

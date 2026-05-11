@@ -572,7 +572,7 @@ export class RemoteSyncEngine {
         this.eventSource?.close();
         this.eventSource = null;
         if (process.env.NODE_ENV !== "production") {
-            // eslint-disable-next-line no-console
+             
             console.info(`[remote-sync] server relay disabled (${reason}) — falling back to BroadcastChannel only`);
         }
     }

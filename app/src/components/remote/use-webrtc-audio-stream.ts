@@ -60,8 +60,55 @@ export interface WebRTCAudioStreamApi {
 export function useWebRTCAudioStream(opts: UseWebRTCAudioStreamOptions): WebRTCAudioStreamApi {
     const remote = useRemoteOptional();
     const bridgeRef = useRef<WebRTCAudioBridge | null>(null);
-    const [, force] = useState(0);
-    const tickRef = useRef(0);
+    // Mirror of the bridge's reactive state so `useWebRTCAudioStream`
+    // returns plain values instead of reading `bridgeRef.current` during
+    // render (which the React compiler / react-hooks lint flags as
+    // "ref read during render" — it can desync the UI from the bridge).
+    // The bridge fires `onStateChange` on every meaningful transition;
+    // we snapshot the values we expose into this state on every tick.
+    const [snapshot, setSnapshot] = useState<{
+        connectionState: ConnectionState;
+        quality: StreamQuality;
+        isSendingOutput: boolean;
+        isSendingMic: boolean;
+        isReceivingRemote: boolean;
+        stats: BridgeStats;
+    }>(() => ({
+        connectionState: "idle",
+        quality: "balanced",
+        isSendingOutput: false,
+        isSendingMic: false,
+        isReceivingRemote: false,
+        stats: {
+            rttMs: 0, bytesSentPerSec: 0, bytesReceivedPerSec: 0,
+            packetsLost: 0, jitterMs: 0, audioLevelOut: 0, audioLevelIn: 0,
+            iceState: "n/a", signalingState: "n/a", role: "responder",
+        },
+    }));
+    const refreshSnapshot = useCallback(() => {
+        const b = bridgeRef.current;
+        setSnapshot(b
+            ? {
+                connectionState: b.connectionState,
+                quality: b.quality,
+                isSendingOutput: b.isSendingOutput,
+                isSendingMic: b.isSendingMic,
+                isReceivingRemote: b.isReceivingRemote,
+                stats: b.stats,
+            }
+            : {
+                connectionState: "idle",
+                quality: "balanced",
+                isSendingOutput: false,
+                isSendingMic: false,
+                isReceivingRemote: false,
+                stats: {
+                    rttMs: 0, bytesSentPerSec: 0, bytesReceivedPerSec: 0,
+                    packetsLost: 0, jitterMs: 0, audioLevelOut: 0, audioLevelIn: 0,
+                    iceState: "n/a", signalingState: "n/a", role: "responder",
+                },
+            });
+    }, []);
 
     // ICE servers (incl. TURN credentials) — fetched once on mount, cached for ~23h.
     // The bridge MUST be constructed with these in place, otherwise an incoming
@@ -91,7 +138,13 @@ export function useWebRTCAudioStream(opts: UseWebRTCAudioStreamOptions): WebRTCA
         const idlePeer = remote.peers.find((p) => p.id !== remote.peerId && p.page === "idle");
         return idlePeer?.id ?? null;
     })();
-    targetPeerId.current = newTarget;
+    // Sync the derived target into a ref AFTER render so the signal
+    // dispatcher (which fires from network events outside React's render
+    // cycle) can compare incoming peerIds against the latest target
+    // without us writing to a ref during render.
+    useEffect(() => {
+        targetPeerId.current = newTarget;
+    }, [newTarget]);
 
     // ── Signal buffering ─────────────────────────────────────────────────────
     // Subscribe to incoming signals IMMEDIATELY on mount so we don't miss the
@@ -132,7 +185,7 @@ export function useWebRTCAudioStream(opts: UseWebRTCAudioStreamOptions): WebRTCA
                 bridgeRef.current.destroy();
                 bridgeRef.current = null;
             }
-            tickRef.current++; force(tickRef.current);
+            refreshSnapshot();
             return;
         }
 
@@ -147,7 +200,7 @@ export function useWebRTCAudioStream(opts: UseWebRTCAudioStreamOptions): WebRTCA
                 console.info("[useWebRTCAudioStream] signal out ←", signal.type, "to", newTarget.slice(0, 6));
                 remote.sendSignal(newTarget, signal);
             },
-            onStateChange: () => { tickRef.current++; force(tickRef.current); },
+            onStateChange: () => { refreshSnapshot(); },
             onRemoteStream: (s) => opts.onRemoteStream?.(s),
         });
 
@@ -160,6 +213,10 @@ export function useWebRTCAudioStream(opts: UseWebRTCAudioStreamOptions): WebRTCA
         } catch { /* noop */ }
 
         bridgeRef.current = bridge;
+        // Bridge state may already be non-default (quality restored) —
+        // pull a fresh snapshot now so consumers see the right values
+        // before the first state-change tick.
+        refreshSnapshot();
 
         // Drain any signals that arrived before the bridge existed (race during ICE-fetch)
         const buffered = signalBufferRef.current.get(newTarget);
@@ -176,6 +233,7 @@ export function useWebRTCAudioStream(opts: UseWebRTCAudioStreamOptions): WebRTCA
         return () => {
             bridge.destroy();
             if (bridgeRef.current === bridge) bridgeRef.current = null;
+            refreshSnapshot();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [remote?.peerId, newTarget, opts.enabled, iceServers]);
@@ -227,18 +285,8 @@ export function useWebRTCAudioStream(opts: UseWebRTCAudioStreamOptions): WebRTCA
         } catch { /* noop */ }
     }, []);
 
-    const b = bridgeRef.current;
     return {
-        connectionState: b?.connectionState ?? "idle",
-        quality: b?.quality ?? "balanced",
-        isSendingOutput: b?.isSendingOutput ?? false,
-        isSendingMic: b?.isSendingMic ?? false,
-        isReceivingRemote: b?.isReceivingRemote ?? false,
-        stats: b?.stats ?? {
-            rttMs: 0, bytesSentPerSec: 0, bytesReceivedPerSec: 0,
-            packetsLost: 0, jitterMs: 0, audioLevelOut: 0, audioLevelIn: 0,
-            iceState: "n/a", signalingState: "n/a", role: "responder",
-        },
+        ...snapshot,
         hasPeer: !!newTarget,
         start, stop, setSendOutput, setSendMic, setQuality,
     };

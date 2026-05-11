@@ -200,7 +200,7 @@ export function DAWExportModal() {
             setPreset(detectPreset(saved));
         }
         setInitialized(true);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, []);
 
     const currentConfig = useCallback((): ExportConfig => ({
@@ -261,7 +261,16 @@ export function DAWExportModal() {
         setExportedBlob(null);
 
         try {
-            const result = await daw.exportProject(format, effectiveBitRate, (pct) => setProgress(pct));
+            const result = await daw.exportProject(format, {
+                bitRate: effectiveBitRate,
+                bitDepth: bitDepth as 16 | 24 | 32,
+                sampleRate,
+                channels,
+                normalize,
+                limitPeak,
+                tailSec,
+                onProgress: (pct) => setProgress(pct),
+            });
             if (result) {
                 setExportedBlob(result.blob);
                 setExportedSize(

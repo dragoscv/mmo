@@ -324,7 +324,7 @@ export function useMidi() {
 export function useMidiMessages(callback: MidiMessageListener) {
     const { addMessageListener } = useMidi();
     const callbackRef = useRef(callback);
-    callbackRef.current = callback;
+    useEffect(() => { callbackRef.current = callback; });
 
     useEffect(() => {
         const listener: MidiMessageListener = (msg) => callbackRef.current(msg);

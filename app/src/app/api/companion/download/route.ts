@@ -21,6 +21,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { log } from "@/lib/logger";
 
 const REPO_OWNER = process.env.COMPANION_REPO_OWNER ?? "dragoscv";
 const REPO_NAME = process.env.COMPANION_REPO_NAME ?? "mmo";
@@ -97,7 +98,7 @@ async function fetchLatestCompanionRelease(): Promise<GhRelease | null> {
         res = await fetch(url, { headers, cache: "no-store" });
     } catch (err) {
         if (!warnedOnce) {
-            console.warn("[companion/download] GitHub fetch failed (network)", err);
+            log.warn("companion.download GitHub fetch failed (network)", undefined, err);
             warnedOnce = true;
         }
         negCachedAt = Date.now();
@@ -112,10 +113,10 @@ async function fetchLatestCompanionRelease(): Promise<GhRelease | null> {
                     : res.status === 403
                         ? " (rate-limited — set GITHUB_TOKEN)"
                         : "";
-            console.warn(
-                `[companion/download] GitHub responded ${res.status}${hint}`,
-                body.slice(0, 200),
-            );
+            log.warn(`companion.download GitHub responded ${res.status}${hint}`, {
+                status: res.status,
+                bodyPreview: body.slice(0, 200),
+            });
             warnedOnce = true;
         }
         negCachedAt = Date.now();

@@ -25,8 +25,10 @@ const PUBLIC_STUN: RTCIceServer[] = [
     { urls: "stun:stun1.l.google.com:19302" },
 ];
 
-/** Credential lifetime in seconds (24h). Re-fetch on the client well before expiry. */
-const TTL_SECONDS = 24 * 60 * 60;
+/** Credential lifetime in seconds (2h). The previous 24h window was excessive
+ *  for what is effectively a bandwidth coupon against our coturn box —
+ *  WebRTC sessions last minutes, and the client refreshes on demand. */
+const TTL_SECONDS = 2 * 60 * 60;
 
 export async function GET() {
     const host = process.env.TURN_HOST;
@@ -44,10 +46,15 @@ export async function GET() {
         });
     }
 
-    // Identify the requester so we can rate-limit on the TURN side via the
-    // username component.  Anonymous fallback is fine — coturn cares about HMAC.
+    // Auth required. The HMAC-derived credential is a 2h bandwidth coupon against
+    // our coturn box; serving it anonymously turns the relay into anyone's free
+    // CDN. All in-app callers (remote-controller, live, webrtc-bridge) hit this
+    // endpoint with same-origin cookies, so they're unaffected.
     const session = await auth().catch(() => null);
-    const userId = session?.user?.id ?? "anon";
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
 
     const expiry = Math.floor(Date.now() / 1000) + TTL_SECONDS;
     const username = `${expiry}:${userId}`;
@@ -76,7 +83,8 @@ export async function GET() {
         mode: "turn",
         realm,
     }, {
-        // Allow the browser to cache for 23h — refresh just before expiry.
-        headers: { "Cache-Control": `private, max-age=${TTL_SECONDS - 3600}` },
+        // Browser-only cache; refresh shortly before expiry. Must NOT be
+        // shared/CDN-cached — this is per-user bearer credentials.
+        headers: { "Cache-Control": `private, max-age=${TTL_SECONDS - 600}` },
     });
 }

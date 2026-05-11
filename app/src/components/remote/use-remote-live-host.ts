@@ -21,7 +21,7 @@ export function useRemoteLiveHost() {
     const live = useLive();
     const remote = useRemoteOptional();
     const liveRef = useRef(live);
-    liveRef.current = live;
+    useEffect(() => { liveRef.current = live; });
 
     const connectedPeerId = remote?.connectedPeerId ?? null;
     const broadcastState = remote?.broadcastState;

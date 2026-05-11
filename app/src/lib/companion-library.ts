@@ -17,6 +17,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { devices } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { materializeDeviceToken } from "@/lib/device-token";
 
 const LOCAL_PREFIXES = ["http://localhost:", "http://127.0.0.1:", "https://localhost:", "https://127.0.0.1:"];
 
@@ -46,13 +47,15 @@ export async function getCompanionLink(): Promise<CompanionLink | null> {
 
     const rows = await db.select().from(devices)
         .where(eq(devices.userId, userId));
-    const usable = rows.filter((d) => d.apiUrl && d.token);
+    const usable = rows.filter((d) => d.apiUrl && d.tokenEncrypted);
     if (usable.length === 0) return null;
     const local = usable.find((d) =>
         LOCAL_PREFIXES.some((p) => d.apiUrl!.startsWith(p))
     );
     const chosen = local ?? usable[0];
-    return { apiUrl: chosen.apiUrl!, token: chosen.token!, deviceId: chosen.id, userId };
+    const bearer = await materializeDeviceToken(chosen);
+    if (!bearer) return null;
+    return { apiUrl: chosen.apiUrl!, token: bearer, deviceId: chosen.id, userId };
 }
 
 /** Resolve a CompanionLink for an explicit device id owned by the
@@ -71,8 +74,10 @@ export async function getCompanionLinkForDevice(
         .where(and(eq(devices.id, deviceId), eq(devices.userId, userId)))
         .limit(1);
     const row = rows[0];
-    if (!row || !row.token || !row.apiUrl) return null;
-    return { apiUrl: row.apiUrl, token: row.token, deviceId: row.id, userId };
+    if (!row || !row.apiUrl) return null;
+    const bearer = await materializeDeviceToken(row);
+    if (!bearer) return null;
+    return { apiUrl: row.apiUrl, token: bearer, deviceId: row.id, userId };
 }
 
 // ─── Low-level fetch helper ─────────────────────────────────────────────────
@@ -309,6 +314,21 @@ export const companionLibrary = {
     async getStats(link: CompanionLink): Promise<DashboardStats> {
         return call<DashboardStats>(link, "GET", `/stats`);
     },
+    async getDrives(link: CompanionLink): Promise<CompanionDrive[]> {
+        const r = await call<{ drives: CompanionDrive[] }>(link, "GET", `/drives`);
+        return r.drives || [];
+    },
+    async getSavedDrives(link: CompanionLink): Promise<CompanionSavedDrive[]> {
+        const r = await call<{ drives: CompanionSavedDrive[] }>(link, "GET", `/drives/saved`);
+        return r.drives || [];
+    },
+    async addSavedDrive(link: CompanionLink, data: { path: string; label: string; type?: string; format?: string }): Promise<CompanionSavedDrive> {
+        const r = await call<{ drive: CompanionSavedDrive }>(link, "POST", `/drives/saved`, data);
+        return r.drive;
+    },
+    async removeSavedDrive(link: CompanionLink, id: number): Promise<void> {
+        await call(link, "DELETE", `/drives/saved/${id}`);
+    },
     async getScanLogs(link: CompanionLink, limit = 20): Promise<ScanLogEntry[]> {
         const r = await call<{ logs: ScanLogEntry[] }>(link, "GET", `/scan-logs?limit=${limit}`);
         return r.logs || [];
@@ -335,6 +355,9 @@ export const companionLibrary = {
     },
     async removeTrackFromPlaylist(link: CompanionLink, playlistId: number, trackId: number): Promise<void> {
         await call(link, "DELETE", `/playlists/${playlistId}/tracks/${trackId}`);
+    },
+    async reorderPlaylist(link: CompanionLink, playlistId: number, trackIds: number[]): Promise<{ count: number }> {
+        return call(link, "POST", `/playlists/${playlistId}/reorder`, { trackIds });
     },
 };
 
@@ -499,6 +522,27 @@ export const companionAnalyzer = {
         return `${link.apiUrl}/library/stems/${trackId}/${stem}.wav`;
     },
 };
+
+export interface CompanionDrive {
+    path: string;
+    label: string;
+    format: string;
+    totalSize: number;
+    freeSpace: number;
+    usedSpace: number;
+    type: "fixed" | "removable" | "network" | "unknown";
+}
+
+export interface CompanionSavedDrive {
+    id: number;
+    userId: string;
+    path: string;
+    label: string;
+    type: string;
+    format: string | null;
+    isActive: boolean | null;
+    createdAt: string | null;
+}
 
 export interface DashboardStats {
     total: number;

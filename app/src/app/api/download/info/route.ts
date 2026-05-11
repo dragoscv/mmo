@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { spawn } from "child_process";
+import { requireSessionWithRate } from "@/lib/api-guard";
+import { validatePublicHttpUrl } from "@/lib/url-guard";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -170,7 +172,7 @@ function parsePlaylistData(data: Record<string, unknown>, url: string): Playlist
 
 async function tryPlaylist(url: string): Promise<PlaylistInfo | MediaInfo | null> {
     const raw = await runYtDlp([
-        "--flat-playlist", "-J", "--no-download", "--no-warnings", url,
+        "--flat-playlist", "-J", "--no-download", "--no-warnings", "--", url,
     ], 60_000);
     const data = JSON.parse(raw);
 
@@ -180,12 +182,17 @@ async function tryPlaylist(url: string): Promise<PlaylistInfo | MediaInfo | null
     // Maybe it returned a single track via -J
     if (data.formats) return parseSingleTrack(data);
 
-    // Single-entry playlist — fetch full info for the single entry
+    // Single-entry playlist — recheck the entry URL through the same
+    // public-URL guard before re-spawning yt-dlp, so a playlist whose
+    // entries point at e.g. file:/// or 169.254.169.254 still gets
+    // rejected on the recursive call.
     if (data._type === "playlist" && data.entries?.length === 1) {
         const entry = data.entries[0];
+        const entryUrl = validatePublicHttpUrl(entry.url || entry.webpage_url);
+        if (!entryUrl) return null;
         const singleRaw = await runYtDlp([
-            "-j", "--no-download", "--no-warnings", "--no-playlist",
-            String(entry.url || entry.webpage_url),
+            "-j", "--no-download", "--no-warnings", "--no-playlist", "--",
+            entryUrl,
         ]);
         return parseSingleTrack(JSON.parse(singleRaw));
     }
@@ -196,16 +203,27 @@ async function tryPlaylist(url: string): Promise<PlaylistInfo | MediaInfo | null
 // ─── Route Handler ───────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+    const guard = await requireSessionWithRate(request, { bucket: "download-info", windowMs: 60_000, max: 30 });
+    if (guard.response) return guard.response;
     try {
         const body = await request.json();
-        const url = body?.url;
+        const rawUrl = body?.url;
 
-        if (!url || typeof url !== "string") {
-            return NextResponse.json({ error: "Missing or invalid URL" }, { status: 400 });
-        }
-
-        try { new URL(url); } catch {
-            return NextResponse.json({ error: "Invalid URL format" }, { status: 400 });
+        // SSRF + CLI-flag-injection guard. yt-dlp will happily fetch from
+        // file://, ftp://, http://localhost, http://169.254.169.254 (cloud
+        // metadata), and any RFC1918 / link-local target — turning this
+        // route into an SSRF gadget. It also accepts options anywhere on
+        // the command line, so a URL beginning with `-` (e.g.
+        // `--exec=...`, `--config-location=/etc/passwd`) becomes RCE.
+        // `validatePublicHttpUrl` rejects all of those; we additionally
+        // pass `--` before the URL on every spawn so even a missed leading
+        // `-` cannot be reinterpreted as a flag.
+        const url = validatePublicHttpUrl(rawUrl);
+        if (!url) {
+            return NextResponse.json(
+                { error: "URL must be a public http(s) link to a supported media site" },
+                { status: 400 }
+            );
         }
 
         // Detect if URL contains playlist indicators
@@ -221,7 +239,7 @@ export async function POST(request: NextRequest) {
             // Playlist extraction failed, try as single track
             try {
                 const raw = await runYtDlp([
-                    "-j", "--no-download", "--no-warnings", "--no-playlist", url,
+                    "-j", "--no-download", "--no-warnings", "--no-playlist", "--", url,
                 ]);
                 return NextResponse.json(parseSingleTrack(JSON.parse(raw)));
             } catch (err) {
@@ -234,7 +252,7 @@ export async function POST(request: NextRequest) {
         let singleError: string | null = null;
         try {
             const raw = await runYtDlp([
-                "-j", "--no-download", "--no-warnings", "--no-playlist", url,
+                "-j", "--no-download", "--no-warnings", "--no-playlist", "--", url,
             ]);
             const data = JSON.parse(raw);
             return NextResponse.json(parseSingleTrack(data));

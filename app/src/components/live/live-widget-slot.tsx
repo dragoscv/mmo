@@ -67,7 +67,7 @@ export function AutoSize({ children, padding = 0, className }: {
     // them directly would tear down + re-create the observers every render and
     // synchronously re-trigger requestAutoHeight → setLayouts → infinite loop).
     const reqRef = useRef<((pixels: number) => void) | undefined>(undefined);
-    reqRef.current = slot?.requestAutoHeight;
+    useEffect(() => { reqRef.current = slot?.requestAutoHeight; });
 
     useEffect(() => {
         const el = ref.current;

@@ -193,8 +193,6 @@ export function LiveRecommendationsWidget({
     useRenderCount("LiveRecommendationsWidget");
     const live = useLiveOptional();
     const settings = useLiveSettings();
-    const [tips, setTips] = useState<CoachTip[]>(IDLE_TIPS);
-    const [meter, setMeter] = useState<VoiceMeterSnapshot | null>(null);
     // Subscribe to the central meters store. Re-renders at the rate set by the
     // global refresh slider (1-30Hz). No separate setInterval needed.
     const liveMeters = useLiveMeters();
@@ -202,20 +200,18 @@ export function LiveRecommendationsWidget({
     const keyIndex = keyIndexProp ?? live?.keyIndex ?? 0;
     const scaleIndex = scaleIndexProp ?? live?.scaleIndex ?? 1;
     const isActive = voiceActiveProp ?? live?.voiceActive ?? false;
-    const keyRef = useRef(keyIndex);
-    const scaleRef = useRef(scaleIndex);
-    keyRef.current = keyIndex;
-    scaleRef.current = scaleIndex;
 
-    // Host mode: derive tips from the throttled meters store snapshot
-    useEffect(() => {
-        if (snapshot !== undefined) return; // remote mode
-        if (!live?.engine || !isActive) {
-            setTips(IDLE_TIPS);
-            setMeter(null);
-            return;
+    // Derive `meter` and `tips` directly from inputs \u2014 no setState in
+    // effects. The hook auto-rebinds when any dep changes; the React
+    // Compiler memoizes the result.
+    const meter = useMemo<VoiceMeterSnapshot | null>(() => {
+        if (snapshot !== undefined) {
+            // Remote mode: use the provided snapshot if active.
+            return isActive ? snapshot ?? null : null;
         }
-        const snap: VoiceMeterSnapshot = {
+        // Host mode: derive from the throttled meters store snapshot.
+        if (!live?.engine || !isActive) return null;
+        return {
             pitch: {
                 note: liveMeters.tunerNote,
                 cents: liveMeters.tunerCents,
@@ -227,21 +223,12 @@ export function LiveRecommendationsWidget({
             peakL: liveMeters.voicePeakL,
             peakR: liveMeters.voicePeakR,
         };
-        setMeter(snap);
-        setTips(generateVoiceTips(snap, keyRef.current, scaleRef.current));
-    }, [live?.engine, isActive, snapshot, liveMeters]);
+    }, [snapshot, isActive, live?.engine, liveMeters]);
 
-    // Remote mode: derive tips from the provided snapshot
-    useEffect(() => {
-        if (snapshot === undefined) return; // host mode
-        if (!snapshot || !isActive) {
-            setTips(IDLE_TIPS);
-            setMeter(null);
-            return;
-        }
-        setMeter(snapshot);
-        setTips(generateVoiceTips(snapshot, keyIndex, scaleIndex));
-    }, [snapshot, isActive, keyIndex, scaleIndex]);
+    const tips = useMemo<CoachTip[]>(() => {
+        if (!meter) return IDLE_TIPS;
+        return generateVoiceTips(meter, keyIndex, scaleIndex);
+    }, [meter, keyIndex, scaleIndex]);
 
     const headerSubtitle = useMemo(() => {
         const kName = noteName(keyIndex, settings.noteNotations, /major/i.test(MUSICAL_SCALES[scaleIndex]?.name ?? "") ? "major" : "minor");
@@ -256,12 +243,19 @@ export function LiveRecommendationsWidget({
     // Stickify the tip list: hash the kinds+texts, hold the hash for the
     // user-configured stickinessMs, then surface the latest snapshot whose
     // hash matches the held value. This prevents the rows from rewriting on
-    // every meter tick — they only swap when the stable hash changes.
+    // every meter tick \u2014 they only swap when the stable hash changes.
     const tipsHash = tips.map(t => `${t.kind}|${t.text}`).join("\u0001");
     const stableHash = useStableValue(tipsHash, settings.coachStickinessMs);
-    const lastShownRef = useRef<{ hash: string; tips: CoachTip[] }>({ hash: tipsHash, tips });
-    if (stableHash === tipsHash) lastShownRef.current = { hash: tipsHash, tips };
-    const displayedTips = lastShownRef.current.tips;
+    const [lastShown, setLastShown] = useState<{ hash: string; tips: CoachTip[] }>({ hash: tipsHash, tips });
+    useEffect(() => {
+        if (stableHash === tipsHash && lastShown.hash !== tipsHash) {
+            // Stickiness intentionally needs to commit a new "latest stable"
+            // snapshot once the held hash catches up to the current one.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setLastShown({ hash: tipsHash, tips });
+        }
+    }, [stableHash, tipsHash, tips, lastShown.hash]);
+    const displayedTips = stableHash === tipsHash ? tips : lastShown.tips;
     const tipLimit = settings.coachVerbosity === "minimal" ? 1 : settings.coachVerbosity === "verbose" ? Infinity : 3;
     const visibleTips = displayedTips.slice(0, tipLimit);
 

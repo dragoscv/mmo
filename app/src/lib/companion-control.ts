@@ -20,6 +20,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { devices } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { materializeDeviceToken } from "@/lib/device-token";
 
 export interface AuthorizedAudioDevice {
     name: string;
@@ -112,8 +113,8 @@ export interface CompanionAudioInventory {
 
 interface DeviceRow {
     id: string;
-    apiUrl: string | null;
-    token: string | null;
+    apiUrl: string;
+    token: string;
 }
 
 async function resolveDevice(deviceId: string): Promise<DeviceRow | null> {
@@ -123,8 +124,10 @@ async function resolveDevice(deviceId: string): Promise<DeviceRow | null> {
         .where(and(eq(devices.id, deviceId), eq(devices.userId, session.user.id)))
         .limit(1);
     const row = rows[0];
-    if (!row || !row.apiUrl || !row.token) return null;
-    return { id: row.id, apiUrl: row.apiUrl, token: row.token };
+    if (!row || !row.apiUrl) return null;
+    const bearer = await materializeDeviceToken(row);
+    if (!bearer) return null;
+    return { id: row.id, apiUrl: row.apiUrl, token: bearer };
 }
 
 async function call<T>(
@@ -136,7 +139,7 @@ async function call<T>(
 ): Promise<T> {
     const dev = await resolveDevice(deviceId);
     if (!dev) throw new Error("Device not found or not authorized");
-    const headers: Record<string, string> = { "X-Device-Token": dev.token! };
+    const headers: Record<string, string> = { "X-Device-Token": dev.token };
     if (body !== undefined) headers["Content-Type"] = "application/json";
     const res = await fetch(`${dev.apiUrl}${pathAndQuery}`, {
         method,

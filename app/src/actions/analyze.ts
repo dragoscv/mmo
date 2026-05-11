@@ -88,6 +88,14 @@ export async function getAnalysisScope(): Promise<AnalysisScope> {
     } catch { return EMPTY_SCOPE; }
 }
 
+// Caps to keep this server action surface from amplifying load against
+// the companion (one POST = N companion calls) or our outbound metadata
+// providers (MusicBrainz / iTunes throttle by source IP — a runaway
+// batch here gets the whole web app banned for everyone).
+const MAX_BATCH_SIZE = 100;
+const MAX_CHANGES_PER_APPLY = 5000;
+const MAX_DSP_TRACKS = 5000;
+
 export async function analyzeTrackBatch(
     offset: number,
     batchSize: number,
@@ -104,18 +112,22 @@ export async function analyzeTrackBatch(
         return { changes: [], processed: 0, total: 0, currentTrack: "", errors: ["Companion not connected"] };
     }
 
+    const safeOffset = Number.isInteger(offset) && offset >= 0 ? offset : 0;
+    const safeBatchSize = Number.isInteger(batchSize) && batchSize > 0
+        ? Math.min(batchSize, MAX_BATCH_SIZE) : 25;
+
     // Page math: companion uses 1-based pages.
-    const page = Math.floor(offset / batchSize) + 1;
+    const page = Math.floor(safeOffset / safeBatchSize) + 1;
 
     let pageData;
     try {
         pageData = await companionLibrary.getTracks(link, {
-            page, pageSize: batchSize,
+            page, pageSize: safeBatchSize,
             // Oldest-analyzed first so re-runs hit the staler rows.
             sort: "analyzedAt", order: "asc",
         });
     } catch {
-        return { changes: [], processed: offset, total: 0, currentTrack: "", errors: ["Failed to fetch tracks"] };
+        return { changes: [], processed: safeOffset, total: 0, currentTrack: "", errors: ["Failed to fetch tracks"] };
     }
 
     const batchTracks = pageData.tracks;
@@ -195,7 +207,7 @@ export async function analyzeTrackBatch(
 
     return {
         changes,
-        processed: offset + batchTracks.length,
+        processed: safeOffset + batchTracks.length,
         total: totalCount,
         currentTrack,
         errors,
@@ -212,13 +224,21 @@ export async function applyAnalysisChanges(
     changesToApply: ChangeToApply[],
 ): Promise<{ applied: number; errors: number }> {
     const link = await getCompanionLink();
-    if (!link) return { applied: 0, errors: changesToApply.length };
+    if (!link) return { applied: 0, errors: changesToApply?.length ?? 0 };
+
+    if (!Array.isArray(changesToApply)) return { applied: 0, errors: 0 };
+    // Cap so a runaway client can't loop us through 100k companion PATCHes.
+    // Real "apply all" UI flows are O(few hundred); 5000 is a generous bound.
+    const safe = changesToApply.slice(0, MAX_CHANGES_PER_APPLY);
 
     let applied = 0;
     let errorCount = 0;
 
     const grouped = new Map<number, ChangeToApply[]>();
-    for (const change of changesToApply) {
+    for (const change of safe) {
+        if (!change || !Number.isInteger(change.trackId) || change.trackId <= 0) continue;
+        if (typeof change.field !== "string" || change.field.length === 0 || change.field.length > 64) continue;
+        if (typeof change.newValue !== "string" || change.newValue.length > 8192) continue;
         const existing = grouped.get(change.trackId) ?? [];
         existing.push(change);
         grouped.set(change.trackId, existing);
@@ -270,10 +290,17 @@ export async function startDspAnalysis(
     trackIds: number[],
     options: AnalyzeOptions,
 ): Promise<{ jobs: Array<{ id: string; trackId: number }>; error?: string }> {
-    if (trackIds.length === 0) return { jobs: [] };
+    if (!Array.isArray(trackIds) || trackIds.length === 0) return { jobs: [] };
+    // Bound the array. The companion enqueues one job per id and the
+    // analyzer Python sidecar is single-process — a 1M-id push would
+    // monopolise the queue for hours.
+    const safeIds = trackIds
+        .filter((n) => Number.isInteger(n) && n > 0)
+        .slice(0, MAX_DSP_TRACKS);
+    if (safeIds.length === 0) return { jobs: [] };
     const link = await getCompanionLink();
     if (!link) return { jobs: [], error: "Companion not connected" };
-    try { return await companionAnalyzer.start(link, trackIds, options); }
+    try { return await companionAnalyzer.start(link, safeIds, options); }
     catch (e) { return { jobs: [], error: e instanceof Error ? e.message : String(e) }; }
 }
 

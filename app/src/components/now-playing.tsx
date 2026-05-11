@@ -123,16 +123,21 @@ export function NowPlaying() {
     const [isClosing, setIsClosing] = useState(false);
     const [hasMounted, setHasMounted] = useState(false);
 
-    // Restore leftView from localStorage / URL after mount to avoid hydration mismatch
+    // Restore leftView from localStorage / URL after mount to avoid hydration mismatch.
+    // Reading window/localStorage during render would crash on the server, so the
+    // setState-in-effect lint rule is intentionally suppressed here.
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only hydration flag
         setHasMounted(true);
         const urlView = new URLSearchParams(window.location.search).get("view");
         if (urlView === "mixer" || urlView === "artwork" || urlView === "visualization" || urlView === "equalizer") {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only browser hydration
             setLeftView(urlView);
             return;
         }
         const saved = localStorage.getItem("mmo-np-left-view");
         if (saved === "artwork" || saved === "visualization" || saved === "equalizer" || saved === "mixer") {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only browser hydration
             setLeftView(saved);
         }
     }, []);
@@ -142,21 +147,26 @@ export function NowPlaying() {
         if (hasMounted) localStorage.setItem("mmo-np-left-view", leftView);
     }, [leftView, hasMounted]);
 
-    // Handle requestedView from player context (e.g. keyboard shortcut Shift+M)
+    // Handle requestedView from player context (e.g. keyboard shortcut Shift+M).
+    // The view is owned by external player state — mirroring it locally on change
+    // is the established pattern; setState-in-effect is intentional.
     useEffect(() => {
         if (player.requestedView) {
             const v = player.requestedView;
             if (v === "artwork" || v === "visualization" || v === "equalizer" || v === "mixer") {
+                // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror external player state
                 setLeftView(v);
             }
             player.clearRequestedView();
         }
     }, [player.requestedView, player.clearRequestedView]);
 
-    // Handle ?view= URL query param — open now playing with the requested view
+    // Handle ?view= URL query param — open now playing with the requested view.
+    // Same rationale as above: external (URL) state propagates into local view.
     useEffect(() => {
         const urlView = searchParams.get("view");
         if (urlView && (urlView === "mixer" || urlView === "artwork" || urlView === "visualization" || urlView === "equalizer")) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror external URL state
             setLeftView(urlView);
             if (!player.isNowPlayingOpen) {
                 player.openNowPlaying();
@@ -183,6 +193,7 @@ export function NowPlaying() {
     // Restore waveformMode from localStorage after mount
     useEffect(() => {
         const saved = localStorage.getItem("waveform-mode");
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only browser hydration
         if (saved === "rgb") setWaveformMode("rgb");
     }, []);
     const [mobilePanel, setMobilePanel] = useState(false);
@@ -193,21 +204,23 @@ export function NowPlaying() {
     const currentViz = allViz[currentVizIdx] || allViz[0];
     const isVizFavorite = vizSettings.favorites.includes(currentViz?.id || "");
 
-    const nextViz = useCallback(() => {
+    // React Compiler memoizes these automatically; manual useCallback wrappers
+    // were stripped because the rule kept reporting "Compilation Skipped".
+    const nextViz = () => {
         setCurrentVizIdx(i => (i + 1) % allViz.length);
-    }, [allViz.length]);
+    };
 
-    const prevViz = useCallback(() => {
+    const prevViz = () => {
         setCurrentVizIdx(i => (i - 1 + allViz.length) % allViz.length);
-    }, [allViz.length]);
+    };
 
-    const randomViz = useCallback(() => {
+    const randomViz = () => {
         const rand = getRandomVisualization(currentViz?.id);
         const idx = allViz.findIndex(v => v.id === rand.id);
         if (idx >= 0) setCurrentVizIdx(idx);
-    }, [allViz, currentViz?.id]);
+    };
 
-    const toggleVizFavorite = useCallback(() => {
+    const toggleVizFavorite = () => {
         setVizSettings(prev => {
             const id = currentViz?.id;
             if (!id) return prev;
@@ -218,21 +231,21 @@ export function NowPlaying() {
             saveVizSettings(next);
             return next;
         });
-    }, [currentViz?.id]);
+    };
 
-    const toggleVizStats = useCallback(() => {
+    const toggleVizStats = () => {
         setVizSettings(prev => {
             const next = { ...prev, showStats: !prev.showStats };
             saveVizSettings(next);
             return next;
         });
-    }, []);
+    };
 
-    const toggleTheater = useCallback(() => {
+    const toggleTheater = () => {
         setIsTheater(prev => !prev);
-    }, []);
+    };
 
-    const toggleFullscreen = useCallback(async () => {
+    const toggleFullscreen = async () => {
         try {
             if (!document.fullscreenElement) {
                 const el = vizContainerRef.current;
@@ -247,7 +260,7 @@ export function NowPlaying() {
         } catch {
             // Fullscreen not supported or denied
         }
-    }, []);
+    };
 
     // Listen for fullscreen changes (e.g. user presses Escape)
     useEffect(() => {
@@ -259,16 +272,16 @@ export function NowPlaying() {
     }, []);
 
     // Browsable visualizations for the side panel
-    const browsedViz = useMemo(() => {
+    const browsedViz = (() => {
         if (vizSearchQuery) return searchVisualizations(vizSearchQuery);
         if (vizBrowseCategory) return getVisualizationsByCategory(vizBrowseCategory);
         return allViz;
-    }, [vizSearchQuery, vizBrowseCategory, allViz]);
+    })();
 
-    const selectViz = useCallback((viz: VisualizationDef) => {
+    const selectViz = (viz: VisualizationDef) => {
         const idx = allViz.findIndex(v => v.id === viz.id);
         if (idx >= 0) setCurrentVizIdx(idx);
-    }, [allViz]);
+    };
 
     const { currentTrack, isPlaying, currentTime, duration, volume, queue, queueIndex, playHistory } = player;
 
@@ -289,12 +302,12 @@ export function NowPlaying() {
     // Mobile swipe gestures:
     // - Horizontal: left to open queue panel, right to close it
     // - Vertical: swipe down to close Now Playing
-    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const handleTouchStart = (e: React.TouchEvent) => {
         const touch = e.touches[0];
         touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
-    }, []);
+    };
 
-    const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const handleTouchEnd = (e: React.TouchEvent) => {
         if (!touchStartRef.current) return;
         const touch = e.changedTouches[0];
         const dx = touch.clientX - touchStartRef.current.x;
@@ -321,7 +334,7 @@ export function NowPlaying() {
         if (absDx < 50 || absDy > absDx) return;
         if (dx < -50 && !mobilePanel) setMobilePanel(true);
         if (dx > 50 && mobilePanel) setMobilePanel(false);
-    }, [mobilePanel, player]);
+    };
 
     if (!hasMounted || !player.isNowPlayingOpen) return null;
 

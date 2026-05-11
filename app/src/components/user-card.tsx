@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { signOutAndPurge } from "@/lib/auth-client";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { LoginModal } from "@/components/login-modal";
@@ -123,7 +124,7 @@ export function UserCard({ collapsed }: UserCardProps) {
                         <button
                             onClick={() => {
                                 setMenuOpen(false);
-                                signOut({ callbackUrl: "/" });
+                                signOutAndPurge({ callbackUrl: "/" });
                             }}
                             className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-red-400/70 hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer"
                         >

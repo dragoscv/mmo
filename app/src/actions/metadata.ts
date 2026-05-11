@@ -14,6 +14,7 @@ import {
     type TrackMetadata,
 } from "@/lib/musicbrainz";
 import { fetchAllMetadata, getLyrics } from "@/lib/metadata-services";
+import { auth } from "@/auth";
 import { companionLibrary, getCompanionLink, type CompanionTrack } from "@/lib/companion-library";
 
 export interface MetadataSearchResult {
@@ -33,6 +34,13 @@ export async function searchTrackMetadata(
     artist: string,
     title: string,
 ): Promise<MetadataSearchResult[]> {
+    // Auth required: this action issues outbound HTTP requests to MusicBrainz
+    // from the server. Without an auth gate the endpoint was an open
+    // server-side proxy — anyone could burn through our MB rate-limit budget
+    // (MB throttles by source IP, so a flood here gets the whole web app's
+    // IP banned for everyone) and chain it as a generic outbound HTTP relay.
+    const session = await auth();
+    if (!session?.user?.id) return [];
     const recordings = await searchRecordings(artist, title, 8);
     return recordings.map((rec) => {
         const meta = extractMetadata(rec);
@@ -188,13 +196,27 @@ export async function applyReanalysisFields(
         "artist", "title", "album", "year", "label", "genre", "bpm",
         "isrc", "artworkUrl", "lyrics", "syncedLyrics", "musicbrainzId", "releaseMbid",
     ]);
+    // Generous per-field cap that still bounds the worst case (lyrics can be
+    // multi-KB; everything else fits in a few hundred bytes). Anything over
+    // 64 KB is a paste-of-an-entire-document mistake or an attempt to bloat
+    // the row — the underlying track schema enforces stricter caps for the
+    // shorter fields, but we want to fail fast before the companion call.
+    const MAX_VALUE_CHARS = 65_536;
 
     const update: Record<string, unknown> = {};
     for (const [field, value] of Object.entries(fieldsToApply)) {
         if (!ALLOWED.has(field)) continue;
-        if (field === "year") update[field] = parseInt(value, 10);
-        else if (field === "bpm") update[field] = parseFloat(value);
-        else update[field] = value;
+        if (typeof value !== "string") continue;
+        if (value.length > MAX_VALUE_CHARS) continue;
+        if (field === "year") {
+            const n = parseInt(value, 10);
+            if (Number.isInteger(n) && n >= 1900 && n <= 2200) update[field] = n;
+        } else if (field === "bpm") {
+            const f = parseFloat(value);
+            if (Number.isFinite(f) && f >= 0 && f <= 400) update[field] = f;
+        } else {
+            update[field] = value;
+        }
     }
     update.analyzedAt = new Date().toISOString();
 

@@ -130,16 +130,14 @@ export function LiveVisualizerWidget({ remoteSnapshot, className }: Props) {
     const accent = ACCENT_HEX[settings.accent] ?? ACCENT_HEX.rose;
     const slot = useLiveWidgetSlot();
 
-    const [config, setConfig] = useState<VizConfig>(DEFAULT_CONFIG);
-    const [hydrated, setHydrated] = useState(false);
+    const [config, setConfig] = useState<VizConfig>(loadConfig);
     const [pickerSlot, setPickerSlot] = useState<number | null>(null);
 
-    useEffect(() => {
-        setConfig(loadConfig());
-        setHydrated(true);
-    }, []);
-
-    useEffect(() => { if (hydrated) saveConfig(config); }, [config, hydrated]);
+    // Persist on every change. The lazy initializer above already returns
+    // DEFAULT_CONFIG on the SSR pass, so the first client effect run will
+    // either re-save the same defaults (no-op write) or save the just-loaded
+    // user config (idempotent). Cheap, no hydration flag needed.
+    useEffect(() => { saveConfig(config); }, [config]);
 
     const slotsCount = config.layout === "single" ? 1 : config.layout === "split2" ? 2 : 4;
     const visibleModes = config.modes.slice(0, slotsCount);
@@ -286,13 +284,21 @@ function VizSlot({ mode, accent, barCount, isRemote, remoteSnapshot, engine, onP
     const stateRef = useRef<VizRenderState>({ particles: [], spectroIdx: 0, peakHold: new Float32Array(64), peakHoldDecay: 0 });
 
     // Stable refs for the inner rAF closure, so swapping mode/accent doesn't
-    // tear down and re-create the loop.
-    const modeRef = useRef(mode); modeRef.current = mode;
-    const accentRef = useRef(accent); accentRef.current = accent;
-    const barCountRef = useRef(barCount); barCountRef.current = barCount;
-    const remoteRef = useRef(remoteSnapshot); remoteRef.current = remoteSnapshot;
-    const engineRef = useRef(engine); engineRef.current = engine;
-    const isRemoteRef = useRef(isRemote); isRemoteRef.current = isRemote;
+    // tear down and re-create the loop. Mirrored *after* commit.
+    const modeRef = useRef(mode);
+    const accentRef = useRef(accent);
+    const barCountRef = useRef(barCount);
+    const remoteRef = useRef(remoteSnapshot);
+    const engineRef = useRef(engine);
+    const isRemoteRef = useRef(isRemote);
+    useEffect(() => {
+        modeRef.current = mode;
+        accentRef.current = accent;
+        barCountRef.current = barCount;
+        remoteRef.current = remoteSnapshot;
+        engineRef.current = engine;
+        isRemoteRef.current = isRemote;
+    });
 
     useEffect(() => {
         const canvas = canvasRef.current;

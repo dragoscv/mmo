@@ -2,21 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { devices, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { requireRate } from "@/lib/api-guard";
+import { findDeviceByToken } from "@/lib/device-token";
 
 export async function POST(request: NextRequest) {
+    const blocked = requireRate(request, { bucket: "device-validate", windowMs: 60_000, max: 30 });
+    if (blocked) return blocked;
     const body = await request.json() as { token: string; hostname?: string };
 
     if (!body.token) {
         return NextResponse.json({ error: "Token required" }, { status: 400 });
     }
 
-    // Find device by token
-    const deviceRows = await db
-        .select()
-        .from(devices)
-        .where(eq(devices.token, body.token))
-        .limit(1);
-    const device = deviceRows[0];
+    // Find device by token_hash; legacy plaintext rows backfilled on hit.
+    const device = await findDeviceByToken(body.token);
 
     if (!device) {
         return NextResponse.json({ error: "Invalid token" }, { status: 401 });

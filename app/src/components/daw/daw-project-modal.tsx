@@ -1,10 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useDAW } from "./daw-context";
 import { cn } from "@/lib/utils";
-import { X, Plus, FolderOpen, Trash2, Copy, Music, Clock, Layers, Search } from "lucide-react";
-import { listProjects, deleteProject, loadProject, saveProject, createId } from "@/lib/daw-engine";
+import { X, Plus, FolderOpen, Trash2, Copy, Music, Clock, Layers, Search, Download, Upload } from "lucide-react";
+import {
+    listProjects,
+    deleteProject,
+    loadProject,
+    saveProject,
+    createId,
+    exportProjectFile,
+    importProjectFile,
+    PROJECT_FILE_EXTENSION,
+} from "@/lib/daw-engine";
+import { downloadBlob, safeFilename } from "@/lib/audio-export";
 import type { DAWProject } from "@/lib/daw-engine";
 
 type ProjectInfo = { id: string; name: string; modifiedAt: number; tempo: number; trackCount: number };
@@ -63,6 +73,30 @@ export function DAWProjectModal() {
             setConfirmDeleteId(null);
         } else {
             setConfirmDeleteId(id);
+        }
+    };
+
+    const handleExport = (p: ProjectInfo) => {
+        const project = loadProject(p.id);
+        if (!project) return;
+        const blob = exportProjectFile(project);
+        downloadBlob(blob, `${safeFilename(project.name)}.${PROJECT_FILE_EXTENSION}`);
+    };
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const handleImportClick = () => fileInputRef.current?.click();
+    const handleImportChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file) return;
+        try {
+            const project = await importProjectFile(file, { rename: true });
+            setProjects(listProjects());
+            daw.openProject(project.id);
+            daw.setProjectModal(false);
+        } catch (err) {
+            const { toast } = await import("sonner");
+            toast.error("Import failed", { description: err instanceof Error ? err.message : String(err) });
         }
     };
 
@@ -200,6 +234,13 @@ export function DAWProjectModal() {
                                                 </div>
                                                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button
+                                                        onClick={e => { e.stopPropagation(); handleExport(p); }}
+                                                        className="w-7 h-7 flex items-center justify-center rounded text-white/20 hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
+                                                        title="Export to file"
+                                                    >
+                                                        <Download className="h-3.5 w-3.5" />
+                                                    </button>
+                                                    <button
                                                         onClick={e => { e.stopPropagation(); handleDuplicate(p); }}
                                                         className="w-7 h-7 flex items-center justify-center rounded text-white/20 hover:text-purple-400 hover:bg-purple-500/10 transition-colors"
                                                         title="Duplicate"
@@ -229,11 +270,27 @@ export function DAWProjectModal() {
                 </div>
 
                 {/* Footer */}
-                <div className="px-4 py-2.5 border-t border-white/[0.06] flex items-center justify-between">
-                    <span className="text-[9px] text-white/15">{projects.length} project{projects.length !== 1 ? "s" : ""} saved</span>
-                    {daw.isDirty && (
-                        <span className="text-[9px] text-amber-400/60">Current project has unsaved changes</span>
-                    )}
+                <div className="px-4 py-2.5 border-t border-white/[0.06] flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-[9px] text-white/15">
+                        <span>{projects.length} project{projects.length !== 1 ? "s" : ""} saved</span>
+                        {daw.isDirty && (
+                            <span className="text-amber-400/60">• unsaved changes</span>
+                        )}
+                    </div>
+                    <button
+                        onClick={handleImportClick}
+                        className="flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[10px] text-white/40 hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
+                        title={`Import a .${PROJECT_FILE_EXTENSION} project file`}
+                    >
+                        <Upload className="h-3 w-3" /> Import
+                    </button>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".json,.mmodaw,application/json"
+                        className="hidden"
+                        onChange={handleImportChange}
+                    />
                 </div>
             </div>
         </div>

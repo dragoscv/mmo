@@ -330,6 +330,9 @@ export function AnalysisClient() {
         const pending = lanes
             ? lanes.reduce((sum, l) => sum + l.queueDepth + (l.current ? 1 : 0), 0)
             : (status?.current ? 1 : 0) + (status?.queue?.length ?? 0);
+        // Derives a stateful summary ("open batch") from the polled
+        // companion status. Each tick can advance the batch counter.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setBatch((prev) => {
             if (pending === 0) {
                 if (!prev) return null;
@@ -372,7 +375,21 @@ export function AnalysisClient() {
         return () => clearTimeout(t);
     }, [batch?.finishedAt]);
 
-    const batchStats = useMemo(() => {
+    // Derive batch stats from current state. The React Compiler memoizes
+    // this automatically; manual `useMemo` was over-coarse on `[batch,
+    // status]` and conflicted with the inferred fine-grained deps.
+    const batchStats = ((): {
+        total: number;
+        doneCount: number;
+        failedCount: number;
+        remaining: number;
+        overall: number;
+        elapsed: number;
+        avgPerJobMs: number | null;
+        etaMs: number | null;
+        finished: boolean;
+        runningCount: number;
+    } | null => {
         if (!batch) return null;
         const total = batch.initialPending + batch.addedSince;
         // Prefer the authoritative sqlite-backed count from the
@@ -405,6 +422,7 @@ export function AnalysisClient() {
             : (status?.current ? 1 : 0);
         const fractionalDone = doneCount + runningProgress;
         const overall = total > 0 ? Math.min(1, fractionalDone / total) : 0;
+        // eslint-disable-next-line react-hooks/purity
         const elapsed = (batch.finishedAt ?? Date.now()) - batch.startedAt;
         const avgPerJobMs =
             fractionalDone > 0.05 ? elapsed / fractionalDone : null;
@@ -427,7 +445,7 @@ export function AnalysisClient() {
             finished: !!batch.finishedAt,
             runningCount,
         };
-    }, [batch, status]);
+    })();
 
     // ─── Render ─────────────────────────────────────────────────────
     return (
@@ -1017,6 +1035,7 @@ function CurrentJobCard({
                         <div className="flex items-center justify-between gap-2 pt-1">
                             <span className="text-[10px] text-white/40">
                                 {job.startedAt
+                                    // eslint-disable-next-line react-hooks/purity
                                     ? `running ${formatDuration(Date.now() - job.startedAt)}`
                                     : "starting…"}
                             </span>

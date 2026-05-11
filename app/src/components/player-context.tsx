@@ -270,7 +270,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
     const lastSavedTimeRef = useRef(0);
     const stateRef = useRef(state);
-    stateRef.current = state;
+    useEffect(() => { stateRef.current = state; });
 
     useEffect(() => {
         // Save immediately on track/queue/settings changes

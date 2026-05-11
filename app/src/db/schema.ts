@@ -121,7 +121,13 @@ export const devices = pgTable("devices", {
     os: text("os"),
     hostname: text("hostname"),
     apiUrl: text("api_url").notNull(),
-    token: text("token").notNull(),
+    /** HMAC-SHA256 of the plaintext bearer (hex). Indexable equality key
+     *  used for inbound auth lookups. Populated by `issueDeviceToken()`. */
+    tokenHash: text("token_hash").unique(),
+    /** AES-256-GCM ciphertext envelope of the plaintext bearer
+     *  ("v1:b64(nonce):b64(ciphertext+tag)"). Decrypted on demand for
+     *  outbound `X-Device-Token` use. Key is derived from AUTH_SECRET. */
+    tokenEncrypted: text("token_encrypted"),
     status: text("status").notNull().default("offline"),
     lastSeenAt: timestamp("last_seen_at"),
     version: text("version"),
@@ -211,26 +217,42 @@ export const tracks = pgTable(
         updatedAt: timestamp("updated_at").defaultNow(),
         /** Monotonic counter for incremental sync. */
         syncVersion: bigint("sync_version", { mode: "number" }).default(0),
+        /**
+         * Per-field last-write-wins clock for sync conflict resolution.
+         * Shape: `{ [fieldName: string]: ISO8601 string }`. Companion sends
+         * a partial payload + one outer `updatedAt`; the server only persists
+         * a field when the incoming timestamp beats the stored per-field one.
+         */
+        fieldVersions: jsonb("field_versions").$type<Record<string, string>>().default(sql`'{}'::jsonb`),
     },
     (t) => [
         index("tracks_user_idx").on(t.userId),
         index("tracks_sha_idx").on(t.sha256),
         index("tracks_sync_idx").on(t.userId, t.syncVersion),
+        uniqueIndex("tracks_user_sha_uniq").on(t.userId, t.sha256),
     ],
 );
 
-export const playlists = pgTable("playlists", {
-    id: serial("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    description: text("description"),
-    color: text("color"),
-    parentId: integer("parent_id"),
-    sortOrder: integer("sort_order").default(0),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    syncVersion: bigint("sync_version", { mode: "number" }).default(0),
-});
+export const playlists = pgTable(
+    "playlists",
+    {
+        id: serial("id").primaryKey(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        /** Stable cross-device identifier (UUID minted by the companion). */
+        externalId: text("external_id"),
+        name: text("name").notNull(),
+        description: text("description"),
+        color: text("color"),
+        parentId: integer("parent_id"),
+        sortOrder: integer("sort_order").default(0),
+        createdAt: timestamp("created_at").defaultNow(),
+        updatedAt: timestamp("updated_at").defaultNow(),
+        syncVersion: bigint("sync_version", { mode: "number" }).default(0),
+    },
+    (t) => [
+        uniqueIndex("playlists_user_external_uniq").on(t.userId, t.externalId),
+    ],
+);
 
 export const playlistTracks = pgTable(
     "playlist_tracks",
@@ -264,17 +286,26 @@ export const trackTags = pgTable(
     (t) => [primaryKey({ columns: [t.trackId, t.tagId] })],
 );
 
-export const cuepoints = pgTable("cuepoints", {
-    id: serial("id").primaryKey(),
-    trackId: integer("track_id").notNull().references(() => tracks.id, { onDelete: "cascade" }),
-    /** Position in milliseconds from start of track. */
-    positionMs: integer("position_ms").notNull(),
-    /** "hot" | "memory" | "loop_in" | "loop_out" */
-    kind: text("kind").notNull(),
-    label: text("label"),
-    color: text("color"),
-    createdAt: timestamp("created_at").defaultNow(),
-});
+export const cuepoints = pgTable(
+    "cuepoints",
+    {
+        id: serial("id").primaryKey(),
+        trackId: integer("track_id").notNull().references(() => tracks.id, { onDelete: "cascade" }),
+        /** Stable cross-device identifier (UUID minted by the companion). */
+        externalId: text("external_id"),
+        /** Position in milliseconds from start of track. */
+        positionMs: integer("position_ms").notNull(),
+        /** "hot" | "memory" | "loop_in" | "loop_out" */
+        kind: text("kind").notNull(),
+        label: text("label"),
+        color: text("color"),
+        createdAt: timestamp("created_at").defaultNow(),
+        updatedAt: timestamp("updated_at").defaultNow(),
+    },
+    (t) => [
+        uniqueIndex("cuepoints_track_external_uniq").on(t.trackId, t.externalId),
+    ],
+);
 
 // ─── Subscriptions (Stripe) ─────────────────────────────────────────────────
 
@@ -289,6 +320,11 @@ export const subscriptions = pgTable("subscriptions", {
     plan: text("plan").notNull().default("free"),
     currentPeriodEnd: timestamp("current_period_end"),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+    /** Last Stripe event applied — used by the webhook for replay-dedupe
+     *  AND out-of-order rejection (events older than `lastEventAt` are
+     *  ignored to stop a stale `updated` from clobbering a newer state). */
+    lastEventId: text("last_event_id"),
+    lastEventAt: timestamp("last_event_at"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -310,6 +346,9 @@ export const syncLog = pgTable(
         op: text("op").notNull(),
         /** Snapshot payload for upserts; null for deletes. */
         payload: jsonb("payload"),
+        /** Device that authored the write. NULL for cloud-side writes (web app).
+         *  GET /api/sync filters this so a device never re-pulls its own pushes. */
+        originDeviceId: text("origin_device_id"),
         createdAt: timestamp("created_at").defaultNow().notNull(),
     },
     (t) => [

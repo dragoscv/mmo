@@ -17,6 +17,7 @@ import { stripe, PRICE_IDS } from "@/lib/stripe";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
+import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -26,28 +27,35 @@ function priceToPlan(priceId: string | null | undefined): "pro_monthly" | "pro_y
     return "free";
 }
 
-async function upsertFromSubscription(sub: Stripe.Subscription) {
+async function upsertFromSubscription(sub: Stripe.Subscription, event: Stripe.Event) {
+    const eventCreatedAt = new Date(event.created * 1000);
     const userId = (sub.metadata?.userId ?? "") as string;
-    if (!userId) {
-        // Fallback: look up via stripe customer id.
-        const existing = await db.query.subscriptions.findFirst({
-            where: eq(subscriptions.stripeCustomerId, sub.customer as string),
-        });
-        if (!existing) {
-            console.warn("[billing/webhook] subscription event without userId metadata, skipping", sub.id);
-            return;
+
+    // Resolve the row we'd be touching (by userId or stripeCustomerId), then
+    // gate the write on event.id (replay) and event.created (ordering).
+    const existing = userId
+        ? await db.query.subscriptions.findFirst({ where: eq(subscriptions.userId, userId) })
+        : await db.query.subscriptions.findFirst({
+              where: eq(subscriptions.stripeCustomerId, sub.customer as string),
+          });
+
+    if (!existing) {
+        if (!userId) {
+            log.warn("billing.webhook subscription event missing userId metadata", { subscriptionId: sub.id });
         }
-        await db
-            .update(subscriptions)
-            .set({
-                stripeSubscriptionId: sub.id,
-                status: sub.status,
-                plan: priceToPlan(sub.items.data[0]?.price.id),
-                currentPeriodEnd: new Date(getPeriodEnd(sub) * 1000),
-                cancelAtPeriodEnd: sub.cancel_at_period_end,
-                updatedAt: new Date(),
-            })
-            .where(eq(subscriptions.userId, existing.userId));
+        return;
+    }
+
+    if (existing.lastEventId === event.id) {
+        log.info("billing.webhook duplicate event ignored", { eventId: event.id });
+        return;
+    }
+    if (existing.lastEventAt && existing.lastEventAt >= eventCreatedAt) {
+        log.warn("billing.webhook stale event ignored", {
+            eventId: event.id,
+            eventCreated: eventCreatedAt.toISOString(),
+            lastApplied: existing.lastEventAt.toISOString(),
+        });
         return;
     }
 
@@ -59,9 +67,11 @@ async function upsertFromSubscription(sub: Stripe.Subscription) {
             plan: priceToPlan(sub.items.data[0]?.price.id),
             currentPeriodEnd: new Date(getPeriodEnd(sub) * 1000),
             cancelAtPeriodEnd: sub.cancel_at_period_end,
+            lastEventId: event.id,
+            lastEventAt: eventCreatedAt,
             updatedAt: new Date(),
         })
-        .where(eq(subscriptions.userId, userId));
+        .where(eq(subscriptions.userId, existing.userId));
 }
 
 function getPeriodEnd(sub: Stripe.Subscription): number {
@@ -87,13 +97,27 @@ export async function POST(req: Request) {
     if (!sig || !secret) {
         return NextResponse.json({ error: "Missing signature / secret" }, { status: 400 });
     }
+
+    // Cap body size. Stripe events are small (~10–50 KB even for the
+    // largest invoice); a 1 MB ceiling is 20× the worst case in practice
+    // and stops an unauthenticated request from forcing us to buffer
+    // multi-MB payloads (memory-pressure DoS) before we reject them at
+    // the signature check. `Content-Length` is set by Stripe; we still
+    // verify after read in case it lied.
+    const declared = Number(req.headers.get("content-length") ?? "0");
+    if (declared > 1_048_576) {
+        return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
     const body = await req.text();
+    if (body.length > 1_048_576) {
+        return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
 
     let event: Stripe.Event;
     try {
         event = stripe().webhooks.constructEvent(body, sig, secret);
     } catch (err) {
-        console.error("[billing/webhook] invalid signature", err);
+        log.error("billing.webhook invalid signature", err);
         return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
 
@@ -101,7 +125,7 @@ export async function POST(req: Request) {
         case "customer.subscription.created":
         case "customer.subscription.updated":
         case "customer.subscription.deleted":
-            await upsertFromSubscription(event.data.object as Stripe.Subscription);
+            await upsertFromSubscription(event.data.object as Stripe.Subscription, event);
             break;
         case "invoice.payment_succeeded":
         case "invoice.payment_failed": {
@@ -109,7 +133,7 @@ export async function POST(req: Request) {
             const subId = getInvoiceSubscriptionId(invoice);
             if (subId) {
                 const sub = await stripe().subscriptions.retrieve(subId);
-                await upsertFromSubscription(sub);
+                await upsertFromSubscription(sub, event);
             }
             break;
         }

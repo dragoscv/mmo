@@ -121,7 +121,10 @@ async function clearAllOffline(db: IDBDatabase) {
 // ─── Hook ───────────────────────────────────────────────────────────────────
 
 export function useOfflineMode() {
-    const [settings, setSettings] = useState<OfflineSettings>(DEFAULT_SETTINGS);
+    // Lazy init reads localStorage on the first client render so we
+    // skip the mount→setState→re-render flash. The function is
+    // SSR-safe via the `typeof window` guard inside `getSettings`.
+    const [settings, setSettings] = useState<OfflineSettings>(getSettings);
     const [cachedTracks, setCachedTracks] = useState<OfflineTrackMeta[]>([]);
     const [totalSize, setTotalSize] = useState(0);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -135,7 +138,6 @@ export function useOfflineMode() {
 
     // Init
     useEffect(() => {
-        setSettings(getSettings());
         openDB().then((db) => {
             dbRef.current = db;
             refreshMeta(db);

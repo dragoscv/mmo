@@ -17,7 +17,7 @@ export function useStableValue<T>(value: T, minHoldMs: number): T {
     const lastChangeAtRef = useRef(0);
     const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const latestRef = useRef(value);
-    latestRef.current = value;
+    useEffect(() => { latestRef.current = value; });
 
     useEffect(() => {
         if (Object.is(value, held)) return;

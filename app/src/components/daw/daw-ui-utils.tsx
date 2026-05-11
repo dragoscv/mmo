@@ -17,13 +17,14 @@ export function InlineEditName({ value, onCommit, className }: {
 
     useEffect(() => {
         if (editing) {
-            setDraft(value);
+            // Focus the input + select-all on the next frame; the draft has
+            // already been seeded from `value` in the onDoubleClick handler.
             requestAnimationFrame(() => {
                 inputRef.current?.focus();
                 inputRef.current?.select();
             });
         }
-    }, [editing, value]);
+    }, [editing]);
 
     const commit = useCallback(() => {
         const trimmed = draft.trim();
@@ -54,7 +55,7 @@ export function InlineEditName({ value, onCommit, className }: {
     return (
         <span
             className={`${className ?? ""} cursor-default`}
-            onDoubleClick={e => { e.stopPropagation(); setEditing(true); }}
+            onDoubleClick={e => { e.stopPropagation(); setDraft(value); setEditing(true); }}
             title="Double-click to rename"
         >
             {value}
@@ -90,12 +91,21 @@ export function useScrollAdjust(opts: {
 
     // Stash the latest opts in refs so the listener doesn't have to re-bind
     // every render — re-binding would race with an in-progress drag.
-    const valueRef = useRef(value); valueRef.current = value;
-    const minRef = useRef(min); minRef.current = min;
-    const maxRef = useRef(max); maxRef.current = max;
-    const stepRef = useRef(step); stepRef.current = step;
-    const fineStepRef = useRef(fineStep); fineStepRef.current = fineStep;
-    const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
+    // Refs are mirrored *after* commit (no ref writes during render).
+    const valueRef = useRef(value);
+    const minRef = useRef(min);
+    const maxRef = useRef(max);
+    const stepRef = useRef(step);
+    const fineStepRef = useRef(fineStep);
+    const onChangeRef = useRef(onChange);
+    useEffect(() => {
+        valueRef.current = value;
+        minRef.current = min;
+        maxRef.current = max;
+        stepRef.current = step;
+        fineStepRef.current = fineStep;
+        onChangeRef.current = onChange;
+    });
 
     useEffect(() => {
         const el = ref.current;
@@ -210,7 +220,7 @@ export function useTouchDrag<T>(opts: {
 }) {
     const { ghostText, threshold = 8, targetSelector = "[data-touch-drop-target]" } = opts;
     const payloadRef = useRef(opts.payload);
-    payloadRef.current = opts.payload;
+    useEffect(() => { payloadRef.current = opts.payload; });
     const startedRef = useRef(false);
     const startPosRef = useRef<{ x: number; y: number } | null>(null);
     const ghostRef = useRef<HTMLDivElement | null>(null);

@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { saveRecording, type RecordingSource } from "@/actions/recordings";
+import { requireSessionWithRate } from "@/lib/api-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -22,6 +23,10 @@ const MAX_BYTES = 1024 * 1024 * 1024; // 1 GB hard cap
 const VALID_SOURCES: RecordingSource[] = ["live", "mixer", "daw", "editor"];
 
 export async function POST(req: NextRequest) {
+    // Recordings can be up to 1 GB each — keep the per-user budget low
+    // (10/min) so a runaway client can't fill the recordings folder.
+    const guard = await requireSessionWithRate(req, { bucket: "recordings-save", windowMs: 60_000, max: 10 });
+    if (guard.response) return guard.response;
     try {
         const form = await req.formData();
         const file = form.get("file");
@@ -45,6 +50,13 @@ export async function POST(req: NextRequest) {
 
         let metadata: Record<string, unknown> | undefined;
         if (typeof metadataRaw === "string" && metadataRaw.trim()) {
+            // Cap metadata at 64 KB. Without this an attacker can POST
+            // a multi-MB metadata field that JSON.parse must walk fully
+            // (CPU-DoS), separately from the file size cap above which
+            // bounds only the binary payload.
+            if (metadataRaw.length > 65_536) {
+                return NextResponse.json({ error: "Metadata too large" }, { status: 413 });
+            }
             try { metadata = JSON.parse(metadataRaw) as Record<string, unknown>; }
             catch { /* ignore malformed metadata */ }
         }

@@ -66,7 +66,7 @@ export function useUIRefreshHz(): [number, (hz: number) => void] {
  */
 export function useThrottledValue<T>(value: T, hz: number): T {
     const latestRef = useRef(value);
-    latestRef.current = value;
+    useEffect(() => { latestRef.current = value; });
     const [snap, setSnap] = useState(value);
 
     useEffect(() => {

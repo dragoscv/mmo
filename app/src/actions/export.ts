@@ -8,10 +8,25 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { auth } from "@/auth";
 import { generateRekordboxXml } from "@/lib/rekordbox-xml";
 import { companionLibrary, getCompanionLink } from "@/lib/companion-library";
 
 export async function exportRekordboxXml(outputPath?: string) {
+    // Auth required: action accepts a caller-supplied `outputPath` and writes
+    // the entire library XML there via `fs.mkdirSync` + `fs.writeFileSync`.
+    // Without an auth gate this is an unauthenticated arbitrary-file-write
+    // primitive (and unauthenticated full-library exfiltration via choosing
+    // a path under `public/` that the web server serves back).
+    const session = await auth();
+    if (!session?.user?.id) {
+        return {
+            success: false,
+            error: "Not authenticated",
+            outputPath: null,
+            count: 0,
+        };
+    }
     const link = await getCompanionLink();
     if (!link) {
         return {

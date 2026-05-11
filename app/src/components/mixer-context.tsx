@@ -591,7 +591,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const stateRef = useRef(state);
     const lastSavedStateRef = useRef<string>("");
-    stateRef.current = state;
+    useEffect(() => { stateRef.current = state; });
     useEffect(() => {
         // Quick fingerprint excluding volatile fields (currentTime, isPlaying, recordingDuration)
         const fingerprint = `${state.deckA.trackId}|${state.deckB.trackId}|${state.deckC.trackId}|${state.deckD.trackId}|` +

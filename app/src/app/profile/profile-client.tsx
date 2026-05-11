@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signOut } from "next-auth/react";
+import { signOutAndPurge } from "@/lib/auth-client";
 import { useRenderCount } from "@/lib/dev-debugger";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,7 +74,7 @@ export function ProfileClient({ user }: ProfileClientProps) {
             const result = await deleteUserAccount();
             if (result.success) {
                 toast.success("Account deleted");
-                await signOut({ callbackUrl: "/" });
+                await signOutAndPurge({ callbackUrl: "/" });
             } else {
                 toast.error("Failed to delete account");
             }
@@ -200,7 +200,7 @@ export function ProfileClient({ user }: ProfileClientProps) {
                     <Button
                         variant="outline"
                         className="w-full gap-2 justify-start"
-                        onClick={() => signOut({ callbackUrl: "/" })}
+                        onClick={() => signOutAndPurge({ callbackUrl: "/" })}
                     >
                         <LogOut className="h-4 w-4" />
                         Sign Out

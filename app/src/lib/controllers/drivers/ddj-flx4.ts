@@ -146,7 +146,7 @@ export class PioneerDDJFLX4Driver extends BaseControllerDriver {
         // pads, knobs etc. all appear "dead" to the host. SysEx is also
         // required for LED writes to take effect.
         if (process.env.NODE_ENV !== "production" && this.ctx) {
-            // eslint-disable-next-line no-console
+             
             console.info(`[FLX4] init deviceId=${this.ctx.deviceId} — sending wake-up SysEx`);
         }
 
@@ -440,11 +440,11 @@ export class PioneerDDJFLX4Driver extends BaseControllerDriver {
 
     runIdentifyAnimation(): void {
         if (!this.ctx) {
-            // eslint-disable-next-line no-console
+             
             console.warn("[DDJ-FLX4] identify: no context (driver not initialised)");
             return;
         }
-        // eslint-disable-next-line no-console
+         
         console.info(`[DDJ-FLX4] identify: flashing all LEDs on ${this.ctx.deviceId}`);
         // Suspend the diff loop's overwrites by clearing lastState & cache —
         // the bridge will keep calling applyState(snap), but we re-route
@@ -483,7 +483,7 @@ export class PioneerDDJFLX4Driver extends BaseControllerDriver {
         // Restore the real deck state after the flash.
         setTimeout(() => {
             if (!this.ctx) return;
-            // eslint-disable-next-line no-console
+             
             console.info("[DDJ-FLX4] identify: restoring state");
             this.invalidateCache();
             this.blankAllLeds();

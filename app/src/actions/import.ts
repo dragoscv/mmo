@@ -12,10 +12,39 @@
 
 import fs from "node:fs";
 import { revalidatePath } from "next/cache";
+import { auth } from "@/auth";
 import { findRekordboxXml, parseRekordboxXml } from "@/lib/rekordbox-import";
 import { companionLibrary, getCompanionLink } from "@/lib/companion-library";
 
+/**
+ * Reject obviously hostile or oversized paths before they reach
+ * `fs.*` / `parseRekordboxXml`. We can't safely whitelist roots here
+ * (the rekordbox XML location is user-configurable across OSes), but
+ * we can stop the cheap classes of abuse: NUL/control bytes (used to
+ * truncate paths or smuggle through layered checks), unbounded length
+ * (multi-MB strings reaching kernel), and empty input.
+ */
+function isSafeFsPath(p: unknown): p is string {
+    return typeof p === "string"
+        && p.length > 0
+        && p.length <= 4096
+        && !/[\x00-\x1F]/.test(p);
+}
+
 export async function importRekordboxAction(xmlPath?: string) {
+    // Auth required: action reads (and parses) an arbitrary caller-supplied
+    // path from the web-server FS. Without this, any unauthenticated POST
+    // to the action endpoint could coerce the server into reading any file
+    // it has FS access to and shipping the parsed payload to a companion
+    // (or surfacing parse errors that leak file contents).
+    const session = await auth();
+    if (!session?.user?.id) {
+        return {
+            success: false,
+            error: "Not authenticated",
+            imported: 0, updated: 0, playlistsCreated: 0,
+        };
+    }
     const link = await getCompanionLink();
     if (!link) {
         return {
@@ -25,6 +54,13 @@ export async function importRekordboxAction(xmlPath?: string) {
         };
     }
 
+    if (xmlPath !== undefined && !isSafeFsPath(xmlPath)) {
+        return {
+            success: false,
+            error: "Invalid xmlPath",
+            imported: 0, updated: 0, playlistsCreated: 0,
+        };
+    }
     const resolvedPath = xmlPath || findRekordboxXml();
     if (!resolvedPath) {
         return {
@@ -75,14 +111,26 @@ export async function importRekordboxAction(xmlPath?: string) {
 }
 
 export async function findRekordboxXmlPath() {
+    const session = await auth();
+    if (!session?.user?.id) return null;
     return findRekordboxXml();
 }
 
 export async function checkFileExists(filePath: string) {
+    // Auth required: previously an unauthenticated FS-existence oracle on
+    // the host — useful for fingerprinting installed software, layouts,
+    // and reachable config files.
+    const session = await auth();
+    if (!session?.user?.id) return false;
+    if (!isSafeFsPath(filePath)) return false;
     return fs.existsSync(filePath);
 }
 
 export async function getFileSize(filePath: string) {
+    // Same: previously unauthenticated FS metadata read.
+    const session = await auth();
+    if (!session?.user?.id) return 0;
+    if (!isSafeFsPath(filePath)) return 0;
     try { return fs.statSync(filePath).size; }
     catch { return 0; }
 }

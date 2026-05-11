@@ -26,7 +26,7 @@ import "react-grid-layout/css/styles.css";
 // `WidthProvider(Responsive)` is the v1-style HOC; the legacy types from RGL v2
 // don't quite line up because `Responsive` uses a generic Breakpoint param the HOC
 // can't infer, so we cast the wrapped component to a permissive functional component.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const ResponsiveGridLayout = WidthProvider(Responsive) as unknown as React.ComponentType<any>;
 
 // Convenient mutable layout-item type (RGL's `Layout` is `readonly LayoutItem[]`)

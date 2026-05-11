@@ -240,6 +240,68 @@ function SoundEditorInner() {
 function EditorToolbar({ onFileOpen, showHistory, onToggleHistory, onToggleSettings, showFx, onToggleFx }: { onFileOpen: () => void; showHistory: boolean; onToggleHistory: () => void; onToggleSettings: () => void; showFx: boolean; onToggleFx: () => void }) {
     const editor = useEditor();
 
+    const exportWav = useCallback(() => {
+        if (!editor.buffer) {
+            void import("sonner").then(({ toast }) => toast.error("Nothing to export", { description: "Open or record audio first." }));
+            return;
+        }
+        void Promise.all([
+            import("@/lib/audio-export"),
+            import("sonner"),
+        ]).then(([{ audioBufferToWavBlob, downloadBlob, safeFilename }, { toast }]) => {
+            try {
+                const blob = audioBufferToWavBlob(editor.buffer!);
+                const base = safeFilename(editor.project.name || "sound-editor");
+                downloadBlob(blob, `${base}.wav`);
+                toast.success("Exported", { description: `${base}.wav (${(blob.size / 1024 / 1024).toFixed(1)} MB)` });
+            } catch (err) {
+                toast.error("Export failed", { description: err instanceof Error ? err.message : String(err) });
+            }
+        });
+    }, [editor.buffer, editor.project.name]);
+
+    // Save project state (markers, regions, source url) as a small JSON
+    // file. Audio buffers are deliberately *not* embedded — the file
+    // stays small (~few KB) and re-opening points back at the original
+    // sourceUrl. If the source is a one-shot blob URL (file picker), the
+    // user re-opens the audio file manually after loading the project.
+    const saveProject = useCallback(() => {
+        void Promise.all([
+            import("@/lib/audio-export"),
+            import("sonner"),
+        ]).then(([{ downloadBlob, safeFilename }, { toast }]) => {
+            try {
+                const payload = {
+                    format: "mmoedit",
+                    version: 1,
+                    savedAt: new Date().toISOString(),
+                    project: editor.project,
+                };
+                const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+                const base = safeFilename(editor.project.name || "sound-editor");
+                downloadBlob(blob, `${base}.mmoedit.json`);
+                toast.success("Project saved", { description: `${base}.mmoedit.json` });
+            } catch (err) {
+                toast.error("Save failed", { description: err instanceof Error ? err.message : String(err) });
+            }
+        });
+    }, [editor.project]);
+
+    // Ctrl/Cmd+S → save project (state). Audio export lives behind a
+    // separate "Export" button below.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            const isSave = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s";
+            if (!isSave) return;
+            const active = document.activeElement;
+            if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || (active as HTMLElement).isContentEditable)) return;
+            e.preventDefault();
+            saveProject();
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [saveProject]);
+
     const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; key: string }[] = [
         { tool: "select", icon: MousePointer2, label: "Select (T)", key: "T" },
         { tool: "zoom", icon: Search, label: "Zoom (Z)", key: "Z" },
@@ -265,8 +327,8 @@ function EditorToolbar({ onFileOpen, showHistory, onToggleHistory, onToggleSetti
 
             {/* File */}
             <Btn icon={FolderOpen} label="Open" onClick={onFileOpen} />
-            <Btn icon={Save} label="Save (Ctrl+S)" onClick={() => { /* TODO: export */ }} />
-            <Btn icon={Download} label="Export" onClick={() => { /* TODO: export dialog */ }} />
+            <Btn icon={Save} label="Save Project (Ctrl+S)" onClick={saveProject} />
+            <Btn icon={Download} label="Export WAV" onClick={exportWav} disabled={!editor.buffer} />
 
             <Sep />
 

@@ -169,9 +169,10 @@ const RGBWaveform = memo(function RGBWaveform({
     // Store currentTime in a ref — updated from props (4Hz) or getter (60fps in draw loop)
     const currentTimeRef = useRef(currentTime);
     const getCurrentTimeRef = useRef(getCurrentTimeFn);
-    getCurrentTimeRef.current = getCurrentTimeFn;
-    // Sync from React prop when it arrives (4Hz throttled)
-    currentTimeRef.current = currentTime;
+    useEffect(() => {
+        getCurrentTimeRef.current = getCurrentTimeFn;
+        currentTimeRef.current = currentTime;
+    });
 
     // Cache canvas rect — update via ResizeObserver, not every frame.
     // `drawRef` holds the current draw fn so ResizeObserver can force a

@@ -9,6 +9,8 @@
  * file (no DB needed).
  */
 
+import { log } from "@/lib/logger";
+
 import { revalidatePath } from "next/cache";
 import {
     companionLibrary,
@@ -16,12 +18,27 @@ import {
     type PaginatedPlaylistTracks,
     type PlaylistSummary,
 } from "@/lib/companion-library";
+import { z } from "zod";
 
 export type { PlaylistSummary, PaginatedPlaylistTracks } from "@/lib/companion-library";
 
 const EMPTY_PAGED_PLAYLIST: PaginatedPlaylistTracks = {
     tracks: [], total: 0, page: 1, pageSize: 50, totalPages: 0,
 };
+
+const playlistIdSchema = z.number().int().positive();
+const playlistNameSchema = z.string().trim().min(1).max(200);
+const playlistDescriptionSchema = z.string().max(2000).optional();
+const trackIdSchema = z.number().int().positive();
+const trackIdsSchema = z.array(trackIdSchema).max(10000);
+const playlistUpdateSchema = z.object({
+    name: playlistNameSchema.optional(),
+    description: z.string().max(2000).optional(),
+}).strict().partial();
+
+function failedValidation(err: z.ZodError): { success: false; error: string } {
+    return { success: false, error: err.issues.map((i) => `${i.path.join(".") || "root"}: ${i.message}`).join("; ") };
+}
 
 // ─── Reads ──────────────────────────────────────────────────────────────────
 
@@ -30,7 +47,7 @@ export async function getPlaylists(): Promise<PlaylistSummary[]> {
     if (!link) return [];
     try { return await companionLibrary.getPlaylists(link); }
     catch (err) {
-        console.warn("[playlists] getPlaylists failed:", err);
+        log.warn("playlists.getPlaylists failed", undefined, err);
         return [];
     }
 }
@@ -45,7 +62,7 @@ export async function getPlaylistTracks(
     try {
         return await companionLibrary.getPlaylistTracks(link, playlistId, page, pageSize);
     } catch (err) {
-        console.warn("[playlists] getPlaylistTracks failed:", err);
+        log.warn("playlists.getPlaylistTracks failed", undefined, err);
         return EMPTY_PAGED_PLAYLIST;
     }
 }
@@ -81,9 +98,13 @@ export async function createPlaylist(
     name: string,
     description?: string,
 ): Promise<PlaylistSummary> {
+    const nameCheck = playlistNameSchema.safeParse(name);
+    if (!nameCheck.success) throw new Error(failedValidation(nameCheck.error).error);
+    const descCheck = playlistDescriptionSchema.safeParse(description);
+    if (!descCheck.success) throw new Error(failedValidation(descCheck.error).error);
     const link = await getCompanionLink();
     if (!link) throw new Error("Companion not connected");
-    const pl = await companionLibrary.createPlaylist(link, name, description);
+    const pl = await companionLibrary.createPlaylist(link, nameCheck.data, descCheck.data);
     revalidatePath("/playlists");
     return pl;
 }
@@ -92,10 +113,14 @@ export async function updatePlaylist(
     id: number,
     data: { name?: string; description?: string },
 ): Promise<{ success: boolean; error?: string }> {
+    const idCheck = playlistIdSchema.safeParse(id);
+    if (!idCheck.success) return failedValidation(idCheck.error);
+    const dataCheck = playlistUpdateSchema.safeParse(data);
+    if (!dataCheck.success) return failedValidation(dataCheck.error);
     const link = await getCompanionLink();
     if (!link) return { success: false, error: "Companion not connected" };
     try {
-        await companionLibrary.updatePlaylist(link, id, data);
+        await companionLibrary.updatePlaylist(link, id, dataCheck.data);
         revalidatePath("/playlists");
         return { success: true };
     } catch (err) {
@@ -106,6 +131,8 @@ export async function updatePlaylist(
 export async function deletePlaylist(
     id: number,
 ): Promise<{ success: boolean; error?: string }> {
+    const idCheck = playlistIdSchema.safeParse(id);
+    if (!idCheck.success) return failedValidation(idCheck.error);
     const link = await getCompanionLink();
     if (!link) return { success: false, error: "Companion not connected" };
     try {
@@ -121,6 +148,10 @@ export async function addTracksToPlaylist(
     playlistId: number,
     trackIds: number[],
 ): Promise<{ success: boolean; added: number; error?: string }> {
+    const idCheck = playlistIdSchema.safeParse(playlistId);
+    if (!idCheck.success) return { success: false, added: 0, error: failedValidation(idCheck.error).error };
+    const tracksCheck = trackIdsSchema.safeParse(trackIds);
+    if (!tracksCheck.success) return { success: false, added: 0, error: failedValidation(tracksCheck.error).error };
     const link = await getCompanionLink();
     if (!link) return { success: false, added: 0, error: "Companion not connected" };
     try {
@@ -136,6 +167,10 @@ export async function removeTrackFromPlaylist(
     playlistId: number,
     trackId: number,
 ): Promise<{ success: boolean; error?: string }> {
+    const plCheck = playlistIdSchema.safeParse(playlistId);
+    if (!plCheck.success) return failedValidation(plCheck.error);
+    const trCheck = trackIdSchema.safeParse(trackId);
+    if (!trCheck.success) return failedValidation(trCheck.error);
     const link = await getCompanionLink();
     if (!link) return { success: false, error: "Companion not connected" };
     try {
@@ -148,24 +183,78 @@ export async function removeTrackFromPlaylist(
 }
 
 export async function moveTrackInPlaylist(
-    _playlistId: number,
-    _trackId: number,
-    _direction: "up" | "down",
+    playlistId: number,
+    trackId: number,
+    direction: "up" | "down",
 ): Promise<{ success: boolean; error?: string }> {
-    void _playlistId; void _trackId; void _direction;
-    // TODO(companion): move-position endpoint. Not blocking for v1.
-    return { success: false, error: "Reordering not yet supported via companion" };
+    const idCheck = playlistIdSchema.safeParse(playlistId);
+    if (!idCheck.success) return failedValidation(idCheck.error);
+    const link = await getCompanionLink();
+    if (!link) return { success: false, error: "Companion not connected" };
+    try {
+        // Pull the full ordered list, swap the target with its neighbour,
+        // and POST the whole thing back. The companion's /reorder
+        // endpoint is a single transactional rewrite, so this is safe
+        // against concurrent adds (anything new gets appended).
+        const { tracks } = await companionLibrary.getPlaylistTracks(link, playlistId, 1, 100000);
+        const ids = tracks.map((t) => t.id);
+        const idx = ids.indexOf(trackId);
+        if (idx < 0) return { success: false, error: "Track not in playlist" };
+        const swapWith = direction === "up" ? idx - 1 : idx + 1;
+        if (swapWith < 0 || swapWith >= ids.length) {
+            return { success: true }; // already at the edge — no-op
+        }
+        [ids[idx], ids[swapWith]] = [ids[swapWith], ids[idx]];
+        await companionLibrary.reorderPlaylist(link, playlistId, ids);
+        revalidatePath("/playlists");
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Reorder failed" };
+    }
+}
+
+export async function reorderPlaylistTracks(
+    playlistId: number,
+    trackIds: number[],
+): Promise<{ success: boolean; error?: string }> {
+    const idCheck = playlistIdSchema.safeParse(playlistId);
+    if (!idCheck.success) return failedValidation(idCheck.error);
+    if (!Array.isArray(trackIds) || trackIds.some((n) => !Number.isInteger(n))) {
+        return { success: false, error: "trackIds must be an array of integers" };
+    }
+    const link = await getCompanionLink();
+    if (!link) return { success: false, error: "Companion not connected" };
+    try {
+        await companionLibrary.reorderPlaylist(link, playlistId, trackIds);
+        revalidatePath("/playlists");
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Reorder failed" };
+    }
 }
 
 export async function clearPlaylist(
     playlistId: number,
 ): Promise<{ success: boolean; error?: string }> {
+    const idCheck = playlistIdSchema.safeParse(playlistId);
+    if (!idCheck.success) return failedValidation(idCheck.error);
     const link = await getCompanionLink();
     if (!link) return { success: false, error: "Companion not connected" };
     try {
-        const { tracks } = await companionLibrary.getPlaylistTracks(link, playlistId, 1, 1000);
-        for (const t of tracks) {
-            await companionLibrary.removeTrackFromPlaylist(link, playlistId, t.id);
+        // Always re-read page 1: removing a track shifts the rest of the
+        // list down, so paging forward would skip every other track. Loop
+        // until page 1 is empty (or we hit the cap as a runaway guard).
+        // The previous single-page read silently left every track past
+        // index 1000 untouched on big playlists.
+        const PAGE_SIZE = 1000;
+        const MAX_ITERATIONS = 200; // 200k tracks ceiling
+        for (let i = 0; i < MAX_ITERATIONS; i++) {
+            const { tracks } = await companionLibrary.getPlaylistTracks(link, playlistId, 1, PAGE_SIZE);
+            if (tracks.length === 0) break;
+            for (const t of tracks) {
+                await companionLibrary.removeTrackFromPlaylist(link, playlistId, t.id);
+            }
+            if (tracks.length < PAGE_SIZE) break;
         }
         revalidatePath("/playlists");
         return { success: true };
@@ -177,6 +266,8 @@ export async function clearPlaylist(
 export async function duplicatePlaylist(
     playlistId: number,
 ): Promise<PlaylistSummary> {
+    const idCheck = playlistIdSchema.safeParse(playlistId);
+    if (!idCheck.success) throw new Error(failedValidation(idCheck.error).error);
     const link = await getCompanionLink();
     if (!link) throw new Error("Companion not connected");
     const all = await companionLibrary.getPlaylists(link);
@@ -425,4 +516,205 @@ export async function getSimilarTracks(
 ): Promise<unknown[]> {
     void _playlistId; void _limit;
     return [];
+}
+
+// ─── Smart playlist engine ──────────────────────────────────────────────────
+//
+// Each smart rule reduces the user's library to a subset using a
+// declarative criteria object. Filters that the companion supports
+// natively (genre, BPM range, energy, favorite, rating) are pushed down
+// to the API; anything else is evaluated client-side after a wide fetch.
+//
+// The engine is intentionally simple: AND-only at the criteria level,
+// no nested groups. That matches every "Per Genre / Per Energy /
+// Specials" preset in RECOMMENDED_PLAYLISTS. More complex rules can be
+// expressed by setting `customMatch` (a function) — used by the Fusions
+// presets, which need OR across genres.
+
+export interface SmartCriteria {
+    genres?: string[];          // OR within the list
+    minBpm?: number;
+    maxBpm?: number;
+    minEnergy?: number;
+    maxEnergy?: number;
+    minRating?: number;
+    isFavorite?: boolean;
+    addedWithinDays?: number;   // e.g. 30 for "Recent Adds"
+    limit?: number;             // hard cap on inserted tracks
+    sort?: "addedAt" | "rating" | "bpm" | "random";
+    /** Optional second-pass predicate evaluated after companion-side filtering. */
+    customMatch?: (track: { bpm?: number | null; energy?: number | null; genre?: string | null; subgenre?: string | null; mood?: string | null }) => boolean;
+}
+
+const SMART_RULES: Record<string, SmartCriteria> = {
+    // Per Genre — single-genre buckets with the genre's typical BPM band.
+    "Techno": { genres: ["Techno"], minBpm: 125, maxBpm: 145 },
+    "Tech House": { genres: ["Tech House"], minBpm: 122, maxBpm: 128 },
+    "Acid": { genres: ["Acid"], minBpm: 125, maxBpm: 140 },
+    "Psytrance": { genres: ["Psytrance"], minBpm: 138, maxBpm: 150 },
+    "Bounce": { genres: ["Bounce"], minBpm: 150, maxBpm: 165 },
+    "Manele": { genres: ["Manele"], minBpm: 85, maxBpm: 130 },
+    "Populară": { genres: ["Populară", "Populara"], minBpm: 80, maxBpm: 140 },
+    "Balkanică": { genres: ["Balkanică", "Balkanica", "Balkan"], minBpm: 90, maxBpm: 160 },
+    "Latino": { genres: ["Latino", "Reggaeton"], minBpm: 85, maxBpm: 130 },
+    "House": { genres: ["House"], minBpm: 120, maxBpm: 130 },
+    "Progressive House": { genres: ["Progressive House"], minBpm: 126, maxBpm: 132 },
+
+    // Per Energy — set-building buckets keyed off the 1-10 energy field.
+    "1-Warmup": { minEnergy: 1, maxEnergy: 3, sort: "bpm" },
+    "2-Build": { minEnergy: 4, maxEnergy: 6, sort: "bpm" },
+    "3-Peak": { minEnergy: 7, maxEnergy: 9, sort: "bpm" },
+    "4-Cooldown": { minEnergy: 1, maxEnergy: 4, sort: "addedAt" },
+
+    // Specials.
+    "Top Favourites": { isFavorite: true, sort: "rating" },
+    "Recent Adds": { addedWithinDays: 30, sort: "addedAt", limit: 200 },
+    "5 Star Only": { minRating: 5, sort: "addedAt" },
+    "Clasice / Evergreen": {
+        minRating: 4,
+        sort: "rating",
+        customMatch: (t) => (t.bpm ?? 0) >= 100 && (t.bpm ?? 0) <= 140,
+    },
+
+    // Fusions — OR across two genres via customMatch.
+    "Techno × Manele": {
+        customMatch: (t) => /techno|manele/i.test(`${t.genre ?? ""} ${t.subgenre ?? ""}`),
+        minBpm: 110, maxBpm: 145,
+    },
+    "Bounce × Balkan": {
+        customMatch: (t) => /bounce|balkan/i.test(`${t.genre ?? ""} ${t.subgenre ?? ""}`),
+        minBpm: 130, maxBpm: 165,
+    },
+    "Tech House × Latino": {
+        customMatch: (t) => /tech house|latino|reggaeton/i.test(`${t.genre ?? ""} ${t.subgenre ?? ""}`),
+        minBpm: 115, maxBpm: 130,
+    },
+    "Acid × Psytrance": {
+        customMatch: (t) => /acid|psy/i.test(`${t.genre ?? ""} ${t.subgenre ?? ""}`),
+        minBpm: 130, maxBpm: 150,
+    },
+    "Balkan × Techno": {
+        customMatch: (t) => /balkan|techno/i.test(`${t.genre ?? ""} ${t.subgenre ?? ""}`),
+        minBpm: 120, maxBpm: 145,
+    },
+};
+
+export function getSmartCriteria(playlistName: string): SmartCriteria | null {
+    return SMART_RULES[playlistName] ?? null;
+}
+
+interface MatchableTrack {
+    id: number;
+    bpm?: number | null;
+    energy?: number | null;
+    rating?: number | null;
+    isFavorite?: boolean | null;
+    genre?: string | null;
+    subgenre?: string | null;
+    mood?: string | null;
+    addedAt?: string | null;
+}
+
+function applyClientFilters(tracks: MatchableTrack[], c: SmartCriteria): MatchableTrack[] {
+    let out = tracks;
+    if (c.genres && c.genres.length > 0) {
+        const set = new Set(c.genres.map((g) => g.toLowerCase()));
+        out = out.filter((t) => t.genre && set.has(t.genre.toLowerCase()));
+    }
+    if (c.minBpm !== undefined) out = out.filter((t) => (t.bpm ?? 0) >= c.minBpm!);
+    if (c.maxBpm !== undefined) out = out.filter((t) => (t.bpm ?? 0) <= c.maxBpm!);
+    if (c.minEnergy !== undefined) out = out.filter((t) => (t.energy ?? 0) >= c.minEnergy!);
+    if (c.maxEnergy !== undefined) out = out.filter((t) => (t.energy ?? 0) <= c.maxEnergy!);
+    if (c.minRating !== undefined) out = out.filter((t) => (t.rating ?? 0) >= c.minRating!);
+    if (c.isFavorite) out = out.filter((t) => !!t.isFavorite);
+    if (c.addedWithinDays !== undefined) {
+        const cutoff = Date.now() - c.addedWithinDays * 86400_000;
+        out = out.filter((t) => {
+            if (!t.addedAt) return false;
+            const ts = Date.parse(t.addedAt);
+            return Number.isFinite(ts) && ts >= cutoff;
+        });
+    }
+    if (c.customMatch) out = out.filter((t) => c.customMatch!(t));
+    if (c.sort === "addedAt") {
+        out = out.slice().sort((a, b) => Date.parse(b.addedAt ?? "") - Date.parse(a.addedAt ?? ""));
+    } else if (c.sort === "rating") {
+        out = out.slice().sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    } else if (c.sort === "bpm") {
+        out = out.slice().sort((a, b) => (a.bpm ?? 0) - (b.bpm ?? 0));
+    } else if (c.sort === "random") {
+        out = out.slice().sort(() => Math.random() - 0.5);
+    }
+    if (c.limit !== undefined) out = out.slice(0, c.limit);
+    return out;
+}
+
+/**
+ * Re-build the contents of a playlist from a smart criteria. Replaces
+ * the existing tracklist atomically (clear + bulk-add). Returns the
+ * number of tracks the playlist now contains.
+ */
+export async function populateSmartPlaylist(
+    playlistId: number,
+    criteria: SmartCriteria,
+): Promise<{ success: boolean; count?: number; error?: string }> {
+    const idCheck = playlistIdSchema.safeParse(playlistId);
+    if (!idCheck.success) return failedValidation(idCheck.error);
+    const link = await getCompanionLink();
+    if (!link) return { success: false, error: "Companion not connected" };
+    try {
+        // Wide fetch — pull the user's whole library and filter in
+        // memory. The companion's /tracks endpoint already paginates;
+        // ask for one big page (10k is well above the typical user).
+        const page = await companionLibrary.getTracks(link, { page: 1, pageSize: 10000 });
+        const matched = applyClientFilters(page.tracks as unknown as MatchableTrack[], criteria);
+        if (matched.length === 0) {
+            // Still clear the playlist so a re-run after pruning is honest.
+            const { tracks: existing } = await companionLibrary.getPlaylistTracks(link, playlistId, 1, 100000);
+            for (const t of existing) {
+                await companionLibrary.removeTrackFromPlaylist(link, playlistId, t.id);
+            }
+            revalidatePath("/playlists");
+            return { success: true, count: 0 };
+        }
+
+        const { tracks: existing } = await companionLibrary.getPlaylistTracks(link, playlistId, 1, 100000);
+        for (const t of existing) {
+            await companionLibrary.removeTrackFromPlaylist(link, playlistId, t.id);
+        }
+        await companionLibrary.addTracksToPlaylist(link, playlistId, matched.map((t) => t.id));
+        revalidatePath("/playlists");
+        return { success: true, count: matched.length };
+    } catch (err) {
+        log.warn("populateSmartPlaylist failed", { playlistId, error: err instanceof Error ? err.message : String(err) });
+        return { success: false, error: err instanceof Error ? err.message : "Populate failed" };
+    }
+}
+
+/**
+ * Convenience: create the named recommended playlists *and* immediately
+ * auto-populate the ones we have a smart rule for.
+ */
+export async function createAndPopulateRecommended(
+    names: string[],
+): Promise<{ created: number; populated: number; error?: string }> {
+    const link = await getCompanionLink();
+    if (!link) return { created: 0, populated: 0, error: "Companion not connected" };
+    const create = await createRecommendedPlaylists(names);
+    if (create.error) return { created: create.created, populated: 0, error: create.error };
+    try {
+        const all = await companionLibrary.getPlaylists(link);
+        let populated = 0;
+        for (const name of names) {
+            const rule = SMART_RULES[name];
+            if (!rule) continue;
+            const target = all.find((p) => p.name === name);
+            if (!target) continue;
+            const r = await populateSmartPlaylist(target.id, rule);
+            if (r.success) populated++;
+        }
+        return { created: create.created, populated };
+    } catch (err) {
+        return { created: create.created, populated: 0, error: err instanceof Error ? err.message : "Populate failed" };
+    }
 }

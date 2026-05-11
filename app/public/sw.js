@@ -1,9 +1,15 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = "music-org-v3";
+const CACHE_NAME = "music-org-v5";
 
-// App shell files to precache
-const PRECACHE_URLS = ["/", "/library", "/playlists", "/scanner", "/settings", "/devices", "/remote", "/live", "/daw", "/mixer", "/sound-editor"];
+// Precache only TRULY public assets — the offline fallback page and the
+// app manifest. Earlier versions of this SW precached `/library`,
+// `/playlists`, `/settings`, … but those routes return user-specific
+// HTML behind auth, so the SW would either hold the install-time user's
+// content (visible to a later sign-in on the same browser → PII leak)
+// or 401-redirect HTML (useless). Per-route navigation is now strictly
+// network-only with no HTML caching at all (see fetch handler below).
+const PRECACHE_URLS = ["/offline", "/manifest.webmanifest"];
 
 // ─── IndexedDB offline audio helper ─────────────────────────────────────────
 
@@ -64,6 +70,22 @@ self.addEventListener("activate", (event) => {
         )
     );
     self.clients.claim();
+});
+
+// Sign-out hook from the page (`lib/auth-client.ts`). Wipe every cache so
+// the next user signed in on this browser can't see the previous user's
+// cached HTML or per-route assets.
+self.addEventListener("message", (event) => {
+    if (event.data?.type !== "purge-caches") return;
+    const port = event.ports && event.ports[0];
+    event.waitUntil((async () => {
+        try {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((k) => caches.delete(k)));
+        } finally {
+            port?.postMessage({ ok: true });
+        }
+    })());
 });
 
 // Fetch: network-first for navigation, cache-first for static assets
@@ -146,18 +168,14 @@ self.addEventListener("fetch", (event) => {
         return;
     }
 
-    // Navigation & pages: network-first with cache fallback
+    // Navigation & pages: network-only. We do NOT write authenticated HTML
+    // into the cache because the cache is shared across all sign-in
+    // sessions on this browser — caching here is a cross-user PII leak
+    // primitive. Falling back to the static `/offline` page when the
+    // network is dead keeps PWA-installable behaviour.
     if (request.mode === "navigate" || request.headers.get("Accept")?.includes("text/html")) {
         event.respondWith(
-            fetch(request)
-                .then((response) => {
-                    if (response.ok) {
-                        const clone = response.clone();
-                        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-                    }
-                    return response;
-                })
-                .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
+            fetch(request).catch(() => caches.match("/offline") || new Response("Offline", { status: 503 })),
         );
         return;
     }

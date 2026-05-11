@@ -15,8 +15,18 @@ import { userPreferences } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 const SETTINGS_NS = "setting:";
+
+// Settings keys are application-controlled (UI dropdowns, not free-form),
+// so we whitelist the character class rather than enumerate every key.
+const settingKeySchema = z.string().min(1).max(128).regex(/^[a-zA-Z0-9._-]+$/);
+const settingValueSchema = z.string().max(8192);
+
+function failedValidation(err: z.ZodError): { success: false; error: string } {
+    return { success: false, error: err.issues.map((i) => `${i.path.join(".") || "root"}: ${i.message}`).join("; ") };
+}
 
 export async function getSettings(): Promise<Record<string, string>> {
     const session = await auth();
@@ -50,6 +60,11 @@ export async function updateSetting(
     key: string,
     value: string,
 ): Promise<{ success: boolean; error?: string }> {
+    const keyCheck = settingKeySchema.safeParse(key);
+    if (!keyCheck.success) return failedValidation(keyCheck.error);
+    const valCheck = settingValueSchema.safeParse(value);
+    if (!valCheck.success) return failedValidation(valCheck.error);
+
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Not signed in" };
     const ns = SETTINGS_NS + key;

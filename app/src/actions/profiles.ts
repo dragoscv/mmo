@@ -2,8 +2,23 @@
 
 import { db } from "@/db";
 import { userProfiles, profilePreferences, userPreferences } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { auth } from "@/auth";
+import { z } from "zod";
+
+const profileIdSchema = z.string().uuid();
+const profileNameSchema = z.string().trim().min(1).max(120);
+const profileDescriptionSchema = z.string().max(2000).optional();
+const profileKeySchema = z.string().min(1).max(128).regex(/^[a-zA-Z0-9._:-]+$/);
+const profileValueSchema = z.string().max(8192);
+const profileBulkSchema = z.array(z.object({
+    key: profileKeySchema,
+    value: profileValueSchema,
+}).strict()).max(1000);
+
+function failedValidation(err: z.ZodError): { success: false; error: string } {
+    return { success: false, error: err.issues.map((i) => `${i.path.join(".") || "root"}: ${i.message}`).join("; ") };
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -111,14 +126,21 @@ export async function listProfiles(): Promise<ProfileSummary[]> {
         .from(userProfiles)
         .where(eq(userProfiles.userId, userId));
 
-    const counts = await db
-        .select({
-            profileId: profilePreferences.profileId,
-        })
-        .from(profilePreferences);
+    // Counts query MUST be scoped to this user's profiles. Previously the
+    // SELECT had no WHERE clause and pulled every preference row in the DB
+    // across all users into process memory just to count entries per profile
+    // — cross-tenant data leakage into RAM and an O(all-users) cost on what
+    // should be an O(this-user) operation.
+    const profileIds = profiles.map((p) => p.id);
     const countMap = new Map<string, number>();
-    for (const row of counts) {
-        countMap.set(row.profileId, (countMap.get(row.profileId) ?? 0) + 1);
+    if (profileIds.length > 0) {
+        const counts = await db
+            .select({ profileId: profilePreferences.profileId })
+            .from(profilePreferences)
+            .where(inArray(profilePreferences.profileId, profileIds));
+        for (const row of counts) {
+            countMap.set(row.profileId, (countMap.get(row.profileId) ?? 0) + 1);
+        }
     }
 
     return profiles
@@ -160,17 +182,20 @@ export async function createProfile(
     name: string,
     description?: string,
 ): Promise<{ success: boolean; id?: string; error?: string }> {
+    const nameCheck = profileNameSchema.safeParse(name);
+    if (!nameCheck.success) return failedValidation(nameCheck.error);
+    const descCheck = profileDescriptionSchema.safeParse(description);
+    if (!descCheck.success) return failedValidation(descCheck.error);
     const userId = await requireUserId();
     if (!userId) return { success: false, error: "Not authenticated" };
-    const trimmed = name.trim();
-    if (!trimmed) return { success: false, error: "Name required" };
+    const trimmed = nameCheck.data;
 
     const id = crypto.randomUUID();
     await db.insert(userProfiles).values({
         id,
         userId,
         name: trimmed,
-        description: description?.trim() || null,
+        description: descCheck.data?.trim() || null,
         isActive: false,
     });
     return { success: true, id };
@@ -181,26 +206,36 @@ export async function renameProfile(
     name: string,
     description?: string,
 ): Promise<{ success: boolean; error?: string }> {
+    const idCheck = profileIdSchema.safeParse(profileId);
+    if (!idCheck.success) return failedValidation(idCheck.error);
+    const nameCheck = profileNameSchema.safeParse(name);
+    if (!nameCheck.success) return failedValidation(nameCheck.error);
+    const descCheck = profileDescriptionSchema.safeParse(description);
+    if (!descCheck.success) return failedValidation(descCheck.error);
     const userId = await requireUserId();
     if (!userId) return { success: false, error: "Not authenticated" };
     if (!(await assertOwnership(userId, profileId))) return { success: false, error: "Not found" };
-    const trimmed = name.trim();
-    if (!trimmed) return { success: false, error: "Name required" };
+    const trimmed = nameCheck.data;
 
     await db
         .update(userProfiles)
         .set({
             name: trimmed,
-            description: description?.trim() || null,
+            description: descCheck.data?.trim() || null,
             updatedAt: new Date(),
         })
-        .where(eq(userProfiles.id, profileId));
+        // Defence in depth: scope the UPDATE to this user even though
+        // `assertOwnership` already verified it. Single-statement guarantee
+        // closes the TOCTOU window between the check and the write.
+        .where(and(eq(userProfiles.id, profileId), eq(userProfiles.userId, userId)));
     return { success: true };
 }
 
 export async function deleteProfile(
     profileId: string,
 ): Promise<{ success: boolean; error?: string; newActiveId?: string }> {
+    const idCheck = profileIdSchema.safeParse(profileId);
+    if (!idCheck.success) return failedValidation(idCheck.error);
     const userId = await requireUserId();
     if (!userId) return { success: false, error: "Not authenticated" };
     if (!(await assertOwnership(userId, profileId))) return { success: false, error: "Not found" };
@@ -215,7 +250,8 @@ export async function deleteProfile(
     }
 
     const wasActive = all.find((p) => p.id === profileId)?.isActive;
-    await db.delete(userProfiles).where(eq(userProfiles.id, profileId));
+    await db.delete(userProfiles)
+        .where(and(eq(userProfiles.id, profileId), eq(userProfiles.userId, userId)));
 
     let newActiveId: string | undefined;
     if (wasActive) {
@@ -234,6 +270,8 @@ export async function deleteProfile(
 export async function activateProfile(
     profileId: string,
 ): Promise<{ success: boolean; error?: string }> {
+    const idCheck = profileIdSchema.safeParse(profileId);
+    if (!idCheck.success) return failedValidation(idCheck.error);
     const userId = await requireUserId();
     if (!userId) return { success: false, error: "Not authenticated" };
     if (!(await assertOwnership(userId, profileId))) return { success: false, error: "Not found" };
@@ -245,7 +283,7 @@ export async function activateProfile(
     await db
         .update(userProfiles)
         .set({ isActive: true, updatedAt: new Date() })
-        .where(eq(userProfiles.id, profileId));
+        .where(and(eq(userProfiles.id, profileId), eq(userProfiles.userId, userId)));
     return { success: true };
 }
 
@@ -253,16 +291,19 @@ export async function duplicateProfile(
     profileId: string,
     newName: string,
 ): Promise<{ success: boolean; id?: string; error?: string }> {
+    const idCheck = profileIdSchema.safeParse(profileId);
+    if (!idCheck.success) return failedValidation(idCheck.error);
+    const nameCheck = profileNameSchema.safeParse(newName);
+    if (!nameCheck.success) return failedValidation(nameCheck.error);
     const userId = await requireUserId();
     if (!userId) return { success: false, error: "Not authenticated" };
     if (!(await assertOwnership(userId, profileId))) return { success: false, error: "Not found" };
-    const trimmed = newName.trim();
-    if (!trimmed) return { success: false, error: "Name required" };
+    const trimmed = nameCheck.data;
 
     const source = await db
         .select()
         .from(userProfiles)
-        .where(eq(userProfiles.id, profileId))
+        .where(and(eq(userProfiles.id, profileId), eq(userProfiles.userId, userId)))
         .limit(1);
     if (source.length === 0) return { success: false, error: "Not found" };
 
@@ -303,6 +344,9 @@ export async function saveActiveProfilePreference(
     key: string,
     value: string,
 ): Promise<{ success: boolean }> {
+    const keyCheck = profileKeySchema.safeParse(key);
+    const valCheck = profileValueSchema.safeParse(value);
+    if (!keyCheck.success || !valCheck.success) return { success: false };
     const userId = await requireUserId();
     if (!userId) return { success: false };
     const profileId = (await getActiveProfileId(userId)) ?? (await ensureDefaultProfile());
@@ -328,6 +372,8 @@ export async function saveActiveProfilePreference(
 export async function saveActiveProfilePreferencesBulk(
     prefs: Array<{ key: string; value: string }>,
 ): Promise<{ success: boolean; saved: number }> {
+    const check = profileBulkSchema.safeParse(prefs);
+    if (!check.success) return { success: false, saved: 0 };
     const userId = await requireUserId();
     if (!userId) return { success: false, saved: 0 };
     const profileId = (await getActiveProfileId(userId)) ?? (await ensureDefaultProfile());
@@ -402,16 +448,30 @@ export async function importProfile(
     if (obj.schema !== "rekordbox-mwrty.profile") return { success: false, error: "Unrecognized schema" };
     if (obj.version !== 1) return { success: false, error: "Unsupported version" };
     if (!Array.isArray(obj.entries)) return { success: false, error: "Missing entries" };
-
-    const name = (options?.name ?? (typeof obj.name === "string" ? obj.name : "Imported")).trim() || "Imported";
-    const description = typeof obj.description === "string" ? obj.description : null;
+    // Hard caps on the importable shape. Without these:
+    //   - `entries` could be millions of rows (single insert builds a
+    //     many-MB SQL statement; OOMs the Postgres connection).
+    //   - per-entry `value` was 1 MB; 1000 entries \u00d7 1 MB = 1 GB query.
+    //   - `name` / `description` were unbounded \u2014 a 1 GB string lands
+    //     in a TEXT column and breaks every list view that loads it.
+    // Harmonise with the regular bulk-save schema: entries \u22641000,
+    // key \u2264128 (matches `profileKeySchema`), value \u226464 KB (a generous
+    // import-only budget; the server-side write API still enforces 8 KB).
+    if (obj.entries.length > 1000) return { success: false, error: "Too many entries (max 1000)" };
+    const rawName = options?.name ?? (typeof obj.name === "string" ? obj.name : "Imported");
+    if (typeof rawName !== "string" || rawName.length > 200) return { success: false, error: "name too long" };
+    const name = rawName.trim() || "Imported";
+    const rawDescription = typeof obj.description === "string" ? obj.description : null;
+    if (rawDescription !== null && rawDescription.length > 2000) return { success: false, error: "description too long" };
+    const description = rawDescription;
 
     const cleanEntries: Array<{ key: string; value: string }> = [];
     for (const raw of obj.entries) {
         if (!raw || typeof raw !== "object") continue;
         const e = raw as Record<string, unknown>;
         if (typeof e.key !== "string" || typeof e.value !== "string") continue;
-        if (e.key.length > 256 || e.value.length > 1_000_000) continue;
+        if (e.key.length === 0 || e.key.length > 128) continue;
+        if (e.value.length > 65_536) continue;
         cleanEntries.push({ key: e.key, value: e.value });
     }
 

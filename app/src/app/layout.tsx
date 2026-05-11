@@ -21,6 +21,8 @@ import { FocusModeProvider } from "@/components/focus-mode-context";
 import { FocusAwareSidebar, FocusAwareMobileHeader, FocusAwareNowPlayingBar } from "@/components/focus-aware-shell";
 import { AuthProvider } from "@/components/auth-provider";
 import { PreferencesSync } from "@/components/preferences-sync";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 // NOTE: globals.css is pre-compiled by `@tailwindcss/cli` into `public/globals.css`
 // during `prebuild`, then served as a static asset and linked from <head> below.
 // We bypass Next.js' postcss pipeline because @tailwindcss/postcss on Linux
@@ -68,9 +70,21 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="ro" className={cn("dark font-sans", inter.variable)} suppressHydrationWarning>
+        <RootLayoutAsync>{children}</RootLayoutAsync>
+    );
+}
+
+async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
+    const locale = await getLocale();
+    const messages = await getMessages();
+    return (
+        <html lang={locale} className={cn("dark font-sans", inter.variable)} suppressHydrationWarning>
             <head>
                 <meta name="theme-color" content="#a855f7" />
+                {/* Served as a static asset from public/, not as an
+                    import, so Tailwind's CSS layers + the legacy globals
+                    stay outside the route's RSC payload. */}
+                {/* eslint-disable-next-line @next/next/no-css-tags */}
                 <link rel="stylesheet" href="/globals.css" />
             </head>
             <body className="antialiased">
@@ -80,6 +94,7 @@ export default function RootLayout({
                 <ThemeProvider>
                     <AuthProvider>
                         <PreferencesSync />
+                        <NextIntlClientProvider locale={locale} messages={messages}>
                         <SelectionProvider>
                             <SidebarProvider>
                                 <PlayerProvider>
@@ -128,6 +143,7 @@ export default function RootLayout({
                                 </PlayerProvider>
                             </SidebarProvider>
                         </SelectionProvider>
+                        </NextIntlClientProvider>
                     </AuthProvider>
                 </ThemeProvider>
             </body>

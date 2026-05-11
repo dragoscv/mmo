@@ -30,14 +30,15 @@ export function useSidebar() {
 const STORAGE_KEY = "sidebar-collapsed";
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-    const [collapsed, setCollapsedState] = useState(false);
+    // Lazy init reads localStorage *during* the initial render on the
+    // client, which matches the hydrated DOM and avoids the
+    // useEffect→setState→re-render flash. The `typeof window` guard
+    // keeps the function SSR-safe.
+    const [collapsed, setCollapsedState] = useState<boolean>(() => {
+        if (typeof window === "undefined") return false;
+        try { return localStorage.getItem(STORAGE_KEY) === "true"; } catch { return false; }
+    });
     const [mobileOpen, setMobileOpen] = useState(false);
-
-    // Restore from localStorage
-    useEffect(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved === "true") setCollapsedState(true);
-    }, []);
 
     const setCollapsed = useCallback((v: boolean) => {
         setCollapsedState(v);

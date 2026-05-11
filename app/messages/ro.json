@@ -1,0 +1,58 @@
+{
+    "appName": "MMO",
+    "tagline": "Multi Media Organizer pentru DJ-i și producători",
+    "nav": {
+        "dashboard": "Panou principal",
+        "library": "Bibliotecă",
+        "analysis": "Analiză",
+        "mixer": "Mixer",
+        "daw": "DAW",
+        "editor": "Editor sunet",
+        "live": "Live",
+        "remote": "Remote",
+        "visualizations": "Vizualizări",
+        "download": "Descărcări",
+        "scanner": "Scanner",
+        "drives": "Drive Manager",
+        "playlists": "Playlisturi",
+        "recordings": "Înregistrări",
+        "devices": "Dispozitive",
+        "settings": "Setări",
+        "plugins": "Pluginuri",
+        "profile": "Profil"
+    },
+    "common": {
+        "loading": "Se încarcă…",
+        "save": "Salvează",
+        "cancel": "Anulează",
+        "delete": "Șterge",
+        "confirm": "Confirmă",
+        "search": "Caută",
+        "noResults": "Niciun rezultat",
+        "error": "A apărut o eroare",
+        "retry": "Reîncearcă"
+    },
+    "auth": {
+        "signIn": "Autentificare",
+        "signOut": "Deconectare",
+        "signInWithGoogle": "Continuă cu Google"
+    },
+    "dashboard": {
+        "empty": {
+            "scanToPopulate": "Scanează și analizează piese ca să populezi",
+            "noTracksToCheck": "Nicio piesă de verificat",
+            "noTracksYet": "Încă nicio piesă",
+            "noRatedTracks": "Încă nicio piesă evaluată",
+            "rateToSeeHere": "Evaluează piesele cu 4-5 stele ca să le vezi aici",
+            "noRecentActivity": "Fără activitate recentă.",
+            "unknown": "Necunoscut",
+            "unknownArtist": "Artist necunoscut"
+        },
+        "recommendations": {
+            "allCreated": "Toate playlisturile recomandate sunt create",
+            "haveAll": "Ai toate cele {total} playlisturi recomandate",
+            "setupProgress": "Progres configurare playlisturi",
+            "createMissing": "Creează {count} playlisturi lipsă"
+        }
+    }
+}

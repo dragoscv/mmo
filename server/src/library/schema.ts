@@ -102,6 +102,15 @@ export const tracks = sqliteTable("tracks", {
     /** Whole-track DSP analysis timestamp (separate from external
      *  metadata `analyzedAt` so each can be re-run independently). */
     dspAnalyzedAt: text("dsp_analyzed_at"),
+    /** Cloud sync key. SHA-256 of the audio file's content; identical
+     *  files on different devices share a row in cloud Postgres. Nullable
+     *  because legacy rows pre-date the column — backfilled lazily on
+     *  next analyze pass. */
+    sha256: text("sha256"),
+    /** JSON-encoded `Record<columnName, ISO8601>` of per-field LWW
+     *  timestamps. Used by the cloud's per-field merge so partial pushes
+     *  from any device can converge without clobbering newer values. */
+    fieldVersions: text("field_versions"),
 });
 
 export const playlists = sqliteTable("playlists", {
@@ -111,6 +120,12 @@ export const playlists = sqliteTable("playlists", {
     description: text("description"),
     type: text("type").default("manual"),
     createdAt: text("created_at").default(sql`(datetime('now'))`),
+    /** Cloud sync key (UUID). Cloud playlists are uniquely keyed by
+     *  (user_id, external_id). Backfilled lazily; legacy rows surface as
+     *  NULL and are pushed with a synthetic id until the next pull. */
+    externalId: text("external_id"),
+    /** ISO-8601 last-write timestamp for row-level LWW. */
+    updatedAt: text("updated_at"),
 });
 
 export const playlistTracks = sqliteTable("playlist_tracks", {
@@ -148,9 +163,29 @@ export const downloads = sqliteTable("downloads", {
     downloadedAt: text("downloaded_at").default(sql`(datetime('now'))`),
 });
 
+/**
+ * User-labelled physical drives. The OS already gives us the live drive
+ * list (see ./drives.ts); this table just stores the human metadata
+ * the user attached to each one — "My CDJ USB", "Backup HDD", etc. —
+ * keyed by the drive *path* (the only field that survives an unmount /
+ * remount). Per-user so two sign-ins on the same machine see their own
+ * labels.
+ */
+export const savedDrives = sqliteTable("saved_drives", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id").notNull(),
+    path: text("path").notNull(),
+    label: text("label").notNull(),
+    type: text("type").notNull().default("removable"),
+    format: text("format"),
+    isActive: integer("is_active", { mode: "boolean" }).default(true),
+    createdAt: text("created_at").default(sql`(datetime('now'))`),
+});
+
 export type Track = typeof tracks.$inferSelect;
 export type NewTrack = typeof tracks.$inferInsert;
 export type Playlist = typeof playlists.$inferSelect;
 export type PlaylistTrack = typeof playlistTracks.$inferSelect;
 export type ScanLog = typeof scanLogs.$inferSelect;
 export type DownloadRecord = typeof downloads.$inferSelect;
+export type SavedDrive = typeof savedDrives.$inferSelect;

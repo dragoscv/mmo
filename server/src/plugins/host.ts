@@ -24,6 +24,7 @@ import { app } from "electron";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { analyzer } from "../library/analyzer";
+import { log } from "../lib/logger";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -129,7 +130,7 @@ class PluginHost extends EventEmitter {
         try {
             writeFileSync(this.cachePath(), JSON.stringify(result, null, 2), "utf8");
         } catch (e) {
-            console.error("[plugins] cache write failed:", e);
+            log.error("plugins.cache_write failed", e);
         }
     }
 
@@ -294,6 +295,20 @@ class PluginHost extends EventEmitter {
         if (job.stage !== "done") return null;
         if (!existsSync(job.outputPath)) return null;
         return job.outputPath;
+    }
+
+    /** True when the given path is in the cached inventory. The /render
+     *  and /describe routes use this as an allowlist guard so a request
+     *  with a leaked device token can't make the host load an arbitrary
+     *  attacker-supplied native plugin (VST3 ≡ arbitrary code exec).
+     *
+     *  A scan must run at least once before any render — that's already
+     *  the UI's first-launch flow. */
+    isKnownPluginPath(p: string): boolean {
+        const cache = this.loadCache();
+        if (!cache) return false;
+        const norm = path.normalize(p);
+        return cache.inventory.some((d) => path.normalize(d.path) === norm);
     }
 }
 

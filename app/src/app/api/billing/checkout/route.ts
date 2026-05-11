@@ -6,11 +6,18 @@
 
 import { auth } from "@/auth";
 import { ensureCustomer, PRICE_IDS, stripe } from "@/lib/stripe";
+import { requireSessionWithRate } from "@/lib/api-guard";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+    // 10 checkouts/min per user is generous for legitimate flow (one
+    // click = one session). Without this, a compromised session could
+    // spam Stripe checkout creation — each call costs us an outbound
+    // API hit and clutters the customer's Stripe dashboard.
+    const guard = await requireSessionWithRate(req, { bucket: "billing-checkout", windowMs: 60_000, max: 10 });
+    if (guard.response) return guard.response;
     const session = await auth();
     if (!session?.user?.id) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -27,7 +34,12 @@ export async function POST(req: Request) {
     }
 
     const customerId = await ensureCustomer(userId);
-    const origin = req.headers.get("origin") ?? "https://muzicai.ro";
+    // Pin redirect targets to a server-controlled origin. Reading from
+    // the request `Origin` header would let an attacker on evil.com
+    // POST a fetch with their own origin and receive a Stripe URL whose
+    // success/cancel links point back to evil.com (open-redirect-via-
+    // Stripe). Fall back to muzicai.ro when the env var is unset.
+    const origin = process.env.NEXT_PUBLIC_APP_URL ?? "https://muzicai.ro";
 
     const checkout = await stripe().checkout.sessions.create({
         mode: "subscription",

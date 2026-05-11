@@ -80,7 +80,7 @@ export function useLongPress(
     const startRef = useRef<{ x: number; y: number } | null>(null);
     const firedRef = useRef(false);
     const cbRef = useRef(onLongPress);
-    cbRef.current = onLongPress;
+    useEffect(() => { cbRef.current = onLongPress; });
 
     const cancel = useCallback(() => {
         if (timerRef.current) {

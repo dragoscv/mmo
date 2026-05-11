@@ -292,7 +292,19 @@ interface DAWActions {
     // Master
     setMasterVolume: (vol: number) => void;
     // Export
-    exportProject: (format: "wav" | "mp3" | "flac" | "ogg", bitRate: number, onProgress?: (pct: number) => void) => Promise<{ blob: Blob; duration: number } | null>;
+    exportProject: (
+        format: "wav" | "mp3" | "flac" | "ogg",
+        options: {
+            bitRate?: number;
+            bitDepth?: 16 | 24 | 32;
+            sampleRate?: number;
+            channels?: 1 | 2;
+            normalize?: boolean;
+            limitPeak?: boolean;
+            tailSec?: number;
+            onProgress?: (pct: number) => void;
+        },
+    ) => Promise<{ blob: Blob; duration: number } | null>;
     // Engine access
     getEngine: () => DAWEngine | null;
     // Voice Processor bridge (for remote)
@@ -664,7 +676,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             engine.destroy();
             engineRef.current = null;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, []);
 
     // Sync step pattern and playback mode to engine
@@ -1919,12 +1931,20 @@ export function DAWProvider({ children }: { children: ReactNode }) {
 
     const exportProject = useCallback(async (
         format: "wav" | "mp3" | "flac" | "ogg",
-        bitRate: number,
-        onProgress?: (pct: number) => void,
+        options: {
+            bitRate?: number;
+            bitDepth?: 16 | 24 | 32;
+            sampleRate?: number;
+            channels?: 1 | 2;
+            normalize?: boolean;
+            limitPeak?: boolean;
+            tailSec?: number;
+            onProgress?: (pct: number) => void;
+        },
     ) => {
         const engine = engineRef.current;
         if (!engine) return null;
-        return engine.exportProject(state.project, format, bitRate, onProgress);
+        return engine.exportProject(state.project, format, options);
     }, [state.project]);
 
     const getEngine = useCallback((): DAWEngine | null => {

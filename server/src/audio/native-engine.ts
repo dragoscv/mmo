@@ -28,6 +28,7 @@ import {
 import { PitchDsp, type DspStatus, type PitchInfo, type ScaleConfig } from "./pitch-dsp";
 import { acquireRealtimeHost, releaseRealtimeHost } from "./realtime-host";
 import { NativeFxChain, type NativeFxChainItem } from "./native-fx";
+import { log } from "../lib/logger";
 
 export type AudioBackend = "auto" | "asio" | "wasapi" | "coreaudio" | "alsa" | "jack" | "pulse";
 
@@ -642,7 +643,7 @@ export class NativeAudioEngine {
         const errorCallback = (type: number, msg: string): void => {
             this.lastErrorMsg = `rtaudio[${type}]: ${msg}`;
             // eslint-disable-next-line no-console
-            console.warn(`[native-engine] RtAudio error type=${type}: ${msg}`);
+            log.warn("native-engine.rtaudio_error", { type, msg });
         };
 
         let actualFrameSize: number;
@@ -704,7 +705,7 @@ export class NativeAudioEngine {
                 if (this.rt.isStreamOpen()) this.rt.closeStream();
             } catch (err) {
                 // eslint-disable-next-line no-console
-                console.warn("[native-engine] stop error:", err);
+                log.warn("native-engine.stop_error", undefined, err);
             }
             this.rt = null;
         }

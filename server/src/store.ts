@@ -43,6 +43,11 @@ export interface CompanionSettings {
     /** Audio devices the user has explicitly opted-in to expose to the
      *  web app's low-latency engine. Empty = no devices shared. */
     authorizedAudioDevices: AuthorizedAudioDevice[];
+    /** Opt-in error telemetry. When true AND a SENTRY_DSN env var is
+     *  set at companion build time, `log.error()` calls forward the
+     *  error to Sentry. Default `false` — the companion is self-hosted
+     *  and telemetry must be explicit. */
+    telemetryEnabled: boolean;
 }
 
 const DEFAULTS: CompanionSettings = {
@@ -59,6 +64,7 @@ const DEFAULTS: CompanionSettings = {
         "http://127.0.0.1:3000",
     ],
     authorizedAudioDevices: [],
+    telemetryEnabled: false,
 };
 
 export const store = new Store({
@@ -101,6 +107,7 @@ export function getSettings(): CompanionSettings {
         webAppUrl: "https://muzicai.ro",
         audioOriginAllowlist: (store.get("audioOriginAllowlist") as string[] | undefined) ?? DEFAULTS.audioOriginAllowlist,
         authorizedAudioDevices: (store.get("authorizedAudioDevices") as AuthorizedAudioDevice[] | undefined) ?? [],
+        telemetryEnabled: (store.get("telemetryEnabled") as boolean | undefined) ?? DEFAULTS.telemetryEnabled,
     };
 }
 

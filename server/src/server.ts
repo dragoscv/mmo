@@ -20,6 +20,8 @@ import {
 } from "./audio/native-engine";
 import type { ScaleConfig } from "./audio/pitch-dsp";
 import { createLibraryRouter } from "./library/routes";
+import { createSyncRouter } from "./sync/http-router";
+import { setOnAppliedListener } from "./sync";
 import { closeLibraryDb } from "./library/db";
 import { createPluginsRouter } from "./plugins/routes";
 import {
@@ -32,6 +34,7 @@ import {
     clearJobTracks,
 } from "./library/scan-jobs";
 import { runScanJob } from "./library/scan-runner";
+import { resolveAllowedFile, resolveAllowedFolder, isPathInAllowedFolder } from "./lib/path-guard";
 import {
     startWatcher,
     stopWatcher,
@@ -122,10 +125,22 @@ export function generateAuthState(): string {
 // ─── Auth Middleware ─────────────────────────────────────────────────────────
 
 function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
-    const token = req.headers["x-device-token"] as string;
+    const token = req.headers["x-device-token"];
     const storedToken = store.get("deviceToken") as string;
 
-    if (!storedToken || token !== storedToken) {
+    // Constant-time compare so an attacker on the same LAN cannot recover
+    // the device token byte-by-byte from response-time deltas. Length
+    // mismatch is short-circuited because timingSafeEqual throws on
+    // unequal-length buffers — the early-return is itself constant time
+    // (it leaks token length, which the storedToken's length already does
+    // implicitly via every successful request anyway).
+    if (!storedToken || typeof token !== "string") {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+    const a = Buffer.from(token);
+    const b = Buffer.from(storedToken);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
     }
@@ -244,18 +259,33 @@ export async function startServer(): Promise<void> {
     serverPort = settings.serverPort;
 
     const app = express();
+
+    // CORS: do NOT use `origin: true` with `credentials: true` — that
+    // reflects every Origin and pairs it with cookies, which is full
+    // cross-origin-with-creds for any web page the user visits.
+    // Reuse `isAllowedOrigin` (loopback + companion settings allowlist +
+    // configured webAppUrl) so the policy stays in one place.
     app.use(cors({
-        origin: true,
+        origin(origin, cb) {
+            if (isAllowedOrigin(origin)) cb(null, true);
+            else cb(null, false);
+        },
         credentials: true,
     }));
-    // Bump JSON limit well above the express default (100 KB). The
-    // /library/tracks/ingest endpoint receives a full scan worth of
-    // metadata in one POST — a 5k-track library easily clears 5 MB.
-    // 64 MB is comfortably above any realistic single-folder scan and
-    // still bounded enough to reject runaway clients. The matching
-    // app-side ingest helper also chunks at 1k tracks per request as a
-    // belt-and-braces measure.
-    app.use(express.json({ limit: "64mb" }));
+
+    // Body parsing:
+    //   - Global default kept tight (1 MB). A LAN attacker who hits any
+    //     route with a giant JSON body would otherwise force the server to
+    //     buffer up to 64 MB into memory BEFORE authMiddleware rejects —
+    //     trivial low-rate RAM-exhaustion DoS on a desktop process.
+    //   - The one route that legitimately needs more is /library/tracks/
+    //     ingest (a full folder scan in one POST; a 5k-track library
+    //     easily clears 5 MB). It gets its own 64 MB parser mounted
+    //     BEFORE the global one, so for that path Express parses with the
+    //     larger limit and the global parser then no-ops (express.json
+    //     skips when req._body is already true).
+    app.use("/library/tracks/ingest", express.json({ limit: "64mb" }));
+    app.use(express.json({ limit: "1mb" }));
 
     // ─── Auth Callback (no auth middleware — this IS the auth endpoint) ───
 
@@ -343,18 +373,13 @@ export async function startServer(): Promise<void> {
             return;
         }
 
-        // Security: verify the file is within a configured scan folder
-        const normalizedPath = path.resolve(filePath);
-        const isAllowed = settings.scanFolders.some((folder) =>
-            normalizedPath.startsWith(path.resolve(folder.path))
-        );
-        if (!isAllowed) {
+        // resolveAllowedFile handles: existence, sibling-prefix bypass
+        // (`/srv/music_evil` won't pass against scanFolder `/srv/music`),
+        // symlink escape (realpath both sides), null/control bytes, and
+        // Windows case-insensitivity. Returns the on-disk path or null.
+        const normalizedPath = resolveAllowedFile(filePath, settings.scanFolders);
+        if (!normalizedPath) {
             res.status(403).json({ error: "Path not in allowed folders" });
-            return;
-        }
-
-        if (!fs.existsSync(normalizedPath)) {
-            res.status(404).json({ error: "File not found" });
             return;
         }
 
@@ -396,17 +421,9 @@ export async function startServer(): Promise<void> {
             return;
         }
 
-        const normalizedPath = path.resolve(filePath);
-        const isAllowed = settings.scanFolders.some((folder) =>
-            normalizedPath.startsWith(path.resolve(folder.path))
-        );
-        if (!isAllowed) {
+        const normalizedPath = resolveAllowedFile(filePath, settings.scanFolders);
+        if (!normalizedPath) {
             res.status(403).json({ error: "Path not in allowed folders" });
-            return;
-        }
-
-        if (!fs.existsSync(normalizedPath)) {
-            res.status(404).json({ error: "File not found" });
             return;
         }
 
@@ -417,7 +434,11 @@ export async function startServer(): Promise<void> {
         res.writeHead(200, {
             "Content-Length": stat.size,
             "Content-Type": contentType,
-            "Content-Disposition": `attachment; filename="${path.basename(normalizedPath)}"`,
+            // Sanitise the filename in Content-Disposition: stripping
+            // CR/LF/quotes prevents header injection (response splitting,
+            // HTTP smuggling) if a maliciously-named file ever lands in
+            // a scan folder.
+            "Content-Disposition": `attachment; filename="${path.basename(normalizedPath).replace(/[\r\n"\\]/g, "_")}"`,
         });
         fs.createReadStream(normalizedPath).pipe(res);
     });
@@ -482,27 +503,17 @@ export async function startServer(): Promise<void> {
         }
     });
 
-    app.post("/folders/add", authMiddleware, (req, res) => {
-        const { path: folderPath } = req.body;
-        if (!folderPath || typeof folderPath !== "string") {
-            res.status(400).json({ error: "Invalid folder path" });
-            return;
-        }
-
-        const resolved = path.resolve(folderPath);
-        if (!fs.existsSync(resolved)) {
-            res.status(404).json({ error: "Folder not found" });
-            return;
-        }
-
-        const folders = settings.scanFolders;
-        if (!folders.some((f) => f.path === resolved)) {
-            folders.push({ path: resolved, watch: false });
-            store.set("scanFolders", folders);
-        }
-
-        res.json({ success: true, folders });
-    });
+    // NOTE: `/folders/add` was removed in the audit-round-6 sweep. It
+    // accepted ANY filesystem path with only companion-token auth, which
+    // turned the companion into an arbitrary-file-read primitive: an
+    // attacker holding the device token (or with web-app session access)
+    // could POST `{path: "/"}` and then stream every file on the host
+    // through `/audio/*`. Folder addition now goes exclusively through
+    // `/folders/pick`, which forces an OS native dialog so the human
+    // sitting at the device must physically click "Open" — there's no
+    // way to add a folder without local consent. Re-introducing this
+    // route requires a real consent surface (electron confirm dialog
+    // bound to the focused window).
 
     app.post("/folders/remove", authMiddleware, (req, res) => {
         const { path: folderPath } = req.body;
@@ -556,9 +567,12 @@ export async function startServer(): Promise<void> {
             return;
         }
 
-        const resolved = path.resolve(folder);
-        const isAllowed = settings.scanFolders.some((f) => resolved.startsWith(path.resolve(f.path)));
-        if (!isAllowed) {
+        // Same sibling-prefix + symlink-escape hardening as /audio/* and
+        // /download/*. Without this, scanning `/srv/music_evil` would
+        // pass when `/srv/music` is the configured scan folder — letting
+        // an attacker queue arbitrary directory walks.
+        const resolved = resolveAllowedFolder(folder, settings.scanFolders);
+        if (!resolved) {
             res.status(403).json({ error: "Folder not in allowed paths" });
             return;
         }
@@ -622,9 +636,25 @@ export async function startServer(): Promise<void> {
             res.status(400).json({ error: "paths must be an array" });
             return;
         }
+        // Cap at 10k entries (the largest legitimate library refresh).
+        // Without this, a 10MB array forces 10M `fs.existsSync` syscalls.
+        if (paths.length > 10_000) {
+            res.status(413).json({ error: "Too many paths (max 10000)" });
+            return;
+        }
 
+        // File-existence oracle: without the scan-folder gate, a caller
+        // with the device token could probe arbitrary filesystem paths
+        // (`/etc/shadow`, `/Users/victim/.ssh/id_rsa`, browser cookie
+        // databases, etc.) and learn which exist. Restrict the probe to
+        // configured scan folders so this route only answers questions
+        // about files the caller is already authorised to enumerate.
         const results: Record<string, boolean> = {};
         for (const p of paths) {
+            if (!isPathInAllowedFolder(p, settings.scanFolders)) {
+                results[p] = false;
+                continue;
+            }
             try {
                 results[p] = fs.existsSync(path.resolve(p));
             } catch {
@@ -642,6 +672,15 @@ export async function startServer(): Promise<void> {
     // Auth.js session. See `server/src/library/routes.ts`.
 
     app.use("/library", createLibraryRouter(authMiddleware));
+
+    // ─── Cloud sync ingestion ────────────────────────────────────────
+    //
+    // Lets the cloud (or any device-token-authed client) push a batch
+    // of `SyncChange[]` into the companion's local SQLite. Used to
+    // close the cross-device loop without waiting for the next pull
+    // tick — the web app can fire-and-forget a push immediately after
+    // a user edit lands in cloud Postgres.
+    app.use("/v1/sync", createSyncRouter(authMiddleware));
 
     // ─── Audio plugin host (VST3 / AU / LV2 via pedalboard) ──────────────
     //
@@ -1014,8 +1053,24 @@ export async function startServer(): Promise<void> {
     httpServer.headersTimeout = 70_000; // must be > keepAliveTimeout
     httpServer.requestTimeout = 0;       // long-lived /analyze + /stems uploads
 
-    // WebSocket for real-time status
-    wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+    // WebSocket for real-time status. Origin allowlist is enforced at
+    // the upgrade handshake — without this, ANY page the user visits
+    // (attacker.com in another tab) can open `ws://localhost:17899/ws`
+    // and silently subscribe to filesystem watcher events + sync ticks
+    // (= a low-rate side-channel disclosing what files the user is
+    // touching, in realtime). The HTTP CORS layer doesn't apply to
+    // WebSockets — only the Origin header arrives, and we have to gate
+    // on it ourselves. Returning false from `verifyClient` cleanly
+    // rejects the upgrade with 401.
+    wss = new WebSocketServer({
+        server: httpServer,
+        path: "/ws",
+        verifyClient: (info, cb) => {
+            const origin = info.req.headers.origin as string | undefined;
+            if (!isAllowedOrigin(origin)) return cb(false, 401, "origin not allowed");
+            cb(true);
+        },
+    });
     wss.on("connection", (ws) => {
         wsClients.add(ws);
         ws.send(JSON.stringify({ type: "connected", hostname: os.hostname() }));
@@ -1051,6 +1106,20 @@ export async function startServer(): Promise<void> {
     // web app can react in realtime (in addition to the polling endpoint).
     watcherBus.on("event", (ev) => {
         const msg = JSON.stringify({ type: "watch:event", event: ev });
+        for (const c of wsClients) if (c.readyState === WebSocket.OPEN) c.send(msg);
+    });
+
+    // Bridge cloud-sync apply ticks onto the same fan-out. Web clients
+    // listening on /ws can refresh affected queries without polling —
+    // far cheaper than a 30s poll cadence and noticeably snappier across
+    // devices. Payload includes the entity set so React Query / SWR can
+    // invalidate selectively.
+    setOnAppliedListener((entities) => {
+        const msg = JSON.stringify({
+            type: "sync:applied",
+            entities: Array.from(entities),
+            timestamp: Date.now(),
+        });
         for (const c of wsClients) if (c.readyState === WebSocket.OPEN) c.send(msg);
     });
 

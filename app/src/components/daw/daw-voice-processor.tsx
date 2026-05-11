@@ -257,7 +257,13 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
 
     // FX Chain
     const [chain, setChain] = useState<FxInsert[]>([]);
-    const [presets, setPresets] = useState<FxPreset[]>([]);
+    const [presets, setPresets] = useState<FxPreset[]>(() => {
+        // Lazy init from localStorage — the engine's loader handles
+        // missing/corrupt JSON. SSR guard: presets are user-scoped and
+        // not visible until hydration anyway.
+        if (typeof window === "undefined") return [];
+        return AudioFxEngine.loadPresets();
+    });
     const [selectedPreset, setSelectedPreset] = useState<string>("");
     const [showPresetMenu, setShowPresetMenu] = useState(false);
     const [showAddFx, setShowAddFx] = useState(false);
@@ -306,19 +312,27 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
     const selectedScaleRef = useRef(1);
     const meterRef = useRef(meter);
     const lastRecTimeRef = useRef(0);
-    selectedKeyRef.current = selectedKey;
-    selectedScaleRef.current = selectedScale;
-    meterRef.current = meter;
     const noteNotationsRef = useRef(noteNotations);
-    noteNotationsRef.current = noteNotations;
+    // Mirror render state into refs *after* commit so the rAF loop
+    // (and the remote bridge below) always reads a stable, post-render
+    // snapshot. Writing to a ref synchronously during render makes the
+    // bridge handed to consumers reflect a half-rendered tree.
+    useEffect(() => {
+        selectedKeyRef.current = selectedKey;
+        selectedScaleRef.current = selectedScale;
+        meterRef.current = meter;
+        noteNotationsRef.current = noteNotations;
+    });
 
     // Auto-correct refs (for the rAF loop, which can't depend on render-time
-    // state without re-subscribing every frame).
+    // state without re-subscribing every frame). Mirrored post-commit.
     const autoCorrectOnRef = useRef(false);
     const autoCorrectSpeedRef = useRef(0.05);
     const autotuneInsertIdRef = useRef<string | null>(null);
-    autoCorrectOnRef.current = autoCorrectOn;
-    autoCorrectSpeedRef.current = autoCorrectSpeed;
+    useEffect(() => {
+        autoCorrectOnRef.current = autoCorrectOn;
+        autoCorrectSpeedRef.current = autoCorrectSpeed;
+    });
 
     // ─── Init Engine ─────────────────────────────────────────────────
 
@@ -331,9 +345,6 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
         } else if (monitorEnabled) {
             engine.output.connect(engine.audioContext.destination);
         }
-
-        // Load presets
-        setPresets(AudioFxEngine.loadPresets());
 
         // Enumerate devices
         engine.enumerateInputDevices().then(setInputDevices).catch(() => { });
@@ -498,9 +509,10 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
                 ));
             }
 
-            // Draw waveform canvas
-            drawWaveform(data.waveform);
-            drawSpectrum(data.spectrum);
+            // Draw waveform canvas (read via refs to avoid forward references
+            // from React Compiler's perspective \u2014 these callbacks are stable).
+            drawWaveformRef.current?.(data.waveform);
+            drawSpectrumRef.current?.(data.spectrum);
 
             rafRef.current = requestAnimationFrame(loop);
         };
@@ -509,6 +521,10 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
     }, [isActive]);
 
     // ─── Drawing ─────────────────────────────────────────────────────
+    // Refs to expose the draw callbacks to the metering loop above
+    // without forward-referencing them at the source-code level.
+    const drawWaveformRef = useRef<((w: Float32Array) => void) | null>(null);
+    const drawSpectrumRef = useRef<((s: Float32Array) => void) | null>(null);
 
     const drawWaveform = useCallback((waveform: Float32Array) => {
         const canvas = canvasRef.current;
@@ -593,6 +609,18 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
             }
         }
     }, []);
+
+    // Wire the draw callbacks into the refs the metering loop uses.
+    // No deps array \u2014 runs after every commit so the refs always point at
+    // the latest stable callback identity. Suppress the immutability rule
+    // because the whole point of these refs is to be a mutable bridge from
+    // the React tree into the rAF loop that lives outside it.
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/immutability
+        drawWaveformRef.current = drawWaveform;
+        // eslint-disable-next-line react-hooks/immutability
+        drawSpectrumRef.current = drawSpectrum;
+    });
 
     // ─── Actions ─────────────────────────────────────────────────────
 
@@ -818,13 +846,17 @@ export function VoiceProcessor({ className, destinationNode, audioContext, compa
 
     const daw = useDAW();
     const chainRef = useRef(chain);
-    chainRef.current = chain;
     const isActiveRef = useRef(isActive);
-    isActiveRef.current = isActive;
     const inputGainRef = useRef(inputGain);
-    inputGainRef.current = inputGain;
     const outputGainRef = useRef(outputGain);
-    outputGainRef.current = outputGain;
+    // Mirror render state into refs *after* commit — see top-of-component
+    // note about why we don't write refs during render.
+    useEffect(() => {
+        chainRef.current = chain;
+        isActiveRef.current = isActive;
+        inputGainRef.current = inputGain;
+        outputGainRef.current = outputGain;
+    });
 
     useEffect(() => {
         const bridge: VPBridge = {

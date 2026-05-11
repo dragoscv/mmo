@@ -22,6 +22,10 @@ export async function GET(request: NextRequest) {
     if (!peerId) {
         return new Response("Missing peerId", { status: 400 });
     }
+    // Bound the client-supplied id: it ends up as a Map key + log field.
+    if (peerId.length > 128 || !/^[A-Za-z0-9._-]+$/.test(peerId)) {
+        return new Response("Invalid peerId", { status: 400 });
+    }
 
     const userId = session.user.id;
 
@@ -40,7 +44,7 @@ export async function GET(request: NextRequest) {
             controller.enqueue(encoder.encode(`: connected\n\n`));
         },
         cancel() {
-            relay.remove(peerId);
+            relay.remove(userId, peerId);
         },
     });
 

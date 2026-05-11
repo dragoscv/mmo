@@ -98,6 +98,16 @@ export function createPluginsRouter(authMiddleware: express.RequestHandler) {
     router.post("/describe", async (req, res) => {
         const body = (req.body ?? {}) as { path?: string };
         if (!body.path) { res.status(400).json({ error: "path required" }); return; }
+        // Defence: only describe plugins already in the inventory. A
+        // raw `path` here could otherwise be coerced into loading any
+        // .vst3 / .so / .dll on disk — VST3 plugins are arbitrary
+        // native code, so this is an RCE primitive if the device
+        // token leaks. The user-facing scan flow always populates the
+        // cache before describe is reachable from the UI.
+        if (!pluginHost.isKnownPluginPath(body.path)) {
+            res.status(403).json({ error: "plugin not in cached inventory; run a scan first" });
+            return;
+        }
         try {
             const data = await pluginHost.describe(body.path);
             res.json(data);
@@ -112,6 +122,20 @@ export function createPluginsRouter(authMiddleware: express.RequestHandler) {
         const body = (req.body ?? {}) as { input?: string; chain?: PluginChainStep[] };
         if (!body.input) { res.status(400).json({ error: "input required" }); return; }
         if (!Array.isArray(body.chain)) { res.status(400).json({ error: "chain required" }); return; }
+        // Same allowlist guard as /describe — every chain step's plugin
+        // path must already be in the inventory. Otherwise an attacker
+        // who has a device token could load an arbitrary native plugin
+        // (RCE).
+        for (const step of body.chain) {
+            if (typeof step?.path !== "string" || !step.path) {
+                res.status(400).json({ error: "each chain step needs a path" });
+                return;
+            }
+            if (!pluginHost.isKnownPluginPath(step.path)) {
+                res.status(403).json({ error: `chain plugin not in cached inventory: ${step.path}` });
+                return;
+            }
+        }
         try {
             const job = await pluginHost.render(body.input, body.chain);
             res.json({ id: job.id, stage: job.stage });

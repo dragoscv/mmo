@@ -96,6 +96,10 @@ export function RemoteProvider({ page, children }: RemoteProviderProps) {
     const [snapshot, setSnapshot] = useState<StateSnapshot | null>(null);
     const [latency, setLatency] = useState(0);
     const [peerId, setPeerId] = useState("");
+    // Mirrors `engineRef.current !== null` as state so consumers can derive
+    // `isActive` without reading the ref during render. Set inside the
+    // mount/unmount effect below.
+    const [engineReady, setEngineReady] = useState(false);
     const commandHandlersRef = useRef(new Set<CommandHandler>());
     const signalHandlersRef = useRef(new Set<SignalHandler>());
 
@@ -103,7 +107,11 @@ export function RemoteProvider({ page, children }: RemoteProviderProps) {
     useEffect(() => {
         const engine = new RemoteSyncEngine(page);
         engineRef.current = engine;
+        // Bridging a non-React subsystem (the sync engine) into React
+        // state. Both setStates land in the same render via batching.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setPeerId(engine.peerId);
+        setEngineReady(true);
 
         const unsub = engine.onMessage((msg: SyncMessage) => {
             switch (msg.type) {
@@ -147,12 +155,19 @@ export function RemoteProvider({ page, children }: RemoteProviderProps) {
             unsub();
             engine.destroy();
             engineRef.current = null;
+            setEngineReady(false);
         };
     }, [page]);
 
-    // Track connectedPeerId in a ref for the message handler
+    // Track connectedPeerId in a ref for the message handler.
+    // Mirrored *after* commit so the React Compiler doesn't see a write
+    // during render. The handler always reads the latest value a tick
+    // later anyway, so post-commit timing is correct.
     const connectedPeerIdRef = useRef(connectedPeerId);
-    connectedPeerIdRef.current = connectedPeerId;
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/immutability
+        connectedPeerIdRef.current = connectedPeerId;
+    });
 
     // Update page if it changes
     useEffect(() => {
@@ -206,7 +221,7 @@ export function RemoteProvider({ page, children }: RemoteProviderProps) {
         connectedPeerId,
         snapshot,
         latency,
-        isActive: !!engineRef.current,
+        isActive: engineReady,
         connectToPeer,
         disconnect,
         sendCommand,
@@ -214,7 +229,7 @@ export function RemoteProvider({ page, children }: RemoteProviderProps) {
         onCommand,
         sendSignal,
         onSignal,
-    }), [peerId, peers, connectedPeerId, snapshot, latency, connectToPeer, disconnect, sendCommand, broadcastState, onCommand, sendSignal, onSignal]);
+    }), [peerId, peers, connectedPeerId, snapshot, latency, engineReady, connectToPeer, disconnect, sendCommand, broadcastState, onCommand, sendSignal, onSignal]);
 
     return (
         <RemoteContext.Provider value={value}>

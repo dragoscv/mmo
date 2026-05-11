@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef, type ReactNode } from "react";
+import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRenderCount } from "@/lib/dev-debugger";
+import { useSyncRefresh } from "@/hooks/use-sync-refresh";
 import {
     Music,
     CheckCircle,
@@ -23,16 +26,31 @@ import {
     TrendingUp,
     HardDrive,
 } from "lucide-react";
-import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    Tooltip,
-    ResponsiveContainer,
-    Cell,
-    CartesianGrid,
-} from "recharts";
+// Recharts (~90 KB gzipped) is split into a separate chunk so it loads
+// in parallel with the dashboard's data instead of blocking initial JS.
+// `ssr: false` is correct: charts render only after stats arrive client-
+// side, and they have empty-state fallbacks so a brief skeleton is fine.
+const ChartLoader = () => (
+    <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground/40">
+        <BarChart3 className="h-6 w-6 animate-pulse" />
+    </div>
+);
+const GenreDistribution = dynamic(
+    () => import("./dashboard-charts").then((m) => m.GenreDistribution),
+    { ssr: false, loading: ChartLoader },
+);
+const EnergyDistribution = dynamic(
+    () => import("./dashboard-charts").then((m) => m.EnergyDistribution),
+    { ssr: false, loading: ChartLoader },
+);
+const BpmDistribution = dynamic(
+    () => import("./dashboard-charts").then((m) => m.BpmDistribution),
+    { ssr: false, loading: ChartLoader },
+);
+const KeyDistribution = dynamic(
+    () => import("./dashboard-charts").then((m) => m.KeyDistribution),
+    { ssr: false, loading: ChartLoader },
+);
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Artwork } from "@/components/artwork";
@@ -59,19 +77,8 @@ interface DashboardClientProps {
 }
 
 // ── Constants ────────────────────────────────────────────────────
-
-const CHART_COLORS = [
-    "#8b5cf6", "#22c55e", "#3b82f6", "#ef4444", "#eab308",
-    "#f97316", "#06b6d4", "#ec4899", "#14b8a6", "#a855f7",
-    "#6366f1", "#10b981", "#f43f5e", "#84cc16",
-];
-
-const ENERGY_HEX: Record<number, string> = {
-    1: "#3b82f6", 2: "#06b6d4", 3: "#22c55e", 4: "#84cc16", 5: "#eab308",
-    6: "#f97316", 7: "#ef4444", 8: "#dc2626", 9: "#db2777", 10: "#e11d48",
-};
-
-const BPM_GRADIENT = ["#8b5cf6", "#6366f1", "#3b82f6", "#06b6d4", "#22c55e", "#eab308", "#ef4444"];
+// CHART_COLORS / ENERGY_HEX / BPM_GRADIENT / TOOLTIP_STYLE moved into
+// dashboard-charts.tsx along with the chart components themselves.
 
 const STAT_THEMES = {
     purple: {
@@ -112,15 +119,6 @@ const STAT_THEMES = {
     },
 } as const;
 
-const TOOLTIP_STYLE = {
-    contentStyle: {
-        background: "var(--card)",
-        border: "1px solid var(--border)",
-        borderRadius: "8px",
-        color: "var(--foreground)",
-        fontSize: "12px",
-    },
-};
 
 // ── Hooks ────────────────────────────────────────────────────────
 
@@ -269,98 +267,8 @@ function ChartCard({ children, className }: { children: ReactNode; className?: s
 }
 
 // ── Chart sections ───────────────────────────────────────────────
-
-function GenreDistribution({ data }: { data: DashboardStats["genreStats"] }) {
-    if (data.length === 0) return <EmptyChart message="No genre data yet" />;
-    return (
-        <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={data.slice(0, 10)} layout="vertical" margin={{ left: 10, right: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                <XAxis type="number" stroke="var(--muted-foreground)" fontSize={12} />
-                <YAxis type="category" dataKey="genre" width={100} stroke="var(--muted-foreground)" fontSize={12} />
-                <Tooltip {...TOOLTIP_STYLE} />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]} animationDuration={1200} animationBegin={300}>
-                    {data.slice(0, 10).map((_, i) => (
-                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                    ))}
-                </Bar>
-            </BarChart>
-        </ResponsiveContainer>
-    );
-}
-
-function EnergyDistribution({ data }: { data: DashboardStats["energyStats"] }) {
-    if (data.length === 0) return <EmptyChart message="No energy data yet" />;
-    const padded = Array.from({ length: 10 }, (_, i) => {
-        const found = data.find((d) => d.energy === i + 1);
-        return { energy: i + 1, label: `${i + 1}`, count: found?.count ?? 0 };
-    });
-    return (
-        <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={padded} margin={{ left: -10, right: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={12} />
-                <Tooltip {...TOOLTIP_STYLE} labelFormatter={(l) => `Energy ${l}`} />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]} animationDuration={1200} animationBegin={500}>
-                    {padded.map((d) => (
-                        <Cell key={d.energy} fill={ENERGY_HEX[d.energy] || "#8b5cf6"} />
-                    ))}
-                </Bar>
-            </BarChart>
-        </ResponsiveContainer>
-    );
-}
-
-function BpmDistribution({ data }: { data: DashboardStats["bpmRanges"] }) {
-    if (data.length === 0) return <EmptyChart message="No BPM data yet" />;
-    return (
-        <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={data} margin={{ left: -10, right: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="range" stroke="var(--muted-foreground)" fontSize={12} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={12} />
-                <Tooltip {...TOOLTIP_STYLE} />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]} animationDuration={1200} animationBegin={700}>
-                    {data.map((_, i) => (
-                        <Cell key={i} fill={BPM_GRADIENT[i % BPM_GRADIENT.length]} />
-                    ))}
-                </Bar>
-            </BarChart>
-        </ResponsiveContainer>
-    );
-}
-
-function KeyDistribution({ data }: { data: DashboardStats["keyStats"] }) {
-    if (data.length === 0) return <EmptyChart message="No key data yet" />;
-    return (
-        <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={data.slice(0, 12)} layout="vertical" margin={{ left: 5, right: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                <XAxis type="number" stroke="var(--muted-foreground)" fontSize={12} />
-                <YAxis type="category" dataKey="key" width={50} stroke="var(--muted-foreground)" fontSize={12} />
-                <Tooltip {...TOOLTIP_STYLE} />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]} animationDuration={1200} animationBegin={700}>
-                    {data.slice(0, 12).map((_, i) => (
-                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                    ))}
-                </Bar>
-            </BarChart>
-        </ResponsiveContainer>
-    );
-}
-
-function EmptyChart({ message }: { message: string }) {
-    return (
-        <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
-            <div className="text-center">
-                <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                <p>{message}</p>
-                <p className="text-xs mt-1 opacity-70">Scan & analyze tracks to populate</p>
-            </div>
-        </div>
-    );
-}
+// Moved to ./dashboard-charts.tsx and dynamically imported above to
+// keep recharts out of the initial bundle.
 
 // ── Library Health ───────────────────────────────────────────────
 
@@ -373,12 +281,13 @@ function LibraryHealth({ health }: { health: DashboardStats["health"] }) {
         { label: "Artwork", icon: <ImageOff className="h-4 w-4" />, missing: health.missingArtwork, color: "bg-rose-500" },
     ];
     const total = health.total;
+    const t = useTranslations("dashboard.empty");
     if (total === 0) {
         return (
             <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
                 <div className="text-center">
                     <Shield className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                    <p>No tracks to check</p>
+                    <p>{t("noTracksToCheck")}</p>
                 </div>
             </div>
         );
@@ -417,12 +326,13 @@ function LibraryHealth({ health }: { health: DashboardStats["health"] }) {
 
 function RecentTracks({ tracks }: { tracks: DashboardStats["recentTracks"] }) {
     const { noteNotations } = useDAWSettings();
+    const t = useTranslations("dashboard.empty");
     if (tracks.length === 0) {
         return (
             <div className="flex h-[140px] items-center justify-center text-sm text-muted-foreground">
                 <div className="text-center">
                     <Music className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                    <p>No tracks yet</p>
+                    <p>{t("noTracksYet")}</p>
                 </div>
             </div>
         );
@@ -454,13 +364,14 @@ function RecentTracks({ tracks }: { tracks: DashboardStats["recentTracks"] }) {
 // ── Top Rated ────────────────────────────────────────────────────
 
 function TopRated({ tracks }: { tracks: DashboardStats["topRated"] }) {
+    const t = useTranslations("dashboard.empty");
     if (tracks.length === 0) {
         return (
             <div className="flex h-[120px] items-center justify-center text-sm text-muted-foreground">
                 <div className="text-center">
                     <Star className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                    <p>No rated tracks yet</p>
-                    <p className="text-xs mt-1 opacity-70">Rate tracks 4-5 stars to see them here</p>
+                    <p>{t("noRatedTracks")}</p>
+                    <p className="text-xs mt-1 opacity-70">{t("rateToSeeHere")}</p>
                 </div>
             </div>
         );
@@ -492,6 +403,7 @@ function TopRated({ tracks }: { tracks: DashboardStats["topRated"] }) {
 // ── Compact Recommendations ──────────────────────────────────────
 
 function CompactRecommendations({ categories }: { categories: RecommendedCategory[] }) {
+    const t = useTranslations("dashboard.recommendations");
     const totalPlaylists = categories.reduce((a, c) => a + c.totalCount, 0);
     const existingCount = categories.reduce((a, c) => a + c.existingCount, 0);
     const missingCount = totalPlaylists - existingCount;
@@ -502,8 +414,8 @@ function CompactRecommendations({ categories }: { categories: RecommendedCategor
             <div className="flex items-center gap-3 rounded-lg border border-green-500/20 bg-green-500/5 p-4">
                 <CheckCircle className="h-5 w-5 text-green-400 shrink-0" />
                 <div>
-                    <p className="text-sm font-medium text-green-400">All recommended playlists created</p>
-                    <p className="text-xs text-muted-foreground">You have all {totalPlaylists} recommended playlists</p>
+                    <p className="text-sm font-medium text-green-400">{t("allCreated")}</p>
+                    <p className="text-xs text-muted-foreground">{t("haveAll", { total: totalPlaylists })}</p>
                 </div>
             </div>
         );
@@ -514,7 +426,7 @@ function CompactRecommendations({ categories }: { categories: RecommendedCategor
             {/* Progress bar */}
             <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Playlist setup progress</span>
+                    <span className="text-muted-foreground">{t("setupProgress")}</span>
                     <span className="tabular-nums font-medium">{existingCount}/{totalPlaylists}</span>
                 </div>
                 <div className="h-2.5 rounded-full bg-muted overflow-hidden">
@@ -555,7 +467,7 @@ function CompactRecommendations({ categories }: { categories: RecommendedCategor
             <Link href="/playlists">
                 <Button variant="outline" size="sm" className="gap-2 hover:border-purple-500/30 hover:text-purple-400">
                     <Sparkles className="h-4 w-4" />
-                    Create {missingCount} missing playlists
+                    {t("createMissing", { count: missingCount })}
                     <ArrowRight className="h-3 w-3" />
                 </Button>
             </Link>
@@ -566,8 +478,9 @@ function CompactRecommendations({ categories }: { categories: RecommendedCategor
 // ── Recent Activity ──────────────────────────────────────────────
 
 function RecentActivity({ scans }: { scans: ScanLog[] }) {
+    const t = useTranslations("dashboard.empty");
     if (scans.length === 0) {
-        return <p className="text-sm text-muted-foreground py-4">No recent activity.</p>;
+        return <p className="text-sm text-muted-foreground py-4">{t("noRecentActivity")}</p>;
     }
 
     const actionColors: Record<string, string> = {
@@ -638,6 +551,7 @@ function formatTotalDuration(seconds: number) {
 
 export function DashboardClient({ stats, recommendedCategories, recentScans }: DashboardClientProps) {
     useRenderCount("Page:/");
+    useSyncRefresh();
     const greeting = getGreeting();
 
     return (

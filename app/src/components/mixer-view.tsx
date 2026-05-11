@@ -825,7 +825,7 @@ const DeckStemsPanel = memo(function DeckStemsPanel({
     const isActive = processor?.isActive ?? false;
     const configs = processor?.configs ?? createDefaultStemConfigs();
     const configsRef = useRef(configs);
-    configsRef.current = configs;
+    useEffect(() => { configsRef.current = configs; });
 
     // Animate levels when active. We deliberately avoid `setState` here —
     // every frame we'd otherwise re-render the entire panel, capping the
@@ -1932,7 +1932,7 @@ export function MixerView() {
                     const divisor = action === "jog-vinyl" ? 3 : 6;
                     const intensity = (delta / divisor) * sensitivity;
                     if (process.env.NODE_ENV !== "production") {
-                        // eslint-disable-next-line no-console
+                         
                         console.debug(`[jog] ${action} deck=${deck} raw=${jogValue} delta=${delta} → intensity=${intensity.toFixed(3)}`);
                     }
                     mixer.nudge(deck, intensity);
@@ -2168,8 +2168,9 @@ export function MixerView() {
                 // wire a slip-reverse helper into DeckEngine.
                 break;
             case "slip-mode":
-                // Reserved: no FLX4 hardware mapping today and the mixer
-                // engine does not yet expose a slip-mode setter. No-op.
+                // FLX4 SLIP button → flip per-deck slip state. Mixer engine
+                // already honours this in transport calls (cue/play/loop).
+                if (deck && isPress) mixer.toggleSlipMode(deck);
                 break;
 
             // ── Sampler ──────────────────────────────────────────

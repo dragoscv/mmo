@@ -12,11 +12,31 @@ export async function GET(request: NextRequest) {
     const state = params.get("state") || "";
     const callbackUrl = params.get("callbackUrl") || "";
     const isAuthenticated = !!session?.user?.id;
+    // Confirmation step: device tokens are only issued when the signed-in
+    // user explicitly clicks "Authorize" on this page. Without this gate,
+    // any link to /api/companion-auth?callbackUrl=http://localhost:PORT...
+    // would silently mint a token and POST it to the local callback,
+    // letting any local listener (or any local CSRF-style attacker) walk
+    // off with a long-lived device token bound to the signed-in user.
+    const confirmed = params.get("confirm") === "1";
 
     // Security: validate callbackUrl is localhost only
     const isLocalCallback =
         callbackUrl.startsWith("http://localhost:") ||
         callbackUrl.startsWith("http://127.0.0.1:");
+
+    // XSS hardening: JSON.stringify by itself does NOT escape `<`, so a
+    // crafted query param like `apiUrl=]}</script><script>...` could
+    // break out of the inline <script> below. Apply the canonical
+    // escape for embedding JSON in HTML (<, >, &, U+2028, U+2029) so
+    // every dynamic value below is safe regardless of caller intent.
+    const safeJson = (v: unknown) =>
+        JSON.stringify(v)
+            .replace(/</g, "\\u003c")
+            .replace(/>/g, "\\u003e")
+            .replace(/&/g, "\\u0026")
+            .replace(/\u2028/g, "\\u2028")
+            .replace(/\u2029/g, "\\u2029");
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -56,10 +76,17 @@ export async function GET(request: NextRequest) {
     </div>
     <script>
         var AUTH = ${isAuthenticated};
-        var REG = ${JSON.stringify({ hostname, os, port: Number(port), apiUrl })};
-        var STATE = ${JSON.stringify(state)};
-        var CALLBACK = ${JSON.stringify(isLocalCallback ? callbackUrl : "")};
-        var WEB_APP_URL = ${JSON.stringify(request.nextUrl.origin)};
+        var CONFIRMED = ${confirmed};
+        var REG = ${safeJson({ hostname, os, port: Number(port), apiUrl })};
+        var STATE = ${safeJson(state)};
+        var CALLBACK = ${safeJson(isLocalCallback ? callbackUrl : "")};
+        var WEB_APP_URL = ${safeJson(request.nextUrl.origin)};
+
+        function escHtml(s) {
+            return String(s == null ? "" : s).replace(/[&<>"']/g, function(c) {
+                return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+            });
+        }
 
         (async function() {
             var root = document.getElementById("root");
@@ -79,8 +106,37 @@ export async function GET(request: NextRequest) {
                     document.body.appendChild(form);
                     form.submit();
                 } catch (e) {
-                    root.innerHTML = '<div class="icon">\\u2717</div><h2 class="error">Auth Failed</h2><p>' + e.message + '</p>';
+                    root.innerHTML = '<div class="icon">\\u2717</div><h2 class="error">Auth Failed</h2><p>' + escHtml(e.message) + '</p>';
                 }
+                return;
+            }
+
+            if (!CONFIRMED) {
+                // Device-name guess for the prompt; matches server-side fallback.
+                var prettyOs = REG.os === "win32" ? "Windows" : REG.os === "darwin" ? "macOS" : REG.os === "linux" ? "Linux" : (REG.os || "unknown OS");
+                var prettyName = REG.hostname && REG.hostname !== "unknown" ? REG.hostname : prettyOs + " device";
+                root.innerHTML =
+                    '<div class="icon">\\u{1F511}</div>' +
+                    '<h2>Authorize this device?</h2>' +
+                    '<p style="margin-top:10px">A companion app is asking to sign in as you and sync your library.</p>' +
+                    '<div style="margin:18px 0;padding:14px;background:#171717;border:1px solid #262626;border-radius:8px;text-align:left;font-size:12px;line-height:1.6">' +
+                        '<div><span style="color:#71717a">Device:</span> <span class="name">' + escHtml(prettyName) + '</span></div>' +
+                        '<div><span style="color:#71717a">OS:</span> ' + escHtml(prettyOs) + '</div>' +
+                        '<div><span style="color:#71717a">Local URL:</span> <code style="font-size:11px">' + escHtml(REG.apiUrl) + '</code></div>' +
+                    '</div>' +
+                    '<div style="display:flex;gap:8px;justify-content:center">' +
+                        '<button id="cancelBtn" style="padding:9px 18px;background:#262626;color:#fafafa;border:0;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button>' +
+                        '<button id="okBtn" style="padding:9px 18px;background:#a855f7;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">Authorize</button>' +
+                    '</div>' +
+                    '<p style="margin-top:14px;font-size:11px;color:#52525b">Only authorize devices you recognize. The companion will receive a token that can read and write your library.</p>';
+                document.getElementById("cancelBtn").addEventListener("click", function() {
+                    root.innerHTML = '<div class="icon">\\u2717</div><h2>Cancelled</h2><p>You can close this tab.</p>';
+                });
+                document.getElementById("okBtn").addEventListener("click", function() {
+                    var u = new URL(window.location.href);
+                    u.searchParams.set("confirm", "1");
+                    window.location.replace(u.toString());
+                });
                 return;
             }
 
@@ -112,11 +168,11 @@ export async function GET(request: NextRequest) {
                     root.innerHTML =
                         '<div class="icon success">\\u2713</div>' +
                         '<h2>Connected!</h2>' +
-                        '<p>Signed in as <span class="name">' + (data.userName || data.userEmail || "user") + '</span></p>' +
+                        '<p>Signed in as <span class="name">' + escHtml(data.userName || data.userEmail || "user") + '</span></p>' +
                         '<p style="margin-top:12px;font-size:11px;color:#3f3f46">You can close this tab.</p>';
                 }
             } catch (e) {
-                root.innerHTML = '<div class="icon">\\u2717</div><h2 class="error">Registration Failed</h2><p>' + e.message + '</p>';
+                root.innerHTML = '<div class="icon">\\u2717</div><h2 class="error">Registration Failed</h2><p>' + escHtml(e.message) + '</p>';
             }
         })();
     </script>
@@ -124,6 +180,16 @@ export async function GET(request: NextRequest) {
 </html>`;
 
     return new NextResponse(html, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
+        headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            // Defence in depth: page mints credentials, so block embedding
+            // (clickjack on Authorize button) and stop the local-callback URL
+            // (which carries the token in the query string) from leaking via
+            // the Referer header to anything the local app subsequently loads.
+            "X-Frame-Options": "DENY",
+            "Content-Security-Policy": "frame-ancestors 'none'",
+            "Referrer-Policy": "no-referrer",
+            "Cache-Control": "no-store",
+        },
     });
 }

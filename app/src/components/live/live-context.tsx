@@ -57,8 +57,9 @@ export interface LiveContextValue extends LiveEngineState {
     voiceChain: FxInsert[];
     voiceInputGain: number;
     voiceOutputGain: number;
-    voicePeakL: number;
-    voicePeakR: number;
+    // Note: voicePeakL/R were removed from the context — they pushed
+    // re-renders on every meter tick. Subscribe to `liveMetersStore`
+    // instead for high-frequency peak data.
 
     // Master
     setMasterVolume: (v: number) => void;
@@ -179,6 +180,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
             const savedChain = localStorage.getItem(VOICE_CHAIN_STORAGE_KEY);
             if (savedChain) {
                 const parsed = JSON.parse(savedChain) as FxInsert[];
+                // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only browser hydration
                 setVoiceChain(parsed);
                 engine.voice.setChain(parsed);
             }
@@ -527,6 +529,12 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         },
     });
 
+    // engineRef holds the LiveEngine across the lifetime of this provider.
+    // Reading `.current` here at render time is intentional — the engine is a
+    // long-lived audio object that *must not* trigger re-renders when it
+    // changes shape (it never does after init). State mutations are surfaced
+    // through `stateTick` from a separate subscribe-on-mount effect.
+    /* eslint-disable react-hooks/refs -- engine/state are intentionally ref-managed; see comment above */
     const engine = engineRef.current;
     const state = engine?.state;
 
@@ -545,8 +553,6 @@ export function LiveProvider({ children }: { children: ReactNode }) {
             voiceChain,
             voiceInputGain,
             voiceOutputGain,
-            voicePeakL: voicePeaksRef.current.peakL,
-            voicePeakR: voicePeaksRef.current.peakR,
             ...state,
             setMasterVolume, setMonitorVolume,
             setTempo, setKey, setScale, tapBpm,
@@ -570,6 +576,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         stream,
         // Action callbacks are all useCallback'd with stable deps and don't need to be listed here.
     ]);
+    // (eslint-enable for react-hooks/refs lives at the end of the function —
+    //  the JSX below also reads engine-derived values and must stay disabled.)
 
     return (
         <LiveContextRef.Provider value={value}>
@@ -580,4 +588,5 @@ export function LiveProvider({ children }: { children: ReactNode }) {
             )}
         </LiveContextRef.Provider>
     );
+    /* eslint-enable react-hooks/refs */
 }

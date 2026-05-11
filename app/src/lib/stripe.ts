@@ -63,7 +63,14 @@ export async function getSubscription(userId: string): Promise<SubscriptionState
         where: eq(subscriptions.userId, userId),
     });
     if (!row) return FREE_STATE;
-    const isPro = row.plan !== "free" && (row.status === "active" || row.status === "trialing");
+    // Honour the grace period during a failed-payment retry cycle.
+    // Stripe transitions to `past_due` while it retries the card (typically
+    // 3–4 attempts over ~3 weeks). Bouncing the user out of Pro on the
+    // first decline is hostile UX and a known revenue-loss anti-pattern;
+    // their access stays until Stripe gives up and emits `unpaid` /
+    // `canceled`.
+    const PRO_STATUSES = new Set(["active", "trialing", "past_due"]);
+    const isPro = row.plan !== "free" && PRO_STATUSES.has(row.status);
     return {
         plan: row.plan as Plan,
         status: row.status,

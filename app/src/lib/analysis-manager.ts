@@ -359,12 +359,34 @@ function previewValue(field: string, value: string): string {
     return value;
 }
 
-// HMR-safe singleton: hang off globalThis so Next.js dev reload doesn't
-// spawn a second manager (which would race for the SSE subscribers).
-const GLOBAL_KEY = Symbol.for("mmo.analysis-manager");
-type GlobalWithManager = typeof globalThis & {
-    [k: symbol]: AnalysisManager | undefined;
-};
-const g = globalThis as GlobalWithManager;
-if (!g[GLOBAL_KEY]) g[GLOBAL_KEY] = new AnalysisManager();
-export const analysisManager: AnalysisManager = g[GLOBAL_KEY] as AnalysisManager;
+// HMR-safe per-user manager registry: hang a Map<userId, AnalysisManager>
+// off globalThis so Next.js dev reload doesn't spawn a second registry
+// (which would race for the SSE subscribers).
+//
+// Why a per-user map instead of a single shared singleton: the manager
+// holds an in-memory queue of pending changes and an SSE subscriber set
+// keyed to a *specific user's library*. A process-global singleton meant
+// `/api/analysis/stream` leaked one user's track titles + lyrics to any
+// other authenticated viewer, `/api/analysis/control` let any user
+// pause/stop/reset another user's running job, and `/api/analysis/apply`
+// let any user commit another user's pending change ids through their
+// own companion link. Per-user managers close all three: a snapshot
+// belongs to exactly one user and never reaches anyone else's request.
+const GLOBAL_KEY = Symbol.for("mmo.analysis-manager.registry");
+type Registry = Map<string, AnalysisManager>;
+type GlobalWithRegistry = typeof globalThis & { [k: symbol]: Registry | undefined };
+const g = globalThis as GlobalWithRegistry;
+if (!g[GLOBAL_KEY]) g[GLOBAL_KEY] = new Map<string, AnalysisManager>();
+const registry = g[GLOBAL_KEY] as Registry;
+
+/** Returns the AnalysisManager scoped to the given user, creating one
+ *  on first access. Routes MUST resolve the userId from `auth()` and
+ *  pass it here — never accept a userId from the client. */
+export function getAnalysisManager(userId: string): AnalysisManager {
+    let mgr = registry.get(userId);
+    if (!mgr) {
+        mgr = new AnalysisManager();
+        registry.set(userId, mgr);
+    }
+    return mgr;
+}

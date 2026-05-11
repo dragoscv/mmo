@@ -71,15 +71,17 @@ function Canvas2DRenderer({
     const player = usePlayer();
     const { getAudioData } = useAudioAnalyzer();
     const playerRef = useRef(player);
-    playerRef.current = player;
     const getAudioDataRef = useRef(getAudioData);
-    getAudioDataRef.current = getAudioData;
     const onFpsUpdateRef = useRef(onFpsUpdate);
-    onFpsUpdateRef.current = onFpsUpdate;
     const showStatsRef = useRef(showStats);
-    showStatsRef.current = showStats;
     const sensitivityRef = useRef(sensitivity);
-    sensitivityRef.current = sensitivity;
+    useEffect(() => {
+        playerRef.current = player;
+        getAudioDataRef.current = getAudioData;
+        onFpsUpdateRef.current = onFpsUpdate;
+        showStatsRef.current = showStats;
+        sensitivityRef.current = sensitivity;
+    });
 
     // Mouse tracking
     const handleMouseMove = useCallback((e: MouseEvent) => {

@@ -1137,15 +1137,49 @@ export class DAWEngine {
 
     /**
      * Offline render the project to an AudioBuffer then encode to the requested format.
-     * Returns a Blob + estimated size info during render via the onProgress callback.
+     *
+     * Supported encodings:
+     * - WAV at 16/24-bit signed PCM or 32-bit float (`bitDepth`).
+     * - MP3 via `@breezystack/lamejs` at the requested kbps (default 192).
+     * - FLAC / OGG fall back to WAV — no encoder is bundled.
+     *
+     * Knobs (all on the optional `options` arg):
+     * - `sampleRate`: render rate in Hz. Defaults to engine context rate.
+     *   The encoder writes whatever rate `OfflineAudioContext` produced.
+     * - `channels`: 1 (mono down-mix as `(L+R)/2`) or 2 (stereo, default).
+     * - `tailSec`: silence appended after the last clip end. Default 1s
+     *   so reverb/delay tails aren't clipped.
+     * - `normalize`: scan the rendered buffer for peak amplitude and apply
+     *   a single linear gain so the loudest sample sits at -0.1 dBFS.
+     *   Cheap (one extra pass) and avoids quantisation distortion on
+     *   16/24-bit exports of low-level material.
+     * - `limitPeak`: when true, applies a `tanh`-based soft clipper before
+     *   bit-depth reduction so any post-normalize residual stays inside
+     *   [-1, 1]. Cheaper than a real lookahead limiter and audibly clean
+     *   for the small overshoots a master bus typically produces.
      */
     async exportProject(
         project: DAWProject,
         format: "wav" | "mp3" | "flac" | "ogg",
-        bitRate: number,
-        onProgress?: (pct: number) => void,
+        options: {
+            bitRate?: number;
+            bitDepth?: 16 | 24 | 32;
+            sampleRate?: number;
+            channels?: 1 | 2;
+            normalize?: boolean;
+            limitPeak?: boolean;
+            tailSec?: number;
+            onProgress?: (pct: number) => void;
+        } = {},
     ): Promise<{ blob: Blob; duration: number }> {
-        const sampleRate = this.ctx.sampleRate;
+        const onProgress = options.onProgress;
+        const targetChannels: 1 | 2 = options.channels ?? 2;
+        const targetSampleRate = options.sampleRate ?? this.ctx.sampleRate;
+        const targetBitDepth: 16 | 24 | 32 = options.bitDepth ?? 16;
+        const tailSec = Math.max(0, options.tailSec ?? 1);
+        const normalize = options.normalize ?? false;
+        const limitPeak = options.limitPeak ?? false;
+
         // Calculate project duration from furthest clip end
         let maxBeat = project.duration || 32;
         for (const track of project.tracks) {
@@ -1154,8 +1188,10 @@ export class DAWEngine {
                 if (end > maxBeat) maxBeat = end;
             }
         }
-        const durationSec = this.beatsToSeconds(maxBeat, project.tempo) + 1; // +1s tail for reverb/delay
-        const offlineCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * durationSec), sampleRate);
+        const durationSec = this.beatsToSeconds(maxBeat, project.tempo) + tailSec;
+        // Always render in stereo so the pan node + master chain match the live
+        // engine; if the user asked for mono, we down-mix after rendering.
+        const offlineCtx = new OfflineAudioContext(2, Math.ceil(targetSampleRate * durationSec), targetSampleRate);
 
         // Create offline master chain
         const offlineMaster = offlineCtx.createGain();
@@ -1204,18 +1240,129 @@ export class DAWEngine {
         if (progressInterval) clearInterval(progressInterval);
         onProgress?.(98);
 
-        // Encode to WAV (native). Other formats would require encoders.
-        const blob = this.audioBufferToWav(renderedBuffer);
+        // ── Post-render shaping ───────────────────────────────────────────
+        const channelData: Float32Array[] = [];
+        const inChannels = renderedBuffer.numberOfChannels;
+        if (targetChannels === 1 && inChannels >= 2) {
+            // Down-mix to mono via simple average of L+R.
+            const len = renderedBuffer.length;
+            const mono = new Float32Array(len);
+            const l = renderedBuffer.getChannelData(0);
+            const r = renderedBuffer.getChannelData(1);
+            for (let i = 0; i < len; i++) mono[i] = (l[i] + r[i]) * 0.5;
+            channelData.push(mono);
+        } else {
+            for (let ch = 0; ch < Math.min(inChannels, targetChannels); ch++) {
+                // Copy so subsequent normalize/limit doesn't mutate the source buffer.
+                channelData.push(new Float32Array(renderedBuffer.getChannelData(ch)));
+            }
+            // Pad to target channel count (mono → stereo by duplicating).
+            while (channelData.length < targetChannels) {
+                channelData.push(new Float32Array(channelData[0]));
+            }
+        }
+
+        if (normalize) {
+            let peak = 0;
+            for (const ch of channelData) {
+                for (let i = 0; i < ch.length; i++) {
+                    const a = Math.abs(ch[i]);
+                    if (a > peak) peak = a;
+                }
+            }
+            // Normalize so the loudest sample lands at -0.1 dBFS (≈ 0.9886).
+            // Skip if the buffer is silent (peak == 0) or already louder than target,
+            // unless user explicitly asked — peak < 1e-6 is treated as silence.
+            if (peak > 1e-6) {
+                const targetPeak = 0.9886;
+                const gain = targetPeak / peak;
+                if (gain !== 1) {
+                    for (const ch of channelData) {
+                        for (let i = 0; i < ch.length; i++) ch[i] *= gain;
+                    }
+                }
+            }
+        }
+
+        if (limitPeak) {
+            // Soft-knee tanh limiter — keeps overshoot under 0 dBFS without
+            // the cost of a true lookahead limiter. Threshold ≈ -0.5 dBFS.
+            const threshold = 0.95;
+            for (const ch of channelData) {
+                for (let i = 0; i < ch.length; i++) {
+                    const x = ch[i];
+                    if (x > threshold) ch[i] = threshold + (1 - threshold) * Math.tanh((x - threshold) / (1 - threshold));
+                    else if (x < -threshold) ch[i] = -threshold + (-1 + threshold) * Math.tanh((x + threshold) / (1 - threshold));
+                }
+            }
+        }
+
+        // Encode to the requested format. MP3 ships via @breezystack/lamejs;
+        // FLAC / OGG still fall back to WAV (no encoder bundled).
+        let blob: Blob;
+        if (format === "mp3") {
+            blob = await this.encodeMp3(channelData, targetSampleRate, options.bitRate ?? 192);
+        } else {
+            blob = this.audioBufferToWav(channelData, targetSampleRate, targetBitDepth);
+        }
         onProgress?.(100);
 
         return { blob, duration: durationSec };
     }
 
-    private audioBufferToWav(buffer: AudioBuffer): Blob {
-        const numChannels = buffer.numberOfChannels;
-        const sampleRate = buffer.sampleRate;
-        const length = buffer.length;
-        const bytesPerSample = 2; // 16-bit
+    /**
+     * MP3 encoder built on `@breezystack/lamejs` (pure-JS fork of lamejs).
+     *
+     * Quantises Float32 to Int16 PCM and feeds 1152-sample frames to the
+     * encoder. We use 1152 because that's the MP3 layer-III granule pair —
+     * any other size triggers internal buffering and slows things down.
+     *
+     * Bitrate is in kbps. Common values: 128 / 192 / 256 / 320. The encoder
+     * accepts 8-320 kbps; we don't validate here because the modal already
+     * exposes a fixed dropdown.
+     */
+    private async encodeMp3(channelData: Float32Array[], sampleRate: number, bitRateKbps: number): Promise<Blob> {
+        const { Mp3Encoder } = await import("@breezystack/lamejs");
+        const channels = channelData.length;
+        const encoder = new Mp3Encoder(channels, sampleRate, bitRateKbps);
+
+        const length = channelData[0]?.length ?? 0;
+        const FRAME = 1152;
+        // Pre-quantise the whole signal so we don't repeat the float→int math
+        // per frame. Negligible memory cost vs encoding time.
+        const left = new Int16Array(length);
+        const right = channels > 1 ? new Int16Array(length) : null;
+        const l = channelData[0];
+        const r = channels > 1 ? channelData[1] : null;
+        for (let i = 0; i < length; i++) {
+            const ls = Math.max(-1, Math.min(1, l[i]));
+            left[i] = Math.round(ls < 0 ? ls * 0x8000 : ls * 0x7FFF);
+            if (right && r) {
+                const rs = Math.max(-1, Math.min(1, r[i]));
+                right[i] = Math.round(rs < 0 ? rs * 0x8000 : rs * 0x7FFF);
+            }
+        }
+
+        const chunks: Uint8Array[] = [];
+        for (let i = 0; i < length; i += FRAME) {
+            const end = Math.min(i + FRAME, length);
+            const lChunk = left.subarray(i, end);
+            const rChunk = right ? right.subarray(i, end) : undefined;
+            const out = rChunk
+                ? encoder.encodeBuffer(lChunk, rChunk)
+                : encoder.encodeBuffer(lChunk);
+            if (out.length) chunks.push(out);
+        }
+        const tail = encoder.flush();
+        if (tail.length) chunks.push(tail);
+        return new Blob(chunks as BlobPart[], { type: "audio/mpeg" });
+    }
+
+    private audioBufferToWav(channelData: Float32Array[], sampleRate: number, bitDepth: 16 | 24 | 32): Blob {
+        const numChannels = channelData.length;
+        const length = channelData[0]?.length ?? 0;
+        const isFloat = bitDepth === 32;
+        const bytesPerSample = bitDepth === 16 ? 2 : bitDepth === 24 ? 3 : 4;
         const blockAlign = numChannels * bytesPerSample;
         const byteRate = sampleRate * blockAlign;
         const dataSize = length * blockAlign;
@@ -1223,7 +1370,6 @@ export class DAWEngine {
         const arrayBuffer = new ArrayBuffer(headerSize + dataSize);
         const view = new DataView(arrayBuffer);
 
-        // WAV header
         const writeString = (offset: number, str: string) => {
             for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
         };
@@ -1231,26 +1377,44 @@ export class DAWEngine {
         view.setUint32(4, 36 + dataSize, true);
         writeString(8, "WAVE");
         writeString(12, "fmt ");
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true); // PCM
+        view.setUint32(16, 16, true);                    // fmt chunk size
+        view.setUint16(20, isFloat ? 3 : 1, true);        // 1 = PCM, 3 = IEEE float
         view.setUint16(22, numChannels, true);
         view.setUint32(24, sampleRate, true);
         view.setUint32(28, byteRate, true);
         view.setUint16(32, blockAlign, true);
-        view.setUint16(34, 16, true); // bits per sample
+        view.setUint16(34, bitDepth, true);
         writeString(36, "data");
         view.setUint32(40, dataSize, true);
 
-        // Interleave channels
-        const channels: Float32Array[] = [];
-        for (let ch = 0; ch < numChannels; ch++) channels.push(buffer.getChannelData(ch));
-
         let offset = headerSize;
-        for (let i = 0; i < length; i++) {
-            for (let ch = 0; ch < numChannels; ch++) {
-                const sample = Math.max(-1, Math.min(1, channels[ch][i]));
-                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-                offset += 2;
+        if (bitDepth === 16) {
+            for (let i = 0; i < length; i++) {
+                for (let ch = 0; ch < numChannels; ch++) {
+                    const s = Math.max(-1, Math.min(1, channelData[ch][i]));
+                    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+                    offset += 2;
+                }
+            }
+        } else if (bitDepth === 24) {
+            for (let i = 0; i < length; i++) {
+                for (let ch = 0; ch < numChannels; ch++) {
+                    const s = Math.max(-1, Math.min(1, channelData[ch][i]));
+                    const v = Math.round(s < 0 ? s * 0x800000 : s * 0x7FFFFF);
+                    // little-endian 24-bit signed
+                    view.setUint8(offset, v & 0xFF);
+                    view.setUint8(offset + 1, (v >> 8) & 0xFF);
+                    view.setUint8(offset + 2, (v >> 16) & 0xFF);
+                    offset += 3;
+                }
+            }
+        } else {
+            // 32-bit float
+            for (let i = 0; i < length; i++) {
+                for (let ch = 0; ch < numChannels; ch++) {
+                    view.setFloat32(offset, channelData[ch][i], true);
+                    offset += 4;
+                }
             }
         }
 
@@ -1538,3 +1702,72 @@ export function deleteProject(id: string) {
     localStorage.setItem(DAW_STORAGE_KEY, JSON.stringify(projects));
     localStorage.removeItem(`mmo-daw-project-${id}`);
 }
+
+// ─── Project file I/O (.mmodaw.json) ────────────────────────────────────
+//
+// Lets users back up / share a project as a single file. Buffers are
+// already stripped on save (see `saveProject`), so the JSON is small
+// and round-trippable. Each clip references its source track by id;
+// re-importing on a different machine will need the user to re-attach
+// the audio, but the timeline + automation + plugin chain survive.
+
+const PROJECT_FILE_VERSION = 1;
+const PROJECT_FILE_EXT = "mmodaw.json";
+
+interface ProjectFileEnvelope {
+    format: "mmodaw";
+    version: number;
+    exportedAt: number;
+    project: DAWProject;
+}
+
+export function exportProjectFile(project: DAWProject): Blob {
+    const sanitized: DAWProject = {
+        ...project,
+        tracks: project.tracks.map((t) => ({
+            ...t,
+            clips: t.clips.map((c) => ({
+                ...c,
+                audio: c.audio ? { ...c.audio, buffer: null, waveformPeaks: undefined } : undefined,
+            })),
+        })),
+    };
+    const envelope: ProjectFileEnvelope = {
+        format: "mmodaw",
+        version: PROJECT_FILE_VERSION,
+        exportedAt: Date.now(),
+        project: sanitized,
+    };
+    return new Blob([JSON.stringify(envelope, null, 2)], { type: "application/json" });
+}
+
+export async function importProjectFile(file: File, options?: { rename?: boolean }): Promise<DAWProject> {
+    const text = await file.text();
+    const data = JSON.parse(text) as Partial<ProjectFileEnvelope> | DAWProject;
+    let project: DAWProject;
+    if ("format" in data && data.format === "mmodaw") {
+        if (typeof data.version !== "number" || data.version > PROJECT_FILE_VERSION) {
+            throw new Error(`Unsupported project file version: ${data.version}`);
+        }
+        if (!data.project) throw new Error("Project file is missing the `project` payload");
+        project = data.project;
+    } else if ("tracks" in data && Array.isArray((data as DAWProject).tracks)) {
+        // Older raw export — accept it directly.
+        project = data as DAWProject;
+    } else {
+        throw new Error("Not a valid MMO DAW project file");
+    }
+    // Always assign a fresh id on import so we never overwrite an
+    // existing project of the same name.
+    const imported: DAWProject = {
+        ...project,
+        id: createId(),
+        name: options?.rename ? `${project.name} (Imported)` : project.name,
+        createdAt: Date.now(),
+        modifiedAt: Date.now(),
+    };
+    saveProject(imported);
+    return imported;
+}
+
+export const PROJECT_FILE_EXTENSION = PROJECT_FILE_EXT;

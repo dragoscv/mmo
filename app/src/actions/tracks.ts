@@ -1,5 +1,8 @@
 "use server";
 
+import { log } from "@/lib/logger";
+import { z } from "zod";
+
 /**
  * Track server actions — thin client over the companion's /library/* API.
  *
@@ -36,7 +39,7 @@ export async function getTracks(filters?: TrackFilters): Promise<PaginatedTracks
     try {
         return await companionLibrary.getTracks(link, filters);
     } catch (err) {
-        console.warn("[tracks] getTracks failed:", err);
+        log.warn("tracks.getTracks failed", undefined, err);
         return EMPTY_PAGINATED_TRACKS;
     }
 }
@@ -47,7 +50,7 @@ export async function getTrackById(id: number): Promise<CompanionTrack | null> {
     try {
         return await companionLibrary.getTrackById(link, id);
     } catch (err) {
-        console.warn("[tracks] getTrackById failed:", err);
+        log.warn("tracks.getTrackById failed", undefined, err);
         return null;
     }
 }
@@ -78,7 +81,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     if (!link) return EMPTY_STATS;
     try { return await companionLibrary.getStats(link); }
     catch (err) {
-        console.warn("[tracks] getDashboardStats failed:", err);
+        log.warn("tracks.getDashboardStats failed", undefined, err);
         return EMPTY_STATS;
     }
 }
@@ -115,15 +118,55 @@ export async function getHiddenTracks(
 }
 
 // ─── Writes ─────────────────────────────────────────────────────────────────
+//
+// Every mutation validates its input shape with Zod before forwarding to
+// the companion. Auth is enforced by `getCompanionLink()` which calls
+// `auth()` and short-circuits without a signed-in session. Untrusted
+// fields are stripped at the API boundary too (companion's `routes.ts`
+// deletes `id`, `userId`, and `filepath` from PATCH bodies regardless
+// of what we send), so this is defense-in-depth.
+
+const trackIdSchema = z.number().int().positive();
+const tagSchema = z.string().min(1).max(64);
+const ratingSchema = z.union([z.number().int().min(1).max(5), z.null()]);
+const trackUpdateSchema = z
+    .object({
+        title: z.string().max(500).optional(),
+        artist: z.string().max(500).optional(),
+        album: z.string().max(500).optional(),
+        genre: z.string().max(200).optional(),
+        subgenre: z.string().max(200).optional(),
+        bpm: z.number().min(0).max(400).optional(),
+        keyCamelot: z.string().max(8).optional(),
+        energy: z.number().int().min(0).max(10).optional(),
+        mood: z.string().max(200).optional(),
+        rating: ratingSchema.optional(),
+        comment: z.string().max(2000).optional(),
+        year: z.number().int().min(1900).max(2200).optional(),
+        label: z.string().max(200).optional(),
+        isFavorite: z.boolean().optional(),
+        isHidden: z.boolean().optional(),
+        // tags are handled by `updateTrackTags`; reject here if leaked.
+    })
+    .strict()
+    .partial();
+
+function failedValidation(err: z.ZodError): { success: false; error: string } {
+    return { success: false, error: err.issues.map((i) => `${i.path.join(".") || "root"}: ${i.message}`).join("; ") };
+}
 
 export async function updateTrack(
     id: number,
     data: Partial<CompanionTrack>,
 ): Promise<{ success: boolean; error?: string }> {
+    const idCheck = trackIdSchema.safeParse(id);
+    if (!idCheck.success) return failedValidation(idCheck.error);
+    const dataCheck = trackUpdateSchema.safeParse(data);
+    if (!dataCheck.success) return failedValidation(dataCheck.error);
     const link = await getCompanionLink();
     if (!link) return { success: false, error: "Companion not connected" };
     try {
-        await companionLibrary.updateTrack(link, id, data);
+        await companionLibrary.updateTrack(link, idCheck.data, dataCheck.data as Partial<CompanionTrack>);
         revalidatePath("/library");
         revalidatePath("/");
         return { success: true };
@@ -135,10 +178,12 @@ export async function updateTrack(
 export async function toggleFavorite(
     id: number,
 ): Promise<{ success: boolean; isFavorite?: boolean; error?: string }> {
+    const idCheck = trackIdSchema.safeParse(id);
+    if (!idCheck.success) return failedValidation(idCheck.error);
     const link = await getCompanionLink();
     if (!link) return { success: false, error: "Companion not connected" };
     try {
-        const r = await companionLibrary.toggleFavorite(link, id);
+        const r = await companionLibrary.toggleFavorite(link, idCheck.data);
         revalidatePath("/library");
         return { success: true, isFavorite: r.isFavorite };
     } catch (err) {
@@ -150,10 +195,14 @@ export async function setTrackRating(
     id: number,
     rating: number | null,
 ): Promise<{ success: boolean; error?: string }> {
+    const idCheck = trackIdSchema.safeParse(id);
+    if (!idCheck.success) return failedValidation(idCheck.error);
+    const ratingCheck = ratingSchema.safeParse(rating);
+    if (!ratingCheck.success) return failedValidation(ratingCheck.error);
     const link = await getCompanionLink();
     if (!link) return { success: false, error: "Companion not connected" };
     try {
-        await companionLibrary.setRating(link, id, rating);
+        await companionLibrary.setRating(link, idCheck.data, ratingCheck.data);
         revalidatePath("/library");
         return { success: true };
     } catch (err) {
@@ -165,10 +214,14 @@ export async function updateTrackTags(
     id: number,
     tags: string[],
 ): Promise<{ success: boolean; error?: string }> {
+    const idCheck = trackIdSchema.safeParse(id);
+    if (!idCheck.success) return failedValidation(idCheck.error);
+    const tagsCheck = z.array(tagSchema).max(100).safeParse(tags);
+    if (!tagsCheck.success) return failedValidation(tagsCheck.error);
     const link = await getCompanionLink();
     if (!link) return { success: false, error: "Companion not connected" };
     try {
-        await companionLibrary.setTags(link, id, tags);
+        await companionLibrary.setTags(link, idCheck.data, tagsCheck.data);
         revalidatePath("/library");
         return { success: true };
     } catch (err) {
@@ -179,10 +232,12 @@ export async function updateTrackTags(
 export async function deleteTrack(
     id: number,
 ): Promise<{ success: boolean; error?: string }> {
+    const idCheck = trackIdSchema.safeParse(id);
+    if (!idCheck.success) return failedValidation(idCheck.error);
     const link = await getCompanionLink();
     if (!link) return { success: false, error: "Companion not connected" };
     try {
-        await companionLibrary.deleteTrack(link, id);
+        await companionLibrary.deleteTrack(link, idCheck.data);
         revalidatePath("/library");
         revalidatePath("/");
         return { success: true };
@@ -191,14 +246,18 @@ export async function deleteTrack(
     }
 }
 
+const trackIdsSchema = z.array(trackIdSchema).max(10000);
+
 export async function hideTracks(
     ids: number[],
 ): Promise<{ success: boolean; count: number; error?: string }> {
-    if (ids.length === 0) return { success: true, count: 0 };
+    const check = trackIdsSchema.safeParse(ids);
+    if (!check.success) return { success: false, count: 0, error: failedValidation(check.error).error };
+    if (check.data.length === 0) return { success: true, count: 0 };
     const link = await getCompanionLink();
     if (!link) return { success: false, count: 0, error: "Companion not connected" };
     try {
-        const r = await companionLibrary.setHidden(link, ids, true);
+        const r = await companionLibrary.setHidden(link, check.data, true);
         revalidatePath("/library");
         revalidatePath("/");
         return { success: true, count: r.count };
@@ -210,11 +269,13 @@ export async function hideTracks(
 export async function unhideTracks(
     ids: number[],
 ): Promise<{ success: boolean; count: number; error?: string }> {
-    if (ids.length === 0) return { success: true, count: 0 };
+    const check = trackIdsSchema.safeParse(ids);
+    if (!check.success) return { success: false, count: 0, error: failedValidation(check.error).error };
+    if (check.data.length === 0) return { success: true, count: 0 };
     const link = await getCompanionLink();
     if (!link) return { success: false, count: 0, error: "Companion not connected" };
     try {
-        const r = await companionLibrary.setHidden(link, ids, false);
+        const r = await companionLibrary.setHidden(link, check.data, false);
         revalidatePath("/library");
         revalidatePath("/library/hidden");
         revalidatePath("/");

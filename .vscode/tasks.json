@@ -260,5 +260,21 @@
         "clear": true
       }
     }
+  ],
+  "statusbar.list.hiddenTasks": [
+    "Companion: Dev (Inspect)",
+    "Companion: Dev on macOS VM",
+    "Companion: Dev on macOS VM (Watch)",
+    "Companion: Dev on Linux VM",
+    "Companion: Dev on Linux VM (Watch)",
+    "Companion: Dev on Windows VM",
+    "Companion: Dev on Windows VM (Watch)",
+    "Companion: Install Dependencies",
+    "Companion: Build",
+    "Companion: Dist (Windows)",
+    "Install Dependencies",
+    "Build",
+    "DB Studio",
+    "Type Check"
   ]
 }

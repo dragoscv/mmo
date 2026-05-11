@@ -1,0 +1,16 @@
+
+> mmo-companion@0.9.12 test E:\gh\mmo\server
+> vitest run "--run"
+
+The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mE:/gh/mmo/server[39m
+
+ [32mΓ£ô[39m src/sync/sqlite-sync-storage.test.ts [2m([22m[2m12 tests[22m[2m)[22m[90m 29[2mms[22m[39m
+ [32mΓ£ô[39m src/sync/cloud-sync-client.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 23[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m19 passed[39m[22m[90m (19)[39m
+[2m   Start at [22m 03:28:52
+[2m   Duration [22m 1.28s[2m (transform 191ms, setup 0ms, collect 294ms, tests 52ms, environment 1ms, prepare 432ms)[22m
+

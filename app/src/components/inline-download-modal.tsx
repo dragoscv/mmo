@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
     Dialog,
     DialogContent,
@@ -234,9 +234,11 @@ export function InlineDownloadModal({ track, targetDeck, onLoadToDeck, onAddedTo
     }, [track, addLog, onAddedToLibrary]);
 
     // Auto-start on open
-    if (open && state.stage === "idle" && !hasStarted.current) {
-        startDownload();
-    }
+    useEffect(() => {
+        if (open && state.stage === "idle" && !hasStarted.current) {
+            startDownload();
+        }
+    }, [open, state.stage, startDownload]);
 
     const handleClose = useCallback(() => {
         if (state.stage === "downloading") {

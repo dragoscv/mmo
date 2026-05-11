@@ -60,7 +60,7 @@ export function useRemoteMixerHost() {
     // when state changes (otherwise we'd tear down + rebuild the rAF/interval
     // every time currentTime ticks — a major source of long tasks during play).
     const mixerRef = useRef(mixer);
-    mixerRef.current = mixer;
+    useEffect(() => { mixerRef.current = mixer; });
 
     // Broadcast state at 15 Hz, *only* when we actually have a remote
     // controller subscribed. Previously we ran a rAF loop at 60 fps just to

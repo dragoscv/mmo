@@ -134,7 +134,7 @@ Browser tab YouTube → content script detectează video
 ```
 DJ A: Web App /remote → init RTCPeerConnection
                       → /api/turn-credentials → primește cred TURN
-                      → schimb SDP via signaling (TBD: WebSocket sau Firestore)
+                      → schimb SDP via SSE relay (`/api/remote/events` + `/api/remote/send`)
 DJ B: la fel
 DJ A → audio stream (Opus) → P2P → DJ B (sau prin TURN dacă NAT blochează)
 ```
@@ -158,7 +158,7 @@ DJ A → audio stream (Opus) → P2P → DJ B (sau prin TURN dacă NAT blocheaz�
 | TURN | Coturn self-hosted pe GCP | Cost predictibil, control complet, fără vendor |
 | UI | Tailwind v4 + shadcn/ui | Owned components, customizable, fast |
 | State | Zustand + TanStack Query | Minimal, type-safe; nu Redux |
-| i18n | TBD (next-intl recomandat) | Web app momentan EN-only în UI; docs RO/EN |
+| i18n | next-intl (cookie-based, RO/EN) | Cookie `mmo-locale`, fără segment `[locale]` în URL — păstrăm rutele neschimbate |
 
 ---
 

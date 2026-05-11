@@ -2,11 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { requireSessionWithRate } from "@/lib/api-guard";
 
 export async function POST(request: NextRequest) {
+    // Filesystem reads must be authenticated — this endpoint exposes
+    // the entire host filesystem (drive letters on Windows). Rate-limit
+    // to keep curiosity-pokes from enumerating a tree.
+    const guard = await requireSessionWithRate(request, { bucket: "browse-folder", windowMs: 60_000, max: 60 });
+    if (guard.response) return guard.response;
     try {
         const body = await request.json();
         const { dir } = body as { dir?: string };
+
+        // Length + control-char gate. Without this, a multi-MB `dir`
+        // string traverses path.resolve / fs.readdirSync with no upper
+        // bound; control bytes also get accepted into log lines.
+        if (typeof dir === "string" && (dir.length > 4096 || /[\x00-\x1F]/.test(dir))) {
+            return NextResponse.json({ error: "Invalid dir" }, { status: 400 });
+        }
 
         const target = dir || os.homedir();
         const resolved = path.resolve(target);
@@ -73,6 +86,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+    const guard = await requireSessionWithRate(request, { bucket: "mkdir", windowMs: 60_000, max: 20 });
+    if (guard.response) return guard.response;
     try {
         const body = await request.json();
         const { dir, name } = body as { dir?: string; name?: string };

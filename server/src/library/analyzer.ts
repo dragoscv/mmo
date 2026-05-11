@@ -42,10 +42,10 @@
 
 import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, createReadStream } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import {
     AnalyzerStore, getAnalyzerStore,
@@ -738,6 +738,40 @@ class Analyzer extends EventEmitter {
         if (fpTouched) parts.push("fp");
         this.pushLog("info",
             `Persisted track ${job.trackId} → ${parts.join("+")}`, job.id);
+
+        // Lazy sha256 backfill — fires on any analysis pass for tracks
+        // that don't have one yet. Cheap (streaming hash, no load into
+        // memory) and idempotent. Decoupled from the persistResult
+        // success path with `void` so a hashing failure never affects
+        // the analyzer pipeline.
+        void this.backfillSha256(job.trackId);
+    }
+
+    /** One-shot SHA-256 backfill for a track. No-op when sha256 is set
+     *  or the file is gone. Errors are logged at debug level — the row
+     *  stays valid without sha256 (cloud sync gracefully degrades). */
+    private async backfillSha256(trackId: number): Promise<void> {
+        try {
+            const db = getLibraryDb();
+            const row = await db
+                .select({ id: tracks.id, filepath: tracks.filepath, sha256: tracks.sha256 })
+                .from(tracks)
+                .where(eq(tracks.id, trackId))
+                .limit(1);
+            const r = row[0];
+            if (!r || r.sha256 || !r.filepath || !existsSync(r.filepath)) return;
+
+            const sha = await new Promise<string>((resolve, reject) => {
+                const hash = createHash("sha256");
+                const stream = createReadStream(r.filepath);
+                stream.on("data", (chunk) => hash.update(chunk));
+                stream.on("end", () => resolve(hash.digest("hex")));
+                stream.on("error", reject);
+            });
+            await db.update(tracks).set({ sha256: sha }).where(eq(tracks.id, r.id)).run();
+        } catch (err) {
+            this.pushLog("warn", `sha256 backfill failed for track ${trackId}: ${(err as Error).message}`);
+        }
     }
 
     pushLog(level: AnalyzerLogEntry["level"], message: string, jobId?: string) {

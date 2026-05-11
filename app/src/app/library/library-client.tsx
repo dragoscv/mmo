@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSyncRefresh } from "@/hooks/use-sync-refresh";
 import { useRouteMemorySave, clearRouteMemory } from "@/hooks/use-route-memory";
 import { useRenderCount } from "@/lib/dev-debugger";
 import {
@@ -107,6 +108,7 @@ export function LibraryClient({
     currentFilters,
 }: LibraryClientProps) {
     useRenderCount("Page:/library");
+    useSyncRefresh(["tracks", "playlist_tracks", "tags", "track_tags"]);
     const router = useRouter();
     const searchParams = useSearchParams();
     const [searchInput, setSearchInput] = useState(currentFilters.search);
@@ -281,6 +283,21 @@ export function LibraryClient({
                             <EyeOff className="h-3.5 w-3.5" />
                             Hidden
                         </Link>
+                        <Link
+                            href="/library/import"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-transparent px-3 py-1.5 text-sm font-medium text-[var(--muted-foreground)] hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-colors"
+                        >
+                            <Download className="h-3.5 w-3.5 rotate-180" />
+                            Import
+                        </Link>
+                        <a
+                            href="/api/export/rekordbox"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-transparent px-3 py-1.5 text-sm font-medium text-[var(--muted-foreground)] hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-colors"
+                            title="Download a rekordbox-compatible XML of your full library, grouped by genre."
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Export XML
+                        </a>
                     </div>
                 </div>
 

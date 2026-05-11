@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import {
     type HistoryState,
     type HistoryEntry,
@@ -52,15 +51,12 @@ export function HistoryPanel<T>({
 }: HistoryPanelProps<T>) {
     const { entries, currentIndex } = history;
 
-    const timeAgo = useMemo(() => {
-        const now = Date.now();
-        return (ts: number) => {
-            const diff = now - ts;
-            if (diff < 60_000) return "just now";
-            if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-            return `${Math.floor(diff / 3_600_000)}h ago`;
-        };
-    }, []);
+    const timeAgo = (ts: number) => {
+        const diff = Date.now() - ts;
+        if (diff < 60_000) return "just now";
+        if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+        return `${Math.floor(diff / 3_600_000)}h ago`;
+    };
 
     return (
         <div className={cn(

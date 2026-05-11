@@ -12,6 +12,7 @@
 import { NextResponse } from "next/server";
 import os from "node:os";
 import { headers } from "next/headers";
+import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,16 @@ function isPrivateIPv4(addr: string): boolean {
 }
 
 export async function GET() {
+    // Auth required: enumerates the host's private-network IPv4 addresses.
+    // While these are RFC1918 ranges (and therefore not directly routable
+    // from the internet), the response still discloses the host's exact LAN
+    // topology to anyone who can reach the public endpoint \u2014 useful for
+    // pivoting once an attacker has any other foothold on the same network,
+    // and unnecessary surface for an unauthenticated GET.
+    const session = await auth();
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
     const h = await headers();
     const host = h.get("host") ?? "localhost:3000";
     const port = host.includes(":") ? host.split(":").pop() : "3000";

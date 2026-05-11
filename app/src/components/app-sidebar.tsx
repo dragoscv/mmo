@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
     LayoutDashboard,
     Library,
@@ -39,24 +40,24 @@ import { UserCard } from "./user-card";
 import { CompanionDownloadButton } from "./sidebar/companion-download-button";
 
 const navItems = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/library", label: "Library", icon: Library },
-    { href: "/analysis", label: "Analysis", icon: Activity },
-    { href: "/playlists", label: "Playlists", icon: ListMusic },
-    { href: "/mixer", label: "Mixer", icon: Disc3 },
-    { href: "/daw", label: "DAW", icon: Piano },
-    { href: "/editor", label: "Sound Editor", icon: Waves },
-    { href: "/plugins", label: "Plugins", icon: Plug },
-    { href: "/live", label: "Live", icon: Mic },
-    { href: "/recordings", label: "Recordings", icon: CircleDot },
-    { href: "/download", label: "Download", icon: Download },
-    { href: "/visualizations", label: "Visualizations", icon: AudioWaveform },
-    { href: "/scanner", label: "Scanner", icon: ScanSearch },
-    { href: "/drives", label: "Drives", icon: HardDrive },
-    { href: "/devices", label: "Devices", icon: Monitor },
-    { href: "/remote", label: "Remote", icon: Smartphone },
-    { href: "/settings", label: "Settings", icon: Settings },
-];
+    { href: "/", label: "Dashboard", key: "dashboard", icon: LayoutDashboard },
+    { href: "/library", label: "Library", key: "library", icon: Library },
+    { href: "/analysis", label: "Analysis", key: "analysis", icon: Activity },
+    { href: "/playlists", label: "Playlists", key: "playlists", icon: ListMusic },
+    { href: "/mixer", label: "Mixer", key: "mixer", icon: Disc3 },
+    { href: "/daw", label: "DAW", key: "daw", icon: Piano },
+    { href: "/editor", label: "Sound Editor", key: "editor", icon: Waves },
+    { href: "/plugins", label: "Plugins", key: "plugins", icon: Plug },
+    { href: "/live", label: "Live", key: "live", icon: Mic },
+    { href: "/recordings", label: "Recordings", key: "recordings", icon: CircleDot },
+    { href: "/download", label: "Download", key: "download", icon: Download },
+    { href: "/visualizations", label: "Visualizations", key: "visualizations", icon: AudioWaveform },
+    { href: "/scanner", label: "Scanner", key: "scanner", icon: ScanSearch },
+    { href: "/drives", label: "Drives", key: "drives", icon: HardDrive },
+    { href: "/devices", label: "Devices", key: "devices", icon: Monitor },
+    { href: "/remote", label: "Remote", key: "remote", icon: Smartphone },
+    { href: "/settings", label: "Settings", key: "settings", icon: Settings },
+] as const;
 
 // ─── Mobile trigger button (rendered outside sidebar) ────────────────────
 export function MobileSidebarTrigger() {
@@ -79,6 +80,13 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
     const [searchOpen, setSearchOpen] = useState(false);
     const savedHrefs = useRouteMemoryHrefs();
     const { toggle, closeMobile } = useSidebar();
+    // Falls back to the English label baked into navItems when a key is
+    // missing in the active locale’s message bundle (next-intl logs a warning
+    // in dev rather than throwing).
+    const t = useTranslations("nav");
+    const labelFor = (item: typeof navItems[number]) => {
+        try { return t(item.key); } catch { return item.label; }
+    };
 
     return (
         <>
@@ -124,7 +132,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                 </div>
             )}
 
-            <nav className="flex-1 min-h-0 overflow-y-auto space-y-0.5 p-2">
+            <nav className="flex-1 min-h-0 overflow-y-auto space-y-0.5 p-2" aria-label="Primary">
                 {navItems.map((item) => {
                     const isActive =
                         pathname === item.href ||
@@ -135,24 +143,32 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                             key={item.href}
                             href={href}
                             onClick={closeMobile}
+                            aria-current={isActive ? "page" : undefined}
                             className={cn(
                                 "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-primary focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
                                 collapsed && "justify-center px-2",
                                 isActive
                                     ? "bg-sidebar-primary/10 text-sidebar-primary shadow-[inset_0_0_0_1px_rgba(139,92,246,0.15)]"
                                     : "text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground/70"
                             )}
-                            title={collapsed ? item.label : undefined}
+                            title={collapsed ? labelFor(item) : undefined}
                         >
                             {/* Active indicator bar */}
                             {isActive && (
-                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b from-purple-400 to-fuchsia-500 animate-[slideUpFade_200ms_ease-out]" />
+                                <div
+                                    aria-hidden="true"
+                                    className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b from-purple-400 to-fuchsia-500 animate-[slideUpFade_200ms_ease-out]"
+                                />
                             )}
-                            <item.icon className={cn(
-                                "h-4 w-4 shrink-0 transition-colors duration-200",
-                                isActive && "text-sidebar-primary"
-                            )} />
-                            {!collapsed && item.label}
+                            <item.icon
+                                aria-hidden="true"
+                                className={cn(
+                                    "h-4 w-4 shrink-0 transition-colors duration-200",
+                                    isActive && "text-sidebar-primary"
+                                )}
+                            />
+                            {!collapsed && labelFor(item)}
                         </Link>
                     );
                 })}

@@ -272,6 +272,7 @@ export class NativeCompanionClient {
     private pitchListeners = new Set<(p: NativePitch, s: NativeStatus | null) => void>();
     private levelListeners = new Set<(l: NativeLevels, p: NativePerf) => void>();
     private connectionListeners = new Set<(connected: boolean) => void>();
+    private syncAppliedListeners = new Set<(entities: ReadonlySet<string>) => void>();
 
     constructor(creds: NativeCompanionCredentials = {}) {
         this.apiUrl = creds.apiUrl ?? DEFAULT_COMPANION_URL;
@@ -469,6 +470,13 @@ export class NativeCompanionClient {
                             streamLatencyMs: 0, dspBlockAvgMs: 0, dspBlockMaxMs: 0, underruns: 0,
                         };
                         for (const fn of this.levelListeners) fn(msg.levels, perf);
+                    } else if (msg && msg.type === "sync:applied" && Array.isArray(msg.entities)) {
+                        // Companion finished pulling cloud changes for this
+                        // device. Fan out to subscribers (typically a hook
+                        // that invalidates affected React Query / SWR keys)
+                        // so the UI refreshes without polling.
+                        const entities = new Set<string>(msg.entities.map(String));
+                        for (const fn of this.syncAppliedListeners) fn(entities);
                     }
                 } catch { /* ignore malformed */ }
             };
@@ -507,5 +515,14 @@ export class NativeCompanionClient {
     addConnectionListener(fn: (connected: boolean) => void): () => void {
         this.connectionListeners.add(fn);
         return () => this.connectionListeners.delete(fn);
+    }
+
+    /** Subscribe to `sync:applied` hints broadcast by the companion at
+     *  the end of a successful pull tick. The set contains the entity
+     *  names (`tracks`, `playlists`, …) that were touched, so callers
+     *  can invalidate selectively. */
+    addSyncAppliedListener(fn: (entities: ReadonlySet<string>) => void): () => void {
+        this.syncAppliedListeners.add(fn);
+        return () => this.syncAppliedListeners.delete(fn);
     }
 }

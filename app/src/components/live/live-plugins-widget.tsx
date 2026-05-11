@@ -51,7 +51,7 @@ export function LivePluginsWidget() {
                 renderWithPlugins(recordingPath, chain) and pass the URL
                 back via setRenderedUrl. The wiring lives in the live
                 hook layer (out of scope for this widget). */}
-            {/* eslint-disable-next-line @typescript-eslint/no-unused-vars */}
+            { }
             {(() => { void setRenderedUrl; return null; })()}
         </div>
     );

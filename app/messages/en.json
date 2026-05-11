@@ -1,0 +1,58 @@
+{
+    "appName": "MMO",
+    "tagline": "Multi Media Organizer for DJs and producers",
+    "nav": {
+        "dashboard": "Dashboard",
+        "library": "Library",
+        "analysis": "Analysis",
+        "mixer": "Mixer",
+        "daw": "DAW",
+        "editor": "Sound Editor",
+        "live": "Live",
+        "remote": "Remote",
+        "visualizations": "Visualizations",
+        "download": "Downloads",
+        "scanner": "Scanner",
+        "drives": "Drives",
+        "playlists": "Playlists",
+        "recordings": "Recordings",
+        "devices": "Devices",
+        "settings": "Settings",
+        "plugins": "Plugins",
+        "profile": "Profile"
+    },
+    "common": {
+        "loading": "Loading…",
+        "save": "Save",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "confirm": "Confirm",
+        "search": "Search",
+        "noResults": "No results",
+        "error": "Something went wrong",
+        "retry": "Retry"
+    },
+    "auth": {
+        "signIn": "Sign in",
+        "signOut": "Sign out",
+        "signInWithGoogle": "Continue with Google"
+    },
+    "dashboard": {
+        "empty": {
+            "scanToPopulate": "Scan & analyze tracks to populate",
+            "noTracksToCheck": "No tracks to check",
+            "noTracksYet": "No tracks yet",
+            "noRatedTracks": "No rated tracks yet",
+            "rateToSeeHere": "Rate tracks 4-5 stars to see them here",
+            "noRecentActivity": "No recent activity.",
+            "unknown": "Unknown",
+            "unknownArtist": "Unknown Artist"
+        },
+        "recommendations": {
+            "allCreated": "All recommended playlists created",
+            "haveAll": "You have all {total} recommended playlists",
+            "setupProgress": "Playlist setup progress",
+            "createMissing": "Create {count} missing playlists"
+        }
+    }
+}

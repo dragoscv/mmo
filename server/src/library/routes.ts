@@ -15,11 +15,66 @@
 import express from "express";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { getLibraryDb } from "./db";
-import { tracks, playlists, playlistTracks, scanLogs, downloads } from "./schema";
+import { tracks, playlists, playlistTracks, scanLogs, downloads, savedDrives } from "./schema";
 import type { NewTrack } from "./schema";
 import { analyzer, type AnalyzeOptions } from "./analyzer";
+import { enqueueSyncChange } from "../sync";
+import { listConnectedDrives } from "./drives";
 import { createReadStream, statSync, existsSync } from "node:fs";
 import path from "node:path";
+
+// ─── Sync helpers ───────────────────────────────────────────────────────────
+//
+// Every local mutation that should round-trip to cloud Postgres calls
+// `pushTrackChange(...)` (or its playlist/cuepoint cousin). The helper is
+// a thin wrapper around `enqueueSyncChange()` so the route handlers stay
+// readable. We use the track's `sha256` if present (preferred — stable
+// across devices); otherwise we fall back to `<userId>:<localId>` so the
+// cloud at least gets an idempotent key for the upsert.
+//
+// Failure to enqueue must NEVER fail the route — local writes are the
+// authoritative store; sync is best-effort.
+
+function pushTrackChange(
+    op: "upsert" | "delete",
+    row: { id: number; userId: string; sha256?: string | null } & Record<string, unknown>,
+    extraPayload?: Record<string, unknown>,
+) {
+    try {
+        const sha = (row.sha256 ?? "") as string;
+        const entityId = sha || `${row.userId}:${row.id}`;
+        enqueueSyncChange({
+            entity: "tracks",
+            entityId,
+            op,
+            payload: { sha256: sha || undefined, ...row, ...extraPayload },
+            updatedAt: new Date().toISOString(),
+        });
+    } catch {
+        // Sync subsystem may not be initialised yet (e.g. unpaired device).
+        // The local write already happened; nothing else to do.
+    }
+}
+
+function pushPlaylistChange(
+    op: "upsert" | "delete",
+    row: { id: number; userId: string } & Record<string, unknown>,
+) {
+    try {
+        // Playlists are keyed in cloud by externalId (UUID). Older rows
+        // without one fall back to a deterministic synthetic id so the
+        // cloud can still upsert; the next pull will rehydrate the proper
+        // externalId once the cloud assigns one.
+        const ext = (row.externalId as string | undefined) || `${row.userId}:pl:${row.id}`;
+        enqueueSyncChange({
+            entity: "playlists",
+            entityId: ext,
+            op,
+            payload: { externalId: ext, ...row },
+            updatedAt: new Date().toISOString(),
+        });
+    } catch { /* see pushTrackChange */ }
+}
 
 // ─── Auth helpers ────────────────────────────────────────────────────────────
 
@@ -216,6 +271,12 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         delete data.id; delete data.userId; delete data.filepath;
         const db = getLibraryDb();
         db.update(tracks).set(data).where(and(eq(tracks.id, id), eq(tracks.userId, userId))).run();
+        // Re-read the row so the sync payload includes whatever shape the
+        // cloud needs, including any sha256 / external columns we don't
+        // touch in this PATCH.
+        const row = db.select().from(tracks)
+            .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).get();
+        if (row) pushTrackChange("upsert", row);
         res.json({ success: true });
     });
 
@@ -224,7 +285,10 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const db = getLibraryDb();
+        const row = db.select().from(tracks)
+            .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).get();
         db.delete(tracks).where(and(eq(tracks.id, id), eq(tracks.userId, userId))).run();
+        if (row) pushTrackChange("delete", row);
         res.json({ success: true });
     });
 
@@ -239,6 +303,9 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         const next = !row.f;
         db.update(tracks).set({ isFavorite: next })
             .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).run();
+        const full = db.select().from(tracks)
+            .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).get();
+        if (full) pushTrackChange("upsert", full);
         res.json({ success: true, isFavorite: next });
     });
 
@@ -246,10 +313,19 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     router.post("/tracks/:id(\\d+)/rating", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
-        const { rating } = req.body as { rating: number | null };
+        const { rating } = req.body as { rating: unknown };
+        // Accept integer 1-5 or null/0 (clear). Reject everything else;
+        // Drizzle would otherwise pass strings/NaN straight to SQLite.
+        let nextRating: number | null;
+        if (rating == null || rating === 0) nextRating = null;
+        else if (typeof rating === "number" && Number.isInteger(rating) && rating >= 1 && rating <= 5) nextRating = rating;
+        else { res.status(400).json({ error: "rating must be 1-5 or null" }); return; }
         const db = getLibraryDb();
-        db.update(tracks).set({ rating: rating || null })
+        db.update(tracks).set({ rating: nextRating })
             .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).run();
+        const full = db.select().from(tracks)
+            .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).get();
+        if (full) pushTrackChange("upsert", full);
         res.json({ success: true });
     });
 
@@ -257,25 +333,57 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     router.post("/tracks/:id(\\d+)/tags", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
-        const { tags } = req.body as { tags: string[] };
+        const { tags: newTags } = req.body as { tags: unknown };
+        // Strict shape: array of short strings. Without this any JSON
+        // shape lands in the column verbatim and breaks downstream
+        // readers that assume `string[]`.
+        if (!Array.isArray(newTags)) { res.status(400).json({ error: "tags must be string[]" }); return; }
+        if (newTags.length > 64) { res.status(413).json({ error: "too many tags (max 64)" }); return; }
+        const safeTags: string[] = [];
+        for (const t of newTags) {
+            if (typeof t !== "string" || t.length === 0 || t.length > 64) {
+                res.status(400).json({ error: "each tag must be a non-empty string ≤ 64 chars" });
+                return;
+            }
+            safeTags.push(t);
+        }
         const db = getLibraryDb();
-        db.update(tracks).set({ tags: JSON.stringify(tags || []) })
+        db.update(tracks).set({ tags: JSON.stringify(safeTags) })
             .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).run();
+        const full = db.select().from(tracks)
+            .where(and(eq(tracks.id, id), eq(tracks.userId, userId))).get();
+        if (full) pushTrackChange("upsert", full);
         res.json({ success: true });
     });
 
     // ── Tracks: bulk hide / unhide ───────────────────────────────────────
     router.post("/tracks/hide", (req, res) => {
         const { userId } = req as AuthedRequest;
-        const { ids, hidden } = req.body as { ids: number[]; hidden: boolean };
+        const { ids, hidden } = req.body as { ids: unknown; hidden: unknown };
         if (!Array.isArray(ids) || ids.length === 0) {
             res.json({ success: true, count: 0 });
             return;
         }
+        // Cap + integer-coerce. Without the cap a 1M-id payload builds
+        // a 1M-placeholder SQL statement and locks the SQLite writer.
+        if (ids.length > 5000) {
+            res.status(413).json({ error: "too many ids (max 5000)" });
+            return;
+        }
+        const intIds: number[] = [];
+        for (const v of ids) {
+            if (typeof v === "number" && Number.isInteger(v) && v > 0) intIds.push(v);
+        }
+        if (intIds.length === 0) { res.json({ success: true, count: 0 }); return; }
         const db = getLibraryDb();
         db.update(tracks).set({ isHidden: !!hidden })
-            .where(and(eq(tracks.userId, userId), inArray(tracks.id, ids))).run();
-        res.json({ success: true, count: ids.length });
+            .where(and(eq(tracks.userId, userId), inArray(tracks.id, intIds))).run();
+        // Enqueue one sync event per affected row so per-field LWW can
+        // converge on the cloud side.
+        const rows = db.select().from(tracks)
+            .where(and(eq(tracks.userId, userId), inArray(tracks.id, intIds))).all();
+        for (const row of rows) pushTrackChange("upsert", row);
+        res.json({ success: true, count: intIds.length });
     });
 
     // ── Tracks: ingest scanned tracks ────────────────────────────────────
@@ -286,6 +394,13 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         const incoming = (req.body?.tracks ?? []) as Array<Omit<NewTrack, "id" | "userId">>;
         if (!Array.isArray(incoming)) {
             res.status(400).json({ error: "tracks must be an array" });
+            return;
+        }
+        // Cap per-request batch size. The route already has a 64MB body
+        // limit; this protects the event loop from a single legit-sized
+        // body that still contains hundreds of thousands of small rows.
+        if (incoming.length > 10_000) {
+            res.status(413).json({ error: "too many tracks per batch (max 10000)" });
             return;
         }
         const db = getLibraryDb();
@@ -442,6 +557,81 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         });
     });
 
+    // ── Connected drives ─────────────────────────────────────────────────
+    //
+    // GET /library/drives
+    // Returns the list of physical drives currently mounted on the
+    // companion's host machine. The web app surfaces these in the Drive
+    // Manager so the user can pick a target for USB-export of a CDJ
+    // library. Drives are *local* by definition (the user's hardware) so
+    // the companion is the only place this can run truthfully.
+    //
+    // Per-user scoping does not apply (drive enumeration is host-wide),
+    // but the route still requires `requireUser` so an unauthenticated
+    // browser can't probe the user's filesystem.
+    router.get("/drives", (_req, res) => {
+        try {
+            const drives = listConnectedDrives();
+            res.json({ drives });
+        } catch (err) {
+            res.status(500).json({
+                error: err instanceof Error ? err.message : "Failed to enumerate drives",
+            });
+        }
+    });
+
+    // Saved-drive metadata (user-given labels for "My CDJ USB" etc.).
+    router.get("/drives/saved", (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const db = getLibraryDb();
+        const rows = db.select().from(savedDrives)
+            .where(eq(savedDrives.userId, userId))
+            .orderBy(desc(savedDrives.createdAt)).all();
+        res.json({ drives: rows });
+    });
+
+    router.post("/drives/saved", (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const body = req.body as { path?: unknown; label?: unknown; type?: unknown; format?: unknown };
+        const path = typeof body.path === "string" ? body.path.trim() : "";
+        const label = typeof body.label === "string" ? body.label.trim() : "";
+        if (!path || !label) { res.status(400).json({ error: "path and label required" }); return; }
+        const type = typeof body.type === "string" ? body.type : "removable";
+        const format = typeof body.format === "string" ? body.format : null;
+        const db = getLibraryDb();
+        try {
+            const row = db.insert(savedDrives).values({
+                userId, path, label, type, format, isActive: true,
+            }).returning().get();
+            res.json({ drive: row });
+        } catch (err) {
+            // UNIQUE(user_id, path) — flip to "update label" semantics
+            // so the user can rename without delete-then-add.
+            const existing = db.select().from(savedDrives)
+                .where(and(eq(savedDrives.userId, userId), eq(savedDrives.path, path))).get();
+            if (existing) {
+                const updated = db.update(savedDrives)
+                    .set({ label, type, format })
+                    .where(eq(savedDrives.id, existing.id))
+                    .returning().get();
+                res.json({ drive: updated });
+            } else {
+                res.status(500).json({ error: err instanceof Error ? err.message : "Insert failed" });
+            }
+        }
+    });
+
+    router.delete("/drives/saved/:id(\\d+)", (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const id = parseInt(req.params.id, 10);
+        const db = getLibraryDb();
+        const row = db.select({ id: savedDrives.id }).from(savedDrives)
+            .where(and(eq(savedDrives.id, id), eq(savedDrives.userId, userId))).get();
+        if (!row) { res.status(404).json({ error: "Not found" }); return; }
+        db.delete(savedDrives).where(eq(savedDrives.id, id)).run();
+        res.json({ success: true });
+    });
+
     // ── Recent scans ─────────────────────────────────────────────────────
     router.get("/scan-logs", (req, res) => {
         const { userId } = req as AuthedRequest;
@@ -472,6 +662,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         const row = db.insert(playlists).values({
             userId, name, description: description || null, type: "manual",
         }).returning().get();
+        if (row) pushPlaylistChange("upsert", row);
         res.json({ playlist: row });
     });
 
@@ -482,6 +673,9 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         const db = getLibraryDb();
         db.update(playlists).set(data)
             .where(and(eq(playlists.id, id), eq(playlists.userId, userId))).run();
+        const full = db.select().from(playlists)
+            .where(and(eq(playlists.id, id), eq(playlists.userId, userId))).get();
+        if (full) pushPlaylistChange("upsert", full);
         res.json({ success: true });
     });
 
@@ -490,11 +684,12 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         const id = parseInt(req.params.id, 10);
         const db = getLibraryDb();
         // Only delete if owned by user
-        const owned = db.select({ id: playlists.id }).from(playlists)
+        const owned = db.select().from(playlists)
             .where(and(eq(playlists.id, id), eq(playlists.userId, userId))).get();
         if (!owned) { res.status(404).json({ error: "Not found" }); return; }
         db.delete(playlistTracks).where(eq(playlistTracks.playlistId, id)).run();
         db.delete(playlists).where(eq(playlists.id, id)).run();
+        pushPlaylistChange("delete", owned);
         res.json({ success: true });
     });
 
@@ -532,11 +727,20 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     router.post("/playlists/:id(\\d+)/tracks", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
-        const { trackIds } = req.body as { trackIds: number[] };
+        const { trackIds } = req.body as { trackIds: unknown };
         if (!Array.isArray(trackIds) || trackIds.length === 0) {
             res.json({ success: true, added: 0 });
             return;
         }
+        if (trackIds.length > 5000) {
+            res.status(413).json({ error: "too many trackIds (max 5000)" });
+            return;
+        }
+        const intIds: number[] = [];
+        for (const v of trackIds) {
+            if (typeof v === "number" && Number.isInteger(v) && v > 0) intIds.push(v);
+        }
+        if (intIds.length === 0) { res.json({ success: true, added: 0 }); return; }
         const db = getLibraryDb();
         const owned = db.select({ id: playlists.id }).from(playlists)
             .where(and(eq(playlists.id, id), eq(playlists.userId, userId))).get();
@@ -544,7 +748,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
 
         // Only allow track ids that belong to this user
         const valid = db.select({ id: tracks.id }).from(tracks)
-            .where(and(eq(tracks.userId, userId), inArray(tracks.id, trackIds))).all().map((r) => r.id);
+            .where(and(eq(tracks.userId, userId), inArray(tracks.id, intIds))).all().map((r) => r.id);
 
         const maxPos = db.select({ m: sql<number>`COALESCE(MAX(position), 0)` })
             .from(playlistTracks).where(eq(playlistTracks.playlistId, id)).get()?.m ?? 0;
@@ -573,6 +777,57 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         db.delete(playlistTracks)
             .where(and(eq(playlistTracks.playlistId, id), eq(playlistTracks.trackId, trackId))).run();
         res.json({ success: true });
+    });
+
+    // POST /playlists/:id/reorder
+    //   body: { trackIds: number[] }  // full ordered list, authoritative
+    //   Atomically rewrites position 1..N for the given track ids. Any
+    //   ids in the body that are not currently in the playlist are
+    //   ignored; any tracks in the playlist not present in the body are
+    //   appended at the end (preserving their relative order). This
+    //   keeps drag-and-drop and "move up/down" both as one round trip.
+    router.post("/playlists/:id(\\d+)/reorder", (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const id = parseInt(req.params.id, 10);
+        const body = req.body as { trackIds?: unknown };
+        const incoming = Array.isArray(body.trackIds)
+            ? body.trackIds.filter((x): x is number => typeof x === "number" && Number.isInteger(x))
+            : null;
+        if (!incoming) { res.status(400).json({ error: "trackIds (number[]) required" }); return; }
+
+        const db = getLibraryDb();
+        const owned = db.select({ id: playlists.id }).from(playlists)
+            .where(and(eq(playlists.id, id), eq(playlists.userId, userId))).get();
+        if (!owned) { res.status(404).json({ error: "Not found" }); return; }
+
+        const current = db.select({ trackId: playlistTracks.trackId, position: playlistTracks.position })
+            .from(playlistTracks)
+            .where(eq(playlistTracks.playlistId, id))
+            .orderBy(playlistTracks.position).all();
+        const currentIds = new Set(current.map((r) => r.trackId));
+
+        const ordered: number[] = [];
+        const seen = new Set<number>();
+        for (const tid of incoming) {
+            if (currentIds.has(tid) && !seen.has(tid)) { ordered.push(tid); seen.add(tid); }
+        }
+        // Anything that was already in the playlist but missing from the
+        // request goes to the tail in its original order — protects
+        // against an out-of-date client racing a concurrent add.
+        for (const r of current) {
+            if (!seen.has(r.trackId)) { ordered.push(r.trackId); seen.add(r.trackId); }
+        }
+
+        db.transaction((tx) => {
+            for (let i = 0; i < ordered.length; i++) {
+                tx.update(playlistTracks)
+                    .set({ position: i + 1 })
+                    .where(and(eq(playlistTracks.playlistId, id), eq(playlistTracks.trackId, ordered[i])))
+                    .run();
+            }
+        });
+
+        res.json({ success: true, count: ordered.length });
     });
 
     // ── Downloads (history) ──────────────────────────────────────────────

@@ -1,5 +1,7 @@
 "use server";
 
+import { log } from "@/lib/logger";
+
 /**
  * Folder scan → ingest into companion library DB.
  *
@@ -11,6 +13,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { auth } from "@/auth";
 import { scanFolder } from "@/lib/scanner";
 import {
     companionLibrary,
@@ -27,6 +30,18 @@ export interface ScanResult {
 }
 
 export async function scanFolderAction(folderPath: string): Promise<ScanResult> {
+    // Auth required: `scanFolder` walks the *web-app host's* filesystem with
+    // `fs.readdir`, recursively. Without a session check this was an
+    // arbitrary-directory enumeration primitive against the host (try
+    // `/etc`, `C:\\Users\\Public`, etc.) returning file counts and
+    // surfacing parse errors that leak filenames.
+    const session = await auth();
+    if (!session?.user?.id) {
+        return {
+            totalFiles: 0, audioFiles: 0, inserted: 0, skipped: 0,
+            errors: ["Not authenticated"],
+        };
+    }
     const link = await getCompanionLink();
     if (!link) {
         return {
@@ -69,7 +84,7 @@ export async function getRecentScans(limit = 20): Promise<ScanLogEntry[]> {
     if (!link) return [];
     try { return await companionLibrary.getScanLogs(link, limit); }
     catch (err) {
-        console.warn("[scan] getRecentScans failed:", err);
+        log.warn("scan.getRecentScans failed", undefined, err);
         return [];
     }
 }

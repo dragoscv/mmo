@@ -1,5 +1,7 @@
 "use server";
 
+import { log } from "@/lib/logger";
+
 /**
  * Global search across the user's companion library.
  *
@@ -43,8 +45,14 @@ const EMPTY: SearchResult = {
     tracks: [], artists: [], albums: [], genres: [], playlists: [],
 };
 
+// 200 chars is well over any realistic search; longer values are either
+// a mistake (paste of an entire row) or a slow-LIKE DoS attempt against
+// the companion's SQL full-text index.
+const MAX_QUERY_CHARS = 200;
+
 export async function globalSearch(query: string): Promise<SearchResult> {
-    const trimmed = query.trim();
+    if (typeof query !== "string") return EMPTY;
+    const trimmed = query.trim().slice(0, MAX_QUERY_CHARS);
     if (!trimmed) return EMPTY;
 
     const link = await getCompanionLink();
@@ -101,7 +109,7 @@ export async function globalSearch(query: string): Promise<SearchResult> {
             playlists: playlistMatches,
         };
     } catch (err) {
-        console.warn("[search] globalSearch failed:", err);
+        log.warn("search.globalSearch failed", undefined, err);
         return EMPTY;
     }
 }

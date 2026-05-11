@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireSessionWithRate } from "@/lib/api-guard";
 import { spawn } from "child_process";
 
 // ─── Types ───────────────────────────────────────────────────────────────
@@ -591,6 +592,8 @@ async function searchProvider(provider: string, query: string, limit: number, se
 // ─── Route Handler ───────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+    const guard = await requireSessionWithRate(request, { bucket: "download-search", windowMs: 60_000, max: 30 });
+    if (guard.response) return guard.response;
     try {
         const body = await request.json();
         const query = body?.query;
