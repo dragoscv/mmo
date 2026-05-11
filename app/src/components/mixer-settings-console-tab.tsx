@@ -12,6 +12,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useMidi } from "@/hooks/use-midi";
 import { listDriverInfos, detectDriverForDevice } from "@/lib/controllers/drivers/registry";
 import { GenericMidiDriver } from "@/lib/controllers/controller-driver";
@@ -42,6 +43,7 @@ function previewColor(preset: ColorPreset, role: ColorRole): string {
 
 export function ConsoleTab() {
     const midi = useMidi();
+    const t = useTranslations("mixerConsole");
     const driverInfos = useMemo(() => listDriverInfos(), []);
     const activeControllers = useActiveControllers();
     const [diag, setDiag] = useState<BindDiagnosticResult | null>(null);
@@ -66,31 +68,31 @@ export function ConsoleTab() {
             <section className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-3">
                 <div className="flex items-center gap-2 mb-2">
                     <Gamepad2 className="w-3.5 h-3.5 text-white/40" />
-                    <span className="text-[11px] uppercase tracking-wider text-white/50 font-medium">Connected Controllers</span>
+                    <span className="text-[11px] uppercase tracking-wider text-white/50 font-medium">{t("connectedControllers")}</span>
                     <div className="ml-auto flex items-center gap-3">
                         <button
                             type="button"
                             onClick={() => { void midi.refreshDevices(); }}
-                            title="Re-scan MIDI devices"
+                            title={t("refreshTitle")}
                             className="inline-flex items-center gap-1 text-[10px] text-white/40 hover:text-white/80 transition-colors cursor-pointer"
                         >
-                            <RefreshCw className="w-3 h-3" /> Refresh
+                            <RefreshCw className="w-3 h-3" /> {t("refresh")}
                         </button>
                         <button
                             type="button"
                             onClick={() => { rebindAllControllers(); }}
-                            title="Tear down and re-bind every controller driver — use if a device shows 'Not bound' even though it's connected"
+                            title={t("rebindTitle")}
                             className="inline-flex items-center gap-1 text-[10px] text-white/40 hover:text-white/80 transition-colors cursor-pointer"
                         >
-                            <Sparkles className="w-3 h-3" /> Re-bind
+                            <Sparkles className="w-3 h-3" /> {t("rebind")}
                         </button>
                         <button
                             type="button"
                             onClick={() => { setDiag(runBindDiagnostic()); }}
-                            title="Run an end-to-end diagnostic that bypasses React and pokes the MIDI engine directly"
+                            title={t("diagnoseTitle")}
                             className="inline-flex items-center gap-1 text-[10px] text-emerald-400/60 hover:text-emerald-300 transition-colors cursor-pointer"
                         >
-                            <Stethoscope className="w-3 h-3" /> Diagnose
+                            <Stethoscope className="w-3 h-3" /> {t("diagnose")}
                         </button>
                     </div>
                 </div>
@@ -98,7 +100,7 @@ export function ConsoleTab() {
                 {connectedOutputs.length === 0 ? (
                     <div className="flex items-center gap-2 text-[10px] text-white/40 bg-white/[0.02] border border-white/[0.04] rounded px-2.5 py-2">
                         <AlertCircle className="w-3 h-3 shrink-0" />
-                        No controllers detected. Plug in a MIDI device with an output port (most DJ controllers) and click Refresh.
+                        {t("noControllers")}
                     </div>
                 ) : (
                     <ul className="space-y-1.5">
@@ -110,7 +112,7 @@ export function ConsoleTab() {
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="min-w-0">
                                             <div className="text-[11px] font-medium text-white/85 truncate">{device.name}</div>
-                                            <div className="text-[9px] text-white/35 truncate">{device.manufacturer || "Unknown vendor"}</div>
+                                            <div className="text-[9px] text-white/35 truncate">{device.manufacturer || t("unknownVendor")}</div>
                                         </div>
                                         <div className="flex flex-col items-end gap-0.5 shrink-0">
                                             <span className={cn(
@@ -126,7 +128,7 @@ export function ConsoleTab() {
                                                 isBound ? "text-emerald-400/85" : "text-white/30"
                                             )}>
                                                 {isBound ? <CheckCircle2 className="w-2.5 h-2.5" /> : <AlertCircle className="w-2.5 h-2.5" />}
-                                                {isBound ? "Driver active" : "Not bound"}
+                                                {isBound ? t("driverActive") : t("notBound")}
                                             </span>
                                         </div>
                                     </div>
@@ -259,29 +261,29 @@ export function ConsoleTab() {
 
                 {/* Driver override */}
                 <div className="mt-3">
-                    <label className="text-[10px] text-white/40 block mb-1">Force driver (advanced)</label>
+                    <label className="text-[10px] text-white/40 block mb-1">{t("forceDriver")}</label>
                     <select
                         value={midi.settings.controllerDriverId ?? ""}
                         onChange={e => midi.updateSettings({ controllerDriverId: e.target.value || null })}
                         className="w-full text-[10px] bg-black/30 border border-white/[0.08] rounded px-2 py-1.5 text-white/70 outline-none cursor-pointer hover:bg-black/40 transition-colors"
                     >
-                        <option value="">Auto-detect from device name (recommended)</option>
+                        <option value="">{t("autoDetect")}</option>
                         {driverInfos.filter(i => i.id !== "generic-midi").map(info => (
                             <option key={info.id} value={info.id}>{info.name}</option>
                         ))}
                     </select>
-                    <p className="text-[9px] text-white/25 mt-1">Override the auto-detected driver — useful if your controller reports an unusual MIDI name.</p>
+                    <p className="text-[9px] text-white/25 mt-1">{t("forceDriverHint")}</p>
                 </div>
 
                 <button
                     type="button"
                     onClick={identifyAllControllers}
                     disabled={activeControllers.length === 0}
-                    title={activeControllers.length === 0 ? "No driver is currently bound to a controller — see status above" : "Flash all LEDs on every connected controller"}
+                    title={activeControllers.length === 0 ? t("flashLedsDisabled") : t("flashLedsTitle")}
                     className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[10px] font-medium bg-purple-500/15 border border-purple-500/25 text-purple-200 hover:bg-purple-500/25 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                     <Sparkles className="w-3 h-3" />
-                    Flash all LEDs ({activeControllers.length} active driver{activeControllers.length === 1 ? "" : "s"})
+                    {t("flashLeds", { count: activeControllers.length })}
                 </button>
             </section>
 
@@ -289,10 +291,10 @@ export function ConsoleTab() {
             <section className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-3">
                 <div className="flex items-center gap-2 mb-2">
                     <Lightbulb className="w-3.5 h-3.5 text-white/40" />
-                    <span className="text-[11px] uppercase tracking-wider text-white/50 font-medium">LED Color Preset</span>
+                    <span className="text-[11px] uppercase tracking-wider text-white/50 font-medium">{t("ledPreset")}</span>
                 </div>
                 <p className="text-[10px] text-white/35 mb-2.5">
-                    These colours are pushed to your controller&apos;s LEDs. Non-RGB controllers (DDJ-FLX4) use the perceived brightness of each colour to drive their single-colour LEDs.
+                    {t("ledPresetDesc")}
                 </p>
 
                 <div className="grid grid-cols-2 gap-1.5">
@@ -312,7 +314,7 @@ export function ConsoleTab() {
                             >
                                 <div className="flex items-center justify-between gap-1.5 mb-1.5">
                                     <span className="text-[10.5px] font-medium text-white/85 truncate">{p.name}</span>
-                                    {active && <span className="text-[8.5px] px-1 py-px rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Active</span>}
+                                    {active && <span className="text-[8.5px] px-1 py-px rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">{t("active")}</span>}
                                 </div>
                                 <div className="flex gap-1 mb-1">
                                     {HOT_CUE_ROLES.map(role => (
@@ -332,7 +334,7 @@ export function ConsoleTab() {
 
             {/* ── Live preview ──────────────────────────────────────────── */}
             <section className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-3">
-                <div className="text-[11px] uppercase tracking-wider text-white/50 font-medium mb-2">Color Preview</div>
+                <div className="text-[11px] uppercase tracking-wider text-white/50 font-medium mb-2">{t("colorPreview")}</div>
                 <div className="grid grid-cols-4 gap-1.5">
                     {PREVIEW_ROLES.map(({ role, label }) => (
                         <div key={role} className="flex flex-col items-center gap-1 py-1.5 rounded bg-black/30 border border-white/[0.04]">

@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 8 (batch i18n: mixer-settings-console-tab)
+
+Second slice of Q8.5. Localized `app/src/components/mixer-settings-console-tab.tsx` (Console tab in mixer settings) — section titles, action buttons (Refresh / Re-bind / Diagnose), empty/error states, driver status chips ("Driver active" / "Not bound"), driver override label + helper, "Flash all LEDs" CTA (with ICU plural for the active-driver count), LED preset section header + description, "Active" badge, "Color Preview" header. The internal Bind Diagnostic block + raw MIDI port listing stay English on purpose — they're expert debug surfaces and translating field names like "Drivers ref size" would obscure them.
+
+- `app/messages/en.json` + `app/messages/ro.json` — new `mixerConsole.*` namespace (22 keys) in both locales. Romanian uses ICU plural for `flashLeds`.
+
+Verified: 0 TSC errors, 283 tests still green across 29 files, 0 new lint errors above baseline.
+
 ### Added — Audit round 8 (batch i18n: onboarding-wizard + perf-config-modal)
 
 Closes the first slice of Q8.5 (i18n mega-batch — top 20 untranslated files). Two high-visibility components fully localised in both `en` and `ro` this batch; the remaining 18 files (sound-editor-page, track-detail-modal, download-client, analysis-client, equalizer, daw-export-modal, mixer-view, settings-client, mixer-settings-console-tab, devices-client, performance-stats, circuit-tracks-panel, playlists-client, now-playing, library-client, legend-modal, daw-browser, analyze-modal) will follow in subsequent batches.
