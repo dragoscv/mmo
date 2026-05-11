@@ -12,7 +12,7 @@
  * adds a one-click "copy audio" step via a companion endpoint.
  */
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import {
     Dialog,
@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Usb, Download, FileText, Disc3 } from "lucide-react";
+import { Loader2, Usb, Download, FileText, Disc3, GitCompareArrows } from "lucide-react";
 import { toast } from "sonner";
 import {
     exportPlaylistToCrate,
@@ -34,6 +34,13 @@ import {
     exportPlaylistToXml,
     exportAllPlaylistsToXml,
 } from "@/actions/playlists";
+import { getPlaylistTrackIds } from "@/actions/export-diff";
+import {
+    diffExport,
+    getExportSnapshot,
+    recordExportSnapshot,
+    type ExportDiff,
+} from "@/lib/export-history";
 
 interface Props {
     open: boolean;
@@ -75,10 +82,32 @@ export function UsbExportWizard({
     const [emitCrate, setEmitCrate] = useState(true);
     const [musicSubdir, setMusicSubdir] = useState("Music");
     const [pending, startTransition] = useTransition();
+    const [xmlDiff, setXmlDiff] = useState<ExportDiff | null>(null);
+    const [crateDiff, setCrateDiff] = useState<ExportDiff | null>(null);
     const t = useTranslations("usb");
+    const tDiff = useTranslations("exportDiff");
     const tCommon = useTranslations("common");
 
     const canActive = activePlaylistId !== undefined;
+
+    // Resolve a diff preview when the user has scope=active + a playlist
+    // selected. The async resolver writes to state after a microtask, which
+    // satisfies `react-hooks/set-state-in-effect`. Stale diffs are masked at
+    // render-time by the same scope/canActive guard.
+    useEffect(() => {
+        if (!open || scope !== "active" || !canActive || activePlaylistId === undefined) {
+            return;
+        }
+        let cancelled = false;
+        getPlaylistTrackIds(activePlaylistId).then((r) => {
+            if (cancelled || !r.ok) return;
+            setXmlDiff(diffExport(getExportSnapshot("xml", activePlaylistId), r.trackIds));
+            setCrateDiff(diffExport(getExportSnapshot("crate", activePlaylistId), r.trackIds));
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [open, scope, canActive, activePlaylistId]);
 
     function handleExport() {
         if (!emitXml && !emitCrate) {
@@ -94,9 +123,14 @@ export function UsbExportWizard({
             try {
                 if (scope === "active") {
                     const name = activePlaylistName ?? "playlist";
+                    // Resolve the current track-id set once so we can both
+                    // export and snapshot from the same source of truth.
+                    const idsResult = await getPlaylistTrackIds(activePlaylistId!);
+                    const currentIds = idsResult.ok ? idsResult.trackIds : null;
                     if (emitXml) {
                         const xml = await exportPlaylistToXml(activePlaylistId!);
                         downloadBlob(new Blob([xml], { type: "application/xml" }), `${name}.xml`);
+                        if (currentIds) recordExportSnapshot("xml", activePlaylistId!, currentIds);
                     }
                     if (emitCrate) {
                         const r = await exportPlaylistToCrate(activePlaylistId!, musicSubdir);
@@ -105,6 +139,7 @@ export function UsbExportWizard({
                             return;
                         }
                         downloadBlob(base64ToBlob(r.base64), r.filename);
+                        if (currentIds) recordExportSnapshot("crate", activePlaylistId!, currentIds);
                     }
                     toast.success(`Exported "${name}"`);
                 } else {
@@ -236,6 +271,30 @@ export function UsbExportWizard({
                     </div>
                 )}
 
+                {/* Diff preview (only for active-playlist scope with a snapshot to compare) */}
+                {scope === "active" && canActive && (xmlDiff || crateDiff) && (
+                    <div className="rounded-md border border-[var(--border)] bg-[var(--muted)]/30 px-3 py-2 text-sm space-y-2">
+                        <div className="flex items-center gap-2 font-medium text-xs text-[var(--muted-foreground)]">
+                            <GitCompareArrows className="h-3.5 w-3.5" />
+                            {tDiff("title")}
+                        </div>
+                        {emitXml && xmlDiff && (
+                            <DiffRow
+                                label={tDiff("xmlLabel")}
+                                diff={xmlDiff}
+                                tDiff={tDiff}
+                            />
+                        )}
+                        {emitCrate && crateDiff && (
+                            <DiffRow
+                                label={tDiff("crateLabel")}
+                                diff={crateDiff}
+                                tDiff={tDiff}
+                            />
+                        )}
+                    </div>
+                )}
+
                 <DialogFooter>
                     <Button
                         variant="outline"
@@ -255,5 +314,38 @@ export function UsbExportWizard({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+function DiffRow({
+    label,
+    diff,
+    tDiff,
+}: {
+    label: string;
+    diff: ExportDiff;
+    tDiff: ReturnType<typeof useTranslations>;
+}) {
+    if (!diff.hasPrevious) {
+        return (
+            <div className="flex items-center gap-2 text-xs">
+                <span className="font-medium">{label}</span>
+                <span className="text-[var(--muted-foreground)]">{tDiff("firstExport")}</span>
+            </div>
+        );
+    }
+    const sinceDate = diff.previousAt ? new Date(diff.previousAt).toLocaleDateString() : "";
+    return (
+        <div className="flex items-center gap-2 text-xs flex-wrap">
+            <span className="font-medium">{label}</span>
+            <span className="text-emerald-400">+{diff.added.length}</span>
+            <span className="text-rose-400">-{diff.removed.length}</span>
+            <span className="text-[var(--muted-foreground)]">
+                {tDiff("unchanged", { count: diff.unchanged.length })}
+            </span>
+            <span className="text-[var(--muted-foreground)] ml-auto">
+                {tDiff("since", { date: sinceDate })}
+            </span>
+        </div>
     );
 }

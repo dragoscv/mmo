@@ -8,6 +8,7 @@
  */
 
 import nextConfig from "eslint-config-next";
+import reactHooks from "eslint-plugin-react-hooks/index.js";
 
 const config = [
     {
@@ -26,9 +27,11 @@ const config = [
         // Our own overrides. We only touch rules whose plugin is already
         // loaded by `next/core-web-vitals` (eslint-plugin-react +
         // eslint-plugin-react-hooks). Flat-config requires that a rule and
-        // its owning plugin live in the same config object, so anything
-        // `@typescript-eslint/*`-related belongs in the upstream
-        // `next/typescript` block — we don't re-open it here.
+        // its owning plugin live in the same config object, so we re-bind
+        // the react-hooks plugin here for any rules we tweak.
+        plugins: {
+            "react-hooks": reactHooks,
+        },
         rules: {
             // Heavy UTF-8 RO copy with apostrophes / quotes in JSX text.
             "react/no-unescaped-entities": "off",

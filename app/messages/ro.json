@@ -171,6 +171,14 @@
         "statusError": "Eșuat",
         "openButton": "Copiază piesele…"
     },
+    "exportDiff": {
+        "title": "Diferențe față de ultimul export",
+        "xmlLabel": "Rekordbox XML",
+        "crateLabel": "Crate Serato",
+        "firstExport": "Primul export — nu există referință de comparat.",
+        "unchanged": "{count} neschimbate",
+        "since": "de la {date}"
+    },
     "account": {
         "title": "Contul tău",
         "subtitle": "Exportă tot ce avem despre tine, sau șterge complet contul.",

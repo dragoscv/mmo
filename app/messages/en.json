@@ -171,6 +171,14 @@
         "statusError": "Failed",
         "openButton": "Copy audio…"
     },
+    "exportDiff": {
+        "title": "Crate diff vs last export",
+        "xmlLabel": "Rekordbox XML",
+        "crateLabel": "Serato crate",
+        "firstExport": "First export — nothing to compare to.",
+        "unchanged": "{count} unchanged",
+        "since": "since {date}"
+    },
     "account": {
         "title": "Your account",
         "subtitle": "Export everything we have on you, or wipe your account entirely.",

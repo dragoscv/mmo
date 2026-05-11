@@ -12,6 +12,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 8 (batch crate diff: "what changed since last USB export")
+
+Closes Q8.12c (one of the three "surprise me" picks). When the user re-exports a playlist for their USB drive, the wizard now shows a one-line diff against the previously exported set so they know which tracks will be added/removed in Rekordbox/Serato.
+
+- **`app/src/lib/export-history.ts`** — new pure module with a localStorage-backed snapshot store (`mmo:export-history:${format}` keyed by playlist id, capped at 100 playlists per format to keep the localStorage budget bounded). Exports `diffExport(previous, currentTrackIds): ExportDiff` (pure, returns `{ added, removed, unchanged, hasPrevious, previousAt }`) plus `recordExportSnapshot()` and `getExportSnapshot()` helpers. localStorage chosen over a DB migration because exports are inherently per-device — sharing diff state across machines would be wrong (different USB drives = different export history).
+- **`app/src/lib/export-history.test.ts`** — 10 new tests (4 pure for `diffExport`, 6 round-trips against jsdom-mocked localStorage) including malformed-JSON resilience. Suite now at **273 tests / 28 files** (was 263/27).
+- **`app/src/actions/export-diff.ts`** — `getPlaylistTrackIds(playlistId)` server action wrapping `companionLibrary.getPlaylistTracks(link, id, 1, 100000)` (same cap as the existing export actions). Returns just the id list — small enough to ship to the wizard for diffing without paying the full track-row payload cost.
+- **`app/src/components/usb-export-wizard.tsx`** — wired the diff. New `useEffect` fires when `scope === "active" && open` and resolves both XML- and crate-format diffs in parallel. The synchronous "no-op when conditions miss" branch returns without touching state to satisfy the `react-hooks/set-state-in-effect` rule (state writes happen only inside the async resolver). New `<DiffRow>` panel renders between the format checkboxes and the dialog footer with `+N / -M / K unchanged` chips and a localised "since {date}" timestamp. After a successful active-scope export, `recordExportSnapshot()` writes the new snapshot keyed by format so the next open shows the delta.
+- **`app/messages/en.json` + `app/messages/ro.json`** — new `exportDiff.*` namespace (6 keys × 2 locales).
+- **`app/eslint.config.mjs`** — fixed pre-existing flat-config break: ESLint 9.39 + `eslint-plugin-react-hooks` 7.x require the plugin to be explicitly bound in the same config object that defines its rules. Added `eslint-plugin-react-hooks` as a direct devDependency (was previously transitively present via `eslint-config-next` but pnpm's strict resolution hid it from the root) and re-bound the `react-hooks` plugin in our overrides block. `pnpm lint:check` is green again.
+
 ### Added — Audit round 8 (batch lighthouse-ci budgets in CI)
 
 Closes Q8.10. The previous answer (round 7) was "trust Next code-splitting, skip bundle budget" — Q8 reversed it. Lighthouse CI now runs against a production build on every PR and fails the build if accessibility regresses below the bar.
