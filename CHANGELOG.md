@@ -12,6 +12,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 8 (batch lighthouse-ci budgets in CI)
+
+Closes Q8.10. The previous answer (round 7) was "trust Next code-splitting, skip bundle budget" — Q8 reversed it. Lighthouse CI now runs against a production build on every PR and fails the build if accessibility regresses below the bar.
+
+- **`@lhci/cli` 0.15.1** added as devDependency. New `pnpm lhci` script wires `lhci autorun --config=./lighthouserc.cjs`.
+- **`app/lighthouserc.cjs`** — config that boots a real `pnpm start` (Next.js production bundle on the existing port 13789, not 3000), runs Lighthouse against `/`, `/offline`, `/status` (the three public routes — `/library` and `/mixer` need a Playwright `storageState` fixture for auth, deferred to a follow-up batch). Skips the PWA category (HTTPS/install hard requirements only satisfiable in a real deployment). Hard-fails the build only on `categories:accessibility` < 0.9 (the strict gate); `performance`, `best-practices`, `seo` are `warn`-only for now to avoid red builds while we baseline. Tighten the warn → error after the first run shows real-world numbers.
+- **`.github/workflows/web-app.yml`** — new `lhci` job depends on `ci`, builds with placeholder env vars (`DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL` — public routes don't actually exercise the DB), runs `pnpm lhci`, uploads the `.lighthouseci/` JSON+HTML report as a workflow artifact (14-day retention) regardless of pass/fail so we can debug from the run page. Upload target switched to `filesystem` (default `temporary-public-storage` posts to a Google-hosted endpoint we don't want our build artifacts on).
+- **`app/.gitignore`** — also added `.lighthouseci/`, `playwright-report/`, `test-results/` so the new local-runs don't leak into commits.
+
 ### Added — Audit round 8 (batch companion metrics: internal counter API)
 
 Closes Q8.7. The companion was already accumulating counts and durations across scan-jobs, watchers, and the analyzer, but nothing surfaced them in one place — the dashboard had to glue per-feature endpoints together. This batch adds a single auth-gated `/metrics` endpoint that returns one JSON snapshot of everything the local UI cares about.

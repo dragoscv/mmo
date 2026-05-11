@@ -100,3 +100,54 @@ jobs:
           name: playwright-report
           path: app/playwright-report/
           retention-days: 14
+
+  lhci:
+    name: lighthouse-ci budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: ci
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build production bundle
+        run: pnpm build
+        env:
+          # `next build` walks API routes; provide a no-op DATABASE_URL
+          # so the build phase doesn't try to open a real connection.
+          # The Lighthouse run targets only public routes (/, /offline,
+          # /status) so the DB pool is never actually exercised.
+          DATABASE_URL: "postgres://lhci:lhci@localhost:5432/lhci"
+          NEXTAUTH_SECRET: "lhci-build-only-not-a-real-secret"
+          NEXTAUTH_URL: "http://localhost:13789"
+
+      - name: Run Lighthouse CI
+        # `lhci autorun` boots the production server itself via
+        # startServerCommand from lighthouserc.cjs. Failures only break
+        # the build on assertions tagged "error" (currently just the
+        # accessibility minScore); "warn" assertions are reported but
+        # do not fail CI yet.
+        run: pnpm lhci
+
+      - name: Upload Lighthouse report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: app/.lighthouseci/
+          retention-days: 14
