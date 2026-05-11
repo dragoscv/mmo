@@ -331,6 +331,14 @@ export const companionLibrary = {
     async removeSavedDrive(link: CompanionLink, id: number): Promise<void> {
         await call(link, "DELETE", `/drives/saved/${id}`);
     },
+    /** Non-streaming USB copy. Use `copyTracksToUsb()` (top-level export)
+     *  when you want progress events as the copy runs. */
+    async copyTracksToUsbBatch(
+        link: CompanionLink,
+        opts: { trackIds: number[]; destination: string; musicSubdir?: string },
+    ): Promise<UsbCopyResult> {
+        return call<UsbCopyResult>(link, "POST", `/usb/copy`, { ...opts, stream: false });
+    },
     async getScanLogs(link: CompanionLink, limit = 20): Promise<ScanLogEntry[]> {
         const r = await call<{ logs: ScanLogEntry[] }>(link, "GET", `/scan-logs?limit=${limit}`);
         return r.logs || [];
@@ -631,3 +639,103 @@ export const EMPTY_STATS: DashboardStats = {
     health: { total: 0, missingGenre: 0, missingBpm: 0, missingKey: 0, missingEnergy: 0, missingArtwork: 0 },
     recentTracks: [], topRated: [],
 };
+
+// ─── USB copy: streaming SSE consumer ──────────────────────────────────────
+
+export type UsbCopyStatus = "copied" | "skipped" | "error";
+
+export interface UsbCopyEvent {
+    type: "start" | "progress" | "done";
+    /** total tracks in the request (sent on `start` and every event). */
+    total: number;
+    /** 1-based index of the in-flight track (only on `progress`). */
+    index?: number;
+    status?: UsbCopyStatus;
+    trackId?: number;
+    /** Absolute target path on the destination drive. */
+    file?: string;
+    /** Final on-disk size in bytes, when the operation succeeded. */
+    size?: number;
+    error?: string;
+    /** Cumulative tally (only on `done`). */
+    copied?: number;
+    skipped?: number;
+    errors?: number;
+    /** The fully resolved `<destination>/<musicSubdir>` (sent on `start`). */
+    targetDir?: string;
+}
+
+export interface UsbCopyResult {
+    copied: number;
+    skipped: number;
+    errors: number;
+    total: number;
+}
+
+/**
+ * Stream USB copy progress from the companion.
+ *
+ * Yields `start` once, one `progress` event per track, then a final
+ * `done` event. The caller can break out of the loop early — the
+ * underlying HTTP body is closed by the surrounding `try/finally`,
+ * but the companion will continue copying any in-flight file. There
+ * is no server-side cancel for this MVP; if you need it, wire an
+ * AbortController through the call.
+ */
+export async function* copyTracksToUsb(
+    link: CompanionLink,
+    opts: { trackIds: number[]; destination: string; musicSubdir?: string },
+    signal?: AbortSignal,
+): AsyncGenerator<UsbCopyEvent, void, void> {
+    const url = `${link.apiUrl}/library/usb/copy`;
+    const res = await fetch(url, {
+        method: "POST",
+        headers: {
+            "X-Device-Token": link.token,
+            "X-User-Id": link.userId,
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+        },
+        body: JSON.stringify({ ...opts, stream: true }),
+        cache: "no-store",
+        signal,
+    });
+    if (!res.ok || !res.body) {
+        let detail = "";
+        try { detail = (await res.json()).error ?? ""; } catch { /* ignore */ }
+        throw new Error(`USB copy failed (${res.status})${detail ? ": " + detail : ""}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+        for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            // Split on the SSE record terminator (\n\n).
+            let idx: number;
+            while ((idx = buffer.indexOf("\n\n")) !== -1) {
+                const raw = buffer.slice(0, idx);
+                buffer = buffer.slice(idx + 2);
+                let event = "message";
+                let data = "";
+                for (const line of raw.split("\n")) {
+                    if (line.startsWith("event:")) event = line.slice(6).trim();
+                    else if (line.startsWith("data:")) data += line.slice(5).trim();
+                }
+                if (event !== "start" && event !== "progress" && event !== "done") continue;
+                try {
+                    const payload = JSON.parse(data) as Omit<UsbCopyEvent, "type">;
+                    yield { type: event, ...payload } as UsbCopyEvent;
+                } catch {
+                    // Malformed payload — skip rather than abort the whole stream.
+                }
+            }
+        }
+    } finally {
+        try { reader.releaseLock(); } catch { /* ignore */ }
+    }
+}

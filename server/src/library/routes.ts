@@ -20,7 +20,9 @@ import type { NewTrack } from "./schema";
 import { analyzer, type AnalyzeOptions } from "./analyzer";
 import { enqueueSyncChange } from "../sync";
 import { listConnectedDrives } from "./drives";
+import { validateCopyRequest, resolveTrackTarget } from "./usb-copy";
 import { createReadStream, statSync, existsSync } from "node:fs";
+import { copyFile, mkdir, stat as statAsync } from "node:fs/promises";
 import path from "node:path";
 
 // ─── Sync helpers ───────────────────────────────────────────────────────────
@@ -578,6 +580,176 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
                 error: err instanceof Error ? err.message : "Failed to enumerate drives",
             });
         }
+    });
+
+    // ── USB audio copy ───────────────────────────────────────────────────
+    //
+    // POST /library/usb/copy
+    // Body: { trackIds: number[], destination: string, musicSubdir?: string,
+    //         stream?: boolean }
+    //
+    // Copies the audio files for the given track ids onto the destination
+    // drive at `<destination>/<musicSubdir>/<basename>`. Streams progress
+    // via SSE by default. The Serato / Rekordbox crate writers (which
+    // only emit metadata) live elsewhere — this endpoint moves the bytes.
+    //
+    // SECURITY: the destination MUST be an absolute path; the subdir is
+    // normalised and rejected if it tries to escape the destination root
+    // via `..`. The source filepath is reduced to its basename so a
+    // tampered tracks row can't influence target placement. Per-user
+    // scoping ensures a track id from another user produces a 404, not
+    // an unauthorised copy.
+    router.post("/usb/copy", async (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const body = (req.body ?? {}) as {
+            trackIds?: unknown;
+            destination?: unknown;
+            musicSubdir?: unknown;
+            stream?: unknown;
+        };
+
+        const ids = Array.isArray(body.trackIds)
+            ? body.trackIds.filter((n): n is number => Number.isInteger(n) && n > 0)
+            : [];
+        if (ids.length === 0) {
+            res.status(400).json({ error: "trackIds: non-empty array of positive integers required" });
+            return;
+        }
+        if (ids.length > 5000) {
+            res.status(400).json({ error: "trackIds: at most 5000 per request" });
+            return;
+        }
+
+        const v = validateCopyRequest({
+            destination: body.destination,
+            musicSubdir: body.musicSubdir,
+        });
+        if (!v.ok) { res.status(400).json({ error: v.error }); return; }
+
+        if (!existsSync(v.destination)) {
+            res.status(400).json({ error: "destination does not exist" });
+            return;
+        }
+
+        // Look up rows scoped to the authed user. Drizzle's `inArray`
+        // with a 5000-item cap above keeps the SQL parameter count
+        // well under SQLite's 32766 limit.
+        const db = getLibraryDb();
+        const rows = db
+            .select({ id: tracks.id, filepath: tracks.filepath, title: tracks.title })
+            .from(tracks)
+            .where(and(eq(tracks.userId, userId), inArray(tracks.id, ids)))
+            .all();
+
+        // Ensure the target subdir exists (recursive — covers Music/2025).
+        try {
+            await mkdir(v.targetDir, { recursive: true });
+        } catch (err) {
+            res.status(500).json({
+                error: err instanceof Error ? err.message : "Failed to create target dir",
+            });
+            return;
+        }
+
+        const useStream = body.stream !== false;
+        if (useStream) {
+            res.status(200);
+            res.setHeader("Content-Type", "text/event-stream");
+            res.setHeader("Cache-Control", "no-cache");
+            res.setHeader("Connection", "keep-alive");
+            res.setHeader("X-Accel-Buffering", "no");
+            const send = (event: string, data: unknown) => {
+                res.write(`event: ${event}\n`);
+                res.write(`data: ${JSON.stringify(data)}\n\n`);
+            };
+            let copied = 0;
+            let skipped = 0;
+            let errors = 0;
+            const total = rows.length;
+            send("start", { total, targetDir: v.targetDir });
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row.filepath) {
+                    errors++;
+                    send("progress", { index: i + 1, total, status: "error", error: "no filepath", trackId: row.id });
+                    continue;
+                }
+                try {
+                    let target: string;
+                    try {
+                        target = resolveTrackTarget(v.targetDir, row.filepath);
+                    } catch (e) {
+                        errors++;
+                        send("progress", {
+                            index: i + 1, total, status: "error",
+                            error: e instanceof Error ? e.message : "bad source filename",
+                            trackId: row.id,
+                        });
+                        continue;
+                    }
+                    if (!existsSync(row.filepath)) {
+                        errors++;
+                        send("progress", {
+                            index: i + 1, total, status: "error",
+                            error: "source missing", trackId: row.id, file: row.filepath,
+                        });
+                        continue;
+                    }
+                    // Skip when target already exists with the same size
+                    // (cheap idempotency — full sha verification would
+                    // double the I/O for a feature users run repeatedly).
+                    if (existsSync(target)) {
+                        const [src, dst] = await Promise.all([
+                            statAsync(row.filepath),
+                            statAsync(target),
+                        ]);
+                        if (src.size === dst.size) {
+                            skipped++;
+                            send("progress", {
+                                index: i + 1, total, status: "skipped",
+                                trackId: row.id, file: target, size: dst.size,
+                            });
+                            continue;
+                        }
+                    }
+                    await copyFile(row.filepath, target);
+                    const final = await statAsync(target);
+                    copied++;
+                    send("progress", {
+                        index: i + 1, total, status: "copied",
+                        trackId: row.id, file: target, size: final.size,
+                    });
+                } catch (e) {
+                    errors++;
+                    send("progress", {
+                        index: i + 1, total, status: "error",
+                        error: e instanceof Error ? e.message : String(e),
+                        trackId: row.id,
+                    });
+                }
+            }
+            send("done", { copied, skipped, errors, total });
+            res.end();
+            return;
+        }
+
+        // Non-streaming fallback.
+        let copied = 0, skipped = 0, errors = 0;
+        for (const row of rows) {
+            if (!row.filepath || !existsSync(row.filepath)) { errors++; continue; }
+            try {
+                const target = resolveTrackTarget(v.targetDir, row.filepath);
+                if (existsSync(target)) {
+                    const [src, dst] = await Promise.all([
+                        statAsync(row.filepath), statAsync(target),
+                    ]);
+                    if (src.size === dst.size) { skipped++; continue; }
+                }
+                await copyFile(row.filepath, target);
+                copied++;
+            } catch { errors++; }
+        }
+        res.json({ copied, skipped, errors, total: rows.length });
     });
 
     // Saved-drive metadata (user-given labels for "My CDJ USB" etc.).
