@@ -12,6 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch i18n: dictionary expansion + palette/USB wizard wiring)
+
+- **`messages/en.json` + `messages/ro.json` expanded** with 4 new top-level namespaces — `palette` (command-palette chrome incl. an ICU plural for the result count), `usb` (full export wizard chrome), `library` (header + bulk actions copy), and a wider `common` (close/open/back/next/yes/no/play/pause/edit/rename/duplicate/etc.). `auth` gained GitHub + magic-link copy. Both locale files always kept in sync key-for-key per the project's locale rule.
+- **`<GlobalSearch>` (command palette) fully localised** — placeholder, "Actions" and "Pages" group headings, all 4 action labels (incl. dynamic enter/exit Focus copy), result-count summary using next-intl's `{count, plural, one {…} other {…}}` ICU syntax (Romanian gets the proper `few` form for 2-19 too), no-results / try-different / searching states, and the Tracks / Artists / Albums / Genres / Playlists section headings. Page nav labels reuse the existing `nav.*` namespace.
+- **`<UsbExportWizard>` fully localised** — title, subtitle, scope toggle (active / all), format checkboxes (Rekordbox XML / Serato .crate), music-subdir field + hint, action buttons (Cancel / Export / Exporting…), and the "pick at least one format" toast.
+- **Verified**: tsc clean, **209 tests pass**, lint baseline unchanged (20). i18n adoption rate doubled across user-visible chrome surfaces touched in the round-6 batches; future batches can extend without changing the dictionary shape.
+
 ### Added — Audit round 6 (batch cmdk: command palette Actions section)
 
 - **Actions** section in the existing global command palette (`<GlobalSearch>`, ⌘K / Ctrl+K). Four executable commands above the Pages list when no query is typed:

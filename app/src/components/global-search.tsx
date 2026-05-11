@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Command,
   CommandList,
@@ -44,14 +45,14 @@ import { useFocusMode } from "@/components/focus-mode-context";
 import { signOutAndPurge } from "@/lib/auth-client";
 
 const PAGES = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard, keywords: "home overview stats" },
-  { label: "Library", href: "/library", icon: Library, keywords: "tracks songs music browse" },
-  { label: "Playlists", href: "/playlists", icon: ListMusic, keywords: "playlist collections sets" },
-  { label: "Visualizations", href: "/visualizations", icon: AudioWaveform, keywords: "charts graphs visual" },
-  { label: "Scanner", href: "/scanner", icon: ScanSearch, keywords: "scan import analyze folder" },
-  { label: "Drives", href: "/drives", icon: HardDrive, keywords: "usb disk drive export" },
-  { label: "Settings", href: "/settings", icon: Settings, keywords: "preferences config options" },
-];
+  { label: "Dashboard", key: "dashboard", href: "/", icon: LayoutDashboard, keywords: "home overview stats" },
+  { label: "Library", key: "library", href: "/library", icon: Library, keywords: "tracks songs music browse" },
+  { label: "Playlists", key: "playlists", href: "/playlists", icon: ListMusic, keywords: "playlist collections sets" },
+  { label: "Visualizations", key: "visualizations", href: "/visualizations", icon: AudioWaveform, keywords: "charts graphs visual" },
+  { label: "Scanner", key: "scanner", href: "/scanner", icon: ScanSearch, keywords: "scan import analyze folder" },
+  { label: "Drives", key: "drives", href: "/drives", icon: HardDrive, keywords: "usb disk drive export" },
+  { label: "Settings", key: "settings", href: "/settings", icon: Settings, keywords: "preferences config options" },
+] as const;
 
 interface GlobalSearchProps {
   open: boolean;
@@ -64,6 +65,8 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const player = usePlayer();
   const { noteNotations } = useDAWSettings();
   const { isFocusMode, toggleFocusMode } = useFocusMode();
+  const t = useTranslations("palette");
+  const tNav = useTranslations("nav");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -168,7 +171,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
             <Search className="mr-3 h-4 w-4 shrink-0 text-muted-foreground/60" />
             <CommandPrimitive.Input
               ref={inputRef}
-              placeholder="Search tracks, artists, albums, playlists..."
+              placeholder={t("placeholder")}
               value={query}
               onValueChange={setQuery}
               className="flex h-12 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -185,7 +188,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
             {/* No query → show pages & quick actions */}
             {!hasQuery && (
               <>
-                <CommandGroup heading="Actions">
+                <CommandGroup heading={t("actions")}>
                   <CommandItem
                     value="action-toggle-focus toggle focus mode hide chrome"
                     onSelect={() => {
@@ -201,7 +204,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">
-                        {isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode"}
+                        {isFocusMode ? t("exitFocus") : t("enterFocus")}
                       </p>
                     </div>
                     <CommandShortcut>F</CommandShortcut>
@@ -218,7 +221,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                       <RefreshCw className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium">Refresh page</p>
+                      <p className="text-sm font-medium">{t("refresh")}</p>
                     </div>
                   </CommandItem>
                   <CommandItem
@@ -230,8 +233,8 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                       <Sparkles className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium">USB Export Wizard</p>
-                      <p className="text-[11px] text-muted-foreground/60">Rekordbox XML / Serato .crate</p>
+                      <p className="text-sm font-medium">{t("usbWizard")}</p>
+                      <p className="text-[11px] text-muted-foreground/60">{t("usbWizardHint")}</p>
                     </div>
                   </CommandItem>
                   <CommandItem
@@ -246,12 +249,12 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                       <LogOut className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium">Sign out</p>
+                      <p className="text-sm font-medium">{t("signOut")}</p>
                     </div>
                   </CommandItem>
                 </CommandGroup>
                 <CommandSeparator className="my-1" />
-                <CommandGroup heading="Pages">
+                <CommandGroup heading={t("pages")}>
                   {PAGES.map((page) => (
                     <CommandItem
                       key={page.href}
@@ -263,7 +266,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                         <page.icon className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{page.label}</p>
+                        <p className="text-sm font-medium">{tNav(page.key)}</p>
                       </div>
                       <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40" />
                     </CommandItem>
@@ -277,7 +280,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
               <div className="flex items-center justify-center py-12">
                 <div className="flex flex-col items-center gap-3">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
-                  <p className="text-xs text-muted-foreground/50">Searching...</p>
+                  <p className="text-xs text-muted-foreground/50">{t("searching")}</p>
                 </div>
               </div>
             )}
@@ -287,10 +290,10 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
               <div className="flex flex-col items-center justify-center py-12 gap-2">
                 <Search className="h-8 w-8 text-muted-foreground/20" />
                 <p className="text-sm text-muted-foreground/50">
-                  No results for &ldquo;{query}&rdquo;
+                  {t("noResults", { query })}
                 </p>
                 <p className="text-xs text-muted-foreground/30">
-                  Try searching for a different term
+                  {t("tryDifferent")}
                 </p>
               </div>
             )}
@@ -301,13 +304,13 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                 {/* Summary */}
                 <div className="px-3 py-1.5">
                   <p className="text-[11px] font-medium text-muted-foreground/50">
-                    {totalResults} result{totalResults !== 1 ? "s" : ""} for &ldquo;{query}&rdquo;
+                    {t("resultsCount", { count: totalResults, query })}
                   </p>
                 </div>
 
                 {/* Tracks */}
                 {results.tracks.length > 0 && (
-                  <CommandGroup heading="Tracks">
+                  <CommandGroup heading={t("tracks")}>
                     {results.tracks.map((track) => (
                       <CommandItem
                         key={`track-${track.id}`}
@@ -360,7 +363,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                 {results.artists.length > 0 && (
                   <>
                     <CommandSeparator className="my-1" />
-                    <CommandGroup heading="Artists">
+                    <CommandGroup heading={t("artists")}>
                       {results.artists.map((artist) => (
                         <CommandItem
                           key={`artist-${artist.name}`}
@@ -391,7 +394,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                 {results.albums.length > 0 && (
                   <>
                     <CommandSeparator className="my-1" />
-                    <CommandGroup heading="Albums">
+                    <CommandGroup heading={t("albums")}>
                       {results.albums.map((album) => (
                         <CommandItem
                           key={`album-${album.name}`}
@@ -427,7 +430,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                 {results.genres.length > 0 && (
                   <>
                     <CommandSeparator className="my-1" />
-                    <CommandGroup heading="Genres">
+                    <CommandGroup heading={t("genres")}>
                       {results.genres.map((genre) => (
                         <CommandItem
                           key={`genre-${genre.name}`}
@@ -458,7 +461,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                 {results.playlists.length > 0 && (
                   <>
                     <CommandSeparator className="my-1" />
-                    <CommandGroup heading="Playlists">
+                    <CommandGroup heading={t("playlists")}>
                       {results.playlists.map((pl) => (
                         <CommandItem
                           key={`playlist-${pl.id}`}

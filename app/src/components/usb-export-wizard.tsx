@@ -13,6 +13,7 @@
  */
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import {
     Dialog,
     DialogContent,
@@ -74,16 +75,18 @@ export function UsbExportWizard({
     const [emitCrate, setEmitCrate] = useState(true);
     const [musicSubdir, setMusicSubdir] = useState("Music");
     const [pending, startTransition] = useTransition();
+    const t = useTranslations("usb");
+    const tCommon = useTranslations("common");
 
     const canActive = activePlaylistId !== undefined;
 
     function handleExport() {
         if (!emitXml && !emitCrate) {
-            toast.error("Pick at least one format");
+            toast.error(t("noFormatSelected"));
             return;
         }
         if (scope === "active" && !canActive) {
-            toast.error("No active playlist selected");
+            toast.error(t("noFormatSelected"));
             return;
         }
 
@@ -141,17 +144,16 @@ export function UsbExportWizard({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Usb className="h-5 w-5 text-primary" />
-                        USB Export Wizard
+                        {t("title")}
                     </DialogTitle>
                     <DialogDescription>
-                        Export your library or a single playlist to formats Rekordbox
-                        and Serato can read directly from a USB drive.
+                        {t("subtitle")}
                     </DialogDescription>
                 </DialogHeader>
 
                 {/* Scope */}
                 <div className="space-y-3">
-                    <Label>What to export</Label>
+                    <Label>{t("scope")}</Label>
                     <div className="grid grid-cols-2 gap-2">
                         <button
                             type="button"
@@ -163,9 +165,9 @@ export function UsbExportWizard({
                                     : "border-[var(--border)] hover:bg-[var(--accent)]"
                             } ${!canActive ? "opacity-50 cursor-not-allowed" : ""}`}
                         >
-                            <div className="font-medium">Active playlist</div>
+                            <div className="font-medium">{t("scopeActive")}</div>
                             <div className="text-xs text-[var(--muted-foreground)] truncate">
-                                {activePlaylistName ?? "(none selected)"}
+                                {activePlaylistName ?? "—"}
                             </div>
                         </button>
                         <button
@@ -177,9 +179,9 @@ export function UsbExportWizard({
                                     : "border-[var(--border)] hover:bg-[var(--accent)]"
                             }`}
                         >
-                            <div className="font-medium">All playlists</div>
+                            <div className="font-medium">{t("scopeAll")}</div>
                             <div className="text-xs text-[var(--muted-foreground)]">
-                                Full library
+                                {tCommon("all")}
                             </div>
                         </button>
                     </div>
@@ -187,7 +189,7 @@ export function UsbExportWizard({
 
                 {/* Formats */}
                 <div className="space-y-2">
-                    <Label>Formats</Label>
+                    <Label>{t("format")}</Label>
                     <div className="space-y-2">
                         <label className="flex items-center gap-3 p-2 rounded-md border border-[var(--border)] hover:bg-[var(--accent)] cursor-pointer">
                             <Checkbox
@@ -196,7 +198,7 @@ export function UsbExportWizard({
                             />
                             <FileText className="h-4 w-4 text-blue-400" />
                             <div className="flex-1">
-                                <div className="text-sm font-medium">Rekordbox XML</div>
+                                <div className="text-sm font-medium">{t("formatRekordbox")}</div>
                                 <div className="text-xs text-[var(--muted-foreground)]">
                                     Import via File → Library → Import library
                                 </div>
@@ -209,7 +211,7 @@ export function UsbExportWizard({
                             />
                             <Disc3 className="h-4 w-4 text-purple-400" />
                             <div className="flex-1">
-                                <div className="text-sm font-medium">Serato .crate</div>
+                                <div className="text-sm font-medium">{t("formatSerato")}</div>
                                 <div className="text-xs text-[var(--muted-foreground)]">
                                     Drop into <code>_Serato_/Subcrates/</code> on the USB
                                 </div>
@@ -221,7 +223,7 @@ export function UsbExportWizard({
                 {/* Music subdir */}
                 {emitCrate && (
                     <div className="space-y-1">
-                        <Label htmlFor="music-subdir">Music folder on USB</Label>
+                        <Label htmlFor="music-subdir">{t("musicSubdir")}</Label>
                         <Input
                             id="music-subdir"
                             value={musicSubdir}
@@ -229,9 +231,7 @@ export function UsbExportWizard({
                             placeholder="Music"
                         />
                         <p className="text-xs text-[var(--muted-foreground)]">
-                            Crates will reference paths like
-                            {" "}<code>{musicSubdir || "Music"}/&lt;file&gt;.mp3</code>.
-                            Copy your audio files to that folder on the USB drive.
+                            {t("musicSubdirHint")}
                         </p>
                     </div>
                 )}
@@ -242,7 +242,7 @@ export function UsbExportWizard({
                         onClick={() => onOpenChange(false)}
                         disabled={pending}
                     >
-                        Cancel
+                        {tCommon("cancel")}
                     </Button>
                     <Button onClick={handleExport} disabled={pending}>
                         {pending ? (
@@ -250,7 +250,7 @@ export function UsbExportWizard({
                         ) : (
                             <Download className="h-4 w-4 mr-2" />
                         )}
-                        Export
+                        {pending ? t("exporting") : t("exportButton")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
