@@ -12,6 +12,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 7 (Q7.9 spike: Rekordbox `export.pdb` writer — research + reader)
+
+One-batch research spike on whether MMO should ship a direct binary writer for Pioneer's `PIONEER/rekordbox/export.pdb` USB database, or stay on the existing XML-export + manual-import path. **Conclusion: don't ship a writer**, full rationale in `concept/rekordbox-pdb.md`.
+
+- **`concept/rekordbox-pdb.md`** — long-form design notes (~280 lines): TL;DR + recommendation, format crash-course (header layout, the 21 known table types, row encoding gotchas), references (Deep-Symmetry's `crate-digger` and the `rekordbox_pdb.ksy` Kaitai schema, `pyrekordbox`), risk register (legal posture re: Pioneer/AlphaTheta trademarks + clean-room reimplementation; format drift across firmware bumps; data-corruption blast radius if a `.pdb` is mis-written; need for a CDJ-3000 or XDJ-RX3 integrity test rig), four alternative paths (direct writer / XML+manual / drive Rekordbox 6 SQLite via `pyrekordbox`-style SQLCipher / wait for Pioneer API) with a comparison table, and a concrete "what a writer would have to do" sketch listing the four hardest sub-tasks (custom 16-bit row checksum, three-way string pickling rules, page balancing for oversized rows, index page layout).
+- **`server/src/library/rekordbox-pdb.ts`** — reader-only spike paired with the prose doc so the format claims are type-checked: `parseRekordboxPdbHeader(Buffer): RekordboxPdbHeader` validates page size + table count + buffer length, `readRekordboxPdbTableDescriptors()` decodes the 16-byte descriptors that follow, and `buildRekordboxPdbHeaderFixture()` produces a header-only buffer for tests so we don't have to check a real Pioneer `.pdb` into git. Throws on implausible page sizes (must be a 512-byte multiple in [512, 65536]) and on table counts that would extend past the buffer.
+- **`server/src/library/rekordbox-pdb.test.ts`** — 5 new tests: round-trip a 4-table fixture, reject buffers too small for the header, reject implausible page sizes, reject implausible table counts, reject headers that promise more tables than the buffer holds. Server suite now **39 tests** across 4 files (was 34 / 3).
+- **No production code wired in.** This deliberately stops at the spike. The reader is documentation-as-code; if someone later argues for path C (`pyrekordbox`-style SQLCipher into Rekordbox 6 desktop DB) or the writer is reconsidered, this module is the entry point. The recommendation in the doc is to revisit only if Pioneer/AlphaTheta publishes an official spec.
+
 ### Added — Audit round 7 (batch Companion release pipeline hardening)
 
 The cross-platform Companion release workflow already shipped Win + macOS + Linux installers on tag push; this batch closes two gaps that bit during the v0.9.x line:
