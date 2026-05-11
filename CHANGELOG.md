@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 8 (batch companion metrics: internal counter API)
+
+Closes Q8.7. The companion was already accumulating counts and durations across scan-jobs, watchers, and the analyzer, but nothing surfaced them in one place — the dashboard had to glue per-feature endpoints together. This batch adds a single auth-gated `/metrics` endpoint that returns one JSON snapshot of everything the local UI cares about.
+
+- **`server/src/metrics.ts`** — pure `buildCompanionMetrics(version): Promise<CompanionMetrics>` aggregator. Pulls live state from `listAllScanJobs()` (active/completed/failed counts, average scan duration in seconds across completed jobs, sum of `discovered`/`scanned`/`errored` files), `listWatcherStatuses()` (active folder count + sum of `eventsSeen`), `listConnectedDrives()` (count only, swallows host-call failures into `-1`), plus process-level gauges (`uptimeSeconds`, `processRssBytes`, `cpuCount`, `memoryTotalBytes`/`memoryFreeBytes`, `platform`).
+- **`/metrics` route** in `server.ts` — auth-middleware gated (drive count + scan stats are sensitive enough to keep behind the device token), 500-on-throw fallback, no path leaks. JSON only — **not** Prometheus exposition format. Rationale documented in the file header: the companion runs on the user's laptop behind a device token, there's no scrape host to push to. Switching to Prom is a one-page refactor if ever needed.
+- **`server/src/metrics.test.ts`** — 2 new tests: shape contract (every documented field present, sane bounds, valid `capturedAt` ISO timestamp, `cpuCount > 0`, `processRssBytes > 0`) and a privacy assertion that the serialised payload contains no `/Users/`, `/Volumes/`, or Windows-style `C:\` substrings — i.e. no filesystem paths leak into the snapshot. Server suite now **41 tests** across 5 files (was 39 / 4).
+
 ### Added — Audit round 8 (batch GDPR pair: data export + delete account)
 
 Closes Q8.9. Users had no way to take their data with them or wipe their account — both are now one click away under Settings → Your account.

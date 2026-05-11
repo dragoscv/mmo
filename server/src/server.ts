@@ -24,6 +24,7 @@ import { createSyncRouter } from "./sync/http-router";
 import { setOnAppliedListener } from "./sync";
 import { closeLibraryDb } from "./library/db";
 import { createPluginsRouter } from "./plugins/routes";
+import { buildCompanionMetrics } from "./metrics";
 import {
     createScanJob,
     getScanJob,
@@ -344,6 +345,19 @@ export async function startServer(): Promise<void> {
             freeMemory: os.freemem(),
             folders: settings.scanFolders,
         });
+    });
+
+    // Internal counter API. Auth-gated (drive count + scan stats are
+    // sensitive enough to keep behind the device token; we don't ship
+    // any paths). JSON snapshot, NOT Prometheus exposition format —
+    // see metrics.ts header for rationale.
+    app.get("/metrics", authMiddleware, async (_req, res) => {
+        try {
+            const snapshot = await buildCompanionMetrics(SERVER_VERSION);
+            res.json(snapshot);
+        } catch (e) {
+            res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+        }
     });
 
     // ─── File Streaming (audio) ──────────────────────────────────────────
