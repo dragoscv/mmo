@@ -1,6 +1,7 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo } from "react";
+import { useTranslations } from "next-intl";
 import {
     Dialog,
     DialogContent,
@@ -75,11 +76,12 @@ function GpuSelector({
     selectedIndex: number;
     onChange: (index: number) => void;
 }) {
+    const t = useTranslations("perfConfig");
     if (gpus.length <= 1) return null;
 
     return (
         <div className="px-2 py-1.5">
-            <div className="text-[9px] uppercase tracking-wider text-white/25 mb-1.5">Select GPU</div>
+            <div className="text-[9px] uppercase tracking-wider text-white/25 mb-1.5">{t("selectGpu")}</div>
             <div className="flex flex-col gap-1">
                 {gpus.map((gpu) => (
                     <button
@@ -112,10 +114,11 @@ function GpuSelector({
 // ─── Poll interval selector ──────────────────────────────────────────────
 
 function PollIntervalSelector({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+    const t = useTranslations("perfConfig");
     const options = [1, 2, 3, 5, 10];
     return (
         <div className="px-2 py-1.5">
-            <div className="text-[9px] uppercase tracking-wider text-white/25 mb-1.5">Update Interval</div>
+            <div className="text-[9px] uppercase tracking-wider text-white/25 mb-1.5">{t("updateInterval")}</div>
             <div className="flex items-center gap-0.5">
                 {options.map((s) => (
                     <button
@@ -145,6 +148,7 @@ export const PerfConfigModal = memo(function PerfConfigModal({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("perfConfig");
     const personalization = usePersonalization();
     const system = useSystemStats(
         personalization.perfConfig.gpuIndex,
@@ -168,15 +172,15 @@ export const PerfConfigModal = memo(function PerfConfigModal({
                     <DialogTitle className="flex items-center justify-between text-sm font-semibold text-white/90">
                         <div className="flex items-center gap-2">
                             <Settings2 className="h-4 w-4" />
-                            Performance Monitor Config
+                            {t("title")}
                         </div>
                         <button
                             onClick={() => update({ ...DEFAULT_PERF_CONFIG })}
                             className="flex items-center gap-1 text-[9px] text-white/25 hover:text-white/50 cursor-pointer transition-colors"
-                            title="Reset to defaults"
+                            title={t("resetTooltip")}
                         >
                             <RotateCcw className="h-3 w-3" />
-                            Reset
+                            {t("reset")}
                         </button>
                     </DialogTitle>
                 </div>
@@ -185,50 +189,50 @@ export const PerfConfigModal = memo(function PerfConfigModal({
                     {/* System Stats */}
                     <div className="py-2">
                         <div className="px-2 mb-1">
-                            <span className="text-[10px] uppercase tracking-wider text-white/30 font-medium">System Stats</span>
+                            <span className="text-[10px] uppercase tracking-wider text-white/30 font-medium">{t("sectionSystem")}</span>
                             {!system.connected && (
-                                <span className="ml-2 text-[8px] text-amber-400/60">Connecting...</span>
+                                <span className="ml-2 text-[8px] text-amber-400/60">{t("connecting")}</span>
                             )}
                         </div>
                         <ToggleRow
                             icon={Cpu}
-                            label="CPU Usage"
-                            description={system.cpuModel || "System CPU load percentage"}
+                            label={t("cpuUsage")}
+                            description={system.cpuModel || t("cpuUsageDesc")}
                             checked={config.showCpu}
                             onChange={(v) => update({ showCpu: v })}
                         />
                         <ToggleRow
                             icon={Thermometer}
-                            label="CPU Temperature"
-                            description="Requires sensor access"
+                            label={t("cpuTemp")}
+                            description={t("sensorRequired")}
                             checked={config.showCpuTemp}
                             onChange={(v) => update({ showCpuTemp: v })}
                         />
                         <ToggleRow
                             icon={MemoryStick}
-                            label="RAM Usage"
-                            description={system.ramTotal > 0 ? `${(system.ramTotal / 1024).toFixed(0)} GB total` : "System memory"}
+                            label={t("ramUsage")}
+                            description={system.ramTotal > 0 ? t("ramTotal", { gb: (system.ramTotal / 1024).toFixed(0) }) : t("ramDesc")}
                             checked={config.showRam}
                             onChange={(v) => update({ showRam: v })}
                         />
                         <ToggleRow
                             icon={Monitor}
-                            label="GPU Usage"
-                            description={system.gpuModel || "GPU utilization percentage"}
+                            label={t("gpuUsage")}
+                            description={system.gpuModel || t("gpuUsageDesc")}
                             checked={config.showGpu}
                             onChange={(v) => update({ showGpu: v })}
                         />
                         <ToggleRow
                             icon={Thermometer}
-                            label="GPU Temperature"
-                            description="Requires sensor access"
+                            label={t("gpuTemp")}
+                            description={t("sensorRequired")}
                             checked={config.showGpuTemp}
                             onChange={(v) => update({ showGpuTemp: v })}
                         />
                         <ToggleRow
                             icon={Box}
-                            label="VRAM Usage"
-                            description="GPU video memory"
+                            label={t("vram")}
+                            description={t("vramDesc")}
                             checked={config.showVram}
                             onChange={(v) => update({ showVram: v })}
                         />
@@ -248,40 +252,40 @@ export const PerfConfigModal = memo(function PerfConfigModal({
                     {/* Browser Stats */}
                     <div className="py-2">
                         <div className="px-2 mb-1">
-                            <span className="text-[10px] uppercase tracking-wider text-white/30 font-medium">Browser Stats</span>
+                            <span className="text-[10px] uppercase tracking-wider text-white/30 font-medium">{t("sectionBrowser")}</span>
                         </div>
                         <ToggleRow
                             icon={Gauge}
-                            label="FPS"
-                            description="Frames per second (target: 60)"
+                            label={t("fps")}
+                            description={t("fpsDesc")}
                             checked={config.showFps}
                             onChange={(v) => update({ showFps: v })}
                         />
                         <ToggleRow
                             icon={MemoryStick}
-                            label="Tab Memory"
-                            description="JS heap used by this tab"
+                            label={t("tabMemory")}
+                            description={t("tabMemoryDesc")}
                             checked={config.showTabMemory}
                             onChange={(v) => update({ showTabMemory: v })}
                         />
                         <ToggleRow
                             icon={Box}
-                            label="JS Heap"
-                            description="Total allocated JS heap"
+                            label={t("jsHeap")}
+                            description={t("jsHeapDesc")}
                             checked={config.showJsHeap}
                             onChange={(v) => update({ showJsHeap: v })}
                         />
                         <ToggleRow
                             icon={MonitorSpeaker}
-                            label="DOM Nodes"
-                            description="Number of DOM elements"
+                            label={t("domNodes")}
+                            description={t("domNodesDesc")}
                             checked={config.showDomNodes}
                             onChange={(v) => update({ showDomNodes: v })}
                         />
                         <ToggleRow
                             icon={Gauge}
-                            label="Audio Latency"
-                            description="Web Audio API output latency"
+                            label={t("audioLatency")}
+                            description={t("audioLatencyDesc")}
                             checked={config.showAudioLatency}
                             onChange={(v) => update({ showAudioLatency: v })}
                         />
@@ -290,12 +294,12 @@ export const PerfConfigModal = memo(function PerfConfigModal({
                     {/* Display Options */}
                     <div className="py-2">
                         <div className="px-2 mb-1">
-                            <span className="text-[10px] uppercase tracking-wider text-white/30 font-medium">Display</span>
+                            <span className="text-[10px] uppercase tracking-wider text-white/30 font-medium">{t("sectionDisplay")}</span>
                         </div>
                         <ToggleRow
                             icon={Cpu}
-                            label="Hardware Info"
-                            description="Show CPU/GPU model names"
+                            label={t("hardwareInfo")}
+                            description={t("hardwareInfoDesc")}
                             checked={config.showModelInfo}
                             onChange={(v) => update({ showModelInfo: v })}
                         />

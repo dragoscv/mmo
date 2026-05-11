@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -35,10 +36,9 @@ type StepKey = "lang" | "auth" | "companion" | "scan";
 
 interface Step {
     key: StepKey;
-    title: string;
-    description: string;
+    titleKey: string;
+    descKey: string;
     icon: React.ComponentType<{ className?: string }>;
-    /** Optional auto-completion check. */
     autoDone?: () => boolean;
 }
 
@@ -57,6 +57,7 @@ interface Props {
 
 export function OnboardingWizard({ currentLocale, isAuthed, hasCompanion, hasTracks }: Props) {
     const router = useRouter();
+    const t = useTranslations("onboarding");
     const [open, setOpen] = useState(false);
     const [step, setStep] = useState<StepKey>("lang");
     const [picking, startTransition] = useTransition();
@@ -105,9 +106,9 @@ export function OnboardingWizard({ currentLocale, isAuthed, hasCompanion, hasTra
         <Dialog open={open} onOpenChange={(v) => { if (!v) dismiss(); }}>
             <DialogContent className="max-w-xl gap-0 p-0 overflow-hidden">
                 <DialogHeader className="p-6 pb-4 border-b border-border/50">
-                    <DialogTitle className="text-lg">Welcome to MMO</DialogTitle>
+                    <DialogTitle className="text-lg">{t("welcomeTitle")}</DialogTitle>
                     <DialogDescription>
-                        Four quick steps and your DJ library is ready.
+                        {t("welcomeDesc")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -138,10 +139,10 @@ export function OnboardingWizard({ currentLocale, isAuthed, hasCompanion, hasTra
                         onClick={dismiss}
                         className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                     >
-                        <X className="h-3 w-3" /> Skip for now
+                        <X className="h-3 w-3" /> {t("skipForNow")}
                     </button>
                     <span className="text-[11px] text-muted-foreground/60">
-                        You can re-open this from <kbd className="rounded border border-border/50 px-1 py-0.5 font-mono">⌘K</kbd> → "Onboarding"
+                        {t.rich("reopenHint", { kbd: (chunks) => <kbd className="rounded border border-border/50 px-1 py-0.5 font-mono">{chunks}</kbd> })}
                     </span>
                 </DialogFooter>
             </DialogContent>
@@ -152,11 +153,12 @@ export function OnboardingWizard({ currentLocale, isAuthed, hasCompanion, hasTra
 function Stepper({
     current, isAuthed, hasCompanion,
 }: { current: StepKey; isAuthed: boolean; hasCompanion: boolean }) {
+    const t = useTranslations("onboarding");
     const steps: { key: StepKey; label: string; done: boolean }[] = [
-        { key: "lang", label: "Language", done: false },
-        { key: "auth", label: "Sign in", done: isAuthed },
-        { key: "companion", label: "Companion", done: hasCompanion },
-        { key: "scan", label: "Scan", done: false },
+        { key: "lang", label: t("stepLang"), done: false },
+        { key: "auth", label: t("stepAuth"), done: isAuthed },
+        { key: "companion", label: t("stepCompanion"), done: hasCompanion },
+        { key: "scan", label: t("stepScan"), done: false },
     ];
     const order: StepKey[] = steps.map(s => s.key);
     const currentIdx = order.indexOf(current);
@@ -193,6 +195,7 @@ function Stepper({
 function LanguageStep({
     current, picking, onPick,
 }: { current: AppLocale; picking: boolean; onPick: (l: AppLocale) => void }) {
+    const t = useTranslations("onboarding");
     const labels: Record<AppLocale, string> = { ro: "Română", en: "English" };
     return (
         <div className="space-y-4">
@@ -201,8 +204,8 @@ function LanguageStep({
                     <Languages className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
-                    <h3 className="text-base font-medium">Pick your language</h3>
-                    <p className="text-xs text-muted-foreground">You can change this later in Settings.</p>
+                    <h3 className="text-base font-medium">{t("langTitle")}</h3>
+                    <p className="text-xs text-muted-foreground">{t("langDesc")}</p>
                 </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -233,6 +236,7 @@ function LanguageStep({
 }
 
 function AuthStep({ isAuthed, onContinue }: { isAuthed: boolean; onContinue: () => void }) {
+    const t = useTranslations("onboarding");
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -240,25 +244,25 @@ function AuthStep({ isAuthed, onContinue }: { isAuthed: boolean; onContinue: () 
                     <LogIn className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
-                    <h3 className="text-base font-medium">Sign in</h3>
-                    <p className="text-xs text-muted-foreground">Your library, playlists, and settings sync across devices.</p>
+                    <h3 className="text-base font-medium">{t("authTitle")}</h3>
+                    <p className="text-xs text-muted-foreground">{t("authDesc")}</p>
                 </div>
             </div>
             {isAuthed ? (
                 <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-center gap-3">
                     <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span className="text-sm text-foreground">You're signed in.</span>
+                    <span className="text-sm text-foreground">{t("authSignedIn")}</span>
                     <Button size="sm" variant="ghost" className="ml-auto" onClick={onContinue}>
-                        Continue <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                        {t("continue")} <ArrowRight className="ml-1 h-3.5 w-3.5" />
                     </Button>
                 </div>
             ) : (
                 <div className="rounded-lg border border-border p-4 space-y-3">
                     <p className="text-sm text-muted-foreground">
-                        Click below to sign in. We'll bring you right back to this wizard.
+                        {t("authNotSignedIn")}
                     </p>
                     <Button asChild className="w-full">
-                        <a href="/login">Sign in</a>
+                        <a href="/login">{t("signIn")}</a>
                     </Button>
                 </div>
             )}
@@ -269,6 +273,7 @@ function AuthStep({ isAuthed, onContinue }: { isAuthed: boolean; onContinue: () 
 function CompanionStep({
     hasCompanion, onContinue, onJump,
 }: { hasCompanion: boolean; onContinue: () => void; onJump: () => void }) {
+    const t = useTranslations("onboarding");
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -276,29 +281,29 @@ function CompanionStep({
                     <MonitorDown className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
-                    <h3 className="text-base font-medium">Install the companion</h3>
-                    <p className="text-xs text-muted-foreground">A small desktop app that scans your local files.</p>
+                    <h3 className="text-base font-medium">{t("companionTitle")}</h3>
+                    <p className="text-xs text-muted-foreground">{t("companionDesc")}</p>
                 </div>
             </div>
             {hasCompanion ? (
                 <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-center gap-3">
                     <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span className="text-sm">Companion linked.</span>
+                    <span className="text-sm">{t("companionLinked")}</span>
                     <Button size="sm" variant="ghost" className="ml-auto" onClick={onContinue}>
-                        Continue <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                        {t("continue")} <ArrowRight className="ml-1 h-3.5 w-3.5" />
                     </Button>
                 </div>
             ) : (
                 <div className="rounded-lg border border-border p-4 space-y-3">
                     <p className="text-sm text-muted-foreground">
-                        Download MMO Companion for your OS, run it once, and link it to this account.
+                        {t("companionInstall")}
                     </p>
                     <div className="flex gap-2">
                         <Button onClick={onJump} className="flex-1">
-                            Open downloads
+                            {t("companionOpenDownloads")}
                         </Button>
                         <Button variant="ghost" onClick={onContinue}>
-                            I'll do it later
+                            {t("companionLater")}
                         </Button>
                     </div>
                 </div>
@@ -308,6 +313,7 @@ function CompanionStep({
 }
 
 function ScanStep({ onFinish }: { onFinish: () => void }) {
+    const t = useTranslations("onboarding");
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -315,16 +321,16 @@ function ScanStep({ onFinish }: { onFinish: () => void }) {
                     <ScanSearch className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
-                    <h3 className="text-base font-medium">Run your first scan</h3>
-                    <p className="text-xs text-muted-foreground">Point MMO at a folder of audio files. We'll handle the rest.</p>
+                    <h3 className="text-base font-medium">{t("scanTitle")}</h3>
+                    <p className="text-xs text-muted-foreground">{t("scanDesc")}</p>
                 </div>
             </div>
             <div className="rounded-lg border border-border p-4 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                    Scanner reads ID3 tags, computes BPM + Camelot key, and indexes everything for instant search.
+                    {t("scanLong")}
                 </p>
                 <Button onClick={onFinish} className="w-full">
-                    Open Scanner <ArrowRight className="ml-2 h-4 w-4" />
+                    {t("scanOpenScanner")} <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
             </div>
         </div>

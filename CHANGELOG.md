@@ -12,6 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 8 (batch i18n: onboarding-wizard + perf-config-modal)
+
+Closes the first slice of Q8.5 (i18n mega-batch — top 20 untranslated files). Two high-visibility components fully localised in both `en` and `ro` this batch; the remaining 18 files (sound-editor-page, track-detail-modal, download-client, analysis-client, equalizer, daw-export-modal, mixer-view, settings-client, mixer-settings-console-tab, devices-client, performance-stats, circuit-tracks-panel, playlists-client, now-playing, library-client, legend-modal, daw-browser, analyze-modal) will follow in subsequent batches.
+
+- **`app/src/components/onboarding-wizard.tsx`** — every hardcoded English string (welcome title, step labels, language pick, sign-in/companion/scan copy, footer hint) now flows through `useTranslations("onboarding")`. The footer hint uses `t.rich(...)` to keep the inline `<kbd>⌘K</kbd>` in markup. 24 keys.
+- **`app/src/components/perf-config-modal.tsx`** — title, reset button + tooltip, "Connecting..." indicator, GPU selector header, poll-interval header, the three section headers (System / Browser / Display) and all 11 toggle row labels + descriptions through `useTranslations("perfConfig")`. RAM total reuses ICU placeholder (`{gb} GB total`) so the formatting stays right in both locales. Removed the unused `useState` import while we were here. 33 keys.
+- **`app/messages/en.json` + `app/messages/ro.json`** — new `onboarding.*` (24 keys) and `perfConfig.*` (33 keys) namespaces in both locales.
+
+Verified: `pnpm exec tsc --noEmit` (0 errors), `pnpm test --run` (283 tests passing across 29 files — unchanged), `pnpm lint:check` (no new errors above baseline).
+
 ### Added — Audit round 8 (batch /learn knowledge base in app)
 
 Closes Q8.11. The user explicitly chose "would be better to have our own /learn implementation" over linking out to docs. The `/learn` route now renders the entire 86-file Romanian DJ corpus (concept, docs, organizare, genuri, echipament, glosar) as a navigable, fully-static section of the app.
