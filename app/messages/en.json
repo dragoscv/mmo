@@ -122,6 +122,8 @@
         "refresh": "Refresh page",
         "usbWizard": "USB Export Wizard",
         "usbWizardHint": "Rekordbox XML / Serato .crate",
+        "onboarding": "Show onboarding wizard",
+        "onboardingHint": "Replay the welcome tour",
         "signOut": "Sign out"
     },
     "usb": {

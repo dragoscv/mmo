@@ -37,6 +37,7 @@ import {
   LogOut,
   Sparkles,
   Copy,
+  BookOpen,
 } from "lucide-react";
 import { cn, formatDuration, formatKey } from "@/lib/utils";
 import { useDAWSettings } from "@/hooks/use-daw-settings";
@@ -237,6 +238,22 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                     <div className="flex-1">
                       <p className="text-sm font-medium">{t("usbWizard")}</p>
                       <p className="text-[11px] text-muted-foreground/60">{t("usbWizardHint")}</p>
+                    </div>
+                  </CommandItem>
+                  <CommandItem
+                    value="action-onboarding show onboarding wizard tour welcome"
+                    onSelect={() => {
+                      try { localStorage.removeItem("mmo.onboarding.dismissed"); } catch { /* noop */ }
+                      navigate("/");
+                    }}
+                    className="gap-3 rounded-lg px-3 py-2.5"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/80">
+                      <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{t("onboarding")}</p>
+                      <p className="text-[11px] text-muted-foreground/60">{t("onboardingHint")}</p>
                     </div>
                   </CommandItem>
                   <CommandItem

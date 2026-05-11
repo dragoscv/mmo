@@ -28,6 +28,7 @@ import {
     MonitorPlay,
     RotateCcw,
     CloudOff,
+    BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -389,6 +390,31 @@ export function SettingsClient({ settings }: SettingsClientProps) {
                         >
                             <RotateCcw className="h-3.5 w-3.5" />
                             Reset All to Defaults
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <BookOpen className="h-4 w-4 text-violet-400" />
+                            Welcome tour
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <p className="text-xs text-[var(--muted-foreground)]">
+                            Replay the four-step onboarding wizard the next time you visit the dashboard.
+                        </p>
+                        <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => {
+                                try { localStorage.removeItem("mmo.onboarding.dismissed"); } catch { /* noop */ }
+                                toast.success("Onboarding will reopen on the dashboard.");
+                            }}
+                        >
+                            <BookOpen className="mr-2 h-4 w-4" />
+                            Show onboarding wizard again
                         </Button>
                     </CardContent>
                 </Card>

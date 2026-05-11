@@ -122,6 +122,8 @@
         "refresh": "Reîmprospătează pagina",
         "usbWizard": "Wizard Export USB",
         "usbWizardHint": "Rekordbox XML / Serato .crate",
+        "onboarding": "Arată ghidul de pornire",
+        "onboardingHint": "Reia turul de bun venit",
         "signOut": "Deconectare"
     },
     "usb": {

@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 7 (batch onboarding reopen: palette + Settings)
+
+- **Command palette entry** — `global-search.tsx` gets a new "Show onboarding wizard" action under the Actions group. Selecting it clears `localStorage["mmo.onboarding.dismissed"]` and routes to `/`, so the dashboard's `<OnboardingWizard>` auto-reopens. New `palette.onboarding` + `palette.onboardingHint` keys in both locales.
+- **Settings → General** — new "Welcome tour" card with a "Show onboarding wizard again" button (uses `BookOpen` icon, sonner toast confirmation). Same mechanism: clears the dismissal flag, then the wizard fires next time the user lands on the dashboard.
+- **Verified**: tsc clean, lint baseline unchanged.
+
 ### Added — Audit round 7 (batch i18n: empty-state components localised)
 
 - **`empty.*` namespace** added to both `messages/en.json` and `messages/ro.json` with three sub-keys: `features.{dashboard|library|playlists|scanner|plugins|analysis}` (the per-page noun phrase that fills the title), `notSignedIn.{title|description|cta}`, and `noCompanion.{title|description|cta}`. Romanian copy uses proper grammatical forms ("autentifică-te pentru a vedea biblioteca ta", "panoul tău principal", etc.).
