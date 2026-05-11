@@ -12,6 +12,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 36.5: server-side Web Push pipeline)
+
+- **`web-push` dependency installed** (`web-push@3.6.7` + `@types/web-push@3.6.4`). Server uses RFC 8030 (Web Push Protocol) with VAPID auth — same provider-agnostic spec FCM/Mozilla/WNS all implement.
+- **New table `push_subscriptions`** (additive migration `app/drizzle/0008_push_subscriptions.sql`): one row per `(user, endpoint)`. Endpoint is globally unique per Push spec. Stores `p256dh`, `auth`, optional `userAgent`, `lastSeenAt`, and `consecutiveFailures` for dead-subscription pruning. FK cascades on user delete. Indexed by `user_id` for the common send-fanout case.
+- **`src/lib/push.ts`**: server-only helper exposing `sendPushToUser(userId, payload)`. Validates VAPID env at first call (fails closed → `{ skipped: true }` if VAPID missing, so dev instances don't crash). Clamps every payload field defensively (title 200, body 500, tag 64, ≤2 actions, url must start with `/`). Enforces 4 KB Web Push payload soft limit. **Failure pruning**: 404/410 (Gone) drops the row immediately; transient errors bump `consecutive_failures` and prune at threshold 5. Successful sends update `lastSeenAt` and zero the failure counter.
+- **`src/app/api/push/subscribe/route.ts`**: `GET` returns `{ configured }` (settings UI hides the toggle when VAPID isn't set), `POST` upserts the subscription on the unique `endpoint` (so a browser swapping accounts re-binds cleanly), `DELETE` removes it. Auth required for POST/DELETE. Zod-validated subscription payload: `endpoint` must be HTTPS (rejects `http://`), p256dh 80–256 chars, auth 16–64 chars.
+- **`src/hooks/use-push-subscription.ts`**: client hook returning `{ state, subscribe, unsubscribe, refresh }`. Handles all six lifecycle phases (env probe → permission → `pushManager.subscribe` → POST → server-rollback on 4xx → SW `pushsubscriptionchange` → re-subscribe). State is one of `loading | unsupported | no-vapid | denied | subscribed | unsubscribed`. Uses a `subscribeRef` to break the forward-reference cycle the SW message-listener creates.
+- **B36 deferral closed.** B36 added the SW push handler; B36.5 wires the server. End-to-end push works as soon as the operator generates VAPID keys (`npx web-push generate-vapid-keys --json`) and sets the three env vars (already documented in `.env.example`).
+
 ### Added — Audit round 6 (batch 36: PWA push notifications + install prompt + maskable icon)
 
 - **Service worker push pipeline.** Added `push` event handler to `public/sw.js`: parses `event.data.json()` payload (`{ title, body, icon, badge, tag, url, actions }`), clamps each field defensively (`title ≤ 200 chars`, `body ≤ 500 chars`, `actions ≤ 2`), validates `url` starts with `/` (no off-origin navigation from a push), and renders via `self.registration.showNotification`. Falls back to a generic notification when the payload is plain text.

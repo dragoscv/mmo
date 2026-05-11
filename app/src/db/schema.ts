@@ -437,3 +437,35 @@ export type NewTrack = Partial<Omit<Track, "id" | "userId">> & {
     filepath: string;
     filename: string;
 };
+
+// ─── Web Push subscriptions ─────────────────────────────────────────────────
+// One row per (user, endpoint). A user can have many devices/browsers
+// subscribed at once. We index by user_id for the common send-fanout case
+// ("notify user X on all their devices"), and the endpoint is unique
+// because the Push spec guarantees endpoint uniqueness across the world.
+
+export const pushSubscriptions = pgTable(
+    "push_subscriptions",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        /** Push provider endpoint URL (FCM/Mozilla/WNS). Unique globally per spec. */
+        endpoint: text("endpoint").notNull().unique(),
+        /** Subscriber's P-256 ECDH public key (base64url). */
+        p256dh: text("p256dh").notNull(),
+        /** Subscriber's auth secret (base64url, 16 bytes). */
+        auth: text("auth").notNull(),
+        /** Optional user-agent hint for the settings UI ("Chrome on Windows"). */
+        userAgent: text("user_agent"),
+        /** Bumped on every successful send; lets us prune dead subs after N failures. */
+        lastSeenAt: timestamp("last_seen_at"),
+        /** Incremented every time the push provider returns 4xx/5xx. Subs with
+         *  consecutiveFailures >= 5 get garbage-collected on the next send. */
+        consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+        createdAt: timestamp("created_at").defaultNow(),
+    },
+    (t) => [index("push_subs_user_idx").on(t.userId)],
+);
+
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;
