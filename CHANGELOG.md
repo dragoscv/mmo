@@ -12,6 +12,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 43: AI provider — Azure AI Foundry default)
+
+- **Azure AI Foundry** added as the **default** AI provider — listed first in `SUPPORTED_PROVIDERS` so the existing fallback chain in `pickProvider()` (used by `actions/ai-tag.ts` and any future AI surface) tries Azure before OpenAI / Anthropic / Google / Mistral / Groq when no per-user preference is set.
+- **`callAzure()`** in `lib/ai-call.ts` — Azure OpenAI Service Chat Completions endpoint with per-deployment URLs. Reads `AZURE_AI_ENDPOINT` + `AZURE_AI_DEPLOYMENT` (+ optional `AZURE_AI_API_VERSION`, defaults to `2024-08-01-preview`) from env so the operator can swap models without re-encrypting per-user secrets. The user's encrypted key is the Azure resource key sent in the `api-key` header. Supports `json: true` via `response_format: {type: "json_object"}` like the OpenAI path.
+- **`PROVIDER_LABELS`** dictionary + **`DEFAULT_PROVIDER`** constant exported from `lib/ai-providers.ts`. Settings panel `<AiKeysPanel>` picks up the new Azure entry with sign-up link → `https://ai.azure.com/` and a "(recommended)" suffix in the label.
+- Existing per-user encrypted-key storage (AES via `crypto-secret`, keyed by `MMO_SECRET_KEY` env, namespaced under `secret:ai:<provider>` in `user_preferences`) carries over unchanged — no schema migration required since Azure is just one more provider in the existing list.
+- **No rate limiting** added (per Q6.6 lock-in: trust user to manage their own provider's billing).
+- **Verified**: tsc clean, **209 tests pass**, lint baseline unchanged (20).
+
 ### Added — Audit round 6 (batch 42b: duplicate detection — exact / fuzzy / audio)
 
 - **New `/library/duplicates` page** with three tabs and a remember-the-default action picker (`ask` / `hide` / `delete`, persisted to `localStorage` under `mmo.duplicates.defaultAction`):

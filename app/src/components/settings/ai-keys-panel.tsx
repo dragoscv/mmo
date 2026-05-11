@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const PROVIDER_META: Record<AiProvider, { label: string; signupUrl: string; placeholder: string }> = {
+    azure: { label: "Azure AI Foundry (recommended)", signupUrl: "https://ai.azure.com/", placeholder: "Azure resource key" },
     openai: { label: "OpenAI", signupUrl: "https://platform.openai.com/api-keys", placeholder: "sk-…" },
     anthropic: { label: "Anthropic", signupUrl: "https://console.anthropic.com/settings/keys", placeholder: "sk-ant-…" },
     google: { label: "Google AI", signupUrl: "https://aistudio.google.com/apikey", placeholder: "AIza…" },

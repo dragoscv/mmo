@@ -13,6 +13,7 @@
 import type { AiProvider } from "@/lib/ai-providers";
 
 const DEFAULT_MODEL: Record<AiProvider, string> = {
+    azure: "gpt-4o-mini",
     openai: "gpt-4o-mini",
     anthropic: "claude-3-5-haiku-latest",
     google: "gemini-2.0-flash",
@@ -45,6 +46,8 @@ export async function aiCall(opts: AiCallOptions): Promise<string> {
     const model = opts.model ?? DEFAULT_MODEL[opts.provider];
     const maxTokens = opts.maxTokens ?? 600;
     switch (opts.provider) {
+        case "azure":
+            return callAzure({ ...opts, model, maxTokens });
         case "openai":
             return callOpenAiCompatible({
                 url: "https://api.openai.com/v1/chat/completions",
@@ -65,6 +68,51 @@ export async function aiCall(opts: AiCallOptions): Promise<string> {
         case "google":
             return callGoogle({ ...opts, model, maxTokens });
     }
+}
+
+/**
+ * Azure AI Foundry / Azure OpenAI Service. Uses the Chat Completions
+ * API on a per-deployment URL. The user's encrypted key is the Azure
+ * resource key; the *endpoint* and *deployment name* come from env
+ * vars (`AZURE_AI_ENDPOINT`, `AZURE_AI_DEPLOYMENT`) so they're easy to
+ * change without re-encrypting per-user secrets. `opts.model` is
+ * treated as the deployment name when explicitly provided.
+ */
+async function callAzure(opts: NormalisedOpts): Promise<string> {
+    const endpoint = process.env.AZURE_AI_ENDPOINT?.replace(/\/+$/, "");
+    const deployment = opts.model || process.env.AZURE_AI_DEPLOYMENT;
+    const apiVersion = process.env.AZURE_AI_API_VERSION ?? "2024-08-01-preview";
+    if (!endpoint || !deployment) {
+        throw new AiCallError(
+            "Azure provider requires AZURE_AI_ENDPOINT and AZURE_AI_DEPLOYMENT env vars.",
+        );
+    }
+    const url = `${endpoint}/openai/deployments/${encodeURIComponent(deployment)}/chat/completions?api-version=${encodeURIComponent(apiVersion)}`;
+    const body: Record<string, unknown> = {
+        max_tokens: opts.maxTokens,
+        messages: [
+            { role: "system", content: opts.system },
+            { role: "user", content: opts.user },
+        ],
+        temperature: 0.3,
+    };
+    if (opts.json) body.response_format = { type: "json_object" };
+    const res = await fetch(url, {
+        method: "POST",
+        headers: {
+            "content-type": "application/json",
+            "api-key": opts.apiKey,
+        },
+        body: JSON.stringify(body),
+        signal: opts.signal,
+    });
+    if (!res.ok) throw new AiCallError(await safeBody(res), res.status);
+    const data = await res.json() as {
+        choices?: { message?: { content?: string } }[];
+    };
+    const text = data?.choices?.[0]?.message?.content;
+    if (typeof text !== "string") throw new AiCallError("Empty response");
+    return text;
 }
 
 interface NormalisedOpts extends Required<Pick<AiCallOptions, "system" | "user" | "apiKey" | "model" | "maxTokens">> {
