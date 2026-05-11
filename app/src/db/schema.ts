@@ -214,6 +214,16 @@ export const tracks = pgTable(
         fileSize: bigint("file_size", { mode: "number" }),
         addedAt: timestamp("added_at").defaultNow(),
         analyzedAt: timestamp("analyzed_at"),
+        /** AI-suggested BPM (awaiting user confirmation). Cleared when accepted into bpm. */
+        aiBpm: real("ai_bpm"),
+        /** AI-suggested Camelot key (e.g. "8A"). Cleared when accepted into keyCamelot. */
+        aiKey: text("ai_key"),
+        /** Confidence 0..1 returned by the model. */
+        aiConfidence: real("ai_confidence"),
+        /** Which model produced the suggestion: "haiku" | "sonnet". */
+        aiModel: text("ai_model"),
+        /** When the AI suggestion was generated. */
+        aiAnalyzedAt: timestamp("ai_analyzed_at"),
         updatedAt: timestamp("updated_at").defaultNow(),
         /** Monotonic counter for incremental sync. */
         syncVersion: bigint("sync_version", { mode: "number" }).default(0),

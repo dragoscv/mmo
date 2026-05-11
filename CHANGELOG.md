@@ -12,6 +12,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 8 (Q8.12a AI key/BPM correction · backend)
+
+First slice of the AI key/BPM correction feature (Q9 lock-in, Q10 confirmed):
+
+- `app/drizzle/0011_ai_analysis.sql` — adds `ai_bpm`, `ai_key`, `ai_confidence`, `ai_model`, `ai_analyzed_at` columns to the cloud `tracks` mirror. Suggestions live here until accepted; once the user confirms, the value is copied into the canonical `bpm` / `key_camelot` columns and synced to the companion through the existing per-field LWW path.
+- `app/src/db/schema.ts` — matching Drizzle column definitions (`aiBpm` real, `aiKey` text, `aiConfidence` real, `aiModel` text, `aiAnalyzedAt` timestamp).
+- `app/src/actions/ai-analyze.ts` — two new server actions:
+  - `analyzeTrackAi(trackId, mode)` calls Anthropic (haiku for batch, sonnet on user-confirm — Q10.3 hybrid lock-in) with metadata-only context (no audio bytes), validates the JSON output with zod (BPM 40–220, Camelot regex, confidence 0–1), and persists the suggestion to the cloud mirror keyed by `(userId, sha256)`.
+  - `acceptAiSuggestion(trackId, { bpm?, key? })` copies the staged value into the canonical companion fields via `companionLibrary.updateTrack`, then clears the staged `ai_*` columns so the diff disappears from the UI.
+
+Backend-only batch — UI surface in the next commit (track-detail-modal "AI suggestion" panel + accept buttons + library context-menu trigger). Verified: 0 TSC errors, 283 tests still green, 0 new lint errors.
+
 ### Added — Audit round 8 (batch i18n: daw-export-modal)
 
 Fifth slice of Q8.5. Localized `app/src/components/daw/daw-export-modal.tsx` (the DAW project export dialog) — modal title, all five section labels (Preset / Format / Quality / Processing / Metadata), Lossy/Lossless badges, format quality controls (Sample Rate / Bit Depth / Bitrate / Channels / Quality slider with "Smaller" ↔ "Better" hints, Stereo/Mono buttons), processing toggles with descriptions (Normalize / Dithering / Brick-wall limiter) and the reverb tail input + unit, all metadata fields and placeholders, file-size summary, progress strings ("Rendering... {pct}%" + "Export complete! ({size})") with placeholders, and the footer ("Remember settings", Cancel, Download, Exporting..., Export). PRESETS labels/descriptions and FORMAT_INFO descriptions kept English (universal audio-engineering terminology).
