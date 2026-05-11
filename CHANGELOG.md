@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed — Audit round 6 (batch 35: Camelot wheel unified on DJ-software convention)
+
+- **`src/lib/note-notation.ts` was using a non-standard Camelot rotation** (`Am=1A`, `C=1B`) while the rest of the codebase (`src/lib/camelot.ts`, `src/lib/genre-suggest.ts`) and every external DJ tool the user imports/exports against (Mixed-In-Key, Rekordbox, Serato, Beatport) use `Am=8A` / `C=8B`. A track tagged in Rekordbox as `8A` would render in the mixer/library as the wrong key — silently breaking harmonic-mix recommendations across the whole UI. Switched `CAMELOT_MINOR` and `CAMELOT_MAJOR` records to the DJ-software convention; pinned with explicit `noteIndex → camelot` per-entry comments. No public API or call-site changes needed.
+- **Updated tests** `note-notation.test.ts` and `utils.test.ts` accordingly. `parseCamelotKey("8A") → noteIndex 9 (A) / minor` now (was `noteIndex 10 (Bb)`). Removed the "pre-existing inconsistency, not fixed" block from the B34 CHANGELOG entry's spirit — the inconsistency is gone.
+- **Why this is safe even though Camelot strings live in user data**: stored Camelot codes (companion DB, scanned-track metadata) were already produced by `camelot.ts` (correct convention) or imported verbatim from Rekordbox/Mixed-In-Key (correct convention). The buggy mapping only affected the *display path* in note-notation's pitch/note formatters, not the storage. So no migration is needed.
+
 ### Added — Audit round 6 (batch 34: test coverage push for pure helpers)
 
 - **`crypto-secret.test.ts` (8 tests)** — pins AES-256-GCM round-trip, IV uniqueness, GCM-tag tamper rejection, malformed-blob rejection, missing/short `MMO_SECRET_KEY` errors, and the `maskSecret` display helper. Security-critical: this module wraps every BYO API key the user stores.

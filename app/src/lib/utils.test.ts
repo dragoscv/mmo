@@ -54,8 +54,8 @@ describe("formatKey", () => {
     });
 
     it("translates to anglo+solfège when notations array passed", () => {
-        // formatKey delegates to note-notation.ts, where 1A is Am.
-        expect(formatKey("1A", ["anglo", "solfege"])).toBe("A / La");
+        // 8A = Am under the unified DJ-software Camelot convention.
+        expect(formatKey("8A", ["anglo", "solfege"])).toBe("A / La");
     });
 });
 

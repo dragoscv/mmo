@@ -24,38 +24,42 @@ const ANGLO_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#",
 const SOLFEGE_NAMES = ["Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"];
 
 // Camelot mapping: noteIndex (0–11) → { minor: "XA", major: "XB" }
-// Standard Camelot wheel: Am=1A, Em=2A, Bm=3A, F#m=4A, C#m=5A, G#m=6A,
-// Ebm=7A, Bbm=8A, Fm=9A, Cm=10A, Gm=11A, Dm=12A
-// Parallel major: C=1B, G=2B, D=3B, A=4B, E=5B, B=6B,
-// F#=7B, Db=8B, Ab=9B, Eb=10B, Bb=11B, F=12B
+// Standard DJ-software Camelot wheel (Mixed-In-Key / Rekordbox / Serato):
+//   Minor: G#m=1A, D#m=2A, A#m=3A, Fm=4A, Cm=5A, Gm=6A, Dm=7A, Am=8A,
+//          Em=9A, Bm=10A, F#m=11A, C#m=12A
+//   Major: B=1B,  F#=2B,  Db=3B,  Ab=4B,  Eb=5B,  Bb=6B,  F=7B,  C=8B,
+//          G=9B,  D=10B,  A=11B,  E=12B
+// NOTE: This used to follow an Am=1A rotation that conflicted with the rest
+// of the codebase (`camelot.ts`, `genre-suggest.ts`) and with every external
+// DJ tool the user imports/exports against. Unified in audit round 6 / B35.
 const CAMELOT_MINOR: Record<number, string> = {
-    9: "1A",   // Am
-    4: "2A",   // Em
-    11: "3A",  // Bm
-    6: "4A",   // F#m
-    1: "5A",   // C#m
-    8: "6A",   // G#m
-    3: "7A",   // Ebm
-    10: "8A",  // Bbm
-    5: "9A",   // Fm
-    0: "10A",  // Cm
-    7: "11A",  // Gm
-    2: "12A",  // Dm
+    8: "1A",   // G#m / Abm
+    3: "2A",   // D#m / Ebm
+    10: "3A",  // A#m / Bbm
+    5: "4A",   // Fm
+    0: "5A",   // Cm
+    7: "6A",   // Gm
+    2: "7A",   // Dm
+    9: "8A",   // Am
+    4: "9A",   // Em
+    11: "10A", // Bm
+    6: "11A",  // F#m / Gbm
+    1: "12A",  // C#m / Dbm
 };
 
 const CAMELOT_MAJOR: Record<number, string> = {
-    0: "1B",   // C
-    7: "2B",   // G
-    2: "3B",   // D
-    9: "4B",   // A
-    4: "5B",   // E
-    11: "6B",  // B
-    6: "7B",   // F#
-    1: "8B",   // Db
-    8: "9B",   // Ab
-    3: "10B",  // Eb
-    10: "11B", // Bb
-    5: "12B",  // F
+    11: "1B",  // B
+    6: "2B",   // F# / Gb
+    1: "3B",   // C# / Db
+    8: "4B",   // G# / Ab
+    3: "5B",   // D# / Eb
+    10: "6B",  // A# / Bb
+    5: "7B",   // F
+    0: "8B",   // C
+    7: "9B",   // G
+    2: "10B",  // D
+    9: "11B",  // A
+    4: "12B",  // E
 };
 
 // Reverse lookup: Camelot string → noteIndex

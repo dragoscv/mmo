@@ -20,8 +20,9 @@ describe("formatNoteIndex", () => {
     });
 
     it("respects quality for camelot output", () => {
-        expect(formatNoteIndex(0, "camelot", "minor")).toBe("10A"); // Cm
-        expect(formatNoteIndex(0, "camelot", "major")).toBe("1B");  // C
+        expect(formatNoteIndex(0, "camelot", "minor")).toBe("5A"); // Cm
+        expect(formatNoteIndex(0, "camelot", "major")).toBe("8B"); // C
+        expect(formatNoteIndex(9, "camelot", "minor")).toBe("8A"); // Am
     });
 
     it("wraps negative and >12 indices", () => {
@@ -39,8 +40,8 @@ describe("formatPitch", () => {
     });
 
     it("camelot pitch ignores octave (no octave concept)", () => {
-        expect(formatPitch(60, "camelot", "major")).toBe("1B");
-        expect(formatPitch(72, "camelot", "major")).toBe("1B");
+        expect(formatPitch(60, "camelot", "major")).toBe("8B"); // C major
+        expect(formatPitch(72, "camelot", "major")).toBe("8B");
     });
 });
 
@@ -57,14 +58,13 @@ describe("formatNoteMulti / formatPitchMulti", () => {
 });
 
 describe("parseCamelotKey / formatCamelotKeyMulti", () => {
-    // NOTE: note-notation.ts uses the convention Am=1A, Bbm=8A, C=1B, Db=8B.
-    // genre-suggest.ts uses a different convention (Am=8A) — pre-existing
-    // inconsistency, tracked in audit notes. These tests pin note-notation.ts's
-    // current behaviour so a future unification is a visible change.
+    // Unified DJ-software Camelot convention (Am=8A, C=8B), matching
+    // Mixed-In-Key / Rekordbox / Serato and the rest of the codebase
+    // (`camelot.ts`, `genre-suggest.ts`). Unified in B35.
     it("parses well-formed camelot codes", () => {
-        expect(parseCamelotKey("1A")).toEqual({ noteIndex: 9, quality: "minor" });    // Am
-        expect(parseCamelotKey("8a")).toEqual({ noteIndex: 10, quality: "minor" });   // Bbm
-        expect(parseCamelotKey(" 1B ")).toEqual({ noteIndex: 0, quality: "major" });  // C
+        expect(parseCamelotKey("8A")).toEqual({ noteIndex: 9, quality: "minor" });   // Am
+        expect(parseCamelotKey("8b")).toEqual({ noteIndex: 0, quality: "major" });   // C
+        expect(parseCamelotKey(" 12B ")).toEqual({ noteIndex: 4, quality: "major" }); // E
     });
 
     it("returns null for unknown camelot strings", () => {
@@ -72,8 +72,8 @@ describe("parseCamelotKey / formatCamelotKeyMulti", () => {
         expect(parseCamelotKey("nope")).toBeNull();
     });
 
-    it("formatCamelotKeyMulti translates 1A → anglo + solfège (Am)", () => {
-        expect(formatCamelotKeyMulti("1A", ["anglo", "solfege"])).toBe("A / La");
+    it("formatCamelotKeyMulti translates 8A → anglo + solfège (Am)", () => {
+        expect(formatCamelotKeyMulti("8A", ["anglo", "solfege"])).toBe("A / La");
     });
 
     it("returns em-dash for empty/sentinel keys", () => {
