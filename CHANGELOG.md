@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 8 (batch axe-core a11y in CI)
+
+Closes the deferred Q7.3 lock-in. Accessibility was previously verified only by hand — this batch wires automated WCAG 2.1 A + AA + Section 508 scans into the existing Playwright e2e suite so regressions get caught on every PR.
+
+- **`app/e2e/a11y.spec.ts`** — new spec runs `@axe-core/playwright` (4.11.3, added as devDependency) against the three public routes (`/`, `/offline`, `/status`) after `networkidle`, with rule tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `section508`. Build-breaking impact filter starts at **`serious` + `critical`** only — the two tiers that mean "real users are blocked"; `moderate` and `minor` are recorded for triage but don't fail CI yet, so the bar can be raised later by editing one constant.
+- **No workflow change needed** — the existing `e2e` job in `.github/workflows/web-app.yml` runs `pnpm e2e` which picks up every `e2e/*.spec.ts` file, so the new suite joins automatically. Authed routes are skipped because they redirect to NextAuth's own sign-in page (out of our control); the smoke spec already asserts they boot.
+- Failures emit a compact one-line-per-violation summary (`[impact] rule-id — help (N nodes)`) instead of a Playwright trace dump, so the GH Actions log is actionable without downloading the report artifact.
+
 ### Added — Audit round 7 (Q7.9 spike: Rekordbox `export.pdb` writer — research + reader)
 
 One-batch research spike on whether MMO should ship a direct binary writer for Pioneer's `PIONEER/rekordbox/export.pdb` USB database, or stay on the existing XML-export + manual-import path. **Conclusion: don't ship a writer**, full rationale in `concept/rekordbox-pdb.md`.
