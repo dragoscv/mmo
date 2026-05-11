@@ -192,6 +192,8 @@ export interface CompanionTrack {
     structureSegments?: string | null;
     /** Last DSP analyzer run timestamp (separate from external metadata). */
     dspAnalyzedAt?: string | null;
+    /** SHA-256 of the source file's content; primary dedupe key. */
+    sha256?: string | null;
 }
 
 export interface PaginatedTracks {

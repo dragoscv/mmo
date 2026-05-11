@@ -12,6 +12,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 42b: duplicate detection — exact / fuzzy / audio)
+
+- **New `/library/duplicates` page** with three tabs and a remember-the-default action picker (`ask` / `hide` / `delete`, persisted to `localStorage` under `mmo.duplicates.defaultAction`):
+  - **Exact** — groups by `sha256`. Decisive — same-byte files.
+  - **Fuzzy** — groups by `(normalisedArtist | normalisedTitle | 5-second-duration-bucket)`. The normaliser strips diacritics, drops bracketed annotations like `(Original Mix)` / `[feat. X]`, trims " - Radio Edit" suffixes, lower-cases, and collapses non-alphanumerics to single spaces. Catches re-rips, transcodes, retagged copies. Skips groups already covered by a single sha (so the same dup never shows twice across tabs).
+  - **Audio** — Chromaprint prefix bucket (first 24 chars of the existing `acoustidFingerprint` string). Catches re-encodes across formats and minor edits. Tracks without a fingerprint are skipped; the empty-state copy nudges the user to run the analyzer with the fingerprint stage on. Future iteration can upgrade to Hamming-distance comparison once the companion exposes raw fingerprint bytes.
+- **Per-group resolve UX** — every group shows its members ranked by a quality score (bitrate + lossless format bonus + rating + recency), the highest scorer is the default keeper marked with a crown, the user can promote any other row to keeper with one click and skip individual rows from the resolve set. Resolve buttons (`Hide N` / `Delete N`) act on the non-keeper, non-skipped IDs only. Delete prompts a `confirm()` since it removes from disk.
+- **`findExactDuplicates` / `findFuzzyDuplicates` / `findAudioDuplicates`** server actions in `actions/duplicates.ts` — each fetches all non-hidden tracks via the existing companion paginated endpoint (500 per page, capped at 40 pages = 20k tracks ceiling), buckets, and returns `{groups, scanned, duplicates}`. Cross-strategy de-dupe so the Fuzzy and Audio tabs hide groups that resolve cleanly to a single sha.
+- **`resolveDuplicatesHide` / `resolveDuplicatesDelete`** server actions — Zod-validate IDs, walk through `companionLibrary.updateTrack({isHidden: true})` or `deleteTrack`, then `revalidatePath` for `/library` and `/library/duplicates`.
+- **`CompanionTrack.sha256?: string | null`** added to the type (companion already returns it; the field was simply missing from the TS surface).
+- **Command palette** — new "Duplicates" entry in the Pages section (icon: Copy, keywords "duplicate dedupe sha fingerprint exact fuzzy audio") so the page is reachable from `⌘K`. Dictionary entry `nav.duplicates` added to both en.json and ro.json.
+- **Verified**: tsc clean, **209 tests pass**, lint baseline unchanged (20).
+
 ### Added — Audit round 6 (batch i18n: dictionary expansion + palette/USB wizard wiring)
 
 - **`messages/en.json` + `messages/ro.json` expanded** with 4 new top-level namespaces — `palette` (command-palette chrome incl. an ICU plural for the result count), `usb` (full export wizard chrome), `library` (header + bulk actions copy), and a wider `common` (close/open/back/next/yes/no/play/pause/edit/rename/duplicate/etc.). `auth` gained GitHub + magic-link copy. Both locale files always kept in sync key-for-key per the project's locale rule.

@@ -19,7 +19,8 @@
         "devices": "Devices",
         "settings": "Settings",
         "plugins": "Plugins",
-        "profile": "Profile"
+        "profile": "Profile",
+        "duplicates": "Duplicates"
     },
     "common": {
         "loading": "Loading…",

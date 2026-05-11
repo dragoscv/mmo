@@ -36,6 +36,7 @@ import {
   RefreshCw,
   LogOut,
   Sparkles,
+  Copy,
 } from "lucide-react";
 import { cn, formatDuration, formatKey } from "@/lib/utils";
 import { useDAWSettings } from "@/hooks/use-daw-settings";
@@ -47,6 +48,7 @@ import { signOutAndPurge } from "@/lib/auth-client";
 const PAGES = [
   { label: "Dashboard", key: "dashboard", href: "/", icon: LayoutDashboard, keywords: "home overview stats" },
   { label: "Library", key: "library", href: "/library", icon: Library, keywords: "tracks songs music browse" },
+  { label: "Duplicates", key: "duplicates", href: "/library/duplicates", icon: Copy, keywords: "duplicate dedupe sha fingerprint exact fuzzy audio" },
   { label: "Playlists", key: "playlists", href: "/playlists", icon: ListMusic, keywords: "playlist collections sets" },
   { label: "Visualizations", key: "visualizations", href: "/visualizations", icon: AudioWaveform, keywords: "charts graphs visual" },
   { label: "Scanner", key: "scanner", href: "/scanner", icon: ScanSearch, keywords: "scan import analyze folder" },

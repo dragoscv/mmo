@@ -19,7 +19,8 @@
         "devices": "Dispozitive",
         "settings": "Setări",
         "plugins": "Pluginuri",
-        "profile": "Profil"
+        "profile": "Profil",
+        "duplicates": "Duplicate"
     },
     "common": {
         "loading": "Se încarcă…",
