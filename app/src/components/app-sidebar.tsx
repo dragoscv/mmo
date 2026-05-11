@@ -29,6 +29,7 @@ import {
     CircleDot,
     Activity,
     Plug,
+    BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
@@ -56,6 +57,7 @@ const navItems = [
     { href: "/drives", label: "Drives", key: "drives", icon: HardDrive },
     { href: "/devices", label: "Devices", key: "devices", icon: Monitor },
     { href: "/remote", label: "Remote", key: "remote", icon: Smartphone },
+    { href: "/learn", label: "Learn", key: "learn", icon: BookOpen },
     { href: "/settings", label: "Settings", key: "settings", icon: Settings },
 ] as const;
 

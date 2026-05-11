@@ -1105,3 +1105,28 @@ html.daw-dockview-dragging * {
         transform: translateY(0) scale(1);
     }
 }
+/* /learn markdown article styling — minimal Tailwind-free prose without
+ * pulling in @tailwindcss/typography. Mirrors the dark UI tokens. */
+.learn-prose {
+    color: var(--foreground);
+    line-height: 1.65;
+    font-size: 1rem;
+}
+.learn-prose h1 { font-size: 2rem; font-weight: 600; margin: 2rem 0 1rem; line-height: 1.25; }
+.learn-prose h2 { font-size: 1.5rem; font-weight: 600; margin: 1.75rem 0 0.75rem; line-height: 1.3; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+.learn-prose h3 { font-size: 1.2rem; font-weight: 600; margin: 1.4rem 0 0.5rem; }
+.learn-prose h4 { font-size: 1.05rem; font-weight: 600; margin: 1.2rem 0 0.4rem; }
+.learn-prose p { margin: 0.75rem 0; }
+.learn-prose a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+.learn-prose a:hover { text-decoration-thickness: 2px; }
+.learn-prose ul, .learn-prose ol { padding-left: 1.5rem; margin: 0.75rem 0; }
+.learn-prose li { margin: 0.25rem 0; }
+.learn-prose code { background: var(--muted); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.9em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.learn-prose pre { background: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1rem 0; }
+.learn-prose pre code { background: transparent; padding: 0; font-size: 0.85rem; }
+.learn-prose blockquote { border-left: 3px solid var(--primary); padding-left: 1rem; color: var(--muted-foreground); margin: 1rem 0; }
+.learn-prose table { border-collapse: collapse; margin: 1rem 0; width: 100%; font-size: 0.9rem; }
+.learn-prose th, .learn-prose td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; }
+.learn-prose th { background: var(--muted); font-weight: 600; }
+.learn-prose hr { border: 0; border-top: 1px solid var(--border); margin: 2rem 0; }
+.learn-prose img { max-width: 100%; border-radius: 6px; }

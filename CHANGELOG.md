@@ -12,6 +12,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 8 (batch /learn knowledge base in app)
+
+Closes Q8.11. The user explicitly chose "would be better to have our own /learn implementation" over linking out to docs. The `/learn` route now renders the entire 86-file Romanian DJ corpus (concept, docs, organizare, genuri, echipament, glosar) as a navigable, fully-static section of the app.
+
+- **`app/scripts/sync-learn-content.mjs`** — copy script that walks `../{concept,docs,organizare,genuri,echipament,glosar}` and mirrors every `.md` file into `app/learn-content/` (gitignored). Wired into `predev` and `prebuild` so the corpus is always in-sync before Next.js builds. Idempotent — wipes the destination each run so source-side deletions propagate.
+- **`app/src/lib/learn.ts`** — pure helper layer: `listSections()`, `listSectionPages(section)`, `getPage(section, slug)`, plus `extractTitle()` / `pathToSlug()` / `slugToPath()`. `getPage()` rejects slugs containing `..`, `/`, or `\` and verifies the resolved file path stays inside the section directory (path-traversal defence). Section labels live in i18n under `learn.sections.<slug>`.
+- **`app/src/lib/learn.test.ts`** — 10 new tests covering title extraction (H1, decorated H1, H2/H3 ignored, fallback, CRLF) and slug round-tripping (forward slash, backslash, case-insensitive `.md`, round-trip identity, flat slugs). Suite now at **283 tests / 29 files** (was 273/28).
+- **`app/src/app/learn/page.tsx`** — landing index showing the 6 sections as cards with page counts. `dynamic = "force-static"` since content is read from disk at build time.
+- **`app/src/app/learn/[section]/page.tsx`** — section TOC listing every `.md` page in the section, sorted, with `generateStaticParams()` over `LEARN_SECTION_SLUGS`. Uses the in-file H1 as link label.
+- **`app/src/app/learn/[section]/[slug]/page.tsx`** — single article view rendering markdown via `react-markdown` + `remark-gfm` (tables, strikethrough, task lists, autolinks). `generateStaticParams()` enumerates every page across every section so the entire `/learn` tree pre-renders at build.
+- **`app/src/app/globals.src.css`** — appended a `.learn-prose` block (≈25 lines) for typography on the article view. Chose hand-rolled CSS over `@tailwindcss/typography` to avoid pulling in another plugin for one route.
+- **`app/src/components/app-sidebar.tsx`** — added `/learn` (BookOpen icon) between `/remote` and `/settings`.
+- **`app/messages/en.json` + `app/messages/ro.json`** — new `nav.learn` key + `learn.*` namespace (eyebrow/title/subtitle/backToIndex/pageCount + 6 section title+description pairs). ICU plural for `pageCount` in both locales.
+- **deps**: `react-markdown@9.1.0`, `remark-gfm@4.0.1`.
+- **`app/.gitignore`** — added `learn-content/` (generated, never committed).
+
+Source markdown stays at the repo root (single source of truth for editors); it is mirrored into `app/learn-content/` only for Next.js bundle tracing. Editors update files in `concept/`, `docs/`, etc. as before — `pnpm dev` reflects changes after a restart (the script runs in `predev`, not on every file change).
+
 ### Changed — Audit round 8 (batch extension cross-browser via webextension-polyfill)
 
 Closes Q8.6. The extension was already on Manifest V3 (so the "MV3 port" wording in the question round was misleading — nothing to migrate from MV2), but it used `chrome.*` APIs throughout, locking it to Chromium. This batch makes the same code load and run unchanged in Firefox.

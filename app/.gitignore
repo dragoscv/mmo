@@ -12,6 +12,7 @@ data/*.db-wal
 
 # Lighthouse CI artifacts (uploaded as workflow artifact in CI)
 .lighthouseci/
+learn-content/
 
 # Playwright artifacts
 playwright-report/

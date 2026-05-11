@@ -40,7 +40,8 @@
         "settings": "Settings",
         "plugins": "Plugins",
         "profile": "Profile",
-        "duplicates": "Duplicates"
+        "duplicates": "Duplicates",
+        "learn": "Learn"
     },
     "common": {
         "loading": "Loading…",
@@ -178,6 +179,39 @@
         "firstExport": "First export — nothing to compare to.",
         "unchanged": "{count} unchanged",
         "since": "since {date}"
+    },
+    "learn": {
+        "eyebrow": "Learn",
+        "title": "MMO Knowledge base",
+        "subtitle": "Concepts, architecture, equipment, genres, organisation tips and the full glossary — everything we know about running a DJ library, in one place.",
+        "backToIndex": "All sections",
+        "pageCount": "{count, plural, =1 {# page} other {# pages}}",
+        "sections": {
+            "concept": {
+                "title": "Concept",
+                "desc": "Vision, architecture decisions and product direction for MMO."
+            },
+            "docs": {
+                "title": "Documentation",
+                "desc": "Module guides, beginner-to-pro tracks, companion app and extension."
+            },
+            "organizare": {
+                "title": "Organisation",
+                "desc": "Conventions for files, folders, tags, BPM/Key/Energy and USB exports."
+            },
+            "genuri": {
+                "title": "Genres",
+                "desc": "Style guides for the genres you mix — tech-house, techno, latino, manele and more."
+            },
+            "echipament": {
+                "title": "Equipment",
+                "desc": "Controllers, cables, MIDI keyboards, recommended setups and upgrade paths."
+            },
+            "glosar": {
+                "title": "Glossary",
+                "desc": "Every DJ and production term you'll meet across the app."
+            }
+        }
     },
     "account": {
         "title": "Your account",

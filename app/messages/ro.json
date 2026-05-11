@@ -40,7 +40,8 @@
         "settings": "Setări",
         "plugins": "Pluginuri",
         "profile": "Profil",
-        "duplicates": "Duplicate"
+        "duplicates": "Duplicate",
+        "learn": "Învață"
     },
     "common": {
         "loading": "Se încarcă…",
@@ -178,6 +179,39 @@
         "firstExport": "Primul export — nu există referință de comparat.",
         "unchanged": "{count} neschimbate",
         "since": "de la {date}"
+    },
+    "learn": {
+        "eyebrow": "Învață",
+        "title": "Bază de cunoștințe MMO",
+        "subtitle": "Concepte, arhitectură, echipament, genuri, sfaturi de organizare și glosarul complet — tot ce știm despre o bibliotecă DJ, într-un singur loc.",
+        "backToIndex": "Toate secțiunile",
+        "pageCount": "{count, plural, one {# pagină} few {# pagini} other {# de pagini}}",
+        "sections": {
+            "concept": {
+                "title": "Concept",
+                "desc": "Viziune, decizii de arhitectură și direcție de produs pentru MMO."
+            },
+            "docs": {
+                "title": "Documentație",
+                "desc": "Ghiduri pe module, parcurs de la începător la profesionist, companion și extensie."
+            },
+            "organizare": {
+                "title": "Organizare",
+                "desc": "Convenții pentru fișiere, foldere, taguri, BPM/Cheie/Energie și exporturi USB."
+            },
+            "genuri": {
+                "title": "Genuri",
+                "desc": "Ghiduri stilistice pentru genurile mixate — tech-house, techno, latino, manele și altele."
+            },
+            "echipament": {
+                "title": "Echipament",
+                "desc": "Controllere, cabluri, claviaturi MIDI, setup-uri recomandate și trasee de upgrade."
+            },
+            "glosar": {
+                "title": "Glosar",
+                "desc": "Toți termenii DJ și de producție pe care îi întâlnești în aplicație."
+            }
+        }
     },
     "account": {
         "title": "Contul tău",
