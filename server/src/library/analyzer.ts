@@ -42,7 +42,7 @@
 
 import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, createReadStream } from "node:fs";
+import { existsSync, mkdirSync, createReadStream, writeFileSync } from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 import { randomUUID, createHash } from "node:crypto";
@@ -105,6 +105,11 @@ export interface AnalyzeResult {
     fingerprintDurationSec?: number;
     stems?: { vocals?: string; drums?: string; bass?: string; other?: string; instrumental?: string };
     stemsModel?: string;
+    /** Hex-encoded Int16 interleaved [min0,max0,min1,max1,…] overview
+     *  peaks. Persisted to a sidecar `.peaks` file, NOT a SQLite column.
+     *  Resolution: 2000 pairs per track (≈ 2px each at 4K width). */
+    waveformPeaksHex?: string;
+    waveformPeaksCount?: number;
     [k: `_${string}_error`]: string | undefined;
 }
 
@@ -679,6 +684,17 @@ class Analyzer extends EventEmitter {
         if (Array.isArray(data.downbeats)) { update.downbeats = JSON.stringify(data.downbeats); dspTouched = true; }
         if (Array.isArray(data.chordProgression)) { update.chordProgression = JSON.stringify(data.chordProgression); dspTouched = true; }
 
+        // ── Waveform overview peaks (sidecar file, not a DB column) ─
+        if (data.waveformPeaksHex && typeof data.waveformPeaksCount === "number") {
+            try {
+                const buf = Buffer.from(data.waveformPeaksHex, "hex");
+                writeFileSync(this.waveformPeaksPath(job.trackId), buf);
+                dspTouched = true;
+            } catch (e) {
+                console.error("[analyzer.persist] waveform write failed:", e);
+            }
+        }
+
         // ── Fingerprint fields ──────────────────────────────────────
         if (data.acoustidFingerprint) {
             update.acoustidFingerprint = data.acoustidFingerprint;
@@ -837,6 +853,19 @@ class Analyzer extends EventEmitter {
         const dir = path.join(this.stemsRoot(), String(trackId));
         if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
         return dir;
+    }
+
+    /** Filesystem location of the binary overview-peaks sidecar for a
+     *  given track. Format: Int16 LE interleaved min/max pairs. We keep
+     *  these out of the SQLite row because at 4 KB per track a 50k-track
+     *  library would push the DB past 200 MB and slow every read. */
+    waveformPeaksPath(trackId: number): string {
+        const base = (() => {
+            try { return app.getPath("userData"); } catch { return process.cwd(); }
+        })();
+        const dir = path.join(base, "waveforms");
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        return path.join(dir, `${trackId}.peaks`);
     }
 
     // ─── Public API ──────────────────────────────────────────────────

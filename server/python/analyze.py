@@ -1018,6 +1018,38 @@ def _dsp_analyze(
     except Exception as e:
         out["_chord_error"] = str(e)
 
+    # ── Waveform overview peaks (for UI scrubber / mixer) ────────────
+    # 2000 min/max pairs across the whole track is enough resolution for
+    # any reasonable overview canvas (~2px per peak at 4K). The companion
+    # writes these as Int16 to a sidecar .peaks file keyed by track id.
+    # Heavy zoom levels (>1px ≈ 1 sample) decode the audio file directly;
+    # a multi-resolution pyramid is a future enhancement.
+    try:
+        target_points = 2000
+        n = len(y)
+        if n > 0:
+            bucket = max(1, n // target_points)
+            actual_points = n // bucket
+            # Reshape to (points, bucket) and take min/max — vectorized,
+            # ~10ms even on 10-minute tracks.
+            trimmed = y[: actual_points * bucket].reshape(actual_points, bucket)
+            mins = trimmed.min(axis=1)
+            maxs = trimmed.max(axis=1)
+            # Interleave: [min0, max0, min1, max1, ...] — matches what the
+            # browser-side renderer expects (single Int16Array decode).
+            peak_norm = max(float(_np.max(_np.abs(y))), 1e-6)
+            mins_i = (mins / peak_norm * 32767.0).astype(_np.int16)
+            maxs_i = (maxs / peak_norm * 32767.0).astype(_np.int16)
+            interleaved = _np.empty(actual_points * 2, dtype=_np.int16)
+            interleaved[0::2] = mins_i
+            interleaved[1::2] = maxs_i
+            # Hex-encode for clean JSON transport (avoids base64 padding
+            # quirks in some serialisers and keeps the data inspectable).
+            out["waveformPeaksHex"] = interleaved.tobytes().hex()
+            out["waveformPeaksCount"] = actual_points
+    except Exception as e:
+        out["_waveform_error"] = str(e)
+
     return out
 
 

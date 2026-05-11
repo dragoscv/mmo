@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 39: waveform overview peaks pipeline)
+
+- **Python sidecar emits 2000-pair Int16 overview peaks** (interleaved `[min0,max0,min1,max1,…]`) on every DSP analyze run. Hex-encoded for clean JSON transport, decoded by the companion. Computation is vectorised numpy reshape + min/max — adds ~10 ms even on 10-minute tracks.
+- **Companion writes a `<userData>/waveforms/<trackId>.peaks` sidecar file** (~8 KB per track). Stored on disk, not in SQLite, because at 50 k tracks an inline column would push the library DB past 200 MB and slow every read.
+- **New HTTP route `GET /tracks/:id/peaks`** serves the binary blob with `Cache-Control: private, max-age=3600`. Browser decodes with `new Int16Array(arrayBuffer)`. Authorised by trackId × userId join, same pattern as the stems route.
+- **`AnalyzeResult.waveformPeaksHex` / `waveformPeaksCount`** added to the analyzer's TypeScript surface; new `Analyzer.waveformPeaksPath(trackId)` helper keeps the file-layout convention in one place.
+- **Verified**: companion tsc + vitest (19/19), app tsc + vitest (175/175), Python `py_compile` all clean. Pyramid (multi-resolution) deferred — 2 k pairs is enough for the overview canvas; heavy-zoom mixer scrub will hit the audio file directly.
+
 ### Added — Audit round 6 (batch 37: Essentia KeyExtractor + librosa BPM cross-check)
 
 - **Essentia `KeyExtractor` is now the preferred key estimator** when available. Runs both `edma` (EDM-tuned) and `temperley` profiles and keeps the higher-confidence result — same algorithm Mixed-In-Key and Beatport use. Falls back to the existing librosa Temperley path when Essentia is unavailable (Windows + Python 3.13 has no wheels) or when Essentia errors on a specific file. New `keyMethod` field in the analyze result lets the UI show whether a track was analysed with `essentia` or `temperley_librosa`.
