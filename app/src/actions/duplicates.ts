@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { log } from "@/lib/logger";
 import { revalidatePath } from "next/cache";
+import { quality, normaliseString, durationBucket } from "@/lib/duplicates-helpers";
 import {
     companionLibrary,
     getCompanionLink,
@@ -100,40 +101,9 @@ function pick(t: CompanionTrack): DuplicateTrack {
     };
 }
 
-/** Score a candidate so the "best" copy floats to the top of a group.
- *  Higher bitrate + lossless format + higher rating + more recent. */
-function quality(t: DuplicateTrack): number {
-    let s = 0;
-    s += t.bitrate ?? 0;
-    if (t.format && /flac|alac|wav|aiff/i.test(t.format)) s += 5000;
-    s += (t.rating ?? 0) * 100;
-    if (t.addedAt) s += Math.min(1000, Math.floor(Date.parse(t.addedAt) / 1e10));
-    return s;
-}
-
+/** Sort a copy of the array best-quality-first, leaving the input untouched. */
 function sortByQuality<T extends DuplicateTrack>(arr: T[]): T[] {
     return [...arr].sort((a, b) => quality(b) - quality(a));
-}
-
-function normaliseString(s: string | null | undefined): string {
-    if (!s) return "";
-    return s
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        // Drop bracketed annotations: (Original Mix), [feat. X], etc.
-        .replace(/[\(\[].*?[\)\]]/g, " ")
-        // Strip common dash-separated suffixes ("- Radio Edit")
-        .replace(/\s-\s.*$/g, " ")
-        .replace(/[^a-z0-9]+/g, " ")
-        .trim()
-        .replace(/\s+/g, " ");
-}
-
-/** Round to nearest 5-second bucket so 03:21 ≈ 03:23. */
-function durationBucket(seconds: number | null): string {
-    if (!seconds || seconds <= 0) return "0";
-    return String(Math.round(seconds / 5));
 }
 
 // ─── Strategy 1: Exact (sha256) ────────────────────────────────────────────

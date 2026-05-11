@@ -1,6 +1,7 @@
 "use server";
 
 import { log } from "@/lib/logger";
+import { bucketGrowth } from "@/lib/scan-helpers";
 
 /**
  * Folder scan → ingest into companion library DB.
@@ -101,22 +102,7 @@ export async function getLibraryGrowth(
     if (!link) return [];
     try {
         const logs = await companionLibrary.getScanLogs(link, 200);
-        const buckets = new Map<string, number>();
-        const now = new Date();
-        // Pre-seed the last `days` days at zero so the chart shows the
-        // full requested window even when there's been no recent activity.
-        for (let i = days - 1; i >= 0; i--) {
-            const d = new Date(now);
-            d.setDate(d.getDate() - i);
-            buckets.set(d.toISOString().slice(0, 10), 0);
-        }
-        for (const entry of logs) {
-            if (entry.action !== "added" || !entry.scannedAt) continue;
-            const day = entry.scannedAt.slice(0, 10); // YYYY-MM-DD
-            if (!buckets.has(day)) continue; // Older than the window — skip.
-            buckets.set(day, (buckets.get(day) ?? 0) + 1);
-        }
-        return Array.from(buckets.entries()).map(([date, added]) => ({ date, added }));
+        return bucketGrowth(logs, days);
     } catch (err) {
         log.warn("scan.getLibraryGrowth failed", undefined, err);
         return [];

@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 7 (batch test coverage: duplicates + scan helpers)
+
+- **`lib/duplicates-helpers.ts`** (new) — extracted the three pure heuristics that drive the duplicates pipeline (`quality`, `normaliseString`, `durationBucket`) out of `actions/duplicates.ts` (which is bound by `"use server"` and only allows async exports). `actions/duplicates.ts` now re-imports them; behaviour unchanged.
+- **`lib/scan-helpers.ts`** (new) — extracted the per-day bucketing math (`bucketGrowth`) out of `actions/scan.ts` for the same reason. The function takes an injectable `now: Date` so tests don't depend on the wall clock. `getLibraryGrowth()` now delegates to it.
+- **`lib/duplicates-helpers.test.ts`** — 15 tests locking in: `normaliseString` (diacritics, bracketed annotations, dash-suffix variants, casing/punctuation collisions), `durationBucket` (5-second rounding, edge cases), `quality` (bitrate, lossless +5000 dwarfs bitrate gap, all 4 lossless format names recognised, rating ≈100/star, recency tiebreaker, all-null safety).
+- **`lib/scan-helpers.test.ts`** — 7 tests locking in: window pre-seeding, oldest-first ordering, action filter (only `"added"` counts), null-`scannedAt` is dropped, out-of-window entries dropped, multiple same-day entries aggregate, 30-day window has no duplicate dates.
+- **Suite now 239 tests** (up from 209 → +30 across the round-7 work, with 22 added in this batch alone).
+
 ### Added — Audit round 7 (batch smart-crates: saved searches that auto-update)
 
 - **New table `saved_searches`** (migration `0010_saved_searches.sql`, additive) — `(user_id, name, icon, filters jsonb, sort_order, created_at, updated_at)` with `(user_id, name)` unique index and `(user_id, sort_order)` lookup index. Drizzle schema mirrored in `db/schema.ts` as `savedSearches` + `SavedSearchRow` / `NewSavedSearch` types.
