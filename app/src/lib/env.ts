@@ -61,6 +61,14 @@ const baseSchema = z.object({
 
     // Self-hosted LAN escape hatch (consumed by url-guard).
     MMO_ALLOW_PRIVATE_DEVICE_URLS: z.string().optional(),
+
+    // Sentry error tracking — fully optional. The lazy shim in
+    // `lib/sentry.ts` short-circuits when SENTRY_DSN is absent, so
+    // self-hosted installs without these set pay zero runtime cost.
+    SENTRY_DSN: z.string().url().optional().or(z.literal("")),
+    SENTRY_ENVIRONMENT: z.string().optional(),
+    SENTRY_RELEASE: z.string().optional(),
+    SENTRY_SEND_PII: z.string().optional(),
 });
 
 const productionRefinements = (env: z.infer<typeof baseSchema>): string[] => {

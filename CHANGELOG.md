@@ -12,6 +12,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 7 (batch sentry: free-tier wiring closed loop)
+
+- **Error boundaries.** Added `app/src/app/error.tsx` (segment-level fallback inside the root layout, preserves header/nav/theme) and `app/src/app/global-error.tsx` (renders its own `<html>`/`<body>` for crashes that happen before the layout mounts). Both call the lazy `captureException` shim so errors land in Sentry when configured and are silent no-ops otherwise.
+- **`.env.example`.** Documented all five Sentry knobs: `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE`, `SENTRY_SEND_PII`, `NEXT_PUBLIC_SENTRY_FEEDBACK`. Each entry explains the free-tier setup steps and the zero-cost-when-unset guarantee.
+- **`lib/env.ts`.** Added the four server-side `SENTRY_*` keys to the validated env schema as `optional()` so a typo in production logs a clear error instead of silently picking up an empty value, while keeping the integration genuinely opt-in (no required-ness, no boot failure).
+- **`docs/arhitectura/06-monitorizare-erori.md`.** New chapter covering: rationale, alternatives (GlitchTip / Logflare / Highlight), 4-step activation walk-through for the Sentry free tier, what's captured automatically (logger, `onRequestError`, both error boundaries, browser SDK), sample rates, PII posture, free-tier cost limits, and clean removal.
+
+The full SDK wiring (`instrumentation.ts`, `instrumentation-client.ts`, `lib/sentry.ts`, `lib/logger.ts → log.error`) was already in place — this batch closes the remaining gaps so a self-hoster can switch it on with a single `pnpm add` + DSN.
+
 ### Added — Audit round 7 (batch test coverage: duplicates + scan helpers)
 
 - **`lib/duplicates-helpers.ts`** (new) — extracted the three pure heuristics that drive the duplicates pipeline (`quality`, `normaliseString`, `durationBucket`) out of `actions/duplicates.ts` (which is bound by `"use server"` and only allows async exports). `actions/duplicates.ts` now re-imports them; behaviour unchanged.
