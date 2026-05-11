@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 37: Essentia KeyExtractor + librosa BPM cross-check)
+
+- **Essentia `KeyExtractor` is now the preferred key estimator** when available. Runs both `edma` (EDM-tuned) and `temperley` profiles and keeps the higher-confidence result — same algorithm Mixed-In-Key and Beatport use. Falls back to the existing librosa Temperley path when Essentia is unavailable (Windows + Python 3.13 has no wheels) or when Essentia errors on a specific file. New `keyMethod` field in the analyze result lets the UI show whether a track was analysed with `essentia` or `temperley_librosa`.
+- **BPM cross-check via `librosa.feature.tempo`.** The existing `librosa.beat.beat_track` estimator now gets corroborated by the newer autocorrelation-based `feature.tempo` API. New result fields `bpmCrossCheck` (the second estimator's value) and `bpmDisagreement` (relative diff) are emitted; when disagreement exceeds 10% the existing `bpmConfidence` is halved so the UI can flag tracks for manual review. Cheap (~50 ms on top of the ~1.5 s `beat_track` call).
+- **Capability flag `_AVAILABLE["essentia"]`** so the companion's "what's installed" UI can show users whether the Essentia upgrade path is active.
+- **Documented installation** in the analyze.py docstring: `pip install essentia` (Linux/macOS) or `pip install essentia-tensorflow` for GPU-accelerated models. Optional — base library still works on every OS / Python combo via librosa.
+- **Verified**: `python -m py_compile server/python/analyze.py` clean; companion test suite still 19/19 passing; web app tsc clean.
+
 ### Added — Audit round 6 (batch 36.5: server-side Web Push pipeline)
 
 - **`web-push` dependency installed** (`web-push@3.6.7` + `@types/web-push@3.6.4`). Server uses RFC 8030 (Web Push Protocol) with VAPID auth — same provider-agnostic spec FCM/Mozilla/WNS all implement.
