@@ -1,4 +1,5 @@
 import { getTracks, getGenres, getAllTags, getKeys } from "@/actions/tracks";
+import { listSavedSearches } from "@/actions/saved-searches";
 import { LibraryClient } from "./library-client";
 import { auth } from "@/auth";
 import { getCompanionLink } from "@/lib/companion-library";
@@ -25,7 +26,7 @@ export default async function LibraryPage({
     const sort = params.sort || "addedAt";
     const order = (params.order || "desc") as "asc" | "desc";
 
-    const [result, genres, allTags, keys] = await Promise.all([
+    const [result, genres, allTags, keys, savedSearches] = await Promise.all([
         getTracks({
             page,
             pageSize,
@@ -50,6 +51,7 @@ export default async function LibraryPage({
         getGenres(),
         getAllTags(),
         getKeys(),
+        listSavedSearches(),
     ]);
 
     return (
@@ -81,6 +83,12 @@ export default async function LibraryPage({
                 subgenre: params.subgenre || "",
                 mood: params.mood || "",
             }}
+            savedSearches={savedSearches.map(s => ({
+                id: s.id,
+                name: s.name,
+                icon: s.icon,
+                filters: s.filters as Record<string, string>,
+            }))}
         />
     );
 }

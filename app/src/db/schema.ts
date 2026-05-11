@@ -504,3 +504,34 @@ export const smartPlaylistRules = pgTable(
 
 export type SmartPlaylistRulesRow = typeof smartPlaylistRules.$inferSelect;
 export type NewSmartPlaylistRules = typeof smartPlaylistRules.$inferInsert;
+
+// ──────────────────────────────────────────────────────────────────────
+// Saved searches (a.k.a. "smart crates").
+//
+// A persisted, named copy of the /library page's URL filter state.
+// Filter shape mirrors `LibrarySearchParams` exactly so we can read/
+// write without any translation layer. Auto-updates on every visit
+// because it's evaluated at read time, not materialised.
+export const savedSearches = pgTable(
+    "saved_searches",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        name: text("name").notNull(),
+        /** Optional lucide icon name, e.g. "Sparkles". */
+        icon: text("icon"),
+        /** Library filter params, validated by `savedSearchFiltersSchema`
+         *  in src/lib/saved-searches.ts. */
+        filters: jsonb("filters").notNull(),
+        sortOrder: integer("sort_order").notNull().default(0),
+        createdAt: timestamp("created_at").defaultNow(),
+        updatedAt: timestamp("updated_at").defaultNow(),
+    },
+    (t) => [
+        index("saved_searches_user_idx").on(t.userId, t.sortOrder),
+        uniqueIndex("saved_searches_user_name_uniq").on(t.userId, t.name),
+    ],
+);
+
+export type SavedSearchRow = typeof savedSearches.$inferSelect;
+export type NewSavedSearch = typeof savedSearches.$inferInsert;

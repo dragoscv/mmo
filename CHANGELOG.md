@@ -12,6 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 7 (batch smart-crates: saved searches that auto-update)
+
+- **New table `saved_searches`** (migration `0010_saved_searches.sql`, additive) — `(user_id, name, icon, filters jsonb, sort_order, created_at, updated_at)` with `(user_id, name)` unique index and `(user_id, sort_order)` lookup index. Drizzle schema mirrored in `db/schema.ts` as `savedSearches` + `SavedSearchRow` / `NewSavedSearch` types.
+- **Domain lib `lib/saved-searches.ts`** — single `SAVED_SEARCH_KEYS` tuple driving Zod validation (`savedSearchFiltersSchema`, `savedSearchInputSchema`), URL helpers (`filtersToQueryString`, `extractFiltersFromParams`), and the `hasMeaningfulFilters` predicate that ignores `sort`/`order` (those reorder, they don't restrict). Filter shape mirrors the /library URL params 1:1 — no translation layer.
+- **Server actions `actions/saved-searches.ts`** — `listSavedSearches`, `createSavedSearch`, `renameSavedSearch`, `deleteSavedSearch`. All scoped to `auth().user.id`, all revalidate `/library`. `createSavedSearch` translates the unique-violation Postgres error into a user-friendly "A saved search named X already exists" message.
+- **Component `components/saved-searches-strip.tsx`** — horizontal chip strip rendered above the library filter bar. Click a chip to apply that crate; the active crate (filters match URL exactly) is highlighted with a primary border. Per-chip hover icons for rename (inline input, Enter to commit, Esc to cancel) and delete (native confirm). When the user has filters set that don't match any saved crate, a "Save current" button appears next to the chips and opens a small naming dialog.
+- **Wiring** — `app/library/page.tsx` runs `listSavedSearches()` in parallel with the existing `Promise.all`; results are forwarded to `<LibraryClient>` via a new optional `savedSearches` prop. `library-client.tsx` renders `<SavedSearchesStrip>` between the header and the Filters Bar.
+- **Tests** — `saved-searches.test.ts` covers `extractFiltersFromParams` (drops unknown keys + empty strings), `filtersToQueryString` (round-trip + empty case), `hasMeaningfulFilters` (sort/order are not meaningful), and `savedSearchInputSchema` rejection of >60-char names. Suite now **217 tests** (up from 209).
+- **Verified**: tsc clean, **217/217 tests** pass, lint baseline unchanged.
+
 ### Added — Audit round 7 (batch onboarding reopen: palette + Settings)
 
 - **Command palette entry** — `global-search.tsx` gets a new "Show onboarding wizard" action under the Actions group. Selecting it clears `localStorage["mmo.onboarding.dismissed"]` and routes to `/`, so the dashboard's `<OnboardingWizard>` auto-reopens. New `palette.onboarding` + `palette.onboardingHint` keys in both locales.

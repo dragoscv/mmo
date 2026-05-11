@@ -31,6 +31,7 @@ import { toggleFavorite, setTrackRating } from "@/actions/tracks";
 import { TrackActions, TrackContextMenu } from "@/components/track-actions";
 import { TrackAvailability } from "@/components/track-availability";
 import { BulkActionsBar } from "@/components/bulk-actions-bar";
+import { SavedSearchesStrip } from "@/components/saved-searches-strip";
 import {
     formatDuration,
     formatNumber,
@@ -92,6 +93,12 @@ interface LibraryClientProps {
         subgenre: string;
         mood: string;
     };
+    savedSearches?: Array<{
+        id: number;
+        name: string;
+        icon?: string | null;
+        filters: Record<string, string>;
+    }>;
 }
 
 export function LibraryClient({
@@ -106,6 +113,7 @@ export function LibraryClient({
     currentSort,
     currentOrder,
     currentFilters,
+    savedSearches = [],
 }: LibraryClientProps) {
     useRenderCount("Page:/library");
     useSyncRefresh(["tracks", "playlist_tracks", "tags", "track_tags"]);
@@ -300,6 +308,12 @@ export function LibraryClient({
                         </a>
                     </div>
                 </div>
+
+                {/* Saved searches strip */}
+                <SavedSearchesStrip
+                    savedSearches={savedSearches}
+                    currentFilters={currentFilters as unknown as Record<string, string>}
+                />
 
                 {/* Filters Bar */}
                 <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 space-y-3">
