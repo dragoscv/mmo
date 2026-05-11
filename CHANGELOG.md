@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 7 (batch Companion release pipeline hardening)
+
+The cross-platform Companion release workflow already shipped Win + macOS + Linux installers on tag push; this batch closes two gaps that bit during the v0.9.x line:
+
+- **Tag-vs-version preflight job** — a new ~5-second `preflight` job runs on `push` events before the 3-OS matrix and asserts that the pushed tag (`v0.9.13` or `companion-v0.9.13`) matches `server/package.json#version`. Without this guard a stale package.json silently produced a release named after whatever was in the file (e.g. tagging `v0.9.13` against a 0.9.5 package.json published a `0.9.5` release and left the v0.9.13 tag dangling). Fails fast with a clear `::error::` line. `workflow_dispatch` runs skip the preflight (no tag context).
+- **Auto-populated GitHub Release notes** — new `server/scripts/extract-release-notes.mjs` slurps the topmost `## ...` section out of repo-root `CHANGELOG.md` (typically `## [Unreleased]` while staging) and writes it to `server/release/RELEASE_NOTES.md`. The release workflow runs the script before each platform's `electron-builder` invocation and passes the file via `--config.releaseInfo.releaseNotesFile=…`, so the GH Release body now contains the actual changelog markdown instead of being empty. Falls back to "See CHANGELOG.md" if the file is missing/malformed so the build never fails on changelog churn.
+- Smoke-tested locally: the extractor produces 158 KB of release notes from the current `## [Unreleased]` block (was 16 B fallback under the first-pass regex — the rewrite manually slices on the next `^## ` heading instead of relying on a non-greedy regex with `\n*$` lookahead, which bailed out at the first blank line).
+
 ### Added — Audit round 7 (batch USB copy UI: SSE-streamed progress with cancel)
 
 Pairs with the round-7 companion endpoint shipped in the previous batch (`POST /library/usb/copy`). The UI side ships in three parts:

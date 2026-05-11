@@ -35,7 +35,38 @@ permissions:
   id-token: write
 
 jobs:
+  # Cheap preflight (~5s) that fails the whole pipeline before we burn 3
+  # OS-runner minutes if the pushed tag doesn't match server/package.json.
+  # electron-builder publishes whatever version is in package.json under a
+  # release named after that version — so a `v0.4.0` tag pointing at a
+  # commit where package.json still says 0.3.5 silently produces a 0.3.5
+  # release and leaves the v0.4.0 tag dangling. This guard makes that an
+  # explicit failure instead of a confusing success. Skipped for manual
+  # workflow_dispatch runs (no tag context).
+  preflight:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert tag matches server/package.json#version
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          # Strip leading "v" or "companion-v" prefix.
+          tagver="${tag#v}"
+          tagver="${tagver#companion-v}"
+          pkgver="$(node -p "require('./server/package.json').version")"
+          echo "Tag version : $tagver"
+          echo "package.json: $pkgver"
+          if [[ "$tagver" != "$pkgver" ]]; then
+            echo "::error::Tag $tag (resolves to $tagver) does not match server/package.json version $pkgver"
+            exit 1
+          fi
+
   build:
+    needs: [preflight]
+    # Allow workflow_dispatch (which skips preflight) to still proceed.
+    if: ${{ always() && (needs.preflight.result == 'success' || needs.preflight.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix:
@@ -143,12 +174,22 @@ jobs:
             echo "flag=--publish never" >> $GITHUB_OUTPUT
           fi
 
+      # Pull the topmost CHANGELOG.md section into release/RELEASE_NOTES.md
+      # so electron-builder can attach it to the GitHub Release body via
+      # --config.releaseInfo.releaseNotesFile. Without this the release
+      # body is empty and users have to dig through the repo to find what
+      # changed. The script gracefully falls back to "See CHANGELOG.md"
+      # if the file is missing or malformed, so it never fails the build.
+      - name: Extract release notes from CHANGELOG
+        shell: bash
+        run: node scripts/extract-release-notes.mjs release/RELEASE_NOTES.md
+
       # ── Windows ────────────────────────────────────────────────────────
       - name: Build Windows installer
         if: matrix.os == 'windows-latest'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm exec electron-builder --win --x64 ${{ steps.pub.outputs.flag }}
+        run: pnpm exec electron-builder --win --x64 --config.releaseInfo.releaseNotesFile=release/RELEASE_NOTES.md ${{ steps.pub.outputs.flag }}
 
       # ── macOS ──────────────────────────────────────────────────────────
       # Unsigned build (no Apple developer certificate). Users will see a
@@ -160,7 +201,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: pnpm exec electron-builder --mac --x64 --arm64 ${{ steps.pub.outputs.flag }}
+        run: pnpm exec electron-builder --mac --x64 --arm64 --config.releaseInfo.releaseNotesFile=release/RELEASE_NOTES.md ${{ steps.pub.outputs.flag }}
       # ── Linux ───────────────────────────────────────────────────
       # Produces three formats so distros without AppImage support get a
       # native package: .deb (Ubuntu/Debian/Mint), .rpm (Fedora/openSUSE),
@@ -175,7 +216,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           USE_SYSTEM_FPM: "false"
-        run: pnpm exec electron-builder --linux --x64 ${{ steps.pub.outputs.flag }}
+        run: pnpm exec electron-builder --linux --x64 --config.releaseInfo.releaseNotesFile=release/RELEASE_NOTES.md ${{ steps.pub.outputs.flag }}
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
