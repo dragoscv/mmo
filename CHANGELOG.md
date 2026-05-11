@@ -12,6 +12,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 40: smart playlists, all four authoring modes)
+
+- **`smart-rules.ts` engine** — pure, dependency-free rules engine. A discriminated-union `SmartRules` type with four variants (`builder` / `sql` / `graph` / `ai`), each compiled to the same canonical `BuilderRules` IR and executed in-memory against the user's library. ~530 lines plus 200 lines of unit tests covering zod validation, condition evaluator (every operator), AND/OR group nesting, the SQL parser (incl. `BETWEEN`, `IN (…)`, parens, AND/OR precedence), graph collapse, AI passthrough, sort+limit, and end-to-end SQL→match flow.
+- **AND/OR builder mode** — full visual rule editor with field/operator/value rows, supports 17 fields × 15 operators × ranges + lists. Combines via top-level `all`/`any` toggle.
+- **SQL mode** — tiny safe WHERE-expression parser (`bpm BETWEEN 120 AND 130 AND genre IN ('techno','tech-house')`). No joins, no functions, no subselects: the surface is too small to misuse, sidesteps SQL-injection concerns by design (we still execute in JS, never against the DB).
+- **Graph mode** — JSON pipeline IR (filter → sort → limit nodes). Visual node editor deferred; today the IR is the contract so the engine is ready when the canvas lands.
+- **AI mode** — stores the prompt + an optional pre-compiled `BuilderRules`. Today this is a passthrough (matches all tracks until an LLM is wired up in B43+); the schema is in place so adding inference later is one server-side compile call.
+- **Cloud table `smart_playlist_rules`** — keyed by `(userId, companionPlaylistId)`, separate from `playlists` so we don't perturb the per-field LWW sync surface. Migration `0009_smart_playlists.sql` adds it with a unique compound index.
+- **Server actions** — `createSmartPlaylist`, `updateSmartPlaylistRules` (upsert, also handles "convert manual to smart"), `refreshSmartPlaylist`, `previewSmartRules` (count+sample), `getSmartPlaylistRules`. All authorised, all zod-validated, with rollback on the create path so a half-baked playlist never gets left behind.
+- **`<SmartPlaylistDialog>`** — tabbed UI in `playlists-client.tsx` next to the existing "New Playlist" button. Live error display when rules don't validate; "Preview match count" hits the new server action; on save creates the companion playlist + rules row + initial population in one click.
+- **Verified**: tests 175 → **200** (25 new for the engine), tsc clean, lint baseline unchanged.
+
 ### Added — Audit round 6 (batch 39: waveform overview peaks pipeline)
 
 - **Python sidecar emits 2000-pair Int16 overview peaks** (interleaved `[min0,max0,min1,max1,…]`) on every DSP analyze run. Hex-encoded for clean JSON transport, decoded by the companion. Computation is vectorised numpy reshape + min/max — adds ~10 ms even on 10-minute tracks.

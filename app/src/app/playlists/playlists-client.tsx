@@ -34,6 +34,7 @@ import { TrackDetailModal } from "@/components/track-detail-modal";
 import { TrackActions, TrackContextMenu } from "@/components/track-actions";
 import { PlaylistActions } from "@/components/playlist-actions";
 import { ColumnManager, useColumnConfig } from "@/components/column-manager";
+import { SmartPlaylistDialog } from "@/components/smart-playlist-dialog";
 import { Select } from "@/components/ui/select";
 import { formatDuration, formatNumber, ENERGY_COLORS, GENRE_COLORS, cn } from "@/lib/utils";
 import {
@@ -112,6 +113,7 @@ export function PlaylistsClient({
 
     // Dialogs
     const [createOpen, setCreateOpen] = useState(false);
+    const [smartOpen, setSmartOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [newName, setNewName] = useState("");
@@ -297,6 +299,15 @@ export function PlaylistsClient({
                             <FileDown className="h-4 w-4" />
                             <span className="hidden sm:inline">Export All to XML</span>
                             <span className="sm:hidden">Export</span>
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            className="gap-2"
+                            onClick={() => setSmartOpen(true)}
+                        >
+                            <Plus className="h-4 w-4" />
+                            Smart Playlist
                         </Button>
                         <Button
                             size="sm"
@@ -865,6 +876,13 @@ export function PlaylistsClient({
                     onMutate={() => router.refresh()}
                 />
             )}
+
+            {/* Smart Playlist Dialog */}
+            <SmartPlaylistDialog
+                open={smartOpen}
+                onOpenChange={setSmartOpen}
+                onCreated={() => router.refresh()}
+            />
         </div>
     );
 }

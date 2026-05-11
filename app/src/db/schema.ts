@@ -469,3 +469,38 @@ export const pushSubscriptions = pgTable(
 
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;
+
+// ─── Smart playlist rules (Batch 40) ────────────────────────────────
+//
+// Stored separately from the `playlists` table so we don't pollute the
+// per-field LWW sync surface and so a future companion-side mirror can
+// adopt the same shape without rewriting the playlists schema.
+//
+// Keyed by (userId, companionPlaylistId): one rules row per user × per
+// companion-side playlist id. The companion's id is what the UI already
+// passes around everywhere.
+export const smartPlaylistRules = pgTable(
+    "smart_playlist_rules",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        /** Companion-side playlist id. Not a FK because the companion DB is
+         *  separate; the cleanup happens via the companion's own delete event. */
+        companionPlaylistId: integer("companion_playlist_id").notNull(),
+        /** Discriminated-union rules JSON. Validated by `smartRulesSchema`
+         *  in src/lib/smart-rules.ts. */
+        rules: jsonb("rules").notNull(),
+        /** Which authoring mode produced `rules`: builder|sql|graph|ai. */
+        ruleSource: text("rule_source").notNull(),
+        /** Last time the smart playlist was re-evaluated against the library. */
+        lastPopulatedAt: timestamp("last_populated_at"),
+        createdAt: timestamp("created_at").defaultNow(),
+        updatedAt: timestamp("updated_at").defaultNow(),
+    },
+    (t) => [
+        uniqueIndex("smart_rules_user_pl_uniq").on(t.userId, t.companionPlaylistId),
+    ],
+);
+
+export type SmartPlaylistRulesRow = typeof smartPlaylistRules.$inferSelect;
+export type NewSmartPlaylistRules = typeof smartPlaylistRules.$inferInsert;
