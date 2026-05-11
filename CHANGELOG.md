@@ -12,6 +12,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch onboarding: 4-step wizard on first dashboard visit)
+
+- **`<OnboardingWizard>`** — a four-step modal (Language → Sign in → Companion → Scan) that auto-opens on `/dashboard` whenever the user has zero tracks AND hasn't dismissed it. Steps are skipped automatically when already satisfied: a brand-new visitor sees all four; a signed-in user with a linked companion lands directly on the Scan step.
+- **State model** — single `localStorage` flag (`mmo.onboarding.dismissed`) so dismissing is one-way. Reopen path is documented in the dialog footer (`⌘K → "Onboarding"` — palette wiring is a follow-up; the flag will be honoured if the user reopens manually).
+- **Step UX** — each step renders a one-line summary plus a primary CTA. Language uses the existing `setLocaleAction` server action, Sign in deep-links `/login`, Companion deep-links `/download`, Scan routes to `/scanner` and dismisses the wizard at the same time. The stepper at the top shows a check mark for completed steps so users get a sense of progress.
+- **Lazy-loaded** via `next/dynamic({ssr: false})` from `dashboard-client.tsx`, so the wizard's JS only ships to users who actually visit the dashboard (and only loads on the client, after RSC streaming).
+- The wizard is the first material use of `useLocale()` from next-intl in the dashboard tree; locale is forwarded as a prop so the language step can highlight the active option.
+
+### Changed — Audit round 6 (batch perf-housekeeping)
+
+- **Deleted** unused `components/genre-chart.tsx` (orphaned recharts importer with no callers in the workspace) so the recharts dependency surface is now exclusively consumed by `dashboard-charts.tsx`, which is already lazy-loaded via `next/dynamic`. Net effect: smaller production graph, no behaviour change.
+- **Verified**: tsc clean, **209 tests pass**, lint baseline unchanged (20).
+
 ### Added — Audit round 6 (batch 43: AI provider — Azure AI Foundry default)
 
 - **Azure AI Foundry** added as the **default** AI provider — listed first in `SUPPORTED_PROVIDERS` so the existing fallback chain in `pickProvider()` (used by `actions/ai-tag.ts` and any future AI surface) tries Azure before OpenAI / Anthropic / Google / Mistral / Groq when no per-user preference is set.

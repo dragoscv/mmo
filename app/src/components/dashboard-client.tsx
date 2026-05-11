@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, type ReactNode } from "react";
 import dynamic from "next/dynamic";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import Link from "next/link";
 import { useRenderCount } from "@/lib/dev-debugger";
 import { useSyncRefresh } from "@/hooks/use-sync-refresh";
@@ -54,6 +54,10 @@ const KeyDistribution = dynamic(
 const LibraryGrowth = dynamic(
     () => import("./dashboard-charts").then((m) => m.LibraryGrowth),
     { ssr: false, loading: ChartLoader },
+);
+const OnboardingWizard = dynamic(
+    () => import("./onboarding-wizard").then((m) => m.OnboardingWizard),
+    { ssr: false },
 );
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -600,9 +604,16 @@ export function DashboardClient({ stats, recommendedCategories, recentScans, gro
     useRenderCount("Page:/");
     useSyncRefresh();
     const greeting = getGreeting();
+    const locale = useLocale() as "ro" | "en";
 
     return (
         <div className="flex flex-col h-full">
+            <OnboardingWizard
+                currentLocale={locale}
+                isAuthed={true}
+                hasCompanion={true}
+                hasTracks={stats.total > 0}
+            />
             {/* Sticky Header */}
             <div className="shrink-0 sticky top-0 z-20 bg-background/95 backdrop-blur-sm px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-3 border-b border-border">
                 <AnimatedSection delay={0}>
