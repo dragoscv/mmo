@@ -241,6 +241,26 @@
         "scanLong": "Scanner-ul citește tagurile ID3, calculează BPM + tonalitate Camelot și indexează totul pentru căutare instantă.",
         "scanOpenScanner": "Deschide Scanner-ul"
     },
+    "dawBrowser": {
+        "tabLibrary": "Bibliotecă",
+        "tabSamples": "Sample-uri",
+        "tabPlugins": "Plugin-uri",
+        "tabPresets": "Preset-uri",
+        "searchPlaceholder": "Caută...",
+        "filterSamples": "Filtrează sample-uri...",
+        "librarySearchHint": "Caută în bibliotecă pentru a găsi piese",
+        "librarySearchHint2": "Trage piese pe timeline sau apasă + pentru a le adăuga",
+        "searching": "Se caută...",
+        "noResults": "Fără rezultate",
+        "loadingSamples": "Se încarcă sample-urile...",
+        "runBuildScript": "Rulează scriptul de build pentru a genera sample-urile",
+        "addToTimeline": "Adaugă pe timeline",
+        "preview": "Previzualizare",
+        "stopPreview": "Oprire previzualizare",
+        "sectionEffects": "Efecte",
+        "sectionInstruments": "Instrumente",
+        "sectionSynthPresets": "Preset-uri synth"
+    },
     "mixerConsole": {
         "connectedControllers": "Controlere conectate",
         "refresh": "Reîmprospătează",

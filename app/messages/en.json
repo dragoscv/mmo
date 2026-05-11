@@ -241,6 +241,26 @@
         "scanLong": "Scanner reads ID3 tags, computes BPM + Camelot key, and indexes everything for instant search.",
         "scanOpenScanner": "Open Scanner"
     },
+    "dawBrowser": {
+        "tabLibrary": "Library",
+        "tabSamples": "Samples",
+        "tabPlugins": "Plugins",
+        "tabPresets": "Presets",
+        "searchPlaceholder": "Search...",
+        "filterSamples": "Filter samples...",
+        "librarySearchHint": "Search your library to find tracks",
+        "librarySearchHint2": "Drag tracks to the timeline or click + to add",
+        "searching": "Searching...",
+        "noResults": "No results",
+        "loadingSamples": "Loading samples...",
+        "runBuildScript": "Run the build script to generate samples",
+        "addToTimeline": "Add to Timeline",
+        "preview": "Preview",
+        "stopPreview": "Stop Preview",
+        "sectionEffects": "Effects",
+        "sectionInstruments": "Instruments",
+        "sectionSynthPresets": "Synth Presets"
+    },
     "mixerConsole": {
         "connectedControllers": "Connected Controllers",
         "refresh": "Refresh",

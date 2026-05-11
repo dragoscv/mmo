@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { useDAW } from "./daw-context";
 import { cn } from "@/lib/utils";
 import {
@@ -68,6 +69,7 @@ interface LibraryTrack {
 export function DAWBrowser() {
     useRenderCount("DAWBrowser");
     const daw = useDAW();
+    const t = useTranslations("dawBrowser");
     const [tab, setTab] = useState<BrowserTab>("files");
     const [searchQuery, setSearchQuery] = useState("");
     const [libraryTracks, setLibraryTracks] = useState<LibraryTrack[]>([]);
@@ -101,10 +103,10 @@ export function DAWBrowser() {
     }, [searchQuery, tab, searchLibrary]);
 
     const tabs: { id: BrowserTab; label: string; icon: typeof Music }[] = [
-        { id: "files", label: "Library", icon: Music },
-        { id: "samples", label: "Samples", icon: FileAudio },
-        { id: "plugins", label: "Plugins", icon: Sliders },
-        { id: "presets", label: "Presets", icon: Piano },
+        { id: "files", label: t("tabLibrary"), icon: Music },
+        { id: "samples", label: t("tabSamples"), icon: FileAudio },
+        { id: "plugins", label: t("tabPlugins"), icon: Sliders },
+        { id: "presets", label: t("tabPresets"), icon: Piano },
     ];
 
     return (
@@ -136,7 +138,7 @@ export function DAWBrowser() {
                         type="text"
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        placeholder="Search..."
+                        placeholder={t("searchPlaceholder")}
                         className="flex-1 bg-transparent text-xs text-white/70 placeholder:text-white/20 focus:outline-none"
                     />
                 </div>
@@ -161,6 +163,7 @@ export function DAWBrowser() {
 
 function FileBrowser({ tracks, loading, query }: { tracks: LibraryTrack[]; loading: boolean; query: string }) {
     const daw = useDAW();
+    const t = useTranslations("dawBrowser");
     const ctxMenu = useContextMenu();
 
     const handleTrackContextMenu = useCallback((e: React.MouseEvent, track: LibraryTrack) => {
@@ -169,7 +172,7 @@ function FileBrowser({ tracks, loading, query }: { tracks: LibraryTrack[]; loadi
             { type: "label", label: track.title },
             { type: "separator" },
             {
-                label: "Add to Timeline",
+                label: t("addToTimeline"),
                 icon: <Plus className="h-3.5 w-3.5" />,
                 onClick: () => daw.importTrackFromLibrary(track.filePath, track.title),
             },
@@ -194,14 +197,14 @@ function FileBrowser({ tracks, loading, query }: { tracks: LibraryTrack[]; loadi
         return (
             <div className="p-3 text-center">
                 <Music className="h-8 w-8 text-white/10 mx-auto mb-2" />
-                <p className="text-[11px] text-white/20">Search your library to find tracks</p>
-                <p className="text-[10px] text-white/10 mt-1">Drag tracks to the timeline or click + to add</p>
+                <p className="text-[11px] text-white/20">{t("librarySearchHint")}</p>
+                <p className="text-[10px] text-white/10 mt-1">{t("librarySearchHint2")}</p>
             </div>
         );
     }
 
     if (loading) {
-        return <div className="p-3 text-center text-[11px] text-white/20">Searching...</div>;
+        return <div className="p-3 text-center text-[11px] text-white/20">{t("searching")}</div>;
     }
 
     return (
@@ -214,7 +217,7 @@ function FileBrowser({ tracks, loading, query }: { tracks: LibraryTrack[]; loadi
                     onAdd={() => daw.importTrackFromLibrary(track.filePath, track.title)}
                 />
             ))}
-            {tracks.length === 0 && <div className="p-3 text-center text-[11px] text-white/20">No results</div>}
+            {tracks.length === 0 && <div className="p-3 text-center text-[11px] text-white/20">{t("noResults")}</div>}
         </div>
     );
 }
@@ -275,6 +278,7 @@ function LibraryTrackRow({ track, onContextMenu, onAdd }: {
 
 function SampleBrowser() {
     const daw = useDAW();
+    const t = useTranslations("dawBrowser");
     const ctxMenu = useContextMenu();
     const [manifest, setManifest] = useState<SampleManifest | null>(null);
     const [loading, setLoading] = useState(true);
@@ -370,12 +374,12 @@ function SampleBrowser() {
             { type: "label", label: sample.name },
             { type: "separator" },
             {
-                label: "Add to Timeline",
+                label: t("addToTimeline"),
                 icon: <Plus className="h-3.5 w-3.5" />,
                 onClick: () => daw.importTrackFromLibrary(sample.path, sample.name),
             },
             {
-                label: previewUrl === sample.path ? "Stop Preview" : "Preview",
+                label: previewUrl === sample.path ? t("stopPreview") : t("preview"),
                 icon: previewUrl === sample.path ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />,
                 onClick: () => togglePreview(sample.path),
             },
@@ -408,7 +412,7 @@ function SampleBrowser() {
         return (
             <div className="p-3 text-center">
                 <div className="animate-spin h-5 w-5 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-2" />
-                <p className="text-[11px] text-white/30">Loading samples...</p>
+                <p className="text-[11px] text-white/30">{t("loadingSamples")}</p>
             </div>
         );
     }
@@ -418,7 +422,7 @@ function SampleBrowser() {
             <div className="p-3 text-center">
                 <Disc className="h-8 w-8 text-white/10 mx-auto mb-2" />
                 <p className="text-[11px] text-red-400/60">{error}</p>
-                <p className="text-[9px] text-white/20 mt-1">Run the build script to generate samples</p>
+                <p className="text-[9px] text-white/20 mt-1">{t("runBuildScript")}</p>
             </div>
         );
     }
@@ -433,7 +437,7 @@ function SampleBrowser() {
                         type="text"
                         value={searchFilter}
                         onChange={e => setSearchFilter(e.target.value)}
-                        placeholder="Filter samples..."
+                        placeholder={t("filterSamples")}
                         className="flex-1 bg-transparent text-[10px] text-white/60 placeholder:text-white/15 focus:outline-none"
                     />
                     {manifest && (
@@ -567,13 +571,13 @@ function SampleRow({ sample, isPreviewing, onTogglePreview, onContextMenu, onDou
 }
 
 function PluginBrowser() {
-    const daw = useDAW();
+    const t = useTranslations("dawBrowser");
 
-    const plugins: { name: string; type: string }[] = EFFECT_TYPES.map(t => ({ name: t, type: "effect" }));
+    const plugins: { name: string; type: string }[] = EFFECT_TYPES.map(name => ({ name, type: "effect" }));
 
     return (
         <div>
-            <CollapsibleSection title="Effects">
+            <CollapsibleSection title={t("sectionEffects")}>
                 {plugins.map(p => (
                     <div
                         key={p.name}
@@ -588,7 +592,7 @@ function PluginBrowser() {
                     </div>
                 ))}
             </CollapsibleSection>
-            <CollapsibleSection title="Instruments">
+            <CollapsibleSection title={t("sectionInstruments")}>
                 {["Synthesizer", "Sampler", "Drum Machine"].map(inst => (
                     <div
                         key={inst}
@@ -604,6 +608,7 @@ function PluginBrowser() {
 }
 
 function PresetBrowser() {
+    const t = useTranslations("dawBrowser");
     const synthPresets = [
         "Init Patch", "Fat Bass", "Saw Lead", "Pad Warm", "Pluck Bright",
         "Sub Bass", "Detuned Lead", "String Pad", "Arp Sequence", "FM Bell",
@@ -611,7 +616,7 @@ function PresetBrowser() {
 
     return (
         <div>
-            <CollapsibleSection title="Synth Presets">
+            <CollapsibleSection title={t("sectionSynthPresets")}>
                 {synthPresets.map(p => (
                     <div
                         key={p}

@@ -12,6 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 8 (batch i18n: daw-browser)
+
+Third slice of Q8.5. Localized `app/src/components/daw/daw-browser.tsx` (DAW left-pane browser) — tab labels (Library/Samples/Plugins/Presets), search placeholders, empty-state hints in the library tab, "Searching..." / "No results", "Loading samples..." spinner, build-script error hint, "Add to Timeline" / "Preview" / "Stop Preview" context-menu entries, section titles in the Plugin and Preset tabs (Effects / Instruments / Synth Presets). Effect type names, instrument names ("Synthesizer", "Sampler", "Drum Machine") and synth preset names ("Init Patch", "Fat Bass", …) stay English on purpose — they're producer-side technical brand-style terms.
+
+- `app/messages/en.json` + `app/messages/ro.json` — new `dawBrowser.*` namespace (18 keys) in both locales.
+
+Also fixed a latent unused-`daw` binding in `PluginBrowser` that the noUnusedLocals strict check would have caught once we added another import, and renamed the `EFFECT_TYPES.map(t => …)` callback param from `t` to `name` so it no longer shadows the new `useTranslations` `t`.
+
+Verified: 0 TSC errors, 283 tests still green across 29 files, 0 new lint errors.
+
 ### Added — Audit round 8 (batch i18n: mixer-settings-console-tab)
 
 Second slice of Q8.5. Localized `app/src/components/mixer-settings-console-tab.tsx` (Console tab in mixer settings) — section titles, action buttons (Refresh / Re-bind / Diagnose), empty/error states, driver status chips ("Driver active" / "Not bound"), driver override label + helper, "Flash all LEDs" CTA (with ICU plural for the active-driver count), LED preset section header + description, "Active" badge, "Color Preview" header. The internal Bind Diagnostic block + raw MIDI port listing stay English on purpose — they're expert debug surfaces and translating field names like "Drivers ref size" would obscure them.
