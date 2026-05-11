@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSyncRefresh } from "@/hooks/use-sync-refresh";
@@ -106,6 +107,7 @@ export function PlaylistsClient({
 }: PlaylistsClientProps) {
     useRenderCount("Page:/playlists");
     useSyncRefresh(["playlists", "playlist_tracks", "tracks"]);
+    const t = useTranslations("playlistsPage");
     const player = usePlayer();
     const { savedIds } = useSessionDownloads();
     const searchParams = useSearchParams();
@@ -258,7 +260,7 @@ export function PlaylistsClient({
             const result = await reorderPlaylistTracks(activePlaylist.id, finalOrder);
             if (!result.success) {
                 const { toast } = await import("sonner");
-                toast.error("Reorder failed", { description: result.error });
+                toast.error(t("reorderFailed"), { description: result.error });
             }
             setDragOrder(null);
             router.refresh();
@@ -303,9 +305,9 @@ export function PlaylistsClient({
                 {/* Header */}
                 <div className="flex items-center justify-between flex-wrap gap-3">
                     <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold">Playlists</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold">{t("title")}</h1>
                         <p className="text-[var(--muted-foreground)]">
-                            {playlists.length} playlist{playlists.length !== 1 ? "s" : ""}
+                            {t("countLabel", { count: playlists.length })}
                         </p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -317,8 +319,8 @@ export function PlaylistsClient({
                             disabled={playlists.length === 0}
                         >
                             <FileDown className="h-4 w-4" />
-                            <span className="hidden sm:inline">Export All to XML</span>
-                            <span className="sm:hidden">Export</span>
+                            <span className="hidden sm:inline">{t("exportAllXml")}</span>
+                            <span className="sm:hidden">{t("export")}</span>
                         </Button>
                         <Button
                             variant="outline"
@@ -326,10 +328,10 @@ export function PlaylistsClient({
                             className="gap-2"
                             onClick={() => setUsbOpen(true)}
                             disabled={playlists.length === 0}
-                            title="Export to Rekordbox XML and/or Serato .crate for USB DJ workflow"
+                            title={t("usbTitle")}
                         >
                             <FileDown className="h-4 w-4" />
-                            USB…
+                            {t("usb")}
                         </Button>
                         <Button
                             variant="outline"
@@ -337,10 +339,10 @@ export function PlaylistsClient({
                             className="gap-2"
                             onClick={() => setUsbCopyOpen(true)}
                             disabled={playlists.length === 0}
-                            title="Copy the audio files themselves to a USB drive"
+                            title={t("copyAudioTitle")}
                         >
                             <FileDown className="h-4 w-4" />
-                            Copy audio…
+                            {t("copyAudio")}
                         </Button>
                         <Button
                             size="sm"
@@ -349,7 +351,7 @@ export function PlaylistsClient({
                             onClick={() => setSmartOpen(true)}
                         >
                             <Plus className="h-4 w-4" />
-                            Smart Playlist
+                            {t("smartPlaylist")}
                         </Button>
                         <Button
                             size="sm"
@@ -361,7 +363,7 @@ export function PlaylistsClient({
                             }}
                         >
                             <Plus className="h-4 w-4" />
-                            New Playlist
+                            {t("newPlaylist")}
                         </Button>
                     </div>
                 </div>
@@ -379,10 +381,10 @@ export function PlaylistsClient({
                             <div className="py-8 text-center">
                                 <ListMusic className="h-8 w-8 mx-auto mb-2 text-zinc-600" />
                                 <p className="text-sm text-[var(--muted-foreground)]">
-                                    No playlists yet
+                                    {t("emptyTitle")}
                                 </p>
                                 <p className="text-xs text-zinc-600 mt-1">
-                                    Create one or import from rekordbox
+                                    {t("emptyHint")}
                                 </p>
                             </div>
                         ) : (
@@ -403,16 +405,16 @@ export function PlaylistsClient({
                                                 {smartIdSet.has(pl.id) && (
                                                     <span
                                                         className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30"
-                                                        title="Smart playlist — auto-populated from rules"
+                                                        title={t("smartTooltip")}
                                                     >
-                                                        ✨ Smart
+                                                        ✨ {t("smart")}
                                                     </span>
                                                 )}
                                             </p>
                                             <p className="text-xs text-[var(--muted-foreground)]">
                                                 {String(pl.id) === activeId
-                                                    ? `${formatNumber(total)} tracks`
-                                                    : `${pl.trackCount} tracks`}
+                                                    ? t("tracksCount", { count: total })
+                                                    : t("tracksCount", { count: pl.trackCount })}
                                             </p>
                                         </div>
                                     </Link>
@@ -455,7 +457,7 @@ export function PlaylistsClient({
                                                 {activePlaylist.name}
                                             </h2>
                                             <p className="text-sm text-[var(--muted-foreground)]">
-                                                {formatNumber(total)} tracks
+                                                {t("tracksCount", { count: total })}
                                             </p>
                                         </div>
                                     </div>
@@ -467,7 +469,7 @@ export function PlaylistsClient({
                                             onClick={() => setSimilarOpen(true)}
                                         >
                                             <Sparkles className="h-3.5 w-3.5" />
-                                            Similar
+                                            {t("similar")}
                                         </Button>
                                         <Button
                                             variant="outline"
@@ -476,7 +478,7 @@ export function PlaylistsClient({
                                             onClick={handleExportPlaylist}
                                         >
                                             <Download className="h-3.5 w-3.5" />
-                                            Export XML
+                                            {t("exportXml")}
                                         </Button>
                                         <Button
                                             variant="outline"
@@ -488,7 +490,7 @@ export function PlaylistsClient({
                                             }}
                                         >
                                             <Pencil className="h-3.5 w-3.5" />
-                                            Rename
+                                            {t("rename")}
                                         </Button>
                                         <Button
                                             variant="outline"
@@ -497,7 +499,7 @@ export function PlaylistsClient({
                                             onClick={() => setDeleteOpen(true)}
                                         >
                                             <Trash2 className="h-3.5 w-3.5" />
-                                            Delete
+                                            {t("delete")}
                                         </Button>
                                     </div>
                                 </div>
@@ -533,7 +535,7 @@ export function PlaylistsClient({
                                                         case "genre": return <TableHead key={col} className="w-20">Genre</TableHead>;
                                                         case "energy": return <TableHead key={col} className="w-14 text-center">⚡</TableHead>;
                                                         case "rating": return <TableHead key={col} className="w-20 text-center">Rating</TableHead>;
-                                                        case "duration": return <TableHead key={col} className="w-16 text-right">Time</TableHead>;
+                                                        case "duration": return <TableHead key={col} className="w-16 text-right">{t("colTime")}</TableHead>;
                                                         default: return null;
                                                     }
                                                 })}
@@ -614,7 +616,7 @@ export function PlaylistsClient({
                                                                     case "artist": return (
                                                                         <TableCell key={col} className="max-w-[180px] truncate text-sm">
                                                                             <span className={cn(isCurrentTrack && "text-purple-400")}>
-                                                                                {track.artist || "Unknown"}
+                                                                                {track.artist || t("unknownArtist")}
                                                                             </span>
                                                                         </TableCell>
                                                                     );
@@ -688,8 +690,8 @@ export function PlaylistsClient({
                                                                 <div className="flex items-center justify-end gap-0.5 pr-1">
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => downloadTrackFile(track.id, `${track.artist || "Unknown"} - ${track.title || `track-${track.id}`}`)}
-                                                                        title={isSavedThisSession ? "Saved this session \u2014 download again" : "Download to PC"}
+                                                                        onClick={() => downloadTrackFile(track.id, `${track.artist || t("unknownArtist")} - ${track.title || `track-${track.id}`}`)}
+                                                                        title={isSavedThisSession ? t("savedThisSession") : t("downloadToPc")}
                                                                         className={cn(
                                                                             "h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors cursor-pointer",
                                                                             isSavedThisSession
@@ -724,7 +726,7 @@ export function PlaylistsClient({
                                     <div className="flex items-center justify-between mt-4">
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm text-[var(--muted-foreground)]">
-                                                Page {page} of {totalPages}
+                                                {t("pageOf", { page, total: totalPages })}
                                             </span>
                                             <Select
                                                 value={String(pageSize)}
@@ -738,7 +740,7 @@ export function PlaylistsClient({
                                                 <option value="100">100</option>
                                             </Select>
                                             <span className="text-xs text-[var(--muted-foreground)]">
-                                                per page
+                                                {t("perPage")}
                                             </span>
                                         </div>
 
@@ -809,10 +811,9 @@ export function PlaylistsClient({
                             <div className="space-y-8">
                                 <div className="flex flex-col items-center justify-center py-8 text-[var(--muted-foreground)]">
                                     <ListMusic className="h-12 w-12 mb-4 opacity-50" />
-                                    <p className="text-lg">Select a playlist</p>
+                                    <p className="text-lg">{t("selectPlaylist")}</p>
                                     <p className="text-sm">
-                                        Choose a playlist from the left to view tracks, or create a new
-                                        one.
+                                        {t("selectPlaylistHint")}
                                     </p>
                                 </div>
                                 <PlaylistRecommendations categories={recommendedCategories} />
@@ -826,38 +827,38 @@ export function PlaylistsClient({
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Create New Playlist</DialogTitle>
+                        <DialogTitle>{t("createTitle")}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3 py-4">
                         <div>
-                            <label className="text-sm text-zinc-400 mb-1 block">Name</label>
+                            <label className="text-sm text-zinc-400 mb-1 block">{t("nameLabel")}</label>
                             <Input
                                 value={newName}
                                 onChange={(e) => setNewName(e.target.value)}
-                                placeholder="My Playlist"
+                                placeholder={t("namePlaceholder")}
                                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                             />
                         </div>
                         <div>
                             <label className="text-sm text-zinc-400 mb-1 block">
-                                Description (optional)
+                                {t("descLabel")}
                             </label>
                             <Input
                                 value={newDesc}
                                 onChange={(e) => setNewDesc(e.target.value)}
-                                placeholder="Description..."
+                                placeholder={t("descPlaceholder")}
                             />
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setCreateOpen(false)}>
-                            Cancel
+                            {t("cancel")}
                         </Button>
                         <Button onClick={handleCreate} disabled={isPending || !newName.trim()}>
                             {isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             ) : null}
-                            Create
+                            {t("create")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -867,7 +868,7 @@ export function PlaylistsClient({
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Rename Playlist</DialogTitle>
+                        <DialogTitle>{t("renameTitle")}</DialogTitle>
                     </DialogHeader>
                     <div className="py-4">
                         <Input
@@ -878,10 +879,10 @@ export function PlaylistsClient({
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setEditOpen(false)}>
-                            Cancel
+                            {t("cancel")}
                         </Button>
                         <Button onClick={handleEdit} disabled={isPending || !editName.trim()}>
-                            Save
+                            {t("save")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -891,21 +892,20 @@ export function PlaylistsClient({
             <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Delete Playlist</DialogTitle>
+                        <DialogTitle>{t("deleteTitle")}</DialogTitle>
                     </DialogHeader>
                     <p className="text-sm text-[var(--muted-foreground)] py-2">
-                        Are you sure you want to delete &quot;{activePlaylist?.name}&quot;?
-                        This will remove the playlist but not the actual tracks.
+                        {t("deleteConfirm", { name: activePlaylist?.name ?? "" })}
                     </p>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-                            Cancel
+                            {t("cancel")}
                         </Button>
                         <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
                             {isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             ) : null}
-                            Delete
+                            {t("delete")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
