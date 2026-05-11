@@ -20,6 +20,8 @@ import {
     ResponsiveContainer,
     Cell,
     CartesianGrid,
+    Area,
+    AreaChart,
 } from "recharts";
 import type { DashboardStats } from "@/actions/tracks";
 
@@ -135,6 +137,46 @@ export function KeyDistribution({ data }: { data: DashboardStats["keyStats"] }) 
                     ))}
                 </Bar>
             </BarChart>
+        </ResponsiveContainer>
+    );
+}
+
+/** Library growth — tracks added per day over the last N days.
+ *  Renders as a smooth area chart so quiet days don't visually
+ *  shout (vs. a bar chart full of empty columns). */
+export function LibraryGrowth({ data }: { data: Array<{ date: string; added: number }> }) {
+    if (data.length === 0) return <EmptyChart message="No growth data yet" />;
+    const total = data.reduce((sum, d) => sum + d.added, 0);
+    if (total === 0) return <EmptyChart message="No tracks added in this window" />;
+    return (
+        <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={data} margin={{ left: 5, right: 15, top: 10, bottom: 0 }}>
+                <defs>
+                    <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.55} />
+                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.04} />
+                    </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis
+                    dataKey="date"
+                    stroke="var(--muted-foreground)"
+                    fontSize={11}
+                    tickFormatter={(d: string) => d.slice(5)} /* MM-DD */
+                    interval={Math.max(0, Math.floor(data.length / 8) - 1)}
+                />
+                <YAxis stroke="var(--muted-foreground)" fontSize={11} allowDecimals={false} width={30} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Area
+                    type="monotone"
+                    dataKey="added"
+                    stroke="#a855f7"
+                    strokeWidth={2}
+                    fill="url(#growthGradient)"
+                    animationDuration={1200}
+                    animationBegin={500}
+                />
+            </AreaChart>
         </ResponsiveContainer>
     );
 }

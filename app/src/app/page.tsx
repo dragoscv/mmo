@@ -1,5 +1,5 @@
 import { getDashboardStats } from "@/actions/tracks";
-import { getRecentScans } from "@/actions/scan";
+import { getRecentScans, getLibraryGrowth } from "@/actions/scan";
 import { getRecommendedPlaylists } from "@/actions/playlists";
 import { DashboardClient } from "@/components/dashboard-client";
 import { auth } from "@/auth";
@@ -14,10 +14,11 @@ export default async function DashboardPage() {
     const link = await getCompanionLink();
     if (!link) return <NoCompanion feature="your dashboard" />;
 
-    const [stats, recommendedCategories, recentScans] = await Promise.all([
+    const [stats, recommendedCategories, recentScans, growth] = await Promise.all([
         getDashboardStats(),
         getRecommendedPlaylists(),
         getRecentScans(10),
+        getLibraryGrowth(30),
     ]);
 
     return (
@@ -25,6 +26,7 @@ export default async function DashboardPage() {
             stats={stats}
             recommendedCategories={recommendedCategories}
             recentScans={recentScans}
+            growth={growth}
         />
     );
 }

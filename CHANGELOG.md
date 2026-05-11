@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 42a: dashboard health score + library growth chart)
+
+- **Aggregate Library Health Score** in the existing `<LibraryHealth>` card. A single 0-100 score computed as the mean of per-field completeness across the 5 quality dimensions (Genre / BPM / Key / Energy / Artwork) — every field weighted equally so the score never lies about a 100%-genre / 0%-key library. Rendered as a 56 × 56 SVG progress ring (radius 22, circumference ≈ 138.23, dashoffset animated over 1 s with a 300 ms entrance delay) with a tone-graded centre number (emerald ≥ 90, amber ≥ 70, rose otherwise) and a one-line copy that changes with the score band ("tournament-ready" / "fill the gaps" / "needs work — analyze + tag missing fields").
+- **`<LibraryGrowth>` area chart** in `dashboard-charts.tsx` — recharts `AreaChart` with a vertical purple gradient fill (`#8b5cf6` 0.55 → 0.04), `monotone` curve, x-axis labels every ~Nth day so 30 ticks become a clean 8-tick spread, animation 1.2 s with 500 ms entrance delay. Bundled into the same lazy `next/dynamic` chunk as the other 4 charts so the recharts dependency stays off the dashboard's initial JS payload.
+- **`getLibraryGrowth(days = 30)` server action** in `actions/scan.ts` — fetches the latest 200 scan-log rows from the companion (`/scan-logs?limit=200`), filters to `action === "added"`, buckets by local-day `YYYY-MM-DD`, and pre-seeds the full 30-day window at zero so the x-axis is continuous even after a quiet week. Catches and logs companion failures, returning `[]` on error so the chart degrades to its empty-state copy ("No tracks added in this window") instead of crashing the dashboard.
+- **`/` server page** picks up `getLibraryGrowth(30)` in the existing `Promise.all` so it runs in parallel with the other three fetches; no extra latency.
+- **Verified**: tsc clean, **209 tests pass**, lint baseline unchanged (20).
+
 ### Added — Audit round 6 (batch 48: cinematic mixer background, audio-reactive)
 
 - **`<MixerCinematicBackground>`** (~210 lines) — three-layer scene rendered without any new dependencies:

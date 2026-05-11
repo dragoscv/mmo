@@ -51,6 +51,10 @@ const KeyDistribution = dynamic(
     () => import("./dashboard-charts").then((m) => m.KeyDistribution),
     { ssr: false, loading: ChartLoader },
 );
+const LibraryGrowth = dynamic(
+    () => import("./dashboard-charts").then((m) => m.LibraryGrowth),
+    { ssr: false, loading: ChartLoader },
+);
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Artwork } from "@/components/artwork";
@@ -74,6 +78,7 @@ interface DashboardClientProps {
     stats: DashboardStats;
     recommendedCategories: RecommendedCategory[];
     recentScans: ScanLog[];
+    growth?: Array<{ date: string; added: number }>;
 }
 
 // ── Constants ────────────────────────────────────────────────────
@@ -295,8 +300,48 @@ function LibraryHealth({ health }: { health: DashboardStats["health"] }) {
         );
     }
 
+    // Aggregate score = mean per-field completeness across all 5 fields,
+    // expressed 0..100. Each field contributes equally so a library with
+    // 100% genre but 0% key still reads as ~80% — encourages filling
+    // every category, not just the easy ones.
+    const score = Math.round(
+        items.reduce((acc, i) => acc + ((total - i.missing) / total), 0) / items.length * 100,
+    );
+    const tone = score >= 90 ? "text-emerald-400" : score >= 70 ? "text-amber-400" : "text-rose-400";
+    const ringTone = score >= 90 ? "stroke-emerald-400" : score >= 70 ? "stroke-amber-400" : "stroke-rose-400";
+    // SVG ring geometry — radius 22 → circumference ≈ 138.23.
+    const C = 2 * Math.PI * 22;
+
     return (
         <div className="space-y-4">
+            {/* Aggregate score header */}
+            <div className="flex items-center gap-3 pb-3 border-b border-[var(--border)]">
+                <div className="relative flex-shrink-0">
+                    <svg width={56} height={56} viewBox="0 0 56 56" className="-rotate-90">
+                        <circle cx={28} cy={28} r={22} strokeWidth={5} fill="none" className="stroke-white/10" />
+                        <circle
+                            cx={28} cy={28} r={22} strokeWidth={5} fill="none"
+                            strokeLinecap="round"
+                            className={cn(ringTone, "transition-all duration-1000 ease-out")}
+                            strokeDasharray={C}
+                            strokeDashoffset={C - (score / 100) * C}
+                            style={{ transitionDelay: "300ms" }}
+                        />
+                    </svg>
+                    <div className={cn("absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums", tone)}>
+                        {score}
+                    </div>
+                </div>
+                <div className="min-w-0">
+                    <div className={cn("text-xs uppercase tracking-wider", tone)}>Health Score</div>
+                    <div className="text-xs text-muted-foreground">
+                        {score >= 90 ? "Excellent — your library is tournament-ready"
+                            : score >= 70 ? "Good — fill the gaps to round it out"
+                                : "Needs work — analyze + tag missing fields"}
+                    </div>
+                </div>
+            </div>
+
             {items.map((item) => {
                 const filled = total - item.missing;
                 const pct = Math.round((filled / total) * 100);
@@ -551,7 +596,7 @@ function formatTotalDuration(seconds: number) {
 
 // ── Main Dashboard ───────────────────────────────────────────────
 
-export function DashboardClient({ stats, recommendedCategories, recentScans }: DashboardClientProps) {
+export function DashboardClient({ stats, recommendedCategories, recentScans, growth = [] }: DashboardClientProps) {
     useRenderCount("Page:/");
     useSyncRefresh();
     const greeting = getGreeting();
@@ -703,6 +748,17 @@ export function DashboardClient({ stats, recommendedCategories, recentScans }: D
                         </ChartCard>
                     </AnimatedSection>
                 </div>
+
+                {/* ── Library Growth (last 30 days) ───────────────── */}
+                <AnimatedSection delay={340}>
+                    <ChartCard>
+                        <SectionHeader
+                            icon={<TrendingUp className="h-5 w-5 text-violet-400" />}
+                            title="Library Growth"
+                        />
+                        <LibraryGrowth data={growth} />
+                    </ChartCard>
+                </AnimatedSection>
 
                 {/* ── Recently Added ──────────────────────────────── */}
                 <AnimatedSection delay={350}>
