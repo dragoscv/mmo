@@ -120,6 +120,7 @@ export function AnalysisFloatingStatus({
     useEffect(() => {
         const saved = loadWidgetPosition();
         if (!saved) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only browser dimensions hydration
             setPosition({
                 x: window.innerWidth - 340,
                 y: window.innerHeight - 140,

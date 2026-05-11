@@ -28,6 +28,7 @@ export function FocusModeProvider({ children }: { children: ReactNode }) {
     // and auto-disable when leaving.
     useEffect(() => {
         const shouldFocus = FOCUS_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- derived from pathname; mutable via toggle
         setIsFocusMode(shouldFocus);
     }, [pathname]);
 

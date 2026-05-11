@@ -1752,6 +1752,7 @@ export function MixerView() {
     useEffect(() => {
         if (!personalization.showExternalDevices) return;
         if (midi.externalDevices.length > 0 && personalization.externalDeviceAutoConnect) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- external MIDI device subscription sync
             setExternalPanelVisible(true);
             setExternalMinimized(false);
         }

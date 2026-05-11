@@ -36,6 +36,7 @@ export function useUIRefreshHz(): [number, (hz: number) => void] {
 
     // Hydrate after mount to avoid SSR mismatch
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only localStorage hydration after SSR
         setHzState(readStored());
         const onChange = () => setHzState(readStored());
         window.addEventListener(EVENT_NAME, onChange);

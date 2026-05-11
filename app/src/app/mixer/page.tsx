@@ -15,6 +15,7 @@ const MixerView = dynamic(
 export default function MixerPage() {
     const personalization = usePersonalization();
     const [mounted, setMounted] = useState(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only mount detection for SSR safety
     useEffect(() => setMounted(true), []);
 
     return (

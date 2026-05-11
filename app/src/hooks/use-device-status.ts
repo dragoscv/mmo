@@ -53,6 +53,7 @@ export function useDeviceStatus(devices: Device[] = []) {
 
     useEffect(() => {
         if (devices.length === 0) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result + interval polling
         checkDevices();
         intervalRef.current = setInterval(checkDevices, CHECK_INTERVAL);
         return () => clearInterval(intervalRef.current);

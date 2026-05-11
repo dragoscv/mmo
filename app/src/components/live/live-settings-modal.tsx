@@ -29,6 +29,7 @@ export function LiveSettingsModal({ open, onClose }: Props) {
     const [tab, setTab] = useState<Tab>("audio");
     const [mounted, setMounted] = useState(false);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only mount detection for SSR safety
     useEffect(() => { setMounted(true); }, []);
 
     useEffect(() => {

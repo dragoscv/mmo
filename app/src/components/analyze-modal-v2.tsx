@@ -193,6 +193,7 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
     // Reset local state when modal closes
     useEffect(() => {
         if (!open) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on close transition
             setLocalView(null);
             setChanges([]);
             setChanagesLoaded(false);

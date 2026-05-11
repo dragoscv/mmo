@@ -196,6 +196,7 @@ export function DAWExportModal() {
         const saved = loadSavedConfig();
         if (saved) {
             applyConfig(saved);
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only localStorage hydration after SSR
             setRememberConfig(true);
             setPreset(detectPreset(saved));
         }

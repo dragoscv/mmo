@@ -416,6 +416,7 @@ export function RemoteController() {
     // Always render with 1.0 on the first paint so SSR matches client; hydrate from
     // localStorage in an effect to avoid a hydration mismatch.
     const [uiScale, setUiScale] = useState(1.0);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only localStorage hydration after SSR
     useEffect(() => { setUiScale(readStoredScale()); }, []);
 
     const changeScale = useCallback((dir: 1 | -1) => {
@@ -447,6 +448,7 @@ export function RemoteController() {
         const hostPeer = availablePeers.find(p => p.page !== "idle");
         if (hostPeer) {
             remote.connectToPeer(hostPeer.id);
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- external peer-connection sync
             setShowDevices(false);
         }
     }, [availablePeers, remote.connectedPeerId, remote]);
@@ -455,6 +457,7 @@ export function RemoteController() {
     useEffect(() => {
         if (remote.connectedPeerId && !connectedPeer) {
             remote.disconnect();
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- external peer-connection sync
             setShowDevices(true);
         }
     }, [remote.connectedPeerId, connectedPeer, remote]);

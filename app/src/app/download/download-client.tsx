@@ -268,6 +268,7 @@ function FolderPicker({ currentPath, onSelect, onClose }: {
         setCreating(false);
     }, [dir, newFolderName, browse]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive
     useEffect(() => { browse(currentPath || undefined); }, [browse, currentPath]);
 
     return (

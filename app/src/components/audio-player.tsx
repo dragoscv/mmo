@@ -397,6 +397,7 @@ function BarWaveformBg({
     useEffect(() => {
         if (!trackId) return;
         if (bgPeaksCache.has(trackId)) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive
             setPeaks(bgPeaksCache.get(trackId)!);
             return;
         }

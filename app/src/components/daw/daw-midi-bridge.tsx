@@ -48,6 +48,7 @@ export function DAWMidiBridge() {
     // Auto-show panel when external device connects
     useEffect(() => {
         if (externalDevices.length > 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- external MIDI device subscription sync
             setPanelVisible(true);
         } else {
             setPanelVisible(false);

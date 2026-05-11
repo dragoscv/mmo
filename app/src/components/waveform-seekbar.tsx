@@ -57,6 +57,7 @@ export function WaveformSeekbar({
 
         // Clear stale data immediately so previous song's waveform doesn't linger
         if (!peaksCache.has(trackId)) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive
             setPeaks(null);
         } else {
             setPeaks(peaksCache.get(trackId)!);
@@ -83,6 +84,7 @@ export function WaveformSeekbar({
 
         // Clear stale data immediately
         if (!rgbPeaksCache.has(trackId)) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive
             setRgbPeaks(null);
         } else {
             setRgbPeaks(rgbPeaksCache.get(trackId)!);

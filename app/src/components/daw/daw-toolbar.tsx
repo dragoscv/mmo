@@ -205,6 +205,7 @@ function ProjectName() {
     const [name, setName] = useState(daw.project.name);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prop sync into local editable state
     useEffect(() => { setName(daw.project.name); }, [daw.project.name]);
     useEffect(() => { if (editing) inputRef.current?.select(); }, [editing]);
 

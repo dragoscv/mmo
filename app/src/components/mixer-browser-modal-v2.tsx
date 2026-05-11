@@ -290,8 +290,7 @@ export function MixerBrowserModal({
 
     // ── Open handler ─────────────────────────────────────────────────────
     useEffect(() => {
-        if (open) {
-            fetchTracks(search);
+        if (open) {            // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive            fetchTracks(search);
             setTimeout(() => searchRef.current?.focus(), 100);
         }
     }, [open]);

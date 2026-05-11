@@ -70,6 +70,7 @@ export function useColumnConfig(storageKey: string) {
     );
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only localStorage hydration after SSR
         setOrderedColumns(loadColumns(storageKey));
     }, [storageKey]);
 

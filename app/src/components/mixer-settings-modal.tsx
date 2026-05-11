@@ -256,6 +256,7 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
             description: `Learned: ${learnTarget}`,
         });
 
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- external MIDI input event sync
         setLearnTarget(null);
     }, [learnTarget, lastMessage, midi]);
 
@@ -455,11 +456,13 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
     useEffect(() => {
         if (learnRowIndex === null || !lastMessage || !editingPreset) return;
         const isNote = (lastMessage.status & 0xF0) === 0x90 || (lastMessage.status & 0xF0) === 0x80;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- external MIDI input event sync (transitive setState via updateEditingMapping)
         updateEditingMapping(learnRowIndex, {
             status: lastMessage.status,
             midino: lastMessage.note,
             type: isNote ? "note" : "cc",
         });
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- external MIDI input event sync
         setLearnRowIndex(null);
     }, [learnRowIndex, lastMessage, editingPreset, updateEditingMapping]);
 

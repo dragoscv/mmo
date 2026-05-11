@@ -75,6 +75,7 @@ export function SimilarTracksModal({
 
     useEffect(() => {
         if (!open) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive
         setLoading(true);
         setAddedIds(new Set());
         getSimilarTracks(playlistId)

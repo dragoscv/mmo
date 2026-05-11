@@ -71,8 +71,10 @@ function useRGBPeaks(trackId: number | null) {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch reset on track change
         if (!trackId) { setPeaks(null); return; }
         let cancelled = false;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive
         setLoading(true);
         fetch(`/api/waveform-rgb/${trackId}`)
             .then(r => r.json())

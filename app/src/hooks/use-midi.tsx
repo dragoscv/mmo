@@ -147,9 +147,11 @@ export function MidiProvider({ children }: { children: ReactNode }) {
             }
         };
 
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- external MIDI engine init lifecycle
         setStatus("connecting");
         engine.init().then((success) => {
             if (success) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect -- external MIDI engine init callback
                 setStatus("connected");
                 setDevices(engine.getDevices());
 

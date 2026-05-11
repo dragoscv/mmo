@@ -32,6 +32,7 @@ export function DAWProjectModal() {
 
     useEffect(() => {
         if (daw.showProjectModal) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only localStorage hydration on open
             setProjects(listProjects());
             setSearch("");
             setConfirmDeleteId(null);

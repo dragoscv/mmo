@@ -126,6 +126,7 @@ function useCountUp(target: number, duration = 1200, delay = 0) {
     const [value, setValue] = useState(0);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on prop change in count-up animation
         if (target === 0) { setValue(0); return; }
         const timeout = setTimeout(() => {
             let startTime: number;
@@ -134,6 +135,7 @@ function useCountUp(target: number, duration = 1200, delay = 0) {
                 if (!startTime) startTime = ts;
                 const progress = Math.min((ts - startTime) / duration, 1);
                 const eased = 1 - Math.pow(1 - progress, 4);
+                // eslint-disable-next-line react-hooks/set-state-in-effect -- timer/interval tick (requestAnimationFrame)
                 setValue(Math.round(target * eased));
                 if (progress < 1) rafId = requestAnimationFrame(animate);
             }

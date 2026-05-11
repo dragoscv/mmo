@@ -66,6 +66,7 @@ export function StickyNowPlaying() {
     }, []);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- imperative DOM measurement reset
         setPosition(null);
 
         if (!player.currentTrack) return;

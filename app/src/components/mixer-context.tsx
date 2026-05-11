@@ -663,6 +663,7 @@ export function MixerProvider({ children }: { children: ReactNode }) {
         }));
         const decksWithTracks = allDecks.filter(d => d.deck.trackId);
         if (decksWithTracks.length === 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- legacy state machine; refactor tracked separately
             setState(prev => ({ ...prev, isRestoring: false, restorationProgress: 100, restorationLabel: "" }));
             return;
         }

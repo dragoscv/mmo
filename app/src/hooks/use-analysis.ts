@@ -60,6 +60,7 @@ export function useAnalysis(enabled: boolean) {
         if (!enabled) {
             eventSourceRef.current?.close();
             eventSourceRef.current = null;
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- external SSE event source sync
             setConnected(false);
             return;
         }

@@ -159,6 +159,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const persisted = loadPersistedState();
         if (persisted.currentTrack) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only localStorage hydration after SSR
             setState((prev) => ({ ...prev, ...persisted }));
         }
     }, []);

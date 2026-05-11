@@ -58,6 +58,7 @@ export function AddToPlaylistModal({
 
     useEffect(() => {
         if (!open) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- imperative reset on open transition + async data fetch
         setSearch("");
         setCreating(false);
         setNewName("");

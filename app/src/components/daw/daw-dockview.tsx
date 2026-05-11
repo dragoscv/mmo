@@ -88,7 +88,9 @@ function DAWTab({ api, containerApi }: IDockviewPanelHeaderProps) {
     const ctxMenu = useContextMenu();
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- external subscription (dockview title change event)
         const d = api.onDidTitleChange(e => setTitle(e.title));
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- prop sync from dockview api on mount
         if (title !== api.title) setTitle(api.title ?? "");
         return () => d.dispose();
     }, [api]);

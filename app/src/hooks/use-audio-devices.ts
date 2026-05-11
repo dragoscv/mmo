@@ -218,6 +218,7 @@ export function useAudioDevices(): AudioDeviceState {
         const sub = (c: CacheShape) => { if (alive) setState(c); };
         subscribers.add(sub);
         if (cache === null) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- external subscription / async device enumeration
             setLoading(true);
             loadAll()
                 .catch(e => alive && setError(e instanceof Error ? e.message : String(e)))

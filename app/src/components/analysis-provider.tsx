@@ -58,6 +58,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
         analysis.status === "completed" || analysis.status === "stopped";
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- derived sync; legacy state machine, refactor tracked separately
         setSseEnabled(modalOpen || isActive);
     }, [modalOpen, isActive]);
 

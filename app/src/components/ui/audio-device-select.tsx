@@ -91,6 +91,7 @@ function usePopoverPosition(triggerRef: React.RefObject<HTMLElement | null>, ope
     const [pos, setPos] = useState<PopoverPosition | null>(null);
 
     useLayoutEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when popover closes
         if (!open) { setPos(null); return; }
         const compute = () => {
             const trigger = triggerRef.current;
@@ -103,6 +104,7 @@ function usePopoverPosition(triggerRef: React.RefObject<HTMLElement | null>, ope
             const spaceAbove = rect.top - margin;
             const placeBelow = spaceBelow >= 200 || spaceBelow >= spaceAbove;
             const maxHeight = Math.min(desired, Math.max(180, placeBelow ? spaceBelow : spaceAbove));
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- imperative DOM measurement (resize/scroll)
             setPos({
                 top: placeBelow ? rect.bottom + 4 : rect.top - 4,
                 left: rect.left,
@@ -204,11 +206,13 @@ export function AudioDeviceSelect({
     }, [items, query]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- derived clamp on filtered length change; cannot useMemo
         if (activeIdx >= filtered.length) setActiveIdx(Math.max(0, filtered.length - 1));
     }, [filtered.length, activeIdx]);
 
     useEffect(() => {
         if (!open) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- imperative reset on open transition
         setQuery("");
         const selectedIdx = items.findIndex(it => it.value === value || (!value && it.value === "default"));
         setActiveIdx(selectedIdx >= 0 ? selectedIdx : 0);

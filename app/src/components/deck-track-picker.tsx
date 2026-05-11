@@ -56,6 +56,7 @@ export function DeckTrackPicker({ side, open, onClose }: DeckTrackPickerProps) {
     useEffect(() => {
         if (open) {
             setTimeout(() => inputRef.current?.focus(), 100);
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- imperative reset on open transition
             setQuery("");
             setSearchResults([]);
         }
@@ -73,6 +74,7 @@ export function DeckTrackPicker({ side, open, onClose }: DeckTrackPickerProps) {
 
         if (!refTrack) return;
 
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive
         setIsLoadingRecs(true);
         getRecommendedTracks(refTrack.id, undefined, refTrack.bpm, refTrack.key, 15)
             .then(setRecommendations)

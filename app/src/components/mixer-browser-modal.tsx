@@ -63,6 +63,7 @@ export function MixerBrowserModal({
 
     useEffect(() => {
         if (open) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive
             fetchTracks(search);
             // Focus search on open
             setTimeout(() => searchRef.current?.focus(), 100);

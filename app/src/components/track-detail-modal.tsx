@@ -168,6 +168,7 @@ export function TrackDetailModal({
 
     // Reset reanalysis state when modal closes or track changes
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on prop transition (track/open change)
         setReanalysisResults(null);
         setIsReanalyzing(false);
         setSelectedReanalysisFields(new Set());
@@ -614,6 +615,7 @@ function OverviewTab({
     const [isPending, startTransition] = useTransition();
     const { noteNotations } = useDAWSettings();
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prop sync into local mutable state
     useEffect(() => setLocalTrack(track), [track]);
 
     const handleRating = (rating: number) => {
@@ -1055,6 +1057,7 @@ function EditTab({
     };
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- prop sync into form state
         setForm({
             artist: track.artist || "",
             title: track.title || "",
@@ -1244,6 +1247,7 @@ function LyricsTab({
     const [isPending, startTransition] = useTransition();
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- prop sync into local editable state
         setPlainLyrics(track.lyrics || "");
         setSyncedLyrics(track.syncedLyrics || "");
         setViewMode(track.syncedLyrics ? "synced" : "plain");
@@ -1722,6 +1726,7 @@ function RecommendationsTab({ track, onClose }: { track: Track; onClose: () => v
     // Auto-load when tab is first viewed
     useEffect(() => {
         if (!loaded) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive
             loadRecommendations();
         }
     }, [loaded, loadRecommendations]);
@@ -1969,6 +1974,7 @@ function PlaylistsTab({ track }: { track: Track }) {
     }, [track.id]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive
         loadData();
     }, [loadData]);
 

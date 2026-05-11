@@ -487,6 +487,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const savedUI = loadUIState();
         if (Object.keys(savedUI).length > 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only localStorage hydration after SSR
             setState(prev => ({
                 ...prev,
                 tool: (savedUI.tool as DAWState["tool"]) || prev.tool,
@@ -622,6 +623,7 @@ export function DAWProvider({ children }: { children: ReactNode }) {
 
         // Load saved project from localStorage (client-only, after hydration)
         const saved = loadInitialProject();
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- engine initialization with persisted project
         setState(prev => ({ ...prev, project: saved }));
         updateProjectUrl(saved.id);
 

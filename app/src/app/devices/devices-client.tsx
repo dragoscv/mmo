@@ -122,6 +122,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
     const [audioLoading, setAudioLoading] = useState<Record<string, boolean>>({});
     const [isLocalhost, setIsLocalhost] = useState(false);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only browser API hydration
     useEffect(() => { setIsLocalhost(isLocalhostHost()); }, []);
 
     const refreshAll = useCallback(() => {

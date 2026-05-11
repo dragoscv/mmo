@@ -77,6 +77,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   // Debounced search
   useEffect(() => {
     if (!query.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when query cleared
       setResults(null);
       return;
     }
@@ -86,6 +87,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
     debounceRef.current = setTimeout(() => {
       startTransition(async () => {
         const data = await globalSearch(query);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch result; cannot derive
         setResults(data);
       });
     }, 200);

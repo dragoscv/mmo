@@ -65,6 +65,7 @@ function useStemLevels(processor: RealtimeStemProcessor | null) {
 
     useEffect(() => {
         if (!processor?.isActive) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- external audio processor subscription sync
             setLevels({ vocals: 0, drums: 0, bass: 0, melody: 0 });
             return;
         }
