@@ -86,9 +86,9 @@
 
     // Load settings
     function loadSettings() {
-        chrome.runtime.sendMessage({ type: "get-settings" }, (response) => {
+        browser.runtime.sendMessage({ type: "get-settings" }).then((response) => {
             if (response) settings = response;
-        });
+        }).catch(() => { /* SW asleep / extension reloaded — keep defaults */ });
     }
 
     // Detect platform
@@ -133,11 +133,11 @@
             e.stopPropagation();
 
             const mediaUrl = platform.getMediaUrl();
-            chrome.runtime.sendMessage({
+            browser.runtime.sendMessage({
                 type: "open-download",
                 url: mediaUrl,
                 autoDownload: settings.autoDownload,
-            });
+            }).catch(() => { /* SW asleep — user can retry */ });
 
             // Visual feedback
             btn.classList.add("mmo-btn-clicked");

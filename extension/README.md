@@ -37,6 +37,8 @@ extension/
 ├── content.css              Stiluri pentru butonul "Capture to MMO"
 ├── popup.html / popup.js    Popup-ul când dai click pe icon (status, link rapid)
 ├── options.html / options.js Pagina de settings
+├── vendor/                  webextension-polyfill (cross-browser browser.* API)
+├── package.json             Dev-only: pnpm vendor:polyfill regenerează vendor/
 └── icons/                   Iconuri 16/48/128 px
 ```
 

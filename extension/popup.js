@@ -41,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Load settings
-    chrome.storage.sync.get(["baseUrl", "autoDownload"], (data) => {
+    browser.storage.sync.get(["baseUrl", "autoDownload"]).then((data) => {
         settings.baseUrl = data.baseUrl || "https://muzicai.ro";
         settings.autoDownload = data.autoDownload || false;
         baseUrlLink.textContent = settings.baseUrl.replace(/^https?:\/\//, "");
@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Get current tab
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
         if (tabs[0]) {
             currentUrl = tabs[0].url || "";
             pageTitle.textContent = tabs[0].title || "Unknown page";
@@ -69,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnDownload.addEventListener("click", () => {
         if (!currentUrl) return;
         const downloadUrl = `${settings.baseUrl}/download?url=${encodeURIComponent(currentUrl)}&auto=1`;
-        chrome.tabs.create({ url: downloadUrl });
+        browser.tabs.create({ url: downloadUrl });
         window.close();
     });
 
@@ -77,13 +77,13 @@ document.addEventListener("DOMContentLoaded", () => {
     btnOpen.addEventListener("click", () => {
         if (!currentUrl) return;
         const downloadUrl = `${settings.baseUrl}/download?url=${encodeURIComponent(currentUrl)}`;
-        chrome.tabs.create({ url: downloadUrl });
+        browser.tabs.create({ url: downloadUrl });
         window.close();
     });
 
     // Settings
     settingsLink.addEventListener("click", (e) => {
         e.preventDefault();
-        chrome.runtime.openOptionsPage();
+        browser.runtime.openOptionsPage();
     });
 });

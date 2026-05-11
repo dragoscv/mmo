@@ -3,6 +3,12 @@
     "name": "MMO - Music Media Organizer Downloader",
     "version": "1.0.1",
     "description": "Detect audio/video on streaming platforms and download to your MMO library",
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "mmo-downloader@muzicai.ro",
+            "strict_min_version": "115.0"
+        }
+    },
     "permissions": [
         "storage",
         "activeTab"
@@ -51,6 +57,7 @@
                 "*://*.deezer.com/*"
             ],
             "js": [
+                "vendor/browser-polyfill.min.js",
                 "content.js"
             ],
             "css": [

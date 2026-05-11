@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const savedMsg = document.getElementById("saved-msg");
 
     // Load saved settings
-    chrome.storage.sync.get(["baseUrl", "autoDownload", "audioOnly"], (data) => {
+    browser.storage.sync.get(["baseUrl", "autoDownload", "audioOnly"]).then((data) => {
         baseUrlInput.value = data.baseUrl || "https://muzicai.ro";
         autoDownloadInput.checked = data.autoDownload || false;
         audioOnlyInput.checked = data.audioOnly !== false; // default true
@@ -22,7 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
             audioOnly: audioOnlyInput.checked,
         };
 
-        chrome.storage.sync.set(settings, () => {
+        browser.storage.sync.set(settings).then(() => {
             savedMsg.style.display = "inline";
             setTimeout(() => { savedMsg.style.display = "none"; }, 2000);
         });

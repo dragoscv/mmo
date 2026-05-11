@@ -12,6 +12,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed — Audit round 8 (batch extension cross-browser via webextension-polyfill)
+
+Closes Q8.6. The extension was already on Manifest V3 (so the "MV3 port" wording in the question round was misleading — nothing to migrate from MV2), but it used `chrome.*` APIs throughout, locking it to Chromium. This batch makes the same code load and run unchanged in Firefox.
+
+- **`extension/vendor/browser-polyfill.min.js`** — vendored Mozilla `webextension-polyfill` 0.12.0 (10 KB minified). Loaded as a content-script entry, via `<script>` tag in `popup.html`/`options.html`, and via `self.importScripts()` at the top of the MV3 service worker. Polyfill is the canonical way to expose a promise-based `browser.*` namespace in Chromium (Firefox already has it native).
+- **`extension/package.json`** — new dev-only manifest with a `vendor:polyfill` script that copies `node_modules/webextension-polyfill/dist/browser-polyfill.min.js` into `vendor/`. The vendor file is committed (no Node toolchain required to load the extension); the script just refreshes it on dependency bumps. `node_modules/` is already in the root `.gitignore`.
+- **`extension/manifest.json`** — added `browser_specific_settings.gecko` with a stable extension id (`mmo-downloader@muzicai.ro`) and `strict_min_version: 115.0` so AMO accepts the upload (Firefox's MV3 SW support landed in 115). Added the polyfill to the content-scripts `js` array (must precede `content.js`).
+- **`extension/background.js`** — swapped every `chrome.*` for `browser.*` and converted the message listener from the `(msg, sender, sendResponse)` callback + `return true` pattern to the modern async-listener-returns-Promise pattern (the polyfill bridges this back to Chromium's callback API).
+- **`extension/popup.js` + `extension/options.js` + `extension/content.js`** — same `chrome.*` → `browser.*` swap (Promises everywhere, no callbacks). Added `.catch()` on the two content-script `sendMessage` calls so a sleeping service worker can't surface as an unhandled rejection in DevTools.
+- **`extension/popup.html` + `extension/options.html`** — load `vendor/browser-polyfill.min.js` before the page script.
+- **`extension/README.md`** — documented the vendor folder + polyfill regenerate script.
+
+Verified with `node --check` on all four JS files and `JSON.parse` on `manifest.json`. No behavioural change for Chrome users; same code now runs on Firefox 115+.
+
 ### Added — Audit round 8 (batch crate diff: "what changed since last USB export")
 
 Closes Q8.12c (one of the three "surprise me" picks). When the user re-exports a playlist for their USB drive, the wizard now shows a one-line diff against the previously exported set so they know which tracks will be added/removed in Rekordbox/Serato.
