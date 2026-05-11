@@ -36,6 +36,7 @@ import { PlaylistActions } from "@/components/playlist-actions";
 import { ColumnManager, useColumnConfig } from "@/components/column-manager";
 import { SmartPlaylistDialog } from "@/components/smart-playlist-dialog";
 import { UsbExportWizard } from "@/components/usb-export-wizard";
+import { UsbCopyDialog } from "@/components/usb-copy-dialog";
 import { Select } from "@/components/ui/select";
 import { formatDuration, formatNumber, ENERGY_COLORS, GENRE_COLORS, cn } from "@/lib/utils";
 import {
@@ -120,6 +121,7 @@ export function PlaylistsClient({
     const [createOpen, setCreateOpen] = useState(false);
     const [smartOpen, setSmartOpen] = useState(false);
     const [usbOpen, setUsbOpen] = useState(false);
+    const [usbCopyOpen, setUsbCopyOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [newName, setNewName] = useState("");
@@ -328,6 +330,17 @@ export function PlaylistsClient({
                         >
                             <FileDown className="h-4 w-4" />
                             USB…
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => setUsbCopyOpen(true)}
+                            disabled={playlists.length === 0}
+                            title="Copy the audio files themselves to a USB drive"
+                        >
+                            <FileDown className="h-4 w-4" />
+                            Copy audio…
                         </Button>
                         <Button
                             size="sm"
@@ -928,6 +941,14 @@ export function PlaylistsClient({
             <UsbExportWizard
                 open={usbOpen}
                 onOpenChange={setUsbOpen}
+                activePlaylistId={activePlaylist?.id}
+                activePlaylistName={activePlaylist?.name}
+            />
+
+            {/* USB Audio Copy Dialog */}
+            <UsbCopyDialog
+                open={usbCopyOpen}
+                onOpenChange={setUsbCopyOpen}
                 activePlaylistId={activePlaylist?.id}
                 activePlaylistName={activePlaylist?.name}
             />

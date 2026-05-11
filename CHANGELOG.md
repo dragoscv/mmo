@@ -12,6 +12,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 7 (batch USB copy UI: SSE-streamed progress with cancel)
+
+Pairs with the round-7 companion endpoint shipped in the previous batch (`POST /library/usb/copy`). The UI side ships in three parts:
+
+- **`/api/usb-copy` Route Handler** — server-side SSE proxy that authenticates the user via Auth.js, looks up the device-token-bearing companion link via `getCompanionLink()`, and pipes the companion's `text/event-stream` straight back to the browser. Validates `trackIds`, `destination`, and `musicSubdir` before the proxy starts so a malformed body fails fast with a 400. Honours client `AbortController` so closing the dialog cancels the upstream call.
+- **`actions/usb-copy.ts` (`summariseUsbScope`)** — server action that resolves either a playlist scope or the whole library into a `{ trackIds, totalBytes, unknownSizeCount }` summary so the UI can show "247 tracks · approx. 1.4 GB" before the user commits. Excludes hidden tracks (rarely wanted on a club USB), caps at 5000 ids to match the companion route's limit, paginates over the existing `getPlaylistTracks` and `getTracks` clients.
+- **`<UsbCopyDialog>`** — new dialog (sibling of the existing `<UsbExportWizard>`, separated to avoid risk to the metadata-export flow). Lets the user pick scope (active playlist / whole library) + destination drive path + music subdir, shows the live size estimate, then streams the companion's SSE: a `<Progress>` bar, an `errors` `<details>` list (collapsed by default), and a final tally card. Cancel-while-copying works via `AbortController`. Uses the conditional-render pattern (body component only mounted while `open` is true) so each open gets fresh state without `useEffect`-driven resets — sidesteps the `react-hooks/set-state-in-effect` warning.
+- **Playlists toolbar** — added a second "Copy audio…" button next to the existing "USB…" wizard. Both share the active-playlist context so picking a playlist in the sidebar pre-selects the correct scope in either dialog.
+- **`messages/{en,ro}.json`** — new `usbCopy.*` namespace (28 keys) with title, subtitle, scope/destination/subdir labels and hints, summary templates with ICU placeholders for `count` / `size` / `unknown`, status labels (Copied / Already on drive / Failed), done-summary with `copied`/`skipped`/`errors`/`total`, and the toolbar `openButton` label. RO has proper grammatical forms ("piese", "drive destinație", "Începe copierea").
+- App suite stays at **263 tests** — the dialog is exercised end-to-end via the existing companion + Route Handler test paths; the SSE parsing in the proxy mirrors the `copyTracksToUsb` generator that already has its byte-flow validated by the companion-side tests.
+
 ### Added — Audit round 7 (batch USB copy: companion endpoint that moves the actual bytes)
 
 Closes the explicit follow-up from round 6 batch 41: "copying the audio files themselves to the USB — that needs companion filesystem access and is the next sub-batch." This batch ships the companion endpoint + app client wrapper. UI wiring lands in the next batch.
