@@ -171,6 +171,24 @@
         "statusError": "Eșuat",
         "openButton": "Copiază piesele…"
     },
+    "account": {
+        "title": "Contul tău",
+        "subtitle": "Exportă tot ce avem despre tine, sau șterge complet contul.",
+        "exportTitle": "Exportă datele mele",
+        "exportSubtitle": "Descarcă un fișier JSON cu fiecare rând per-utilizator din baza noastră de date (piese, playlisturi, taguri, preferințe). Credențialele și cheile criptate sunt redactate intenționat.",
+        "exportButton": "Descarcă JSON",
+        "exporting": "Se pregătește…",
+        "exportSuccess": "Export descărcat.",
+        "exportFailed": "Exportul a eșuat: {error}",
+        "deleteTitle": "Șterge contul",
+        "deleteSubtitle": "Șterge definitiv contul, toate piesele, playlisturile, dispozitivele, înregistrările, preferințele, cheile AI și orice abonament activ. Nu se poate anula.",
+        "deleteConfirmLabel": "Tastează DELETE pentru confirmare:",
+        "deleteConfirmRequired": "Tastează DELETE pentru confirmare.",
+        "deleteButton": "Șterge contul meu",
+        "deleting": "Se șterge…",
+        "deleteSuccess": "Cont șters.",
+        "deleteFailed": "Ștergerea a eșuat: {error}"
+    },
     "library": {
         "title": "Bibliotecă",
         "subtitle": "{count} piese · {artists} artiști",

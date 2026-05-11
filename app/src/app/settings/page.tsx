@@ -8,6 +8,7 @@ import { SettingsClient } from "./settings-client";
 import { LocaleSwitcher } from "@/components/settings/locale-switcher";
 import { BillingPanel } from "@/components/settings/billing-panel";
 import { AiKeysPanel } from "@/components/settings/ai-keys-panel";
+import { AccountPanel } from "@/components/settings/account-panel";
 import type { AppLocale } from "@/i18n/locales";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export default async function SettingsPage() {
                 )}
                 {session?.user?.id && <AiKeysPanel keys={aiKeys} preferredProvider={preferredAiProvider} />}
                 <SettingsClient settings={settings} />
+                {session?.user?.id && <AccountPanel />}
             </div>
         </div>
     );

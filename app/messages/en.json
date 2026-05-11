@@ -171,6 +171,24 @@
         "statusError": "Failed",
         "openButton": "Copy audio…"
     },
+    "account": {
+        "title": "Your account",
+        "subtitle": "Export everything we have on you, or wipe your account entirely.",
+        "exportTitle": "Export my data",
+        "exportSubtitle": "Downloads a JSON file with every per-user row in our database (tracks, playlists, tags, preferences). Credentials and encrypted keys are redacted by design.",
+        "exportButton": "Download JSON",
+        "exporting": "Preparing…",
+        "exportSuccess": "Export downloaded.",
+        "exportFailed": "Export failed: {error}",
+        "deleteTitle": "Delete account",
+        "deleteSubtitle": "Permanently removes your account, all tracks, playlists, devices, recordings, preferences, AI keys and any active subscription. This cannot be undone.",
+        "deleteConfirmLabel": "Type DELETE to confirm:",
+        "deleteConfirmRequired": "Type DELETE to confirm.",
+        "deleteButton": "Delete my account",
+        "deleting": "Deleting…",
+        "deleteSuccess": "Account deleted.",
+        "deleteFailed": "Delete failed: {error}"
+    },
     "library": {
         "title": "Library",
         "subtitle": "{count} tracks · {artists} artists",
