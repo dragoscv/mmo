@@ -44,12 +44,20 @@ import {
 import {
     createSmartPlaylist,
     previewSmartRules,
+    updateSmartPlaylistRules,
 } from "@/actions/smart-playlists";
 
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onCreated?: (playlistId: number) => void;
+    /** Edit mode: when set, the dialog updates this playlist's rules
+     *  instead of creating a new one. The Name input becomes
+     *  read-only since renames go through the regular Rename flow. */
+    editPlaylistId?: number;
+    editPlaylistName?: string;
+    initialRules?: SmartRules;
+    initialRuleSource?: "builder" | "sql" | "graph" | "ai";
 }
 
 const FIELD_OPTIONS: Array<{ value: Field; label: string }> = [
@@ -96,31 +104,57 @@ function newCondition(): Condition {
 const SQL_PLACEHOLDER = `bpm BETWEEN 120 AND 130 AND genre IN ('techno', 'tech-house')
 OR (rating >= 4 AND energy > 0.7)`;
 
-export function SmartPlaylistDialog({ open, onOpenChange, onCreated }: Props) {
-    const [mode, setMode] = useState<"builder" | "sql" | "graph" | "ai">("builder");
-    const [name, setName] = useState("");
+export function SmartPlaylistDialog({
+    open,
+    onOpenChange,
+    onCreated,
+    editPlaylistId,
+    editPlaylistName,
+    initialRules,
+    initialRuleSource,
+}: Props) {
+    const isEdit = editPlaylistId !== undefined;
+    const [mode, setMode] = useState<"builder" | "sql" | "graph" | "ai">(initialRuleSource ?? "builder");
+    const [name, setName] = useState(editPlaylistName ?? "");
     const [pending, startTransition] = useTransition();
     const [previewCount, setPreviewCount] = useState<number | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
 
     // Builder state
-    const [conditions, setConditions] = useState<Condition[]>([newCondition()]);
-    const [combinator, setCombinator] = useState<"and" | "or">("and");
+    const [conditions, setConditions] = useState<Condition[]>(() => {
+        if (initialRules?.kind === "builder") {
+            return initialRules.root.children.filter((c): c is Condition => c.type === "condition");
+        }
+        return [newCondition()];
+    });
+    const [combinator, setCombinator] = useState<"and" | "or">(() => {
+        if (initialRules?.kind === "builder") return initialRules.root.combinator;
+        return "and";
+    });
 
     // SQL state
-    const [sqlQuery, setSqlQuery] = useState("bpm BETWEEN 120 AND 130");
+    const [sqlQuery, setSqlQuery] = useState(
+        initialRules?.kind === "sql" ? initialRules.query : "bpm BETWEEN 120 AND 130",
+    );
 
     // Graph state — exposed as JSON for now; visual editor is future.
-    const [graphJson, setGraphJson] = useState(`{
+    const [graphJson, setGraphJson] = useState(() => {
+        if (initialRules?.kind === "graph") {
+            return JSON.stringify({ nodes: initialRules.nodes }, null, 2);
+        }
+        return `{
   "nodes": [
     { "kind": "filter", "id": "f1", "condition": { "type": "condition", "field": "genre", "operator": "eq", "value": "techno" } },
     { "kind": "sort", "id": "s1", "sort": { "field": "bpm", "direction": "asc" } },
     { "kind": "limit", "id": "l1", "limit": 100 }
   ]
-}`);
+}`;
+    });
 
     // AI state
-    const [aiPrompt, setAiPrompt] = useState("");
+    const [aiPrompt, setAiPrompt] = useState(
+        initialRules?.kind === "ai" ? initialRules.prompt : "",
+    );
 
     // Build the current SmartRules from whichever tab is active.
     const currentRules = useMemo<{ rules: SmartRules; error: string | null }>(() => {
@@ -158,7 +192,7 @@ export function SmartPlaylistDialog({ open, onOpenChange, onCreated }: Props) {
     }
 
     function handleSave() {
-        if (!name.trim()) {
+        if (!isEdit && !name.trim()) {
             toast.error("Playlist name is required");
             return;
         }
@@ -167,12 +201,22 @@ export function SmartPlaylistDialog({ open, onOpenChange, onCreated }: Props) {
             return;
         }
         startTransition(async () => {
+            if (isEdit) {
+                const r = await updateSmartPlaylistRules(editPlaylistId!, currentRules.rules, mode);
+                if (r.success) {
+                    toast.success(`Updated — ${r.count ?? 0} tracks now match`);
+                    onCreated?.(editPlaylistId!);
+                    onOpenChange(false);
+                } else {
+                    toast.error(r.error ?? "Update failed");
+                }
+                return;
+            }
             const r = await createSmartPlaylist(name.trim(), currentRules.rules, mode);
             if (r.success && r.id) {
                 toast.success(`Created "${name}" with ${r.count ?? 0} tracks`);
                 onCreated?.(r.id);
                 onOpenChange(false);
-                // Reset state for next time.
                 setName("");
                 setConditions([newCondition()]);
                 setPreviewCount(null);
@@ -188,24 +232,27 @@ export function SmartPlaylistDialog({ open, onOpenChange, onCreated }: Props) {
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Sparkles className="h-5 w-5 text-primary" />
-                        New Smart Playlist
+                        {isEdit ? `Edit Smart Rules — ${editPlaylistName}` : "New Smart Playlist"}
                     </DialogTitle>
                     <DialogDescription>
-                        Choose how to define which tracks the playlist auto-collects.
-                        It re-evaluates whenever you click Refresh.
+                        {isEdit
+                            ? "Update the rules. The playlist will be re-populated immediately on save."
+                            : "Choose how to define which tracks the playlist auto-collects. It re-evaluates whenever you click Refresh."}
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-2">
-                    <Label htmlFor="smart-name">Name</Label>
-                    <Input
-                        id="smart-name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Peak Time Techno"
-                        maxLength={200}
-                    />
-                </div>
+                {!isEdit && (
+                    <div className="space-y-2">
+                        <Label htmlFor="smart-name">Name</Label>
+                        <Input
+                            id="smart-name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="e.g. Peak Time Techno"
+                            maxLength={200}
+                        />
+                    </div>
+                )}
 
                 <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
                     <TabsList className="grid grid-cols-4 w-full">
@@ -320,7 +367,7 @@ export function SmartPlaylistDialog({ open, onOpenChange, onCreated }: Props) {
                     </Button>
                     <Button onClick={handleSave} disabled={pending || !!currentRules.error}>
                         {pending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                        Create &amp; populate
+                        {isEdit ? "Save & re-populate" : "Create & populate"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -243,6 +243,18 @@ export async function getSmartPlaylistRules(
     };
 }
 
+/** Return the set of companionPlaylistIds that have smart rules attached.
+ *  Used by the playlists list to show a "smart" badge without fetching
+ *  the rules themselves. One query for the whole sidebar. */
+export async function getSmartPlaylistIds(): Promise<number[]> {
+    const u = await requireUser();
+    if ("error" in u) return [];
+    const rows = await db.select({ id: smartPlaylistRules.companionPlaylistId })
+        .from(smartPlaylistRules)
+        .where(eq(smartPlaylistRules.userId, u.userId));
+    return rows.map((r) => r.id);
+}
+
 // ─── internals ──────────────────────────────────────────────────────
 
 async function runSmartPopulation(

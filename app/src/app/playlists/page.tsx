@@ -1,4 +1,5 @@
 import { getPlaylists, getPlaylistTracks, getRecommendedPlaylists } from "@/actions/playlists";
+import { getSmartPlaylistIds } from "@/actions/smart-playlists";
 import { PlaylistsClient } from "./playlists-client";
 import type { Track } from "@/db/schema";
 import { auth } from "@/auth";
@@ -22,9 +23,10 @@ export default async function PlaylistsPage({
     const page = parseInt(params.page || "1");
     const pageSize = parseInt(params.pageSize || "50");
 
-    const [allPlaylists, recommendedCategories] = await Promise.all([
+    const [allPlaylists, recommendedCategories, smartIds] = await Promise.all([
         getPlaylists(),
         getRecommendedPlaylists(),
+        getSmartPlaylistIds(),
     ]);
     const playlistResult = playlistId
         ? await getPlaylistTracks(playlistId, page, pageSize)
@@ -44,6 +46,7 @@ export default async function PlaylistsPage({
             totalPages={playlistResult?.totalPages ?? 0}
             activePlaylist={activePlaylist}
             recommendedCategories={recommendedCategories}
+            smartPlaylistIds={smartIds}
         />
     );
 }

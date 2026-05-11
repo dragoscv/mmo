@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSyncRefresh } from "@/hooks/use-sync-refresh";
@@ -88,6 +88,7 @@ interface PlaylistsClientProps {
     totalPages: number;
     activePlaylist?: PlaylistInfo;
     recommendedCategories: RecommendedCategory[];
+    smartPlaylistIds: number[];
 }
 
 export function PlaylistsClient({
@@ -99,6 +100,7 @@ export function PlaylistsClient({
     totalPages,
     activePlaylist,
     recommendedCategories,
+    smartPlaylistIds,
 }: PlaylistsClientProps) {
     useRenderCount("Page:/playlists");
     useSyncRefresh(["playlists", "playlist_tracks", "tracks"]);
@@ -107,6 +109,8 @@ export function PlaylistsClient({
     const searchParams = useSearchParams();
     const router = useRouter();
     const activeId = searchParams.get("id");
+    // O(1) sidebar badge lookup; one DB round-trip on the server.
+    const smartIdSet = useMemo(() => new Set(smartPlaylistIds), [smartPlaylistIds]);
 
     // Persist URL state so sidebar navigation restores it
     useRouteMemorySave("/playlists", searchParams.toString());
@@ -356,7 +360,17 @@ export function PlaylistsClient({
                                     >
                                         <ListMusic className="h-4 w-4 shrink-0" />
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate font-medium">{pl.name}</p>
+                                            <p className="truncate font-medium flex items-center gap-1.5">
+                                                {pl.name}
+                                                {smartIdSet.has(pl.id) && (
+                                                    <span
+                                                        className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30"
+                                                        title="Smart playlist — auto-populated from rules"
+                                                    >
+                                                        ✨ Smart
+                                                    </span>
+                                                )}
+                                            </p>
                                             <p className="text-xs text-[var(--muted-foreground)]">
                                                 {String(pl.id) === activeId
                                                     ? `${formatNumber(total)} tracks`
@@ -368,6 +382,7 @@ export function PlaylistsClient({
                                         <PlaylistActions
                                             playlistId={pl.id}
                                             playlistName={pl.name}
+                                            isSmart={smartIdSet.has(pl.id)}
                                             onMutate={() => router.refresh()}
                                         />
                                     </div>

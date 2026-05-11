@@ -12,6 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 40.5: smart playlist polish — Refresh, Edit, badge)
+
+- **Refresh action** — every smart playlist gets a "Refresh Smart Rules" item in its row menu (`<PlaylistActions>`), wired to `refreshSmartPlaylist` with a toast reporting how many tracks now match. Lets you re-evaluate without opening the dialog.
+- **Edit Smart Rules** — same menu now opens `<SmartPlaylistDialog>` in **edit mode** (new optional `editPlaylistId` / `initialRules` / `initialRuleSource` props). The dialog hydrates from the stored rules, swaps the title and CTA copy, hides the Name input (renames go through the normal Rename flow), and on save calls `updateSmartPlaylistRules` instead of create — re-populating the playlist in place.
+- **`✨ Smart` badge in the sidebar** — the playlists page server-component now also fetches `getSmartPlaylistIds()` (one cheap query, just the id list) in the same `Promise.all` as the regular playlists, threads it through `<PlaylistsClient>` as `smartPlaylistIds`, and a `useMemo` `Set` gives O(1) badge lookup per row. Same set is passed down to `<PlaylistActions>` as `isSmart` so the Refresh + Edit items only render where they make sense — no extra fetches per row.
+- **Verified**: tsc clean, **200 tests pass**, lint baseline unchanged.
+
 ### Added — Audit round 6 (batch 40: smart playlists, all four authoring modes)
 
 - **`smart-rules.ts` engine** — pure, dependency-free rules engine. A discriminated-union `SmartRules` type with four variants (`builder` / `sql` / `graph` / `ai`), each compiled to the same canonical `BuilderRules` IR and executed in-memory against the user's library. ~530 lines plus 200 lines of unit tests covering zod validation, condition evaluator (every operator), AND/OR group nesting, the SQL parser (incl. `BETWEEN`, `IN (…)`, parens, AND/OR precedence), graph collapse, AI passthrough, sort+limit, and end-to-end SQL→match flow.

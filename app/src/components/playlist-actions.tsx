@@ -37,6 +37,8 @@ import {
     Download,
     ListX,
     Loader2,
+    RefreshCw,
+    Sparkles,
 } from "lucide-react";
 import {
     updatePlaylist,
@@ -45,11 +47,21 @@ import {
     clearPlaylist,
     exportPlaylistToXml,
 } from "@/actions/playlists";
+import {
+    refreshSmartPlaylist,
+    getSmartPlaylistRules,
+} from "@/actions/smart-playlists";
+import { SmartPlaylistDialog } from "@/components/smart-playlist-dialog";
+import type { SmartRules } from "@/lib/smart-rules";
 import { toast } from "sonner";
 
 interface PlaylistActionsProps {
     playlistId: number;
     playlistName: string;
+    /** When true, shows the Refresh + Edit Smart Rules menu items.
+     *  Parent passes this from a single getSmartPlaylistIds() lookup
+     *  so we don't fetch per-row in big sidebars. */
+    isSmart?: boolean;
     onMutate?: () => void;
     className?: string;
 }
@@ -57,6 +69,7 @@ interface PlaylistActionsProps {
 export function PlaylistActions({
     playlistId,
     playlistName,
+    isSmart,
     onMutate,
     className,
 }: PlaylistActionsProps) {
@@ -67,6 +80,36 @@ export function PlaylistActions({
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [clearOpen, setClearOpen] = useState(false);
     const [editName, setEditName] = useState(playlistName);
+    const [smartEditOpen, setSmartEditOpen] = useState(false);
+    const [smartInitial, setSmartInitial] = useState<{ rules: SmartRules; source: "builder" | "sql" | "graph" | "ai" } | null>(null);
+
+    function handleRefreshSmart() {
+        startTransition(async () => {
+            const r = await refreshSmartPlaylist(playlistId);
+            if (r.success) {
+                toast.success(`Refreshed — ${r.count ?? 0} tracks now match`);
+                onMutate?.();
+                router.refresh();
+            } else {
+                toast.error(r.error ?? "Refresh failed");
+            }
+        });
+    }
+
+    function handleOpenSmartEdit() {
+        startTransition(async () => {
+            const data = await getSmartPlaylistRules(playlistId);
+            if (!data) {
+                toast.error("Couldn't load smart rules");
+                return;
+            }
+            setSmartInitial({
+                rules: data.rules,
+                source: (data.ruleSource as "builder" | "sql" | "graph" | "ai"),
+            });
+            setSmartEditOpen(true);
+        });
+    }
 
     function handleRename() {
         if (!editName.trim()) return;
@@ -160,6 +203,20 @@ export function PlaylistActions({
                         <Download className="h-3.5 w-3.5 mr-2" />
                         Export to XML
                     </DropdownMenuItem>
+
+                    {isSmart && (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={handleRefreshSmart}>
+                                <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                                Refresh Smart Rules
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleOpenSmartEdit}>
+                                <Sparkles className="h-3.5 w-3.5 mr-2" />
+                                Edit Smart Rules
+                            </DropdownMenuItem>
+                        </>
+                    )}
 
                     <DropdownMenuSeparator />
 
@@ -264,6 +321,25 @@ export function PlaylistActions({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Smart Rules Edit Dialog */}
+            {smartInitial && (
+                <SmartPlaylistDialog
+                    open={smartEditOpen}
+                    onOpenChange={(o) => {
+                        setSmartEditOpen(o);
+                        if (!o) setSmartInitial(null);
+                    }}
+                    editPlaylistId={playlistId}
+                    editPlaylistName={playlistName}
+                    initialRules={smartInitial.rules}
+                    initialRuleSource={smartInitial.source}
+                    onCreated={() => {
+                        onMutate?.();
+                        router.refresh();
+                    }}
+                />
+            )}
         </>
     );
 }
