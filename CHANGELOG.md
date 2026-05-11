@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 8 (batch i18n: daw-export-modal)
+
+Fifth slice of Q8.5. Localized `app/src/components/daw/daw-export-modal.tsx` (the DAW project export dialog) — modal title, all five section labels (Preset / Format / Quality / Processing / Metadata), Lossy/Lossless badges, format quality controls (Sample Rate / Bit Depth / Bitrate / Channels / Quality slider with "Smaller" ↔ "Better" hints, Stereo/Mono buttons), processing toggles with descriptions (Normalize / Dithering / Brick-wall limiter) and the reverb tail input + unit, all metadata fields and placeholders, file-size summary, progress strings ("Rendering... {pct}%" + "Export complete! ({size})") with placeholders, and the footer ("Remember settings", Cancel, Download, Exporting..., Export). PRESETS labels/descriptions and FORMAT_INFO descriptions kept English (universal audio-engineering terminology).
+
+- `app/messages/en.json` + `app/messages/ro.json` — new `dawExport.*` namespace (44 keys) in both locales.
+
+Verified: 0 TSC errors, 283 tests still green, 0 new lint errors.
+
 ### Added — Audit round 8 (batch i18n: playlists page)
 
 Fourth slice of Q8.5. Localized `app/src/app/playlists/playlists-client.tsx` (the main `/playlists` page client) — page title, ICU-pluralised playlist count + track count, all action buttons in the header (Export All to XML / USB… / Copy audio… / Smart Playlist / New Playlist), the empty sidebar state, "Smart" badge + tooltip, the active-playlist toolbar (Similar / Export XML / Rename / Delete), all table column headers (Artist / Title / Album / Key / Genre / Rating / Time — BPM stays English as it's a universal abbreviation), the per-row download tooltip ("Saved this session — download again" / "Download to PC"), pagination strip ("Page X of Y" / "per page"), the "Select a playlist" empty state, and all three modals (Create / Rename / Delete) including labels, placeholders, action buttons, and the delete confirmation copy with `{name}` interpolation.

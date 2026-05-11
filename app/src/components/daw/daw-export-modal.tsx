@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useDAW } from "./daw-context";
 import { cn } from "@/lib/utils";
 import {
@@ -155,6 +156,7 @@ function detectPreset(config: ExportConfig): PresetKey {
 
 export function DAWExportModal() {
     const daw = useDAW();
+    const t = useTranslations("dawExport");
     const project = daw.project;
 
     // Load saved config or default to CD Quality
@@ -329,7 +331,7 @@ export function DAWExportModal() {
                 <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
                     <div className="flex items-center gap-2">
                         <Download className="h-4 w-4 text-purple-400" />
-                        <h2 className="text-sm font-medium text-white/80">Export Project</h2>
+                        <h2 className="text-sm font-medium text-white/80">{t("title")}</h2>
                     </div>
                     <button
                         onClick={handleClose}
@@ -355,7 +357,7 @@ export function DAWExportModal() {
                     </div>
 
                     {/* ─── Quality Presets ─────────────────────────────────── */}
-                    <Section label="Preset">
+                    <Section label={t("sectionPreset")}>
                         <div className="flex gap-1.5 flex-wrap">
                             {(Object.entries(PRESETS) as [PresetKey, typeof PRESETS[PresetKey]][]).map(([key, p]) => (
                                 <button
@@ -384,7 +386,7 @@ export function DAWExportModal() {
                     </Section>
 
                     {/* ─── Format ─────────────────────────────────────────── */}
-                    <Section label="Format">
+                    <Section label={t("sectionFormat")}>
                         <div className="grid grid-cols-4 gap-1.5">
                             {(Object.keys(FORMAT_INFO) as Format[]).map(f => {
                                 const info = FORMAT_INFO[f];
@@ -406,7 +408,7 @@ export function DAWExportModal() {
                                     >
                                         <FileAudio className="h-4 w-4" />
                                         <span className="text-[10px] font-medium">{info.label}</span>
-                                        <span className="text-[8px] opacity-50">{info.lossy ? "Lossy" : "Lossless"}</span>
+                                        <span className="text-[8px] opacity-50">{info.lossy ? t("lossy") : t("lossless")}</span>
                                     </button>
                                 );
                             })}
@@ -415,11 +417,11 @@ export function DAWExportModal() {
                     </Section>
 
                     {/* ─── Quality ────────────────────────────────────────── */}
-                    <Section label="Quality">
+                    <Section label={t("sectionQuality")}>
                         <div className="grid grid-cols-2 gap-3">
                             {/* Sample Rate */}
                             <div>
-                                <label className="text-[9px] text-white/25 block mb-1">Sample Rate</label>
+                                <label className="text-[9px] text-white/25 block mb-1">{t("sampleRate")}</label>
                                 <DawSelect
                                     value={sampleRate}
                                     onChange={v => { setSampleRate(Number(v)); markCustom(); }}
@@ -431,7 +433,7 @@ export function DAWExportModal() {
                             {/* Bit Depth or Bitrate */}
                             {!FORMAT_INFO[format].lossy ? (
                                 <div>
-                                    <label className="text-[9px] text-white/25 block mb-1">Bit Depth</label>
+                                    <label className="text-[9px] text-white/25 block mb-1">{t("bitDepth")}</label>
                                     <DawSelect
                                         value={bitDepth}
                                         onChange={v => { setBitDepth(Number(v)); markCustom(); }}
@@ -441,7 +443,7 @@ export function DAWExportModal() {
                                 </div>
                             ) : (
                                 <div>
-                                    <label className="text-[9px] text-white/25 block mb-1">Bitrate</label>
+                                    <label className="text-[9px] text-white/25 block mb-1">{t("bitrate")}</label>
                                     <DawSelect
                                         value={bitRate}
                                         onChange={v => { setBitRate(Number(v)); markCustom(); }}
@@ -456,7 +458,7 @@ export function DAWExportModal() {
 
                             {/* Channels */}
                             <div>
-                                <label className="text-[9px] text-white/25 block mb-1">Channels</label>
+                                <label className="text-[9px] text-white/25 block mb-1">{t("channels")}</label>
                                 <div className="flex gap-1">
                                     {([2, 1] as const).map(ch => (
                                         <button
@@ -470,7 +472,7 @@ export function DAWExportModal() {
                                                     : "bg-black/20 border-white/[0.06] text-white/40 hover:text-white/60"
                                             )}
                                         >
-                                            {ch === 2 ? "Stereo" : "Mono"}
+                                            {ch === 2 ? t("stereo") : t("mono")}
                                         </button>
                                     ))}
                                 </div>
@@ -479,7 +481,7 @@ export function DAWExportModal() {
                             {/* Bit rate slider for lossy */}
                             {FORMAT_INFO[format].lossy && (
                                 <div>
-                                    <label className="text-[9px] text-white/25 block mb-1">Quality</label>
+                                    <label className="text-[9px] text-white/25 block mb-1">{t("qualitySlider")}</label>
                                     <input
                                         type="range"
                                         min={FORMAT_INFO[format].bitRates[0]}
@@ -491,8 +493,8 @@ export function DAWExportModal() {
                                         className="w-full h-1 accent-purple-500"
                                     />
                                     <div className="flex justify-between mt-0.5">
-                                        <span className="text-[8px] text-white/15">Smaller</span>
-                                        <span className="text-[8px] text-white/15">Better</span>
+                                        <span className="text-[8px] text-white/15">{t("smaller")}</span>
+                                        <span className="text-[8px] text-white/15">{t("better")}</span>
                                     </div>
                                 </div>
                             )}
@@ -548,18 +550,18 @@ export function DAWExportModal() {
                         >
                             {showMeta ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                             <Tag className="h-3 w-3" />
-                            Metadata
+                            {t("sectionMetadata")}
                         </button>
                         {showMeta && (
                             <div className="grid grid-cols-2 gap-x-3 gap-y-2 p-3 rounded-lg bg-black/15 border border-white/[0.04]">
-                                <MetaField label="Title" value={meta.title} onChange={v => updateMeta("title", v)} disabled={exporting} />
-                                <MetaField label="Artist" value={meta.artist} onChange={v => updateMeta("artist", v)} disabled={exporting} placeholder="Artist name" />
-                                <MetaField label="Album" value={meta.album} onChange={v => updateMeta("album", v)} disabled={exporting} placeholder="Album name" />
-                                <MetaField label="Genre" value={meta.genre} onChange={v => updateMeta("genre", v)} disabled={exporting} placeholder="e.g. Electronic" />
-                                <MetaField label="Year" value={meta.year} onChange={v => updateMeta("year", v)} disabled={exporting} placeholder="2026" />
-                                <MetaField label="Track #" value={meta.trackNumber} onChange={v => updateMeta("trackNumber", v)} disabled={exporting} placeholder="1" />
+                                <MetaField label={t("metaTitle")} value={meta.title} onChange={v => updateMeta("title", v)} disabled={exporting} />
+                                <MetaField label={t("metaArtist")} value={meta.artist} onChange={v => updateMeta("artist", v)} disabled={exporting} placeholder={t("metaArtistPh")} />
+                                <MetaField label={t("metaAlbum")} value={meta.album} onChange={v => updateMeta("album", v)} disabled={exporting} placeholder={t("metaAlbumPh")} />
+                                <MetaField label={t("metaGenre")} value={meta.genre} onChange={v => updateMeta("genre", v)} disabled={exporting} placeholder={t("metaGenrePh")} />
+                                <MetaField label={t("metaYear")} value={meta.year} onChange={v => updateMeta("year", v)} disabled={exporting} placeholder="2026" />
+                                <MetaField label={t("metaTrack")} value={meta.trackNumber} onChange={v => updateMeta("trackNumber", v)} disabled={exporting} placeholder="1" />
                                 <div className="col-span-2">
-                                    <MetaField label="Comment" value={meta.comment} onChange={v => updateMeta("comment", v)} disabled={exporting} placeholder="Additional notes..." />
+                                    <MetaField label={t("metaComment")} value={meta.comment} onChange={v => updateMeta("comment", v)} disabled={exporting} placeholder={t("metaCommentPh")} />
                                 </div>
                             </div>
                         )}
@@ -568,7 +570,7 @@ export function DAWExportModal() {
                     {/* ─── File Size Estimate ────────────────────────────── */}
                     <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-black/15 border border-white/[0.04]">
                         <div className="flex items-center gap-3">
-                            <span className="text-[10px] text-white/25">Estimated size</span>
+                            <span className="text-[10px] text-white/25">{t("estimatedSize")}</span>
                             <span className="text-[10px] text-white/50 font-medium tabular-nums">
                                 {estimateFileSize(durationSec, format, sampleRate, bitDepth, effectiveBitRate || (sampleRate * bitDepth * channels / 1000), channels)}
                             </span>
@@ -595,7 +597,7 @@ export function DAWExportModal() {
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className={cn("text-[10px]", done ? "text-emerald-400" : "text-white/40")}>
-                                    {done ? `Export complete! (${exportedSize})` : `Rendering... ${progress.toFixed(0)}%`}
+                                    {done ? t("exportComplete", { size: exportedSize }) : t("rendering", { pct: progress.toFixed(0) })}
                                 </span>
                                 {exporting && <Loader2 className="h-3 w-3 text-purple-400 animate-spin" />}
                                 {done && <Check className="h-3 w-3 text-emerald-400" />}
@@ -623,7 +625,7 @@ export function DAWExportModal() {
                         />
                         <Save className="h-3 w-3 text-white/20 group-hover:text-white/40 transition-colors" />
                         <span className="text-[10px] text-white/30 group-hover:text-white/50 transition-colors">
-                            Remember settings
+                            {t("rememberSettings")}
                         </span>
                     </label>
 
@@ -633,14 +635,14 @@ export function DAWExportModal() {
                             disabled={exporting}
                             className="h-8 px-4 rounded-lg text-xs text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors disabled:opacity-30"
                         >
-                            Cancel
+                            {t("cancel")}
                         </button>
                         {done && exportedBlob ? (
                             <button
                                 onClick={handleDownload}
                                 className="h-8 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-lg transition-colors flex items-center gap-1.5"
                             >
-                                <Download className="h-3.5 w-3.5" /> Download {FORMAT_INFO[format].ext}
+                                <Download className="h-3.5 w-3.5" /> {t("download")} {FORMAT_INFO[format].ext}
                             </button>
                         ) : (
                             <button
@@ -649,9 +651,9 @@ export function DAWExportModal() {
                                 className="h-8 px-4 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {exporting ? (
-                                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Exporting...</>
+                                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("exporting")}</>
                                 ) : (
-                                    <><Download className="h-3.5 w-3.5" /> Export</>
+                                    <><Download className="h-3.5 w-3.5" /> {t("export")}</>
                                 )}
                             </button>
                         )}
