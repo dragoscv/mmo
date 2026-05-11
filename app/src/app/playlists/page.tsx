@@ -4,7 +4,7 @@ import { PlaylistsClient } from "./playlists-client";
 import type { Track } from "@/db/schema";
 import { auth } from "@/auth";
 import { getCompanionLink } from "@/lib/companion-library";
-import { NotSignedIn, NoCompanion } from "@/components/library-empty-state";
+import { notSignedInFor, noCompanionFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +15,9 @@ export default async function PlaylistsPage({
 }) {
     const params = await searchParams;
     const session = await auth();
-    if (!session?.user?.id) return <NotSignedIn feature="your playlists" />;
+    if (!session?.user?.id) return notSignedInFor("playlists");
     const link = await getCompanionLink();
-    if (!link) return <NoCompanion feature="your playlists" />;
+    if (!link) return noCompanionFor("playlists");
 
     const playlistId = params.id ? parseInt(params.id) : undefined;
     const page = parseInt(params.page || "1");

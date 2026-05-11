@@ -4,15 +4,15 @@ import { getRecommendedPlaylists } from "@/actions/playlists";
 import { DashboardClient } from "@/components/dashboard-client";
 import { auth } from "@/auth";
 import { getCompanionLink } from "@/lib/companion-library";
-import { NotSignedIn, NoCompanion } from "@/components/library-empty-state";
+import { notSignedInFor, noCompanionFor } from "@/components/empty-state-server";
 
 export const revalidate = 300; // 5 minutes
 
 export default async function DashboardPage() {
     const session = await auth();
-    if (!session?.user?.id) return <NotSignedIn feature="your dashboard" />;
+    if (!session?.user?.id) return notSignedInFor("dashboard");
     const link = await getCompanionLink();
-    if (!link) return <NoCompanion feature="your dashboard" />;
+    if (!link) return noCompanionFor("dashboard");
 
     const [stats, recommendedCategories, recentScans, growth] = await Promise.all([
         getDashboardStats(),

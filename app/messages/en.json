@@ -1,6 +1,26 @@
 {
     "appName": "MMO",
     "tagline": "Multi Media Organizer for DJs and producers",
+    "empty": {
+        "features": {
+            "dashboard": "your dashboard",
+            "library": "your library",
+            "playlists": "your playlists",
+            "scanner": "the scanner",
+            "plugins": "plugins",
+            "analysis": "library analysis"
+        },
+        "notSignedIn": {
+            "title": "Sign in to see {feature}",
+            "description": "Tracks, playlists, and scans are stored per user. Sign in to access {feature}.",
+            "cta": "Sign in"
+        },
+        "noCompanion": {
+            "title": "Connect a companion to see {feature}",
+            "description": "{feature} now lives on your local companion app. Install it and pair it with this account to get going.",
+            "cta": "Manage devices"
+        }
+    },
     "nav": {
         "dashboard": "Dashboard",
         "library": "Library",

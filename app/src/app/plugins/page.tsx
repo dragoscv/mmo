@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { getCompanionLink } from "@/lib/companion-library";
-import { NotSignedIn, NoCompanion } from "@/components/library-empty-state";
+import { notSignedInFor, noCompanionFor } from "@/components/empty-state-server";
 import { getPluginInventory } from "@/actions/plugins";
 import { PluginsClient } from "./plugins-client";
 
@@ -22,9 +22,9 @@ export const dynamic = "force-dynamic";
  */
 export default async function PluginsPage() {
     const session = await auth();
-    if (!session?.user?.id) return <NotSignedIn feature="plugins" />;
+    if (!session?.user?.id) return notSignedInFor("plugins");
     const link = await getCompanionLink();
-    if (!link) return <NoCompanion feature="plugins" />;
+    if (!link) return noCompanionFor("plugins");
 
     const initial = await getPluginInventory();
     return <PluginsClient initialCached={initial.cached} />;

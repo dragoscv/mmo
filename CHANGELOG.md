@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 7 (batch i18n: empty-state components localised)
+
+- **`empty.*` namespace** added to both `messages/en.json` and `messages/ro.json` with three sub-keys: `features.{dashboard|library|playlists|scanner|plugins|analysis}` (the per-page noun phrase that fills the title), `notSignedIn.{title|description|cta}`, and `noCompanion.{title|description|cta}`. Romanian copy uses proper grammatical forms ("autentifică-te pentru a vedea biblioteca ta", "panoul tău principal", etc.).
+- **`empty-state-server.tsx`** (new): two async server helpers `notSignedInFor(featureKey)` and `noCompanionFor(featureKey)` that resolve translations via `getTranslations("empty")` and pass them as pre-translated props to the existing `<NotSignedIn>` / `<NoCompanion>` components. The presentational component stays sync + jsdom-test-friendly; pages get a one-liner instead of six copies of the boilerplate.
+- **`library-empty-state.tsx`** — extended with optional `title`, `description`, and `ctaLabel` overrides. English fallbacks preserved verbatim so the existing `library-empty-state.test.tsx` passes unchanged.
+- **All 6 callers** updated to use the new helpers: `app/page.tsx` (dashboard), `app/library/page.tsx`, `app/playlists/page.tsx`, `app/scanner/page.tsx`, `app/plugins/page.tsx`, `app/analysis/page.tsx`. Each gate-and-bail line stays a one-liner.
+- **Verified**: tsc clean, **209/209** tests pass, lint baseline unchanged.
+
 ### Fixed — Audit round 6 (batch mobile-responsive: top offenders)
 
 - **`settings/settings-client.tsx`** — `TabsList` switched from a flat `grid-cols-5` to `grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto gap-1`, and the longer labels ("General", "Profiles") get a 3-letter mobile alias (`Gen`, `Prof`) so 5 tabs no longer get squished off-screen on phones.

@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { getCompanionLink } from "@/lib/companion-library";
-import { NotSignedIn, NoCompanion } from "@/components/library-empty-state";
+import { notSignedInFor, noCompanionFor } from "@/components/empty-state-server";
 import { AnalysisClient } from "./analysis-client";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +15,9 @@ export const dynamic = "force-dynamic";
  */
 export default async function AnalysisPage() {
     const session = await auth();
-    if (!session?.user?.id) return <NotSignedIn feature="library analysis" />;
+    if (!session?.user?.id) return notSignedInFor("analysis");
     const link = await getCompanionLink();
-    if (!link) return <NoCompanion feature="library analysis" />;
+    if (!link) return noCompanionFor("analysis");
 
     return <AnalysisClient />;
 }

@@ -1,6 +1,26 @@
 {
     "appName": "MMO",
     "tagline": "Multi Media Organizer pentru DJ-i și producători",
+    "empty": {
+        "features": {
+            "dashboard": "panoul tău principal",
+            "library": "biblioteca ta",
+            "playlists": "playlist-urile tale",
+            "scanner": "scanerul",
+            "plugins": "plugin-urile",
+            "analysis": "analiza bibliotecii"
+        },
+        "notSignedIn": {
+            "title": "Autentifică-te pentru a vedea {feature}",
+            "description": "Piesele, playlist-urile și scanările sunt stocate per utilizator. Autentifică-te pentru a accesa {feature}.",
+            "cta": "Autentificare"
+        },
+        "noCompanion": {
+            "title": "Conectează o aplicație companion pentru a vedea {feature}",
+            "description": "{feature} este stocat acum în aplicația companion locală. Instaleaz-o și conecteaz-o la acest cont pentru a începe.",
+            "cta": "Gestionează dispozitive"
+        }
+    },
     "nav": {
         "dashboard": "Panou principal",
         "library": "Bibliotecă",

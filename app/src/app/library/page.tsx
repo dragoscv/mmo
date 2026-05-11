@@ -2,7 +2,7 @@ import { getTracks, getGenres, getAllTags, getKeys } from "@/actions/tracks";
 import { LibraryClient } from "./library-client";
 import { auth } from "@/auth";
 import { getCompanionLink } from "@/lib/companion-library";
-import { NotSignedIn, NoCompanion } from "@/components/library-empty-state";
+import { notSignedInFor, noCompanionFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +16,9 @@ export default async function LibraryPage({
     // Library is per-user and lives on the companion. Bail out early
     // when we can't reach either, rather than rendering an empty grid.
     const session = await auth();
-    if (!session?.user?.id) return <NotSignedIn feature="your library" />;
+    if (!session?.user?.id) return notSignedInFor("library");
     const link = await getCompanionLink();
-    if (!link) return <NoCompanion feature="your library" />;
+    if (!link) return noCompanionFor("library");
 
     const page = parseInt(params.page || "1");
     const pageSize = parseInt(params.pageSize || "50");

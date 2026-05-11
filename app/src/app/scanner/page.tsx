@@ -2,15 +2,15 @@ import { getSettings } from "@/actions/settings";
 import { ScannerClient } from "./scanner-client";
 import { auth } from "@/auth";
 import { getCompanionLink } from "@/lib/companion-library";
-import { NotSignedIn, NoCompanion } from "@/components/library-empty-state";
+import { notSignedInFor, noCompanionFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function ScannerPage() {
     const session = await auth();
-    if (!session?.user?.id) return <NotSignedIn feature="the scanner" />;
+    if (!session?.user?.id) return notSignedInFor("scanner");
     const link = await getCompanionLink();
-    if (!link) return <NoCompanion feature="the scanner" />;
+    if (!link) return noCompanionFor("scanner");
 
     const settings = await getSettings();
     const watchFolders = settings.watch_folders
