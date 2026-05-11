@@ -12,6 +12,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — Audit round 6 (batch mobile-responsive: top offenders)
+
+- **`settings/settings-client.tsx`** — `TabsList` switched from a flat `grid-cols-5` to `grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto gap-1`, and the longer labels ("General", "Profiles") get a 3-letter mobile alias (`Gen`, `Prof`) so 5 tabs no longer get squished off-screen on phones.
+- **`recordings/recordings-client.tsx`** — Stats strip changed from `grid-cols-3` to `grid-cols-1 sm:grid-cols-3` (cards now stack vertically on mobile instead of crushing to ~100px each), and the search field went from `flex-1 min-w-[200px]` to `w-full sm:flex-1 sm:min-w-[200px]` so it occupies the full row on phones rather than overflowing alongside filter pills.
+- **`library/library-client.tsx`** — Pagination row got `flex-wrap gap-3` so the "Page X of Y / per-page select" cluster doesn't push the next/prev buttons off-screen on narrow viewports.
+- **`library/duplicates/duplicates-client.tsx`** — `TabsList` got `text-xs sm:text-sm` so the three tab labels with their `(N)` count badges fit at <640px without truncation.
+- Audit notes (already mobile-fine, no change needed): `playlists/playlists-client.tsx` already has `w-full md:w-72` + `hidden md:block` sidebar toggle; `analysis/analysis-client.tsx` stat strip is already `grid-cols-2 md:grid-cols-5`.
+- **Verified**: tsc clean, lint baseline unchanged.
+
 ### Added — Audit round 6 (batch onboarding: 4-step wizard on first dashboard visit)
 
 - **`<OnboardingWizard>`** — a four-step modal (Language → Sign in → Companion → Scan) that auto-opens on `/dashboard` whenever the user has zero tracks AND hasn't dismissed it. Steps are skipped automatically when already satisfied: a brand-new visitor sees all four; a signed-in user with a linked companion lands directly on the Scan step.

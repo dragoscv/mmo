@@ -196,14 +196,16 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 
     return (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-3xl">
-            <TabsList className="mb-6 w-full grid grid-cols-5">
+            <TabsList className="mb-6 w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto gap-1">
                 <TabsTrigger value="general" className="gap-2">
                     <Settings className="h-3.5 w-3.5" />
-                    General
+                    <span className="hidden sm:inline">General</span>
+                    <span className="sm:hidden">Gen</span>
                 </TabsTrigger>
                 <TabsTrigger value="profiles" className="gap-2">
                     <UserCircle2 className="h-3.5 w-3.5" />
-                    Profiles
+                    <span className="hidden sm:inline">Profiles</span>
+                    <span className="sm:hidden">Prof</span>
                 </TabsTrigger>
                 <TabsTrigger value="folders" className="gap-2">
                     <FolderOpen className="h-3.5 w-3.5" />

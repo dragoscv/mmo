@@ -188,7 +188,7 @@ export function RecordingsClient({ initialRecordings, folder }: Props) {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.05 }}
-                    className="grid grid-cols-3 gap-3"
+                    className="grid grid-cols-1 sm:grid-cols-3 gap-3"
                 >
                     <StatCard icon={Music2} label="Total" value={String(stats.total)} accent="violet" />
                     <StatCard icon={Clock} label="Duration" value={formatDuration(stats.totalMs)} accent="fuchsia" />
@@ -197,7 +197,7 @@ export function RecordingsClient({ initialRecordings, folder }: Props) {
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative flex-1 min-w-[200px]">
+                    <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <input
                             value={search}

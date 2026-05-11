@@ -849,7 +849,7 @@ export function LibraryClient({
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-3">
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-[var(--muted-foreground)]">
                                 Page {page} of {totalPages}

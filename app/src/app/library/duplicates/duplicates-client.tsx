@@ -76,7 +76,7 @@ export function DuplicatesClient({ exact, fuzzy, audio }: Props) {
             </header>
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="space-y-4">
-                <TabsList className="grid w-full grid-cols-3 max-w-2xl">
+                <TabsList className="grid w-full grid-cols-3 max-w-2xl text-xs sm:text-sm">
                     <TabsTrigger value="exact" className="gap-2">
                         <Copy className="h-4 w-4" />
                         Exact ({exact.groups.length})
