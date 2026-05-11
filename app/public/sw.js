@@ -194,3 +194,76 @@ self.addEventListener("fetch", (event) => {
         })
     );
 });
+
+// ─── Push notifications ─────────────────────────────────────────────────────
+// Server pushes a JSON payload encrypted under the user's subscription
+// public key (Web Push protocol, RFC 8030). We render it as a system
+// notification. Payload shape:
+//   { title: string, body?: string, icon?: string, badge?: string,
+//     tag?: string, url?: string, actions?: NotificationAction[] }
+self.addEventListener("push", (event) => {
+    let data = {};
+    try {
+        data = event.data?.json() ?? {};
+    } catch {
+        // Some senders push plain text; fall back to a generic notification.
+        data = { title: "MMO", body: event.data?.text() || "" };
+    }
+
+    const title = typeof data.title === "string" && data.title.length > 0
+        ? data.title.slice(0, 200)
+        : "MMO";
+    const body = typeof data.body === "string" ? data.body.slice(0, 500) : "";
+    const tag = typeof data.tag === "string" ? data.tag : undefined;
+    const url = typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/";
+
+    const options = {
+        body,
+        icon: typeof data.icon === "string" ? data.icon : "/icon-192.png",
+        badge: typeof data.badge === "string" ? data.badge : "/icon-192.png",
+        tag,
+        renotify: !!tag,
+        data: { url },
+        actions: Array.isArray(data.actions) ? data.actions.slice(0, 2) : undefined,
+    };
+
+    event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+    event.notification.close();
+    const url = event.notification.data?.url || "/";
+    event.waitUntil((async () => {
+        const allClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        // Focus an existing same-origin window and navigate it, instead of
+        // opening a duplicate tab. Falls back to openWindow on cold start.
+        for (const client of allClients) {
+            try {
+                const clientUrl = new URL(client.url);
+                if (clientUrl.origin === self.location.origin) {
+                    await client.focus();
+                    if (client.navigate && clientUrl.pathname + clientUrl.search !== url) {
+                        await client.navigate(url);
+                    }
+                    return;
+                }
+            } catch {
+                // ignore malformed client URLs
+            }
+        }
+        await self.clients.openWindow(url);
+    })());
+});
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+    // The browser rotated the subscription (e.g. key expired). Re-subscribe
+    // with the same applicationServerKey and POST the new subscription to
+    // the server. The page picks this up via the `pushsubscriptionchange`
+    // message and re-runs the subscribe flow.
+    event.waitUntil((async () => {
+        const allClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const client of allClients) {
+            client.postMessage({ type: "pushsubscriptionchange" });
+        }
+    })());
+});

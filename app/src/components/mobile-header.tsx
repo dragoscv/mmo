@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Search, Menu } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
 import { GlobalSearch } from "./global-search";
+import { PwaInstallButton } from "./pwa-install-button";
 import { cn } from "@/lib/utils";
 
 export function MobileHeader() {
@@ -29,6 +30,8 @@ export function MobileHeader() {
                     <Search className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">Search tracks, artists...</span>
                 </button>
+
+                <PwaInstallButton />
             </header>
             <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
         </>

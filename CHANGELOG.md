@@ -12,6 +12,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 36: PWA push notifications + install prompt + maskable icon)
+
+- **Service worker push pipeline.** Added `push` event handler to `public/sw.js`: parses `event.data.json()` payload (`{ title, body, icon, badge, tag, url, actions }`), clamps each field defensively (`title ≤ 200 chars`, `body ≤ 500 chars`, `actions ≤ 2`), validates `url` starts with `/` (no off-origin navigation from a push), and renders via `self.registration.showNotification`. Falls back to a generic notification when the payload is plain text.
+- **`notificationclick` handler.** Closes the notification, finds an existing same-origin window via `clients.matchAll`, focuses + navigates it to the payload's `url` instead of opening a duplicate tab. Cold-start case falls back to `clients.openWindow`. Same-origin check prevents a malicious `data.url` from being used as an open-redirect.
+- **`pushsubscriptionchange` handler.** When the browser rotates the user's subscription (key expiry, push provider key change), broadcasts a `pushsubscriptionchange` message to all open clients so the page can re-run the subscribe flow and POST the new subscription to the server.
+- **`<PwaInstallButton />` component** (`src/components/pwa-install-button.tsx`): captures `beforeinstallprompt`, gates display on `display-mode: standalone` (already-installed check, lazy initial state to avoid `react-hooks/set-state-in-effect`), and snoozes for 14 days after the user dismisses Chrome's install dialog. Mounted in `MobileHeader` so it surfaces on mobile (where install matters most) without cluttering desktop chrome. No-op on iOS Safari (no `beforeinstallprompt`).
+- **Manifest gains a maskable 192 icon.** `public/manifest.webmanifest` now declares both `any` and `maskable` purposes at both 192 and 512. Without 192-maskable, Android adaptive-icon tiles fall back to a cropped non-maskable bitmap and show a white border around the logo.
+- **VAPID env vars documented** in `app/.env.example` (`NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) with generation instructions (`npx web-push generate-vapid-keys --json`) and a note on graceful degradation.
+
+### Deferred to a follow-up batch (B36.5)
+
+- Server-side push pipeline (`/api/push/subscribe` + `/api/push/send` + `web-push` npm install + Drizzle `push_subscriptions` table additive migration + settings UI toggle). The SW handler is in place and will work as soon as a sender posts to a user's subscription endpoint; the wiring is just not built yet.
+
 ### Changed — Audit round 6 (batch 35: Camelot wheel unified on DJ-software convention)
 
 - **`src/lib/note-notation.ts` was using a non-standard Camelot rotation** (`Am=1A`, `C=1B`) while the rest of the codebase (`src/lib/camelot.ts`, `src/lib/genre-suggest.ts`) and every external DJ tool the user imports/exports against (Mixed-In-Key, Rekordbox, Serato, Beatport) use `Am=8A` / `C=8B`. A track tagged in Rekordbox as `8A` would render in the mixer/library as the wrong key — silently breaking harmonic-mix recommendations across the whole UI. Switched `CAMELOT_MINOR` and `CAMELOT_MAJOR` records to the DJ-software convention; pinned with explicit `noteIndex → camelot` per-entry comments. No public API or call-site changes needed.
