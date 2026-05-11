@@ -19,6 +19,11 @@ import {
     type PlaylistSummary,
 } from "@/lib/companion-library";
 import { z } from "zod";
+import {
+    buildSeratoCrate,
+    sanitizeCrateName,
+    type SeratoCrateTrack,
+} from "@/lib/serato-crate";
 
 export type { PlaylistSummary, PaginatedPlaylistTracks } from "@/lib/companion-library";
 
@@ -717,4 +722,72 @@ export async function createAndPopulateRecommended(
     } catch (err) {
         return { created: create.created, populated: 0, error: err instanceof Error ? err.message : "Populate failed" };
     }
+}
+
+// ─── Serato .crate export ──────────────────────────────────────────────────
+
+/** Convert an absolute filepath to a Serato-compatible relative path
+ *  (forward-slashed, prefixed with `musicSubdir`). The basename is kept
+ *  verbatim; users are expected to copy their library files to
+ *  `<USB-root>/<musicSubdir>/...` so the crate paths resolve. */
+function toRelativePath(absPath: string, musicSubdir: string): string {
+    // Strip everything up to and including the final separator. Keeps the
+    // file name only — preserving deeper structure across mixed Windows /
+    // POSIX libraries is brittle and would only work if users mirror the
+    // exact source-tree layout to the USB, which is rare. Flat copy is
+    // the common workflow.
+    const name = absPath.split(/[\\/]/).pop() ?? absPath;
+    return `${musicSubdir}/${name}`.replace(/^\/+/, "");
+}
+
+export async function exportPlaylistToCrate(
+    playlistId: number,
+    musicSubdir: string = "Music",
+): Promise<{ success: false; error: string } | { success: true; base64: string; filename: string; trackCount: number }> {
+    const link = await getCompanionLink();
+    if (!link) return { success: false, error: "Companion not connected" };
+
+    const all = await companionLibrary.getPlaylists(link);
+    const playlist = all.find((p) => p.id === playlistId);
+    if (!playlist) return { success: false, error: "Playlist not found" };
+
+    const { tracks } = await companionLibrary.getPlaylistTracks(link, playlistId, 1, 100000);
+    const sub = (musicSubdir || "Music").replace(/^\/+|\/+$/g, "");
+    const crateTracks: SeratoCrateTrack[] = tracks.map((t) => ({
+        relativePath: toRelativePath(t.filepath, sub),
+    }));
+    const buf = buildSeratoCrate({ tracks: crateTracks });
+    return {
+        success: true,
+        base64: buf.toString("base64"),
+        filename: `${sanitizeCrateName(playlist.name)}.crate`,
+        trackCount: tracks.length,
+    };
+}
+
+/** Returns one crate per playlist, ready for client-side zipping. */
+export async function exportAllPlaylistsToCrates(
+    musicSubdir: string = "Music",
+): Promise<{ success: false; error: string } | { success: true; crates: Array<{ filename: string; base64: string; trackCount: number }> }> {
+    const link = await getCompanionLink();
+    if (!link) return { success: false, error: "Companion not connected" };
+
+    const playlists = await companionLibrary.getPlaylists(link);
+    const sub = (musicSubdir || "Music").replace(/^\/+|\/+$/g, "");
+    const crates: Array<{ filename: string; base64: string; trackCount: number }> = [];
+
+    // Sequential — companion is local, the round-trip is cheap, and this
+    // keeps memory bounded for 100+ playlist libraries.
+    for (const pl of playlists) {
+        const { tracks } = await companionLibrary.getPlaylistTracks(link, pl.id, 1, 100000);
+        const buf = buildSeratoCrate({
+            tracks: tracks.map((t) => ({ relativePath: toRelativePath(t.filepath, sub) })),
+        });
+        crates.push({
+            filename: `${sanitizeCrateName(pl.name)}.crate`,
+            base64: buf.toString("base64"),
+            trackCount: tracks.length,
+        });
+    }
+    return { success: true, crates };
 }

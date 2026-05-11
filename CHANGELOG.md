@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 41: Serato `.crate` writer + USB Export Wizard)
+
+- **`serato-crate.ts` writer** — pure binary builder for Serato Sub-files V2 `.crate` format (~150 lines + 110 lines of tests). Encodes the four-tag spine: `vrsn` (UTF-16BE version string), `osrt` (sort order), `ovct` (visible columns) and one `otrk{ptrk}` per track. Tag header = 4 ASCII bytes + 4-byte big-endian length. Round-trips through a tiny `parseCrate` helper used by the test suite to verify byte-level structure. Path normaliser collapses backslashes / leading slashes / `//` runs so a Windows source library produces a Serato-clean crate. **9 new tests** cover header layout, track encoding, custom sort/columns, UTF-8 paths (`Țărișoară — Ñoño.mp3`), 500-track stress, empty-path skipping and the `sanitizeCrateName` helper.
+- **`exportPlaylistToCrate` + `exportAllPlaylistsToCrates` server actions** — wrap the writer behind the existing companion-link auth. Crates encode paths as `<musicSubdir>/<basename>` (default subdir = `Music`); workflow is "rsync your audio to `<USB>/Music/`, drop the crate into `<USB>/_Serato_/Subcrates/`". Output is base64 + filename so the client can issue downloads without a server round-trip per file.
+- **`<UsbExportWizard>`** — single-step dialog that wraps both formats and both scopes (active playlist / full library) behind one entry point. Format checkboxes (Rekordbox XML / Serato `.crate`) are independent so the user can emit either or both in one click. Music-folder field shows up only when crate output is selected, with a live preview of the path that will go into the crate. Multi-file output is sequential downloads with a 100 ms stagger (browsers throttle bulk saves; one save dialog per file is the cost of staying zip-dependency-free for now).
+- **"USB…" button** in the playlists toolbar next to "Export All to XML"; the existing per-row XML export keeps working unchanged.
+- **Verified**: tsc clean, **209 tests pass** (200 → 209), lint baseline unchanged. **Out of scope for this batch**: copying the audio files themselves to the USB — that needs companion filesystem access and is the next sub-batch.
+
 ### Added — Audit round 6 (batch 40.5: smart playlist polish — Refresh, Edit, badge)
 
 - **Refresh action** — every smart playlist gets a "Refresh Smart Rules" item in its row menu (`<PlaylistActions>`), wired to `refreshSmartPlaylist` with a toast reporting how many tracks now match. Lets you re-evaluate without opening the dialog.

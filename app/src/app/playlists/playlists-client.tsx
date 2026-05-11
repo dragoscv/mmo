@@ -35,6 +35,7 @@ import { TrackActions, TrackContextMenu } from "@/components/track-actions";
 import { PlaylistActions } from "@/components/playlist-actions";
 import { ColumnManager, useColumnConfig } from "@/components/column-manager";
 import { SmartPlaylistDialog } from "@/components/smart-playlist-dialog";
+import { UsbExportWizard } from "@/components/usb-export-wizard";
 import { Select } from "@/components/ui/select";
 import { formatDuration, formatNumber, ENERGY_COLORS, GENRE_COLORS, cn } from "@/lib/utils";
 import {
@@ -118,6 +119,7 @@ export function PlaylistsClient({
     // Dialogs
     const [createOpen, setCreateOpen] = useState(false);
     const [smartOpen, setSmartOpen] = useState(false);
+    const [usbOpen, setUsbOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [newName, setNewName] = useState("");
@@ -303,6 +305,17 @@ export function PlaylistsClient({
                             <FileDown className="h-4 w-4" />
                             <span className="hidden sm:inline">Export All to XML</span>
                             <span className="sm:hidden">Export</span>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => setUsbOpen(true)}
+                            disabled={playlists.length === 0}
+                            title="Export to Rekordbox XML and/or Serato .crate for USB DJ workflow"
+                        >
+                            <FileDown className="h-4 w-4" />
+                            USB…
                         </Button>
                         <Button
                             size="sm"
@@ -897,6 +910,14 @@ export function PlaylistsClient({
                 open={smartOpen}
                 onOpenChange={setSmartOpen}
                 onCreated={() => router.refresh()}
+            />
+
+            {/* USB Export Wizard */}
+            <UsbExportWizard
+                open={usbOpen}
+                onOpenChange={setUsbOpen}
+                activePlaylistId={activePlaylist?.id}
+                activePlaylistName={activePlaylist?.name}
             />
         </div>
     );
