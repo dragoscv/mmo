@@ -12,6 +12,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch cmdk: command palette Actions section)
+
+- **Actions** section in the existing global command palette (`<GlobalSearch>`, ⌘K / Ctrl+K). Four executable commands above the Pages list when no query is typed:
+  - **Toggle Focus Mode** — calls `useFocusMode().toggleFocusMode()`; icon swaps Eye ↔ EyeOff based on state. Closes the palette before flipping so the chrome animation is smooth.
+  - **Refresh page** — `router.refresh()` to re-run the current RSC tree without reloading the document.
+  - **USB Export Wizard** — navigates to `/playlists?openUsbWizard=1`. Playlists client picks up the query param via a one-shot `useEffect`, opens the wizard, and strips the param via `router.replace` so a back-nav doesn't re-open it.
+  - **Sign out** — uses the cache-purging `signOutAndPurge` helper (already used by the sidebar) so SW caches don't bleed across accounts.
+- All four are also `value`-tagged with searchable keywords (e.g. "logout", "rekordbox serato crate", "hide chrome") so typing a verb fuzzy-matches the right action.
+- Uses cmdk + the existing `<CommandShortcut>` styling — zero new dependencies.
+- **Verified**: tsc clean, lint baseline unchanged (20).
+
 ### Added — Audit round 6 (batch 42a: dashboard health score + library growth chart)
 
 - **Aggregate Library Health Score** in the existing `<LibraryHealth>` card. A single 0-100 score computed as the mean of per-field completeness across the 5 quality dimensions (Genre / BPM / Key / Energy / Artwork) — every field weighted equally so the score never lies about a 100%-genre / 0%-key library. Rendered as a 56 × 56 SVG progress ring (radius 22, circumference ≈ 138.23, dashoffset animated over 1 s with a 300 ms entrance delay) with a tone-graded centre number (emerald ≥ 90, amber ≥ 70, rose otherwise) and a one-line copy that changes with the score band ("tournament-ready" / "fill the gaps" / "needs work — analyze + tag missing fields").

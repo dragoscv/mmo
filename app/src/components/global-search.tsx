@@ -30,11 +30,18 @@ import {
   Hash,
   ArrowRight,
   Loader2,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  LogOut,
+  Sparkles,
 } from "lucide-react";
 import { cn, formatDuration, formatKey } from "@/lib/utils";
 import { useDAWSettings } from "@/hooks/use-daw-settings";
 import { globalSearch, type SearchResult } from "@/actions/search";
 import { usePlayer } from "@/components/player-context";
+import { useFocusMode } from "@/components/focus-mode-context";
+import { signOutAndPurge } from "@/lib/auth-client";
 
 const PAGES = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, keywords: "home overview stats" },
@@ -56,6 +63,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const router = useRouter();
   const player = usePlayer();
   const { noteNotations } = useDAWSettings();
+  const { isFocusMode, toggleFocusMode } = useFocusMode();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -177,6 +185,72 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
             {/* No query → show pages & quick actions */}
             {!hasQuery && (
               <>
+                <CommandGroup heading="Actions">
+                  <CommandItem
+                    value="action-toggle-focus toggle focus mode hide chrome"
+                    onSelect={() => {
+                      onOpenChange(false);
+                      toggleFocusMode();
+                    }}
+                    className="gap-3 rounded-lg px-3 py-2.5"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/80">
+                      {isFocusMode
+                        ? <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        : <Eye className="h-4 w-4 text-muted-foreground" />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">
+                        {isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode"}
+                      </p>
+                    </div>
+                    <CommandShortcut>F</CommandShortcut>
+                  </CommandItem>
+                  <CommandItem
+                    value="action-refresh refresh reload page"
+                    onSelect={() => {
+                      onOpenChange(false);
+                      router.refresh();
+                    }}
+                    className="gap-3 rounded-lg px-3 py-2.5"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/80">
+                      <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Refresh page</p>
+                    </div>
+                  </CommandItem>
+                  <CommandItem
+                    value="action-usb-export usb export wizard rekordbox serato crate"
+                    onSelect={() => navigate("/playlists?openUsbWizard=1")}
+                    className="gap-3 rounded-lg px-3 py-2.5"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/80">
+                      <Sparkles className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">USB Export Wizard</p>
+                      <p className="text-[11px] text-muted-foreground/60">Rekordbox XML / Serato .crate</p>
+                    </div>
+                  </CommandItem>
+                  <CommandItem
+                    value="action-signout sign out logout"
+                    onSelect={() => {
+                      onOpenChange(false);
+                      signOutAndPurge({ callbackUrl: "/" });
+                    }}
+                    className="gap-3 rounded-lg px-3 py-2.5"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/80">
+                      <LogOut className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Sign out</p>
+                    </div>
+                  </CommandItem>
+                </CommandGroup>
+                <CommandSeparator className="my-1" />
                 <CommandGroup heading="Pages">
                   {PAGES.map((page) => (
                     <CommandItem

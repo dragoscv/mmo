@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSyncRefresh } from "@/hooks/use-sync-refresh";
@@ -125,6 +125,18 @@ export function PlaylistsClient({
     const [newName, setNewName] = useState("");
     const [newDesc, setNewDesc] = useState("");
     const [editName, setEditName] = useState("");
+
+    // Honour ?openUsbWizard=1 from the global command palette so commands
+    // that need a dialog still feel instant.
+    useEffect(() => {
+        if (searchParams.get("openUsbWizard") === "1") {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- imperative open from URL trigger
+            setUsbOpen(true);
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete("openUsbWizard");
+            router.replace(`/playlists?${params.toString()}`, { scroll: false });
+        }
+    }, [searchParams, router]);
 
     // Track detail modal
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
