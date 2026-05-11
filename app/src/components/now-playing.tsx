@@ -44,7 +44,7 @@ import {
     Sparkles,
     History,
     Heart,
-    Image,
+    Image as ImageIcon,
     AudioWaveform,
     Search,
     Grid3X3,
@@ -426,7 +426,7 @@ export function NowPlaying() {
                                     : "text-white/40 hover:text-white/70"
                             )}
                         >
-                            <Image className="h-3.5 w-3.5" />
+                            <ImageIcon className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Artwork</span>
                         </button>
                         <button
@@ -499,6 +499,7 @@ export function NowPlaying() {
                                         <div className="relative mb-8">
                                             {currentTrack.artworkUrl ? (
                                                 <div className="relative animate-[pulseGlow_3s_ease-in-out_infinite] rounded-2xl">
+                                                    // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
                                                     <img
                                                         src={currentTrack.artworkUrl}
                                                         alt={currentTrack.title || "Artwork"}
@@ -1475,6 +1476,7 @@ function VizMediaBar({
             <div className="flex items-center gap-2.5 min-w-0 w-40 shrink-0">
                 <div className="relative h-8 w-8 rounded-md bg-white/10 flex items-center justify-center shrink-0 overflow-hidden">
                     {track?.artworkUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
                         <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" />
                     ) : (
                         <Disc3 className={cn("h-4 w-4 text-purple-400", isPlaying && "animate-[vinylSpin_3s_linear_infinite]")} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -48,8 +48,15 @@ export function ConfirmLoadDialog() {
     });
     const [dontAskAgain, setDontAskAgain] = useState(false);
 
-    // Register the setter so requestConfirmLoad can open the dialog
-    dialogSetter = setState;
+    // Register the setter so requestConfirmLoad can open the dialog.
+    // Module-scope reassignment runs in a layout effect (not during
+    // render) so React Compiler / StrictMode double-render don't see a
+    // mid-render side effect, and the cleanup nulls the slot when the
+    // singleton dialog unmounts.
+    useEffect(() => {
+        dialogSetter = setState;
+        return () => { dialogSetter = null; };
+    }, []);
 
     const handleConfirm = useCallback(() => {
         if (dontAskAgain) {

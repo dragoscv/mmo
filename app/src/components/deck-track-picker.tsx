@@ -250,6 +250,7 @@ function TrackRow({
         >
             {/* Artwork */}
             {track.artworkUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
                 <img
                     src={track.artworkUrl}
                     alt=""

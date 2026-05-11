@@ -40,6 +40,11 @@ export function DAWPianoRoll() {
     const pxPerBeat = daw.zoom * 2; // Higher zoom for piano roll
     const selectedNoteIds = daw.selectedNotes;
 
+    // Hooks (`useContextMenu`) must run on every render path, so it sits
+    // above the early-return below. The downstream `handleGridContextMenu`
+    // callback already guards its body with `!clip`.
+    const ctxMenu = useContextMenu();
+
     if (!clip || !track) {
         return (
             <div className="h-full flex items-center justify-center text-white/20 text-sm">
@@ -114,8 +119,6 @@ export function DAWPianoRoll() {
         const noteId = daw.playSynthNote(pitch, 100);
         setTimeout(() => daw.stopSynthNote(noteId), 300);
     };
-
-    const ctxMenu = useContextMenu();
 
     const handleGridContextMenu = useCallback((e: React.MouseEvent) => {
         e.preventDefault();

@@ -100,6 +100,7 @@ export function ProfileClient({ user }: ProfileClientProps) {
                         {/* Avatar */}
                         <div className="shrink-0">
                             {user.image ? (
+                                // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
                                 <img
                                     src={user.image}
                                     alt={user.name || "User"}

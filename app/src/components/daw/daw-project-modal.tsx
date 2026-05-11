@@ -26,6 +26,9 @@ export function DAWProjectModal() {
     const [newName, setNewName] = useState("");
     const [search, setSearch] = useState("");
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    // Hooks must run on every render path — declared here so they sit above
+    // the `!showProjectModal` early return below.
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (daw.showProjectModal) {
@@ -83,7 +86,6 @@ export function DAWProjectModal() {
         downloadBlob(blob, `${safeFilename(project.name)}.${PROJECT_FILE_EXTENSION}`);
     };
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const handleImportClick = () => fileInputRef.current?.click();
     const handleImportChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];

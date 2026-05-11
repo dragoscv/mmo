@@ -215,6 +215,7 @@ export function MixerBrowserModal({
                                 {/* Artwork */}
                                 <div className="h-9 w-9 rounded overflow-hidden bg-white/5 shrink-0">
                                     {track.artworkUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
                                         <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" />
                                     ) : (
                                         <div className="h-full w-full flex items-center justify-center">

@@ -202,6 +202,7 @@ function DeckCard({
             <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/[0.06] flex items-center justify-center shrink-0 overflow-hidden">
                     {deck.artworkUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
                         <img src={deck.artworkUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
                         <Disc className="w-5 h-5 text-white/15" />

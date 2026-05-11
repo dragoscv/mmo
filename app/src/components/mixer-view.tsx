@@ -734,6 +734,7 @@ const DeckInfo = memo(function DeckInfo({ side, deck, color, track, onBrowse }: 
                 <div className="flex flex-col gap-1 lg:gap-1.5">
                     <div className="flex items-center gap-2">
                         {deck.trackArtworkUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
                             <img src={deck.trackArtworkUrl} alt="" className="w-8 h-8 lg:w-10 lg:h-10 xl:w-12 xl:h-12 rounded object-cover shrink-0" />
                         ) : (
                             <div className="w-8 h-8 lg:w-10 lg:h-10 xl:w-12 xl:h-12 rounded bg-white/10 shrink-0" />

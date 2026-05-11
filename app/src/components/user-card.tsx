@@ -69,6 +69,7 @@ export function UserCard({ collapsed }: UserCardProps) {
                 title={collapsed ? session.user.name || "Profile" : undefined}
             >
                 {session.user.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
                     <img
                         src={session.user.image}
                         alt={session.user.name || "User"}

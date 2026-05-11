@@ -6,7 +6,7 @@ import {
     Download, Search, Music, Video, FileAudio, Loader2, CheckCircle2,
     AlertCircle, Library, ExternalLink, X, ChevronDown, ChevronUp,
     Globe, Clock, User, Play, HardDrive, FolderOpen, Settings2,
-    Trash2, History, Sparkles, Image, MicVocal, Tag,
+    Trash2, History, Sparkles, Image as ImageIcon, MicVocal, Tag,
     ListMusic, CheckSquare, Square, CheckCheck, XSquare, FolderPlus, Plus,
     Link as LinkIcon,
 } from "lucide-react";
@@ -2121,7 +2121,7 @@ export function DownloadClient() {
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                         {Object.entries(analysisResults).map(([key, val]) => (
                                             <div key={key} className="flex items-center gap-1.5 text-xs">
-                                                {key === "Artwork" && <Image className="h-3 w-3 text-green-400" />}
+                                                {key === "Artwork" && <ImageIcon className="h-3 w-3 text-green-400" />}
                                                 {key === "Genre" && <Tag className="h-3 w-3 text-blue-400" />}
                                                 {key === "BPM" && <Music className="h-3 w-3 text-orange-400" />}
                                                 {key === "Lyrics" && <MicVocal className="h-3 w-3 text-pink-400" />}

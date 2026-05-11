@@ -262,6 +262,7 @@ export function InlineDownloadModal({ track, targetDeck, onLoadToDeck, onAddedTo
                     {/* Track info */}
                     <div className="flex items-center gap-3 rounded-lg bg-white/[0.03] border border-white/[0.06] p-2.5">
                         {track.thumbnail ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
                             <img src={track.thumbnail} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
                         ) : (
                             <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center shrink-0">

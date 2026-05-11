@@ -184,6 +184,7 @@ export function AudioPlayer() {
                                     isPlaying && "shadow-[0_0_16px_rgba(139,92,246,0.1)]"
                                 )}>
                                     {currentTrack.artworkUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
                                         <img
                                             src={currentTrack.artworkUrl}
                                             alt=""

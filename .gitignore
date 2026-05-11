@@ -40,3 +40,5 @@ __pycache__/
 /server/assets/virtual-audio/windows/*.exe
 
 .vercel
+
+*.log
