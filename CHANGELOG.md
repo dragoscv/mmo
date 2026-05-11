@@ -12,6 +12,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 6 (batch 34: test coverage push for pure helpers)
+
+- **`crypto-secret.test.ts` (8 tests)** — pins AES-256-GCM round-trip, IV uniqueness, GCM-tag tamper rejection, malformed-blob rejection, missing/short `MMO_SECRET_KEY` errors, and the `maskSecret` display helper. Security-critical: this module wraps every BYO API key the user stores.
+- **`url-guard.test.ts` (12 tests)** — covers `isPrivateOrLoopbackHost` (loopback, RFC1918, AWS metadata 169.254.169.254, multicast, IPv6 ULA / link-local), `validatePublicHttpUrl` (rejects non-http(s), private hosts, leading-`-` flag-injection, oversize, non-strings), and `validateDeviceApiUrl` env-driven branch (private allowed in dev, blocked in prod, opt-in re-enables). SSRF surface is now regression-locked.
+- **`note-notation.test.ts` (12 tests)** — pins all 12 anglo/solfège names, MIDI octave math (`C4 = 60`), camelot quality switching, multi-notation join, parser tolerance (case + whitespace), and the em-dash sentinel for empty keys.
+- **`genre-suggest.test.ts` (12 tests)** — pins BPM→genre buckets, key-string normalisation (`A minor` / `C major`), Camelot↔key round-trip, harmonic score (identical/relative/fifth-adjacent/clash/unknown), and `getCompatibleKeys` wheel-wrap behaviour.
+- **`utils.test.ts` (16 tests)** — pins `cn` (clsx + twMerge), `formatDuration` (mm:ss + em-dash for null/0), `formatNumber`, `formatBytes` (B/KB/MB/GB scaling), `formatKey`, and `getHarmonicColor` (green/yellow/red harmonic feedback used across mixer + browser UIs).
+- **Test count: 115 → 175** (+60 tests across 5 new files).
+
+### Discovered (pre-existing inconsistency, not fixed in this batch)
+
+- **Two contradictory Camelot conventions live in the codebase.** `src/lib/note-notation.ts` maps `Am → 1A` (and uses the rotation `Am=1A, Em=2A, Bm=3A, F#m=4A, C#m=5A, G#m=6A, Ebm=7A, Bbm=8A, Fm=9A, Cm=10A, Gm=11A, Dm=12A`). `src/lib/genre-suggest.ts` maps `Am → 8A` (the more common Mixed-In-Key / DJ-software convention: `Cm=5A, Am=8A, Em=9A, Bm=10A`). The new tests pin each module's *current* behaviour so a future unification pass is a visible diff. Recommended: standardise on the Am=8A (DJ-software) convention since that's what users will see in Rekordbox / Serato / Mixed-In-Key, then refactor `note-notation.ts` to match.
+
 ### Fixed — Audit round 6 (batch 33: lint baseline burndown — rules-of-hooks, lucide `Image` collision, dialogSetter hoist, `<img>` rationale)
 
 - **`daw-piano-roll.tsx` violated `react-hooks/rules-of-hooks`** by calling `useContextMenu()` after a `if (!clip || !track) return null` early return, so the hook order changed when a clip became unavailable mid-session — React would throw "rendered fewer hooks than expected". Hoisted the hook above the early return.
