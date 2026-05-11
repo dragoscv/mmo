@@ -12,6 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Audit round 7 (batch chromaprint: real Hamming-distance audio dedupe)
+
+- **`lib/chromaprint.ts`** (new) — pure-JS decoder for the Chromaprint-compressed `acoustidFingerprint` field. Implements the full algorithm from `chromaprint/src/fingerprint_compressor.cpp`: URL-safe base64 → BitReader (3-bit normal values + 5-bit exceptions for the value `7`) → unpack bit positions → cumulative XOR-delta reconstruction. Includes a 100k-item sanity cap, returns `null` for any malformation rather than throwing (one bad row must not abort a 50k-track batch). Plus `hammingDistance(a, b)` (popcount over min-overlap) and `fingerprintSimilarity(a, b)` (`[0, 1]`, where identical recordings score 1.00 and unrelated tracks sit below 0.55).
+- **`lib/cluster.ts`** (new) — `clusterByPredicate(items, linked)`: union-find connected components over an arbitrary similarity predicate. Pulled out so the dedupe action stays small and the clustering logic can be tested without mocking the companion. Used by the new audio-fingerprint pipeline so chains like A≈B≈C all surface even when A and C don't directly cross the threshold.
+- **`actions/duplicates.ts`** — replaced the old `FP_PREFIX_LEN=24` prefix-bucket heuristic (which silently missed re-encodes that differed in the first base64 byte) with a two-pass design: a **loose** 10-char prefix bucket generates O(n) candidates, then **`fingerprintSimilarity ≥ 0.85`** (`FP_SIMILARITY_THRESHOLD`) decides actual matches via union-find. Each emitted group's `reason` now reads `audio similarity 92.4%` instead of `fingerprint prefix abc…`. The strategy still skips clusters already covered by SHA-256 (strategy 1) to keep the UI uncluttered.
+- **`lib/chromaprint.test.ts`** — 17 tests covering: nullish / non-string / malformed-base64 / too-short / oversize input → all return `null`; decoding a real fpcalc payload yields a deterministic non-empty `Uint32Array`; Hamming popcount handles the high bit (`0x80000000`) without sign-extension bugs; identical → distance 0; all-bits-flipped → 32 × len; mismatched lengths use the overlapping prefix; similarity is 1.0 for identical, 0.0 for fully complementary, ≈0.96875 for a single-bit flip.
+- **`lib/cluster.test.ts`** — 6 tests covering: empty / singleton / no edges / fully connected / transitive chain (A-B-C clusters even without A-C edge) / disjoint components stay separate.
+- **Suite now 263 tests** (up from 239 → +24 across this batch alone, +54 across round 7 so far).
+- **No companion change required.** The compressed `acoustidFingerprint` field already IS the raw Chromaprint bytes — they were just packed. Decoding client-side gives every existing tracked deployment access to the new dedupe accuracy with zero migration, zero re-analysis, and zero protocol break with older companion versions.
+
 ### Added — Audit round 7 (batch sentry: free-tier wiring closed loop)
 
 - **Error boundaries.** Added `app/src/app/error.tsx` (segment-level fallback inside the root layout, preserves header/nav/theme) and `app/src/app/global-error.tsx` (renders its own `<html>`/`<body>` for crashes that happen before the layout mounts). Both call the lazy `captureException` shim so errors land in Sentry when configured and are silent no-ops otherwise.

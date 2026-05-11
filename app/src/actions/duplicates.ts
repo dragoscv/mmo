@@ -4,6 +4,8 @@ import { z } from "zod";
 import { log } from "@/lib/logger";
 import { revalidatePath } from "next/cache";
 import { quality, normaliseString, durationBucket } from "@/lib/duplicates-helpers";
+import { decodeFingerprint, fingerprintSimilarity } from "@/lib/chromaprint";
+import { clusterByPredicate } from "@/lib/cluster";
 import {
     companionLibrary,
     getCompanionLink,
@@ -181,46 +183,84 @@ export async function findFuzzyDuplicates(): Promise<DuplicateReport> {
 
 // ─── Strategy 3: Audio fingerprint (chromaprint) ───────────────────────────
 
-/** Quick prefix-bucket fingerprint match. Two fingerprints are
- *  considered "close enough" if they share their first PREFIX_LEN chars
- *  (Chromaprint's compressed string is positional, so a shared prefix
- *  ≈ shared opening seconds of the song). This is intentionally loose —
- *  the UI shows the group and the user confirms. A future iteration can
- *  upgrade to a Hamming-distance comparison on the raw fingerprint
- *  bytes once the companion exposes them. */
-const FP_PREFIX_LEN = 24;
+/** Bucket key length used for O(n) candidate generation. The compressed
+ *  Chromaprint header byte plus the next ~9 base64 chars cover the
+ *  algorithm version + the first few sub-fingerprints. We deliberately
+ *  use a short prefix here (vs. the previous 24) — the Hamming-distance
+ *  pass below is what actually decides whether two tracks match, so the
+ *  bucket only needs to be loose enough to put true duplicates in the
+ *  same group, not strict enough to be its own answer. */
+const FP_BUCKET_LEN = 10;
+
+/** Minimum bit-level similarity for two decoded fingerprints to be
+ *  considered the same recording. Empirically: identical files score
+ *  1.00, the same song re-encoded at a different bitrate scores
+ *  ~0.90–0.99, unrelated tracks sit below 0.55. 0.85 is the safe floor
+ *  that catches mastering / loudness-normalised re-encodes without
+ *  generating false positives across genre-related (but distinct)
+ *  recordings. */
+const FP_SIMILARITY_THRESHOLD = 0.85;
 
 export async function findAudioDuplicates(): Promise<DuplicateReport> {
     try {
         const all = await fetchAllTracks();
-        const buckets = new Map<string, CompanionTrack[]>();
-        let withFp = 0;
+
+        // 1) Decode every fingerprint exactly once and keep tracks
+        //    that produced a usable Uint32Array.
+        type Decoded = { track: CompanionTrack; data: Uint32Array; fp: string };
+        const decoded: Decoded[] = [];
         for (const t of all) {
             const fp = t.acoustidFingerprint;
-            if (!fp || fp.length < FP_PREFIX_LEN) continue;
-            withFp++;
-            const key = fp.slice(0, FP_PREFIX_LEN);
+            if (!fp || fp.length < FP_BUCKET_LEN) continue;
+            const d = decodeFingerprint(fp);
+            if (!d || d.data.length === 0) continue;
+            decoded.push({ track: t, data: d.data, fp });
+        }
+
+        // 2) Loose prefix bucketing → O(n) candidate groups.
+        const buckets = new Map<string, Decoded[]>();
+        for (const d of decoded) {
+            const key = d.fp.slice(0, FP_BUCKET_LEN);
             const arr = buckets.get(key) ?? [];
-            arr.push(t);
+            arr.push(d);
             buckets.set(key, arr);
         }
+
+        // 3) For each candidate bucket, run union-find over pairwise
+        //    Hamming similarity. Connected components ≥ 2 are emitted.
         const groups: DuplicateGroup[] = [];
         let dupCount = 0;
-        for (const [key, ts] of buckets) {
-            if (ts.length < 2) continue;
-            // Skip groups already covered by sha256 (strategy 1).
-            const shas = new Set(ts.map(t => t.sha256).filter(Boolean));
-            if (shas.size <= 1 && ts.every(t => t.sha256)) continue;
-            const picked = sortByQuality(ts.map(pick));
-            groups.push({
-                key: `fp:${key}`,
-                tracks: picked,
-                reason: `fingerprint prefix ${key.slice(0, 8)}…`,
-            });
-            dupCount += picked.length;
+        for (const [key, items] of buckets) {
+            if (items.length < 2) continue;
+            const clusters = clusterByPredicate(items, (a, b) =>
+                fingerprintSimilarity(a.data, b.data) >= FP_SIMILARITY_THRESHOLD,
+            );
+            for (const cluster of clusters) {
+                if (cluster.length < 2) continue;
+                // Skip clusters already covered by sha256 (strategy 1).
+                const shas = new Set(cluster.map((c) => c.track.sha256).filter(Boolean));
+                if (shas.size <= 1 && cluster.every((c) => c.track.sha256)) continue;
+                const picked = sortByQuality(cluster.map((c) => pick(c.track)));
+                // Average pairwise similarity for the group's display reason.
+                let pairs = 0;
+                let sum = 0;
+                for (let i = 0; i < cluster.length; i++) {
+                    for (let j = i + 1; j < cluster.length; j++) {
+                        sum += fingerprintSimilarity(cluster[i].data, cluster[j].data);
+                        pairs++;
+                    }
+                }
+                const avg = pairs > 0 ? sum / pairs : 1;
+                groups.push({
+                    key: `fp:${key}:${picked[0]?.id ?? 0}`,
+                    tracks: picked,
+                    reason: `audio similarity ${(avg * 100).toFixed(1)}%`,
+                });
+                dupCount += picked.length;
+            }
         }
         groups.sort((a, b) => b.tracks.length - a.tracks.length);
-        return { groups, scanned: withFp, duplicates: dupCount };
+        return { groups, scanned: decoded.length, duplicates: dupCount };
     } catch (err) {
         log.warn("duplicates.audio failed", undefined, err);
         return EMPTY;
