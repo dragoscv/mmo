@@ -188,7 +188,7 @@ export function parseRekordboxXml(xmlPath: string): RekordboxImportResult {
             const filepath = decodeRekordboxLocation(String(rt.Location || ""));
             if (!filepath) continue;
 
-            const filename = path.basename(filepath);
+            const filename = path.win32.basename(filepath);
             const tonality = String(rt.Tonality || "");
             const camelot = tonality ? musicalKeyToCamelot(tonality) : undefined;
 
