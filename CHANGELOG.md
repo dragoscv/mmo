@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed — Folder management UX & instant removal (web `0.3.6` + companion `1.0.19`)
+
+- **Removed the per-folder purpose selector from the Library Folders list.** The kind (Music / Movies / TV Shows / Samples / Recordings / Other) is now chosen exclusively at pick time. Existing entries display the chosen kind as a read-only pill; to change it, remove the folder and re-add it. The previous inline `<Select>` was wired to a queue-backed action that visibly lagged and, when offline, silently rolled back — confusing operators.
+- **Folder removal now uses the tunnel fast path.** `handleRemoveFolder` calls a new `fastRemoveFolder` helper that hits `POST /folders/remove` over the per-device Cloudflare Tunnel; the row disappears optimistically and is rolled back only if both the tunnel and the queue fall through. Previously remove went via `enqueueDeviceCommand` exclusively and could take 60 s+ when the companion's event loop was busy.
+- **CI: `fetch-cloudflared.mjs` now respects `process.arch` on macOS** so Apple-Silicon GitHub runners (`macos-latest` is now arm64) pull `cloudflared-darwin-arm64.tgz` instead of always asking for the amd64 build, which was breaking the companion release workflow.
+
 ### Added — Per-device Cloudflare Tunnel fast path (web app v0.3.0 + companion v1.0.14)
 
 - **Direct browser ↔ companion transport via Cloudflare Tunnel.** Every paired device is now auto-provisioned with its own named CF Tunnel (`https://device-<12hex>.muzicai.ro`) on first heartbeat. The browser fetches `/fs/drives`, `/fs/list`, `/fs/add` directly through the tunnel with an `X-Device-Token` bearer, collapsing the folder-browser round-trip from ~1.5–6 s (queue + heartbeat) to ~30–80 ms (CF edge → companion). Works from any network — coffee shop, mobile data, or LAN — with real HTTPS, no mixed-content fights, no Private Network Access prompts.

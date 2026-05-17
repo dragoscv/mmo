@@ -82,7 +82,6 @@ import {
     getCompanionAudioInventory,
     setCompanionAuthorizedAudioDevices,
     setCompanionFolderWatch,
-    setCompanionFolderKind,
     startCompanionScan,
     getCompanionScanJob,
     listCompanionScanJobs,
@@ -307,6 +306,24 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         return r;
     }
 
+    /** Fast folder removal via tunnel; falls back to the queue path. */
+    async function fastRemoveFolder(deviceId: string, path: string): Promise<CompanionFolder[]> {
+        const t0 = performance.now();
+        const target = await getDirectAccess(deviceId);
+        if (target) {
+            const r = await directFetch<{ success: boolean; folders: CompanionFolder[] }>(
+                target, "/folders/remove", { method: "POST", body: JSON.stringify({ path }) },
+            );
+            if (r) {
+                console.log(`[folders] remove "${path}" via tunnel in ${Math.round(performance.now() - t0)}ms`);
+                return r.folders ?? [];
+            }
+        }
+        const folders = await removeCompanionFolder(deviceId, path);
+        console.log(`[folders] remove "${path}" via queue in ${Math.round(performance.now() - t0)}ms`);
+        return folders;
+    }
+
     const refreshAll = useCallback(() => {
         for (const device of devices) {
             pingDevice(device.id).then((r) =>
@@ -524,19 +541,26 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         }
     }
 
-    function handleChangeFolderKind(deviceId: string, folderPath: string, kind: FolderKind) {
-        startTransition(async () => {
-            const r = await setCompanionFolderKind(deviceId, folderPath, kind);
-            if ("error" in r) { toast.error(r.error); return; }
-            setFolders((p) => ({ ...p, [deviceId]: r.folders }));
-        });
-    }
-
     function handleRemoveFolder(deviceId: string, folderPath: string) {
+        // Optimistic removal so the UI feels instant; if the request fails
+        // we restore the previous list below.
+        let previous: CompanionFolder[] | undefined;
+        setFolders((p) => {
+            previous = p[deviceId];
+            return {
+                ...p,
+                [deviceId]: (p[deviceId] ?? []).filter((f) => f.path !== folderPath),
+            };
+        });
         startTransition(async () => {
-            const updated = await removeCompanionFolder(deviceId, folderPath);
-            setFolders((p) => ({ ...p, [deviceId]: updated }));
-            toast.success("Folder removed");
+            try {
+                const updated = await fastRemoveFolder(deviceId, folderPath);
+                setFolders((p) => ({ ...p, [deviceId]: updated }));
+                toast.success("Folder removed");
+            } catch (err) {
+                if (previous) setFolders((p) => ({ ...p, [deviceId]: previous! }));
+                toast.error(err instanceof Error ? err.message : "Failed to remove folder");
+            }
         });
     }
 
@@ -809,7 +833,6 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                                                     for (const f of dFolders) handleScanFolder(device.id, f.path);
                                                 }}
                                                 onToggleWatch={(p, w) => handleToggleWatch(device.id, p, w)}
-                                                onChangeKind={(p, k) => handleChangeFolderKind(device.id, p, k)}
                                             />
                                         </motion.div>
                                     )}
@@ -1202,12 +1225,11 @@ interface FolderSectionProps {
     onRemove: (path: string) => void;
     onScanAll: () => void;
     onToggleWatch: (path: string, watch: boolean) => void;
-    onChangeKind: (path: string, kind: FolderKind) => void;
 }
 
 function FolderSection({
     folders, isOnline, isPicking, scanProgress, togglingWatch,
-    onPick, onScan, onRemove, onScanAll, onToggleWatch, onChangeKind,
+    onPick, onScan, onRemove, onScanAll, onToggleWatch,
 }: FolderSectionProps) {
     const anyScanning = Object.values(scanProgress).some(
         (j) => j.status !== "complete" && j.status !== "error" && j.status !== "canceled",
@@ -1248,7 +1270,6 @@ function FolderSection({
                                 onScan={() => onScan(folder.path)}
                                 onRemove={() => onRemove(folder.path)}
                                 onToggleWatch={(w) => onToggleWatch(folder.path, w)}
-                                onChangeKind={(k) => onChangeKind(folder.path, k)}
                             />
                         ))}
                     </AnimatePresence>
@@ -1286,11 +1307,10 @@ interface FolderRowProps {
     onScan: () => void;
     onRemove: () => void;
     onToggleWatch: (watch: boolean) => void;
-    onChangeKind: (kind: FolderKind) => void;
 }
 
 function FolderRow({
-    folder, isOnline, togglingWatch, progress, onScan, onRemove, onToggleWatch, onChangeKind,
+    folder, isOnline, togglingWatch, progress, onScan, onRemove, onToggleWatch,
 }: FolderRowProps) {
     const isScanning = progress
         && progress.status !== "complete"
@@ -1331,20 +1351,14 @@ function FolderRow({
                     )}
                 </div>
 
-                {/* Folder purpose (music/movies/tv-shows/...) — drives downstream
-                    behaviour (e.g. only "music" folders feed the DJ library). */}
-                <Select
-                    size="sm"
-                    value={folder.kind ?? "music"}
-                    onChange={(e) => onChangeKind(e.target.value as FolderKind)}
-                    disabled={!isOnline}
-                    title="Folder purpose"
-                    className="h-7 w-[110px] shrink-0"
+                {/* Folder purpose label — chosen at pick time, fixed thereafter.
+                    To change the purpose, remove the folder and re-add it. */}
+                <span
+                    className="shrink-0 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                    title="Folder purpose (set at pick time)"
                 >
-                    {FOLDER_KINDS.map((k) => (
-                        <option key={k} value={k}>{FOLDER_KIND_LABELS[k]}</option>
-                    ))}
-                </Select>
+                    {FOLDER_KIND_LABELS[folder.kind ?? "music"]}
+                </span>
 
                 {/* Watch toggle */}
                 <button

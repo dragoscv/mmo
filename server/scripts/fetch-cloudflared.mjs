@@ -29,7 +29,7 @@ function assetNameFor(platform, arch) {
     // Match the file naming used in CF's GitHub releases.
     // https://github.com/cloudflare/cloudflared/releases
     if (platform === "win32") return arch === "x64" ? "cloudflared-windows-amd64.exe" : "cloudflared-windows-386.exe";
-    if (platform === "darwin") return "cloudflared-darwin-amd64.tgz";
+    if (platform === "darwin") return arch === "arm64" ? "cloudflared-darwin-arm64.tgz" : "cloudflared-darwin-amd64.tgz";
     if (platform === "linux") return arch === "arm64" ? "cloudflared-linux-arm64" : "cloudflared-linux-amd64";
     throw new Error(`Unsupported platform: ${platform}`);
 }
