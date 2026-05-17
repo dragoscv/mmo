@@ -1,0 +1,48 @@
+name: Release (Changesets)
+
+# Opens / updates a "Version Packages" PR whenever changesets land on
+# main. Merging that PR bumps versions + writes CHANGELOG entries across
+# the workspace. Each package's own release pipeline
+# (companion-release.yml, native-release.yml, extension-release.yml, the
+# Vercel web-app deploy) still drives the actual artifact / publish step
+# off the resulting version tag.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  version:
+    name: Open / update Version PR
+    runs-on: ubuntu-latest
+    # Skip on the version PR itself to avoid loops.
+    if: "!contains(github.event.head_commit.message, 'chore(release): version packages')"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Create Release PR
+        uses: changesets/action@v1
+        with:
+          version: pnpm exec changeset version
+          commit: "chore(release): version packages"
+          title: "chore(release): version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

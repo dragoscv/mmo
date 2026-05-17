@@ -5,9 +5,13 @@
     "description": "MMO root \u2014 hosts husky hooks + workspace declaration. Each sub-package keeps its own pnpm-lock.yaml so existing CI (web-app, companion) and Vercel continue to work unchanged.",
     "scripts": {
         "prepare": "husky || true",
-        "check:extension-version": "node apps/extension/scripts/check-version.mjs"
+        "check:extension-version": "node apps/extension/scripts/check-version.mjs",
+        "changeset": "changeset",
+        "version": "changeset version",
+        "release:changelog": "changeset version"
     },
     "devDependencies": {
+        "@changesets/cli": "^2.27.10",
         "husky": "^9.1.7"
     },
     "packageManager": "pnpm@10.0.0"
