@@ -18,24 +18,51 @@ These steps are required ONCE on your Cloudflare account, then every
 device that pairs gets its own tunnel automatically (provisioned by the
 web app's announce route on first heartbeat).
 
-### 1 · Delegate `devices.muzicai.ro` to Cloudflare (free)
+### 1 · Move `muzicai.ro` DNS to Cloudflare (free)
 
-Cloudflare's free tier requires the zone to be hosted on their
-nameservers, but you don't have to move your whole `muzicai.ro`. Just
-delegate the subdomain:
+Cloudflare's free plan does **not** support subdomain-only zones — that
+needs Business ($200/mo). The clean and free path is to move the whole
+domain's nameservers from Vercel to Cloudflare. Vercel hosting keeps
+working unchanged; only DNS authority moves.
 
-1. Go to <https://dash.cloudflare.com> → **Add a domain** → enter
-   `devices.muzicai.ro` → **Free** plan → **Continue**. CF will scan
-   (find nothing) and give you **two nameservers**, e.g.
-   `ada.ns.cloudflare.com` and `bob.ns.cloudflare.com`.
-2. At your existing DNS provider for `muzicai.ro`, add two NS records:
+> **Before you start**: open Vercel → Domains → `muzicai.ro` → **DNS
+> Records** and screenshot / export every single record (A, CNAME, MX,
+> TXT, etc.). You must recreate every one in Cloudflare before flipping
+> nameservers, or email + preview deploys break.
+
+1. <https://dash.cloudflare.com> → **Add a domain** → `muzicai.ro` →
+   **Free** plan.
+2. Cloudflare auto-scans your current DNS and imports most records.
+   **Cross-check the imported list against your Vercel export.** CF
+   sometimes misses TXT records (SPF, DKIM, `_vercel` verification).
+   Add anything missing manually.
+3. For each record that points at Vercel (`A @ 76.76.21.21`,
+   `CNAME www cname.vercel-dns.com`), set the proxy status to
+   **DNS-only** (grey cloud, NOT orange). Vercel needs the real client
+   IP and does its own TLS — proxying through CF would double-proxy.
+4. CF shows you two nameservers, e.g.
+   `ada.ns.cloudflare.com` + `bob.ns.cloudflare.com`. Copy them.
+5. Go to your domain registrar (where you bought `muzicai.ro` — Hostico,
+   ROTLD, Namecheap, etc.). Find the nameserver setting for the domain.
+   Replace Vercel's `ns1.vercel-dns.com` / `ns2.vercel-dns.com` with
+   the two Cloudflare ones. Save.
+6. Wait 5 min – 24 h (usually under 1 h for `.ro`) for propagation. CF
+   emails you when the zone status flips to **Active**.
+7. Verify nothing broke:
+   ```powershell
+   nslookup muzicai.ro 1.1.1.1
+   nslookup www.muzicai.ro 1.1.1.1
    ```
-   devices.muzicai.ro  NS  ada.ns.cloudflare.com
-   devices.muzicai.ro  NS  bob.ns.cloudflare.com
-   ```
-   (use the exact nameservers Cloudflare gave you).
-3. Wait 5–60 minutes for the delegation to propagate. Cloudflare emails
-   you when the zone status flips to **Active**.
+   Both should resolve to Vercel's IP. Open <https://muzicai.ro> in a
+   private window — the site should load normally.
+
+**Rollback**: if anything breaks, change nameservers back to
+`ns1.vercel-dns.com` + `ns2.vercel-dns.com` at the registrar.
+Propagation takes 5–60 min.
+
+> No separate `devices.muzicai.ro` zone is needed. The per-device
+> hostnames (`device-<id>.devices.muzicai.ro`) are just CNAMEs under
+> the apex `muzicai.ro` zone, auto-created by the API on first heartbeat.
 
 ### 2 · Create a scoped API token
 
@@ -44,9 +71,9 @@ delegate the subdomain:
 2. Name: `MMO Tunnel Provisioner`.
 3. **Permissions**:
    - `Account` → `Cloudflare Tunnel` → **Edit**
-   - `Zone` → `DNS` → **Edit`
+   - `Zone` → `DNS` → **Edit**
 4. **Account Resources**: include your own account.
-5. **Zone Resources**: include **only** `devices.muzicai.ro`.
+5. **Zone Resources**: include **only** `muzicai.ro`.
 6. (Optional) TTL: leave blank for indefinite, or set 1 year.
 7. **Continue to summary** → **Create Token** → copy the token. You
    only see it once.
@@ -54,7 +81,7 @@ delegate the subdomain:
 ### 3 · Find the two IDs
 
 - **Account ID** — dashboard home → right sidebar.
-- **Zone ID** — open `devices.muzicai.ro` → right sidebar.
+- **Zone ID** — open `muzicai.ro` zone → right sidebar.
 
 ### 4 · Set environment variables
 
@@ -64,9 +91,13 @@ Add to **both** `app/.env.local` (for local dev) and Vercel
 ```bash
 CLOUDFLARE_API_TOKEN=...           # the token from step 2
 CLOUDFLARE_ACCOUNT_ID=...          # from step 3
-CLOUDFLARE_TUNNEL_ZONE_ID=...      # from step 3
+CLOUDFLARE_TUNNEL_ZONE_ID=...      # from step 3 (the muzicai.ro zone ID)
 CLOUDFLARE_TUNNEL_BASE_HOSTNAME=devices.muzicai.ro
 ```
+
+`CLOUDFLARE_TUNNEL_BASE_HOSTNAME` is just the suffix used to compose
+`device-<id>.devices.muzicai.ro`. The records live under the apex
+`muzicai.ro` zone — no separate subdomain zone exists.
 
 Redeploy the web app.
 
