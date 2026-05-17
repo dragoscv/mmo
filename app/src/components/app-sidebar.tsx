@@ -209,7 +209,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                         </div>
                         <div className="px-2">
                             <p className="text-[11px] text-sidebar-foreground/20">
-                                MMO v0.1
+                                MMO v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
                             </p>
                             <p className="text-[11px] text-sidebar-foreground/15">by mwrty</p>
                         </div>

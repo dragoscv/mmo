@@ -1,2 +1,5 @@
 # Only runs when files under apps/extension/ are staged.
 node apps/extension/scripts/check-version.mjs --staged
+
+# Only runs when files under app/ (the Next.js web app) are staged.
+node app/scripts/check-version.mjs --staged

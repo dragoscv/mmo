@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import bundleAnalyzer from "@next/bundle-analyzer";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 const withBundleAnalyzer = bundleAnalyzer({
@@ -8,7 +10,17 @@ const withBundleAnalyzer = bundleAnalyzer({
     openAnalyzer: false,
 });
 
+// Single source of truth for the displayed app version (sidebar footer,
+// /api/health, etc.) — read from package.json so a bump there propagates
+// without touching any UI code.
+const pkgVersion = (JSON.parse(
+    readFileSync(resolve(__dirname, "package.json"), "utf8"),
+) as { version: string }).version;
+
 const nextConfig: NextConfig = {
+    env: {
+        NEXT_PUBLIC_APP_VERSION: pkgVersion,
+    },
     serverExternalPackages: ["postgres", "music-metadata", "systeminformation"],
 
     images: {
