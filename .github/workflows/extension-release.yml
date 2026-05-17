@@ -28,10 +28,6 @@ permissions:
     contents: write
     id-token: write
 
-# Run JavaScript-based actions on Node 24 (GitHub default starting 2026-06-02).
-env:
-    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
     preflight:
         if: github.event_name == 'push'
@@ -74,7 +70,7 @@ jobs:
 
             - uses: actions/setup-node@v4
               with:
-                  node-version: 22
+                  node-version: 24
                   cache: pnpm
                   cache-dependency-path: apps/extension/pnpm-lock.yaml
 
@@ -211,7 +207,7 @@ jobs:
             - uses: actions/setup-node@v4
               if: steps.secrets.outputs.have == 'true'
               with:
-                  node-version: 22
+                  node-version: 24
 
             - name: Sign + upload to AMO
               if: steps.secrets.outputs.have == 'true'

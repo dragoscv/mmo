@@ -34,14 +34,6 @@ permissions:
   contents: write   # needed to publish releases
   id-token: write
 
-# Opt into Node.js 24 for all JavaScript-based actions in this workflow.
-# GitHub is deprecating Node 20 (forced default on 2026-06-02, removed
-# 2026-09-16). Setting this env at the workflow level silences the
-# deprecation warning emitted by checkout@v4 / setup-node@v4 /
-# upload-artifact@v4 / pnpm/action-setup@v4 and runs them on Node 24.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   # Cheap preflight (~5s) that fails the whole pipeline before we burn 3
   # OS-runner minutes if the pushed tag doesn't match server/package.json.
@@ -114,10 +106,10 @@ jobs:
         with:
           run_install: false
 
-      - name: Setup Node 20
+      - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: server/pnpm-lock.yaml
 

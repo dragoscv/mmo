@@ -34,10 +34,6 @@ permissions:
     contents: write
     id-token: write
 
-# Run JavaScript-based actions on Node 24 (GitHub default starting 2026-06-02).
-env:
-    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
     # Fast preflight (~5s) that fails before we burn 4 OS-runner minutes
     # if the pushed tag doesn't match apps/native/package.json#version.
@@ -155,7 +151,7 @@ jobs:
 
             - uses: actions/setup-node@v4
               with:
-                  node-version: 22
+                  node-version: 24
                   cache: pnpm
                   cache-dependency-path: apps/native/pnpm-lock.yaml
 
@@ -235,7 +231,7 @@ jobs:
 
             - uses: actions/setup-node@v4
               with:
-                  node-version: 22
+                  node-version: 24
                   cache: pnpm
                   cache-dependency-path: apps/native/pnpm-lock.yaml
 
@@ -325,7 +321,7 @@ jobs:
 
             - uses: actions/setup-node@v4
               with:
-                  node-version: 22
+                  node-version: 24
                   cache: pnpm
                   cache-dependency-path: apps/native/pnpm-lock.yaml
 
