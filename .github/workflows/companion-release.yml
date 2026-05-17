@@ -1,16 +1,21 @@
 name: Companion — build & release
 
-# Cross-platform builder for the MMO Companion (Electron). Triggered
-# ONLY by pushing a tag like `companion-v1.2.3`, or manually via the
-# Actions tab. Bare `v*` tags are intentionally NOT a trigger so that
-# tagging the web app or another package never starts a 7-minute
-# 3-runner build of the desktop app.
+# Cross-platform builder for the MMO Companion (Electron). Triggered by:
+#   1. Pushing a tag like `companion-v1.2.3` (legacy / manual path).
+#   2. Pushing to `main` with changes under `server/**` or to this
+#      workflow file. We read `server/package.json#version` and only
+#      build when no GitHub Release exists for that version yet — so
+#      pushing a perf fix without bumping the version is a no-op, but
+#      bumping the version automatically cuts a release.
+#   3. Manually via the Actions tab (workflow_dispatch).
+# Bare `v*` tags are intentionally NOT a trigger so that tagging the
+# web app or another package never starts a 7-minute 3-runner build.
 #
 # Produces:
 #   - Windows: NSIS installer (.exe) + latest.yml (electron-updater feed)
 #   - macOS:   DMG (.dmg) + latest-mac.yml
 #   - Linux:   AppImage + .deb + .rpm + latest-linux.yml
-# All artifacts are uploaded to a GitHub Release named after the tag.
+# All artifacts are uploaded to a GitHub Release named after the version.
 #
 # The web app's /api/companion/download route reads the latest release
 # and redirects browsers to the appropriate installer for their OS.
@@ -19,6 +24,11 @@ on:
   push:
     tags:
       - "companion-v*"
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - ".github/workflows/companion-release.yml"
   workflow_dispatch:
     inputs:
       publish:
@@ -35,6 +45,44 @@ permissions:
   id-token: write
 
 jobs:
+  # On a branch push (auto-trigger), decide whether the build should run.
+  # We build iff `server/package.json#version` does not already have a
+  # matching GitHub Release — so bumping the version is what cuts a
+  # release, not every commit under server/**. Tag pushes and manual
+  # runs skip this and go straight to preflight/build.
+  detect:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read server/package.json version
+        id: read
+        shell: bash
+        run: |
+          v="$(node -p "require('./server/package.json').version")"
+          echo "version=$v" >> $GITHUB_OUTPUT
+          echo "server version: $v"
+      - name: Check if release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          # electron-builder publishes to a release tagged `v<version>`
+          # (its default; `companion-v<version>` is only the *trigger*
+          # tag for the tag-push path). We gate on the release tag here.
+          tag="v${{ steps.read.outputs.version }}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists — skipping build."
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          else
+            echo "No release for $tag — will build."
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
+
   # Cheap preflight (~5s) that fails the whole pipeline before we burn 3
   # OS-runner minutes if the pushed tag doesn't match server/package.json.
   # electron-builder publishes whatever version is in package.json under a
@@ -42,9 +90,10 @@ jobs:
   # commit where package.json still says 0.3.5 silently produces a 0.3.5
   # release and leaves the v0.4.0 tag dangling. This guard makes that an
   # explicit failure instead of a confusing success. Skipped for manual
-  # workflow_dispatch runs (no tag context).
+  # workflow_dispatch runs (no tag context) and for branch auto-triggers
+  # (no tag exists yet — detect job is the gate there).
   preflight:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,9 +113,16 @@ jobs:
           fi
 
   build:
-    needs: [preflight]
-    # Allow workflow_dispatch (which skips preflight) to still proceed.
-    if: ${{ always() && (needs.preflight.result == 'success' || needs.preflight.result == 'skipped') }}
+    needs: [preflight, detect]
+    # Allow workflow_dispatch (which skips preflight/detect) to still proceed.
+    # Build runs when: tag push (preflight passed), or branch auto-trigger
+    # with version bump (detect=true), or manual dispatch.
+    if: |
+      always() && (
+        needs.preflight.result == 'success' ||
+        (needs.detect.result == 'success' && needs.detect.outputs.should_build == 'true') ||
+        (needs.preflight.result == 'skipped' && needs.detect.result == 'skipped')
+      )
     strategy:
       fail-fast: false
       matrix:
@@ -167,8 +223,9 @@ jobs:
           # to avoid electron-winstaller / postinstall surprises on Windows.
           npm rebuild audify better-sqlite3 || true
 
-      # Publish flag: tag pushes always publish; workflow_dispatch publishes
-      # only when the input is "true". Otherwise we just build artifacts.
+      # Publish flag: tag pushes always publish; branch auto-triggers
+      # (detect job confirmed version is unreleased) always publish;
+      # workflow_dispatch publishes only when the input is "true".
       - name: Determine publish flag
         id: pub
         shell: bash
