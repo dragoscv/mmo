@@ -221,25 +221,12 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
     async function fastAddFolder(deviceId: string, path: string, kind: FolderKind): Promise<
         { added: boolean; picked: string; folders: CompanionFolder[] } | { error: string }
     > {
-        // Tunnel `/fs/add` only returns {added, picked} — folders are
-        // refetched separately. The queue path returns folders inline,
-        // so for the direct path we follow up with a folders fetch only
-        // if needed. Most callers re-render via the announce loop within
-        // 3s anyway, but we keep parity by reading folders from the
-        // server action when the tunnel response lacks them.
         const target = await getDirectAccess(deviceId);
         if (target) {
-            const r = await directFetch<{ added: boolean; picked: string }>(
+            const r = await directFetch<{ added: boolean; picked: string; folders: CompanionFolder[] }>(
                 target, "/fs/add", { method: "POST", body: JSON.stringify({ path, kind }) },
             );
-            if (r) {
-                // Hit the queue action just to fetch the updated folders
-                // (cheap when the companion already cached them).
-                const tail = await addCompanionFolder(deviceId, path, kind).catch(() => null);
-                return tail && !("error" in tail)
-                    ? tail
-                    : { added: r.added, picked: r.picked, folders: [] };
-            }
+            if (r) return r;
         }
         return addCompanionFolder(deviceId, path, kind);
     }

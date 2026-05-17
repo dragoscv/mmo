@@ -98,14 +98,7 @@ export async function createDeviceTunnel(
     //    "cloudflare") so we can update ingress via the API later
     //    without touching the companion config file.
     const secret = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64");
-    const created = await cf<{ id: string; token: string }>(
-        cfg,
-        `/accounts/${cfg.accountId}/cfd_tunnel`,
-        {
-            method: "POST",
-            body: JSON.stringify({ name, tunnel_secret: secret, config_src: "cloudflare" }),
-        },
-    );
+    const created = await createTunnelHandlingCollision(cfg, name, secret);
 
     // 2. Set ingress. Order matters — the catch-all 404 must be last.
     await cf<unknown>(
@@ -126,6 +119,7 @@ export async function createDeviceTunnel(
 
     // 3. CNAME the hostname at our zone. Proxied (orange cloud) so CF
     //    terminates TLS and routes via the tunnel.
+    await deleteStaleDnsByName(cfg, hostname);
     const dns = await cf<{ id: string }>(
         cfg,
         `/zones/${cfg.zoneId}/dns_records`,
@@ -143,6 +137,72 @@ export async function createDeviceTunnel(
     );
 
     return { tunnelId: created.id, tunnelToken: created.token, hostname, dnsRecordId: dns.id };
+}
+
+/**
+ * Create a tunnel; if a tunnel with the same name already exists (CF
+ * error 1013), force-delete the orphan and retry. Re-provisioning a
+ * device whose DB row was wiped (or whose hostname pattern changed) is
+ * the only legitimate path through here, so collision == stale.
+ */
+async function createTunnelHandlingCollision(
+    cfg: CloudflareConfig,
+    name: string,
+    secret: string,
+): Promise<{ id: string; token: string }> {
+    try {
+        return await cf<{ id: string; token: string }>(
+            cfg,
+            `/accounts/${cfg.accountId}/cfd_tunnel`,
+            {
+                method: "POST",
+                body: JSON.stringify({ name, tunnel_secret: secret, config_src: "cloudflare" }),
+            },
+        );
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes("[1013]")) throw err;
+        // List by name, delete any matches with ?cascade (forces removal
+        // even if a stale cloudflared replica is still holding connections).
+        const list = await cf<Array<{ id: string }>>(
+            cfg,
+            `/accounts/${cfg.accountId}/cfd_tunnel?name=${encodeURIComponent(name)}&is_deleted=false`,
+            { method: "GET" },
+        ).catch(() => [] as Array<{ id: string }>);
+        for (const t of list) {
+            try {
+                await cf<unknown>(
+                    cfg,
+                    `/accounts/${cfg.accountId}/cfd_tunnel/${t.id}?cascade=true`,
+                    { method: "DELETE" },
+                );
+            } catch { /* ignore — best-effort cleanup */ }
+        }
+        return cf<{ id: string; token: string }>(
+            cfg,
+            `/accounts/${cfg.accountId}/cfd_tunnel`,
+            {
+                method: "POST",
+                body: JSON.stringify({ name, tunnel_secret: secret, config_src: "cloudflare" }),
+            },
+        );
+    }
+}
+
+/** DNS record collisions are common after a stale tunnel cleanup —
+ *  the CNAME outlives the tunnel. Remove any matching record before
+ *  we recreate so the POST below doesn't 81057 fail. */
+async function deleteStaleDnsByName(cfg: CloudflareConfig, hostname: string): Promise<void> {
+    const list = await cf<Array<{ id: string }>>(
+        cfg,
+        `/zones/${cfg.zoneId}/dns_records?name=${encodeURIComponent(hostname)}`,
+        { method: "GET" },
+    ).catch(() => [] as Array<{ id: string }>);
+    for (const r of list) {
+        try {
+            await cf<unknown>(cfg, `/zones/${cfg.zoneId}/dns_records/${r.id}`, { method: "DELETE" });
+        } catch { /* ignore */ }
+    }
 }
 
 /** Best-effort teardown. Swallows individual errors so a partial state

@@ -467,25 +467,25 @@ export async function startServer(): Promise<void> {
     // (which also reuse listDrivesCached / listDirectoryCached); this
     // route lets the browser hit the companion directly via the
     // Cloudflare Tunnel and skip the 1.5-6s queue round-trip.
-    app.get("/fs/drives", authMiddleware, (_req, res) => {
+    app.get("/fs/drives", authMiddleware, async (_req, res) => {
         try {
-            res.json({ drives: listDrivesCached() });
+            res.json({ drives: await listDrivesCached() });
         } catch (err) {
             res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
         }
     });
 
-    app.get("/fs/list", authMiddleware, (req, res) => {
+    app.get("/fs/list", authMiddleware, async (req, res) => {
         const requested = typeof req.query.path === "string" ? req.query.path : "";
         if (!requested) { res.status(400).json({ error: "path required" }); return; }
         try {
-            res.json(listDirectoryCached(requested));
+            res.json(await listDirectoryCached(requested));
         } catch (err) {
             res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
         }
     });
 
-    app.post("/fs/add", authMiddleware, (req, res) => {
+    app.post("/fs/add", authMiddleware, async (req, res) => {
         const body = req.body as { path?: unknown; kind?: unknown };
         const folderPath = typeof body.path === "string" ? body.path : "";
         if (!folderPath) { res.status(400).json({ error: "path required" }); return; }
@@ -493,19 +493,35 @@ export async function startServer(): Promise<void> {
             && (FOLDER_KINDS as readonly string[]).includes(body.kind)
             ? (body.kind as FolderKind) : "music";
         try {
-            const stat = fs.statSync(folderPath);
+            const stat = await fs.promises.stat(folderPath);
             if (!stat.isDirectory()) { res.status(400).json({ error: "Not a directory" }); return; }
         } catch {
             res.status(400).json({ error: "Folder does not exist or is not readable" }); return;
         }
         const resolved = path.resolve(folderPath);
         const folders = getSettings().scanFolders;
+        let added = false;
         if (!folders.some((f) => f.path === resolved)) {
             folders.push({ path: resolved, watch: false, kind });
             store.set("scanFolders", folders);
+            added = true;
         }
         invalidateDirectoryCache(path.dirname(resolved));
-        res.json({ added: true, picked: resolved });
+        // Return the updated folders list inline so the browser can render
+        // immediately without a follow-up queue round-trip (saves ~1.5-6s
+        // when the LAN announce loop is the only transport).
+        const watcherStatuses = new Map(listWatcherStatuses().map((s) => [s.folder, s] as const));
+        const updatedFolders = getSettings().scanFolders.map((f) => ({
+            path: f.path,
+            exists: fs.existsSync(f.path),
+            label: path.basename(f.path) || f.path,
+            kind: f.kind ?? "music",
+            watch: !!f.watch,
+            watchActive: !!watcherStatuses.get(f.path)?.active,
+            watchEvents: watcherStatuses.get(f.path)?.eventsSeen ?? 0,
+            watchError: watcherStatuses.get(f.path)?.error ?? null,
+        }));
+        res.json({ added, picked: resolved, folders: updatedFolders });
     });
 
     app.get("/folders", authMiddleware, (_req, res) => {

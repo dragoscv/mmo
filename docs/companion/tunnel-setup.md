@@ -5,8 +5,16 @@ The browser at `https://muzicai.ro` cannot talk to a companion at
 Access kill it. Instead we give every paired device its own named
 Cloudflare Tunnel: the companion runs `cloudflared --token …` which
 opens an outbound QUIC connection to the Cloudflare edge; the browser
-fetches `https://device-<id>.devices.muzicai.ro` which the edge proxies
-back through the tunnel to the companion's `localhost:17899`.
+fetches `https://device-<id>.muzicai.ro` which the edge proxies
+back through the tunnel to the companion's local Express port.
+
+> **Use a flat (single-level) subdomain.** Cloudflare's free Universal
+> SSL certificate covers only `muzicai.ro` and `*.muzicai.ro` — it does
+> NOT cover `*.devices.muzicai.ro`. Two-level subdomains require a
+> paid Advanced Certificate. We therefore use `device-<id>.muzicai.ro`
+> (flat) instead of `device-<id>.devices.muzicai.ro` (nested). The
+> `device-` prefix keeps these hostnames out of the way of `www`,
+> `api`, etc.
 
 End-to-end ~30–80 ms anywhere on the planet. Real HTTPS, no LAN games,
 no NAT punching. Falls back gracefully to the announce queue when CF
@@ -60,9 +68,9 @@ working unchanged; only DNS authority moves.
 `ns1.vercel-dns.com` + `ns2.vercel-dns.com` at the registrar.
 Propagation takes 5–60 min.
 
-> No separate `devices.muzicai.ro` zone is needed. The per-device
-> hostnames (`device-<id>.devices.muzicai.ro`) are just CNAMEs under
-> the apex `muzicai.ro` zone, auto-created by the API on first heartbeat.
+> No separate zone is needed. The per-device hostnames
+> (`device-<id>.muzicai.ro`) are just CNAMEs under the apex
+> `muzicai.ro` zone, auto-created by the API on first heartbeat.
 
 ### 2 · Create a scoped API token
 
@@ -92,12 +100,13 @@ Add to **both** `app/.env.local` (for local dev) and Vercel
 CLOUDFLARE_API_TOKEN=...           # the token from step 2
 CLOUDFLARE_ACCOUNT_ID=...          # from step 3
 CLOUDFLARE_TUNNEL_ZONE_ID=...      # from step 3 (the muzicai.ro zone ID)
-CLOUDFLARE_TUNNEL_BASE_HOSTNAME=devices.muzicai.ro
+CLOUDFLARE_TUNNEL_BASE_HOSTNAME=muzicai.ro
 ```
 
 `CLOUDFLARE_TUNNEL_BASE_HOSTNAME` is just the suffix used to compose
-`device-<id>.devices.muzicai.ro`. The records live under the apex
-`muzicai.ro` zone — no separate subdomain zone exists.
+`device-<id>.muzicai.ro`. Use the apex (single-level) so the existing
+free `*.muzicai.ro` cert covers it — nesting under `devices.muzicai.ro`
+requires a paid Advanced Certificate.
 
 Redeploy the web app.
 

@@ -17,8 +17,9 @@
 import { BrowserWindow, dialog } from "electron";
 import path from "node:path";
 import fs from "node:fs";
+import fsp from "node:fs/promises";
 import os from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { getSettings, store, FOLDER_KINDS, type FolderKind } from "./store";
 import { listBackends, listDevices, type AudioBackend } from "./audio/native-engine";
 import { listWatcherStatuses, startWatcher, stopWatcher } from "./library/watcher";
@@ -144,7 +145,7 @@ const handlers: Record<string, Handler> = {
     // `list_directory` per click. `add_folder` finalises the pick. We never
     // open a native dialog so the entire flow stays in the browser.
 
-    list_drives: async () => ({ drives: listDrivesCached() }),
+    list_drives: async () => ({ drives: await listDrivesCached() }),
 
     list_directory: async (payload) => {
         const requested = pickString(payload, "path");
@@ -157,7 +158,7 @@ const handlers: Record<string, Handler> = {
         if (!folderPath) throw new Error("path required");
         const desiredKind = pickKind(payload);
         let stat: fs.Stats;
-        try { stat = fs.statSync(folderPath); }
+        try { stat = await fsp.stat(folderPath); }
         catch { throw new Error("Folder does not exist or is not readable"); }
         if (!stat.isDirectory()) throw new Error("Path is not a directory");
         const resolved = path.resolve(folderPath);
@@ -168,42 +169,49 @@ const handlers: Record<string, Handler> = {
         }
         folders.push({ path: resolved, watch: false, kind: desiredKind });
         store.set("scanFolders", folders);
-        // The newly-added folder may now display a different "already in library"
-        // affordance on the next listing of its parent. Drop the parent so the
-        // very next navigate-up returns fresh data.
         invalidateDirectoryCache(path.dirname(resolved));
         return { added: true, picked: resolved, folders: listFolders() };
     },
 };
 
 // ─── Filesystem browser cache ────────────────────────────────────────────
-// Two reasons this exists:
-//   1. Each round-trip through the announce queue adds ~750ms-3s of
-//      transport latency. Re-listing the same drive after a back-click
-//      shouldn't pay that twice.
-//   2. `fs.readdirSync` + per-child `hasChildren` probe is ~5-50 ms on
-//      hot dirs and can spike to seconds on a slow USB/network drive.
-// Both transports (queue and any future direct LAN call) benefit.
+// Drive list and per-directory listings are stable for minutes — a folder
+// the user just opened is overwhelmingly likely to be re-opened in the
+// same picker session, and drives don't sprout and vanish every few
+// seconds. We use long TTLs and rely on explicit invalidation
+// (`invalidateDirectoryCache`) when our own `add_folder` mutates state.
+// Stale entries from the OS adding a USB drive or the user creating a
+// folder externally are corrected on the next picker open after TTL.
 
-const DRIVES_TTL_MS = 10_000;
-const DIR_TTL_MS = 30_000;
+const DRIVES_TTL_MS = 5 * 60_000;
+const DIR_TTL_MS = 5 * 60_000;
 const DIR_LRU_MAX = 200;
 
 let drivesCache: { at: number; value: DriveInfo[] } | null = null;
+let drivesInflight: Promise<DriveInfo[]> | null = null;
 
-type DirListing = ReturnType<typeof listDirectory>;
+type DirListing = Awaited<ReturnType<typeof listDirectory>>;
 // Map preserves insertion order → cheap LRU: delete + re-insert on hit.
 const dirCache = new Map<string, { at: number; value: DirListing }>();
+const dirInflight = new Map<string, Promise<DirListing>>();
 
-export function listDrivesCached(): DriveInfo[] {
+export async function listDrivesCached(): Promise<DriveInfo[]> {
     const now = Date.now();
     if (drivesCache && now - drivesCache.at < DRIVES_TTL_MS) return drivesCache.value;
-    const value = listDrives();
-    drivesCache = { at: now, value };
-    return value;
+    if (drivesInflight) return drivesInflight;
+    drivesInflight = (async () => {
+        try {
+            const value = await listDrives();
+            drivesCache = { at: Date.now(), value };
+            return value;
+        } finally {
+            drivesInflight = null;
+        }
+    })();
+    return drivesInflight;
 }
 
-export function listDirectoryCached(requested: string): DirListing {
+export async function listDirectoryCached(requested: string): Promise<DirListing> {
     const key = path.resolve(requested);
     const now = Date.now();
     const hit = dirCache.get(key);
@@ -213,13 +221,24 @@ export function listDirectoryCached(requested: string): DirListing {
         dirCache.set(key, hit);
         return hit.value;
     }
-    const value = listDirectory(requested);
-    dirCache.set(key, { at: now, value });
-    if (dirCache.size > DIR_LRU_MAX) {
-        const oldest = dirCache.keys().next().value;
-        if (oldest !== undefined) dirCache.delete(oldest);
-    }
-    return value;
+    // Coalesce concurrent requests for the same directory.
+    const pending = dirInflight.get(key);
+    if (pending) return pending;
+    const promise = (async () => {
+        try {
+            const value = await listDirectory(requested);
+            dirCache.set(key, { at: Date.now(), value });
+            if (dirCache.size > DIR_LRU_MAX) {
+                const oldest = dirCache.keys().next().value;
+                if (oldest !== undefined) dirCache.delete(oldest);
+            }
+            return value;
+        } finally {
+            dirInflight.delete(key);
+        }
+    })();
+    dirInflight.set(key, promise);
+    return promise;
 }
 
 export function invalidateDirectoryCache(p: string): void {
@@ -256,75 +275,109 @@ interface DriveInfo {
     total?: number;
 }
 
-function listDrives(): DriveInfo[] {
-    const drives: DriveInfo[] = [];
+function listDrives(): Promise<DriveInfo[]> {
+    if (process.platform === "win32") return listDrivesWin();
+    if (process.platform === "darwin") return listDrivesMac();
+    return listDrivesLinux();
+}
+
+// Windows: probe drive letters in parallel via async `fs.access`. This
+// completes in ~5-20 ms on a normal system — orders of magnitude faster
+// than spawning `powershell.exe` (which has a 300-1500 ms cold start) or
+// `wmic` (deprecated and missing on Win11 24H2+). We give up volume
+// labels and free-space numbers (cosmetic only — the picker only needs
+// the root paths to navigate), and kick off a background label refresh
+// that updates the cache transparently for the next picker open.
+async function listDrivesWin(): Promise<DriveInfo[]> {
     const home = os.homedir();
-    if (process.platform === "win32") {
-        // PowerShell is far more reliable than `wmic` on modern Windows
-        // (wmic is deprecated and missing on Win11 24H2+). We ask for the
-        // bare minimum and parse JSON. If it fails we fall back to a
-        // simple A:-Z: probe via fs.existsSync.
-        try {
-            const out = execFileSync(
-                "powershell.exe",
-                [
-                    "-NoProfile", "-NonInteractive", "-Command",
-                    "Get-PSDrive -PSProvider FileSystem | Select-Object Name,Root,DisplayRoot,Description,Used,Free | ConvertTo-Json -Compress",
-                ],
-                { encoding: "utf8", timeout: 5_000, stdio: ["ignore", "pipe", "pipe"] },
-            ).trim();
-            const parsed = JSON.parse(out.startsWith("[") ? out : `[${out}]`) as Array<{
-                Name?: string; Root?: string; DisplayRoot?: string | null;
-                Description?: string | null; Used?: number | null; Free?: number | null;
-            }>;
-            for (const d of parsed) {
-                const root = (d.Root ?? (d.Name ? `${d.Name}:\\` : "")).trim();
-                if (!root) continue;
-                const label = d.Description?.toString().trim() || d.DisplayRoot?.toString().trim() || root;
-                const used = typeof d.Used === "number" ? d.Used : 0;
-                const free = typeof d.Free === "number" ? d.Free : undefined;
-                const total = free !== undefined ? used + free : undefined;
-                drives.push({
-                    path: root,
-                    label: `${label} (${root.replace(/\\$/, "")})`,
-                    type: d.DisplayRoot ? "network" : "fixed",
-                    free, total,
-                });
-            }
-        } catch {
-            for (let c = "A".charCodeAt(0); c <= "Z".charCodeAt(0); c++) {
-                const letter = String.fromCharCode(c);
-                const root = `${letter}:\\`;
-                try { if (fs.existsSync(root)) drives.push({ path: root, label: root, type: "fixed" }); }
-                catch { /* ignore */ }
-            }
+    const letters: string[] = [];
+    for (let c = "A".charCodeAt(0); c <= "Z".charCodeAt(0); c++) letters.push(String.fromCharCode(c));
+    const probes = await Promise.all(letters.map(async (letter) => {
+        const root = `${letter}:\\`;
+        try { await fsp.access(root); return root; } catch { return null; }
+    }));
+    const drives: DriveInfo[] = [];
+    for (const root of probes) {
+        if (root) drives.push({ path: root, label: root, type: "fixed" });
+    }
+    drives.push({ path: home, label: `Home (${path.basename(home)})`, type: "home" });
+    // Best-effort background enrichment: ask PowerShell for friendly
+    // labels + sizes. When it returns we splice the data into the cache
+    // so the *next* picker open gets the nicer labels. Failure is silent.
+    void enrichWindowsDrives(drives);
+    return drives;
+}
+
+function enrichWindowsDrives(current: DriveInfo[]): void {
+    execFile(
+        "powershell.exe",
+        [
+            "-NoProfile", "-NonInteractive", "-Command",
+            "Get-PSDrive -PSProvider FileSystem | Select-Object Name,Root,DisplayRoot,Description,Used,Free | ConvertTo-Json -Compress",
+        ],
+        { encoding: "utf8", timeout: 4_000, maxBuffer: 1 << 20 },
+        (err, stdout) => {
+            if (err || !stdout) return;
+            try {
+                const trimmed = stdout.trim();
+                if (!trimmed) return;
+                const parsed = JSON.parse(trimmed.startsWith("[") ? trimmed : `[${trimmed}]`) as Array<{
+                    Name?: string; Root?: string; DisplayRoot?: string | null;
+                    Description?: string | null; Used?: number | null; Free?: number | null;
+                }>;
+                const byRoot = new Map<string, DriveInfo>();
+                for (const d of parsed) {
+                    const root = (d.Root ?? (d.Name ? `${d.Name}:\\` : "")).trim();
+                    if (!root) continue;
+                    const label = d.Description?.toString().trim() || d.DisplayRoot?.toString().trim() || root;
+                    const used = typeof d.Used === "number" ? d.Used : 0;
+                    const free = typeof d.Free === "number" ? d.Free : undefined;
+                    const total = free !== undefined ? used + free : undefined;
+                    byRoot.set(root, {
+                        path: root,
+                        label: `${label} (${root.replace(/\\$/, "")})`,
+                        type: d.DisplayRoot ? "network" : "fixed",
+                        free, total,
+                    });
+                }
+                if (byRoot.size === 0) return;
+                const enriched = current.map((d) => byRoot.get(d.path) ?? d);
+                drivesCache = { at: Date.now(), value: enriched };
+            } catch { /* ignore parse failures */ }
+        },
+    );
+}
+
+async function listDrivesMac(): Promise<DriveInfo[]> {
+    const home = os.homedir();
+    const drives: DriveInfo[] = [
+        { path: "/", label: "Macintosh HD (/)", type: "root" },
+        { path: home, label: `Home (${path.basename(home)})`, type: "home" },
+    ];
+    try {
+        const volumes = (await fsp.readdir("/Volumes", { withFileTypes: true }))
+            .filter((e) => (e.isDirectory() || e.isSymbolicLink()) && !e.name.startsWith("."));
+        for (const v of volumes) {
+            drives.push({ path: path.join("/Volumes", v.name), label: v.name, type: "removable" });
         }
-        drives.push({ path: home, label: `Home (${path.basename(home)})`, type: "home" });
-    } else if (process.platform === "darwin") {
-        drives.push({ path: "/", label: "Macintosh HD (/)", type: "root" });
-        drives.push({ path: home, label: `Home (${path.basename(home)})`, type: "home" });
+    } catch { /* ignore */ }
+    return drives;
+}
+
+async function listDrivesLinux(): Promise<DriveInfo[]> {
+    const home = os.homedir();
+    const drives: DriveInfo[] = [
+        { path: "/", label: "Root (/)", type: "root" },
+        { path: home, label: `Home (${path.basename(home)})`, type: "home" },
+    ];
+    for (const base of ["/mnt", "/media"]) {
         try {
-            const volumes = fs.readdirSync("/Volumes", { withFileTypes: true })
-                .filter((e) => e.isDirectory() || e.isSymbolicLink())
-                .filter((e) => !e.name.startsWith("."));
-            for (const v of volumes) {
-                const p = path.join("/Volumes", v.name);
-                drives.push({ path: p, label: v.name, type: "removable" });
+            await fsp.access(base);
+            const dirs = (await fsp.readdir(base, { withFileTypes: true })).filter((e) => e.isDirectory());
+            for (const d of dirs) {
+                drives.push({ path: path.join(base, d.name), label: `${d.name} (${base})`, type: "removable" });
             }
         } catch { /* ignore */ }
-    } else {
-        // Linux / other POSIX.
-        drives.push({ path: "/", label: "Root (/)", type: "root" });
-        drives.push({ path: home, label: `Home (${path.basename(home)})`, type: "home" });
-        for (const base of ["/mnt", "/media"]) {
-            try {
-                if (!fs.existsSync(base)) continue;
-                const dirs = fs.readdirSync(base, { withFileTypes: true }).filter((e) => e.isDirectory());
-                for (const d of dirs) {
-                    drives.push({ path: path.join(base, d.name), label: `${d.name} (${base})`, type: "removable" });
-                }
-            } catch { /* ignore */ }
-        }
     }
     return drives;
 }
@@ -340,41 +393,40 @@ function isHiddenName(name: string): boolean {
     return HIDDEN_PREFIXES_POSIX.some((p) => name.startsWith(p));
 }
 
-function listDirectory(requested: string): {
+async function listDirectory(requested: string): Promise<{
     path: string; parent: string | null; entries: Array<{ name: string; path: string; hasChildren: boolean | null }>; partial?: boolean;
-} {
+}> {
     const target = path.resolve(requested);
     let dirents: fs.Dirent[];
     try {
-        dirents = fs.readdirSync(target, { withFileTypes: true });
+        dirents = await fsp.readdir(target, { withFileTypes: true });
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         throw new Error(`Cannot read "${target}": ${msg}`);
     }
     let partial = false;
     const entries: Array<{ name: string; path: string; hasChildren: boolean | null }> = [];
-    for (const d of dirents) {
-        if (!d.isDirectory()) {
-            // Honour symlinks that point at directories. Stat may EACCES — skip silently.
-            if (d.isSymbolicLink()) {
-                try {
-                    const s = fs.statSync(path.join(target, d.name));
-                    if (!s.isDirectory()) continue;
-                } catch { partial = true; continue; }
-            } else continue;
-        }
-        if (isHiddenName(d.name)) continue;
-        const full = path.join(target, d.name);
-        let hasChildren: boolean | null = null;
+    // We deliberately do NOT probe each subdirectory for children: on
+    // Windows/USB/network drives that was N synchronous readdir calls per
+    // listing (a folder with 100 subdirs blocked the event loop for
+    // hundreds of ms to seconds). The UI shows every directory as
+    // potentially-expandable; the cost of one wasted click on a leaf
+    // folder is far cheaper than blocking every listing.
+    const symlinkChecks = dirents.map(async (d) => {
+        if (d.isDirectory()) return d;
+        if (!d.isSymbolicLink()) return null;
         try {
-            const inner = fs.readdirSync(full, { withFileTypes: true });
-            hasChildren = inner.some((c) => c.isDirectory() && !isHiddenName(c.name));
-        } catch { hasChildren = null; partial = true; }
-        entries.push({ name: d.name, path: full, hasChildren });
+            const s = await fsp.stat(path.join(target, d.name));
+            return s.isDirectory() ? d : null;
+        } catch { partial = true; return null; }
+    });
+    const resolved = await Promise.all(symlinkChecks);
+    for (const d of resolved) {
+        if (!d) continue;
+        if (isHiddenName(d.name)) continue;
+        entries.push({ name: d.name, path: path.join(target, d.name), hasChildren: true });
     }
     entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }));
-    // Parent is null at a drive root: on Windows `path.dirname("C:\\")` returns `C:\` again;
-    // on POSIX `path.dirname("/")` returns `/`. Compare normalized strings.
     const parentRaw = path.dirname(target);
     const parent = path.resolve(parentRaw) === target ? null : parentRaw;
     return { path: target, parent, entries, partial: partial || undefined };
