@@ -1,5 +1,11 @@
 # Changelog — MMO Companion
 
+## 1.1.0
+
+### Minor Changes
+
+- c82abbf: Bootstrap Changesets for unified version + changelog management across the monorepo. Each package keeps its own release pipeline; this just standardises how we record user-facing changes.
+
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
 ## 1.0.4 — simplified main view + audio setup consolidation
