@@ -87,7 +87,9 @@ const nextConfig: NextConfig = {
             "img-src 'self' data: blob: https:",
             "media-src 'self' blob: https:",
             // SSE relay, devices, sync, Auth.js callbacks, Stripe webhooks.
-            "connect-src 'self' http://localhost:* https: wss: ws:",
+            // Companion probes hit 127.0.0.1 (default for native fetches on
+            // some browsers when the URL is typed without DNS) and localhost.
+            "connect-src 'self' http://localhost:* http://127.0.0.1:* https: wss: ws:",
             // Stripe Elements + Auth.js Google one-tap iframes.
             "frame-src 'self' https://js.stripe.com https://accounts.google.com https://hooks.stripe.com",
             "frame-ancestors 'self'",
