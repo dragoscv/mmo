@@ -2,6 +2,10 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.5 — manual update check button
+
+- **UI**: added a small refresh button (↻) next to the version footer that triggers an on-demand update check. Surfaces "Checking… / Up to date / Downloading… / Update ready" inline so the user can pull a release immediately instead of waiting for the 4-hour background recheck.
+
 ## 1.0.4 — simplified main view + audio setup consolidation
 
 - **UI**: removed the "Music Folders" section and the "Folders" stat from the main view. Library folders are managed end-to-end from the web app at https://muzicai.ro/devices (pick, scan, remove, watch toggle, per-folder progress), so the companion no longer duplicates that UI.

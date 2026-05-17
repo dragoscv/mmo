@@ -801,6 +801,54 @@
             flex-shrink: 0;
         }
 
+        .version-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 8px 0;
+            flex-shrink: 0;
+        }
+
+        .version-row .version {
+            padding: 0;
+        }
+
+        .btn-version-refresh {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            border-radius: 4px;
+            width: 22px;
+            height: 22px;
+            font-size: 12px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: color .15s, border-color .15s, transform .4s;
+        }
+
+        .btn-version-refresh:hover:not(:disabled) {
+            color: var(--text);
+            border-color: var(--text);
+        }
+
+        .btn-version-refresh:disabled {
+            cursor: default;
+            opacity: .6;
+        }
+
+        .btn-version-refresh.spinning {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         #view-auth,
         #view-main {
             display: none;
@@ -1159,7 +1207,11 @@
                 Disconnect Account
             </button>
         </div>
-        <div class="version" id="version-text">MMO Companion</div>
+        <div class="version-row">
+            <div class="version" id="version-text">MMO Companion</div>
+            <button id="btn-check-update" type="button" class="btn-version-refresh"
+                title="Check for updates" aria-label="Check for updates">↻</button>
+        </div>
         <button id="install-update-btn" type="button"
             style="display:none;margin:6px auto 0;padding:6px 12px;border:0;border-radius:6px;background:#22c55e;color:#fff;font-weight:600;cursor:pointer;">
             Install update &amp; restart
@@ -1819,22 +1871,74 @@
         }
 
         // Listen for auto-update notifications
+        let updateCheckResetTimer = null;
+        function setVersionText(text, color) {
+            const ver = document.getElementById("version-text");
+            if (!ver) return;
+            ver.textContent = text;
+            ver.style.color = color || "";
+        }
+        function restoreVersionText() {
+            window.mmo.getStatus().then(renderVersion).catch(() => { });
+        }
         if (window.mmo.onUpdateStatus) {
             window.mmo.onUpdateStatus(function (data) {
-                const ver = document.getElementById("version-text");
                 const btn = document.getElementById("install-update-btn");
-                if (data.status === "available") {
-                    ver.textContent = "Downloading update v" + data.version + "...";
-                    ver.style.color = "#a855f7";
+                const refresh = document.getElementById("btn-check-update");
+                if (data.status === "checking") {
+                    setVersionText("Checking for updates…", "#a855f7");
+                    if (refresh) { refresh.classList.add("spinning"); refresh.disabled = true; }
+                } else if (data.status === "current") {
+                    setVersionText("Up to date (v" + data.version + ")", "#22c55e");
+                    if (refresh) { refresh.classList.remove("spinning"); refresh.disabled = false; }
+                    if (updateCheckResetTimer) clearTimeout(updateCheckResetTimer);
+                    updateCheckResetTimer = setTimeout(restoreVersionText, 4000);
+                } else if (data.status === "available") {
+                    setVersionText("Downloading update v" + data.version + "…", "#a855f7");
                     if (btn) btn.style.display = "none";
+                    if (refresh) { refresh.classList.remove("spinning"); refresh.disabled = false; }
                 } else if (data.status === "downloading") {
-                    ver.textContent = "Downloading update... " + data.percent + "%";
-                    ver.style.color = "#a855f7";
+                    setVersionText("Downloading update… " + data.percent + "%", "#a855f7");
                     if (btn) btn.style.display = "none";
                 } else if (data.status === "ready") {
-                    ver.textContent = "Update v" + data.version + " ready";
-                    ver.style.color = "#22c55e";
+                    setVersionText("Update v" + data.version + " ready", "#22c55e");
                     if (btn) btn.style.display = "inline-block";
+                } else if (data.status === "error") {
+                    setVersionText("Update check failed", "#ef4444");
+                    if (refresh) { refresh.classList.remove("spinning"); refresh.disabled = false; refresh.title = "Check for updates — last error: " + (data.error || "unknown"); }
+                    if (updateCheckResetTimer) clearTimeout(updateCheckResetTimer);
+                    updateCheckResetTimer = setTimeout(restoreVersionText, 5000);
+                }
+            });
+        }
+
+        // Manual update-check button next to the version text.
+        const checkBtn = document.getElementById("btn-check-update");
+        if (checkBtn && window.mmo.checkForUpdates) {
+            checkBtn.addEventListener("click", async function () {
+                if (checkBtn.disabled) return;
+                checkBtn.disabled = true;
+                checkBtn.classList.add("spinning");
+                setVersionText("Checking for updates…", "#a855f7");
+                try {
+                    const result = await window.mmo.checkForUpdates();
+                    // The `checking` / `available` / `current` events already
+                    // drive the version text. Only surface errors that the
+                    // updater swallowed (e.g. no network) ourselves.
+                    if (result && result.ok === false) {
+                        setVersionText("Update check failed", "#ef4444");
+                        checkBtn.title = "Check for updates — last error: " + (result.error || "unknown");
+                        if (updateCheckResetTimer) clearTimeout(updateCheckResetTimer);
+                        updateCheckResetTimer = setTimeout(restoreVersionText, 5000);
+                    }
+                } catch (err) {
+                    setVersionText("Update check failed", "#ef4444");
+                    checkBtn.title = "Check for updates — " + (err && err.message ? err.message : String(err));
+                    if (updateCheckResetTimer) clearTimeout(updateCheckResetTimer);
+                    updateCheckResetTimer = setTimeout(restoreVersionText, 5000);
+                } finally {
+                    checkBtn.disabled = false;
+                    checkBtn.classList.remove("spinning");
                 }
             });
         }
