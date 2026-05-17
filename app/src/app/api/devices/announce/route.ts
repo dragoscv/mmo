@@ -1,14 +1,16 @@
 /**
  * POST /api/devices/announce
  *
- * Called by the companion at startup (and after network changes — Wi-Fi
- * roam, VPN toggle) to publish its non-loopback LAN URL. The web app
- * stores it in `devices.lan_url` so the user's other devices (tablet,
- * TV, second laptop) can reach this companion without mDNS / Bonjour
- * support in the browser.
+ * Dual purpose:
+ *   1. Heartbeat — sets devices.status=online + lastSeenAt every tick.
+ *      Vercel can't probe the user's LAN, so this push is the only
+ *      liveness signal for /devices.
+ *   2. Command channel — carries pending companion commands (folder
+ *      picker, audio enumeration, etc.) in the response, and accepts
+ *      results posted from the companion in the request body. See
+ *      lib/device-commands.ts for the WHY.
  *
- * Auth: bearer device token. SSRF defence via `validateDeviceLanUrl`
- * — only RFC1918 + IPv6 ULA hosts are accepted.
+ * Auth: bearer device token. SSRF defence via `validateDeviceLanUrl`.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,9 +20,16 @@ import { eq } from "drizzle-orm";
 import { requireRate } from "@/lib/api-guard";
 import { findDeviceByToken } from "@/lib/device-token";
 import { validateDeviceLanUrl } from "@/lib/url-guard";
+import {
+    claimPendingCommands,
+    recordCommandResults,
+    type IncomingCommandResult,
+} from "@/lib/device-commands";
 
 export async function POST(request: NextRequest) {
-    const blocked = requireRate(request, { bucket: "device-announce", windowMs: 60_000, max: 30 });
+    // Bumped from 30 to 240/min since announce now doubles as a ~3s
+    // command poll. Per-device, so multi-device users scale fine.
+    const blocked = requireRate(request, { bucket: "device-announce", windowMs: 60_000, max: 240 });
     if (blocked) return blocked;
 
     const body = await request.json().catch(() => null) as {
@@ -29,6 +38,7 @@ export async function POST(request: NextRequest) {
         hostname?: string;
         os?: string;
         version?: string;
+        results?: IncomingCommandResult[];
     } | null;
 
     if (!body || typeof body !== "object" || typeof body.token !== "string") {
@@ -40,11 +50,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // The announce loop doubles as our heartbeat: every successful
-    // call refreshes `status` + `lastSeenAt`, which is how /devices
-    // decides whether to render the green dot. Vercel can't reach the
-    // user's LAN to do an active /health probe, so this push-based
-    // signal is the only reliable liveness source.
+    // Persist any command results the companion is reporting BEFORE we
+    // hand it new work, so awaiting server actions wake up faster.
+    if (Array.isArray(body.results) && body.results.length > 0) {
+        await recordCommandResults(device.id, body.results);
+    }
+
     const baseUpdate = {
         status: "online" as const,
         lastSeenAt: new Date(),
@@ -56,23 +67,30 @@ export async function POST(request: NextRequest) {
             ? body.version : device.version,
     };
 
-    // Allow `lanUrl: null` to clear a previously-announced LAN URL
-    // (companion went headless / VPN-only).
     if (body.lanUrl === null) {
         await db.update(devices)
             .set({ ...baseUpdate, lanUrl: null, lanAnnouncedAt: new Date() })
             .where(eq(devices.id, device.id));
-        return NextResponse.json({ ok: true, cleared: true, name: device.name });
+        const commands = await claimPendingCommands(device.id);
+        return NextResponse.json({ ok: true, cleared: true, name: device.name, commands });
     }
 
-    const lanUrl = validateDeviceLanUrl(body.lanUrl);
-    if (!lanUrl) {
-        return NextResponse.json({ error: "Invalid lanUrl (must be private RFC1918 / ULA)" }, { status: 400 });
+    if (body.lanUrl !== undefined) {
+        const lanUrl = validateDeviceLanUrl(body.lanUrl);
+        if (!lanUrl) {
+            return NextResponse.json({ error: "Invalid lanUrl (must be private RFC1918 / ULA)" }, { status: 400 });
+        }
+        await db.update(devices)
+            .set({ ...baseUpdate, lanUrl, lanAnnouncedAt: new Date() })
+            .where(eq(devices.id, device.id));
+        const commands = await claimPendingCommands(device.id);
+        return NextResponse.json({ ok: true, lanUrl, name: device.name, commands });
     }
 
+    // No lanUrl in body — heartbeat + results-only ack.
     await db.update(devices)
-        .set({ ...baseUpdate, lanUrl, lanAnnouncedAt: new Date() })
+        .set(baseUpdate)
         .where(eq(devices.id, device.id));
-
-    return NextResponse.json({ ok: true, lanUrl, name: device.name });
+    const commands = await claimPendingCommands(device.id);
+    return NextResponse.json({ ok: true, name: device.name, commands });
 }

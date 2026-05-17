@@ -8,7 +8,7 @@ import os from "node:os";
 import { EventEmitter } from "node:events";
 import { WebSocketServer, WebSocket } from "ws";
 import { dialog, BrowserWindow } from "electron";
-import { store, getSettings, updateSettings, type AuthorizedAudioDevice } from "./store";
+import { store, getSettings, updateSettings, FOLDER_KINDS, type AuthorizedAudioDevice, type FolderKind } from "./store";
 import {
     NativeAudioEngine,
     listBackends,
@@ -472,6 +472,7 @@ export async function startServer(): Promise<void> {
                 path: f.path,
                 exists: fs.existsSync(f.path),
                 label: path.basename(f.path) || f.path,
+                kind: f.kind ?? "music",
                 watch: !!f.watch,
                 watchActive: !!watcherStatuses.get(f.path)?.active,
                 watchEvents: watcherStatuses.get(f.path)?.eventsSeen ?? 0,
@@ -489,8 +490,11 @@ export async function startServer(): Promise<void> {
      * The dialog is shown on the focused or main window so it's modal and
      * the user can't accidentally pick folders for the wrong device.
      */
-    app.post("/folders/pick", authMiddleware, async (_req, res) => {
+    app.post("/folders/pick", authMiddleware, async (req, res) => {
         try {
+            const desiredKind = (req.body && typeof (req.body as { kind?: unknown }).kind === "string"
+                && (FOLDER_KINDS as readonly string[]).includes((req.body as { kind: string }).kind))
+                ? ((req.body as { kind: FolderKind }).kind) : "music";
             const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
             const result = win
                 ? await dialog.showOpenDialog(win, {
@@ -510,7 +514,7 @@ export async function startServer(): Promise<void> {
             const picked = path.resolve(result.filePaths[0]);
             const folders = settings.scanFolders;
             if (!folders.some((f) => f.path === picked)) {
-                folders.push({ path: picked, watch: false });
+                folders.push({ path: picked, watch: false, kind: desiredKind });
                 store.set("scanFolders", folders);
             }
             res.json({ canceled: false, picked, folders });
@@ -566,6 +570,28 @@ export async function startServer(): Promise<void> {
             void stopWatcher(folderPath);
             res.json({ success: true, folders, watcher: null });
         }
+    });
+
+    /** Set the purpose label (music/movies/tv-shows/...) on a folder. */
+    app.post("/folders/kind", authMiddleware, (req, res) => {
+        const { path: folderPath, kind } = req.body as { path?: string; kind?: string };
+        if (!folderPath || typeof folderPath !== "string") {
+            res.status(400).json({ error: "Invalid folder path" });
+            return;
+        }
+        if (!kind || !(FOLDER_KINDS as readonly string[]).includes(kind)) {
+            res.status(400).json({ error: "Invalid kind" });
+            return;
+        }
+        const folders = settings.scanFolders.map((f) =>
+            f.path === folderPath ? { ...f, kind: kind as FolderKind } : f,
+        );
+        if (!folders.some((f) => f.path === folderPath)) {
+            res.status(404).json({ error: "Folder not configured" });
+            return;
+        }
+        store.set("scanFolders", folders);
+        res.json({ success: true, folders });
     });
 
     // ─── Scan Folder ─────────────────────────────────────────────────────

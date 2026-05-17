@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Cloud→companion command queue + folder kinds (companion v1.0.11)
+
+- **Command queue (`app/src/lib/device-commands.ts` + `app/drizzle/0014_device_commands.sql`)** — fixes the long-standing failure where **Pick Folder** and **Audio Devices** never worked from https://muzicai.ro (Vercel can't reach the user's LAN, browsers block mixed-content + Private Network Access). Server actions now enqueue rows in `device_commands`, the companion drains them via the existing `/api/devices/announce` heartbeat response, executes them locally, and posts results back on the next tick. No new endpoints; the heartbeat is the bidirectional transport. Announce rate-limit bumped 30→240/min to accommodate the 3-second cadence (burst mode drops to 0.75 s for ~20 s after a command, so multi-step flows feel instant).
+- **Folder kinds (music / movies / tv-shows / samples / recordings / other)** — every library folder now carries a `kind` label so downstream features (DJ library, samples panel, etc.) can ignore folders that aren't theirs. The picker in `/devices` exposes a dropdown to choose the kind for the next pick, and each row has an inline selector to re-label later. Legacy folders auto-migrate to `"music"`.
+- **`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`** added to all five release/CI workflows so the GitHub Actions runner stops warning about deprecated Node.js 20 actions without pinning every action to a new major.
+
 ### Added — Native shells + extension CI/CD (multi-pillar release plan)
 
 - **`apps/native/`** — Tauri 2 (desktop) + Capacitor (mobile) shells that wrap https://muzicai.ro. Loads the live origin so updates ship without app-store re-review; the Next.js PWA service worker handles offline. Released via `native-v*` tags through `.github/workflows/native-release.yml` (Win/Mac/Linux Tauri bundles, Android apk/aab, iOS xcarchive/ipa). All store-publishing and code-signing steps are gated on optional secrets and skip gracefully.

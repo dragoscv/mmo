@@ -11,6 +11,10 @@ on:
             - "apps/extension/**"
             - ".github/workflows/extension-ci.yml"
 
+# Run JavaScript-based actions on Node 24 (GitHub default starting 2026-06-02).
+env:
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
     group: extension-ci-${{ github.ref }}
     cancel-in-progress: true

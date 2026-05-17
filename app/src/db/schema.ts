@@ -143,6 +143,38 @@ export const devices = pgTable("devices", {
     createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ─── Device command queue ───────────────────────────────────────────────────
+//
+// Cloud→companion RPC. The browser/server enqueues a row; the companion
+// drains it via /api/devices/announce response and posts a result back.
+// See drizzle/0014_device_commands.sql for the WHY (mixed-content + PNA).
+export const deviceCommands = pgTable(
+    "device_commands",
+    {
+        id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+        deviceId: text("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+        /** Stable opcode the companion's command worker switches on. */
+        kind: text("kind").notNull(),
+        /** Arbitrary JSON body, command-specific. */
+        payload: jsonb("payload"),
+        /** pending | dispatched | done | error | expired */
+        status: text("status").notNull().default("pending"),
+        /** Successful result payload (kind-specific). */
+        result: jsonb("result"),
+        /** Human-readable failure reason when status='error'. */
+        error: text("error"),
+        createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+        dispatchedAt: timestamp("dispatched_at", { withTimezone: true }),
+        completedAt: timestamp("completed_at", { withTimezone: true }),
+        /** Set to now()+5min on insert; the announce route lazily expires. */
+        expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    },
+    (t) => [
+        index("device_commands_dispatch_idx").on(t.deviceId, t.status, t.createdAt),
+        index("device_commands_status_idx").on(t.status, t.expiresAt),
+    ],
+);
+
 export const deviceFolders = pgTable("device_folders", {
     id: serial("id").primaryKey(),
     deviceId: text("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),

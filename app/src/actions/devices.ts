@@ -12,8 +12,22 @@ import {
     type CompanionFolder,
     type CompanionAudioInventory,
     type CompanionScanJob,
+    type FolderKind,
 } from "@/lib/companion-control";
 import { issueDeviceToken, materializeDeviceToken } from "@/lib/device-token";
+import { enqueueDeviceCommand } from "@/lib/device-commands";
+
+/** Confirm the caller owns this device. Used by every command-queue
+ *  action below so a signed-in user can't enqueue work for someone
+ *  else's device. */
+async function assertDeviceOwnership(deviceId: string): Promise<string | null> {
+    const session = await auth();
+    if (!session?.user?.id) return "Not authenticated";
+    const rows = await db.select({ id: devices.id }).from(devices)
+        .where(and(eq(devices.id, deviceId), eq(devices.userId, session.user.id)))
+        .limit(1);
+    return rows[0] ? null : "Device not found";
+}
 
 // NOTE: Next.js 16 forbids re-exporting types from `"use server"` files —
 // every export must be an async function. Client components import the
@@ -383,8 +397,11 @@ export async function getLocalCompanion(): Promise<{ apiUrl: string; token: stri
 // per-folder stats; new flows ignore it.
 
 export async function getCompanionFolders(deviceId: string): Promise<CompanionFolder[]> {
-    try { return await companionControl.listFolders(deviceId); }
-    catch { return []; }
+    if (await assertDeviceOwnership(deviceId)) return [];
+    const r = await enqueueDeviceCommand<{ folders: CompanionFolder[] }>(
+        deviceId, "list_folders", null, { timeoutMs: 8_000 },
+    );
+    return r.ok ? (r.result?.folders ?? []) : [];
 }
 
 /** Triggers the companion's native OS folder picker. Returns the new
@@ -392,26 +409,32 @@ export async function getCompanionFolders(deviceId: string): Promise<CompanionFo
  *  argument — that's the whole point: no manual entry. */
 export async function pickCompanionFolder(
     deviceId: string,
+    kind: FolderKind = "music",
 ): Promise<
     | { canceled: true }
     | { canceled: false; picked: string; folders: CompanionFolder[] }
     | { error: string }
 > {
-    try {
-        const r = await companionControl.pickFolder(deviceId);
-        if (r.canceled) return { canceled: true };
-        return { canceled: false, picked: r.picked!, folders: r.folders };
-    } catch (e) {
-        return { error: e instanceof Error ? e.message : String(e) };
-    }
+    const err = await assertDeviceOwnership(deviceId);
+    if (err) return { error: err };
+    // Long timeout — the user may take a while to choose a folder. The
+    // companion side also caps its own dialog wait at ~2 min.
+    const r = await enqueueDeviceCommand<
+        { canceled: true } | { canceled: false; picked: string; folders: CompanionFolder[] }
+    >(deviceId, "pick_folder", { kind }, { timeoutMs: 120_000 });
+    if (!r.ok) return { error: r.error ?? "Pick folder failed" };
+    return r.result!;
 }
 
 export async function removeCompanionFolder(
     deviceId: string,
     folderPath: string,
 ): Promise<CompanionFolder[]> {
-    try { return await companionControl.removeFolder(deviceId, folderPath); }
-    catch { return []; }
+    if (await assertDeviceOwnership(deviceId)) return [];
+    const r = await enqueueDeviceCommand<{ folders: CompanionFolder[] }>(
+        deviceId, "remove_folder", { path: folderPath }, { timeoutMs: 8_000 },
+    );
+    return r.ok ? (r.result?.folders ?? []) : [];
 }
 
 /**
@@ -424,12 +447,28 @@ export async function setCompanionFolderWatch(
     folderPath: string,
     watch: boolean,
 ): Promise<{ success: true; folders: CompanionFolder[] } | { error: string }> {
-    try {
-        const folders = await companionControl.setFolderWatch(deviceId, folderPath, watch);
-        return { success: true, folders };
-    } catch (e) {
-        return { error: e instanceof Error ? e.message : String(e) };
-    }
+    const err = await assertDeviceOwnership(deviceId);
+    if (err) return { error: err };
+    const r = await enqueueDeviceCommand<{ folders: CompanionFolder[] }>(
+        deviceId, "set_folder_watch", { path: folderPath, watch }, { timeoutMs: 8_000 },
+    );
+    if (!r.ok) return { error: r.error ?? "Failed to toggle watcher" };
+    return { success: true, folders: r.result?.folders ?? [] };
+}
+
+/** Update the purpose label of a folder (music / movies / tv-shows / ...). */
+export async function setCompanionFolderKind(
+    deviceId: string,
+    folderPath: string,
+    kind: FolderKind,
+): Promise<{ success: true; folders: CompanionFolder[] } | { error: string }> {
+    const err = await assertDeviceOwnership(deviceId);
+    if (err) return { error: err };
+    const r = await enqueueDeviceCommand<{ folders: CompanionFolder[] }>(
+        deviceId, "set_folder_kind", { path: folderPath, kind }, { timeoutMs: 8_000 },
+    );
+    if (!r.ok) return { error: r.error ?? "Failed to update folder kind" };
+    return { success: true, folders: r.result?.folders ?? [] };
 }
 
 // ─── Async scan jobs (refresh-resilient progress) ──────────────────────────
@@ -582,18 +621,24 @@ export async function pollCompanionWatchEvents(
 export async function getCompanionAudioInventory(
     deviceId: string,
 ): Promise<CompanionAudioInventory | { error: string }> {
-    try { return await companionControl.getAudioInventory(deviceId); }
-    catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
+    const err = await assertDeviceOwnership(deviceId);
+    if (err) return { error: err };
+    const r = await enqueueDeviceCommand<CompanionAudioInventory>(
+        deviceId, "list_audio_devices", null, { timeoutMs: 15_000 },
+    );
+    if (!r.ok) return { error: r.error ?? "Audio enumeration failed" };
+    return r.result!;
 }
 
 export async function setCompanionAuthorizedAudioDevices(
     deviceId: string,
     list: AuthorizedAudioDevice[],
 ): Promise<{ success: true; authorized: AuthorizedAudioDevice[] } | { error: string }> {
-    try {
-        const authorized = await companionControl.setAuthorizedAudioDevices(deviceId, list);
-        return { success: true, authorized };
-    } catch (e) {
-        return { error: e instanceof Error ? e.message : String(e) };
-    }
+    const err = await assertDeviceOwnership(deviceId);
+    if (err) return { error: err };
+    const r = await enqueueDeviceCommand<{ authorized: AuthorizedAudioDevice[] }>(
+        deviceId, "set_authorized_audio_devices", { devices: list }, { timeoutMs: 8_000 },
+    );
+    if (!r.ok) return { error: r.error ?? "Failed to authorize audio devices" };
+    return { success: true, authorized: r.result?.authorized ?? [] };
 }

@@ -17,9 +17,24 @@ export interface AuthorizedAudioDevice {
     preferredSampleRate?: number;
 }
 
+/** Categorical purpose of a music folder. Drives UI grouping and (eventually)
+ *  which file-type pipeline handles new files (audio scanner vs. video). */
+export type FolderKind = "music" | "movies" | "tv-shows" | "samples" | "recordings" | "other";
+
+export const FOLDER_KINDS: ReadonlyArray<FolderKind> = [
+    "music", "movies", "tv-shows", "samples", "recordings", "other",
+];
+
+function normalizeFolderKind(raw: unknown): FolderKind {
+    return typeof raw === "string" && (FOLDER_KINDS as readonly string[]).includes(raw)
+        ? raw as FolderKind
+        : "music";
+}
+
 /**
  * A music folder configured on this companion. Stored shape evolved from
- * `string` → `{ path, watch? }` so older installs are migrated on read.
+ * `string` → `{ path, watch? }` → `{ path, watch?, kind? }` so older
+ * installs are migrated on read.
  */
 export interface FolderConfig {
     path: string;
@@ -27,6 +42,9 @@ export interface FolderConfig {
      *  scan ingestion pipeline so newly-dropped files appear in the
      *  library without an explicit re-scan. */
     watch?: boolean;
+    /** Purpose of the folder (music / movies / tv-shows / …). Defaults
+     *  to "music" for legacy entries that pre-date the field. */
+    kind?: FolderKind;
 }
 
 export interface CompanionSettings {
@@ -90,11 +108,12 @@ function readScanFolders(): FolderConfig[] {
     const out: FolderConfig[] = [];
     for (const entry of raw) {
         if (typeof entry === "string") {
-            out.push({ path: entry, watch: false });
+            out.push({ path: entry, watch: false, kind: "music" });
         } else if (entry && typeof entry === "object" && typeof (entry as { path?: unknown }).path === "string") {
             out.push({
                 path: (entry as { path: string }).path,
                 watch: !!(entry as { watch?: boolean }).watch,
+                kind: normalizeFolderKind((entry as { kind?: unknown }).kind),
             });
         }
     }

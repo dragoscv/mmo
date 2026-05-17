@@ -19,6 +19,10 @@ permissions:
   contents: write
   pull-requests: write
 
+# Run JavaScript-based actions on Node 24 (GitHub default starting 2026-06-02).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   version:
     name: Open / update Version PR

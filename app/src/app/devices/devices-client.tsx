@@ -23,6 +23,7 @@
 import { useState, useTransition, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -70,18 +71,31 @@ import {
     getCompanionAudioInventory,
     setCompanionAuthorizedAudioDevices,
     setCompanionFolderWatch,
+    setCompanionFolderKind,
     startCompanionScan,
     getCompanionScanJob,
     listCompanionScanJobs,
     ingestCompanionScanJob,
     pollCompanionWatchEvents,
 } from "@/actions/devices";
-import type {
-    CompanionFolder,
-    CompanionAudioInventory,
-    AuthorizedAudioDevice,
-    CompanionScanJob,
+import {
+    FOLDER_KINDS,
+    type CompanionFolder,
+    type CompanionAudioInventory,
+    type AuthorizedAudioDevice,
+    type CompanionScanJob,
+    type FolderKind,
 } from "@/lib/companion-control";
+
+/** Human-readable labels for folder kinds shown in the picker + badge. */
+const FOLDER_KIND_LABELS: Record<FolderKind, string> = {
+    music: "Music",
+    movies: "Movies",
+    "tv-shows": "TV Shows",
+    samples: "Samples",
+    recordings: "Recordings",
+    other: "Other",
+};
 
 interface DevicesClientProps {
     initialDevices: Device[];
@@ -115,6 +129,8 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
     const watchHighWatermark = useRef<Record<string, number>>({});
     const [pickingFolder, setPickingFolder] = useState<string | null>(null);
     const [togglingWatch, setTogglingWatch] = useState<string | null>(null);
+    /** Per-device kind to apply to the next picked folder. Defaults to music. */
+    const [pickKindByDevice, setPickKindByDevice] = useState<Record<string, FolderKind>>({});
     const [editingName, setEditingName] = useState<string | null>(null);
     const [editNameValue, setEditNameValue] = useState("");
     const [openSection, setOpenSection] = useState<Record<string, "folders" | "audio" | null>>({});
@@ -181,15 +197,24 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
 
     async function handlePickFolder(deviceId: string) {
         setPickingFolder(deviceId);
+        const kind = pickKindByDevice[deviceId] ?? "music";
         try {
-            const r = await pickCompanionFolder(deviceId);
+            const r = await pickCompanionFolder(deviceId, kind);
             if ("error" in r) { toast.error(r.error); return; }
             if (r.canceled) { toast.info("No folder picked"); return; }
             setFolders((p) => ({ ...p, [deviceId]: r.folders }));
-            toast.success(`Added ${r.picked}`);
+            toast.success(`Added ${r.picked} (${FOLDER_KIND_LABELS[kind]})`);
         } finally {
             setPickingFolder(null);
         }
+    }
+
+    function handleChangeFolderKind(deviceId: string, folderPath: string, kind: FolderKind) {
+        startTransition(async () => {
+            const r = await setCompanionFolderKind(deviceId, folderPath, kind);
+            if ("error" in r) { toast.error(r.error); return; }
+            setFolders((p) => ({ ...p, [deviceId]: r.folders }));
+        });
     }
 
     function handleRemoveFolder(deviceId: string, folderPath: string) {
@@ -462,6 +487,8 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                                                 isPicking={pickingFolder === device.id}
                                                 scanProgress={scanProgress}
                                                 togglingWatch={togglingWatch}
+                                                pickKind={pickKindByDevice[device.id] ?? "music"}
+                                                onPickKindChange={(k) => setPickKindByDevice((p) => ({ ...p, [device.id]: k }))}
                                                 onPick={() => handlePickFolder(device.id)}
                                                 onScan={(p) => handleScanFolder(device.id, p)}
                                                 onRemove={(p) => handleRemoveFolder(device.id, p)}
@@ -469,6 +496,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                                                     for (const f of dFolders) handleScanFolder(device.id, f.path);
                                                 }}
                                                 onToggleWatch={(p, w) => handleToggleWatch(device.id, p, w)}
+                                                onChangeKind={(p, k) => handleChangeFolderKind(device.id, p, k)}
                                             />
                                         </motion.div>
                                     )}
@@ -672,34 +700,52 @@ interface FolderSectionProps {
     isPicking: boolean;
     scanProgress: Record<string, CompanionScanJob>;
     togglingWatch: string | null;
+    pickKind: FolderKind;
+    onPickKindChange: (k: FolderKind) => void;
     onPick: () => void;
     onScan: (path: string) => void;
     onRemove: (path: string) => void;
     onScanAll: () => void;
     onToggleWatch: (path: string, watch: boolean) => void;
+    onChangeKind: (path: string, kind: FolderKind) => void;
 }
 
 function FolderSection({
     folders, isOnline, isPicking, scanProgress, togglingWatch,
-    onPick, onScan, onRemove, onScanAll, onToggleWatch,
+    pickKind, onPickKindChange,
+    onPick, onScan, onRemove, onScanAll, onToggleWatch, onChangeKind,
 }: FolderSectionProps) {
     const anyScanning = Object.values(scanProgress).some(
         (j) => j.status !== "complete" && j.status !== "error" && j.status !== "canceled",
     );
     return (
         <div className="space-y-3 border-t border-border pt-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
                 <h4 className="text-sm font-medium">Library Folders</h4>
-                <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={onPick}
-                    disabled={!isOnline || isPicking}
-                    title={isOnline ? "Open folder picker on the companion" : "Device offline"}
-                >
-                    {isPicking ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FolderPlus className="mr-1 h-3 w-3" />}
+                <div className="flex items-center gap-1.5">
+                    <Select
+                        size="sm"
+                        value={pickKind}
+                        onChange={(e) => onPickKindChange(e.target.value as FolderKind)}
+                        disabled={!isOnline || isPicking}
+                        title="Folder purpose for the next pick"
+                        className="h-7"
+                    >
+                        {FOLDER_KINDS.map((k) => (
+                            <option key={k} value={k}>{FOLDER_KIND_LABELS[k]}</option>
+                        ))}
+                    </Select>
+                    <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={onPick}
+                        disabled={!isOnline || isPicking}
+                        title={isOnline ? "Open folder picker on the companion" : "Device offline"}
+                    >
+                        {isPicking ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FolderPlus className="mr-1 h-3 w-3" />}
                     Pick Folder…
-                </Button>
+                    </Button>
+                </div>
             </div>
 
             {folders.length === 0 ? (
@@ -722,6 +768,7 @@ function FolderSection({
                                 onScan={() => onScan(folder.path)}
                                 onRemove={() => onRemove(folder.path)}
                                 onToggleWatch={(w) => onToggleWatch(folder.path, w)}
+                                onChangeKind={(k) => onChangeKind(folder.path, k)}
                             />
                         ))}
                     </AnimatePresence>
@@ -759,10 +806,11 @@ interface FolderRowProps {
     onScan: () => void;
     onRemove: () => void;
     onToggleWatch: (watch: boolean) => void;
+    onChangeKind: (kind: FolderKind) => void;
 }
 
 function FolderRow({
-    folder, isOnline, togglingWatch, progress, onScan, onRemove, onToggleWatch,
+    folder, isOnline, togglingWatch, progress, onScan, onRemove, onToggleWatch, onChangeKind,
 }: FolderRowProps) {
     const isScanning = progress
         && progress.status !== "complete"
@@ -802,6 +850,21 @@ function FolderRow({
                         <p className="text-[11px] text-amber-400">Folder no longer exists on the companion</p>
                     )}
                 </div>
+
+                {/* Folder purpose (music/movies/tv-shows/...) — drives downstream
+                    behaviour (e.g. only "music" folders feed the DJ library). */}
+                <Select
+                    size="sm"
+                    value={folder.kind ?? "music"}
+                    onChange={(e) => onChangeKind(e.target.value as FolderKind)}
+                    disabled={!isOnline}
+                    title="Folder purpose"
+                    className="h-7 w-[110px] shrink-0"
+                >
+                    {FOLDER_KINDS.map((k) => (
+                        <option key={k} value={k}>{FOLDER_KIND_LABELS[k]}</option>
+                    ))}
+                </Select>
 
                 {/* Watch toggle */}
                 <button

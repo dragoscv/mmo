@@ -23,12 +23,22 @@
 import os from "node:os";
 import { Bonjour, type Service } from "bonjour-service";
 import { getSettings, store } from "./store";
+import { executeCommands, type InboundCommand, type OutboundResult } from "./command-worker";
 
-// 30 s heartbeat. Doubles as the liveness signal for /devices on the
-// web app: Vercel can't reach the user's LAN to do an active probe,
-// so this push-based tick is what flips the green dot on/off. Keep
-// it well below the web app's 90 s freshness threshold.
-const RE_ANNOUNCE_INTERVAL_MS = 30 * 1000;
+// 3 s heartbeat. The announce loop doubles as:
+//   - liveness signal: Vercel uses the lastSeenAt timestamp to render
+//     the green dot on /devices (must stay < 90 s to count as online).
+//   - command channel: response carries pending device commands (folder
+//     picker, audio enumeration, etc.) and request body carries results
+//     from the previous batch. See lib/device-commands.ts on the web.
+// 3 s is the tradeoff: fast enough that a user clicking "Pick Folder"
+// sees the dialog within a couple seconds, slow enough that we don't
+// drown Vercel in invocations for an idle device (~20 req/min/device).
+const RE_ANNOUNCE_INTERVAL_MS = 3 * 1000;
+// When a command was just delivered, re-poll faster for a short burst
+// so multi-step flows (pick → kind → watch toggle) feel snappy.
+const BURST_INTERVAL_MS = 750;
+const BURST_DURATION_MS = 20_000;
 const SERVICE_NAME = "MMO Companion";
 const SERVICE_TYPE = "mmo-companion";
 
@@ -38,6 +48,8 @@ let bonjourService: Service | null = null;
 let lastAnnouncedUrl: string | null = null;
 let currentVersion = "0.0.0";
 let onDeviceNameCb: ((name: string) => void) | null = null;
+let pendingResults: OutboundResult[] = [];
+let burstUntil = 0;
 
 /**
  * Pick the most useful non-loopback IPv4 address. Prefers (in order):
@@ -89,6 +101,10 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
     const token = store.get("deviceToken") as string | undefined;
     if (!token) return; // not paired yet
 
+    // Drain results from the previous tick. If the POST fails we re-queue.
+    const sending = pendingResults;
+    pendingResults = [];
+
     try {
         const ac = new AbortController();
         const t = setTimeout(() => ac.abort(), 8000);
@@ -101,27 +117,44 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
                 hostname: os.hostname(),
                 os: process.platform,
                 version: currentVersion,
+                results: sending.length > 0 ? sending : undefined,
             }),
             signal: ac.signal,
         }).finally(() => clearTimeout(t));
-        // 401 = the cloud no longer recognises our token (device row
-        // deleted, key rotated, or never inserted because pairing
-        // half-failed). Fire the callback so main can wipe state and
-        // prompt the user to re-pair instead of looping forever.
+
         if (res.status === 401 && onAuthInvalidatedCb) {
+            // Token rejected — surrender the results we tried to send;
+            // re-pairing will produce fresh command rows anyway.
             try { onAuthInvalidatedCb("announce-401"); } catch { /* ignore */ }
             return;
         }
-        // Sync the user-chosen device name back to the companion so the
-        // UI / tray can display the same label that shows on /devices.
-        if (res.ok && onDeviceNameCb) {
-            try {
-                const data = await res.json() as { name?: string };
-                if (data?.name) onDeviceNameCb(data.name);
-            } catch { /* response wasn't JSON; ignore */ }
+        if (!res.ok) {
+            // Server error — re-queue results so we don't drop them.
+            pendingResults = sending.concat(pendingResults);
+            return;
+        }
+
+        const data = await res.json().catch(() => null) as {
+            name?: string;
+            commands?: InboundCommand[];
+        } | null;
+        if (!data) return;
+
+        if (data.name && onDeviceNameCb) {
+            try { onDeviceNameCb(data.name); } catch { /* ignore */ }
+        }
+        if (Array.isArray(data.commands) && data.commands.length > 0) {
+            burstUntil = Date.now() + BURST_DURATION_MS;
+            // Execute sequentially so dialog-based commands don't race.
+            const results = await executeCommands(data.commands);
+            pendingResults.push(...results);
+            // Trigger an immediate follow-up tick so results reach the
+            // awaiting server action without waiting a full interval.
+            queueMicrotask(() => { void postAnnounce(lanUrl); });
         }
     } catch {
-        // Network down, paired but cloud unreachable — try again next tick.
+        // Network down — re-queue so results survive the retry.
+        pendingResults = sending.concat(pendingResults);
     }
 }
 
@@ -181,21 +214,25 @@ export function startLanAnnounce(opts: { port: number; version: string }): void 
 
     const tick = async () => {
         const url = buildLanUrl(opts.port);
-        // Always POST every tick so `lastSeenAt` keeps refreshing on
-        // the cloud (that's how /devices flips the green dot on/off).
-        // The 30 s tick rate is cheap enough; conditional skips would
-        // make the device look offline whenever the URL is stable.
         await postAnnounce(url);
         lastAnnouncedUrl = url;
     };
+    // Self-rescheduling timer so we can shift between burst (post-command)
+    // and idle cadences without tearing down setInterval each time.
+    const schedule = () => {
+        const interval = Date.now() < burstUntil ? BURST_INTERVAL_MS : RE_ANNOUNCE_INTERVAL_MS;
+        timer = setTimeout(async () => {
+            await tick();
+            schedule();
+        }, interval);
+    };
     // First announce after a short delay so the user's pairing token
     // (set during /auth/callback) is on disk before we POST.
-    setTimeout(() => { void tick(); }, 4000);
-    timer = setInterval(() => { void tick(); }, RE_ANNOUNCE_INTERVAL_MS);
+    setTimeout(() => { void tick().then(schedule); }, 4000);
 }
 
 export function stopLanAnnounce(): void {
-    if (timer) { clearInterval(timer); timer = null; }
+    if (timer) { clearTimeout(timer); timer = null; }
     lastAnnouncedUrl = null;
     stopBonjour();
 }

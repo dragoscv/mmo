@@ -29,10 +29,20 @@ export interface AuthorizedAudioDevice {
     preferredSampleRate?: number;
 }
 
+/** Folder purpose label. Used to filter / colour rows in the UI and (eventually)
+ *  to route file types to different pipelines (video transcoder vs audio scanner). */
+export type FolderKind = "music" | "movies" | "tv-shows" | "samples" | "recordings" | "other";
+
+export const FOLDER_KINDS: ReadonlyArray<FolderKind> = [
+    "music", "movies", "tv-shows", "samples", "recordings", "other",
+];
+
 export interface CompanionFolder {
     path: string;
     exists: boolean;
     label: string;
+    /** What lives in this folder. Defaults to "music" for legacy installs. */
+    kind?: FolderKind;
     /** True when the user has toggled "Auto-watch" for this folder. */
     watch?: boolean;
     /** True when a chokidar watcher is currently running for it. */
