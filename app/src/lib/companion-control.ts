@@ -59,9 +59,20 @@ async function resolveDevice(deviceId: string): Promise<DeviceRow | null> {
         .where(and(eq(devices.id, deviceId), eq(devices.userId, session.user.id)))
         .limit(1);
     const row = rows[0];
-    if (!row || !row.apiUrl) return null;
+    if (!row) return null;
     const bearer = await materializeDeviceToken(row);
     if (!bearer) return null;
+    // Prefer the per-device Cloudflare Tunnel hostname over the
+    // companion's announced apiUrl. The announced URL is almost always
+    // a LAN address (http://192.168.x.y:9876) which works from a
+    // localhost dev server but is UNREACHABLE from Vercel — making
+    // every server-action call (scan, audio, folders) time out on the
+    // cloud build. Routing through `https://device-<slug>.muzicai.ro`
+    // costs ~30-80 ms via the CF edge instead.
+    if (row.tunnelHostname) {
+        return { id: row.id, apiUrl: `https://${row.tunnelHostname}`, token: bearer };
+    }
+    if (!row.apiUrl) return null;
     return { id: row.id, apiUrl: row.apiUrl, token: bearer };
 }
 

@@ -12,6 +12,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — Server actions to companion now use the tunnel (web `0.3.8`)
+
+- **Server-side `resolveDevice` now prefers `tunnelHostname` over `apiUrl`.** Every `companionControl.*` server action (scan, audio, watch events, drives, folders) was building `${dev.apiUrl}` and `fetch`-ing it directly. On the cloud build that meant Vercel was trying to reach `http://192.168.x.y:9876` — a LAN address that obviously doesn't resolve from a serverless function — so every call timed out after 15–60 s. The UI showed “Starting…” forever because `startCompanionScan` never returned a real job ID and polling silently swallowed the timeouts. Now Vercel hits `https://device-<slug>.muzicai.ro` through the per-device Cloudflare Tunnel and the cloud build behaves identically to localhost.
+
 ### Added — Realtime recursive video scanning (web `0.3.7` + companion `1.0.20`)
 
 - **Per-kind scan dispatcher on the companion.** `POST /scan` now reads the folder's kind from `settings.scanFolders` and routes Movies / TV Shows folders through the new `runVideoScanJob` runner, while Music / Samples / Recordings / Other keep using the audio runner. One endpoint, no API change for the web — the web `startScan` payload is still just `{ folder }`.
