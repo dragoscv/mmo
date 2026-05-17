@@ -51,10 +51,23 @@ const nextConfig: NextConfig = {
 
     experimental: {
         // NOTE: `cacheComponents: true` (Next.js 16 opt-in caching via the
-        // `"use cache"` directive) is a worthwhile next step but requires
-        // wrapping every dynamic IO call (`auth()`, `cookies()`, db queries)
-        // in Suspense boundaries or marking pages dynamic explicitly. That
-        // migration is tracked separately so the build stays green here.
+        // `"use cache"` directive) is the next logical step but requires a
+        // sweeping refactor across the app:
+        //   - Remove 35 `export const dynamic = "force-dynamic"` declarations
+        //     (they become a build error — every page is dynamic by default
+        //     under cacheComponents unless it explicitly opts into caching).
+        //   - Decide a caching strategy for the 6 `force-static` routes
+        //     (`/learn/*`, `/offline`, the two `.well-known` JSON endpoints)
+        //     — each needs a top-of-function `"use cache"` directive plus
+        //     `cacheLife` / `cacheTag` calls to retain the current revalidate
+        //     window.
+        //   - Drop the 2 `revalidate = N` exports on `/page.tsx` and migrate
+        //     to `"use cache"` + `cacheLife({ revalidate: 300 })`.
+        //   - Add `<Suspense>` boundaries around any dynamic IO in shared
+        //     layouts.
+        // Tracked as a dedicated follow-up branch so we can iterate the
+        // Suspense / cacheLife decisions per route without blocking the
+        // current release train.
         serverActions: {
             allowedOrigins: [
                 "localhost:3000",
