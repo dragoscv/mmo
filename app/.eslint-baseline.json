@@ -12,7 +12,9 @@
   "src/components/mixer-view.tsx": 1,
   "src/components/now-playing.tsx": 1,
   "src/components/remote/widgets/mixer-remote-widget.tsx": 1,
+  "src/components/sidebar/download-hub-button.tsx": 2,
   "src/components/stems-panel.tsx": 1,
+  "src/components/video/subtitle-picker.tsx": 1,
   "src/hooks/use-midi.tsx": 2,
   "src/hooks/use-route-memory.ts": 1
 }
