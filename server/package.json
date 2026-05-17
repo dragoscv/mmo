@@ -1,6 +1,6 @@
 {
   "name": "mmo-companion",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "MMO Companion Server — serves local music files to MMO web app",
   "main": "dist/main.js",
   "author": {
@@ -202,6 +202,7 @@
     "audify": "^1.10.1",
     "better-sqlite3": "^11.7.0",
     "bindings": "^1.5.0",
+    "bonjour-service": "^1.3.0",
     "cheerio": "^1.0.0",
     "chokidar": "^4.0.3",
     "cors": "^2.8.5",

@@ -47,6 +47,7 @@ import {
     stopWatcherGc,
     stopAllWatchers,
 } from "./library/watcher";
+import { startLanAnnounce, stopLanAnnounce } from "./lan-announce";
 
 const MIME_TYPES: Record<string, string> = {
     ".mp3": "audio/mpeg",
@@ -1150,6 +1151,11 @@ export async function startServer(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
         httpServer!.listen(serverPort, "0.0.0.0", () => {
             console.log(`MMO Companion Server running on port ${serverPort}`);
+            // Publish LAN URL + mDNS so other devices on the user's
+            // network can discover the companion. Re-announces every
+            // 5 min so DHCP renewals / Wi-Fi roams self-heal.
+            try { startLanAnnounce({ port: serverPort, version: SERVER_VERSION }); }
+            catch (err) { console.warn("[lan-announce] start failed:", err); }
             resolve();
         });
         httpServer!.on("error", reject);
@@ -1165,6 +1171,7 @@ export async function stopServer(): Promise<void> {
     stopScanJobGc();
     stopWatcherGc();
     await stopAllWatchers().catch(() => { /* ignore */ });
+    stopLanAnnounce();
 
     for (const client of wsClients) {
         client.close();

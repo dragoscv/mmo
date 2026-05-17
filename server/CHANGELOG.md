@@ -2,6 +2,13 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.6 — LAN beacon + mDNS broadcast
+
+- **Cross-device discovery (LAN beacon)**: at startup and every 5 minutes the companion now posts its LAN URL (e.g. `http://192.168.1.42:17899`) to the paired account via `POST /api/devices/announce`. The web app then exposes a per-user `/api/devices/peers` endpoint that the browser uses as a discovery fallback when loopback probing fails — so a tablet on the couch finds the desktop companion without manual config.
+- **mDNS / Bonjour broadcast**: companion publishes `_mmo-companion._tcp` on the local network with a TXT record (`product`, `version`, `api`). Native MMO shells (TV, mobile) can now discover the companion without going through the cloud.
+- **Network interface picking**: prefers the user's real Wi-Fi / Ethernet IP and skips virtual adapters (`vEthernet`, `vmnet`, `vbox`, `docker`, `WSL`, `Tailscale`, `utun`, `tap`) to avoid announcing useless container bridges.
+- **Pairing**: the LAN URL is announced immediately after the user completes web-app pairing, not just on the periodic tick.
+
 ## 1.0.5 — manual update check button
 
 - **UI**: added a small refresh button (↻) next to the version footer that triggers an on-demand update check. Surfaces "Checking… / Up to date / Downloading… / Update ready" inline so the user can pull a release immediately instead of waiting for the 4-hour background recheck.

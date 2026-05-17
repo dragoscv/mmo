@@ -632,6 +632,16 @@ function setupIPC() {
         store.set("userEmail", data.userEmail || "");
         store.set("userImage", data.userImage || "");
         updateSettings({ webAppUrl: data.webAppUrl });
+        // Push our LAN URL to the freshly-paired account so the user's
+        // other devices can discover us without waiting for the next
+        // 5 min re-announce tick.
+        try {
+            const port = serverModule?.getServerPort();
+            if (port) {
+                const { announceNow } = await import("./lan-announce");
+                void announceNow(port);
+            }
+        } catch { /* best-effort */ }
         return { success: true };
     });
 

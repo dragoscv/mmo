@@ -121,6 +121,13 @@ export const devices = pgTable("devices", {
     os: text("os"),
     hostname: text("hostname"),
     apiUrl: text("api_url").notNull(),
+    /** Non-loopback LAN URL the companion announces on startup
+     *  (e.g. http://192.168.1.42:17899). Populated via POST
+     *  /api/devices/announce by the companion; null when never reported
+     *  or when the companion only binds loopback. Used by sibling
+     *  devices (tablet/TV) to reach this companion. */
+    lanUrl: text("lan_url"),
+    lanAnnouncedAt: timestamp("lan_announced_at"),
     /** HMAC-SHA256 of the plaintext bearer (hex). Indexable equality key
      *  used for inbound auth lookups. Populated by `issueDeviceToken()`. */
     tokenHash: text("token_hash").unique(),

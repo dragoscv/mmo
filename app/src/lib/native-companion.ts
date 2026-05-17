@@ -181,10 +181,21 @@ export interface NativeCompanionCredentials {
 export async function probeCompanion(
     apiUrl: string = DEFAULT_COMPANION_URL,
     signal?: AbortSignal,
+    timeoutMs = 1500,
 ): Promise<{ version: string; platform: string; capabilities: string[] } | null> {
+    // Bound every probe so a hung TCP connection (firewall, captive
+    // portal, half-open companion) can't stall discovery for seconds.
+    // Compose the caller's abort signal with our own timeout.
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    const onAbort = () => ac.abort();
+    if (signal) {
+        if (signal.aborted) ac.abort();
+        else signal.addEventListener("abort", onAbort, { once: true });
+    }
     try {
         const res = await fetch(`${apiUrl}/audio/native/probe`, {
-            signal,
+            signal: ac.signal,
             cache: "no-store",
             // No credentials — the route is public localhost-only.
         });
@@ -200,6 +211,9 @@ export async function probeCompanion(
         return null;
     } catch {
         return null;
+    } finally {
+        clearTimeout(timer);
+        if (signal) signal.removeEventListener("abort", onAbort);
     }
 }
 
@@ -257,7 +271,30 @@ export async function discoverCompanion(
         }
     }
     const results = await Promise.all(candidates.map((u) => tryOne(u)));
-    const hit = results.find((r) => r !== null);
+    let hit = results.find((r) => r !== null);
+
+    // 4. LAN fallback. If no loopback hit, ask the cloud for the
+    //    signed-in user's other companions' self-announced LAN URLs
+    //    (tablet on the couch reaching the desktop companion in the
+    //    home office). The endpoint is best-effort — silent failure
+    //    keeps offline-first browsing working when the cloud is
+    //    unreachable.
+    if (!hit && typeof window !== "undefined") {
+        try {
+            const res = await fetch("/api/devices/peers", { cache: "no-store" });
+            if (res.ok) {
+                const body = (await res.json()) as { peers?: Array<{ lanUrl: string }> };
+                const peerUrls = (body.peers ?? [])
+                    .map((p) => p.lanUrl)
+                    .filter((u): u is string => typeof u === "string" && !!u);
+                if (peerUrls.length > 0) {
+                    const peerResults = await Promise.all(peerUrls.map((u) => tryOne(u)));
+                    hit = peerResults.find((r) => r !== null);
+                }
+            }
+        } catch { /* offline or unauthenticated — drop through */ }
+    }
+
     if (hit && typeof window !== "undefined") {
         try { window.localStorage.setItem(COMPANION_URL_CACHE_KEY, hit.apiUrl); } catch { /* ignore */ }
     }

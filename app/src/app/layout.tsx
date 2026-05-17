@@ -21,6 +21,7 @@ import { FocusModeProvider } from "@/components/focus-mode-context";
 import { FocusAwareSidebar, FocusAwareMobileHeader, FocusAwareNowPlayingBar } from "@/components/focus-aware-shell";
 import { AuthProvider } from "@/components/auth-provider";
 import { PreferencesSync } from "@/components/preferences-sync";
+import { CompanionStatusProvider } from "@/components/companion/companion-status-provider";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 // NOTE: globals.css is pre-compiled by `@tailwindcss/cli` into `public/globals.css`
@@ -94,6 +95,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                 <ThemeProvider>
                     <AuthProvider>
                         <PreferencesSync />
+                        <CompanionStatusProvider>
                         <NextIntlClientProvider locale={locale} messages={messages}>
                         <SelectionProvider>
                             <SidebarProvider>
@@ -144,6 +146,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                             </SidebarProvider>
                         </SelectionProvider>
                         </NextIntlClientProvider>
+                        </CompanionStatusProvider>
                     </AuthProvider>
                 </ThemeProvider>
             </body>

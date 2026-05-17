@@ -21,6 +21,13 @@ import { materializeDeviceToken } from "@/lib/device-token";
 
 const LOCAL_PREFIXES = ["http://localhost:", "http://127.0.0.1:", "https://localhost:", "https://127.0.0.1:"];
 
+/** True when `url` points at the same machine as the Next.js runtime —
+ *  i.e. a loopback URL we should never `fetch()` from the server
+ *  because we'd hit the Vercel container, not the user's laptop. */
+function isLoopbackUrl(url: string): boolean {
+    return LOCAL_PREFIXES.some((p) => url.startsWith(p));
+}
+
 export interface CompanionLink {
     apiUrl: string;
     token: string;
@@ -55,7 +62,19 @@ export async function getCompanionLink(): Promise<CompanionLink | null> {
     const chosen = local ?? usable[0];
     const bearer = await materializeDeviceToken(chosen);
     if (!bearer) return null;
-    return { apiUrl: chosen.apiUrl!, token: bearer, deviceId: chosen.id, userId };
+    // Prefer the device's self-announced LAN URL over a loopback
+    // api_url. Server-side fetches from Vercel can't reach
+    // 127.0.0.1 / localhost on the user's machine — they always hit
+    // the Vercel container's own loopback. The LAN URL is the only
+    // server-reachable one when both are populated, and only when
+    // the Vercel function itself sits on the same LAN (rare — but
+    // harmless when not: the fetch just times out). When apiUrl is
+    // already non-loopback we leave it alone.
+    let chosenUrl = chosen.apiUrl!;
+    if (isLoopbackUrl(chosenUrl) && chosen.lanUrl) {
+        chosenUrl = chosen.lanUrl;
+    }
+    return { apiUrl: chosenUrl, token: bearer, deviceId: chosen.id, userId };
 }
 
 /** Resolve a CompanionLink for an explicit device id owned by the
@@ -77,7 +96,8 @@ export async function getCompanionLinkForDevice(
     if (!row || !row.apiUrl) return null;
     const bearer = await materializeDeviceToken(row);
     if (!bearer) return null;
-    return { apiUrl: row.apiUrl, token: bearer, deviceId: row.id, userId };
+    const url = isLoopbackUrl(row.apiUrl) && row.lanUrl ? row.lanUrl : row.apiUrl;
+    return { apiUrl: url, token: bearer, deviceId: row.id, userId };
 }
 
 // ─── Low-level fetch helper ─────────────────────────────────────────────────
