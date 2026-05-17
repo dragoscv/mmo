@@ -9,7 +9,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
-    serverExternalPackages: ["postgres", "music-metadata"],
+    serverExternalPackages: ["postgres", "music-metadata", "systeminformation"],
 
     // Keep large local-only assets out of every serverless function bundle.
     // The recordings/import actions use dynamic path.join() which causes

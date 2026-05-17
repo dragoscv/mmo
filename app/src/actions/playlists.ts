@@ -604,10 +604,6 @@ const SMART_RULES: Record<string, SmartCriteria> = {
     },
 };
 
-export function getSmartCriteria(playlistName: string): SmartCriteria | null {
-    return SMART_RULES[playlistName] ?? null;
-}
-
 interface MatchableTrack {
     id: number;
     bpm?: number | null;

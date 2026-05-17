@@ -34,12 +34,12 @@ export interface LearnPage extends LearnPageRef {
 // User-facing labels for each section (slug -> { title, description }).
 // Translation lives in messages/{en,ro}.json under `learn.sections.<slug>`.
 const SECTION_META: Record<string, { titleKey: string; descKey: string }> = {
-    concept: { titleKey: "concept.title", descKey: "concept.desc" },
-    docs: { titleKey: "docs.title", descKey: "docs.desc" },
-    organizare: { titleKey: "organizare.title", descKey: "organizare.desc" },
-    genuri: { titleKey: "genuri.title", descKey: "genuri.desc" },
-    echipament: { titleKey: "echipament.title", descKey: "echipament.desc" },
-    glosar: { titleKey: "glosar.title", descKey: "glosar.desc" },
+    concept: { titleKey: "sections.concept.title", descKey: "sections.concept.desc" },
+    docs: { titleKey: "sections.docs.title", descKey: "sections.docs.desc" },
+    organizare: { titleKey: "sections.organizare.title", descKey: "sections.organizare.desc" },
+    genuri: { titleKey: "sections.genuri.title", descKey: "sections.genuri.desc" },
+    echipament: { titleKey: "sections.echipament.title", descKey: "sections.echipament.desc" },
+    glosar: { titleKey: "sections.glosar.title", descKey: "sections.glosar.desc" },
 };
 
 export const LEARN_SECTION_SLUGS = Object.keys(SECTION_META);
