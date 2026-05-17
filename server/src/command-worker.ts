@@ -144,12 +144,12 @@ const handlers: Record<string, Handler> = {
     // `list_directory` per click. `add_folder` finalises the pick. We never
     // open a native dialog so the entire flow stays in the browser.
 
-    list_drives: async () => ({ drives: listDrives() }),
+    list_drives: async () => ({ drives: listDrivesCached() }),
 
     list_directory: async (payload) => {
         const requested = pickString(payload, "path");
         if (!requested) throw new Error("path required");
-        return listDirectory(requested);
+        return listDirectoryCached(requested);
     },
 
     add_folder: async (payload) => {
@@ -168,9 +168,63 @@ const handlers: Record<string, Handler> = {
         }
         folders.push({ path: resolved, watch: false, kind: desiredKind });
         store.set("scanFolders", folders);
+        // The newly-added folder may now display a different "already in library"
+        // affordance on the next listing of its parent. Drop the parent so the
+        // very next navigate-up returns fresh data.
+        invalidateDirectoryCache(path.dirname(resolved));
         return { added: true, picked: resolved, folders: listFolders() };
     },
 };
+
+// ─── Filesystem browser cache ────────────────────────────────────────────
+// Two reasons this exists:
+//   1. Each round-trip through the announce queue adds ~750ms-3s of
+//      transport latency. Re-listing the same drive after a back-click
+//      shouldn't pay that twice.
+//   2. `fs.readdirSync` + per-child `hasChildren` probe is ~5-50 ms on
+//      hot dirs and can spike to seconds on a slow USB/network drive.
+// Both transports (queue and any future direct LAN call) benefit.
+
+const DRIVES_TTL_MS = 10_000;
+const DIR_TTL_MS = 30_000;
+const DIR_LRU_MAX = 200;
+
+let drivesCache: { at: number; value: DriveInfo[] } | null = null;
+
+type DirListing = ReturnType<typeof listDirectory>;
+// Map preserves insertion order → cheap LRU: delete + re-insert on hit.
+const dirCache = new Map<string, { at: number; value: DirListing }>();
+
+function listDrivesCached(): DriveInfo[] {
+    const now = Date.now();
+    if (drivesCache && now - drivesCache.at < DRIVES_TTL_MS) return drivesCache.value;
+    const value = listDrives();
+    drivesCache = { at: now, value };
+    return value;
+}
+
+function listDirectoryCached(requested: string): DirListing {
+    const key = path.resolve(requested);
+    const now = Date.now();
+    const hit = dirCache.get(key);
+    if (hit && now - hit.at < DIR_TTL_MS) {
+        // LRU touch.
+        dirCache.delete(key);
+        dirCache.set(key, hit);
+        return hit.value;
+    }
+    const value = listDirectory(requested);
+    dirCache.set(key, { at: now, value });
+    if (dirCache.size > DIR_LRU_MAX) {
+        const oldest = dirCache.keys().next().value;
+        if (oldest !== undefined) dirCache.delete(oldest);
+    }
+    return value;
+}
+
+function invalidateDirectoryCache(p: string): void {
+    dirCache.delete(path.resolve(p));
+}
 
 function listFolders() {
     const settings = getSettings();

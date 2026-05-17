@@ -101,6 +101,7 @@ import {
     type FolderKind,
     type CompanionDrive,
     type CompanionDirectoryEntry,
+    type CompanionDirectoryListing,
 } from "@/lib/companion-types";
 
 /** Human-readable labels for folder kinds shown in the picker + badge. */
@@ -156,6 +157,12 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
     const [browserLoading, setBrowserLoading] = useState(false);
     const [browserError, setBrowserError] = useState<string | null>(null);
     const [browserAdding, setBrowserAdding] = useState(false);
+    /** SWR-style caches so reopening the modal or back-clicking renders
+     *  instantly and the network call only updates if data has shifted. */
+    const drivesCacheRef = useRef<Map<string, CompanionDrive[]>>(new Map());
+    const dirCacheRef = useRef<Map<string, CompanionDirectoryListing>>(new Map());
+    /** In-flight prefetches we should not re-issue. Cleared on resolution. */
+    const inflightRef = useRef<Set<string>>(new Set());
     const [editingName, setEditingName] = useState<string | null>(null);
     const [editNameValue, setEditNameValue] = useState("");
     const [openSection, setOpenSection] = useState<Record<string, "folders" | "audio" | null>>({});
@@ -221,27 +228,105 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
     }
 
     async function navigateBrowser(deviceId: string, path: string | null) {
-        setBrowserLoading(true);
         setBrowserError(null);
-        try {
-            if (path === null) {
-                // Root: show drives.
+        if (path === null) {
+            // Root: show drives. Paint cache instantly, refresh in background.
+            const cached = drivesCacheRef.current.get(deviceId);
+            if (cached) {
+                setBrowserDrives(cached);
+                setBrowserCwd(null);
+                setBrowserEntries([]);
+                setBrowserParent(null);
+                setBrowserLoading(false);
+                void refreshDrives(deviceId);
+                return;
+            }
+            setBrowserLoading(true);
+            try {
                 const r = await listCompanionDrives(deviceId);
                 if ("error" in r) { setBrowserError(r.error); return; }
+                drivesCacheRef.current.set(deviceId, r.drives);
                 setBrowserDrives(r.drives);
                 setBrowserCwd(null);
                 setBrowserEntries([]);
                 setBrowserParent(null);
-            } else {
+            } finally {
+                setBrowserLoading(false);
+            }
+        } else {
+            const cacheKey = `${deviceId}::${path}`;
+            const cached = dirCacheRef.current.get(cacheKey);
+            if (cached) {
+                setBrowserCwd(cached.path);
+                setBrowserEntries(cached.entries);
+                setBrowserParent(cached.parent);
+                setBrowserLoading(false);
+                void refreshDirectory(deviceId, path);
+                return;
+            }
+            setBrowserLoading(true);
+            try {
                 const r = await listCompanionDirectory(deviceId, path);
                 if ("error" in r) { setBrowserError(r.error); return; }
+                dirCacheRef.current.set(cacheKey, r);
                 setBrowserCwd(r.path);
                 setBrowserEntries(r.entries);
                 setBrowserParent(r.parent);
+            } finally {
+                setBrowserLoading(false);
             }
-        } finally {
-            setBrowserLoading(false);
         }
+    }
+
+    async function refreshDrives(deviceId: string) {
+        const key = `drives::${deviceId}`;
+        if (inflightRef.current.has(key)) return;
+        inflightRef.current.add(key);
+        try {
+            const r = await listCompanionDrives(deviceId);
+            if ("error" in r) return;
+            drivesCacheRef.current.set(deviceId, r.drives);
+            // Only update visible state if we're still on the drives view.
+            setBrowserCwd((cwd) => { if (cwd === null) setBrowserDrives(r.drives); return cwd; });
+        } finally {
+            inflightRef.current.delete(key);
+        }
+    }
+
+    async function refreshDirectory(deviceId: string, path: string) {
+        const cacheKey = `${deviceId}::${path}`;
+        if (inflightRef.current.has(cacheKey)) return;
+        inflightRef.current.add(cacheKey);
+        try {
+            const r = await listCompanionDirectory(deviceId, path);
+            if ("error" in r) return;
+            dirCacheRef.current.set(cacheKey, r);
+            // Only update visible state if user hasn't navigated away.
+            setBrowserCwd((cwd) => {
+                if (cwd === r.path) {
+                    setBrowserEntries(r.entries);
+                    setBrowserParent(r.parent);
+                }
+                return cwd;
+            });
+        } finally {
+            inflightRef.current.delete(cacheKey);
+        }
+    }
+
+    /** Hover-prefetch: warm the cache without touching visible state. */
+    function prefetchDirectory(deviceId: string, path: string) {
+        const cacheKey = `${deviceId}::${path}`;
+        if (dirCacheRef.current.has(cacheKey) || inflightRef.current.has(cacheKey)) return;
+        inflightRef.current.add(cacheKey);
+        void (async () => {
+            try {
+                const r = await listCompanionDirectory(deviceId, path);
+                if (!("error" in r)) dirCacheRef.current.set(cacheKey, r);
+            } finally {
+                inflightRef.current.delete(cacheKey);
+            }
+        })();
     }
 
     function openPickerDialog(deviceId: string) {
@@ -262,6 +347,14 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
             const r = await addCompanionFolder(deviceId, browserCwd, pendingPickKind);
             if ("error" in r) { toast.error(r.error); return; }
             setFolders((p) => ({ ...p, [deviceId]: r.folders }));
+            // Drop the parent listing so a follow-up open doesn't show stale
+            // "not in library yet" affordances. The companion already invalidates
+            // its own cache for the same reason.
+            const parts = browserCwd.split(/[\\/]/).filter(Boolean);
+            if (parts.length > 1) {
+                const parent = browserCwd.replace(/[\\/][^\\/]+[\\/]?$/, "");
+                if (parent) dirCacheRef.current.delete(`${deviceId}::${parent}`);
+            }
             toast.success(
                 r.added
                     ? `Added ${r.picked} (${FOLDER_KIND_LABELS[pendingPickKind]})`
@@ -673,6 +766,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                                             type="button"
                                             disabled={browserLoading}
                                             onClick={() => pickerDialogDevice && navigateBrowser(pickerDialogDevice, d.path)}
+                                            onMouseEnter={() => pickerDialogDevice && prefetchDirectory(pickerDialogDevice, d.path)}
                                             className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60 disabled:opacity-50"
                                         >
                                             <HardDrive className={cn(
@@ -705,6 +799,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                                         type="button"
                                         disabled={browserLoading}
                                         onClick={() => pickerDialogDevice && navigateBrowser(pickerDialogDevice, e.path)}
+                                        onMouseEnter={() => pickerDialogDevice && e.hasChildren !== false && prefetchDirectory(pickerDialogDevice, e.path)}
                                         className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60 disabled:opacity-50"
                                     >
                                         <Folder className="h-4 w-4 shrink-0 text-blue-400/80" />
