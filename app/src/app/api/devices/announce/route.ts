@@ -25,6 +25,7 @@ import {
     recordCommandResults,
     type IncomingCommandResult,
 } from "@/lib/device-commands";
+import { ensureDeviceTunnel } from "@/actions/devices";
 
 export async function POST(request: NextRequest) {
     // Bumped from 30 to 240/min since announce now doubles as a ~3s
@@ -39,6 +40,11 @@ export async function POST(request: NextRequest) {
         os?: string;
         version?: string;
         results?: IncomingCommandResult[];
+        /** Companion echoes the tunnel hostname it currently runs
+         *  cloudflared against. Used by the server to decide whether
+         *  to include `tunnelBootstrap` in the response (we only send
+         *  the secret token when the companion needs it). */
+        tunnelHostnameAck?: string | null;
     } | null;
 
     if (!body || typeof body !== "object" || typeof body.token !== "string") {
@@ -72,7 +78,8 @@ export async function POST(request: NextRequest) {
             .set({ ...baseUpdate, lanUrl: null, lanAnnouncedAt: new Date() })
             .where(eq(devices.id, device.id));
         const commands = await claimPendingCommands(device.id);
-        return NextResponse.json({ ok: true, cleared: true, name: device.name, commands });
+        const tunnelBootstrap = await maybeTunnelBootstrap(device.id, body.tunnelHostnameAck);
+        return NextResponse.json({ ok: true, cleared: true, name: device.name, commands, tunnelBootstrap });
     }
 
     if (body.lanUrl !== undefined) {
@@ -84,7 +91,8 @@ export async function POST(request: NextRequest) {
             .set({ ...baseUpdate, lanUrl, lanAnnouncedAt: new Date() })
             .where(eq(devices.id, device.id));
         const commands = await claimPendingCommands(device.id);
-        return NextResponse.json({ ok: true, lanUrl, name: device.name, commands });
+        const tunnelBootstrap = await maybeTunnelBootstrap(device.id, body.tunnelHostnameAck);
+        return NextResponse.json({ ok: true, lanUrl, name: device.name, commands, tunnelBootstrap });
     }
 
     // No lanUrl in body — heartbeat + results-only ack.
@@ -92,5 +100,27 @@ export async function POST(request: NextRequest) {
         .set(baseUpdate)
         .where(eq(devices.id, device.id));
     const commands = await claimPendingCommands(device.id);
-    return NextResponse.json({ ok: true, name: device.name, commands });
+    const tunnelBootstrap = await maybeTunnelBootstrap(device.id, body.tunnelHostnameAck);
+    return NextResponse.json({ ok: true, name: device.name, commands, tunnelBootstrap });
+}
+
+/**
+ * Returns the cloudflared bootstrap (token + hostname) the companion
+ * should run, OR null when:
+ *  - Cloudflare is not configured at all (ensureDeviceTunnel → null);
+ *  - The companion has already ACKed the matching hostname (token
+ *    already in its electron-store; no point re-sending the secret on
+ *    every 3s heartbeat).
+ *
+ * Provisioning is idempotent so it's safe to call on every heartbeat —
+ * if the device row already has tunnel cols set, no CF API calls happen.
+ */
+async function maybeTunnelBootstrap(
+    deviceId: string,
+    ack: string | null | undefined,
+): Promise<{ tunnelHostname: string; tunnelToken: string } | null> {
+    const t = await ensureDeviceTunnel(deviceId);
+    if (!t) return null;
+    if (ack === t.tunnelHostname) return null;
+    return t;
 }

@@ -98,6 +98,11 @@ export const store = new Store({
         userName: "",
         userEmail: "",
         userImage: "",
+        // Cloudflare Tunnel bootstrap delivered via the announce
+        // channel. Persisted so cloudflared restarts across app boots
+        // without waiting for the next heartbeat.
+        tunnelToken: "",
+        tunnelHostname: "",
     },
 });
 

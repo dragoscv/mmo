@@ -1,6 +1,6 @@
 {
   "name": "mmo-companion",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "MMO Companion Server — serves local music files to MMO web app",
   "main": "dist/main.js",
   "author": {
@@ -23,6 +23,7 @@
     "dist:mac": "tsc && electron-builder --mac",
     "dist:linux": "tsc && electron-builder --linux",
     "fetch:virtual-audio": "node scripts/fetch-virtual-audio.mjs",
+    "fetch:cloudflared": "node scripts/fetch-cloudflared.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -73,6 +74,16 @@
         "filter": [
           "**/*",
           "!**/.gitkeep"
+        ]
+      },
+      {
+        "from": "assets/cloudflared",
+        "to": "cloudflared",
+        "filter": [
+          "**/*",
+          "!.gitkeep",
+          "!.gitignore",
+          "!README.md"
         ]
       }
     ],

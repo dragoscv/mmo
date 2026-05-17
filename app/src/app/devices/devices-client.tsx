@@ -91,7 +91,9 @@ import {
     listCompanionDrives,
     listCompanionDirectory,
     addCompanionFolder,
+    getDeviceDirectAccess,
 } from "@/actions/devices";
+import { directFetch } from "@/lib/companion-direct";
 import {
     FOLDER_KINDS,
     type CompanionFolder,
@@ -163,6 +165,10 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
     const dirCacheRef = useRef<Map<string, CompanionDirectoryListing>>(new Map());
     /** In-flight prefetches we should not re-issue. Cleared on resolution. */
     const inflightRef = useRef<Set<string>>(new Set());
+    /** Per-device {hostname, bearer} for the Cloudflare-Tunnel fast path.
+     *  Fetched lazily on first need; falsy entry means "tried, none
+     *  available" so we don't re-ask the server every call. */
+    const directAccessRef = useRef<Map<string, { tunnelHostname: string; bearer: string } | null>>(new Map());
     const [editingName, setEditingName] = useState<string | null>(null);
     const [editNameValue, setEditNameValue] = useState("");
     const [openSection, setOpenSection] = useState<Record<string, "folders" | "audio" | null>>({});
@@ -172,6 +178,71 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only browser API hydration
     useEffect(() => { setIsLocalhost(isLocalhostHost()); }, []);
+
+    // ─── Direct-tunnel fast path ────────────────────────────────────────────
+    // We resolve { hostname, bearer } once per device per session and cache
+    // it. Each call below tries the tunnel first and silently falls back
+    // to the queue-based server action on any failure (network, 4xx, CF
+    // outage, env not configured). The fallback path is what existed
+    // before — no behavior regression possible, only speedup when the
+    // tunnel is healthy.
+
+    async function getDirectAccess(deviceId: string) {
+        if (directAccessRef.current.has(deviceId)) return directAccessRef.current.get(deviceId);
+        const access = await getDeviceDirectAccess(deviceId).catch(() => null);
+        directAccessRef.current.set(deviceId, access);
+        return access;
+    }
+
+    async function fastListDrives(deviceId: string): Promise<
+        { drives: CompanionDrive[] } | { error: string }
+    > {
+        const target = await getDirectAccess(deviceId);
+        if (target) {
+            const r = await directFetch<{ drives: CompanionDrive[] }>(target, "/fs/drives");
+            if (r) return r;
+        }
+        return listCompanionDrives(deviceId);
+    }
+
+    async function fastListDirectory(deviceId: string, path: string): Promise<
+        CompanionDirectoryListing | { error: string }
+    > {
+        const target = await getDirectAccess(deviceId);
+        if (target) {
+            const r = await directFetch<CompanionDirectoryListing>(
+                target, `/fs/list?path=${encodeURIComponent(path)}`,
+            );
+            if (r) return r;
+        }
+        return listCompanionDirectory(deviceId, path);
+    }
+
+    async function fastAddFolder(deviceId: string, path: string, kind: FolderKind): Promise<
+        { added: boolean; picked: string; folders: CompanionFolder[] } | { error: string }
+    > {
+        // Tunnel `/fs/add` only returns {added, picked} — folders are
+        // refetched separately. The queue path returns folders inline,
+        // so for the direct path we follow up with a folders fetch only
+        // if needed. Most callers re-render via the announce loop within
+        // 3s anyway, but we keep parity by reading folders from the
+        // server action when the tunnel response lacks them.
+        const target = await getDirectAccess(deviceId);
+        if (target) {
+            const r = await directFetch<{ added: boolean; picked: string }>(
+                target, "/fs/add", { method: "POST", body: JSON.stringify({ path, kind }) },
+            );
+            if (r) {
+                // Hit the queue action just to fetch the updated folders
+                // (cheap when the companion already cached them).
+                const tail = await addCompanionFolder(deviceId, path, kind).catch(() => null);
+                return tail && !("error" in tail)
+                    ? tail
+                    : { added: r.added, picked: r.picked, folders: [] };
+            }
+        }
+        return addCompanionFolder(deviceId, path, kind);
+    }
 
     const refreshAll = useCallback(() => {
         for (const device of devices) {
@@ -243,7 +314,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
             }
             setBrowserLoading(true);
             try {
-                const r = await listCompanionDrives(deviceId);
+                const r = await fastListDrives(deviceId);
                 if ("error" in r) { setBrowserError(r.error); return; }
                 drivesCacheRef.current.set(deviceId, r.drives);
                 setBrowserDrives(r.drives);
@@ -266,7 +337,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
             }
             setBrowserLoading(true);
             try {
-                const r = await listCompanionDirectory(deviceId, path);
+                const r = await fastListDirectory(deviceId, path);
                 if ("error" in r) { setBrowserError(r.error); return; }
                 dirCacheRef.current.set(cacheKey, r);
                 setBrowserCwd(r.path);
@@ -283,7 +354,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         if (inflightRef.current.has(key)) return;
         inflightRef.current.add(key);
         try {
-            const r = await listCompanionDrives(deviceId);
+            const r = await fastListDrives(deviceId);
             if ("error" in r) return;
             drivesCacheRef.current.set(deviceId, r.drives);
             // Only update visible state if we're still on the drives view.
@@ -298,7 +369,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         if (inflightRef.current.has(cacheKey)) return;
         inflightRef.current.add(cacheKey);
         try {
-            const r = await listCompanionDirectory(deviceId, path);
+            const r = await fastListDirectory(deviceId, path);
             if ("error" in r) return;
             dirCacheRef.current.set(cacheKey, r);
             // Only update visible state if user hasn't navigated away.
@@ -321,7 +392,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         inflightRef.current.add(cacheKey);
         void (async () => {
             try {
-                const r = await listCompanionDirectory(deviceId, path);
+                const r = await fastListDirectory(deviceId, path);
                 if (!("error" in r)) dirCacheRef.current.set(cacheKey, r);
             } finally {
                 inflightRef.current.delete(cacheKey);
@@ -344,7 +415,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         if (!browserCwd) return;
         setBrowserAdding(true);
         try {
-            const r = await addCompanionFolder(deviceId, browserCwd, pendingPickKind);
+            const r = await fastAddFolder(deviceId, browserCwd, pendingPickKind);
             if ("error" in r) { toast.error(r.error); return; }
             setFolders((p) => ({ ...p, [deviceId]: r.folders }));
             // Drop the parent listing so a follow-up open doesn't show stale

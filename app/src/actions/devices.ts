@@ -14,8 +14,9 @@ import {
     type CompanionScanJob,
     type FolderKind,
 } from "@/lib/companion-control";
-import { issueDeviceToken, materializeDeviceToken } from "@/lib/device-token";
+import { issueDeviceToken, materializeDeviceToken, encryptDeviceToken, decryptDeviceToken } from "@/lib/device-token";
 import { enqueueDeviceCommand } from "@/lib/device-commands";
+import { createDeviceTunnel, deleteDeviceTunnel, getCloudflareConfig } from "@/lib/cloudflare";
 
 /** Confirm the caller owns this device. Used by every command-queue
  *  action below so a signed-in user can't enqueue work for someone
@@ -120,6 +121,11 @@ async function updateDeviceStatusInternal(
 export async function removeDevice(deviceId: string) {
     const session = await auth();
     if (!session?.user?.id) return { error: "Not authenticated" };
+
+    // Best-effort CF teardown BEFORE the row goes away — we need the
+    // tunnelId. Failure here leaves an orphan tunnel on the CF account
+    // but never blocks the user-visible removal.
+    try { await destroyDeviceTunnel(deviceId); } catch { /* ignore */ }
 
     await db
         .delete(devices)
@@ -692,4 +698,96 @@ export async function setCompanionAuthorizedAudioDevices(
     );
     if (!r.ok) return { error: r.error ?? "Failed to authorize audio devices" };
     return { success: true, authorized: r.result?.authorized ?? [] };
+}
+
+
+// ─── Cloudflare Tunnel (per-device fast path) ──────────────────────────────
+//
+// Each device gets its own named tunnel + DNS record so the browser can
+// fetch the companion's HTTP API at https://device-xxx.devices.muzicai.ro
+// — bypassing the 1.5-6s announce-queue round-trip for hot operations
+// (folder browsing, drive listing). The functions below are imported by
+// the announce route (auto-provision on first heartbeat) and the devices
+// client (fetch bearer + tunnel hostname for direct fetches).
+
+/**
+ * Provision a Cloudflare Tunnel for the given device. Idempotent:
+ * returns the existing tunnel info if one is already attached. Safe to
+ * call from the announce route on first heartbeat. Returns null when
+ * Cloudflare env vars are not configured (graceful fallback to queue
+ * transport — existing pairings stay functional with zero CF setup).
+ */
+export async function ensureDeviceTunnel(deviceId: string): Promise<
+    { tunnelHostname: string; tunnelToken: string } | null
+> {
+    const cfg = getCloudflareConfig();
+    if (!cfg) return null;
+
+    const row = (await db.select({
+        id: devices.id,
+        tunnelId: devices.tunnelId,
+        tunnelHostname: devices.tunnelHostname,
+        tunnelTokenEncrypted: devices.tunnelTokenEncrypted,
+    }).from(devices).where(eq(devices.id, deviceId)).limit(1))[0];
+    if (!row) return null;
+
+    if (row.tunnelId && row.tunnelHostname && row.tunnelTokenEncrypted) {
+        try {
+            return {
+                tunnelHostname: row.tunnelHostname,
+                tunnelToken: decryptDeviceToken(row.tunnelTokenEncrypted),
+            };
+        } catch {
+            // Corrupt envelope — fall through and re-provision.
+        }
+    }
+
+    try {
+        const t = await createDeviceTunnel(cfg, deviceId);
+        await db.update(devices).set({
+            tunnelId: t.tunnelId,
+            tunnelHostname: t.hostname,
+            tunnelTokenEncrypted: encryptDeviceToken(t.tunnelToken),
+        }).where(eq(devices.id, deviceId));
+        return { tunnelHostname: t.hostname, tunnelToken: t.tunnelToken };
+    } catch (err) {
+        console.warn("[devices] tunnel provision failed:", err instanceof Error ? err.message : err);
+        return null;
+    }
+}
+
+/**
+ * Returns the data the browser needs to call the companion directly
+ * over the tunnel: { hostname, bearer }. Auth-gated to the device's
+ * owner. Same trust boundary as the queue-based actions.
+ */
+export async function getDeviceDirectAccess(deviceId: string): Promise<
+    { tunnelHostname: string; bearer: string } | null
+> {
+    const err = await assertDeviceOwnership(deviceId);
+    if (err) return null;
+    const row = (await db.select({
+        tokenEncrypted: devices.tokenEncrypted,
+        tunnelHostname: devices.tunnelHostname,
+    }).from(devices).where(eq(devices.id, deviceId)).limit(1))[0];
+    if (!row || !row.tunnelHostname || !row.tokenEncrypted) return null;
+    try {
+        return { tunnelHostname: row.tunnelHostname, bearer: decryptDeviceToken(row.tokenEncrypted) };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Drop the CF tunnel + DNS record when a device is unpaired. Best
+ * effort — failures here leave orphan tunnels on the CF account but
+ * don't break the user-visible removal flow.
+ */
+export async function destroyDeviceTunnel(deviceId: string): Promise<void> {
+    const cfg = getCloudflareConfig();
+    if (!cfg) return;
+    const row = (await db.select({ tunnelId: devices.tunnelId }).from(devices)
+        .where(eq(devices.id, deviceId)).limit(1))[0];
+    if (!row?.tunnelId) return;
+    await deleteDeviceTunnel(cfg, { tunnelId: row.tunnelId });
 }

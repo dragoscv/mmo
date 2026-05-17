@@ -48,6 +48,7 @@ import {
     stopAllWatchers,
 } from "./library/watcher";
 import { startLanAnnounce, stopLanAnnounce } from "./lan-announce";
+import { listDrivesCached, listDirectoryCached, invalidateDirectoryCache } from "./command-worker";
 
 const MIME_TYPES: Record<string, string> = {
     ".mp3": "audio/mpeg",
@@ -460,6 +461,52 @@ export async function startServer(): Promise<void> {
     });
 
     // ─── Folder Browsing ─────────────────────────────────────────────────
+
+    // Tunnel-fast filesystem browser. Same semantics as the
+    // list_drives / list_directory / add_folder command-queue handlers
+    // (which also reuse listDrivesCached / listDirectoryCached); this
+    // route lets the browser hit the companion directly via the
+    // Cloudflare Tunnel and skip the 1.5-6s queue round-trip.
+    app.get("/fs/drives", authMiddleware, (_req, res) => {
+        try {
+            res.json({ drives: listDrivesCached() });
+        } catch (err) {
+            res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+        }
+    });
+
+    app.get("/fs/list", authMiddleware, (req, res) => {
+        const requested = typeof req.query.path === "string" ? req.query.path : "";
+        if (!requested) { res.status(400).json({ error: "path required" }); return; }
+        try {
+            res.json(listDirectoryCached(requested));
+        } catch (err) {
+            res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+        }
+    });
+
+    app.post("/fs/add", authMiddleware, (req, res) => {
+        const body = req.body as { path?: unknown; kind?: unknown };
+        const folderPath = typeof body.path === "string" ? body.path : "";
+        if (!folderPath) { res.status(400).json({ error: "path required" }); return; }
+        const kind = typeof body.kind === "string"
+            && (FOLDER_KINDS as readonly string[]).includes(body.kind)
+            ? (body.kind as FolderKind) : "music";
+        try {
+            const stat = fs.statSync(folderPath);
+            if (!stat.isDirectory()) { res.status(400).json({ error: "Not a directory" }); return; }
+        } catch {
+            res.status(400).json({ error: "Folder does not exist or is not readable" }); return;
+        }
+        const resolved = path.resolve(folderPath);
+        const folders = getSettings().scanFolders;
+        if (!folders.some((f) => f.path === resolved)) {
+            folders.push({ path: resolved, watch: false, kind });
+            store.set("scanFolders", folders);
+        }
+        invalidateDirectoryCache(path.dirname(resolved));
+        res.json({ added: true, picked: resolved });
+    });
 
     app.get("/folders", authMiddleware, (_req, res) => {
         // Return rich entries (path + per-folder stats from the library DB).
@@ -1190,6 +1237,16 @@ export async function startServer(): Promise<void> {
             // 5 min so DHCP renewals / Wi-Fi roams self-heal.
             try { startLanAnnounce({ port: serverPort, version: SERVER_VERSION }); }
             catch (err) { console.warn("[lan-announce] start failed:", err); }
+            // Restart cloudflared from the persisted token so the
+            // per-device tunnel comes back online before the first
+            // announce reply (saves ~3s on cold boot).
+            try {
+                const persistedToken = store.get("tunnelToken") as string | undefined;
+                const persistedHost = store.get("tunnelHostname") as string | undefined;
+                if (persistedToken && persistedHost) {
+                    void import("./cloudflared").then((m) => m.startCloudflared(persistedToken, persistedHost));
+                }
+            } catch (err) { console.warn("[cloudflared] boot start failed:", err); }
             resolve();
         });
         httpServer!.on("error", reject);

@@ -1218,6 +1218,10 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", async () => {
     isQuitting = true;
+    try {
+        const { stopCloudflared } = await import("./cloudflared");
+        stopCloudflared();
+    } catch { /* best-effort */ }
     if (serverModule) {
         try {
             await serverModule.stopServer();

@@ -24,6 +24,7 @@ import os from "node:os";
 import { Bonjour, type Service } from "bonjour-service";
 import { getSettings, store } from "./store";
 import { executeCommands, type InboundCommand, type OutboundResult } from "./command-worker";
+import { startCloudflared } from "./cloudflared";
 
 // 3 s heartbeat. The announce loop doubles as:
 //   - liveness signal: Vercel uses the lastSeenAt timestamp to render
@@ -108,6 +109,7 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
     try {
         const ac = new AbortController();
         const t = setTimeout(() => ac.abort(), 8000);
+        const localTunnelHostname = (store.get("tunnelHostname") as string | undefined) || null;
         const res = await fetch(`${webAppUrl}/api/devices/announce`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -118,6 +120,9 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
                 os: process.platform,
                 version: currentVersion,
                 results: sending.length > 0 ? sending : undefined,
+                // ACK lets the server skip resending the secret token
+                // on every 3s heartbeat — only sent when missing or stale.
+                tunnelHostnameAck: localTunnelHostname,
             }),
             signal: ac.signal,
         }).finally(() => clearTimeout(t));
@@ -137,12 +142,25 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
         const data = await res.json().catch(() => null) as {
             name?: string;
             commands?: InboundCommand[];
+            tunnelBootstrap?: { tunnelHostname: string; tunnelToken: string } | null;
         } | null;
         if (!data) return;
 
         if (data.name && onDeviceNameCb) {
             try { onDeviceNameCb(data.name); } catch { /* ignore */ }
         }
+
+        // Persist + start cloudflared when the server hands us a new
+        // bootstrap. Idempotent — startCloudflared no-ops if the same
+        // token is already running.
+        if (data.tunnelBootstrap?.tunnelHostname && data.tunnelBootstrap.tunnelToken) {
+            const b = data.tunnelBootstrap;
+            store.set("tunnelHostname", b.tunnelHostname);
+            store.set("tunnelToken", b.tunnelToken);
+            try { startCloudflared(b.tunnelToken, b.tunnelHostname); }
+            catch (err) { console.warn("[lan-announce] cloudflared start failed:", err); }
+        }
+
         if (Array.isArray(data.commands) && data.commands.length > 0) {
             burstUntil = Date.now() + BURST_DURATION_MS;
             // Execute sequentially so dialog-based commands don't race.

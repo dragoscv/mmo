@@ -5,12 +5,21 @@ All notable changes to **MMO — Multi Media Organizer** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 > Web app and companion are versioned independently:
-> - **Web app** (`app/`): see [`app/package.json`](app/package.json) — currently `0.2.0`
-> - **MMO Companion** (`server/`): see [`server/package.json`](server/package.json) — currently `0.9.5`, releases at [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
+> - **Web app** (`app/`): see [`app/package.json`](app/package.json) — currently `0.3.0`
+> - **MMO Companion** (`server/`): see [`server/package.json`](server/package.json) — currently `1.0.14`, releases at [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
 
 ---
 
 ## [Unreleased]
+
+### Added — Per-device Cloudflare Tunnel fast path (web app v0.3.0 + companion v1.0.14)
+
+- **Direct browser ↔ companion transport via Cloudflare Tunnel.** Every paired device is now auto-provisioned with its own named CF Tunnel (`https://device-<12hex>.devices.muzicai.ro`) on first heartbeat. The browser fetches `/fs/drives`, `/fs/list`, `/fs/add` directly through the tunnel with an `X-Device-Token` bearer, collapsing the folder-browser round-trip from ~1.5–6 s (queue + heartbeat) to ~30–80 ms (CF edge → companion). Works from any network — coffee shop, mobile data, or LAN — with real HTTPS, no mixed-content fights, no Private Network Access prompts.
+- **Graceful fallback.** Missing any of the 4 `CLOUDFLARE_*` env vars disables provisioning; companions skip cloudflared startup; the browser's `fast*` wrappers seamlessly fall through to the existing announce-queue server actions. No functional regression — only a speedup when the fast path is healthy.
+- **Cloudflared bundled with the installer.** `server/scripts/fetch-cloudflared.mjs` runs in CI to download the platform-matched binary; electron-builder ships it as an `extraResources` entry so end users don't install anything separately. Subprocess lifecycle (`server/src/cloudflared.ts`) handles spawn, token rotation, exponential restart backoff, and clean shutdown.
+- **DB**: new migration `0015_device_tunnel.sql` adds `tunnel_id`, `tunnel_hostname`, `tunnel_token_encrypted` to `devices`. Token is encrypted at rest using the existing AES-256-GCM envelope helpers.
+- **Security**: plaintext token is only handed to the owner-authenticated browser via `getDeviceDirectAccess()` (gated by `assertDeviceOwnership`); equivalent trust boundary to the existing session, since XSS already grants queue-based control.
+- **Docs**: full setup walkthrough in [docs/companion/tunnel-setup.md](docs/companion/tunnel-setup.md) (subdomain delegation, scoped API token, env vars).
 
 ### Added — Cloud→companion command queue + folder kinds (companion v1.0.11)
 

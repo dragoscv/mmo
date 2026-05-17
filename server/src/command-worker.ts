@@ -195,7 +195,7 @@ type DirListing = ReturnType<typeof listDirectory>;
 // Map preserves insertion order → cheap LRU: delete + re-insert on hit.
 const dirCache = new Map<string, { at: number; value: DirListing }>();
 
-function listDrivesCached(): DriveInfo[] {
+export function listDrivesCached(): DriveInfo[] {
     const now = Date.now();
     if (drivesCache && now - drivesCache.at < DRIVES_TTL_MS) return drivesCache.value;
     const value = listDrives();
@@ -203,7 +203,7 @@ function listDrivesCached(): DriveInfo[] {
     return value;
 }
 
-function listDirectoryCached(requested: string): DirListing {
+export function listDirectoryCached(requested: string): DirListing {
     const key = path.resolve(requested);
     const now = Date.now();
     const hit = dirCache.get(key);
@@ -222,7 +222,7 @@ function listDirectoryCached(requested: string): DirListing {
     return value;
 }
 
-function invalidateDirectoryCache(p: string): void {
+export function invalidateDirectoryCache(p: string): void {
     dirCache.delete(path.resolve(p));
 }
 

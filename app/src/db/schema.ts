@@ -135,6 +135,19 @@ export const devices = pgTable("devices", {
      *  ("v1:b64(nonce):b64(ciphertext+tag)"). Decrypted on demand for
      *  outbound `X-Device-Token` use. Key is derived from AUTH_SECRET. */
     tokenEncrypted: text("token_encrypted"),
+    /** Cloudflare Tunnel UUID. Provisioned per-device so the browser
+     *  can hit the companion directly (HTTPS, no LAN, no mixed content)
+     *  via a per-device hostname. NULL until first provision. See
+     *  drizzle/0015_device_tunnel.sql. */
+    tunnelId: text("tunnel_id"),
+    /** FQDN the browser fetches (e.g. device-<short>.devices.muzicai.ro).
+     *  CNAME of <tunnelId>.cfargotunnel.com. */
+    tunnelHostname: text("tunnel_hostname"),
+    /** AES-256-GCM envelope of the `cloudflared --token` bearer.
+     *  Encrypted with the same key as tokenEncrypted. Sent to the
+     *  companion once over the announce channel; companion persists
+     *  locally. */
+    tunnelTokenEncrypted: text("tunnel_token_encrypted"),
     status: text("status").notNull().default("offline"),
     lastSeenAt: timestamp("last_seen_at"),
     version: text("version"),
