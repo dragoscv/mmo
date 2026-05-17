@@ -1,5 +1,2 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 # Only runs when files under apps/extension/ are staged.
 node apps/extension/scripts/check-version.mjs --staged

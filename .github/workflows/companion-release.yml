@@ -1,7 +1,11 @@
 name: Companion — build & release
 
-# Cross-platform builder for the MMO Companion (Electron). Triggered by
-# pushing a tag like `companion-v0.2.0`, or manually via the Actions tab.
+# Cross-platform builder for the MMO Companion (Electron). Triggered
+# ONLY by pushing a tag like `companion-v1.2.3`, or manually via the
+# Actions tab. Bare `v*` tags are intentionally NOT a trigger so that
+# tagging the web app or another package never starts a 7-minute
+# 3-runner build of the desktop app.
+#
 # Produces:
 #   - Windows: NSIS installer (.exe) + latest.yml (electron-updater feed)
 #   - macOS:   DMG (.dmg) + latest-mac.yml
@@ -14,10 +18,6 @@ name: Companion — build & release
 on:
   push:
     tags:
-      # electron-builder publishes to a release tagged with package.json#version
-      # (e.g. "v0.3.0"). We trigger on either the simple v* tag or our
-      # explicit companion-v* prefix for clarity.
-      - "v*"
       - "companion-v*"
   workflow_dispatch:
     inputs:
