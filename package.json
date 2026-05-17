@@ -4,7 +4,7 @@
     "version": "0.0.0",
     "description": "MMO root \u2014 hosts husky hooks + workspace declaration. Each sub-package keeps its own pnpm-lock.yaml so existing CI (web-app, companion) and Vercel continue to work unchanged.",
     "scripts": {
-        "prepare": "node -e \"try{require('child_process').execSync(process.platform==='win32'?'husky.cmd':'husky',{stdio:'inherit'})}catch(e){}\"",
+        "dev:setup": "node ./scripts/prepare-husky.cjs",
         "check:extension-version": "node apps/extension/scripts/check-version.mjs",
         "changeset": "changeset",
         "version": "changeset version",
