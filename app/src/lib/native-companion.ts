@@ -230,18 +230,29 @@ export async function discoverCompanion(
     signal?: AbortSignal,
 ): Promise<{ apiUrl: string; beacon: { version: string; platform: string; capabilities: string[] } } | null> {
     const tried = new Set<string>();
-    const tryOne = async (apiUrl: string) => {
+    // Per-attempt outcomes so the user can paste a single summary into
+    // a bug report instead of guessing why discovery failed. Exposed on
+    // `window.__mmoCompanionDiscovery` after each run and logged once
+    // at the end. Each entry is `{ url, ok, error? }`.
+    const report: Array<{ url: string; ok: boolean; error?: string; stage: string }> = [];
+    const tryOne = async (apiUrl: string, stage: string) => {
         if (tried.has(apiUrl)) return null;
         tried.add(apiUrl);
-        const beacon = await probeCompanion(apiUrl, signal);
-        return beacon ? { apiUrl, beacon } : null;
+        try {
+            const beacon = await probeCompanion(apiUrl, signal);
+            report.push({ url: apiUrl, ok: !!beacon, stage });
+            return beacon ? { apiUrl, beacon } : null;
+        } catch (err) {
+            report.push({ url: apiUrl, ok: false, error: err instanceof Error ? err.message : String(err), stage });
+            return null;
+        }
     };
 
     // 1. Env override wins outright.
     const envUrl = typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_COMPANION_URL : undefined;
     if (envUrl) {
-        const hit = await tryOne(envUrl);
-        if (hit) return hit;
+        const hit = await tryOne(envUrl, "env");
+        if (hit) { publishDiscoveryReport(report, hit); return hit; }
     }
 
     // 2. Cached URL from a previous session.
@@ -249,8 +260,8 @@ export async function discoverCompanion(
         try {
             const cached = window.localStorage.getItem(COMPANION_URL_CACHE_KEY);
             if (cached) {
-                const hit = await tryOne(cached);
-                if (hit) return hit;
+                const hit = await tryOne(cached, "cache");
+                if (hit) { publishDiscoveryReport(report, hit); return hit; }
                 // Cached URL no longer works — purge it so we don't keep
                 // trying it first on every probe (e.g. after the user's
                 // OS resolver flips `localhost` from IPv4 to IPv6).
@@ -270,7 +281,7 @@ export async function discoverCompanion(
             candidates.push(`http://${host}:${port}`);
         }
     }
-    const results = await Promise.all(candidates.map((u) => tryOne(u)));
+    const results = await Promise.all(candidates.map((u) => tryOne(u, "loopback")));
     let hit = results.find((r) => r !== null);
 
     // 4. LAN fallback. If no loopback hit, ask the cloud for the
@@ -288,7 +299,7 @@ export async function discoverCompanion(
                     .map((p) => p.lanUrl)
                     .filter((u): u is string => typeof u === "string" && !!u);
                 if (peerUrls.length > 0) {
-                    const peerResults = await Promise.all(peerUrls.map((u) => tryOne(u)));
+                    const peerResults = await Promise.all(peerUrls.map((u) => tryOne(u, "lan-peer")));
                     hit = peerResults.find((r) => r !== null);
                 }
             }
@@ -298,7 +309,28 @@ export async function discoverCompanion(
     if (hit && typeof window !== "undefined") {
         try { window.localStorage.setItem(COMPANION_URL_CACHE_KEY, hit.apiUrl); } catch { /* ignore */ }
     }
+    publishDiscoveryReport(report, hit ?? null);
     return hit ?? null;
+}
+
+/** Publish the discovery report on window + console for debugging. The
+ *  user can paste `window.__mmoCompanionDiscovery` from devtools into a
+ *  bug report and we see exactly which candidates were tried, which
+ *  failed, and which (if any) succeeded — no guessing. */
+function publishDiscoveryReport(
+    attempts: Array<{ url: string; ok: boolean; error?: string; stage: string }>,
+    hit: { apiUrl: string } | null,
+): void {
+    if (typeof window === "undefined") return;
+    const payload = {
+        timestamp: new Date().toISOString(),
+        result: hit ? { ok: true, apiUrl: hit.apiUrl } : { ok: false },
+        attempts,
+    };
+    (window as unknown as { __mmoCompanionDiscovery: typeof payload }).__mmoCompanionDiscovery = payload;
+    const label = hit ? `[companion] discovered ${hit.apiUrl}` : "[companion] no companion reachable";
+    // eslint-disable-next-line no-console
+    console.info(label, payload);
 }
 
 export class NativeCompanionClient {

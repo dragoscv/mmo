@@ -136,12 +136,26 @@ function healWebAppUrl(stored: string | undefined): string {
     return stored;
 }
 
+// Heal serverPort if it's missing, 0, or out of the valid range. A 0
+// value silently bound the HTTP server to a random OS-chosen port,
+// breaking every loopback probe (web app expects 17899) and turning the
+// LAN beacon + mDNS broadcast into garbage. Seen in the wild when an
+// older build wrote 0 to the store during a settings save edge case.
+function healServerPort(stored: unknown): number {
+    const n = typeof stored === "number" ? stored : Number(stored);
+    if (!Number.isInteger(n) || n < 1 || n > 65535) {
+        store.set("serverPort", DEFAULTS.serverPort);
+        return DEFAULTS.serverPort;
+    }
+    return n;
+}
+
 export function getSettings(): CompanionSettings {
     return {
         startAtLogin: store.get("startAtLogin") as boolean,
         closeToTray: store.get("closeToTray") as boolean,
         startMinimized: store.get("startMinimized") as boolean,
-        serverPort: store.get("serverPort") as number,
+        serverPort: healServerPort(store.get("serverPort")),
         scanFolders: readScanFolders(),
         // Respect the value the OAuth flow persisted (or that the user typed in
         // settings). Heals legacy `localhost:3000` values left over from

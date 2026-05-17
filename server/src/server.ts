@@ -1150,6 +1150,14 @@ export async function startServer(): Promise<void> {
 
     return new Promise<void>((resolve, reject) => {
         httpServer!.listen(serverPort, "0.0.0.0", () => {
+            // Read back the *actual* bound port. When `serverPort` was 0
+            // (legacy store corruption) the OS picks a random port; we
+            // recover so downstream consumers (LAN beacon, mDNS, IPC
+            // status) see the real number instead of garbage.
+            const addr = httpServer!.address();
+            if (addr && typeof addr === "object" && typeof addr.port === "number" && addr.port > 0) {
+                serverPort = addr.port;
+            }
             console.log(`MMO Companion Server running on port ${serverPort}`);
             // Publish LAN URL + mDNS so other devices on the user's
             // network can discover the companion. Re-announces every

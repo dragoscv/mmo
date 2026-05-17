@@ -1103,7 +1103,7 @@ app.whenReady().then(async () => {
             }
             try {
                 mod.startServer();
-                logLine("info", "server started");
+                logLine("info", `server started on port ${mod.getServerPort()}`);
                 // Defensive: if a previous companion process or a stale
                 // browser tab left the audio engine running (rare but
                 // possible if we crashed mid-session and another instance

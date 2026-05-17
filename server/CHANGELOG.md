@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.8 — heal invalid serverPort, log actual bound port
+
+- **Critical fix**: a `serverPort` of `0` persisted in some users' stores caused the HTTP server to silently bind to a random OS-chosen port. The companion logged "server started" but the web app's loopback discovery (which expects `17899`) found nothing, the LAN beacon URL pointed at port 0, and mDNS advertised garbage. `getSettings()` now validates the stored port (must be an integer in 1–65535) and resets to `17899` otherwise.
+- **Recovery**: after `httpServer.listen()` the actual bound port is read back via `address()` so even if a request for port 0 slipped through, downstream consumers see the real number.
+- **Log line**: `server started` now includes the bound port (e.g. `server started on port 17899`) so bug reports surface the issue at a glance.
+
 ## 1.0.7 — drop localhost:3000 default, heal stale pairings
 
 - **Fix**: cloud-sync was silently failing for users whose `webAppUrl` had been pinned to `http://localhost:3000` by an early dev pairing — the web app moved to port `13789` ages ago and port 3000 is the Node ecosystem default (high collision risk with other services). The companion now detects the known-bad legacy values (`http://localhost:3000`, `http://127.0.0.1:3000`) on startup and rewrites them to the production default `https://muzicai.ro`, so cloud-sync starts working again without the user having to repair from settings.
