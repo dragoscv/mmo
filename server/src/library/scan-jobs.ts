@@ -36,11 +36,49 @@ export interface ScannedTrackPayload {
     year?: number;
 }
 
+/**
+ * Payload for a single scanned video file. Carries enough of the ffprobe
+ * result to drive grouping (parsed title/year/season/episode), to render
+ * the per-file UI badge (resolution, codec), and to upsert into the
+ * cloud `videoFiles` row without a second probe at ingest time.
+ */
+export interface ScannedVideoPayload {
+    filepath: string;
+    filename: string;
+    fileSize: number;
+    mtime: number; // ms since epoch
+    container: string | null;
+    videoCodec: string | null;
+    audioCodec: string | null;
+    width: number | null;
+    height: number | null;
+    durationSec: number | null;
+    bitrateKbps: number | null;
+    hdr: "sdr" | "hdr10" | "hlg" | "dolby" | null;
+    audioTracks: Array<{ index: number; codec: string; channels: number; lang: string | null; title: string | null }>;
+    subtitleTracks: Array<{ index: number; codec: string; lang: string | null; title: string | null; forced: boolean }>;
+    /** Parsed from the basename. `season`/`episode` are null for movies. */
+    parsedTitle: string;
+    parsedYear: number | null;
+    parsedSeason: number | null;
+    parsedEpisode: number | null;
+    /** Show name when the file lives under a `Show Name/Season 01/` tree.
+     *  Falls back to `parsedTitle` for flat layouts. Only meaningful for tv-shows. */
+    showHint: string | null;
+    /** Standard label: "480p" | "720p" | "1080p" | "1440p" | "2160p" | null. */
+    resolutionLabel: string | null;
+}
+
+export type ScanJobKind = "audio" | "video";
+
 export type ScanJobStatus = "pending" | "discovering" | "scanning" | "complete" | "error" | "canceled";
 
 export interface ScanJob {
     id: string;
     folder: string;
+    /** Which payload shape this job produces. Drives the runner used
+     *  on the companion side and the ingest action on the web side. */
+    kind: ScanJobKind;
     status: ScanJobStatus;
     /** Total files discovered so far (grows during the discovery phase). */
     discovered: number;
@@ -55,9 +93,11 @@ export interface ScanJob {
     startedAt: number;
     finishedAt: number | null;
     error: string | null;
-    /** Filled in once status === "complete". Cleared after retrieval to
-     *  free memory; the web app fetches once then ingests. */
+    /** Filled in once status === "complete" for audio jobs. Cleared after
+     *  retrieval to free memory; the web app fetches once then ingests. */
     tracks: ScannedTrackPayload[] | null;
+    /** Same as `tracks` but for video jobs. */
+    videos: ScannedVideoPayload[] | null;
     /** Origin label for telemetry: manual scan vs watcher event. */
     origin: "manual" | "watcher";
 }
@@ -67,10 +107,15 @@ const FAILURE_TTL_MS = 15 * 60_000;
 
 const jobs = new Map<string, ScanJob>();
 
-export function createScanJob(folder: string, origin: "manual" | "watcher" = "manual"): ScanJob {
+export function createScanJob(
+    folder: string,
+    origin: "manual" | "watcher" = "manual",
+    kind: ScanJobKind = "audio",
+): ScanJob {
     const job: ScanJob = {
         id: randomUUID(),
         folder,
+        kind,
         status: "pending",
         discovered: 0,
         scanned: 0,
@@ -81,6 +126,7 @@ export function createScanJob(folder: string, origin: "manual" | "watcher" = "ma
         finishedAt: null,
         error: null,
         tracks: null,
+        videos: null,
         origin,
     };
     jobs.set(job.id, job);
@@ -125,6 +171,18 @@ export function completeScanJob(id: string, tracks: ScannedTrackPayload[]): void
     j.currentFile = null;
 }
 
+/** Same as `completeScanJob` but for video jobs. */
+export function completeVideoScanJob(id: string, videos: ScannedVideoPayload[]): void {
+    const j = jobs.get(id);
+    if (!j) return;
+    j.status = "complete";
+    j.videos = videos;
+    j.total = videos.length;
+    j.scanned = videos.length;
+    j.finishedAt = Date.now();
+    j.currentFile = null;
+}
+
 export function failScanJob(id: string, error: string): void {
     const j = jobs.get(id);
     if (!j) return;
@@ -135,7 +193,7 @@ export function failScanJob(id: string, error: string): void {
 
 export function clearJobTracks(id: string): void {
     const j = jobs.get(id);
-    if (j) j.tracks = null;
+    if (j) { j.tracks = null; j.videos = null; }
 }
 
 /** Periodic GC. Called once a minute from the server bootstrap. */

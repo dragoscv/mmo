@@ -36,6 +36,7 @@ import {
     clearJobTracks,
 } from "./library/scan-jobs";
 import { runScanJob } from "./library/scan-runner";
+import { runVideoScanJob } from "./library/video-scan-runner";
 import { resolveAllowedFile, resolveAllowedFolder, isPathInAllowedFolder } from "./lib/path-guard";
 import {
     startWatcher,
@@ -675,14 +676,22 @@ export async function startServer(): Promise<void> {
             return;
         }
 
-        const job = createScanJob(resolved, "manual");
-        // Fire-and-forget — runScanJob never throws. Status updates are
+        // Per-folder kind decides which runner walks the tree:
+        // video files (movies / tv-shows) go through ffprobe + filename
+        // parsing; everything else (music / samples / recordings / other)
+        // uses the audio metadata runner.
+        const cfg = settings.scanFolders.find((f) => f.path === resolved);
+        const kind = cfg?.kind ?? "music";
+        const isVideo = kind === "movies" || kind === "tv-shows";
+        const job = createScanJob(resolved, "manual", isVideo ? "video" : "audio");
+        // Fire-and-forget — runners never throw. Status updates are
         // visible via GET /scan/jobs/:id.
         const broadcast = () => {
             const msg = JSON.stringify({ type: "scan:progress", job });
             for (const c of wsClients) if (c.readyState === WebSocket.OPEN) c.send(msg);
         };
-        void runScanJob(job, broadcast);
+        if (isVideo) void runVideoScanJob(job, broadcast);
+        else void runScanJob(job, broadcast);
 
         res.status(202).json({ jobId: job.id, job });
     });

@@ -12,6 +12,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Realtime recursive video scanning (web `0.3.7` + companion `1.0.20`)
+
+- **Per-kind scan dispatcher on the companion.** `POST /scan` now reads the folder's kind from `settings.scanFolders` and routes Movies / TV Shows folders through the new `runVideoScanJob` runner, while Music / Samples / Recordings / Other keep using the audio runner. One endpoint, no API change for the web — the web `startScan` payload is still just `{ folder }`.
+- **Recursive video walker with realtime progress.** `video-scan-runner.ts` uses the existing `walkVideos` async generator to discover `.mkv/.mp4/.avi/...` files down the full subtree, sets `total` for a determinate bar, then probes each file with `ffprobe` + filename parsing (title, year, season, episode). `currentFile` is updated after every file and throttled to ~60 ms so the existing `FolderRow` progress bar in the web UI now shows the real movie being scanned, not just a spinning count.
+- **Multi-version handling out of the box.** Files like `Movie.1080p.mkv` and `Movie.2160p.mkv` collapse onto the same `movies` row but produce two `videoFiles` rows (unique on `device_id + path`). For TV shows, `Show / Season 03 / Show.S03E07.1080p.mkv` + `…2160p.mkv` produce a single episode row with two file rows.
+- **Hierarchical ingest (`ingestCompanionVideoScanJob`).** New server action drains the completed video scan job, reconciles the bigint `companionDevices` row by `machineId = devices.id` (creating it on demand), then for Movies upserts `movies` → `videoFiles`, and for TV Shows upserts `tvShows` → `tvSeasons` → `tvEpisodes` → `videoFiles`. Files without a parseable season/episode under a tv-shows folder are counted as `skipped` rather than silently dropped. No TMDB enrichment in this slice — titles come straight from the filename parser.
+- **Show-name detection from folder layout.** `detectShowHint()` walks parent directories upward and skips season-style folders (`Season 03`, `S03`, `Specials`, `Extras`) so the show name resolves to the next meaningful folder above. Falls back to the parsed title when the file sits directly under the scan root.
+- **Resolution labelling.** Heights are bucketed into `2160p / 1440p / 1080p / 720p / 480p` (with raw `<height>p` fallback) and stored on `videoFiles.resolutionLabel` for fast version-picker rendering later.
+- **Toast feedback per kind.** Completion toast now reads `"Scan complete: 3 movies, 1 shows, 12 episodes, 14 files, 0 skipped"` for video folders and keeps the existing `"X new, Y skipped"` format for audio.
+
+### Fixed — Missing tunnel helpers and broken `removeDevice` teardown
+
+- Restored `ensureDeviceTunnel(deviceId, opts)` and `getDeviceDirectAccess(deviceId)` server actions that the `/api/devices/announce` route and the `devices` client page already referenced — the previous tunnel-diagnostics slice forgot to commit the implementations, which would have type-errored any clean checkout.
+- `removeDevice` now looks up the device's `tunnelId` first and calls `deleteDeviceTunnel(cfg, { tunnelId })` with the correct two-arg signature, instead of the typo'd `destroyDeviceTunnel(deviceId)` that never compiled.
+
 ### Changed — Folder management UX & instant removal (web `0.3.6` + companion `1.0.19`)
 
 - **Removed the per-folder purpose selector from the Library Folders list.** The kind (Music / Movies / TV Shows / Samples / Recordings / Other) is now chosen exclusively at pick time. Existing entries display the chosen kind as a read-only pill; to change it, remove the folder and re-add it. The previous inline `<Select>` was wired to a queue-backed action that visibly lagged and, when offline, silently rolled back — confusing operators.

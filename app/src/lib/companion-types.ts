@@ -51,9 +51,37 @@ export interface CompanionScannedTrack {
     year?: number;
 }
 
+/** Payload for a single scanned video file. Mirrors the companion-side
+ *  `ScannedVideoPayload` in `server/src/library/scan-jobs.ts`. */
+export interface CompanionScannedVideo {
+    filepath: string;
+    filename: string;
+    fileSize: number;
+    mtime: number;
+    container: string | null;
+    videoCodec: string | null;
+    audioCodec: string | null;
+    width: number | null;
+    height: number | null;
+    durationSec: number | null;
+    bitrateKbps: number | null;
+    hdr: "sdr" | "hdr10" | "hlg" | "dolby" | null;
+    audioTracks: Array<{ index: number; codec: string; channels: number; lang: string | null; title: string | null }>;
+    subtitleTracks: Array<{ index: number; codec: string; lang: string | null; title: string | null; forced: boolean }>;
+    parsedTitle: string;
+    parsedYear: number | null;
+    parsedSeason: number | null;
+    parsedEpisode: number | null;
+    showHint: string | null;
+    resolutionLabel: string | null;
+}
+
 export interface CompanionScanJob {
     id: string;
     folder: string;
+    /** Discriminator: "audio" jobs emit `tracks`; "video" jobs emit `videos`.
+     *  Older companions (≤1.0.18) omit this field — treat missing as "audio". */
+    kind?: "audio" | "video";
     status: "pending" | "discovering" | "scanning" | "complete" | "error" | "canceled";
     discovered: number;
     scanned: number;
@@ -65,6 +93,7 @@ export interface CompanionScanJob {
     error: string | null;
     origin: "manual" | "watcher";
     tracks?: CompanionScannedTrack[] | null;
+    videos?: CompanionScannedVideo[] | null;
 }
 
 export interface CompanionWatchEvent {

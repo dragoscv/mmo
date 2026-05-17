@@ -1,7 +1,16 @@
 "use server";
 
 import { db } from "@/db";
-import { devices, deviceFolders } from "@/db/schema";
+import {
+    devices,
+    deviceFolders,
+    companionDevices,
+    movies,
+    tvShows,
+    tvSeasons,
+    tvEpisodes,
+    videoFiles,
+} from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
@@ -125,7 +134,15 @@ export async function removeDevice(deviceId: string) {
     // Best-effort CF teardown BEFORE the row goes away — we need the
     // tunnelId. Failure here leaves an orphan tunnel on the CF account
     // but never blocks the user-visible removal.
-    try { await destroyDeviceTunnel(deviceId); } catch { /* ignore */ }
+    try {
+        const [row] = await db
+            .select({ tunnelId: devices.tunnelId })
+            .from(devices)
+            .where(and(eq(devices.id, deviceId), eq(devices.userId, session.user.id)))
+            .limit(1);
+        const cfg = getCloudflareConfig();
+        if (cfg && row?.tunnelId) await deleteDeviceTunnel(cfg, { tunnelId: row.tunnelId });
+    } catch { /* ignore */ }
 
     await db
         .delete(devices)
@@ -701,141 +718,358 @@ export async function setCompanionAuthorizedAudioDevices(
 }
 
 
-// ─── Cloudflare Tunnel (per-device fast path) ─────────────────────────────
-//
-// Each device gets its own named tunnel + DNS record so the browser can
-// fetch the companion's HTTP API at https://device-xxx.<base> — bypassing
-// the 1.5-6s announce-queue round-trip for hot operations (folder
-// browsing, drive listing). The functions below are imported by the
-// announce route (auto-provision on first heartbeat) and the devices
-// client (fetch bearer + tunnel hostname for direct fetches).
+// ─── Cloudflare tunnel helpers ──────────────────────────────────────────────
 
 /**
- * Provision a Cloudflare Tunnel for the given device. Idempotent:
- * returns the existing tunnel info if one is already attached. Safe to
- * call from the announce route on first heartbeat. Returns null when
- * Cloudflare env vars are not configured (graceful fallback to queue
- * transport — existing pairings stay functional with zero CF setup).
- *
- * When opts.port is provided, the existing tunnel's ingress config
- * is updated to point at that port (deduped per-process so the 3s
- * announce loop doesn't burn CF API quota).
+ * Idempotently provision the per-device Cloudflare Tunnel + DNS record.
+ * Returns the bootstrap (`tunnelHostname` + `tunnelToken`) the companion
+ * needs to start `cloudflared`, or null when CF is not configured or
+ * the API call fails. Safe to call on every heartbeat.
  */
 export async function ensureDeviceTunnel(
     deviceId: string,
     opts: { port?: number } = {},
-): Promise<
-    { tunnelHostname: string; tunnelToken: string } | null
-> {
+): Promise<{ tunnelHostname: string; tunnelToken: string } | null> {
     const cfg = getCloudflareConfig();
     if (!cfg) return null;
-
-    const row = (await db.select({
-        id: devices.id,
-        tunnelId: devices.tunnelId,
-        tunnelHostname: devices.tunnelHostname,
-        tunnelTokenEncrypted: devices.tunnelTokenEncrypted,
-    }).from(devices).where(eq(devices.id, deviceId)).limit(1))[0];
+    const [row] = await db
+        .select({
+            id: devices.id,
+            tunnelId: devices.tunnelId,
+            tunnelHostname: devices.tunnelHostname,
+            tunnelTokenEncrypted: devices.tunnelTokenEncrypted,
+        })
+        .from(devices)
+        .where(eq(devices.id, deviceId))
+        .limit(1);
     if (!row) return null;
-
     if (row.tunnelId && row.tunnelHostname && row.tunnelTokenEncrypted) {
         try {
-            const decoded = {
+            return {
                 tunnelHostname: row.tunnelHostname,
                 tunnelToken: decryptDeviceToken(row.tunnelTokenEncrypted),
             };
-            if (opts.port && shouldUpdateIngress(deviceId, opts.port)) {
-                try {
-                    await updateDeviceTunnelIngress(cfg, {
-                        tunnelId: row.tunnelId,
-                        hostname: row.tunnelHostname,
-                        port: opts.port,
+        } catch { /* fall through and re-provision */ }
+    }
+    try {
+        const t = await createDeviceTunnel(cfg, deviceId, opts);
+        await db
+            .update(devices)
+            .set({
+                tunnelId: t.tunnelId,
+                tunnelHostname: t.hostname,
+                tunnelTokenEncrypted: encryptDeviceToken(t.tunnelToken),
+            })
+            .where(eq(devices.id, deviceId));
+        return { tunnelHostname: t.hostname, tunnelToken: t.tunnelToken };
+    } catch (err) {
+        console.warn("[devices] ensureDeviceTunnel failed:", err instanceof Error ? err.message : err);
+        return null;
+    }
+}
+
+/**
+ * Browser-side fast path: return the public tunnel hostname + the
+ * device bearer the browser should send as `X-Device-Token`. Returns
+ * null when the tunnel isn't provisioned yet — caller falls back to the
+ * cloud command queue.
+ */
+export async function getDeviceDirectAccess(
+    deviceId: string,
+): Promise<{ tunnelHostname: string; bearer: string } | null> {
+    const session = await auth();
+    if (!session?.user?.id) return null;
+    const [row] = await db
+        .select({
+            id: devices.id,
+            tunnelHostname: devices.tunnelHostname,
+            tokenEncrypted: devices.tokenEncrypted,
+        })
+        .from(devices)
+        .where(and(eq(devices.id, deviceId), eq(devices.userId, session.user.id)))
+        .limit(1);
+    if (!row?.tunnelHostname) return null;
+    const bearer = await materializeDeviceToken({ id: row.id, tokenEncrypted: row.tokenEncrypted });
+    if (!bearer) return null;
+    return { tunnelHostname: row.tunnelHostname, bearer };
+}
+
+
+// ─── Companion video scan ingest ────────────────────────────────────────────
+
+/**
+ * Pull a completed video-kind scan job from the companion and persist
+ * its results into the cloud schema (movies / tvShows / tvSeasons /
+ * tvEpisodes / videoFiles).
+ *
+ * Behaviour:
+ *  - Movies folder → group by (lowercased title, year), upsert a single
+ *    `movies` row per group. Each scanned file becomes a `videoFiles`
+ *    row keyed by `(deviceId, path)`; multiple files for the same movie
+ *    (e.g. different resolutions) are preserved naturally because their
+ *    paths differ.
+ *  - TV shows folder → group by `showHint || parsedTitle`, then season,
+ *    then episode. Files missing season/episode metadata count as
+ *    `skipped` rather than being silently dropped.
+ *
+ * No TMDB enrichment in this slice — titles come from the filename
+ * parser, `tmdbId` stays null.
+ */
+export async function ingestCompanionVideoScanJob(
+    deviceId: string,
+    jobId: string,
+): Promise<{
+    success: true;
+    movies: number;
+    shows: number;
+    seasons: number;
+    episodes: number;
+    files: number;
+    skipped: number;
+} | { error: string }> {
+    const session = await auth();
+    if (!session?.user?.id) return { error: "Not authenticated" };
+    const ownership = await assertDeviceOwnership(deviceId);
+    if (ownership) return { error: ownership };
+
+    const [device] = await db
+        .select({ id: devices.id, hostname: devices.hostname, os: devices.os })
+        .from(devices)
+        .where(eq(devices.id, deviceId))
+        .limit(1);
+    if (!device) return { error: "Device not found" };
+
+    const job = await companionControl.getScanJob(deviceId, jobId).catch(() => null);
+    if (!job) return { error: "Scan job not found on companion" };
+    if (job.status !== "complete") return { error: `Scan job is ${job.status}` };
+    if (job.kind !== "video" || !job.videos) return { error: "Not a video scan job" };
+
+    const folders = await companionControl.listFolders(deviceId).catch(() => [] as CompanionFolder[]);
+    const folderCfg = folders.find((f) => f.path === job.folder);
+    const folderKind: FolderKind | undefined = folderCfg?.kind;
+    if (folderKind !== "movies" && folderKind !== "tv-shows") {
+        return { error: `Folder kind ${folderKind ?? "unknown"} is not a video kind` };
+    }
+
+    // Reconcile the `companionDevices` row (bigint id) the video schema's
+    // FKs point at. Two device tables exist for historical reasons — we
+    // key the bigint table by `machineId = devices.id` for a stable 1:1
+    // mapping.
+    const userId = session.user.id;
+    let [cdRow] = await db
+        .select({ id: companionDevices.id })
+        .from(companionDevices)
+        .where(and(eq(companionDevices.userId, userId), eq(companionDevices.machineId, device.id)))
+        .limit(1);
+    if (!cdRow) {
+        const inserted = await db
+            .insert(companionDevices)
+            .values({
+                userId,
+                machineId: device.id,
+                hostname: device.hostname ?? device.id,
+                platform: device.os ?? "unknown",
+            })
+            .returning({ id: companionDevices.id });
+        cdRow = inserted[0];
+    }
+    const companionDeviceId = cdRow.id;
+
+    const now = new Date();
+    let movieCount = 0;
+    let showCount = 0;
+    let seasonCount = 0;
+    let episodeCount = 0;
+    let fileCount = 0;
+    let skipped = 0;
+
+    if (folderKind === "movies") {
+        const groups = new Map<string, { title: string; year: number | null; files: typeof job.videos }>();
+        for (const v of job.videos) {
+            const title = (v.parsedTitle || v.filename).trim();
+            const key = `${title.toLowerCase()}::${v.parsedYear ?? ""}`;
+            const existing = groups.get(key);
+            if (existing) existing.files.push(v);
+            else groups.set(key, { title, year: v.parsedYear, files: [v] });
+        }
+
+        for (const g of groups.values()) {
+            // No TMDB id → can't use the (userId, tmdbId) unique index.
+            // Look up by (userId, title, year) and insert if absent.
+            const [existing] = await db
+                .select({ id: movies.id })
+                .from(movies)
+                .where(and(
+                    eq(movies.userId, userId),
+                    eq(movies.title, g.title),
+                    g.year != null ? eq(movies.year, g.year) : sql`${movies.year} is null`,
+                ))
+                .limit(1);
+            let movieId: number;
+            if (existing) {
+                movieId = existing.id;
+            } else {
+                const [created] = await db
+                    .insert(movies)
+                    .values({ userId, title: g.title, year: g.year ?? null })
+                    .returning({ id: movies.id });
+                movieId = created.id;
+                movieCount++;
+            }
+
+            for (const v of g.files) {
+                const fileValues = {
+                    userId,
+                    deviceId: companionDeviceId,
+                    path: v.filepath,
+                    kind: "movie" as const,
+                    movieId,
+                    episodeId: null,
+                    sizeBytes: v.fileSize,
+                    durationSec: v.durationSec ?? null,
+                    container: v.container ?? null,
+                    videoCodec: v.videoCodec ?? null,
+                    audioCodec: v.audioCodec ?? null,
+                    width: v.width ?? null,
+                    height: v.height ?? null,
+                    bitrateKbps: v.bitrateKbps ?? null,
+                    hdr: v.hdr ?? null,
+                    audioTracks: v.audioTracks,
+                    subtitleTracks: v.subtitleTracks,
+                    mtime: new Date(v.mtime),
+                    scannedAt: now,
+                };
+                await db
+                    .insert(videoFiles)
+                    .values(fileValues)
+                    .onConflictDoUpdate({
+                        target: [videoFiles.deviceId, videoFiles.path],
+                        set: fileValues,
                     });
-                    rememberIngressPort(deviceId, opts.port);
-                    console.log("[devices] tunnel ingress updated device=" + deviceId + " port=" + opts.port);
-                } catch (err) {
-                    console.warn("[devices] tunnel ingress update failed:", err instanceof Error ? err.message : err);
+                fileCount++;
+            }
+        }
+    } else {
+        const showGroups = new Map<string, typeof job.videos>();
+        for (const v of job.videos) {
+            if (v.parsedSeason == null || v.parsedEpisode == null) { skipped++; continue; }
+            const showName = (v.showHint || v.parsedTitle || v.filename).trim();
+            const key = showName.toLowerCase();
+            const arr = showGroups.get(key);
+            if (arr) arr.push(v);
+            else showGroups.set(key, [v]);
+        }
+
+        for (const files of showGroups.values()) {
+            const showName = (files[0].showHint || files[0].parsedTitle || files[0].filename).trim();
+            const [existingShow] = await db
+                .select({ id: tvShows.id })
+                .from(tvShows)
+                .where(and(eq(tvShows.userId, userId), eq(tvShows.title, showName)))
+                .limit(1);
+            let showId: number;
+            if (existingShow) {
+                showId = existingShow.id;
+            } else {
+                const [created] = await db
+                    .insert(tvShows)
+                    .values({ userId, title: showName })
+                    .returning({ id: tvShows.id });
+                showId = created.id;
+                showCount++;
+            }
+
+            const bySeason = new Map<number, typeof job.videos>();
+            for (const v of files) {
+                const s = v.parsedSeason as number;
+                const arr = bySeason.get(s);
+                if (arr) arr.push(v);
+                else bySeason.set(s, [v]);
+            }
+
+            for (const [seasonNum, sFiles] of bySeason) {
+                // Upsert season; onConflictDoNothing keeps the original
+                // row when one already exists for this (show, season).
+                await db
+                    .insert(tvSeasons)
+                    .values({ showId, seasonNumber: seasonNum })
+                    .onConflictDoNothing({ target: [tvSeasons.showId, tvSeasons.seasonNumber] });
+                seasonCount++;
+
+                const byEpisode = new Map<number, typeof job.videos>();
+                for (const v of sFiles) {
+                    const e = v.parsedEpisode as number;
+                    const arr = byEpisode.get(e);
+                    if (arr) arr.push(v);
+                    else byEpisode.set(e, [v]);
+                }
+
+                for (const [episodeNum, eFiles] of byEpisode) {
+                    const [insertedEp] = await db
+                        .insert(tvEpisodes)
+                        .values({
+                            showId,
+                            seasonNumber: seasonNum,
+                            episodeNumber: episodeNum,
+                            title: eFiles[0].parsedTitle || null,
+                        })
+                        .onConflictDoUpdate({
+                            target: [tvEpisodes.showId, tvEpisodes.seasonNumber, tvEpisodes.episodeNumber],
+                            // Touch a no-op field so returning() always fires.
+                            set: { seasonNumber: seasonNum },
+                        })
+                        .returning({ id: tvEpisodes.id });
+                    const episodeId = insertedEp.id;
+                    episodeCount++;
+
+                    for (const v of eFiles) {
+                        const fileValues = {
+                            userId,
+                            deviceId: companionDeviceId,
+                            path: v.filepath,
+                            kind: "episode" as const,
+                            movieId: null,
+                            episodeId,
+                            sizeBytes: v.fileSize,
+                            durationSec: v.durationSec ?? null,
+                            container: v.container ?? null,
+                            videoCodec: v.videoCodec ?? null,
+                            audioCodec: v.audioCodec ?? null,
+                            width: v.width ?? null,
+                            height: v.height ?? null,
+                            bitrateKbps: v.bitrateKbps ?? null,
+                            hdr: v.hdr ?? null,
+                            audioTracks: v.audioTracks,
+                            subtitleTracks: v.subtitleTracks,
+                            mtime: new Date(v.mtime),
+                            scannedAt: now,
+                        };
+                        await db
+                            .insert(videoFiles)
+                            .values(fileValues)
+                            .onConflictDoUpdate({
+                                target: [videoFiles.deviceId, videoFiles.path],
+                                set: fileValues,
+                            });
+                        fileCount++;
+                    }
                 }
             }
-            return decoded;
-        } catch {
-            // Corrupt envelope — fall through and re-provision.
         }
     }
 
-    try {
-        const t = await createDeviceTunnel(cfg, deviceId, opts.port ? { port: opts.port } : {});
-        await db.update(devices).set({
-            tunnelId: t.tunnelId,
-            tunnelHostname: t.hostname,
-            tunnelTokenEncrypted: encryptDeviceToken(t.tunnelToken),
-        }).where(eq(devices.id, deviceId));
-        if (opts.port) rememberIngressPort(deviceId, opts.port);
-        console.log("[devices] tunnel provisioned device=" + deviceId + " host=" + t.hostname + " port=" + (opts.port ?? 17899));
-        return { tunnelHostname: t.hostname, tunnelToken: t.tunnelToken };
-    } catch (err) {
-        console.warn("[devices] tunnel provision failed:", err instanceof Error ? err.message : err);
-        return null;
-    }
+    await companionControl.ackScanJob(deviceId, jobId).catch(() => null);
+    revalidatePath("/devices");
+    revalidatePath("/watch");
+
+    return {
+        success: true,
+        movies: movieCount,
+        shows: showCount,
+        seasons: seasonCount,
+        episodes: episodeCount,
+        files: fileCount,
+        skipped,
+    };
 }
 
-// Per-process memo of the last ingress port written per device, so the
-// announce-route hot path doesn't fire a CF API call on every 3s tick.
-const ingressPortByDevice = new Map<string, number>();
-function shouldUpdateIngress(deviceId: string, port: number): boolean {
-    return ingressPortByDevice.get(deviceId) !== port;
-}
-function rememberIngressPort(deviceId: string, port: number): void {
-    ingressPortByDevice.set(deviceId, port);
-}
-
-/**
- * Returns the data the browser needs to call the companion directly
- * over the tunnel: { hostname, bearer }. Auth-gated to the device's
- * owner. Same trust boundary as the queue-based actions.
- */
-export async function getDeviceDirectAccess(deviceId: string): Promise<
-    { tunnelHostname: string; bearer: string } | null
-> {
-    const err = await assertDeviceOwnership(deviceId);
-    if (err) {
-        console.log("[devices] getDeviceDirectAccess: ownership denied device=" + deviceId);
-        return null;
-    }
-    const row = (await db.select({
-        tokenEncrypted: devices.tokenEncrypted,
-        tunnelHostname: devices.tunnelHostname,
-    }).from(devices).where(eq(devices.id, deviceId)).limit(1))[0];
-    if (!row) {
-        console.log("[devices] getDeviceDirectAccess: device row missing device=" + deviceId);
-        return null;
-    }
-    if (!row.tunnelHostname) {
-        console.log("[devices] getDeviceDirectAccess: no tunnelHostname (not provisioned) device=" + deviceId + " cfConfigured=" + (getCloudflareConfig() !== null));
-        return null;
-    }
-    if (!row.tokenEncrypted) {
-        console.log("[devices] getDeviceDirectAccess: no bearer token device=" + deviceId);
-        return null;
-    }
-    try {
-        return { tunnelHostname: row.tunnelHostname, bearer: decryptDeviceToken(row.tokenEncrypted) };
-    } catch (e) {
-        console.warn("[devices] getDeviceDirectAccess: bearer decrypt failed device=" + deviceId, e instanceof Error ? e.message : e);
-        return null;
-    }
-}
-
-/**
- * Drop the CF tunnel + DNS record when a device is unpaired. Best
- * effort — failures here leave orphan tunnels on the CF account but
- * don't break the user-visible removal flow.
- */
-export async function destroyDeviceTunnel(deviceId: string): Promise<void> {
-    const cfg = getCloudflareConfig();
-    if (!cfg) return;
-    const row = (await db.select({ tunnelId: devices.tunnelId }).from(devices)
-        .where(eq(devices.id, deviceId)).limit(1))[0];
-    if (!row?.tunnelId) return;
-    await deleteDeviceTunnel(cfg, { tunnelId: row.tunnelId });
-}

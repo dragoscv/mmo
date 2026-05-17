@@ -86,6 +86,7 @@ import {
     getCompanionScanJob,
     listCompanionScanJobs,
     ingestCompanionScanJob,
+    ingestCompanionVideoScanJob,
     pollCompanionWatchEvents,
     listCompanionDrives,
     listCompanionDirectory,
@@ -610,16 +611,33 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                 if ("error" in r) continue;
                 setScanProgress((p) => ({ ...p, [folderPath]: { ...r.job, folder: folderPath } }));
                 if (r.job.status === "complete") {
-                    // Pull tracks + ingest, then clear progress after a short
-                    // celebratory pause so the user sees the “100% done” state.
-                    const ingest = await ingestCompanionScanJob(owner.id, job.id);
-                    if ("error" in ingest) {
-                        toast.error(`Ingest failed: ${ingest.error}`);
+                    // Pull tracks/videos + ingest, then clear progress after a
+                    // short celebratory pause so the user sees the “100% done”
+                    // state. Branch by kind — audio jobs feed the music library,
+                    // video jobs feed movies/tvShows/episodes/videoFiles.
+                    if (r.job.kind === "video") {
+                        const ingest = await ingestCompanionVideoScanJob(owner.id, job.id);
+                        if ("error" in ingest) {
+                            toast.error(`Ingest failed: ${ingest.error}`);
+                        } else {
+                            const parts: string[] = [];
+                            if (ingest.movies) parts.push(`${ingest.movies} movies`);
+                            if (ingest.shows) parts.push(`${ingest.shows} shows`);
+                            if (ingest.episodes) parts.push(`${ingest.episodes} episodes`);
+                            parts.push(`${ingest.files} files`);
+                            if (ingest.skipped) parts.push(`${ingest.skipped} skipped`);
+                            toast.success(`Scan complete: ${parts.join(", ")}`);
+                        }
                     } else {
-                        toast.success(`Scan complete: ${ingest.inserted} new, ${ingest.skipped} skipped`);
-                        // Refresh the device's track count.
-                        const c = await getDeviceTrackCount(owner.id);
-                        setTrackCounts((p) => ({ ...p, [owner.id]: c }));
+                        const ingest = await ingestCompanionScanJob(owner.id, job.id);
+                        if ("error" in ingest) {
+                            toast.error(`Ingest failed: ${ingest.error}`);
+                        } else {
+                            toast.success(`Scan complete: ${ingest.inserted} new, ${ingest.skipped} skipped`);
+                            // Refresh the device's track count.
+                            const c = await getDeviceTrackCount(owner.id);
+                            setTrackCounts((p) => ({ ...p, [owner.id]: c }));
+                        }
                     }
                     setTimeout(() => {
                         setScanProgress((p) => {
