@@ -2,6 +2,11 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.4 — simplified main view + audio setup consolidation
+
+- **UI**: removed the "Music Folders" section and the "Folders" stat from the main view. Library folders are managed end-to-end from the web app at https://muzicai.ro/devices (pick, scan, remove, watch toggle, per-folder progress), so the companion no longer duplicates that UI.
+- **UI**: moved the "Physical Audio Devices" section and the live engine metrics widget into the Audio Setup view next to the Virtual Devices list. Audio inventory is now lazy-loaded the first time the user opens that view, so the main view paints faster on cold start.
+
 ## 1.0.3 — CORS allowlist always merges defaults
 
 - **Fix**: `audioOriginAllowlist` now always merges in the built-in defaults (`https://muzicai.ro`, `https://*.muzicai.ro`, `http://localhost:3000`, `http://127.0.0.1:3000`) on top of whatever the user has stored. Previous behaviour was "replace with stored value", which meant any installation that had been pointed at a different webAppUrl in the past (e.g. local dev or a sibling brand) would CORS-block the production muzicai.ro origin until the user manually fixed it in settings.
