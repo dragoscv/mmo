@@ -1,15 +1,18 @@
 name: Release (Changesets)
 
-# Opens / updates a "Version Packages" PR whenever changesets land on
-# main. Merging that PR bumps versions + writes CHANGELOG entries across
-# the workspace. Each package's own release pipeline
-# (companion-release.yml, native-release.yml, extension-release.yml, the
-# Vercel web-app deploy) still drives the actual artifact / publish step
-# off the resulting version tag.
+# Disabled by default: the project doesn't actually use changesets-driven
+# releases — companion ships via tag-based `companion-release.yml`, the
+# web app auto-deploys via Vercel, and the extension/native packages have
+# their own release workflows. Running this on every push to main would
+# just open a "Version Packages" PR no one ever merges.
+#
+# Kept in the repo (rather than deleted) so it can be re-enabled with a
+# single-line change if we ever adopt changesets. To re-arm, add:
+#   push:
+#     branches: [main]
+# back into the `on:` block below.
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
