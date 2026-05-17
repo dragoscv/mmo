@@ -568,6 +568,26 @@ function refreshTrayMenu() {
     }
 }
 
+/**
+ * Wipe the locally-stored device token + profile and tell the renderer
+ * to switch back to the auth view. Called when the cloud reports the
+ * token as invalid (orphaned pairing, deleted device row, rotated key,
+ * etc.) so the user gets a clear "sign in again" UX instead of a
+ * silent perpetual 401 loop in the background.
+ */
+function invalidateLocalPairing(reason: string): void {
+    store.delete("deviceToken" as never);
+    store.delete("deviceId" as never);
+    store.delete("userName" as never);
+    store.delete("userEmail" as never);
+    store.delete("userImage" as never);
+    try { void import("./sync/index").then((m) => m.stopCloudSync()); } catch { /* ignore */ }
+    try { void import("./lan-announce").then((m) => m.stopLanAnnounce()); } catch { /* ignore */ }
+    try { mainWindow?.webContents.send("auth-invalidated", { reason }); } catch { /* ignore */ }
+    try { mainWindow?.webContents.send("status-changed"); } catch { /* ignore */ }
+    refreshTrayMenu();
+}
+
 function createTray() {
     const iconPath = path.join(__dirname, "../assets/icon.png");
     let icon: Electron.NativeImage;
@@ -1096,14 +1116,25 @@ app.whenReady().then(async () => {
     // Lazy-load the server, also deferred. Failures here will NOT close
     // the window; they show an error dialog and disable the audio engine.
     runAfterPaint(() => {
-        void loadServerModule().then((mod) => {
+        void loadServerModule().then(async (mod) => {
             if (!mod) {
                 refreshTrayMenu();
                 return;
             }
             try {
-                mod.startServer();
+                await mod.startServer();
                 logLine("info", `server started on port ${mod.getServerPort()}`);
+                // Notify the renderer so the "Port" stat updates from its
+                // initial 0 to the real bound port. Without this push the
+                // UI sticks at 0 until the user manually refreshes.
+                try { mainWindow?.webContents.send("status-changed"); } catch { /* ignore */ }
+                // Wire LAN-announce 401 detection into our shared
+                // invalidation helper so an orphaned token surfaces as a
+                // visible re-pair prompt instead of a silent 401 loop.
+                try {
+                    const la = await import("./lan-announce");
+                    la.setOnAuthInvalidated((reason) => invalidateLocalPairing(reason));
+                } catch { /* best-effort */ }
                 // Defensive: if a previous companion process or a stale
                 // browser tab left the audio engine running (rare but
                 // possible if we crashed mid-session and another instance
@@ -1131,7 +1162,19 @@ app.whenReady().then(async () => {
     runAfterPaint(() => {
         void import("./sync/index").then((m) => {
             try {
-                const started = m.startCloudSync((msg, err) => err ? logLine("warn", msg, err as Error) : logLine("info", msg));
+                const started = m.startCloudSync((msg, err) => {
+                    // Cloud rejected our token — every paired endpoint will
+                    // bounce until the user re-pairs. Clear the local state
+                    // and switch the renderer to the auth view instead of
+                    // looping forever on 401s.
+                    if (/\b401\b/.test(msg) || (err instanceof Error && /\b401\b/.test(err.message))) {
+                        logLine("warn", `[auth] device token rejected by cloud (${msg}) — clearing local pairing`);
+                        try { invalidateLocalPairing("cloud-sync-401"); } catch { /* best-effort */ }
+                        return;
+                    }
+                    if (err) logLine("warn", msg, err as Error);
+                    else logLine("info", msg);
+                });
                 if (!started) logLine("info", "cloud sync deferred — waiting on device pairing");
             } catch (err) {
                 logLine("error", "startCloudSync threw:", err as Error);

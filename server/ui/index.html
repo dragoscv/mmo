@@ -1344,6 +1344,41 @@
             }
         }
 
+        // Re-fetch + re-render whenever main pushes a status update.
+        // Covers: server bound to its port (port stat 0 → 17899/9876),
+        // pairing completed, cloud invalidated our token (auth view).
+        async function refreshStatusFromMain() {
+            try {
+                const status = await window.mmo.getStatus();
+                renderVersion(status);
+                if (status.authenticated) {
+                    document.getElementById("view-auth").classList.remove("active");
+                    document.getElementById("view-main").classList.add("active");
+                    if (status.port) document.getElementById("stat-port").textContent = status.port;
+                    if (status.userName) document.getElementById("user-name").textContent = status.userName;
+                    if (status.userEmail) document.getElementById("user-email").textContent = status.userEmail;
+                } else {
+                    document.getElementById("view-main").classList.remove("active");
+                    document.getElementById("view-auth").classList.add("active");
+                }
+            } catch { /* ignore transient IPC errors */ }
+        }
+
+        if (window.mmo?.onStatusChanged) {
+            window.mmo.onStatusChanged(refreshStatusFromMain);
+        }
+        if (window.mmo?.onAuthInvalidated) {
+            window.mmo.onAuthInvalidated((data) => {
+                console.warn("[auth] device pairing invalidated by cloud:", data?.reason);
+                // Hard re-render to the auth view; the user must re-pair.
+                refreshStatusFromMain();
+            });
+        }
+        // Safety net poll. The push events above handle 99% of cases but
+        // a 3 s tick guarantees the UI converges even if a push is
+        // dropped during a renderer reload race.
+        setInterval(refreshStatusFromMain, 3000);
+
         function renderVersion(status) {
             const appV = status.appVersion || "?";
             const srvV = status.serverVersion || appV;

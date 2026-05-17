@@ -48,6 +48,24 @@ contextBridge.exposeInMainWorld("mmo", {
     onUpdateStatus: (callback: (data: Record<string, unknown>) => void) => {
         ipcRenderer.on("update-status", (_event, data) => callback(data));
     },
+    /** Push notification fired by main whenever the companion's status
+     *  changes (server bound to its port, paired/unpaired, etc.). The
+     *  renderer re-fetches getStatus() rather than receiving the full
+     *  payload so the source of truth stays in one place. */
+    onStatusChanged: (callback: () => void) => {
+        const handler = () => callback();
+        ipcRenderer.on("status-changed", handler);
+        return () => ipcRenderer.off("status-changed", handler);
+    },
+    /** Fired when the cloud reports the device token is no longer valid
+     *  (HTTP 401 from /api/devices/announce, /api/sync, etc.). Main has
+     *  already cleared the local token; the renderer should switch to
+     *  the auth view and prompt the user to re-pair. */
+    onAuthInvalidated: (callback: (data: { reason: string }) => void) => {
+        const handler = (_e: unknown, data: { reason: string }) => callback(data);
+        ipcRenderer.on("auth-invalidated", handler);
+        return () => ipcRenderer.off("auth-invalidated", handler);
+    },
     /** Manually re-check for updates (Settings → Help button). */
     checkForUpdates: () => ipcRenderer.invoke("updater:check"),
     /** Get the cached updater status (current version, last check ts, last error). */

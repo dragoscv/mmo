@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.9 — self-heal orphaned pairings + live status refresh
+
+- **Critical fix**: when the cloud no longer recognises the device token (HTTP 401 from `/api/devices/announce` or `/api/sync` — typical cause: device row deleted server-side or pairing half-failed), the companion now wipes the local pairing, stops cloud-sync + LAN-announce, and pushes the renderer back to the auth view via a new `auth-invalidated` IPC event. Previously a stale token produced a silent perpetual 401 loop with no user-facing signal.
+- **UI**: the renderer now subscribes to a new `status-changed` IPC push (fired after the HTTP server actually binds) and additionally polls `getStatus()` every 3 s as a safety net. Fixes the long-standing "Port: 0" stat that never updated to the real port (server boots asynchronously, status was only fetched at window-init time).
+- **Web /devices**: auto-refresh dropped from 30 s → 5 s so a fresh pairing opened in a separate browser tab shows up on the existing /devices tab without manual reload.
+
 ## 1.0.8 — heal invalid serverPort, log actual bound port
 
 - **Critical fix**: a `serverPort` of `0` persisted in some users' stores caused the HTTP server to silently bind to a random OS-chosen port. The companion logged "server started" but the web app's loopback discovery (which expects `17899`) found nothing, the LAN beacon URL pointed at port 0, and mDNS advertised garbage. `getSettings()` now validates the stored port (must be an integer in 1–65535) and resets to `17899` otherwise.

@@ -86,15 +86,30 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
     try {
         const ac = new AbortController();
         const t = setTimeout(() => ac.abort(), 8000);
-        await fetch(`${webAppUrl}/api/devices/announce`, {
+        const res = await fetch(`${webAppUrl}/api/devices/announce`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ token, lanUrl }),
             signal: ac.signal,
         }).finally(() => clearTimeout(t));
+        // 401 = the cloud no longer recognises our token (device row
+        // deleted, key rotated, or never inserted because pairing
+        // half-failed). Fire the callback so main can wipe state and
+        // prompt the user to re-pair instead of looping forever.
+        if (res.status === 401 && onAuthInvalidatedCb) {
+            try { onAuthInvalidatedCb("announce-401"); } catch { /* ignore */ }
+        }
     } catch {
         // Network down, paired but cloud unreachable — try again next tick.
     }
+}
+
+let onAuthInvalidatedCb: ((reason: string) => void) | null = null;
+
+/** Register a callback invoked when /api/devices/announce returns 401.
+ *  Set once at startup from main.ts to wire into invalidateLocalPairing. */
+export function setOnAuthInvalidated(cb: ((reason: string) => void) | null): void {
+    onAuthInvalidatedCb = cb;
 }
 
 function startBonjour(port: number, version: string): void {

@@ -145,12 +145,14 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         return () => clearInterval(interval);
     }, [refreshAll]);
 
-    // Auto-discover newly-registered companions
+    // Auto-discover newly-registered companions. 5s instead of 30s so
+    // a fresh pairing (opened in a separate browser tab by the companion)
+    // shows up almost immediately on this tab without a manual refresh.
     useEffect(() => {
         const t = setInterval(async () => {
             const updated = await getDevices();
             setDevices(updated);
-        }, 30_000);
+        }, 5_000);
         return () => clearInterval(t);
     }, []);
 
