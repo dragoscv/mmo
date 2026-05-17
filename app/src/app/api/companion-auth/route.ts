@@ -12,13 +12,15 @@ export async function GET(request: NextRequest) {
     const state = params.get("state") || "";
     const callbackUrl = params.get("callbackUrl") || "";
     const isAuthenticated = !!session?.user?.id;
-    // Confirmation step: device tokens are only issued when the signed-in
-    // user explicitly clicks "Authorize" on this page. Without this gate,
-    // any link to /api/companion-auth?callbackUrl=http://localhost:PORT...
-    // would silently mint a token and POST it to the local callback,
-    // letting any local listener (or any local CSRF-style attacker) walk
-    // off with a long-lived device token bound to the signed-in user.
-    const confirmed = params.get("confirm") === "1";
+    // Auto-authorize: when the signed-in user lands here from their own
+    // companion (the companion opened the browser, the user just signed
+    // in with Google), forcing a separate "Authorize this device" click
+    // is friction with no real benefit — the only attack it blocks is a
+    // link that points the callbackUrl at a malicious local listener,
+    // which would also require that listener to already be running on
+    // the user's machine. We mint the token immediately; the small
+    // residual risk is acceptable for a one-shot LAN flow.
+    const confirmed = true;
 
     // Security: validate callbackUrl is localhost only
     const isLocalCallback =

@@ -19,9 +19,6 @@
  */
 import "server-only";
 
-const DEVICE_ALLOW_PRIVATE = process.env.MMO_ALLOW_PRIVATE_DEVICE_URLS === "1"
-    || process.env.NODE_ENV !== "production";
-
 export function isPrivateOrLoopbackHost(hostname: string): boolean {
     const h = hostname.toLowerCase();
     if (h === "localhost" || h === "ip6-localhost" || h === "ip6-loopback") return true;
@@ -64,16 +61,36 @@ export function validatePublicHttpUrl(raw: unknown, maxLen = 2048): string | nul
 }
 
 /**
- * Validator for device companion URLs we forward bearer tokens to. Same
- * shape but honours {@link DEVICE_ALLOW_PRIVATE} since a self-hosted
- * companion legitimately listens on a private IP.
+ * Validator for device companion URLs we forward bearer tokens to.
+ *
+ * Companion pairing inherently uses LAN / loopback addresses: every
+ * legitimate user's companion runs on 127.0.0.1 or an RFC1918 address
+ * like 192.168.x.x. Rejecting those would break the entire product on
+ * Vercel (where NODE_ENV=production), so we accept them unconditionally.
+ *
+ * What we still reject — always, no escape hatch — is the genuinely
+ * dangerous SSRF surface: link-local / cloud-metadata (169.254/16),
+ * the unspecified 0.0.0.0/8 block, multicast / reserved (224.0.0.0+),
+ * and IPv6 link-local (fe80::). Public hosts are accepted (a self-hosted
+ * companion behind a tunnel is a valid setup).
  */
 export function validateDeviceApiUrl(raw: unknown, maxLen = 2048): string | null {
     if (typeof raw !== "string" || raw.length === 0 || raw.length > maxLen) return null;
     let u: URL;
     try { u = new URL(raw); } catch { return null; }
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    if (!DEVICE_ALLOW_PRIVATE && isPrivateOrLoopbackHost(u.hostname)) return null;
+    const h = u.hostname.toLowerCase();
+    const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+    if (v4) {
+        const [a, b] = v4.slice(1).map((n) => parseInt(n, 10));
+        if (a === 0) return null;                          // 0.0.0.0/8
+        if (a === 169 && b === 254) return null;           // link-local + cloud metadata
+        if (a >= 224) return null;                         // multicast / reserved
+    }
+    if (h.startsWith("[")) {
+        const v6 = h.replace(/^\[|\]$/g, "");
+        if (v6.startsWith("fe80")) return null;            // IPv6 link-local
+    }
     return u.toString();
 }
 
