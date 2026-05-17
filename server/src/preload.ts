@@ -48,6 +48,13 @@ contextBridge.exposeInMainWorld("mmo", {
     onUpdateStatus: (callback: (data: Record<string, unknown>) => void) => {
         ipcRenderer.on("update-status", (_event, data) => callback(data));
     },
+    /** Manually re-check for updates (Settings → Help button). */
+    checkForUpdates: () => ipcRenderer.invoke("updater:check"),
+    /** Get the cached updater status (current version, last check ts, last error). */
+    getUpdaterStatus: () => ipcRenderer.invoke("updater:status"),
+    /** One-click "install now & restart". Renderer calls this after an
+     *  `update-status: ready` event to apply the downloaded update. */
+    installUpdateNow: () => ipcRenderer.invoke("updater:install"),
     /**
      * Virtual Audio Devices — manage the bundled virtual audio driver
      * (BlackHole on macOS, Virtual-Audio-Driver on Windows, pactl on

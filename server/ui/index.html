@@ -1202,6 +1202,10 @@
             </button>
         </div>
         <div class="version" id="version-text">MMO Companion</div>
+        <button id="install-update-btn" type="button"
+            style="display:none;margin:6px auto 0;padding:6px 12px;border:0;border-radius:6px;background:#22c55e;color:#fff;font-weight:600;cursor:pointer;">
+            Install update &amp; restart
+        </button>
     </div>
 
     <!-- VIRTUAL AUDIO VIEW (accessible from auth + main) -->
@@ -1834,15 +1838,36 @@
         if (window.mmo.onUpdateStatus) {
             window.mmo.onUpdateStatus(function (data) {
                 const ver = document.getElementById("version-text");
+                const btn = document.getElementById("install-update-btn");
                 if (data.status === "available") {
                     ver.textContent = "Downloading update v" + data.version + "...";
                     ver.style.color = "#a855f7";
+                    if (btn) btn.style.display = "none";
                 } else if (data.status === "downloading") {
                     ver.textContent = "Downloading update... " + data.percent + "%";
                     ver.style.color = "#a855f7";
+                    if (btn) btn.style.display = "none";
                 } else if (data.status === "ready") {
-                    ver.textContent = "Update v" + data.version + " ready — restart to install";
+                    ver.textContent = "Update v" + data.version + " ready";
                     ver.style.color = "#22c55e";
+                    if (btn) btn.style.display = "inline-block";
+                }
+            });
+        }
+
+        // One-click install: closes the app, runs the installer, relaunches
+        // the freshly-installed version (and the post-update flag in main.ts
+        // forces the window to show even when "start minimized" is on).
+        const installBtn = document.getElementById("install-update-btn");
+        if (installBtn && window.mmo.installUpdateNow) {
+            installBtn.addEventListener("click", async function () {
+                installBtn.disabled = true;
+                installBtn.textContent = "Installing…";
+                try { await window.mmo.installUpdateNow(); }
+                catch (err) {
+                    installBtn.disabled = false;
+                    installBtn.textContent = "Install update & restart";
+                    console.warn("installUpdateNow failed:", err);
                 }
             });
         }

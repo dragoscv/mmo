@@ -52,6 +52,14 @@ jobs:
         run: pnpm approve-builds || true
         continue-on-error: true
 
+      # Explicit rebuild — `pnpm approve-builds` is interactive in newer
+      # pnpm releases and the `|| true` fallback above means the bindings
+      # may not have been compiled. Rebuilding here guarantees that
+      # better-sqlite3 + audify produce loadable .node files before tests
+      # touch the SQLite-backed library catalog.
+      - name: Rebuild native modules
+        run: pnpm rebuild better-sqlite3 audify
+
       - name: Typecheck
         run: pnpm exec tsc --noEmit
 

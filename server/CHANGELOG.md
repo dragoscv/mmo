@@ -2,6 +2,17 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.1 — auto-update polish
+
+- **One-click install**: added an "Install update & restart" button that appears on the auth screen as soon as a new version has finished downloading. Clicking it bypasses the OS update dialog and immediately runs the installer + relaunches the freshly-installed binary.
+- **Force-show after update**: the first launch after an update now always shows the main window, even when the user has `startMinimized` enabled. The flag is cleared after one launch so subsequent normal starts honour the preference again. Users explicitly asked for the update — they expect to see the new version come up.
+- **New IPC**: `updater:install` (manual install trigger) and reuses the existing `updater:status` / `updater:check`. Exposed on `window.mmo.installUpdateNow()` via the preload bridge.
+
+CI / build fixes that unblock the release pipeline:
+
+- **Root `prepare` script** rewritten to a cross-platform Node one-liner. The previous `husky || true` broke Windows installs (`'true' is not recognized…`) which is why the 1.0.0 Windows `.exe` was never uploaded to the GitHub Release.
+- **Companion CI**: explicit `pnpm rebuild better-sqlite3 audify` step so the native bindings exist when the test suite touches the SQLite-backed library catalog. Previously `pnpm approve-builds || true` left the bindings uncompiled and `vitest` crashed on `Could not locate the bindings file`.
+
 ## 1.0.0 — first stable release
 
 First version published under the `muzicai.ro` domain. From this release the companion is considered API-stable: the device-pairing handshake, the device-token format and the audio-engine HTTP surface (`/api/devices/probe`, `/api/audio/local`, `/api/audio/device/:id`, `/api/library/*`, `/api/sse`) will only change in backwards-compatible ways within the 1.x line.

@@ -465,7 +465,17 @@ function createWindow() {
         if (shown || !mainWindow || mainWindow.isDestroyed()) return;
         shown = true;
         const settings = getSettings();
-        if (settings.startMinimized) return;
+        // Force-show after an auto-update install regardless of the
+        // user's `startMinimized` preference. The flag is set right
+        // before `quitAndInstall` and cleared here so the next normal
+        // launch honours `startMinimized` again.
+        const forceShowAfterUpdate = store.get("showOnceAfterUpdate") === true;
+        if (forceShowAfterUpdate) {
+            store.set("showOnceAfterUpdate", false);
+            logLine("info", "post-update launch — forcing window show despite startMinimized");
+        } else if (settings.startMinimized) {
+            return;
+        }
         mainWindow.show();
         mainWindow.focus();
         logLine("info", `window shown (${reason})`);
@@ -956,6 +966,12 @@ function setupAutoUpdater() {
             .then(({ response }) => {
                 if (response === 0) {
                     isQuitting = true;
+                    // Persist a one-shot flag so the freshly-installed
+                    // app forces its window to show on next launch even
+                    // when the user has `startMinimized` enabled. The
+                    // user explicitly asked for the update — they expect
+                    // to see the new version come up.
+                    try { store.set("showOnceAfterUpdate", true); } catch { /* best-effort */ }
                     autoUpdater.quitAndInstall(false, true);
                 }
             });
@@ -1003,6 +1019,19 @@ function setupAutoUpdater() {
         lastCheckTs: lastUpdateCheckTs,
         lastError: lastUpdateError,
     }));
+
+    // One-click "Install now & restart" — triggered by the renderer
+    // after `update-status: ready` fires. Sets the post-update show
+    // flag and asks electron-updater to swap the binary and relaunch.
+    ipcMain.handle("updater:install", () => {
+        try { store.set("showOnceAfterUpdate", true); } catch { /* best-effort */ }
+        isQuitting = true;
+        // isSilent=false (Windows: show installer UI), isForceRunAfter=true
+        // (relaunch the freshly-installed app even when this process
+        // exits cleanly). On macOS/Linux these flags are no-ops.
+        autoUpdater.quitAndInstall(false, true);
+        return { ok: true };
+    });
 }
 
 app.on("before-quit", () => {
