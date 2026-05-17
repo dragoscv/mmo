@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
             .set({ ...baseUpdate, lanUrl: null, lanAnnouncedAt: new Date() })
             .where(eq(devices.id, device.id));
         const commands = await claimPendingCommands(device.id);
-        const tunnelBootstrap = await maybeTunnelBootstrap(device.id, body.tunnelHostnameAck);
+        const tunnelBootstrap = await maybeTunnelBootstrap(device.id, body.tunnelHostnameAck, null);
         return NextResponse.json({ ok: true, cleared: true, name: device.name, commands, tunnelBootstrap });
     }
 
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
             .set({ ...baseUpdate, lanUrl, lanAnnouncedAt: new Date() })
             .where(eq(devices.id, device.id));
         const commands = await claimPendingCommands(device.id);
-        const tunnelBootstrap = await maybeTunnelBootstrap(device.id, body.tunnelHostnameAck);
+        const tunnelBootstrap = await maybeTunnelBootstrap(device.id, body.tunnelHostnameAck, lanUrl);
         return NextResponse.json({ ok: true, lanUrl, name: device.name, commands, tunnelBootstrap });
     }
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         .set(baseUpdate)
         .where(eq(devices.id, device.id));
     const commands = await claimPendingCommands(device.id);
-    const tunnelBootstrap = await maybeTunnelBootstrap(device.id, body.tunnelHostnameAck);
+    const tunnelBootstrap = await maybeTunnelBootstrap(device.id, body.tunnelHostnameAck, null);
     return NextResponse.json({ ok: true, name: device.name, commands, tunnelBootstrap });
 }
 
@@ -118,8 +118,16 @@ export async function POST(request: NextRequest) {
 async function maybeTunnelBootstrap(
     deviceId: string,
     ack: string | null | undefined,
+    lanUrl: string | null,
 ): Promise<{ tunnelHostname: string; tunnelToken: string } | null> {
-    const t = await ensureDeviceTunnel(deviceId);
+    // Extract the port the companion is actually serving on (it can be
+    // customised away from the default 17899). Passed into ensureDeviceTunnel
+    // so the CF ingress config stays aligned with reality.
+    let port: number | undefined;
+    if (lanUrl) {
+        try { port = Number(new URL(lanUrl).port) || undefined; } catch { /* ignore */ }
+    }
+    const t = await ensureDeviceTunnel(deviceId, port ? { port } : {});
     if (!t) return null;
     if (ack === t.tunnelHostname) return null;
     return t;

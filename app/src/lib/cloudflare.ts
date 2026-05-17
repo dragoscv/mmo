@@ -205,6 +205,33 @@ async function deleteStaleDnsByName(cfg: CloudflareConfig, hostname: string): Pr
     }
 }
 
+/**
+ * Update the ingress config of an existing tunnel so it points at the
+ * given port on the companion's localhost. Idempotent — safe to call
+ * on every heartbeat; the caller should dedupe by remembered port to
+ * keep CF API traffic low.
+ */
+export async function updateDeviceTunnelIngress(
+    cfg: CloudflareConfig,
+    args: { tunnelId: string; hostname: string; port: number },
+): Promise<void> {
+    await cf<unknown>(
+        cfg,
+        `/accounts/${cfg.accountId}/cfd_tunnel/${args.tunnelId}/configurations`,
+        {
+            method: "PUT",
+            body: JSON.stringify({
+                config: {
+                    ingress: [
+                        { hostname: args.hostname, service: `http://localhost:${args.port}` },
+                        { service: "http_status:404" },
+                    ],
+                },
+            }),
+        },
+    );
+}
+
 /** Best-effort teardown. Swallows individual errors so a partial state
  *  (e.g. tunnel already deleted manually) still cleans up the rest. */
 export async function deleteDeviceTunnel(

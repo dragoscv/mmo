@@ -52,6 +52,7 @@ export async function enqueueDeviceCommand<T = unknown>(
     const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT;
     const pollMs = opts.pollMs ?? DEFAULT_POLL;
 
+    const t0 = Date.now();
     const expiresAt = new Date(Date.now() + Math.max(timeoutMs + 30_000, 60_000));
     const [row] = await db.insert(deviceCommands).values({
         deviceId,
@@ -61,10 +62,14 @@ export async function enqueueDeviceCommand<T = unknown>(
     }).returning({ id: deviceCommands.id });
 
     if (!row?.id) return { ok: false, error: "Failed to enqueue command" };
+    const enqueuedMs = Date.now() - t0;
+    console.log(`[cmd] enqueue kind=${kind} id=${row.id} device=${deviceId} in ${enqueuedMs}ms`);
 
     const deadline = Date.now() + timeoutMs;
+    let polls = 0;
     while (Date.now() < deadline) {
         await sleep(pollMs);
+        polls++;
         const [r] = await db
             .select({
                 status: deviceCommands.status,
@@ -74,11 +79,24 @@ export async function enqueueDeviceCommand<T = unknown>(
             .from(deviceCommands)
             .where(eq(deviceCommands.id, row.id))
             .limit(1);
-        if (!r) return { ok: false, error: "Command row vanished" };
-        if (r.status === "done") return { ok: true, result: r.result as T };
-        if (r.status === "error") return { ok: false, error: r.error ?? "Unknown companion error" };
-        if (r.status === "expired") return { ok: false, error: "Command expired before companion picked it up" };
+        if (!r) {
+            console.warn(`[cmd] row vanished kind=${kind} id=${row.id} after ${Date.now() - t0}ms polls=${polls}`);
+            return { ok: false, error: "Command row vanished" };
+        }
+        if (r.status === "done") {
+            console.log(`[cmd] done  kind=${kind} id=${row.id} in ${Date.now() - t0}ms polls=${polls}`);
+            return { ok: true, result: r.result as T };
+        }
+        if (r.status === "error") {
+            console.warn(`[cmd] error kind=${kind} id=${row.id} in ${Date.now() - t0}ms polls=${polls} — ${r.error}`);
+            return { ok: false, error: r.error ?? "Unknown companion error" };
+        }
+        if (r.status === "expired") {
+            console.warn(`[cmd] expired kind=${kind} id=${row.id} in ${Date.now() - t0}ms polls=${polls}`);
+            return { ok: false, error: "Command expired before companion picked it up" };
+        }
     }
+    console.warn(`[cmd] timeout kind=${kind} id=${row.id} in ${Date.now() - t0}ms polls=${polls}`);
     return { ok: false, error: "Companion did not respond in time (device offline?)" };
 }
 

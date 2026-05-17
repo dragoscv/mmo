@@ -23,6 +23,7 @@ import { execFile } from "node:child_process";
 import { getSettings, store, FOLDER_KINDS, type FolderKind } from "./store";
 import { listBackends, listDevices, type AudioBackend } from "./audio/native-engine";
 import { listWatcherStatuses, startWatcher, stopWatcher } from "./library/watcher";
+import { log } from "./logger";
 
 export interface InboundCommand {
     id: string;
@@ -455,13 +456,19 @@ export async function executeCommands(cmds: InboundCommand[]): Promise<OutboundR
     for (const cmd of cmds) {
         const handler = handlers[cmd.kind];
         if (!handler) {
+            log("warn", `[cmd] unknown kind=${cmd.kind} id=${cmd.id}`);
             out.push({ id: cmd.id, ok: false, error: `Unknown command: ${cmd.kind}` });
             continue;
         }
+        const t0 = Date.now();
         try {
             const result = await handler(cmd.payload);
+            const ms = Date.now() - t0;
+            log("info", `[cmd] ok kind=${cmd.kind} id=${cmd.id} in ${ms}ms`);
             out.push({ id: cmd.id, ok: true, result });
         } catch (e) {
+            const ms = Date.now() - t0;
+            log("error", `[cmd] fail kind=${cmd.kind} id=${cmd.id} in ${ms}ms`, e as Error);
             out.push({ id: cmd.id, ok: false, error: e instanceof Error ? e.message : String(e) });
         }
     }

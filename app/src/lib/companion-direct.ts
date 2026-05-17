@@ -35,6 +35,7 @@ export async function directFetch<T>(
     const url = `https://${target.tunnelHostname}${path}`;
     const ac = new AbortController();
     const t = setTimeout(() => ac.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    const t0 = performance.now();
     try {
         const res = await fetch(url, {
             ...init,
@@ -50,9 +51,16 @@ export async function directFetch<T>(
             credentials: "omit",
             cache: "no-store",
         });
-        if (!res.ok) return null;
+        const ms = Math.round(performance.now() - t0);
+        if (!res.ok) {
+            console.warn(`[direct] ${init.method ?? "GET"} ${path} → ${res.status} in ${ms}ms`);
+            return null;
+        }
+        console.log(`[direct] ${init.method ?? "GET"} ${path} → ok in ${ms}ms`);
         return await res.json() as T;
-    } catch {
+    } catch (err) {
+        const ms = Math.round(performance.now() - t0);
+        console.warn(`[direct] ${init.method ?? "GET"} ${path} → fail in ${ms}ms`, err);
         return null;
     } finally {
         clearTimeout(t);

@@ -25,6 +25,7 @@ import { Bonjour, type Service } from "bonjour-service";
 import { getSettings, store } from "./store";
 import { executeCommands, type InboundCommand, type OutboundResult } from "./command-worker";
 import { startCloudflared } from "./cloudflared";
+import { log } from "./logger";
 
 // 3 s heartbeat. The announce loop doubles as:
 //   - liveness signal: Vercel uses the lastSeenAt timestamp to render
@@ -163,8 +164,11 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
 
         if (Array.isArray(data.commands) && data.commands.length > 0) {
             burstUntil = Date.now() + BURST_DURATION_MS;
+            log("info", `[announce] received n=${data.commands.length} kinds=${data.commands.map((c) => c.kind).join(",")}`);
+            const t0 = Date.now();
             // Execute sequentially so dialog-based commands don't race.
             const results = await executeCommands(data.commands);
+            log("info", `[announce] executed n=${results.length} in ${Date.now() - t0}ms — posting back`);
             pendingResults.push(...results);
             // Trigger an immediate follow-up tick so results reach the
             // awaiting server action without waiting a full interval.

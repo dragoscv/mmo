@@ -197,38 +197,58 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
     async function fastListDrives(deviceId: string): Promise<
         { drives: CompanionDrive[] } | { error: string }
     > {
+        const t0 = performance.now();
         const target = await getDirectAccess(deviceId);
         if (target) {
             const r = await directFetch<{ drives: CompanionDrive[] }>(target, "/fs/drives");
-            if (r) return r;
+            if (r) {
+                console.log(`[picker] drives via tunnel in ${Math.round(performance.now() - t0)}ms (n=${r.drives.length})`);
+                return r;
+            }
         }
-        return listCompanionDrives(deviceId);
+        const r = await listCompanionDrives(deviceId);
+        const tag = "error" in r ? `error=${r.error}` : `n=${r.drives.length}`;
+        console.log(`[picker] drives via queue in ${Math.round(performance.now() - t0)}ms (${tag})`);
+        return r;
     }
 
     async function fastListDirectory(deviceId: string, path: string): Promise<
         CompanionDirectoryListing | { error: string }
     > {
+        const t0 = performance.now();
         const target = await getDirectAccess(deviceId);
         if (target) {
             const r = await directFetch<CompanionDirectoryListing>(
                 target, `/fs/list?path=${encodeURIComponent(path)}`,
             );
-            if (r) return r;
+            if (r) {
+                console.log(`[picker] list "${path}" via tunnel in ${Math.round(performance.now() - t0)}ms (n=${r.entries.length})`);
+                return r;
+            }
         }
-        return listCompanionDirectory(deviceId, path);
+        const r = await listCompanionDirectory(deviceId, path);
+        const tag = "error" in r ? `error=${r.error}` : `n=${r.entries.length}`;
+        console.log(`[picker] list "${path}" via queue in ${Math.round(performance.now() - t0)}ms (${tag})`);
+        return r;
     }
 
     async function fastAddFolder(deviceId: string, path: string, kind: FolderKind): Promise<
         { added: boolean; picked: string; folders: CompanionFolder[] } | { error: string }
     > {
+        const t0 = performance.now();
         const target = await getDirectAccess(deviceId);
         if (target) {
             const r = await directFetch<{ added: boolean; picked: string; folders: CompanionFolder[] }>(
                 target, "/fs/add", { method: "POST", body: JSON.stringify({ path, kind }) },
             );
-            if (r) return r;
+            if (r) {
+                console.log(`[picker] add "${path}" via tunnel in ${Math.round(performance.now() - t0)}ms`);
+                return r;
+            }
         }
-        return addCompanionFolder(deviceId, path, kind);
+        const r = await addCompanionFolder(deviceId, path, kind);
+        console.log(`[picker] add "${path}" via queue in ${Math.round(performance.now() - t0)}ms`);
+        return r;
     }
 
     const refreshAll = useCallback(() => {

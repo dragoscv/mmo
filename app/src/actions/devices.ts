@@ -16,7 +16,7 @@ import {
 } from "@/lib/companion-control";
 import { issueDeviceToken, materializeDeviceToken, encryptDeviceToken, decryptDeviceToken } from "@/lib/device-token";
 import { enqueueDeviceCommand } from "@/lib/device-commands";
-import { createDeviceTunnel, deleteDeviceTunnel, getCloudflareConfig } from "@/lib/cloudflare";
+import { createDeviceTunnel, deleteDeviceTunnel, getCloudflareConfig, updateDeviceTunnelIngress } from "@/lib/cloudflare";
 
 /** Confirm the caller owns this device. Used by every command-queue
  *  action below so a signed-in user can't enqueue work for someone
@@ -701,13 +701,13 @@ export async function setCompanionAuthorizedAudioDevices(
 }
 
 
-// ─── Cloudflare Tunnel (per-device fast path) ──────────────────────────────
+// ─── Cloudflare Tunnel (per-device fast path) ─────────────────────────────
 //
 // Each device gets its own named tunnel + DNS record so the browser can
-// fetch the companion's HTTP API at https://device-xxx.devices.muzicai.ro
-// — bypassing the 1.5-6s announce-queue round-trip for hot operations
-// (folder browsing, drive listing). The functions below are imported by
-// the announce route (auto-provision on first heartbeat) and the devices
+// fetch the companion's HTTP API at https://device-xxx.<base> — bypassing
+// the 1.5-6s announce-queue round-trip for hot operations (folder
+// browsing, drive listing). The functions below are imported by the
+// announce route (auto-provision on first heartbeat) and the devices
 // client (fetch bearer + tunnel hostname for direct fetches).
 
 /**
@@ -716,8 +716,15 @@ export async function setCompanionAuthorizedAudioDevices(
  * call from the announce route on first heartbeat. Returns null when
  * Cloudflare env vars are not configured (graceful fallback to queue
  * transport — existing pairings stay functional with zero CF setup).
+ *
+ * When opts.port is provided, the existing tunnel's ingress config
+ * is updated to point at that port (deduped per-process so the 3s
+ * announce loop doesn't burn CF API quota).
  */
-export async function ensureDeviceTunnel(deviceId: string): Promise<
+export async function ensureDeviceTunnel(
+    deviceId: string,
+    opts: { port?: number } = {},
+): Promise<
     { tunnelHostname: string; tunnelToken: string } | null
 > {
     const cfg = getCloudflareConfig();
@@ -733,27 +740,53 @@ export async function ensureDeviceTunnel(deviceId: string): Promise<
 
     if (row.tunnelId && row.tunnelHostname && row.tunnelTokenEncrypted) {
         try {
-            return {
+            const decoded = {
                 tunnelHostname: row.tunnelHostname,
                 tunnelToken: decryptDeviceToken(row.tunnelTokenEncrypted),
             };
+            if (opts.port && shouldUpdateIngress(deviceId, opts.port)) {
+                try {
+                    await updateDeviceTunnelIngress(cfg, {
+                        tunnelId: row.tunnelId,
+                        hostname: row.tunnelHostname,
+                        port: opts.port,
+                    });
+                    rememberIngressPort(deviceId, opts.port);
+                    console.log("[devices] tunnel ingress updated device=" + deviceId + " port=" + opts.port);
+                } catch (err) {
+                    console.warn("[devices] tunnel ingress update failed:", err instanceof Error ? err.message : err);
+                }
+            }
+            return decoded;
         } catch {
             // Corrupt envelope — fall through and re-provision.
         }
     }
 
     try {
-        const t = await createDeviceTunnel(cfg, deviceId);
+        const t = await createDeviceTunnel(cfg, deviceId, opts.port ? { port: opts.port } : {});
         await db.update(devices).set({
             tunnelId: t.tunnelId,
             tunnelHostname: t.hostname,
             tunnelTokenEncrypted: encryptDeviceToken(t.tunnelToken),
         }).where(eq(devices.id, deviceId));
+        if (opts.port) rememberIngressPort(deviceId, opts.port);
+        console.log("[devices] tunnel provisioned device=" + deviceId + " host=" + t.hostname + " port=" + (opts.port ?? 17899));
         return { tunnelHostname: t.hostname, tunnelToken: t.tunnelToken };
     } catch (err) {
         console.warn("[devices] tunnel provision failed:", err instanceof Error ? err.message : err);
         return null;
     }
+}
+
+// Per-process memo of the last ingress port written per device, so the
+// announce-route hot path doesn't fire a CF API call on every 3s tick.
+const ingressPortByDevice = new Map<string, number>();
+function shouldUpdateIngress(deviceId: string, port: number): boolean {
+    return ingressPortByDevice.get(deviceId) !== port;
+}
+function rememberIngressPort(deviceId: string, port: number): void {
+    ingressPortByDevice.set(deviceId, port);
 }
 
 /**

@@ -49,6 +49,7 @@ import {
 } from "./library/watcher";
 import { startLanAnnounce, stopLanAnnounce } from "./lan-announce";
 import { listDrivesCached, listDirectoryCached, invalidateDirectoryCache } from "./command-worker";
+import { log } from "./logger";
 
 const MIME_TYPES: Record<string, string> = {
     ".mp3": "audio/mpeg",
@@ -468,9 +469,13 @@ export async function startServer(): Promise<void> {
     // route lets the browser hit the companion directly via the
     // Cloudflare Tunnel and skip the 1.5-6s queue round-trip.
     app.get("/fs/drives", authMiddleware, async (_req, res) => {
+        const t0 = Date.now();
         try {
-            res.json({ drives: await listDrivesCached() });
+            const drives = await listDrivesCached();
+            log("info", `[fs] drives n=${drives.length} in ${Date.now() - t0}ms`);
+            res.json({ drives });
         } catch (err) {
+            log("error", `[fs] drives fail in ${Date.now() - t0}ms`, err as Error);
             res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
         }
     });
@@ -478,9 +483,13 @@ export async function startServer(): Promise<void> {
     app.get("/fs/list", authMiddleware, async (req, res) => {
         const requested = typeof req.query.path === "string" ? req.query.path : "";
         if (!requested) { res.status(400).json({ error: "path required" }); return; }
+        const t0 = Date.now();
         try {
-            res.json(await listDirectoryCached(requested));
+            const listing = await listDirectoryCached(requested);
+            log("info", `[fs] list path=${requested} n=${listing.entries.length} in ${Date.now() - t0}ms`);
+            res.json(listing);
         } catch (err) {
+            log("error", `[fs] list path=${requested} fail in ${Date.now() - t0}ms`, err as Error);
             res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
         }
     });
