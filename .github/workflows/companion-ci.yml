@@ -46,19 +46,18 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # Approve native build scripts so better-sqlite3 / audify compile.
-      # Mirrors the release workflow.
-      - name: Approve native build scripts
-        run: pnpm approve-builds || true
-        continue-on-error: true
-
-      # Explicit rebuild — `pnpm approve-builds` is interactive in newer
-      # pnpm releases and the `|| true` fallback above means the bindings
-      # may not have been compiled. Rebuilding here guarantees that
-      # better-sqlite3 + audify produce loadable .node files before tests
-      # touch the SQLite-backed library catalog.
-      - name: Rebuild native modules
-        run: pnpm rebuild better-sqlite3 audify
+      # Native bindings: prebuild-install pulls prebuilt .node files for
+      # better-sqlite3 and audify on most Node × OS combos. In pnpm v10
+      # the install script of a whitelisted `onlyBuiltDependencies` entry
+      # runs as part of `pnpm install`, but the cached `~/.local/share/pnpm`
+      # symlink layout sometimes leaves the binding file outside the path
+      # `require('bindings')` searches in this repo (see the path list
+      # in the previous CI failure). Running an explicit `npm rebuild`
+      # against the deps that actually need a .node file recompiles them
+      # in-place under `node_modules/<pkg>/build/Release/` where the
+      # bindings resolver looks first.
+      - name: Rebuild native modules (in-place)
+        run: npm rebuild better-sqlite3 audify
 
       - name: Typecheck
         run: pnpm exec tsc --noEmit
