@@ -50,6 +50,7 @@
         "delete": "Delete",
         "confirm": "Confirm",
         "search": "Search",
+        "searchPlaceholder": "Search…",
         "noResults": "No results",
         "error": "Something went wrong",
         "retry": "Retry",

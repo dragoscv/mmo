@@ -50,6 +50,7 @@
         "delete": "Șterge",
         "confirm": "Confirmă",
         "search": "Caută",
+        "searchPlaceholder": "Caută…",
         "noResults": "Niciun rezultat",
         "error": "A apărut o eroare",
         "retry": "Reîncearcă",

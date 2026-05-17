@@ -86,6 +86,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
     // missing in the active locale’s message bundle (next-intl logs a warning
     // in dev rather than throwing).
     const t = useTranslations("nav");
+    const tCommon = useTranslations("common");
     const labelFor = (item: typeof navItems[number]) => {
         try { return t(item.key); } catch { return item.label; }
     };
@@ -116,7 +117,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                         className="flex w-full items-center gap-2.5 rounded-xl border border-sidebar-border/50 bg-sidebar-accent/30 px-3 py-2 text-sm text-sidebar-foreground/40 transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground/70 hover:border-sidebar-border cursor-pointer"
                     >
                         <Search className="h-3.5 w-3.5" />
-                        <span className="flex-1 text-left">Search...</span>
+                        <span className="flex-1 text-left">{tCommon("searchPlaceholder")}</span>
                         <kbd className="inline-flex h-5 items-center rounded border border-sidebar-border/60 bg-sidebar-accent/50 px-1.5 font-mono text-[10px] font-medium text-sidebar-foreground/25">
                             ⌘K
                         </kbd>
