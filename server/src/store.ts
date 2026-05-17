@@ -97,6 +97,19 @@ function readScanFolders(): FolderConfig[] {
     return out;
 }
 
+// Ensure the production muzicai.ro origins are always allowed, even when
+// the user's stored allowlist was created on an older build or while
+// pointing at a different webAppUrl (e.g. local dev / brivio). Without
+// this, fresh deployments to muzicai.ro get CORS-blocked from the
+// companion until the user manually edits settings.
+function mergeAllowlistWithDefaults(stored: string[] | undefined): string[] {
+    const base = stored && stored.length > 0 ? [...stored] : [];
+    for (const def of DEFAULTS.audioOriginAllowlist) {
+        if (!base.includes(def)) base.push(def);
+    }
+    return base;
+}
+
 export function getSettings(): CompanionSettings {
     return {
         startAtLogin: store.get("startAtLogin") as boolean,
@@ -107,7 +120,7 @@ export function getSettings(): CompanionSettings {
         // Respect the value the OAuth flow persisted (or that the user typed in
         // settings). Falls back to https://muzicai.ro for fresh installs.
         webAppUrl: (store.get("webAppUrl") as string | undefined) ?? DEFAULTS.webAppUrl,
-        audioOriginAllowlist: (store.get("audioOriginAllowlist") as string[] | undefined) ?? DEFAULTS.audioOriginAllowlist,
+        audioOriginAllowlist: mergeAllowlistWithDefaults(store.get("audioOriginAllowlist") as string[] | undefined),
         authorizedAudioDevices: (store.get("authorizedAudioDevices") as AuthorizedAudioDevice[] | undefined) ?? [],
         telemetryEnabled: (store.get("telemetryEnabled") as boolean | undefined) ?? DEFAULTS.telemetryEnabled,
     };

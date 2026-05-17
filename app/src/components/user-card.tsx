@@ -1,21 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useLocale } from "next-intl";
 import { signOutAndPurge } from "@/lib/auth-client";
+import { setLocaleAction } from "@/actions/locale";
+import { useTheme } from "@/components/theme-provider";
+import { SUPPORTED_LOCALES, type AppLocale } from "@/i18n/locales";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { LoginModal } from "@/components/login-modal";
-import { LogIn, LogOut, User, ChevronUp } from "lucide-react";
+import { LogIn, LogOut, User, ChevronUp, Sun, Moon, Monitor, Languages, Palette } from "lucide-react";
 
 interface UserCardProps {
     collapsed?: boolean;
 }
 
+const LOCALE_LABELS: Record<AppLocale, string> = {
+    ro: "Română",
+    en: "English",
+};
+
+const THEME_OPTIONS = [
+    { value: "light", icon: Sun, label: "Light" },
+    { value: "dark", icon: Moon, label: "Dark" },
+    { value: "system", icon: Monitor, label: "System" },
+] as const;
+
 export function UserCard({ collapsed }: UserCardProps) {
     const { data: session, status } = useSession();
     const [loginOpen, setLoginOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [pending, startTransition] = useTransition();
+    const { theme, setTheme } = useTheme();
+    const locale = useLocale() as AppLocale;
+    const [mounted, setMounted] = useState(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only mount detection for SSR safety
+    useEffect(() => setMounted(true), []);
 
     // Loading state
     if (status === "loading") {
@@ -108,7 +129,7 @@ export function UserCard({ collapsed }: UserCardProps) {
                         onClick={() => setMenuOpen(false)}
                     />
                     <div className={cn(
-                        "absolute z-50 rounded-xl border border-sidebar-border bg-sidebar shadow-xl py-1 min-w-[180px]",
+                        "absolute z-50 rounded-xl border border-sidebar-border bg-sidebar shadow-xl py-1 min-w-[220px]",
                         collapsed
                             ? "bottom-0 left-full ml-2"
                             : "bottom-full left-0 right-0 mb-1"
@@ -121,6 +142,71 @@ export function UserCard({ collapsed }: UserCardProps) {
                             <User className="h-3.5 w-3.5" />
                             Profile
                         </Link>
+
+                        <div className="h-px bg-sidebar-border mx-2 my-1" />
+
+                        {/* Theme switcher */}
+                        <div className="px-3 py-2">
+                            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-sidebar-foreground/40 mb-1.5">
+                                <Palette className="h-3 w-3" />
+                                Theme
+                            </div>
+                            {mounted ? (
+                                <div className="flex gap-0.5 rounded-lg bg-muted p-0.5">
+                                    {THEME_OPTIONS.map(({ value, icon: Icon, label }) => (
+                                        <button
+                                            key={value}
+                                            type="button"
+                                            onClick={() => setTheme(value)}
+                                            className={cn(
+                                                "flex flex-1 h-7 items-center justify-center rounded-md transition-colors cursor-pointer",
+                                                theme === value
+                                                    ? "bg-background text-foreground shadow-sm"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                            title={label}
+                                            aria-pressed={theme === value}
+                                        >
+                                            <Icon className="h-3.5 w-3.5" />
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="h-8 rounded-lg bg-muted" />
+                            )}
+                        </div>
+
+                        {/* Locale switcher */}
+                        <div className="px-3 py-2">
+                            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-sidebar-foreground/40 mb-1.5">
+                                <Languages className="h-3 w-3" />
+                                Language
+                            </div>
+                            <div className="flex gap-0.5 rounded-lg bg-muted p-0.5">
+                                {SUPPORTED_LOCALES.map((loc) => {
+                                    const isActive = loc === locale;
+                                    return (
+                                        <button
+                                            key={loc}
+                                            type="button"
+                                            disabled={pending || isActive}
+                                            onClick={() => startTransition(() => { setLocaleAction(loc); })}
+                                            className={cn(
+                                                "flex-1 h-7 rounded-md text-xs font-medium transition-colors",
+                                                isActive
+                                                    ? "bg-background text-foreground shadow-sm"
+                                                    : "text-muted-foreground hover:text-foreground cursor-pointer",
+                                                pending && !isActive && "opacity-60 cursor-progress",
+                                            )}
+                                            aria-pressed={isActive}
+                                        >
+                                            {LOCALE_LABELS[loc]}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
                         <div className="h-px bg-sidebar-border mx-2 my-1" />
                         <button
                             onClick={() => {

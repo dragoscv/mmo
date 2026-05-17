@@ -34,12 +34,11 @@ import {
     UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "./theme-toggle";
+import { UserCard } from "./user-card";
 import { LegendModal } from "./legend-modal";
 import { GlobalSearch } from "./global-search";
 import { useRouteMemoryHrefs } from "@/hooks/use-route-memory";
 import { useSidebar } from "./sidebar-context";
-import { UserCard } from "./user-card";
 import { DownloadHubButton } from "./sidebar/download-hub-button";
 
 const navItems = [
@@ -187,7 +186,6 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                     <div className="flex flex-col items-center gap-1">
                         <UserCard collapsed />
                         <DownloadHubButton collapsed />
-                        <ThemeToggle collapsed />
                         <button
                             onClick={() => setLegendOpen(true)}
                             className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
@@ -200,8 +198,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                     <>
                         <UserCard />
                         <DownloadHubButton />
-                        <div className="flex items-center justify-between px-2">
-                            <ThemeToggle />
+                        <div className="flex items-center justify-end px-2">
                             <button
                                 onClick={() => setLegendOpen(true)}
                                 className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
