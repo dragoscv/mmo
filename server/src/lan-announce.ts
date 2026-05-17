@@ -156,10 +156,12 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
         // token is already running.
         if (data.tunnelBootstrap?.tunnelHostname && data.tunnelBootstrap.tunnelToken) {
             const b = data.tunnelBootstrap;
+            const prevHost = store.get("tunnelHostname") as string | undefined;
             store.set("tunnelHostname", b.tunnelHostname);
             store.set("tunnelToken", b.tunnelToken);
+            log("info", `[announce] tunnelBootstrap received host=${b.tunnelHostname} (prev=${prevHost ?? "none"})`);
             try { startCloudflared(b.tunnelToken, b.tunnelHostname); }
-            catch (err) { console.warn("[lan-announce] cloudflared start failed:", err); }
+            catch (err) { log("warn", "[lan-announce] cloudflared start failed:", err); }
         }
 
         if (Array.isArray(data.commands) && data.commands.length > 0) {

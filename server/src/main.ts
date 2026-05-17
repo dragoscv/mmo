@@ -206,27 +206,11 @@ try {
 } catch { /* ignore */ }
 const LOG_FILE = path.join(LOG_DIR, "main.log");
 
-function logLine(level: "info" | "warn" | "error", ...args: unknown[]): void {
-    const line = `[${new Date().toISOString()}] [${level}] ${args
-        .map((a) => (a instanceof Error ? `${a.stack ?? a.message}` : typeof a === "string" ? a : JSON.stringify(a)))
-        .join(" ")}\n`;
-    try {
-        fs.appendFileSync(LOG_FILE, line);
-    } catch { /* ignore */ }
-    // Keep an in-memory ring of the most recent lines so the renderer can
-    // surface them in a Debug panel without re-reading the log file (which
-    // can be many MB after a long session). Capped so the panel never
-    // exposes a runaway buffer.
-    debugLogRing.push(line.trimEnd());
-    if (debugLogRing.length > DEBUG_LOG_MAX) {
-        debugLogRing.splice(0, debugLogRing.length - DEBUG_LOG_MAX);
-    }
-    // Also print to stderr so "open -a 'MMO Companion' --stderr" shows it
-    process.stderr.write(line);
-}
+import { pushDebugLog, getDebugLogSnapshot, clearDebugLog } from "./debug-log";
 
-const DEBUG_LOG_MAX = 500;
-const debugLogRing: string[] = [];
+function logLine(level: "info" | "warn" | "error", ...args: unknown[]): void {
+    pushDebugLog(level, ...args);
+}
 
 // ─── Event-loop lag monitor ──────────────────────────────────────────
 //
@@ -774,7 +758,7 @@ function setupIPC() {
     ipcMain.handle("get-debug-log", () => {
         return {
             logFile: LOG_FILE,
-            lines: debugLogRing.slice(),
+            lines: getDebugLogSnapshot(),
             // Quick environment dump so the user pastes context, not just
             // log lines. Most fields are static; uptime / memory are live.
             env: {
@@ -790,7 +774,7 @@ function setupIPC() {
     });
 
     ipcMain.handle("clear-debug-log", () => {
-        debugLogRing.length = 0;
+        clearDebugLog();
         return { success: true };
     });
 

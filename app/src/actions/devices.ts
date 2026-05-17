@@ -798,15 +798,30 @@ export async function getDeviceDirectAccess(deviceId: string): Promise<
     { tunnelHostname: string; bearer: string } | null
 > {
     const err = await assertDeviceOwnership(deviceId);
-    if (err) return null;
+    if (err) {
+        console.log("[devices] getDeviceDirectAccess: ownership denied device=" + deviceId);
+        return null;
+    }
     const row = (await db.select({
         tokenEncrypted: devices.tokenEncrypted,
         tunnelHostname: devices.tunnelHostname,
     }).from(devices).where(eq(devices.id, deviceId)).limit(1))[0];
-    if (!row || !row.tunnelHostname || !row.tokenEncrypted) return null;
+    if (!row) {
+        console.log("[devices] getDeviceDirectAccess: device row missing device=" + deviceId);
+        return null;
+    }
+    if (!row.tunnelHostname) {
+        console.log("[devices] getDeviceDirectAccess: no tunnelHostname (not provisioned) device=" + deviceId + " cfConfigured=" + (getCloudflareConfig() !== null));
+        return null;
+    }
+    if (!row.tokenEncrypted) {
+        console.log("[devices] getDeviceDirectAccess: no bearer token device=" + deviceId);
+        return null;
+    }
     try {
         return { tunnelHostname: row.tunnelHostname, bearer: decryptDeviceToken(row.tokenEncrypted) };
-    } catch {
+    } catch (e) {
+        console.warn("[devices] getDeviceDirectAccess: bearer decrypt failed device=" + deviceId, e instanceof Error ? e.message : e);
         return null;
     }
 }

@@ -21,6 +21,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 import { app } from "electron";
+import { pushDebugLog } from "./debug-log";
 
 let child: ChildProcess | null = null;
 let activeToken: string | null = null;
@@ -64,21 +65,29 @@ export function getActiveTunnelHostname(): string | null {
  * same token, no-op. If running with a different token, restart.
  */
 export function startCloudflared(token: string, hostname: string): void {
-    if (!token || !hostname) return;
-    if (child && activeToken === token) return;
+    if (!token || !hostname) {
+        pushDebugLog("warn", `[cloudflared] startCloudflared called with empty token or hostname; ignoring`);
+        return;
+    }
+    if (child && activeToken === token) {
+        pushDebugLog("info", `[cloudflared] already running for host=${hostname} — no-op`);
+        return;
+    }
     stopCloudflared();
     stopRequested = false;
     activeToken = token;
     activeHostname = hostname;
+    pushDebugLog("info", `[cloudflared] starting for host=${hostname}`);
     spawnOnce();
 }
 
 function spawnOnce(): void {
     const bin = locateBinary();
     if (!bin) {
-        console.warn("[cloudflared] binary not found; tunnel disabled");
+        pushDebugLog("warn", "[cloudflared] binary not found; tunnel disabled");
         return;
     }
+    pushDebugLog("info", `[cloudflared] spawning ${bin}`);
     try {
         child = spawn(bin, ["tunnel", "--no-autoupdate", "run"], {
             env: { ...process.env, TUNNEL_TOKEN: activeToken ?? "" },
@@ -86,17 +95,17 @@ function spawnOnce(): void {
             windowsHide: true,
         });
     } catch (err) {
-        console.warn("[cloudflared] spawn failed:", err instanceof Error ? err.message : err);
+        pushDebugLog("warn", "[cloudflared] spawn failed:", err instanceof Error ? err.message : String(err));
         scheduleRestart();
         return;
     }
 
     child.stdout?.on("data", (b: Buffer) => {
-        process.stdout.write(`[cloudflared] ${b.toString()}`);
+        pushDebugLog("info", `[cloudflared] ${b.toString().trimEnd()}`);
     });
     child.stderr?.on("data", (b: Buffer) => {
         // cloudflared logs to stderr by default — not errors.
-        process.stderr.write(`[cloudflared] ${b.toString()}`);
+        pushDebugLog("info", `[cloudflared] ${b.toString().trimEnd()}`);
     });
 
     child.once("exit", (code, signal) => {

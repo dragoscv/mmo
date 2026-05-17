@@ -362,9 +362,12 @@ async function listDrivesWin(): Promise<DriveInfo[]> {
     // enough that the entire picker (and every other HTTP request, since
     // the event loop is shared) appears frozen. 500 ms is plenty for any
     // healthy local drive and gives up cleanly on dead/slow ones.
+    // 250 ms is plenty for any healthy local drive (typical: <10 ms).
+    // Dead/sleeping drives fail fast; this caps the worst-case latency
+    // of /fs/drives at 250 ms even if every letter is a stalled mount.
     const probes = await Promise.all(letters.map(async (letter) => {
         const root = `${letter}:\\`;
-        return (await probeAccess(root, 500)) ? root : null;
+        return (await probeAccess(root, 250)) ? root : null;
     }));
     const drives: DriveInfo[] = [];
     for (const root of probes) {

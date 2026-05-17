@@ -2,6 +2,11 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.18 — instant picker open
+
+- **Drive probe timeout 500 ms → 250 ms**: healthy local drives respond in <10 ms, so the previous 500 ms cap was over-conservative. With this change `/fs/drives` returns in <300 ms even if every drive letter is a stalled mount.
+- Pairs with the web app's eager prefetch (web 0.3.5): the modal now paints from cache the instant it opens and a background refresh kicks in.
+
 ## 1.0.17 — unfreeze the folder picker
 
 - **Critical perf fix**: a disconnected USB / empty optical drive / sleeping network share would make the picker take *minutes* to list drives or open a folder. Root cause: every existence / access check on the companion side (`fs.existsSync` in `listFolders()`, `fsp.access` in `listDrivesWin`, `fsp.stat` on symlinks in `listDirectory`) had no timeout, and Windows can sit on a request to a not-ready drive for tens of seconds while blocking the *entire* Node event loop — the same loop that serves `/fs/drives` and `/fs/list` over the tunnel. Symptom in the debug log: `[freeze] event-loop blocked for ~Xms` warnings stacking up while the picker spun.

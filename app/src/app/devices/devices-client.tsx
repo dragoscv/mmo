@@ -169,11 +169,13 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
      *  Fetched lazily on first need; falsy entry means "tried, none
      *  available" so we don't re-ask the server every call. */
     const directAccessRef = useRef<Map<string, { tunnelHostname: string; bearer: string } | null>>(new Map());
+    /** Devices whose drives we've already prefetched this mount. */
+    const drivesPrefetchedRef = useRef<Set<string>>(new Set());
     /** Surfaced in the picker modal so the user can see whether the
      *  request went over the fast tunnel path or the slow queue, and how
      *  long the round-trip took. Helps diagnose multi-second freezes
      *  caused by an unhealthy tunnel or a frozen companion event loop. */
-    const [pickerDebug, setPickerDebug] = useState<{ op: string; via: "tunnel" | "queue"; ms: number; n?: number; err?: string } | null>(null);
+    const [pickerDebug, setPickerDebug] = useState<{ op: string; via: "tunnel" | "queue"; reason?: "no-tunnel" | "tunnel-fail"; ms: number; n?: number; err?: string } | null>(null);
     const [editingName, setEditingName] = useState<string | null>(null);
     const [editNameValue, setEditNameValue] = useState("");
     const [openSection, setOpenSection] = useState<Record<string, "folders" | "audio" | null>>({});
@@ -199,6 +201,37 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         return access;
     }
 
+    /** Hydrate the drives cache from localStorage on first render so the
+     *  picker can paint the moment it opens — even before the first
+     *  server round-trip completes. Stale entries (>24h) are dropped. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only browser API hydration
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        try {
+            const raw = window.localStorage.getItem("mmo:picker:drives");
+            if (!raw) return;
+            const parsed = JSON.parse(raw) as Record<string, { at: number; drives: CompanionDrive[] }>;
+            const now = Date.now();
+            for (const [deviceId, entry] of Object.entries(parsed)) {
+                if (entry && Array.isArray(entry.drives) && now - entry.at < 24 * 3_600_000) {
+                    drivesCacheRef.current.set(deviceId, entry.drives);
+                }
+            }
+        } catch { /* ignore corrupted cache */ }
+    }, []);
+
+    /** Write-through the in-memory drives cache to localStorage. */
+    const persistDrivesCache = useCallback((deviceId: string, drives: CompanionDrive[]) => {
+        drivesCacheRef.current.set(deviceId, drives);
+        if (typeof window === "undefined") return;
+        try {
+            const raw = window.localStorage.getItem("mmo:picker:drives");
+            const parsed = (raw ? JSON.parse(raw) : {}) as Record<string, { at: number; drives: CompanionDrive[] }>;
+            parsed[deviceId] = { at: Date.now(), drives };
+            window.localStorage.setItem("mmo:picker:drives", JSON.stringify(parsed));
+        } catch { /* quota / private mode — silently ignore */ }
+    }, []);
+
     async function fastListDrives(deviceId: string): Promise<
         { drives: CompanionDrive[] } | { error: string }
     > {
@@ -213,12 +246,13 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                 return r;
             }
         }
+        const reason: "no-tunnel" | "tunnel-fail" = target ? "tunnel-fail" : "no-tunnel";
         const r = await listCompanionDrives(deviceId);
         const ms = Math.round(performance.now() - t0);
         const tag = "error" in r ? `error=${r.error}` : `n=${r.drives.length}`;
-        console.log(`[picker] drives via queue in ${ms}ms (${tag})`);
+        console.log(`[picker] drives via queue (${reason}) in ${ms}ms (${tag})`);
         setPickerDebug({
-            op: "drives", via: "queue", ms,
+            op: "drives", via: "queue", reason, ms,
             n: "error" in r ? undefined : r.drives.length,
             err: "error" in r ? r.error : undefined,
         });
@@ -241,12 +275,13 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                 return r;
             }
         }
+        const reason: "no-tunnel" | "tunnel-fail" = target ? "tunnel-fail" : "no-tunnel";
         const r = await listCompanionDirectory(deviceId, path);
         const ms = Math.round(performance.now() - t0);
         const tag = "error" in r ? `error=${r.error}` : `n=${r.entries.length}`;
-        console.log(`[picker] list "${path}" via queue in ${ms}ms (${tag})`);
+        console.log(`[picker] list "${path}" via queue (${reason}) in ${ms}ms (${tag})`);
         setPickerDebug({
-            op: "list", via: "queue", ms,
+            op: "list", via: "queue", reason, ms,
             n: "error" in r ? undefined : r.entries.length,
             err: "error" in r ? r.error : undefined,
         });
@@ -291,6 +326,25 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         const interval = setInterval(refreshAll, 30_000);
         return () => clearInterval(interval);
     }, [refreshAll]);
+
+    // Eager prefetch: warm the direct-access + drives caches for every
+    // device on mount and whenever a new device appears. By the time the
+    // user clicks "Add a folder" the modal can paint from cache in <1ms
+    // instead of waiting for two cold round-trips (server action for the
+    // tunnel bearer + CF tunnel cold-start + companion drive enumeration).
+    useEffect(() => {
+        for (const device of devices) {
+            if (drivesPrefetchedRef.current.has(device.id)) continue;
+            drivesPrefetchedRef.current.add(device.id);
+            void (async () => {
+                // Warm the tunnel bearer first (fills directAccessRef);
+                // fastListDrives will then take the fast path and write
+                // through to localStorage via refreshDrives.
+                await getDirectAccess(device.id);
+                void refreshDrives(device.id);
+            })();
+        }
+    }, [devices]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: refreshDrives/getDirectAccess are stable closures over refs
 
     // Auto-discover newly-registered companions. 5s instead of 30s so
     // a fresh pairing (opened in a separate browser tab by the companion)
@@ -344,7 +398,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
             try {
                 const r = await fastListDrives(deviceId);
                 if ("error" in r) { setBrowserError(r.error); return; }
-                drivesCacheRef.current.set(deviceId, r.drives);
+                persistDrivesCache(deviceId, r.drives);
                 setBrowserDrives(r.drives);
                 setBrowserCwd(null);
                 setBrowserEntries([]);
@@ -384,7 +438,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         try {
             const r = await fastListDrives(deviceId);
             if ("error" in r) return;
-            drivesCacheRef.current.set(deviceId, r.drives);
+            persistDrivesCache(deviceId, r.drives);
             // Only update visible state if we're still on the drives view.
             setBrowserCwd((cwd) => { if (cwd === null) setBrowserDrives(r.drives); return cwd; });
         } finally {
@@ -430,7 +484,11 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
 
     function openPickerDialog(deviceId: string) {
         setPendingPickKind("music");
-        setBrowserDrives([]);
+        // Hydrate from cache synchronously so the modal paints instantly.
+        // If the cache is cold we still kick off the network call below;
+        // navigateBrowser handles both paths transparently.
+        const cachedDrives = drivesCacheRef.current.get(deviceId) ?? [];
+        setBrowserDrives(cachedDrives);
         setBrowserCwd(null);
         setBrowserEntries([]);
         setBrowserParent(null);
@@ -858,6 +916,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                                 <span>{pickerDebug.op}</span>
                                 <span>·</span>
                                 <span>{pickerDebug.via}</span>
+                                {pickerDebug.reason && (<><span>·</span><span>{pickerDebug.reason}</span></>)}
                                 <span>·</span>
                                 <span>{pickerDebug.ms}ms</span>
                                 {pickerDebug.n !== undefined && (<><span>·</span><span>n={pickerDebug.n}</span></>)}
