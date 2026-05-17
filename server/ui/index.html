@@ -1146,6 +1146,10 @@
                 <div class="section-title">Server Status</div>
                 <div class="stat-grid">
                     <div class="stat" style="grid-column:span 2">
+                        <div class="stat-value" id="stat-device-name" style="font-size:18px">—</div>
+                        <div class="stat-label">Device name (synced from web)</div>
+                    </div>
+                    <div class="stat" style="grid-column:span 2">
                         <div class="stat-value" id="stat-port">17899</div>
                         <div class="stat-label">Port</div>
                     </div>
@@ -1355,6 +1359,8 @@
                     document.getElementById("view-auth").classList.remove("active");
                     document.getElementById("view-main").classList.add("active");
                     if (status.port) document.getElementById("stat-port").textContent = status.port;
+                    const nameEl = document.getElementById("stat-device-name");
+                    if (nameEl) nameEl.textContent = status.deviceName || status.userName || "—";
                     if (status.userName) document.getElementById("user-name").textContent = status.userName;
                     if (status.userEmail) document.getElementById("user-email").textContent = status.userEmail;
                 } else {
@@ -1408,6 +1414,8 @@
 
             // Stats
             document.getElementById("stat-port").textContent = status.port;
+            document.getElementById("stat-device-name").textContent =
+                status.deviceName || status.userName || "—";
 
             // Load settings (folders are now managed from the web app /devices view)
             const settings = await window.mmo.getSettings();

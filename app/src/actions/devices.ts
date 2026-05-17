@@ -309,11 +309,10 @@ export async function scanDeviceFolder(deviceId: string, folderPath: string) {
 // ─── Check device online status ─────────────────────────────────────────────
 
 export async function pingDevice(deviceId: string): Promise<{ online: boolean; info?: Record<string, unknown> }> {
-    // Auth + ownership scope: this action issues a server-side fetch to the
-    // device's `apiUrl`, which is user-controlled. Without a session check
-    // any caller could trigger an SSRF against arbitrary URLs and read /health
-    // responses from internal services; without an ownership check a signed-in
-    // user could ping (and probe + reclassify) any other user's device row.
+    // Auth + ownership scope: pingDevice runs server-side from Vercel,
+    // which cannot reach the user's LAN. We rely on the push-based
+    // heartbeat written by POST /api/devices/announce (the companion
+    // calls it every 30 s). Online = heartbeat within the last 90 s.
     const session = await auth();
     if (!session?.user?.id) return { online: false };
 
@@ -323,29 +322,19 @@ export async function pingDevice(deviceId: string): Promise<{ online: boolean; i
         .where(and(eq(devices.id, deviceId), eq(devices.userId, session.user.id)))
         .limit(1);
     const device = rows[0];
-
     if (!device) return { online: false };
 
-    try {
-        const resp = await fetch(`${device.apiUrl}/health`, {
-            signal: AbortSignal.timeout(5_000),
-        });
-        if (resp.ok) {
-            const info = await resp.json();
-            await updateDeviceStatusInternal(deviceId, {
-                status: "online",
-                hostname: info.hostname,
-                os: info.platform,
-                version: info.version,
-            });
-            return { online: true, info };
-        }
-    } catch {
-        // offline
-    }
-
-    await updateDeviceStatusInternal(deviceId, { status: "offline" });
-    return { online: false };
+    const lastSeen = device.lastSeenAt ? new Date(device.lastSeenAt).getTime() : 0;
+    const fresh = Date.now() - lastSeen < 90_000;
+    return {
+        online: fresh,
+        info: {
+            hostname: device.hostname,
+            platform: device.os,
+            version: device.version,
+            lastSeenAt: device.lastSeenAt,
+        },
+    };
 }
 
 // ─── Get track count per device ─────────────────────────────────────────────

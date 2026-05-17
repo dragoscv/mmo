@@ -578,6 +578,7 @@ function refreshTrayMenu() {
 function invalidateLocalPairing(reason: string): void {
     store.delete("deviceToken" as never);
     store.delete("deviceId" as never);
+    store.delete("deviceName" as never);
     store.delete("userName" as never);
     store.delete("userEmail" as never);
     store.delete("userImage" as never);
@@ -633,6 +634,7 @@ function setupIPC() {
         serverVersion: serverModule?.getServerVersion() ?? null,
         authenticated: !!store.get("deviceToken"),
         deviceId: store.get("deviceId") || null,
+        deviceName: store.get("deviceName") || null,
         userName: store.get("userName") || null,
         userEmail: store.get("userEmail") || null,
         userImage: store.get("userImage") || null,
@@ -668,6 +670,7 @@ function setupIPC() {
     ipcMain.handle("logout", () => {
         store.delete("deviceToken" as never);
         store.delete("deviceId" as never);
+        store.delete("deviceName" as never);
         store.delete("userName" as never);
         store.delete("userEmail" as never);
         store.delete("userImage" as never);
@@ -1134,6 +1137,17 @@ app.whenReady().then(async () => {
                 try {
                     const la = await import("./lan-announce");
                     la.setOnAuthInvalidated((reason) => invalidateLocalPairing(reason));
+                    // Sync the cloud-side device name into our store so
+                    // the renderer UI can show the same label the user
+                    // sees on /devices (rename there, rename here).
+                    la.setOnDeviceName((name) => {
+                        const prev = store.get("deviceName") as string | undefined;
+                        if (prev !== name) {
+                            store.set("deviceName", name);
+                            try { mainWindow?.webContents.send("status-changed"); } catch { /* ignore */ }
+                            refreshTrayMenu();
+                        }
+                    });
                 } catch { /* best-effort */ }
                 // Defensive: if a previous companion process or a stale
                 // browser tab left the audio engine running (rare but

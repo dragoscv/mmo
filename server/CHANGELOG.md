@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.10 — push-based liveness + device name sync
+
+- **Web /devices online status fix**: Vercel can't reach the user's LAN, so the old server-side `fetch(apiUrl + "/health")` probe always failed and every device rendered "Offline". Replaced with a push-based heartbeat: the companion now POSTs `/api/devices/announce` every 30 s (was 5 min) carrying `{ hostname, os, version }`; the cloud sets `status: "online"` + `lastSeenAt: now()`; `pingDevice` returns online when `lastSeenAt < 90 s`.
+- **Device name sync**: the announce response now returns the user-chosen `name` from the cloud. The companion stores it and displays it as a new "Device name" stat in the UI (above Port). Rename on /devices → the companion picks it up on the next 30 s tick.
+- The `deviceName` value is cleared alongside the other auth keys on logout and on the 1.0.9 auto-invalidate path.
+
 ## 1.0.9 — self-heal orphaned pairings + live status refresh
 
 - **Critical fix**: when the cloud no longer recognises the device token (HTTP 401 from `/api/devices/announce` or `/api/sync` — typical cause: device row deleted server-side or pairing half-failed), the companion now wipes the local pairing, stops cloud-sync + LAN-announce, and pushes the renderer back to the auth view via a new `auth-invalidated` IPC event. Previously a stale token produced a silent perpetual 401 loop with no user-facing signal.

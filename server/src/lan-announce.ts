@@ -24,7 +24,11 @@ import os from "node:os";
 import { Bonjour, type Service } from "bonjour-service";
 import { getSettings, store } from "./store";
 
-const RE_ANNOUNCE_INTERVAL_MS = 5 * 60 * 1000;
+// 30 s heartbeat. Doubles as the liveness signal for /devices on the
+// web app: Vercel can't reach the user's LAN to do an active probe,
+// so this push-based tick is what flips the green dot on/off. Keep
+// it well below the web app's 90 s freshness threshold.
+const RE_ANNOUNCE_INTERVAL_MS = 30 * 1000;
 const SERVICE_NAME = "MMO Companion";
 const SERVICE_TYPE = "mmo-companion";
 
@@ -32,6 +36,8 @@ let timer: NodeJS.Timeout | null = null;
 let bonjourInstance: Bonjour | null = null;
 let bonjourService: Service | null = null;
 let lastAnnouncedUrl: string | null = null;
+let currentVersion = "0.0.0";
+let onDeviceNameCb: ((name: string) => void) | null = null;
 
 /**
  * Pick the most useful non-loopback IPv4 address. Prefers (in order):
@@ -89,7 +95,13 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
         const res = await fetch(`${webAppUrl}/api/devices/announce`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token, lanUrl }),
+            body: JSON.stringify({
+                token,
+                lanUrl,
+                hostname: os.hostname(),
+                os: process.platform,
+                version: currentVersion,
+            }),
             signal: ac.signal,
         }).finally(() => clearTimeout(t));
         // 401 = the cloud no longer recognises our token (device row
@@ -98,6 +110,15 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
         // prompt the user to re-pair instead of looping forever.
         if (res.status === 401 && onAuthInvalidatedCb) {
             try { onAuthInvalidatedCb("announce-401"); } catch { /* ignore */ }
+            return;
+        }
+        // Sync the user-chosen device name back to the companion so the
+        // UI / tray can display the same label that shows on /devices.
+        if (res.ok && onDeviceNameCb) {
+            try {
+                const data = await res.json() as { name?: string };
+                if (data?.name) onDeviceNameCb(data.name);
+            } catch { /* response wasn't JSON; ignore */ }
         }
     } catch {
         // Network down, paired but cloud unreachable — try again next tick.
@@ -110,6 +131,12 @@ let onAuthInvalidatedCb: ((reason: string) => void) | null = null;
  *  Set once at startup from main.ts to wire into invalidateLocalPairing. */
 export function setOnAuthInvalidated(cb: ((reason: string) => void) | null): void {
     onAuthInvalidatedCb = cb;
+}
+
+/** Register a callback invoked when the cloud reports our display name.
+ *  Set once at startup so main.ts can persist it for the renderer UI. */
+export function setOnDeviceName(cb: ((name: string) => void) | null): void {
+    onDeviceNameCb = cb;
 }
 
 function startBonjour(port: number, version: string): void {
@@ -149,16 +176,17 @@ function stopBonjour(): void {
  */
 export function startLanAnnounce(opts: { port: number; version: string }): void {
     stopLanAnnounce();
+    currentVersion = opts.version;
     startBonjour(opts.port, opts.version);
 
     const tick = async () => {
         const url = buildLanUrl(opts.port);
-        // Only POST when the URL has changed — typical case: nothing
-        // moves between ticks. Reduces noise on the web side.
-        if (url !== lastAnnouncedUrl) {
-            await postAnnounce(url);
-            lastAnnouncedUrl = url;
-        }
+        // Always POST every tick so `lastSeenAt` keeps refreshing on
+        // the cloud (that's how /devices flips the green dot on/off).
+        // The 30 s tick rate is cheap enough; conditional skips would
+        // make the device look offline whenever the URL is stable.
+        await postAnnounce(url);
+        lastAnnouncedUrl = url;
     };
     // First announce after a short delay so the user's pairing token
     // (set during /auth/callback) is on disk before we POST.

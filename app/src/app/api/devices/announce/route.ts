@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null) as {
         token?: string;
         lanUrl?: string | null;
+        hostname?: string;
+        os?: string;
+        version?: string;
     } | null;
 
     if (!body || typeof body !== "object" || typeof body.token !== "string") {
@@ -37,13 +40,29 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
+    // The announce loop doubles as our heartbeat: every successful
+    // call refreshes `status` + `lastSeenAt`, which is how /devices
+    // decides whether to render the green dot. Vercel can't reach the
+    // user's LAN to do an active /health probe, so this push-based
+    // signal is the only reliable liveness source.
+    const baseUpdate = {
+        status: "online" as const,
+        lastSeenAt: new Date(),
+        hostname: typeof body.hostname === "string" && body.hostname.length > 0 && body.hostname.length <= 128
+            ? body.hostname : device.hostname,
+        os: typeof body.os === "string" && body.os.length > 0 && body.os.length <= 64
+            ? body.os : device.os,
+        version: typeof body.version === "string" && body.version.length > 0 && body.version.length <= 32
+            ? body.version : device.version,
+    };
+
     // Allow `lanUrl: null` to clear a previously-announced LAN URL
     // (companion went headless / VPN-only).
     if (body.lanUrl === null) {
         await db.update(devices)
-            .set({ lanUrl: null, lanAnnouncedAt: new Date() })
+            .set({ ...baseUpdate, lanUrl: null, lanAnnouncedAt: new Date() })
             .where(eq(devices.id, device.id));
-        return NextResponse.json({ ok: true, cleared: true });
+        return NextResponse.json({ ok: true, cleared: true, name: device.name });
     }
 
     const lanUrl = validateDeviceLanUrl(body.lanUrl);
@@ -52,8 +71,8 @@ export async function POST(request: NextRequest) {
     }
 
     await db.update(devices)
-        .set({ lanUrl, lanAnnouncedAt: new Date() })
+        .set({ ...baseUpdate, lanUrl, lanAnnouncedAt: new Date() })
         .where(eq(devices.id, device.id));
 
-    return NextResponse.json({ ok: true, lanUrl });
+    return NextResponse.json({ ok: true, lanUrl, name: device.name });
 }
