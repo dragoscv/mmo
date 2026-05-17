@@ -88,6 +88,15 @@
         "checkEmail": "Check your inbox for the sign-in link.",
         "termsNote": "By continuing you agree to our Terms and Privacy Policy."
     },
+    "login": {
+        "welcomeTitle": "Welcome to MMO",
+        "welcomeSubtitle": "Mwrty Music Organizer",
+        "formTitle": "Sign in to MMO",
+        "formSubtitle": "Your settings and preferences will be synced across sessions",
+        "formFooter": "By continuing, you agree to store your preferences securely in the app database.",
+        "skipNoteLine1": "You can also use the app without signing in.",
+        "skipNoteLine2": "Settings will be stored locally in your browser."
+    },
     "dashboard": {
         "empty": {
             "scanToPopulate": "Scan & analyze tracks to populate",

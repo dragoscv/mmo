@@ -88,6 +88,15 @@
         "checkEmail": "Verifică-ți inbox-ul pentru link-ul de autentificare.",
         "termsNote": "Continuând, accepți Termenii și Politica de confidențialitate."
     },
+    "login": {
+        "welcomeTitle": "Bun venit la MMO",
+        "welcomeSubtitle": "Mwrty Music Organizer",
+        "formTitle": "Autentifică-te la MMO",
+        "formSubtitle": "Setările și preferințele tale vor fi sincronizate între sesiuni",
+        "formFooter": "Continuând, ești de acord să-ți stocăm preferințele în siguranță în baza de date a aplicației.",
+        "skipNoteLine1": "Poți folosi aplicația și fără autentificare.",
+        "skipNoteLine2": "Setările vor fi salvate local în browser."
+    },
     "dashboard": {
         "empty": {
             "scanToPopulate": "Scanează și analizează piese ca să populezi",

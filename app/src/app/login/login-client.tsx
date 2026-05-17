@@ -1,11 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { LoginForm } from "@/components/login-form";
 import { useRenderCount } from "@/lib/dev-debugger";
 
 export function LoginPageClient() {
     useRenderCount("Page:/login");
+    const t = useTranslations("login");
     return (
         <div className="flex min-h-full items-center justify-center px-4">
             <div className="w-full max-w-sm space-y-8">
@@ -20,10 +22,10 @@ export function LoginPageClient() {
                     />
                     <div className="text-center">
                         <h1 className="text-2xl font-bold tracking-tight">
-                            Welcome to MMO
+                            {t("welcomeTitle")}
                         </h1>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Mwrty Music Organizer
+                            {t("welcomeSubtitle")}
                         </p>
                     </div>
                 </div>
@@ -35,9 +37,9 @@ export function LoginPageClient() {
 
                 {/* Skip option */}
                 <p className="text-center text-xs text-muted-foreground/50">
-                    You can also use the app without signing in.
+                    {t("skipNoteLine1")}
                     <br />
-                    Settings will be stored locally in your browser.
+                    {t("skipNoteLine2")}
                 </p>
             </div>
         </div>

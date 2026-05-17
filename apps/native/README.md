@@ -13,6 +13,17 @@ the live origin gives us:
 - Native window chrome, dock/launcher icons, deep-linking, file pickers
 - Offline support via the existing service worker cache
 
+### Why no `@capacitor/live-updates` plugin?
+
+The Capacitor `server.url` already points at `https://muzicai.ro`, so every
+app launch fetches the latest Vercel deploy. There is no bundled web payload
+to OTA-update — `dist/index.html` only exists as a fallback that immediately
+redirects to the live origin. Adding `@capacitor/live-updates` (Capgo /
+Appflow) would target the local `dist/` bundle that the app never actually
+uses, so it is intentionally **not** wired up. The only reason to ship a new
+store build is a change to native plugins, native config, or the WebView
+shell itself.
+
 ## Local development
 
 ```sh

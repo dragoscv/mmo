@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 function GoogleIcon({ className }: { className?: string }) {
     return (
@@ -23,6 +24,8 @@ interface LoginFormProps {
 
 export function LoginForm({ callbackUrl = "/", compact }: LoginFormProps) {
     const [loading, setLoading] = useState(false);
+    const tLogin = useTranslations("login");
+    const tAuth = useTranslations("auth");
 
     async function handleGoogleSignIn() {
         setLoading(true);
@@ -37,9 +40,9 @@ export function LoginForm({ callbackUrl = "/", compact }: LoginFormProps) {
         <div className={compact ? "space-y-3" : "space-y-4"}>
             {!compact && (
                 <div className="text-center space-y-1.5">
-                    <h2 className="text-xl font-semibold">Sign in to MMO</h2>
+                    <h2 className="text-xl font-semibold">{tLogin("formTitle")}</h2>
                     <p className="text-sm text-muted-foreground">
-                        Your settings and preferences will be synced across sessions
+                        {tLogin("formSubtitle")}
                     </p>
                 </div>
             )}
@@ -56,12 +59,12 @@ export function LoginForm({ callbackUrl = "/", compact }: LoginFormProps) {
                 ) : (
                     <GoogleIcon className="h-4 w-4" />
                 )}
-                Continue with Google
+                {tAuth("signInWithGoogle")}
             </Button>
 
             {!compact && (
                 <p className="text-center text-[11px] text-muted-foreground/60">
-                    By continuing, you agree to store your preferences securely in the app database.
+                    {tLogin("formFooter")}
                 </p>
             )}
         </div>
