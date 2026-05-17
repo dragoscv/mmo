@@ -21,105 +21,30 @@ import { db } from "@/db";
 import { devices } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { materializeDeviceToken } from "@/lib/device-token";
+import type {
+    AuthorizedAudioDevice,
+    CompanionFolder,
+    CompanionScanJob,
+    CompanionWatchEvent,
+    CompanionAudioInventory,
+} from "./companion-types";
 
-export interface AuthorizedAudioDevice {
-    name: string;
-    direction: "input" | "output";
-    backend: string;
-    preferredSampleRate?: number;
-}
-
-/** Folder purpose label. Used to filter / colour rows in the UI and (eventually)
- *  to route file types to different pipelines (video transcoder vs audio scanner). */
-export type FolderKind = "music" | "movies" | "tv-shows" | "samples" | "recordings" | "other";
-
-export const FOLDER_KINDS: ReadonlyArray<FolderKind> = [
-    "music", "movies", "tv-shows", "samples", "recordings", "other",
-];
-
-export interface CompanionFolder {
-    path: string;
-    exists: boolean;
-    label: string;
-    /** What lives in this folder. Defaults to "music" for legacy installs. */
-    kind?: FolderKind;
-    /** True when the user has toggled "Auto-watch" for this folder. */
-    watch?: boolean;
-    /** True when a chokidar watcher is currently running for it. */
-    watchActive?: boolean;
-    /** Cumulative watcher events seen since the watcher started. */
-    watchEvents?: number;
-    /** Last error reported by the watcher (e.g. EACCES). */
-    watchError?: string | null;
-}
-
-/** Mirrors `ScanJob` on the companion. Polled every ~750 ms while a job
- *  is active. The `tracks` field is only populated once `status === "complete"`. */
-export interface CompanionScanJob {
-    id: string;
-    folder: string;
-    status: "pending" | "discovering" | "scanning" | "complete" | "error" | "canceled";
-    discovered: number;
-    scanned: number;
-    errored: number;
-    currentFile: string | null;
-    total: number;
-    startedAt: number;
-    finishedAt: number | null;
-    error: string | null;
-    origin: "manual" | "watcher";
-    tracks?: CompanionScannedTrack[] | null;
-}
-
-export interface CompanionScannedTrack {
-    filepath: string;
-    filename: string;
-    artist?: string;
-    title?: string;
-    album?: string;
-    bpm?: number;
-    key?: string;
-    duration?: number;
-    genre?: string;
-    format?: string;
-    bitrate?: number;
-    sampleRate?: number;
-    fileSize: number;
-    year?: number;
-}
-
-export interface CompanionWatchEvent {
-    id: number;
-    folder: string;
-    kind: "add" | "change" | "unlink";
-    filepath: string;
-    payload: CompanionScannedTrack | null;
-    timestamp: number;
-}
-
-export interface CompanionAudioDevice {
-    id: number;
-    name: string;
-    inputChannels: number;
-    outputChannels: number;
-    duplexChannels: number;
-    isDefaultInput: boolean;
-    isDefaultOutput: boolean;
-    sampleRates: number[];
-    preferredSampleRate: number;
-}
-
-export interface CompanionAudioBackendGroup {
-    backend: string;
-    apiName: string;
-    available: boolean;
-    devices: CompanionAudioDevice[];
-}
-
-export interface CompanionAudioInventory {
-    backends: CompanionAudioBackendGroup[];
-    authorized: AuthorizedAudioDevice[];
-}
+// Re-export the public types/constants from the client-safe module so
+// existing `from "@/lib/companion-control"` imports keep working from
+// server actions. Client components must import from `companion-types`
+// directly to avoid pulling in `server-only`.
+export {
+    FOLDER_KINDS,
+    type AuthorizedAudioDevice,
+    type FolderKind,
+    type CompanionFolder,
+    type CompanionScannedTrack,
+    type CompanionScanJob,
+    type CompanionWatchEvent,
+    type CompanionAudioDevice,
+    type CompanionAudioBackendGroup,
+    type CompanionAudioInventory,
+} from "./companion-types";
 
 interface DeviceRow {
     id: string;

@@ -85,7 +85,7 @@ import {
     type AuthorizedAudioDevice,
     type CompanionScanJob,
     type FolderKind,
-} from "@/lib/companion-control";
+} from "@/lib/companion-types";
 
 /** Human-readable labels for folder kinds shown in the picker + badge. */
 const FOLDER_KIND_LABELS: Record<FolderKind, string> = {
