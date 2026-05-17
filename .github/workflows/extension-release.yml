@@ -98,6 +98,7 @@ jobs:
                     manifest.json \
                     background.js \
                     content.js \
+                    beacon.js \
                     content.css \
                     popup.html popup.js \
                     options.html options.js \

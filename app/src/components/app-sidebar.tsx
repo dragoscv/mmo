@@ -38,7 +38,7 @@ import { GlobalSearch } from "./global-search";
 import { useRouteMemoryHrefs } from "@/hooks/use-route-memory";
 import { useSidebar } from "./sidebar-context";
 import { UserCard } from "./user-card";
-import { CompanionDownloadButton } from "./sidebar/companion-download-button";
+import { DownloadHubButton } from "./sidebar/download-hub-button";
 
 const navItems = [
     { href: "/", label: "Dashboard", key: "dashboard", icon: LayoutDashboard },
@@ -180,7 +180,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                 {collapsed ? (
                     <div className="flex flex-col items-center gap-1">
                         <UserCard collapsed />
-                        <CompanionDownloadButton collapsed />
+                        <DownloadHubButton collapsed />
                         <ThemeToggle collapsed />
                         <button
                             onClick={() => setLegendOpen(true)}
@@ -193,7 +193,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                 ) : (
                     <>
                         <UserCard />
-                        <CompanionDownloadButton />
+                        <DownloadHubButton />
                         <div className="flex items-center justify-between px-2">
                             <ThemeToggle />
                             <button

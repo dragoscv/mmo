@@ -200,10 +200,10 @@ function isAllowedOrigin(origin: string | undefined): boolean {
         for (const pattern of allowlist) {
             if (pattern === "*") return true;
             if (pattern === origin) return true;
-            // Simple wildcard suffix support: "https://*.brivio.ro"
+            // Simple wildcard suffix support: "https://*.muzicai.ro"
             if (pattern.startsWith("https://*.") || pattern.startsWith("http://*.")) {
                 const proto = pattern.startsWith("https://") ? "https:" : "http:";
-                const suffix = pattern.slice(pattern.indexOf("*.") + 1); // ".brivio.ro"
+                const suffix = pattern.slice(pattern.indexOf("*.") + 1); // ".muzicai.ro"
                 if (u.protocol === proto && u.hostname.endsWith(suffix)) return true;
             }
         }
@@ -984,7 +984,7 @@ export async function startServer(): Promise<void> {
     //
     // These routes are auth'd with the device token (not publicLocalhost),
     // so the user can configure them from the web UI even when it lives
-    // on app.brivio.ro.
+    // on muzicai.ro.
 
     app.get("/audio/devices", authMiddleware, (_req, res) => {
         try {

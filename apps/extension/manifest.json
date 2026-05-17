@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "MMO - Music Media Organizer Downloader",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Detect audio/video on streaming platforms and download to your MMO library",
     "browser_specific_settings": {
         "gecko": {
@@ -64,6 +64,16 @@
                 "content.css"
             ],
             "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "*://muzicai.ro/*",
+                "*://*.muzicai.ro/*"
+            ],
+            "js": [
+                "beacon.js"
+            ],
+            "run_at": "document_start"
         }
     ],
     "options_ui": {

@@ -104,7 +104,9 @@ export function getSettings(): CompanionSettings {
         startMinimized: store.get("startMinimized") as boolean,
         serverPort: store.get("serverPort") as number,
         scanFolders: readScanFolders(),
-        webAppUrl: "https://muzicai.ro",
+        // Respect the value the OAuth flow persisted (or that the user typed in
+        // settings). Falls back to https://muzicai.ro for fresh installs.
+        webAppUrl: (store.get("webAppUrl") as string | undefined) ?? DEFAULTS.webAppUrl,
         audioOriginAllowlist: (store.get("audioOriginAllowlist") as string[] | undefined) ?? DEFAULTS.audioOriginAllowlist,
         authorizedAudioDevices: (store.get("authorizedAudioDevices") as AuthorizedAudioDevice[] | undefined) ?? [],
         telemetryEnabled: (store.get("telemetryEnabled") as boolean | undefined) ?? DEFAULTS.telemetryEnabled,

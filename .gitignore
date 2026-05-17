@@ -1,6 +1,6 @@
 .pnpm-cache/
 .next/
-downloads/
+/app/data/downloads/
 node_modules/
 /server/node_modules/
 
