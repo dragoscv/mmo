@@ -545,3 +545,273 @@ export const savedSearches = pgTable(
 
 export type SavedSearchRow = typeof savedSearches.$inferSelect;
 export type NewSavedSearch = typeof savedSearches.$inferInsert;
+
+// ─── Video Pillar ────────────────────────────────────────────────────────────
+// Movies, TV shows, episodes, file index, watch state, recommendations,
+// family sub-profiles, companion-device metadata.
+
+/** Family sub-profiles under a single account. Picker on launch. */
+export const watchProfiles = pgTable(
+    "watch_profiles",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        name: text("name").notNull(),
+        avatar: text("avatar"),
+        color: text("color"),
+        isKid: boolean("is_kid").default(false).notNull(),
+        sortOrder: integer("sort_order").notNull().default(0),
+        prefs: jsonb("prefs").default({}).notNull(),
+        createdAt: timestamp("created_at").defaultNow(),
+    },
+    (t) => [index("watch_profiles_user_idx").on(t.userId, t.sortOrder)],
+);
+
+/** Companion devices (per install). Replaces the music `devices` table for video purposes. */
+export const companionDevices = pgTable(
+    "companion_devices",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        machineId: text("machine_id").notNull(),
+        hostname: text("hostname"),
+        platform: text("platform"),
+        friendlyName: text("friendly_name"),
+        color: text("color"),
+        icon: text("icon"),
+        publicIp: text("public_ip"),
+        lastSeen: timestamp("last_seen").defaultNow(),
+        capabilities: jsonb("capabilities").default({}).notNull(),
+        createdAt: timestamp("created_at").defaultNow(),
+    },
+    (t) => [
+        uniqueIndex("companion_devices_user_machine_uniq").on(t.userId, t.machineId),
+        index("companion_devices_user_idx").on(t.userId),
+    ],
+);
+
+/** Movie metadata (one row per logical movie, can map to many files). */
+export const movies = pgTable(
+    "movies",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        tmdbId: integer("tmdb_id"),
+        imdbId: text("imdb_id"),
+        title: text("title").notNull(),
+        originalTitle: text("original_title"),
+        year: integer("year"),
+        overview: text("overview"),
+        tagline: text("tagline"),
+        runtimeMinutes: integer("runtime_minutes"),
+        posterPath: text("poster_path"),
+        backdropPath: text("backdrop_path"),
+        trailerYoutubeId: text("trailer_youtube_id"),
+        genres: jsonb("genres").default([]).notNull(),
+        cast: jsonb("cast").default([]).notNull(),
+        crew: jsonb("crew").default([]).notNull(),
+        rating: real("rating"),
+        ratingCount: integer("rating_count"),
+        ageRating: text("age_rating"),
+        dominantColor: text("dominant_color"),
+        addedAt: timestamp("added_at").defaultNow(),
+        updatedAt: timestamp("updated_at").defaultNow(),
+    },
+    (t) => [
+        index("movies_user_idx").on(t.userId),
+        index("movies_tmdb_idx").on(t.tmdbId),
+        uniqueIndex("movies_user_tmdb_uniq").on(t.userId, t.tmdbId),
+    ],
+);
+
+export const tvShows = pgTable(
+    "tv_shows",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        tmdbId: integer("tmdb_id"),
+        imdbId: text("imdb_id"),
+        title: text("title").notNull(),
+        originalTitle: text("original_title"),
+        firstAirYear: integer("first_air_year"),
+        overview: text("overview"),
+        posterPath: text("poster_path"),
+        backdropPath: text("backdrop_path"),
+        trailerYoutubeId: text("trailer_youtube_id"),
+        genres: jsonb("genres").default([]).notNull(),
+        cast: jsonb("cast").default([]).notNull(),
+        rating: real("rating"),
+        ratingCount: integer("rating_count"),
+        ageRating: text("age_rating"),
+        status: text("status"),
+        dominantColor: text("dominant_color"),
+        addedAt: timestamp("added_at").defaultNow(),
+        updatedAt: timestamp("updated_at").defaultNow(),
+    },
+    (t) => [
+        index("tv_shows_user_idx").on(t.userId),
+        index("tv_shows_tmdb_idx").on(t.tmdbId),
+        uniqueIndex("tv_shows_user_tmdb_uniq").on(t.userId, t.tmdbId),
+    ],
+);
+
+export const tvSeasons = pgTable(
+    "tv_seasons",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        showId: bigint("show_id", { mode: "number" }).notNull().references(() => tvShows.id, { onDelete: "cascade" }),
+        seasonNumber: integer("season_number").notNull(),
+        name: text("name"),
+        overview: text("overview"),
+        posterPath: text("poster_path"),
+        airDate: timestamp("air_date"),
+        episodeCount: integer("episode_count"),
+    },
+    (t) => [
+        uniqueIndex("tv_seasons_show_num_uniq").on(t.showId, t.seasonNumber),
+    ],
+);
+
+export const tvEpisodes = pgTable(
+    "tv_episodes",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        showId: bigint("show_id", { mode: "number" }).notNull().references(() => tvShows.id, { onDelete: "cascade" }),
+        seasonNumber: integer("season_number").notNull(),
+        episodeNumber: integer("episode_number").notNull(),
+        title: text("title"),
+        overview: text("overview"),
+        runtimeMinutes: integer("runtime_minutes"),
+        airDate: timestamp("air_date"),
+        stillPath: text("still_path"),
+        rating: real("rating"),
+        introStartSec: real("intro_start_sec"),
+        introEndSec: real("intro_end_sec"),
+        creditsStartSec: real("credits_start_sec"),
+    },
+    (t) => [
+        uniqueIndex("tv_episodes_show_se_ep_uniq").on(t.showId, t.seasonNumber, t.episodeNumber),
+        index("tv_episodes_show_idx").on(t.showId),
+    ],
+);
+
+/** Actual file on a companion device. One movie/episode can have many files (qualities, languages). */
+export const videoFiles = pgTable(
+    "video_files",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        deviceId: bigint("device_id", { mode: "number" }).references(() => companionDevices.id, { onDelete: "cascade" }),
+        kind: text("kind").notNull(), // 'movie' | 'episode'
+        movieId: bigint("movie_id", { mode: "number" }).references(() => movies.id, { onDelete: "cascade" }),
+        episodeId: bigint("episode_id", { mode: "number" }).references(() => tvEpisodes.id, { onDelete: "cascade" }),
+        path: text("path").notNull(),
+        sizeBytes: bigint("size_bytes", { mode: "number" }),
+        container: text("container"),
+        videoCodec: text("video_codec"),
+        audioCodec: text("audio_codec"),
+        width: integer("width"),
+        height: integer("height"),
+        durationSec: real("duration_sec"),
+        bitrateKbps: integer("bitrate_kbps"),
+        hdr: text("hdr"),
+        audioTracks: jsonb("audio_tracks").default([]).notNull(),
+        subtitleTracks: jsonb("subtitle_tracks").default([]).notNull(),
+        hash: text("hash"),
+        mtime: timestamp("mtime"),
+        scannedAt: timestamp("scanned_at").defaultNow(),
+    },
+    (t) => [
+        index("video_files_user_idx").on(t.userId),
+        index("video_files_movie_idx").on(t.movieId),
+        index("video_files_episode_idx").on(t.episodeId),
+        index("video_files_device_idx").on(t.deviceId),
+        uniqueIndex("video_files_device_path_uniq").on(t.deviceId, t.path),
+    ],
+);
+
+/** Per-profile watch progress. */
+export const watchHistory = pgTable(
+    "watch_history",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        profileId: bigint("profile_id", { mode: "number" }).notNull().references(() => watchProfiles.id, { onDelete: "cascade" }),
+        kind: text("kind").notNull(), // 'movie' | 'episode'
+        movieId: bigint("movie_id", { mode: "number" }).references(() => movies.id, { onDelete: "cascade" }),
+        episodeId: bigint("episode_id", { mode: "number" }).references(() => tvEpisodes.id, { onDelete: "cascade" }),
+        positionSec: real("position_sec").default(0).notNull(),
+        durationSec: real("duration_sec"),
+        progress: real("progress").default(0).notNull(),
+        watchedAt: timestamp("watched_at").defaultNow(),
+        completed: boolean("completed").default(false).notNull(),
+        playCount: integer("play_count").default(0).notNull(),
+    },
+    (t) => [
+        uniqueIndex("watch_history_profile_movie_uniq").on(t.profileId, t.movieId),
+        uniqueIndex("watch_history_profile_episode_uniq").on(t.profileId, t.episodeId),
+        index("watch_history_profile_idx").on(t.profileId, t.watchedAt),
+    ],
+);
+
+/** Per-profile ratings (1-10). */
+export const videoRatings = pgTable(
+    "video_ratings",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        profileId: bigint("profile_id", { mode: "number" }).notNull().references(() => watchProfiles.id, { onDelete: "cascade" }),
+        kind: text("kind").notNull(),
+        movieId: bigint("movie_id", { mode: "number" }).references(() => movies.id, { onDelete: "cascade" }),
+        showId: bigint("show_id", { mode: "number" }).references(() => tvShows.id, { onDelete: "cascade" }),
+        rating: integer("rating").notNull(),
+        ratedAt: timestamp("rated_at").defaultNow(),
+    },
+    (t) => [
+        uniqueIndex("video_ratings_profile_movie_uniq").on(t.profileId, t.movieId),
+        uniqueIndex("video_ratings_profile_show_uniq").on(t.profileId, t.showId),
+    ],
+);
+
+export const videoCollections = pgTable(
+    "video_collections",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        profileId: bigint("profile_id", { mode: "number" }).notNull().references(() => watchProfiles.id, { onDelete: "cascade" }),
+        name: text("name").notNull(),
+        kind: text("kind").notNull().default("custom"), // 'custom' | 'watch_later' | 'wishlist'
+        description: text("description"),
+        sortOrder: integer("sort_order").notNull().default(0),
+        createdAt: timestamp("created_at").defaultNow(),
+    },
+    (t) => [index("video_collections_profile_idx").on(t.profileId)],
+);
+
+export const videoCollectionItems = pgTable(
+    "video_collection_items",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        collectionId: bigint("collection_id", { mode: "number" }).notNull().references(() => videoCollections.id, { onDelete: "cascade" }),
+        kind: text("kind").notNull(),
+        movieId: bigint("movie_id", { mode: "number" }).references(() => movies.id, { onDelete: "cascade" }),
+        showId: bigint("show_id", { mode: "number" }).references(() => tvShows.id, { onDelete: "cascade" }),
+        // Items can also be tmdb-only (wishlist for things not yet in library)
+        tmdbId: integer("tmdb_id"),
+        tmdbKind: text("tmdb_kind"),
+        sortOrder: integer("sort_order").notNull().default(0),
+        addedAt: timestamp("added_at").defaultNow(),
+    },
+    (t) => [
+        index("video_collection_items_collection_idx").on(t.collectionId, t.sortOrder),
+    ],
+);
+
+export type WatchProfileRow = typeof watchProfiles.$inferSelect;
+export type CompanionDeviceRow = typeof companionDevices.$inferSelect;
+export type MovieRow = typeof movies.$inferSelect;
+export type TvShowRow = typeof tvShows.$inferSelect;
+export type TvSeasonRow = typeof tvSeasons.$inferSelect;
+export type TvEpisodeRow = typeof tvEpisodes.$inferSelect;
+export type VideoFileRow = typeof videoFiles.$inferSelect;
+export type WatchHistoryRow = typeof watchHistory.$inferSelect;
+export type VideoRatingRow = typeof videoRatings.$inferSelect;
+export type VideoCollectionRow = typeof videoCollections.$inferSelect;
+export type VideoCollectionItemRow = typeof videoCollectionItems.$inferSelect;

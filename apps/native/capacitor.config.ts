@@ -37,6 +37,14 @@ const config: CapacitorConfig = {
         allowMixedContent: false,
         captureInput: true,
         webContentsDebuggingEnabled: false,
+        // Android TV / Leanback compatibility — see ANDROID_TV.md for the
+        // AndroidManifest.xml additions needed after running `npx cap add android`.
+        buildOptions: {
+            // Block the soft keyboard from auto-showing on TV inputs.
+            // The user navigates with a remote; on-screen keyboard would
+            // cover the focused element.
+            keystorePath: undefined,
+        },
     },
 };
 

@@ -1,0 +1,41 @@
+/**
+ * TV-mode CSS overrides — bigger focus rings, no hover-only states,
+ * minimum 44px hit targets, scaled typography. Activated when the
+ * `.tv-mode` class is on the document root.
+ */
+
+.tv-mode {
+    font-size: 1.15rem;
+}
+
+.tv-mode a:focus-visible,
+.tv-mode button:focus-visible,
+.tv-mode input:focus-visible,
+.tv-mode [tabindex]:focus-visible {
+    outline: 3px solid var(--watch-accent, #ff3366);
+    outline-offset: 4px;
+    border-radius: 8px;
+    transition: outline-offset 80ms ease-out;
+}
+
+.tv-mode .poster-card,
+.tv-mode .watch-cta,
+.tv-mode .watch-pill {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+.tv-mode .poster-card:focus-visible {
+    transform: scale(1.06);
+    z-index: 5;
+    box-shadow: 0 16px 32px rgba(0, 0, 0, .6);
+}
+
+/* Disable hover-only effects on TV (no pointer). */
+@media (hover: none) and (pointer: coarse), (pointer: none) {
+
+    .poster-card:hover,
+    .watch-cta:hover {
+        transform: none;
+    }
+}

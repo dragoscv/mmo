@@ -30,6 +30,8 @@ import {
     Activity,
     Plug,
     BookOpen,
+    Clapperboard,
+    UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
@@ -43,6 +45,9 @@ import { DownloadHubButton } from "./sidebar/download-hub-button";
 const navItems = [
     { href: "/", label: "Dashboard", key: "dashboard", icon: LayoutDashboard },
     { href: "/library", label: "Library", key: "library", icon: Library },
+    { href: "/watch", label: "Watch", key: "watch", icon: Clapperboard },
+    { href: "/watch/collections", label: "Collections", key: "collections", icon: Library },
+    { href: "/profiles", label: "Profiles", key: "profiles", icon: UserCircle },
     { href: "/analysis", label: "Analysis", key: "analysis", icon: Activity },
     { href: "/playlists", label: "Playlists", key: "playlists", icon: ListMusic },
     { href: "/mixer", label: "Mixer", key: "mixer", icon: Disc3 },

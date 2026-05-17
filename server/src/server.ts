@@ -24,6 +24,7 @@ import { createSyncRouter } from "./sync/http-router";
 import { setOnAppliedListener } from "./sync";
 import { closeLibraryDb } from "./library/db";
 import { createPluginsRouter } from "./plugins/routes";
+import { createVideoRouter, shutdownVideoSubsystem } from "./library/video-routes";
 import { buildCompanionMetrics } from "./metrics";
 import {
     createScanJob,
@@ -705,6 +706,15 @@ export async function startServer(): Promise<void> {
 
     app.use("/plugins", createPluginsRouter(authMiddleware));
 
+    // ─── Video pillar (movies, tv shows, HLS transcode, TMDB cache) ──────
+    //
+    // Local file index + on-demand HLS transcode pipeline. The web app
+    // browses metadata through cloud Postgres + TMDB; the actual bytes
+    // are served by these routes from the user's local library. See
+    // `server/src/library/video-routes.ts` for the route shape.
+
+    app.use("/video", createVideoRouter(authMiddleware));
+
     // ─── Native low-latency audio engine ─────────────────────────────────
     //
     // These routes intentionally use `publicLocalhostMiddleware` instead of
@@ -1162,6 +1172,7 @@ export async function stopServer(): Promise<void> {
     wsClients.clear();
 
     try { closeLibraryDb(); } catch { /* ignore */ }
+    try { shutdownVideoSubsystem(); } catch { /* ignore */ }
 
     return new Promise<void>((resolve) => {
         if (httpServer) {

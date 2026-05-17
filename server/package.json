@@ -81,7 +81,9 @@
       "**/node_modules/audify/**",
       "**/node_modules/better-sqlite3/**",
       "**/node_modules/bindings/**",
-      "**/node_modules/file-uri-to-path/**"
+      "**/node_modules/file-uri-to-path/**",
+      "**/node_modules/ffmpeg-static/**",
+      "**/node_modules/ffprobe-static/**"
     ],
     "win": {
       "target": [
@@ -200,8 +202,10 @@
     "audify": "^1.10.1",
     "better-sqlite3": "^11.7.0",
     "bindings": "^1.5.0",
+    "cheerio": "^1.0.0",
     "chokidar": "^4.0.3",
     "cors": "^2.8.5",
+    "discord-rpc": "^4.0.1",
     "drizzle-orm": "^0.36.4",
     "ee-first": "^1.1.1",
     "electron-store": "^8.2.0",
@@ -209,6 +213,8 @@
     "encodeurl": "^2.0.0",
     "escape-html": "^1.0.3",
     "express": "^4.21.0",
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0",
     "file-uri-to-path": "^1.0.0",
     "finalhandler": "^1.3.1",
     "ms": "^2.1.3",

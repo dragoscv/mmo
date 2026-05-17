@@ -11,6 +11,15 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig: NextConfig = {
     serverExternalPackages: ["postgres", "music-metadata", "systeminformation"],
 
+    images: {
+        remotePatterns: [
+            { protocol: "https", hostname: "image.tmdb.org" },
+            { protocol: "https", hostname: "img.omdbapi.com" },
+            { protocol: "https", hostname: "walter.trakt.tv" },
+            { protocol: "https", hostname: "lh3.googleusercontent.com" },
+        ],
+    },
+
     // Keep large local-only assets out of every serverless function bundle.
     // The recordings/import actions use dynamic path.join() which causes
     // Next's tracer to pull in the entire project (data/, public/samples/,
