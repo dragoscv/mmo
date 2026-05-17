@@ -404,9 +404,10 @@ export async function getCompanionFolders(deviceId: string): Promise<CompanionFo
     return r.ok ? (r.result?.folders ?? []) : [];
 }
 
-/** Triggers the companion's native OS folder picker. Returns the new
- *  full list (or `canceled: true`). The web action does NOT take a path
- *  argument — that's the whole point: no manual entry. */
+/** Legacy: triggers the companion's native OS folder picker. Kept for
+ *  backwards compat but the UI now uses the in-web browser (listCompanionDrives
+ *  / listCompanionDirectory / addCompanionFolder) so the user never has to
+ *  switch focus to the companion app. */
 export async function pickCompanionFolder(
     deviceId: string,
     kind: FolderKind = "music",
@@ -417,12 +418,62 @@ export async function pickCompanionFolder(
 > {
     const err = await assertDeviceOwnership(deviceId);
     if (err) return { error: err };
-    // Long timeout — the user may take a while to choose a folder. The
-    // companion side also caps its own dialog wait at ~2 min.
     const r = await enqueueDeviceCommand<
         { canceled: true } | { canceled: false; picked: string; folders: CompanionFolder[] }
     >(deviceId, "pick_folder", { kind }, { timeoutMs: 120_000 });
     if (!r.ok) return { error: r.error ?? "Pick folder failed" };
+    return r.result!;
+}
+
+// ─── In-web filesystem browser ────────────────────────────────────────────
+// Three small server actions back the modal's folder tree: list mounted
+// drives once, list a directory on each navigation step, finalise with
+// add. All routed through the command queue so they work over the same
+// NAT-traversing announce loop as everything else.
+
+export async function listCompanionDrives(deviceId: string): Promise<
+    | { drives: import("@/lib/companion-types").CompanionDrive[] }
+    | { error: string }
+> {
+    const err = await assertDeviceOwnership(deviceId);
+    if (err) return { error: err };
+    const r = await enqueueDeviceCommand<{ drives: import("@/lib/companion-types").CompanionDrive[] }>(
+        deviceId, "list_drives", null, { timeoutMs: 15_000 },
+    );
+    if (!r.ok) return { error: r.error ?? "Failed to list drives" };
+    return { drives: r.result?.drives ?? [] };
+}
+
+export async function listCompanionDirectory(
+    deviceId: string,
+    folderPath: string,
+): Promise<
+    | import("@/lib/companion-types").CompanionDirectoryListing
+    | { error: string }
+> {
+    const err = await assertDeviceOwnership(deviceId);
+    if (err) return { error: err };
+    const r = await enqueueDeviceCommand<import("@/lib/companion-types").CompanionDirectoryListing>(
+        deviceId, "list_directory", { path: folderPath }, { timeoutMs: 20_000 },
+    );
+    if (!r.ok) return { error: r.error ?? "Failed to list directory" };
+    return r.result!;
+}
+
+export async function addCompanionFolder(
+    deviceId: string,
+    folderPath: string,
+    kind: FolderKind,
+): Promise<
+    | { added: boolean; picked: string; folders: CompanionFolder[] }
+    | { error: string }
+> {
+    const err = await assertDeviceOwnership(deviceId);
+    if (err) return { error: err };
+    const r = await enqueueDeviceCommand<{ added: boolean; picked: string; folders: CompanionFolder[] }>(
+        deviceId, "add_folder", { path: folderPath, kind }, { timeoutMs: 15_000 },
+    );
+    if (!r.ok) return { error: r.error ?? "Failed to add folder" };
     return r.result!;
 }
 

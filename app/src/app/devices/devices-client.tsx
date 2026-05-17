@@ -58,10 +58,14 @@ import {
     Globe,
     AudioLines,
     ChevronDown,
+    ChevronRight,
     Eye,
     EyeOff,
     FileMusic,
     Sparkles,
+    Folder,
+    Home,
+    ArrowUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -74,7 +78,6 @@ import {
     getDeviceTrackCount,
     getDevices,
     getCompanionFolders,
-    pickCompanionFolder,
     removeCompanionFolder,
     getCompanionAudioInventory,
     setCompanionAuthorizedAudioDevices,
@@ -85,6 +88,9 @@ import {
     listCompanionScanJobs,
     ingestCompanionScanJob,
     pollCompanionWatchEvents,
+    listCompanionDrives,
+    listCompanionDirectory,
+    addCompanionFolder,
 } from "@/actions/devices";
 import {
     FOLDER_KINDS,
@@ -93,6 +99,8 @@ import {
     type AuthorizedAudioDevice,
     type CompanionScanJob,
     type FolderKind,
+    type CompanionDrive,
+    type CompanionDirectoryEntry,
 } from "@/lib/companion-types";
 
 /** Human-readable labels for folder kinds shown in the picker + badge. */
@@ -135,12 +143,19 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
     const [scanProgress, setScanProgress] = useState<Record<string, CompanionScanJob>>({});
     /** Per-device highest watcher event id we've ingested so far. */
     const watchHighWatermark = useRef<Record<string, number>>({});
-    const [pickingFolder, setPickingFolder] = useState<string | null>(null);
     const [togglingWatch, setTogglingWatch] = useState<string | null>(null);
     /** Device whose Pick-Folder modal is open. Null = closed. */
     const [pickerDialogDevice, setPickerDialogDevice] = useState<string | null>(null);
-    /** Selected kind inside the open Pick-Folder modal. Reset each open. */
+    /** Pending kind selected inside the modal. */
     const [pendingPickKind, setPendingPickKind] = useState<FolderKind>("music");
+    /** Drives + current listing for the in-modal folder browser. */
+    const [browserDrives, setBrowserDrives] = useState<CompanionDrive[]>([]);
+    const [browserCwd, setBrowserCwd] = useState<string | null>(null);
+    const [browserEntries, setBrowserEntries] = useState<CompanionDirectoryEntry[]>([]);
+    const [browserParent, setBrowserParent] = useState<string | null>(null);
+    const [browserLoading, setBrowserLoading] = useState(false);
+    const [browserError, setBrowserError] = useState<string | null>(null);
+    const [browserAdding, setBrowserAdding] = useState(false);
     const [editingName, setEditingName] = useState<string | null>(null);
     const [editNameValue, setEditNameValue] = useState("");
     const [openSection, setOpenSection] = useState<Record<string, "folders" | "audio" | null>>({});
@@ -205,23 +220,57 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         });
     }
 
-    async function handlePickFolder(deviceId: string, kind: FolderKind) {
-        setPickerDialogDevice(null);
-        setPickingFolder(deviceId);
+    async function navigateBrowser(deviceId: string, path: string | null) {
+        setBrowserLoading(true);
+        setBrowserError(null);
         try {
-            const r = await pickCompanionFolder(deviceId, kind);
-            if ("error" in r) { toast.error(r.error); return; }
-            if (r.canceled) { toast.info("No folder picked"); return; }
-            setFolders((p) => ({ ...p, [deviceId]: r.folders }));
-            toast.success(`Added ${r.picked} (${FOLDER_KIND_LABELS[kind]})`);
+            if (path === null) {
+                // Root: show drives.
+                const r = await listCompanionDrives(deviceId);
+                if ("error" in r) { setBrowserError(r.error); return; }
+                setBrowserDrives(r.drives);
+                setBrowserCwd(null);
+                setBrowserEntries([]);
+                setBrowserParent(null);
+            } else {
+                const r = await listCompanionDirectory(deviceId, path);
+                if ("error" in r) { setBrowserError(r.error); return; }
+                setBrowserCwd(r.path);
+                setBrowserEntries(r.entries);
+                setBrowserParent(r.parent);
+            }
         } finally {
-            setPickingFolder(null);
+            setBrowserLoading(false);
         }
     }
 
     function openPickerDialog(deviceId: string) {
         setPendingPickKind("music");
+        setBrowserDrives([]);
+        setBrowserCwd(null);
+        setBrowserEntries([]);
+        setBrowserParent(null);
+        setBrowserError(null);
         setPickerDialogDevice(deviceId);
+        void navigateBrowser(deviceId, null);
+    }
+
+    async function handleAddBrowsedFolder(deviceId: string) {
+        if (!browserCwd) return;
+        setBrowserAdding(true);
+        try {
+            const r = await addCompanionFolder(deviceId, browserCwd, pendingPickKind);
+            if ("error" in r) { toast.error(r.error); return; }
+            setFolders((p) => ({ ...p, [deviceId]: r.folders }));
+            toast.success(
+                r.added
+                    ? `Added ${r.picked} (${FOLDER_KIND_LABELS[pendingPickKind]})`
+                    : `${r.picked} was already in the library`,
+            );
+            setPickerDialogDevice(null);
+        } finally {
+            setBrowserAdding(false);
+        }
     }
 
     function handleChangeFolderKind(deviceId: string, folderPath: string, kind: FolderKind) {
@@ -499,7 +548,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                                             <FolderSection
                                                 folders={dFolders}
                                                 isOnline={isOnline}
-                                                isPicking={pickingFolder === device.id}
+                                                isPicking={false}
                                                 scanProgress={scanProgress}
                                                 togglingWatch={togglingWatch}
                                                 onPick={() => openPickerDialog(device.id)}
@@ -539,56 +588,168 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                 </div>
             )}
 
-            {/* Pick-Folder modal: asks for the folder purpose, then triggers
-                the OS picker on the companion. We do the kind question up-front
-                so the companion only has to deal with one round-trip. */}
+            {/* Pick-Folder modal: choose kind, then browse the companion's
+                filesystem in-place. Everything stays in the web app — the
+                companion only answers list_drives / list_directory queries
+                routed through the announce-loop command queue. */}
             <Dialog
                 open={pickerDialogDevice !== null}
                 onOpenChange={(open) => { if (!open) setPickerDialogDevice(null); }}
             >
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>Add a library folder</DialogTitle>
                         <DialogDescription>
-                            Pick what kind of content lives in this folder. We&apos;ll then open the
-                            native folder picker on the companion so you can browse to it.
+                            Choose what kind of content lives in this folder, then browse the
+                            companion&apos;s drives to pick one. Nothing opens on the desktop.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid grid-cols-2 gap-2 py-2 sm:grid-cols-3">
+
+                    {/* Kind chips */}
+                    <div className="flex flex-wrap gap-1.5 pb-1">
                         {FOLDER_KINDS.map((k) => (
                             <button
                                 key={k}
                                 type="button"
                                 onClick={() => setPendingPickKind(k)}
                                 className={cn(
-                                    "flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-sm transition-colors",
+                                    "rounded-full border px-3 py-1 text-xs transition-colors",
                                     pendingPickKind === k
                                         ? "border-blue-500/60 bg-blue-500/10 text-foreground"
-                                        : "border-border hover:border-ring hover:bg-muted/40",
+                                        : "border-border text-muted-foreground hover:border-ring hover:bg-muted/40",
                                 )}
                             >
-                                <span className="font-medium">{FOLDER_KIND_LABELS[k]}</span>
+                                {FOLDER_KIND_LABELS[k]}
                             </button>
                         ))}
                     </div>
-                    <DialogFooter>
+
+                    {/* Browser: breadcrumbs + entries list */}
+                    <div className="rounded-lg border bg-card/40">
+                        {/* Header / breadcrumbs */}
+                        <div className="flex items-center gap-1 border-b px-2 py-1.5 text-xs">
+                            <button
+                                type="button"
+                                title="Drives"
+                                disabled={browserLoading}
+                                onClick={() => pickerDialogDevice && navigateBrowser(pickerDialogDevice, null)}
+                                className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted/60 disabled:opacity-50"
+                            >
+                                <Home className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                title="Parent"
+                                disabled={browserLoading || !browserParent}
+                                onClick={() => pickerDialogDevice && browserParent && navigateBrowser(pickerDialogDevice, browserParent)}
+                                className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted/60 disabled:opacity-30"
+                            >
+                                <ArrowUp className="h-3.5 w-3.5" />
+                            </button>
+                            <div className="ml-1 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+                                {browserCwd ?? "Drives"}
+                            </div>
+                            {browserLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                        </div>
+
+                        {/* Body */}
+                        <div className="h-72 overflow-y-auto px-1 py-1">
+                            {browserError && (
+                                <div className="m-2 rounded border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
+                                    {browserError}
+                                </div>
+                            )}
+                            {browserCwd === null ? (
+                                browserDrives.length === 0 ? (
+                                    !browserLoading && !browserError && (
+                                        <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                                            No drives reported.
+                                        </p>
+                                    )
+                                ) : (
+                                    browserDrives.map((d) => (
+                                        <button
+                                            key={d.path}
+                                            type="button"
+                                            disabled={browserLoading}
+                                            onClick={() => pickerDialogDevice && navigateBrowser(pickerDialogDevice, d.path)}
+                                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60 disabled:opacity-50"
+                                        >
+                                            <HardDrive className={cn(
+                                                "h-4 w-4 shrink-0",
+                                                d.type === "removable" ? "text-amber-400" :
+                                                    d.type === "network" ? "text-blue-400" :
+                                                        d.type === "home" ? "text-green-400" :
+                                                            "text-muted-foreground",
+                                            )} />
+                                            <span className="flex-1 truncate">{d.label}</span>
+                                            {typeof d.free === "number" && typeof d.total === "number" && d.total > 0 && (
+                                                <span className="shrink-0 text-[10px] text-muted-foreground/70">
+                                                    {formatGB(d.free)} free / {formatGB(d.total)}
+                                                </span>
+                                            )}
+                                            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                                        </button>
+                                    ))
+                                )
+                            ) : browserEntries.length === 0 ? (
+                                !browserLoading && !browserError && (
+                                    <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                                        This folder has no subfolders. You can still add it.
+                                    </p>
+                                )
+                            ) : (
+                                browserEntries.map((e) => (
+                                    <button
+                                        key={e.path}
+                                        type="button"
+                                        disabled={browserLoading}
+                                        onClick={() => pickerDialogDevice && navigateBrowser(pickerDialogDevice, e.path)}
+                                        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted/60 disabled:opacity-50"
+                                    >
+                                        <Folder className="h-4 w-4 shrink-0 text-blue-400/80" />
+                                        <span className="flex-1 truncate">{e.name}</span>
+                                        {e.hasChildren && (
+                                            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                                        )}
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    </div>
+
+                    <DialogFooter className="flex items-center justify-between gap-2 sm:flex-row">
+                        <p className="mr-auto truncate text-[11px] text-muted-foreground">
+                            {browserCwd
+                                ? <>Will add <span className="font-mono text-foreground/80">{browserCwd}</span></>
+                                : "Pick a drive to start browsing"}
+                        </p>
                         <Button variant="ghost" onClick={() => setPickerDialogDevice(null)}>
                             Cancel
                         </Button>
                         <Button
-                            onClick={() => {
-                                if (pickerDialogDevice) void handlePickFolder(pickerDialogDevice, pendingPickKind);
-                            }}
-                            disabled={!pickerDialogDevice}
+                            onClick={() => { if (pickerDialogDevice) void handleAddBrowsedFolder(pickerDialogDevice); }}
+                            disabled={!pickerDialogDevice || !browserCwd || browserAdding || browserLoading}
                         >
-                            <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
-                            Open picker on companion
+                            {browserAdding ? (
+                                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                                <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            Add this folder
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
     );
+}
+
+function formatGB(bytes: number): string {
+    const gb = bytes / (1024 ** 3);
+    if (gb >= 100) return `${gb.toFixed(0)} GB`;
+    if (gb >= 10) return `${gb.toFixed(1)} GB`;
+    return `${gb.toFixed(2)} GB`;
 }
 
 // ─── Device card chrome ───────────────────────────────────────────────────────

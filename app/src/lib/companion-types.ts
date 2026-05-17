@@ -99,3 +99,41 @@ export interface CompanionAudioInventory {
     backends: CompanionAudioBackendGroup[];
     authorized: AuthorizedAudioDevice[];
 }
+
+// ─── In-web filesystem browser (companion-side FS, navigated from the cloud) ─
+
+/** A top-level mount: a drive letter on Windows, root volumes on macOS/Linux. */
+export interface CompanionDrive {
+    /** Absolute path used as the starting point (`C:\`, `/`, `/Volumes/External`). */
+    path: string;
+    /** Display label (`Local Disk (C:)`, `/`, `External SSD`). */
+    label: string;
+    /** Mount kind hint, mostly for icon selection. */
+    type: "fixed" | "removable" | "network" | "root" | "home" | "unknown";
+    /** Free space in bytes if cheaply known. */
+    free?: number;
+    /** Total capacity in bytes if cheaply known. */
+    total?: number;
+}
+
+export interface CompanionDirectoryEntry {
+    name: string;
+    path: string;
+    /** True if the directory has at least one navigable subfolder. Used
+     *  to show a chevron without forcing the user to drill in. May be
+     *  null when the companion didn't probe (e.g. permission denied). */
+    hasChildren: boolean | null;
+}
+
+export interface CompanionDirectoryListing {
+    /** Absolute path that was listed. */
+    path: string;
+    /** Parent path, or null when we're at a drive root. */
+    parent: string | null;
+    /** Subdirectories, sorted alphabetically. Files are intentionally
+     *  omitted — the picker only deals with folders. */
+    entries: CompanionDirectoryEntry[];
+    /** Soft-fail flag: when true the listing partially succeeded (e.g.
+     *  some children threw EACCES). The visible entries are still valid. */
+    partial?: boolean;
+}
