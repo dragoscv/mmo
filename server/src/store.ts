@@ -60,8 +60,12 @@ const DEFAULTS: CompanionSettings = {
     audioOriginAllowlist: [
         "https://muzicai.ro",
         "https://*.muzicai.ro",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
+        // Local dev: web app's `next dev` / `next start` bind to 13789
+        // (see app/package.json scripts). Port 3000 is intentionally NOT
+        // allowed — it's the Node ecosystem default and tends to clash
+        // with random unrelated services the user may be running.
+        "http://localhost:13789",
+        "http://127.0.0.1:13789",
     ],
     authorizedAudioDevices: [],
     telemetryEnabled: false,
@@ -110,6 +114,28 @@ function mergeAllowlistWithDefaults(stored: string[] | undefined): string[] {
     return base;
 }
 
+// Stale `webAppUrl` values from older pairings (when the web app used
+// Next.js's default port 3000) silently break cloud-sync — every POST
+// goes to a port nothing's listening on. If we detect such a legacy
+// URL we overwrite it with the production default. The user can still
+// pair against a custom local dev URL afterward; we only heal the
+// known-bad legacy values.
+const LEGACY_WEB_APP_URLS = new Set([
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3000/",
+    "http://127.0.0.1:3000/",
+]);
+
+function healWebAppUrl(stored: string | undefined): string {
+    if (!stored) return DEFAULTS.webAppUrl;
+    if (LEGACY_WEB_APP_URLS.has(stored.trim())) {
+        store.set("webAppUrl", DEFAULTS.webAppUrl);
+        return DEFAULTS.webAppUrl;
+    }
+    return stored;
+}
+
 export function getSettings(): CompanionSettings {
     return {
         startAtLogin: store.get("startAtLogin") as boolean,
@@ -118,8 +144,9 @@ export function getSettings(): CompanionSettings {
         serverPort: store.get("serverPort") as number,
         scanFolders: readScanFolders(),
         // Respect the value the OAuth flow persisted (or that the user typed in
-        // settings). Falls back to https://muzicai.ro for fresh installs.
-        webAppUrl: (store.get("webAppUrl") as string | undefined) ?? DEFAULTS.webAppUrl,
+        // settings). Heals legacy `localhost:3000` values left over from
+        // pairings made before the web app moved to port 13789.
+        webAppUrl: healWebAppUrl(store.get("webAppUrl") as string | undefined),
         audioOriginAllowlist: mergeAllowlistWithDefaults(store.get("audioOriginAllowlist") as string[] | undefined),
         authorizedAudioDevices: (store.get("authorizedAudioDevices") as AuthorizedAudioDevice[] | undefined) ?? [],
         telemetryEnabled: (store.get("telemetryEnabled") as boolean | undefined) ?? DEFAULTS.telemetryEnabled,

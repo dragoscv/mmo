@@ -399,7 +399,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                             <p className="font-medium text-amber-300">You&apos;re viewing the cloud build</p>
                             <p className="mt-0.5 text-muted-foreground">
                                 Audio device authorization is saved on the companion, but the in-browser
-                                low-latency engine only runs when the web app is opened from <code className="rounded bg-background px-1">localhost:3000</code>.
+                                low-latency engine only runs when the web app is opened from <code className="rounded bg-background px-1">localhost:13789</code>.
                                 For 3–5 ms live performance latency, run the web app locally.
                             </p>
                         </div>
@@ -982,7 +982,7 @@ function AudioSection({
                 <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-300">
                     <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                     <span>
-                        Authorizations are saved, but the engine only runs from <code className="rounded bg-background px-1">localhost:3000</code>.
+                        Authorizations are saved, but the engine only runs from <code className="rounded bg-background px-1">localhost:13789</code>.
                     </span>
                 </div>
             )}

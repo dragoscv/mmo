@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.7 — drop localhost:3000 default, heal stale pairings
+
+- **Fix**: cloud-sync was silently failing for users whose `webAppUrl` had been pinned to `http://localhost:3000` by an early dev pairing — the web app moved to port `13789` ages ago and port 3000 is the Node ecosystem default (high collision risk with other services). The companion now detects the known-bad legacy values (`http://localhost:3000`, `http://127.0.0.1:3000`) on startup and rewrites them to the production default `https://muzicai.ro`, so cloud-sync starts working again without the user having to repair from settings.
+- **Defaults**: built-in `audioOriginAllowlist` now uses `http://localhost:13789` / `http://127.0.0.1:13789` instead of the legacy port 3000 entries.
+- **Tray menu**: "Open MMO in Browser" falls back to `https://muzicai.ro` instead of `http://localhost:3000` when no `webAppUrl` is set (should never happen, but defends against corrupted store).
+
 ## 1.0.6 — LAN beacon + mDNS broadcast
 
 - **Cross-device discovery (LAN beacon)**: at startup and every 5 minutes the companion now posts its LAN URL (e.g. `http://192.168.1.42:17899`) to the paired account via `POST /api/devices/announce`. The web app then exposes a per-user `/api/devices/peers` endpoint that the browser uses as a discovery fallback when loopback probing fails — so a tablet on the couch finds the desktop companion without manual config.

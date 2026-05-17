@@ -79,9 +79,9 @@ const nextConfig: NextConfig = {
         // current release train.
         serverActions: {
             allowedOrigins: [
-                "localhost:3000",
+                "localhost:13789",
+                "127.0.0.1:13789",
                 "*.devtunnels.ms",
-                "qgst0zss-3000.euw.devtunnels.ms",
             ],
         },
         // NOTE: `turbopackFileSystemCacheForDev` was enabled here for faster

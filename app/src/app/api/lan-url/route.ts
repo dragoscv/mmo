@@ -40,8 +40,8 @@ export async function GET() {
         return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
     const h = await headers();
-    const host = h.get("host") ?? "localhost:3000";
-    const port = host.includes(":") ? host.split(":").pop() : "3000";
+    const host = h.get("host") ?? "localhost:13789";
+    const port = host.includes(":") ? host.split(":").pop() : "13789";
 
     const interfaces = os.networkInterfaces();
     const candidates: string[] = [];

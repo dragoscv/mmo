@@ -7,7 +7,7 @@ export function proxy(request: NextRequest) {
     const xfh = headers.get("x-forwarded-host");
     const xfp = headers.get("x-forwarded-proto");
 
-    // VS Code dev tunnel sends: host=localhost:3000, x-forwarded-host=<tunnel>, x-forwarded-proto=https
+    // VS Code dev tunnel sends: host=localhost:13789, x-forwarded-host=<tunnel>, x-forwarded-proto=https
     // Auth.js can mix host port with x-forwarded-host hostname → https://tunnel:3000
     // Fix: override host to match x-forwarded-host so no stale port leaks through
     if (xfh && xfp && xfh.includes("devtunnels.ms")) {
@@ -24,7 +24,7 @@ export function proxy(request: NextRequest) {
     }
 
     // Localhost with stray x-forwarded-proto (no x-forwarded-host)
-    // → strip it to prevent Auth.js from generating https://localhost:3000
+    // → strip it to prevent Auth.js from generating https://localhost:13789
     if (xfp && !xfh && (host.startsWith("localhost") || host.startsWith("127.0.0.1"))) {
         headers.delete("x-forwarded-proto");
         return NextResponse.next({ request: { headers } });

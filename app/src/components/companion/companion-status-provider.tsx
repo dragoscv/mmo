@@ -99,6 +99,13 @@ export function CompanionStatusProvider({ children }: { children: React.ReactNod
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Expose status on window for debugging — surfaces in dev tools as
+    // `__mmoCompanion` without pulling in React DevTools.
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        (window as unknown as { __mmoCompanion: CompanionStatusValue }).__mmoCompanion = value;
+    }, [value]);
+
     useEffect(() => {
         const interval = value.status === "online" ? REPROBE_ONLINE_MS : REPROBE_OFFLINE_MS;
         const t = setInterval(() => { void doDiscover(); }, interval);

@@ -540,7 +540,7 @@ function buildTrayMenu(): Electron.Menu {
             label: "Open MMO in Browser",
             click: () => {
                 const settings = getSettings();
-                shell.openExternal(settings.webAppUrl || "http://localhost:3000");
+                shell.openExternal(settings.webAppUrl || "https://muzicai.ro");
             },
         },
         { type: "separator" },
