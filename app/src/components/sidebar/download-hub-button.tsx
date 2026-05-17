@@ -45,7 +45,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { discoverCompanion } from "@/lib/native-companion";
+import { useCompanionStatus } from "@/components/companion/companion-status-provider";
 
 // ── Types mirroring /api/downloads/manifest ────────────────────────────
 interface PlatformAsset {
@@ -166,31 +166,22 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
     const [error, setError] = useState<string | null>(null);
 
     const [env, setEnv] = useState<Env | null>(null);
-    const [companionPresent, setCompanionPresent] = useState<
-        boolean | "checking"
-    >("checking");
+    const companion = useCompanionStatus();
+    // Derive companion presence from the shared status — replaces the
+    // per-mount discovery probe that fired on every page navigation.
+    const companionPresent: boolean | "checking" =
+        companion.status === "online" ? true
+            : companion.status === "offline" ? false
+                : "checking";
     const [extensionPresent, setExtensionPresent] = useState<
         string | null | "checking"
     >("checking");
 
-    // First-mount: detect env + presence. We do this even when the modal is
-    // closed so the trigger button can show a green dot when at least one
-    // companion piece is connected.
+    // First-mount: detect env + extension marker. Companion presence is
+    // sourced from <CompanionStatusProvider> so we no longer probe here.
     useEffect(() => {
         setEnv(detectEnv());
-
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 1500);
-        discoverCompanion(ctrl.signal)
-            .then((found) => setCompanionPresent(!!found))
-            .catch(() => setCompanionPresent(false))
-            .finally(() => clearTimeout(t));
-
         setExtensionPresent(findExtensionMarker());
-        return () => {
-            ctrl.abort();
-            clearTimeout(t);
-        };
     }, []);
 
     // Lazy-load the manifest only when the modal opens for the first time.

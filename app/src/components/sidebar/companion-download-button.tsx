@@ -21,7 +21,7 @@
 
 import { useEffect, useState } from "react";
 import { Download, Loader2 } from "lucide-react";
-import { discoverCompanion } from "@/lib/native-companion";
+import { useCompanionStatus } from "@/components/companion/companion-status-provider";
 import { CompanionStatusCard } from "./companion-status-card";
 
 interface CompanionInfo {
@@ -51,32 +51,30 @@ function osLabel(os: CompanionInfo["os"]): string {
 
 export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boolean }) {
     const [status, setStatus] = useState<Status>({ kind: "probing" });
+    const companion = useCompanionStatus();
 
     useEffect(() => {
+        // Companion is reachable — short-circuit, no need to fetch the
+        // download manifest.
+        if (companion.status === "online" && companion.apiUrl && companion.beacon) {
+            setStatus({
+                kind: "connected",
+                apiUrl: companion.apiUrl,
+                version: companion.beacon.version,
+                platform: companion.beacon.platform,
+                capabilities: companion.beacon.capabilities,
+            });
+            return;
+        }
+        // Still discovering — keep the spinner.
+        if (companion.status === "discovering" || companion.status === "unknown") {
+            setStatus({ kind: "probing" });
+            return;
+        }
+        // Offline → fetch download metadata for this OS (once per offline
+        // transition).
         let cancelled = false;
-        const ctrl = new AbortController();
-        const timeout = setTimeout(() => ctrl.abort(), 1500);
-
         (async () => {
-            // First — is the companion already running locally? Use the
-            // full discovery (env override → cached URL → port scan) so a
-            // companion bound to a non-default port still gets picked up.
-            const found = await discoverCompanion(ctrl.signal);
-            clearTimeout(timeout);
-            if (cancelled) return;
-
-            if (found) {
-                setStatus({
-                    kind: "connected",
-                    apiUrl: found.apiUrl,
-                    version: found.beacon.version,
-                    platform: found.beacon.platform,
-                    capabilities: found.beacon.capabilities,
-                });
-                return;
-            }
-
-            // No local companion → fetch download metadata for this OS.
             try {
                 const res = await fetch("/api/companion/download?info=1", { cache: "no-store" });
                 if (cancelled) return;
@@ -99,12 +97,8 @@ export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boo
             }
         })();
 
-        return () => {
-            cancelled = true;
-            ctrl.abort();
-            clearTimeout(timeout);
-        };
-    }, []);
+        return () => { cancelled = true; };
+    }, [companion.status, companion.apiUrl, companion.beacon]);
 
     // ── COLLAPSED layout: 28×28 icon button only ──────────────────────────
     if (collapsed) {

@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { DevicesClient } from "./devices-client";
 import { getDevices } from "@/actions/devices";
+import { CompanionOfflineBanner } from "@/components/companion/companion-offline-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function DevicesPage() {
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6">
+                <CompanionOfflineBanner context="devices" />
                 <DevicesClient initialDevices={userDevices} />
             </div>
         </div>

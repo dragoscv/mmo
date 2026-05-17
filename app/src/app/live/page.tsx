@@ -2,6 +2,7 @@ import { LiveProvider } from "@/components/live/live-context";
 import { LivePage } from "@/components/live/live-page";
 import { RemoteHostBridge } from "@/components/remote/remote-host-bridge";
 import { LiveRemoteBridge } from "@/components/remote/live-remote-bridge";
+import { CompanionOfflineBanner } from "@/components/companion/companion-offline-banner";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 
@@ -14,6 +15,7 @@ export default async function LiveRoute() {
         <RemoteHostBridge page="live">
             <LiveProvider>
                 <LiveRemoteBridge />
+                <CompanionOfflineBanner context="live" />
                 <LivePage />
             </LiveProvider>
         </RemoteHostBridge>
