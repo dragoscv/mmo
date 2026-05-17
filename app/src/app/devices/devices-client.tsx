@@ -24,6 +24,14 @@ import { useState, useTransition, useEffect, useCallback, useMemo, useRef } from
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -129,8 +137,10 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
     const watchHighWatermark = useRef<Record<string, number>>({});
     const [pickingFolder, setPickingFolder] = useState<string | null>(null);
     const [togglingWatch, setTogglingWatch] = useState<string | null>(null);
-    /** Per-device kind to apply to the next picked folder. Defaults to music. */
-    const [pickKindByDevice, setPickKindByDevice] = useState<Record<string, FolderKind>>({});
+    /** Device whose Pick-Folder modal is open. Null = closed. */
+    const [pickerDialogDevice, setPickerDialogDevice] = useState<string | null>(null);
+    /** Selected kind inside the open Pick-Folder modal. Reset each open. */
+    const [pendingPickKind, setPendingPickKind] = useState<FolderKind>("music");
     const [editingName, setEditingName] = useState<string | null>(null);
     const [editNameValue, setEditNameValue] = useState("");
     const [openSection, setOpenSection] = useState<Record<string, "folders" | "audio" | null>>({});
@@ -195,9 +205,9 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         });
     }
 
-    async function handlePickFolder(deviceId: string) {
+    async function handlePickFolder(deviceId: string, kind: FolderKind) {
+        setPickerDialogDevice(null);
         setPickingFolder(deviceId);
-        const kind = pickKindByDevice[deviceId] ?? "music";
         try {
             const r = await pickCompanionFolder(deviceId, kind);
             if ("error" in r) { toast.error(r.error); return; }
@@ -207,6 +217,11 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         } finally {
             setPickingFolder(null);
         }
+    }
+
+    function openPickerDialog(deviceId: string) {
+        setPendingPickKind("music");
+        setPickerDialogDevice(deviceId);
     }
 
     function handleChangeFolderKind(deviceId: string, folderPath: string, kind: FolderKind) {
@@ -487,9 +502,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                                                 isPicking={pickingFolder === device.id}
                                                 scanProgress={scanProgress}
                                                 togglingWatch={togglingWatch}
-                                                pickKind={pickKindByDevice[device.id] ?? "music"}
-                                                onPickKindChange={(k) => setPickKindByDevice((p) => ({ ...p, [device.id]: k }))}
-                                                onPick={() => handlePickFolder(device.id)}
+                                                onPick={() => openPickerDialog(device.id)}
                                                 onScan={(p) => handleScanFolder(device.id, p)}
                                                 onRemove={(p) => handleRemoveFolder(device.id, p)}
                                                 onScanAll={() => {
@@ -525,6 +538,55 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                     })}
                 </div>
             )}
+
+            {/* Pick-Folder modal: asks for the folder purpose, then triggers
+                the OS picker on the companion. We do the kind question up-front
+                so the companion only has to deal with one round-trip. */}
+            <Dialog
+                open={pickerDialogDevice !== null}
+                onOpenChange={(open) => { if (!open) setPickerDialogDevice(null); }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Add a library folder</DialogTitle>
+                        <DialogDescription>
+                            Pick what kind of content lives in this folder. We&apos;ll then open the
+                            native folder picker on the companion so you can browse to it.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid grid-cols-2 gap-2 py-2 sm:grid-cols-3">
+                        {FOLDER_KINDS.map((k) => (
+                            <button
+                                key={k}
+                                type="button"
+                                onClick={() => setPendingPickKind(k)}
+                                className={cn(
+                                    "flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-sm transition-colors",
+                                    pendingPickKind === k
+                                        ? "border-blue-500/60 bg-blue-500/10 text-foreground"
+                                        : "border-border hover:border-ring hover:bg-muted/40",
+                                )}
+                            >
+                                <span className="font-medium">{FOLDER_KIND_LABELS[k]}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setPickerDialogDevice(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                if (pickerDialogDevice) void handlePickFolder(pickerDialogDevice, pendingPickKind);
+                            }}
+                            disabled={!pickerDialogDevice}
+                        >
+                            <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
+                            Open picker on companion
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
@@ -700,8 +762,6 @@ interface FolderSectionProps {
     isPicking: boolean;
     scanProgress: Record<string, CompanionScanJob>;
     togglingWatch: string | null;
-    pickKind: FolderKind;
-    onPickKindChange: (k: FolderKind) => void;
     onPick: () => void;
     onScan: (path: string) => void;
     onRemove: (path: string) => void;
@@ -712,7 +772,6 @@ interface FolderSectionProps {
 
 function FolderSection({
     folders, isOnline, isPicking, scanProgress, togglingWatch,
-    pickKind, onPickKindChange,
     onPick, onScan, onRemove, onScanAll, onToggleWatch, onChangeKind,
 }: FolderSectionProps) {
     const anyScanning = Object.values(scanProgress).some(
@@ -722,30 +781,16 @@ function FolderSection({
         <div className="space-y-3 border-t border-border pt-3">
             <div className="flex items-center justify-between gap-2">
                 <h4 className="text-sm font-medium">Library Folders</h4>
-                <div className="flex items-center gap-1.5">
-                    <Select
-                        size="sm"
-                        value={pickKind}
-                        onChange={(e) => onPickKindChange(e.target.value as FolderKind)}
-                        disabled={!isOnline || isPicking}
-                        title="Folder purpose for the next pick"
-                        className="h-7"
-                    >
-                        {FOLDER_KINDS.map((k) => (
-                            <option key={k} value={k}>{FOLDER_KIND_LABELS[k]}</option>
-                        ))}
-                    </Select>
-                    <Button
-                        variant="outline"
-                        size="xs"
-                        onClick={onPick}
-                        disabled={!isOnline || isPicking}
-                        title={isOnline ? "Open folder picker on the companion" : "Device offline"}
-                    >
-                        {isPicking ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FolderPlus className="mr-1 h-3 w-3" />}
+                <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={onPick}
+                    disabled={!isOnline || isPicking}
+                    title={isOnline ? "Choose a folder purpose, then open the picker on the companion" : "Device offline"}
+                >
+                    {isPicking ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FolderPlus className="mr-1 h-3 w-3" />}
                     Pick Folder…
-                    </Button>
-                </div>
+                </Button>
             </div>
 
             {folders.length === 0 ? (
