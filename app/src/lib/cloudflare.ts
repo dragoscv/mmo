@@ -34,10 +34,12 @@ export interface CloudflareConfig {
 }
 
 export function getCloudflareConfig(): CloudflareConfig | null {
-    const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-    const zoneId = process.env.CLOUDFLARE_TUNNEL_ZONE_ID;
-    const baseHostname = process.env.CLOUDFLARE_TUNNEL_BASE_HOSTNAME;
+    // Vercel env values pasted via CLI can carry trailing CR/LF; trim
+    // before use so the resulting hostname stays a valid URL host.
+    const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+    const zoneId = process.env.CLOUDFLARE_TUNNEL_ZONE_ID?.trim();
+    const baseHostname = process.env.CLOUDFLARE_TUNNEL_BASE_HOSTNAME?.trim();
     if (!apiToken || !accountId || !zoneId || !baseHostname) return null;
     return { apiToken, accountId, zoneId, baseHostname };
 }
