@@ -1097,56 +1097,14 @@
             <div class="section">
                 <div class="section-title">Server Status</div>
                 <div class="stat-grid">
-                    <div class="stat">
+                    <div class="stat" style="grid-column:span 2">
                         <div class="stat-value" id="stat-port">17899</div>
                         <div class="stat-label">Port</div>
                     </div>
-                    <div class="stat">
-                        <div class="stat-value" id="stat-folders">0</div>
-                        <div class="stat-label">Folders</div>
-                    </div>
                 </div>
             </div>
 
-            <!-- Scan Folders -->
-            <div class="section">
-                <div class="section-title">Music Folders</div>
-                <ul class="folder-list" id="folder-list"></ul>
-                <button class="btn full" onclick="addFolder()" style="margin-top:8px">
-                    + Add Folder
-                </button>
-            </div>
-
-            <!-- Audio Devices -->
-            <div class="section">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                    <div class="section-title" style="margin-bottom:0">Audio Devices</div>
-                    <button class="btn" id="btn-refresh-audio" onclick="loadAudioDevices(true)"
-                        style="padding:4px 8px;font-size:11px">↻ Refresh</button>
-                </div>
-                <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.4">
-                    Toggle which physical inputs / outputs the web app's low-latency engine can use. Default devices are
-                    marked.
-                </div>
-                <div id="audio-devices-container">
-                    <div class="audio-loading"><span class="audio-spinner"></span> Loading audio devices…</div>
-                </div>
-                <!-- Live engine metrics — updates every 500ms while engine is running. -->
-                <div id="latency-widget" class="latency-widget idle">
-                    <div class="lw-head" style="display:flex;align-items:center;gap:8px">
-                        <span class="lw-dot"></span>
-                        <span id="lw-title" style="flex:1">Engine idle</span>
-                        <button class="btn" id="btn-kill-engine" onclick="killAudioEngine()"
-                            title="Stop the audio engine immediately. Use when sound is stuck on after closing a browser tab."
-                            style="padding:4px 10px;font-size:11px;background:#5a1a1a;border-color:#8a2a2a;color:#ffd5d5">
-                            ■ Stop
-                        </button>
-                    </div>
-                    <div id="lw-body" style="font-size:11px;color:var(--muted)">
-                        Start the low-latency engine from the web app to see realtime stats.
-                    </div>
-                </div>
-            </div>
+            <!-- Library folders are managed from the web app (muzicai.ro /devices). -->
 
             <!-- Settings -->
             <div class="section">
@@ -1238,7 +1196,7 @@
 
             <div class="section" style="margin-top:18px">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                    <div class="section-title" style="margin-bottom:0">Devices</div>
+                    <div class="section-title" style="margin-bottom:0">Virtual Devices</div>
                     <div style="display:flex;gap:6px">
                         <button class="btn" id="va-btn-refresh" onclick="vaRefresh()" style="padding:4px 8px;font-size:11px">↻ Refresh</button>
                         <button class="btn" id="va-btn-add" onclick="vaPromptAdd()" style="padding:4px 8px;font-size:11px">+ Add</button>
@@ -1246,6 +1204,35 @@
                 </div>
                 <div id="va-device-list">
                     <div class="va-empty">No devices yet.</div>
+                </div>
+            </div>
+
+            <!-- Physical Audio Devices (moved from main view) -->
+            <div class="section" style="margin-top:18px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <div class="section-title" style="margin-bottom:0">Physical Audio Devices</div>
+                    <button class="btn" id="btn-refresh-audio" onclick="loadAudioDevices(true)"
+                        style="padding:4px 8px;font-size:11px">↻ Refresh</button>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.4">
+                    Toggle which physical inputs / outputs the web app's low-latency engine can use. Default devices are marked.
+                </div>
+                <div id="audio-devices-container">
+                    <div class="audio-loading"><span class="audio-spinner"></span> Loading audio devices…</div>
+                </div>
+                <div id="latency-widget" class="latency-widget idle" style="margin-top:10px">
+                    <div class="lw-head" style="display:flex;align-items:center;gap:8px">
+                        <span class="lw-dot"></span>
+                        <span id="lw-title" style="flex:1">Engine idle</span>
+                        <button class="btn" id="btn-kill-engine" onclick="killAudioEngine()"
+                            title="Stop the audio engine immediately. Use when sound is stuck on after closing a browser tab."
+                            style="padding:4px 10px;font-size:11px;background:#5a1a1a;border-color:#8a2a2a;color:#ffd5d5">
+                            ■ Stop
+                        </button>
+                    </div>
+                    <div id="lw-body" style="font-size:11px;color:var(--muted)">
+                        Start the low-latency engine from the web app to see realtime stats.
+                    </div>
                 </div>
             </div>
 
@@ -1335,16 +1322,13 @@
             // Stats
             document.getElementById("stat-port").textContent = status.port;
 
-            // Load settings & folders
+            // Load settings (folders are now managed from the web app /devices view)
             const settings = await window.mmo.getSettings();
             updateToggles(settings);
-            renderFolders(settings.scanFolders || []);
-            document.getElementById("stat-folders").textContent = (settings.scanFolders || []).length;
 
-            // Audio devices (deferred so the main view paints first)
-            setTimeout(loadAudioDevices, 50);
-
-            // Live engine metrics widget — polls every 500 ms.
+            // Live engine metrics widget — polls every 500 ms even while
+            // the Audio Setup view is hidden, so the UI is up-to-date the
+            // moment the user opens it.
             startLatencyPolling();
         }
 
@@ -1899,6 +1883,9 @@
             const btn = document.getElementById("btn-open-va");
             if (btn) btn.style.visibility = "hidden";
             vaRefresh();
+            // The physical audio devices block lives in this view now —
+            // load it lazily so it's ready by the time the user scrolls.
+            loadAudioDevices();
         }
 
         function hideVirtualAudioView() {
