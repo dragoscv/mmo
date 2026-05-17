@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Performance — Parallel BFS video discovery (companion `1.0.21`)
+
+- **Replaced the serial `walkVideos` async generator with `discoverVideos` doing parallel BFS** — up to 16 directories are `readdir`-ed concurrently per round instead of one at a time. A 50 k-file Movies drive that previously took minutes to enumerate now finishes in seconds (wall time ≈ tree depth × one readdir, not file count × readdir).
+- **Skip junk directories** like `$RECYCLE.BIN`, `System Volume Information`, `node_modules`, `.git`, `.thumbnails`, and any dotfile dir so a deep `.cache` subtree can't stall discovery on its own.
+- **Stream the current directory into `ScanJob.currentFile` during discovery** so the UI never sits on “0 found” while we crawl non-video subtrees — the user sees the folder name tick across even before the first `.mkv` matches.
+
 ### Fixed — Server actions to companion now use the tunnel (web `0.3.8`)
 
 - **Server-side `resolveDevice` now prefers `tunnelHostname` over `apiUrl`.** Every `companionControl.*` server action (scan, audio, watch events, drives, folders) was building `${dev.apiUrl}` and `fetch`-ing it directly. On the cloud build that meant Vercel was trying to reach `http://192.168.x.y:9876` — a LAN address that obviously doesn't resolve from a serverless function — so every call timed out after 15–60 s. The UI showed “Starting…” forever because `startCompanionScan` never returned a real job ID and polling silently swallowed the timeouts. Now Vercel hits `https://device-<slug>.muzicai.ro` through the per-device Cloudflare Tunnel and the cloud build behaves identically to localhost.

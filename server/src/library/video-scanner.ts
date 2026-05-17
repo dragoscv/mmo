@@ -50,6 +50,100 @@ export async function* walkVideos(root: string): AsyncGenerator<string> {
     }
 }
 
+/** Folders that we never recurse into — system junk, browser caches,
+ *  recycle bins, version-control internals. Matched case-insensitively. */
+const SKIP_DIR_NAMES = new Set([
+    "$recycle.bin", "system volume information", "$windows.~bt", "$windows.~ws",
+    ".thumbnails", ".trash", ".trash-1000", "node_modules", ".git", ".svn",
+    ".hg", "lost+found", "__macosx", ".ds_store", ".cache",
+]);
+
+function shouldSkipDir(name: string): boolean {
+    const low = name.toLowerCase();
+    if (SKIP_DIR_NAMES.has(low)) return true;
+    // Hidden Unix dirs and Windows system dirs.
+    if (name.startsWith(".") && name.length > 1) return true;
+    return false;
+}
+
+export interface DiscoverProgress {
+    /** Total matching video files found so far. */
+    files: number;
+    /** Total directories visited so far. */
+    dirsVisited: number;
+    /** Directories still in the BFS queue. */
+    dirsQueued: number;
+    /** Most-recently-entered directory (absolute path). */
+    currentDir: string;
+}
+
+/**
+ * Parallel BFS video discovery.
+ *
+ * The previous `walkVideos` recursed one directory at a time with
+ * `for await … yield*` — every `readdir` blocked the next, and a
+ * 50k-file Movies drive could take minutes just to enumerate. This
+ * processes up to `concurrency` directories per round, dropping wall
+ * time to ~the depth of the tree × one readdir.
+ *
+ * Errors per directory (permission denied, vanished mid-scan) are
+ * silently dropped so a single bad subtree never aborts the walk.
+ *
+ * `onProgress` is throttled to ~50 ms by the caller — we invoke it
+ * after every directory completes so a stuck "0 found" line can never
+ * occur: even before the first video matches, the UI sees the current
+ * directory ticking.
+ */
+export async function discoverVideos(
+    root: string,
+    opts: { concurrency?: number; onProgress?: (p: DiscoverProgress) => void } = {},
+): Promise<string[]> {
+    const concurrency = Math.max(1, opts.concurrency ?? 16);
+    const onProgress = opts.onProgress;
+    const results: string[] = [];
+    let queue: string[] = [root];
+    let dirsVisited = 0;
+
+    async function processDir(dir: string): Promise<string[]> {
+        const subdirs: string[] = [];
+        let entries: import("node:fs").Dirent[];
+        try {
+            entries = await fs.readdir(dir, { withFileTypes: true });
+        } catch {
+            return subdirs;
+        }
+        for (const e of entries) {
+            const full = path.join(dir, e.name);
+            if (e.isDirectory()) {
+                if (!shouldSkipDir(e.name)) subdirs.push(full);
+            } else if (e.isFile() && VIDEO_EXTS.has(path.extname(e.name).toLowerCase())) {
+                results.push(full);
+            }
+        }
+        dirsVisited++;
+        if (onProgress) onProgress({
+            files: results.length,
+            dirsVisited,
+            dirsQueued: queue.length + subdirs.length,
+            currentDir: dir,
+        });
+        return subdirs;
+    }
+
+    while (queue.length > 0) {
+        const batch = queue.splice(0, concurrency);
+        const batches = await Promise.all(batch.map(processDir));
+        // Append newly discovered subdirs to the back of the queue —
+        // BFS keeps memory usage proportional to the widest level rather
+        // than the deepest, which matters on flat Movies drives with
+        // tens of thousands of top-level entries.
+        for (const subs of batches) {
+            if (subs.length > 0) queue = queue.concat(subs);
+        }
+    }
+    return results;
+}
+
 export function ffprobe(filePath: string): Promise<ProbedVideo | null> {
     return new Promise(async (resolve) => {
         let stat: import("node:fs").Stats;

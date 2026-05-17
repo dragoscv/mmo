@@ -17,7 +17,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { ffprobe, walkVideos, parseFilename } from "./video-scanner";
+import { ffprobe, discoverVideos, parseFilename } from "./video-scanner";
 import {
     completeVideoScanJob,
     failScanJob,
@@ -26,12 +26,21 @@ import {
 } from "./scan-jobs";
 
 async function discover(root: string, job: ScanJob, onUpdate: () => void): Promise<string[]> {
-    const files: string[] = [];
-    for await (const full of walkVideos(root)) {
-        files.push(full);
-        job.discovered = files.length;
-        if (files.length % 16 === 0) onUpdate();
-    }
+    let lastEmit = 0;
+    const files = await discoverVideos(root, {
+        concurrency: 16,
+        onProgress: (p) => {
+            job.discovered = p.files;
+            // Surface the current directory so the UI never sits on
+            // "0 found" while we crawl deep junk subtrees — the user
+            // sees "Reading: D:\Movies\Action\…" tick across.
+            job.currentFile = path.basename(p.currentDir) || p.currentDir;
+            const now = Date.now();
+            if (now - lastEmit > 50) { onUpdate(); lastEmit = now; }
+        },
+    });
+    job.discovered = files.length;
+    onUpdate();
     return files;
 }
 
