@@ -41,7 +41,7 @@ export interface OutboundResult {
 type Handler = (payload: unknown) => Promise<unknown>;
 
 const handlers: Record<string, Handler> = {
-    list_folders: async () => ({ folders: listFolders() }),
+    list_folders: async () => ({ folders: await listFolders() }),
 
     pick_folder: async (payload) => {
         const desiredKind = pickKind(payload);
@@ -56,7 +56,7 @@ const handlers: Record<string, Handler> = {
                 properties: ["openDirectory", "createDirectory"],
             });
         if (result.canceled || result.filePaths.length === 0) {
-            return { canceled: true, folders: listFolders() };
+            return { canceled: true, folders: await listFolders() };
         }
         const picked = path.resolve(result.filePaths[0]);
         const settings = getSettings();
@@ -65,7 +65,7 @@ const handlers: Record<string, Handler> = {
             folders.push({ path: picked, watch: false, kind: desiredKind });
             store.set("scanFolders", folders);
         }
-        return { canceled: false, picked, folders: listFolders() };
+        return { canceled: false, picked, folders: await listFolders() };
     },
 
     remove_folder: async (payload) => {
@@ -75,7 +75,7 @@ const handlers: Record<string, Handler> = {
         const folders = settings.scanFolders.filter((f) => f.path !== folderPath);
         store.set("scanFolders", folders);
         void stopWatcher(folderPath);
-        return { folders: listFolders() };
+        return { folders: await listFolders() };
     },
 
     set_folder_watch: async (payload) => {
@@ -92,7 +92,7 @@ const handlers: Record<string, Handler> = {
         store.set("scanFolders", folders);
         if (watch) startWatcher(folderPath);
         else void stopWatcher(folderPath);
-        return { folders: listFolders() };
+        return { folders: await listFolders() };
     },
 
     set_folder_kind: async (payload) => {
@@ -107,7 +107,7 @@ const handlers: Record<string, Handler> = {
             f.path === folderPath ? { ...f, kind } : f,
         );
         store.set("scanFolders", folders);
-        return { folders: listFolders() };
+        return { folders: await listFolders() };
     },
 
     list_audio_devices: async () => {
@@ -166,12 +166,12 @@ const handlers: Record<string, Handler> = {
         const settings = getSettings();
         const folders = settings.scanFolders;
         if (folders.some((f) => f.path === resolved)) {
-            return { added: false, picked: resolved, folders: listFolders() };
+            return { added: false, picked: resolved, folders: await listFolders() };
         }
         folders.push({ path: resolved, watch: false, kind: desiredKind });
         store.set("scanFolders", folders);
         invalidateDirectoryCache(path.dirname(resolved));
-        return { added: true, picked: resolved, folders: listFolders() };
+        return { added: true, picked: resolved, folders: await listFolders() };
     },
 };
 
@@ -246,12 +246,75 @@ export function invalidateDirectoryCache(p: string): void {
     dirCache.delete(path.resolve(p));
 }
 
-function listFolders() {
+// ─── Bounded filesystem probes ──────────────────────────────────────────
+// fsp.access / fsp.stat have no built-in timeout. On Windows the kernel
+// can sit on a request to an empty optical drive, a sleeping USB drive,
+// or a dead network share for 30+ seconds before failing — and during
+// that wait the *entire* Node event loop is stalled, which surfaces in
+// the renderer as `[freeze] event-loop blocked for ~Xms` and to the web
+// app as multi-minute picker freezes. We wrap every external probe in a
+// short timeout and cache existence results for a few seconds so a UI
+// re-render doesn't re-probe the same dead drive again.
+
+export async function probeAccess(p: string, timeoutMs: number): Promise<boolean> {
+    return new Promise((resolve) => {
+        let done = false;
+        const t = setTimeout(() => { if (!done) { done = true; resolve(false); } }, timeoutMs);
+        fsp.access(p).then(
+            () => { if (!done) { done = true; clearTimeout(t); resolve(true); } },
+            () => { if (!done) { done = true; clearTimeout(t); resolve(false); } },
+        );
+    });
+}
+
+async function statBounded(p: string, timeoutMs: number): Promise<fs.Stats | null> {
+    return new Promise((resolve) => {
+        let done = false;
+        const t = setTimeout(() => { if (!done) { done = true; resolve(null); } }, timeoutMs);
+        fsp.stat(p).then(
+            (s) => { if (!done) { done = true; clearTimeout(t); resolve(s); } },
+            () => { if (!done) { done = true; clearTimeout(t); resolve(null); } },
+        );
+    });
+}
+
+const EXISTS_TTL_MS = 10_000;
+const existsCache = new Map<string, { at: number; value: boolean }>();
+const existsInflight = new Map<string, Promise<boolean>>();
+
+export async function existsBounded(p: string, timeoutMs = 300): Promise<boolean> {
+    const now = Date.now();
+    const hit = existsCache.get(p);
+    if (hit && now - hit.at < EXISTS_TTL_MS) return hit.value;
+    const pending = existsInflight.get(p);
+    if (pending) return pending;
+    const promise = (async () => {
+        try {
+            const value = await probeAccess(p, timeoutMs);
+            existsCache.set(p, { at: Date.now(), value });
+            return value;
+        } finally {
+            existsInflight.delete(p);
+        }
+    })();
+    existsInflight.set(p, promise);
+    return promise;
+}
+
+export function invalidateExistsCache(p?: string): void {
+    if (p) existsCache.delete(p); else existsCache.clear();
+}
+
+export async function listFolders() {
     const settings = getSettings();
     const watcherStatuses = new Map(listWatcherStatuses().map((s) => [s.folder, s] as const));
-    return settings.scanFolders.map((f) => ({
+    const folders = settings.scanFolders;
+    // Probe existence in parallel with a bounded timeout per path so a
+    // single offline drive cannot stall the whole list.
+    const existsResults = await Promise.all(folders.map((f) => existsBounded(f.path, 300)));
+    return folders.map((f, i) => ({
         path: f.path,
-        exists: fs.existsSync(f.path),
+        exists: existsResults[i],
         label: path.basename(f.path) || f.path,
         kind: f.kind ?? "music",
         watch: !!f.watch,
@@ -293,9 +356,15 @@ async function listDrivesWin(): Promise<DriveInfo[]> {
     const home = os.homedir();
     const letters: string[] = [];
     for (let c = "A".charCodeAt(0); c <= "Z".charCodeAt(0); c++) letters.push(String.fromCharCode(c));
+    // Use a per-letter timeout. On Windows, fsp.access against an empty
+    // optical drive, a sleeping network share, or a USB drive that's
+    // spinning up can block for tens of seconds with NO error — long
+    // enough that the entire picker (and every other HTTP request, since
+    // the event loop is shared) appears frozen. 500 ms is plenty for any
+    // healthy local drive and gives up cleanly on dead/slow ones.
     const probes = await Promise.all(letters.map(async (letter) => {
         const root = `${letter}:\\`;
-        try { await fsp.access(root); return root; } catch { return null; }
+        return (await probeAccess(root, 500)) ? root : null;
     }));
     const drives: DriveInfo[] = [];
     for (const root of probes) {
@@ -416,10 +485,12 @@ async function listDirectory(requested: string): Promise<{
     const symlinkChecks = dirents.map(async (d) => {
         if (d.isDirectory()) return d;
         if (!d.isSymbolicLink()) return null;
-        try {
-            const s = await fsp.stat(path.join(target, d.name));
-            return s.isDirectory() ? d : null;
-        } catch { partial = true; return null; }
+        // Bounded: a dead symlink (broken share, removed mount) can hang
+        // fsp.stat indefinitely on Windows. Drop the child and mark the
+        // listing partial rather than freezing the whole picker.
+        const s = await statBounded(path.join(target, d.name), 500);
+        if (s === null) { partial = true; return null; }
+        return s.isDirectory() ? d : null;
     });
     const resolved = await Promise.all(symlinkChecks);
     for (const d of resolved) {

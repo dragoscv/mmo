@@ -169,6 +169,11 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
      *  Fetched lazily on first need; falsy entry means "tried, none
      *  available" so we don't re-ask the server every call. */
     const directAccessRef = useRef<Map<string, { tunnelHostname: string; bearer: string } | null>>(new Map());
+    /** Surfaced in the picker modal so the user can see whether the
+     *  request went over the fast tunnel path or the slow queue, and how
+     *  long the round-trip took. Helps diagnose multi-second freezes
+     *  caused by an unhealthy tunnel or a frozen companion event loop. */
+    const [pickerDebug, setPickerDebug] = useState<{ op: string; via: "tunnel" | "queue"; ms: number; n?: number; err?: string } | null>(null);
     const [editingName, setEditingName] = useState<string | null>(null);
     const [editNameValue, setEditNameValue] = useState("");
     const [openSection, setOpenSection] = useState<Record<string, "folders" | "audio" | null>>({});
@@ -202,13 +207,21 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         if (target) {
             const r = await directFetch<{ drives: CompanionDrive[] }>(target, "/fs/drives");
             if (r) {
-                console.log(`[picker] drives via tunnel in ${Math.round(performance.now() - t0)}ms (n=${r.drives.length})`);
+                const ms = Math.round(performance.now() - t0);
+                console.log(`[picker] drives via tunnel in ${ms}ms (n=${r.drives.length})`);
+                setPickerDebug({ op: "drives", via: "tunnel", ms, n: r.drives.length });
                 return r;
             }
         }
         const r = await listCompanionDrives(deviceId);
+        const ms = Math.round(performance.now() - t0);
         const tag = "error" in r ? `error=${r.error}` : `n=${r.drives.length}`;
-        console.log(`[picker] drives via queue in ${Math.round(performance.now() - t0)}ms (${tag})`);
+        console.log(`[picker] drives via queue in ${ms}ms (${tag})`);
+        setPickerDebug({
+            op: "drives", via: "queue", ms,
+            n: "error" in r ? undefined : r.drives.length,
+            err: "error" in r ? r.error : undefined,
+        });
         return r;
     }
 
@@ -222,13 +235,21 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                 target, `/fs/list?path=${encodeURIComponent(path)}`,
             );
             if (r) {
-                console.log(`[picker] list "${path}" via tunnel in ${Math.round(performance.now() - t0)}ms (n=${r.entries.length})`);
+                const ms = Math.round(performance.now() - t0);
+                console.log(`[picker] list "${path}" via tunnel in ${ms}ms (n=${r.entries.length})`);
+                setPickerDebug({ op: "list", via: "tunnel", ms, n: r.entries.length });
                 return r;
             }
         }
         const r = await listCompanionDirectory(deviceId, path);
+        const ms = Math.round(performance.now() - t0);
         const tag = "error" in r ? `error=${r.error}` : `n=${r.entries.length}`;
-        console.log(`[picker] list "${path}" via queue in ${Math.round(performance.now() - t0)}ms (${tag})`);
+        console.log(`[picker] list "${path}" via queue in ${ms}ms (${tag})`);
+        setPickerDebug({
+            op: "list", via: "queue", ms,
+            n: "error" in r ? undefined : r.entries.length,
+            err: "error" in r ? r.error : undefined,
+        });
         return r;
     }
 
@@ -414,6 +435,7 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
         setBrowserEntries([]);
         setBrowserParent(null);
         setBrowserError(null);
+        setPickerDebug(null);
         setPickerDialogDevice(deviceId);
         void navigateBrowser(deviceId, null);
     }
@@ -822,6 +844,26 @@ export function DevicesClient({ initialDevices }: DevicesClientProps) {
                             </div>
                             {browserLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
                         </div>
+
+                        {/* Debug strip — last call's transport + latency */}
+                        {pickerDebug && (
+                            <div className={cn(
+                                "flex items-center gap-2 border-b px-2 py-1 font-mono text-[10px]",
+                                pickerDebug.err
+                                    ? "bg-destructive/10 text-destructive"
+                                    : pickerDebug.via === "tunnel"
+                                        ? "bg-emerald-500/5 text-emerald-400/80"
+                                        : "bg-amber-500/5 text-amber-400/80",
+                            )}>
+                                <span>{pickerDebug.op}</span>
+                                <span>·</span>
+                                <span>{pickerDebug.via}</span>
+                                <span>·</span>
+                                <span>{pickerDebug.ms}ms</span>
+                                {pickerDebug.n !== undefined && (<><span>·</span><span>n={pickerDebug.n}</span></>)}
+                                {pickerDebug.err && (<><span>·</span><span className="truncate">{pickerDebug.err}</span></>)}
+                            </div>
+                        )}
 
                         {/* Body */}
                         <div className="h-72 overflow-y-auto px-1 py-1">

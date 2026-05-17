@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.17 — unfreeze the folder picker
+
+- **Critical perf fix**: a disconnected USB / empty optical drive / sleeping network share would make the picker take *minutes* to list drives or open a folder. Root cause: every existence / access check on the companion side (`fs.existsSync` in `listFolders()`, `fsp.access` in `listDrivesWin`, `fsp.stat` on symlinks in `listDirectory`) had no timeout, and Windows can sit on a request to a not-ready drive for tens of seconds while blocking the *entire* Node event loop — the same loop that serves `/fs/drives` and `/fs/list` over the tunnel. Symptom in the debug log: `[freeze] event-loop blocked for ~Xms` warnings stacking up while the picker spun.
+- **What changed**: added `probeAccess` / `statBounded` wrappers that race the FS call against a short timeout (500 ms for drive probes, 500 ms for symlink stat, 300 ms for scan-folder existence). Added a 10 s `existsBounded` cache so the every-30-s `getCompanionFolders` poll doesn't re-probe the same dead drive every tick. Made `listFolders()` async and updated all callers (command worker + `/folders` + `/fs/add`) so a bad path on one scan folder no longer freezes the whole companion.
+- **Web picker debug strip**: the "Add a library folder" modal now shows the transport (tunnel / queue), latency in ms, and entry count for the last request — makes it obvious at a glance whether the tunnel fast path is actually being used.
+
 ## 1.0.10 — push-based liveness + device name sync
 
 - **Web /devices online status fix**: Vercel can't reach the user's LAN, so the old server-side `fetch(apiUrl + "/health")` probe always failed and every device rendered "Offline". Replaced with a push-based heartbeat: the companion now POSTs `/api/devices/announce` every 30 s (was 5 min) carrying `{ hostname, os, version }`; the cloud sets `status: "online"` + `lastSeenAt: now()`; `pingDevice` returns online when `lastSeenAt < 90 s`.

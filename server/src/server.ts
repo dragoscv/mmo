@@ -48,7 +48,7 @@ import {
     stopAllWatchers,
 } from "./library/watcher";
 import { startLanAnnounce, stopLanAnnounce } from "./lan-announce";
-import { listDrivesCached, listDirectoryCached, invalidateDirectoryCache } from "./command-worker";
+import { listDrivesCached, listDirectoryCached, invalidateDirectoryCache, listFolders, invalidateExistsCache, probeAccess } from "./command-worker";
 import { log } from "./logger";
 
 const MIME_TYPES: Record<string, string> = {
@@ -501,6 +501,11 @@ export async function startServer(): Promise<void> {
         const kind = typeof body.kind === "string"
             && (FOLDER_KINDS as readonly string[]).includes(body.kind)
             ? (body.kind as FolderKind) : "music";
+        // Bounded existence probe — a dead network share could otherwise
+        // stall fs.stat for 30+ seconds, blocking the event loop.
+        if (!(await probeAccess(folderPath, 2_000))) {
+            res.status(400).json({ error: "Folder does not exist or is not readable" }); return;
+        }
         try {
             const stat = await fs.promises.stat(folderPath);
             if (!stat.isDirectory()) { res.status(400).json({ error: "Not a directory" }); return; }
@@ -516,41 +521,20 @@ export async function startServer(): Promise<void> {
             added = true;
         }
         invalidateDirectoryCache(path.dirname(resolved));
+        invalidateExistsCache(resolved);
         // Return the updated folders list inline so the browser can render
         // immediately without a follow-up queue round-trip (saves ~1.5-6s
         // when the LAN announce loop is the only transport).
-        const watcherStatuses = new Map(listWatcherStatuses().map((s) => [s.folder, s] as const));
-        const updatedFolders = getSettings().scanFolders.map((f) => ({
-            path: f.path,
-            exists: fs.existsSync(f.path),
-            label: path.basename(f.path) || f.path,
-            kind: f.kind ?? "music",
-            watch: !!f.watch,
-            watchActive: !!watcherStatuses.get(f.path)?.active,
-            watchEvents: watcherStatuses.get(f.path)?.eventsSeen ?? 0,
-            watchError: watcherStatuses.get(f.path)?.error ?? null,
-        }));
+        const updatedFolders = await listFolders();
         res.json({ added, picked: resolved, folders: updatedFolders });
     });
 
-    app.get("/folders", authMiddleware, (_req, res) => {
+    app.get("/folders", authMiddleware, async (_req, res) => {
         // Return rich entries (path + per-folder stats from the library DB).
         // Stats are computed best-effort by counting tracks whose filepath
         // is inside the folder. The web UI uses these to skip a separate
         // round trip to /library/stats per folder.
-        const watcherStatuses = new Map(listWatcherStatuses().map((s) => [s.folder, s] as const));
-        res.json({
-            folders: settings.scanFolders.map((f) => ({
-                path: f.path,
-                exists: fs.existsSync(f.path),
-                label: path.basename(f.path) || f.path,
-                kind: f.kind ?? "music",
-                watch: !!f.watch,
-                watchActive: !!watcherStatuses.get(f.path)?.active,
-                watchEvents: watcherStatuses.get(f.path)?.eventsSeen ?? 0,
-                watchError: watcherStatuses.get(f.path)?.error ?? null,
-            })),
-        });
+        res.json({ folders: await listFolders() });
     });
 
     /**
