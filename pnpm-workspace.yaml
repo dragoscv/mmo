@@ -1,0 +1,14 @@
+# pnpm workspace declaration.
+#
+# We keep `shared-workspace-lockfile=false` in .npmrc so each sub-package
+# retains its own pnpm-lock.yaml. That way:
+#   - Vercel (root = app/) keeps using app/pnpm-lock.yaml.
+#   - The companion-release workflow keeps using server/pnpm-lock.yaml.
+#   - We can still run cross-workspace commands like
+#       `pnpm -r --filter @mmo/extension run check-version`.
+# A future PR can flip the flag and consolidate lockfiles in one go.
+
+packages:
+    - "app"
+    - "server"
+    - "apps/*"

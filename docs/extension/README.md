@@ -13,7 +13,7 @@
 | [platforme-suportate.md](platforme-suportate.md) | Lista celor 15 platforme + ce funcționează unde |
 | [cum-functioneaza.md](cum-functioneaza.md) | Cum lucrează extensia cu web app + companion |
 
-> Aceste ghiduri sunt în curs de scriere. Pentru setup dev → [`extension/README.md`](../../extension/README.md).
+> Aceste ghiduri sunt în curs de scriere. Pentru setup dev → [`apps/extension/README.md`](../../apps/extension/README.md).
 
 ---
 

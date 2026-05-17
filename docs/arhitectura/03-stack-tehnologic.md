@@ -89,7 +89,7 @@ Toate dependențele majore din MMO, grupate pe componentă, cu **motivația** al
 
 ---
 
-## 🧩 Extension (`extension/manifest.json`)
+## 🧩 Extension (`apps/extension/manifest.json`)
 
 | Tehnologie | De ce |
 |---|---|

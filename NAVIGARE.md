@@ -274,7 +274,7 @@ mindmap
 |------|-----------|
 | [app/README.md](app/README.md) | Setup web app dev |
 | [server/README.md](server/README.md) | Setup MMO Companion dev |
-| [extension/README.md](extension/README.md) | Setup extensie dev |
+| [apps/extension/README.md](apps/extension/README.md) | Setup extensie dev |
 | [infra/terraform/README.md](infra/terraform/README.md) | Provisioning infra |
 
 ---

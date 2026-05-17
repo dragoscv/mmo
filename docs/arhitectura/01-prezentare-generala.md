@@ -35,7 +35,7 @@ MMO este o suite de **4 componente** care colaborează pentru a oferi unei singu
 | **Contributor frontend** | Adaug feature UI în web app | [02-componente-suite](02-componente-suite.md) → [03-stack](03-stack-tehnologic.md) → [`app/README.md`](../../app/README.md) |
 | **Contributor backend** | Schimb DB schema, server action, API | [04-fluxuri-date](04-fluxuri-date.md) → [03-stack](03-stack-tehnologic.md) → [`app/README.md`](../../app/README.md) |
 | **Contributor companion** | Lucrez la Electron, IPC, audio nativ | [02-componente-suite](02-componente-suite.md) → [`docs/companion/`](../companion/) → [`server/README.md`](../../server/README.md) |
-| **Contributor extension** | Adaug platformă nouă în extensie | [`docs/extension/`](../extension/) → [`extension/README.md`](../../extension/README.md) |
+| **Contributor extension** | Adaug platformă nouă în extensie | [`docs/extension/`](../extension/) → [`apps/extension/README.md`](../../apps/extension/README.md) |
 | **DevOps / SRE** | Provisionez infra, monitorizez TURN | [05-securitate-auth](05-securitate-auth.md) → [`infra/terraform/README.md`](../../infra/terraform/README.md) |
 | **Reviewer / arhitect** | Înțeleg deciziile globale | toată secțiunea, în ordine 01→05 |
 

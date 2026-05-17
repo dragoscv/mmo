@@ -1,0 +1,90 @@
+name: extension-ci
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "apps/extension/**"
+            - ".github/workflows/extension-ci.yml"
+    pull_request:
+        paths:
+            - "apps/extension/**"
+            - ".github/workflows/extension-ci.yml"
+
+concurrency:
+    group: extension-ci-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    version-bump:
+        name: version-bump guard
+        runs-on: ubuntu-latest
+        timeout-minutes: 3
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  # Need history so the check can diff vs origin/main.
+                  fetch-depth: 0
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+
+            - name: Fetch base ref
+              run: git fetch origin ${{ github.base_ref || 'main' }} --depth=20
+
+            - name: Run version-bump check
+              run: |
+                  base="origin/${{ github.base_ref || 'main' }}"
+                  node apps/extension/scripts/check-version.mjs --base="$base"
+
+    validate:
+        name: manifest + lint
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        defaults:
+            run:
+                working-directory: apps/extension
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+                  cache-dependency-path: apps/extension/pnpm-lock.yaml
+
+            - name: Install
+              run: pnpm install --no-frozen-lockfile
+
+            - name: Validate manifest.json is valid JSON + has required fields
+              shell: bash
+              run: |
+                  node -e "
+                    const m = require('./manifest.json');
+                    if (!m.name || !m.version || !m.manifest_version) {
+                      console.error('manifest.json missing required fields');
+                      process.exit(1);
+                    }
+                    if (m.manifest_version !== 3) {
+                      console.error('manifest_version must be 3 (we only ship MV3)');
+                      process.exit(1);
+                    }
+                    console.log('manifest.json OK \u2014', m.name, m.version);
+                  "
+
+            - name: Refresh vendored polyfill (must match pinned version)
+              run: pnpm run vendor:polyfill
+
+            - name: Fail if vendor/ drifted from pinned upstream
+              shell: bash
+              run: |
+                  if [[ -n "$(git status --porcelain vendor/)" ]]; then
+                    echo "::error::vendor/browser-polyfill.min.js is out of date; run 'pnpm run vendor:polyfill' and commit the result"
+                    git diff vendor/
+                    exit 1
+                  fi

@@ -12,6 +12,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Native shells + extension CI/CD (multi-pillar release plan)
+
+- **`apps/native/`** — Tauri 2 (desktop) + Capacitor (mobile) shells that wrap https://muzicai.ro. Loads the live origin so updates ship without app-store re-review; the Next.js PWA service worker handles offline. Released via `native-v*` tags through `.github/workflows/native-release.yml` (Win/Mac/Linux Tauri bundles, Android apk/aab, iOS xcarchive/ipa). All store-publishing and code-signing steps are gated on optional secrets and skip gracefully.
+- **`apps/extension/`** — moved from `extension/` so the repo aligns with the `apps/*` layout. Version bumped to `1.1.0`. No code changes inside the extension itself; only the path moved.
+- **`.github/workflows/extension-ci.yml`** — runs the version-bump guard on every PR touching `apps/extension/**` and validates the manifest. Vendor folder is regenerated and the build fails if `vendor/browser-polyfill.min.js` drifts from the pinned upstream version.
+- **`.github/workflows/extension-release.yml`** — triggered by `extension-v*` tags. Packages a single `.zip` (consumable by Chrome / Edge / Firefox), uploads to GitHub Releases, and publishes to the Chrome Web Store / Edge Add-ons / Firefox AMO when their respective secrets are configured.
+- **`.husky/pre-commit` + `apps/extension/scripts/check-version.mjs`** — local pre-commit hook that fails human-readably when `apps/extension/**` is staged without bumping BOTH `manifest.json` AND `package.json` to the same new version. Includes a legacy-path fallback so the `extension/` → `apps/extension/` rename diffs correctly against pre-move history.
+- **Root `package.json` + `pnpm-workspace.yaml` + `.npmrc`** — declares the monorepo (app, server, apps/*) but keeps `shared-workspace-lockfile=false` so each sub-package retains its own `pnpm-lock.yaml`. Vercel (root = `app/`) and the companion-release workflow keep working unchanged. A follow-up PR will consolidate lockfiles when we're ready to migrate Vercel root to repo root.
+
 ### Added — Audit round 8 (Q8.12a AI key/BPM correction · backend)
 
 First slice of the AI key/BPM correction feature (Q9 lock-in, Q10 confirmed):

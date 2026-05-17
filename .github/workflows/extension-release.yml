@@ -1,0 +1,260 @@
+name: Extension — build & release
+
+# Triggered by tag push `extension-v0.2.0` (must match
+# apps/extension/manifest.json#version), or manually.
+# Produces:
+#   - apps/extension/build/mmo-extension-vX.Y.Z.zip (Chrome/Edge package)
+#   - apps/extension/build/mmo-extension-vX.Y.Z.xpi (Firefox; same zip)
+# Both attached to a GitHub Release. Store-publishing steps for
+# Chrome Web Store, Firefox AMO, and Edge Add-ons run only when the
+# relevant secrets are present \u2014 otherwise they SKIP gracefully.
+
+on:
+    push:
+        tags:
+            - "extension-v*"
+    workflow_dispatch:
+        inputs:
+            publish_stores:
+                description: "Also publish to extension stores (true) or only GH Release (false)"
+                required: false
+                default: "false"
+                type: choice
+                options:
+                    - "false"
+                    - "true"
+
+permissions:
+    contents: write
+    id-token: write
+
+jobs:
+    preflight:
+        if: github.event_name == 'push'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Assert tag matches apps/extension/manifest.json#version
+              shell: bash
+              run: |
+                  tag="${GITHUB_REF_NAME}"
+                  tagver="${tag#extension-v}"
+                  manver="$(node -p "require('./apps/extension/manifest.json').version")"
+                  pkgver="$(node -p "require('./apps/extension/package.json').version")"
+                  echo "Tag       : $tagver"
+                  echo "manifest  : $manver"
+                  echo "package   : $pkgver"
+                  if [[ "$tagver" != "$manver" ]]; then
+                    echo "::error::Tag $tag (resolves to $tagver) does not match manifest version $manver"
+                    exit 1
+                  fi
+                  if [[ "$manver" != "$pkgver" ]]; then
+                    echo "::error::manifest.json ($manver) and package.json ($pkgver) versions disagree"
+                    exit 1
+                  fi
+
+    build:
+        needs: [preflight]
+        if: ${{ always() && (needs.preflight.result == 'success' || needs.preflight.result == 'skipped') }}
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.meta.outputs.version }}
+            zip_path: ${{ steps.pack.outputs.zip_path }}
+        defaults:
+            run:
+                working-directory: apps/extension
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+                  cache-dependency-path: apps/extension/pnpm-lock.yaml
+
+            - name: Install
+              run: pnpm install --no-frozen-lockfile
+
+            - name: Read version
+              id: meta
+              shell: bash
+              run: echo "version=$(node -p "require('./manifest.json').version")" >> $GITHUB_OUTPUT
+
+            - name: Refresh vendored polyfill
+              run: pnpm run vendor:polyfill
+
+            - name: Package extension (.zip)
+              id: pack
+              shell: bash
+              run: |
+                  mkdir -p build
+                  name="mmo-extension-v${{ steps.meta.outputs.version }}.zip"
+                  # Include only the runtime files; exclude dev cruft.
+                  zip -rq "build/$name" \
+                    manifest.json \
+                    background.js \
+                    content.js \
+                    content.css \
+                    popup.html popup.js \
+                    options.html options.js \
+                    vendor \
+                    icons \
+                    -x "*.DS_Store" "*/.DS_Store"
+                  ls -lh build/
+                  echo "zip_path=apps/extension/build/$name" >> $GITHUB_OUTPUT
+
+            - name: Upload zip as workflow artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: extension-zip
+                  path: apps/extension/build/*.zip
+                  retention-days: 30
+
+    github-release:
+        needs: [build]
+        if: github.event_name == 'push'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/download-artifact@v4
+              with:
+                  name: extension-zip
+                  path: ./out
+
+            - name: Extract release notes
+              shell: bash
+              run: |
+                  if [[ -f CHANGELOG.md ]]; then
+                    awk '/^## /{c++} c==1{print} c==2{exit}' CHANGELOG.md > release_notes.md
+                  else
+                    echo "Browser extension v${{ needs.build.outputs.version }}" > release_notes.md
+                  fi
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ github.ref_name }}
+                  name: ${{ github.ref_name }}
+                  body_path: release_notes.md
+                  files: ./out/*.zip
+
+    # ── Chrome Web Store (skip when secrets missing) ────────────────────
+    chrome-store:
+        needs: [build]
+        if: |
+            (github.event_name == 'push' || github.event.inputs.publish_stores == 'true')
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/download-artifact@v4
+              with:
+                  name: extension-zip
+                  path: ./out
+
+            - name: Check for Chrome Web Store secrets
+              id: secrets
+              shell: bash
+              run: |
+                  if [[ -n "${{ secrets.CHROME_EXTENSION_ID }}" \
+                    && -n "${{ secrets.CHROME_CLIENT_ID }}" \
+                    && -n "${{ secrets.CHROME_CLIENT_SECRET }}" \
+                    && -n "${{ secrets.CHROME_REFRESH_TOKEN }}" ]]; then
+                    echo "have=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "have=false" >> $GITHUB_OUTPUT
+                    echo "::notice::Chrome Web Store secrets not configured \u2014 skipping. Set CHROME_EXTENSION_ID, CHROME_CLIENT_ID, CHROME_CLIENT_SECRET, CHROME_REFRESH_TOKEN to enable."
+                  fi
+
+            - name: Publish to Chrome Web Store
+              if: steps.secrets.outputs.have == 'true'
+              uses: mnao305/chrome-extension-upload@v5.0.0
+              with:
+                  file-path: ./out/mmo-extension-v${{ needs.build.outputs.version }}.zip
+                  extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+                  client-id: ${{ secrets.CHROME_CLIENT_ID }}
+                  client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+                  refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+                  publish: true
+
+    # ── Firefox AMO (skip when secrets missing) ─────────────────────────
+    firefox-amo:
+        needs: [build]
+        if: |
+            (github.event_name == 'push' || github.event.inputs.publish_stores == 'true')
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/download-artifact@v4
+              with:
+                  name: extension-zip
+                  path: ./out
+
+            - name: Check for AMO secrets
+              id: secrets
+              shell: bash
+              run: |
+                  if [[ -n "${{ secrets.FIREFOX_AMO_JWT_ISSUER }}" \
+                    && -n "${{ secrets.FIREFOX_AMO_JWT_SECRET }}" ]]; then
+                    echo "have=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "have=false" >> $GITHUB_OUTPUT
+                    echo "::notice::Firefox AMO secrets not configured \u2014 skipping. Set FIREFOX_AMO_JWT_ISSUER + FIREFOX_AMO_JWT_SECRET to enable."
+                  fi
+
+            - uses: actions/setup-node@v4
+              if: steps.secrets.outputs.have == 'true'
+              with:
+                  node-version: 22
+
+            - name: Sign + upload to AMO
+              if: steps.secrets.outputs.have == 'true'
+              env:
+                  WEB_EXT_API_KEY: ${{ secrets.FIREFOX_AMO_JWT_ISSUER }}
+                  WEB_EXT_API_SECRET: ${{ secrets.FIREFOX_AMO_JWT_SECRET }}
+              run: |
+                  npm install --global web-ext@8
+                  cd ./out
+                  unzip -q "mmo-extension-v${{ needs.build.outputs.version }}.zip" -d unpacked
+                  cd unpacked
+                  web-ext sign \
+                    --channel=listed \
+                    --api-key="$WEB_EXT_API_KEY" \
+                    --api-secret="$WEB_EXT_API_SECRET"
+
+    # ── Microsoft Edge Add-ons (skip when secrets missing) ──────────────
+    edge-store:
+        needs: [build]
+        if: |
+            (github.event_name == 'push' || github.event.inputs.publish_stores == 'true')
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/download-artifact@v4
+              with:
+                  name: extension-zip
+                  path: ./out
+
+            - name: Check for Edge Add-ons secrets
+              id: secrets
+              shell: bash
+              run: |
+                  if [[ -n "${{ secrets.EDGE_PRODUCT_ID }}" \
+                    && -n "${{ secrets.EDGE_CLIENT_ID }}" \
+                    && -n "${{ secrets.EDGE_API_KEY }}" ]]; then
+                    echo "have=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "have=false" >> $GITHUB_OUTPUT
+                    echo "::notice::Edge Add-ons secrets not configured \u2014 skipping. Set EDGE_PRODUCT_ID, EDGE_CLIENT_ID, EDGE_API_KEY to enable."
+                  fi
+
+            - name: Publish to Edge Add-ons
+              if: steps.secrets.outputs.have == 'true'
+              uses: wdzeng/edge-addon@v2
+              with:
+                  product-id: ${{ secrets.EDGE_PRODUCT_ID }}
+                  zip-path: ./out/mmo-extension-v${{ needs.build.outputs.version }}.zip
+                  client-id: ${{ secrets.EDGE_CLIENT_ID }}
+                  api-key: ${{ secrets.EDGE_API_KEY }}

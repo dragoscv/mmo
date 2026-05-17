@@ -224,7 +224,7 @@ pnpm dev                            # pornește Electron în dev mode
 | [docs/arhitectura/05-securitate-auth.md](docs/arhitectura/05-securitate-auth.md) | Auth.js, TURN credentials, CORS, CSP |
 | [app/README.md](app/README.md) | Setup web app dev |
 | [server/README.md](server/README.md) | Setup companion dev |
-| [extension/README.md](extension/README.md) | Setup extensie dev |
+| [apps/extension/README.md](apps/extension/README.md) | Setup extensie dev |
 | [infra/terraform/README.md](infra/terraform/README.md) | Provisioning infrastructură |
 
 ### Convenții repo
