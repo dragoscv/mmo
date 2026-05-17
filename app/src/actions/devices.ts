@@ -419,12 +419,57 @@ export async function getLocalCompanion(): Promise<{ apiUrl: string; token: stri
 // thin proxies. The legacy `deviceFolders` table is kept only for stale
 // per-folder stats; new flows ignore it.
 
+/** Write-through: replace the cached folder set for a device. Best-effort. */
+async function mirrorCompanionFolders(deviceId: string, list: CompanionFolder[]): Promise<void> {
+    try {
+        await db.transaction(async (tx) => {
+            await tx.delete(deviceFolders).where(eq(deviceFolders.deviceId, deviceId));
+            if (list.length === 0) return;
+            await tx.insert(deviceFolders).values(list.map((f) => ({
+                deviceId,
+                path: f.path,
+                label: f.label ?? null,
+                kind: f.kind ?? null,
+                watch: f.watch ?? false,
+            })));
+        });
+    } catch (e) {
+        console.warn("[folders] mirror failed", e);
+    }
+}
+
+/** Read the cached folder set without touching the companion. */
+export async function getCachedCompanionFolders(deviceId: string): Promise<CompanionFolder[]> {
+    if (await assertDeviceOwnership(deviceId)) return [];
+    const rows = await db
+        .select({
+            path: deviceFolders.path,
+            label: deviceFolders.label,
+            kind: deviceFolders.kind,
+            watch: deviceFolders.watch,
+        })
+        .from(deviceFolders)
+        .where(eq(deviceFolders.deviceId, deviceId));
+    return rows.map((r) => ({
+        path: r.path,
+        exists: true,
+        label: r.label ?? (r.path.split(/[/\\]/).pop() || r.path),
+        kind: (r.kind ?? undefined) as FolderKind | undefined,
+        watch: r.watch ?? false,
+    }));
+}
+
 export async function getCompanionFolders(deviceId: string): Promise<CompanionFolder[]> {
     if (await assertDeviceOwnership(deviceId)) return [];
     const r = await enqueueDeviceCommand<{ folders: CompanionFolder[] }>(
         deviceId, "list_folders", null, { timeoutMs: 8_000 },
     );
-    return r.ok ? (r.result?.folders ?? []) : [];
+    if (r.ok) {
+        const list = r.result?.folders ?? [];
+        void mirrorCompanionFolders(deviceId, list);
+        return list;
+    }
+    return getCachedCompanionFolders(deviceId);
 }
 
 /** Legacy: triggers the companion's native OS folder picker. Kept for
@@ -497,6 +542,7 @@ export async function addCompanionFolder(
         deviceId, "add_folder", { path: folderPath, kind }, { timeoutMs: 15_000 },
     );
     if (!r.ok) return { error: r.error ?? "Failed to add folder" };
+    void mirrorCompanionFolders(deviceId, r.result!.folders);
     return r.result!;
 }
 
@@ -508,7 +554,10 @@ export async function removeCompanionFolder(
     const r = await enqueueDeviceCommand<{ folders: CompanionFolder[] }>(
         deviceId, "remove_folder", { path: folderPath }, { timeoutMs: 8_000 },
     );
-    return r.ok ? (r.result?.folders ?? []) : [];
+    if (!r.ok) return getCachedCompanionFolders(deviceId);
+    const list = r.result?.folders ?? [];
+    void mirrorCompanionFolders(deviceId, list);
+    return list;
 }
 
 /**
@@ -527,7 +576,9 @@ export async function setCompanionFolderWatch(
         deviceId, "set_folder_watch", { path: folderPath, watch }, { timeoutMs: 8_000 },
     );
     if (!r.ok) return { error: r.error ?? "Failed to toggle watcher" };
-    return { success: true, folders: r.result?.folders ?? [] };
+    const folders = r.result?.folders ?? [];
+    void mirrorCompanionFolders(deviceId, folders);
+    return { success: true, folders };
 }
 
 /** Update the purpose label of a folder (music / movies / tv-shows / ...). */
@@ -542,7 +593,9 @@ export async function setCompanionFolderKind(
         deviceId, "set_folder_kind", { path: folderPath, kind }, { timeoutMs: 8_000 },
     );
     if (!r.ok) return { error: r.error ?? "Failed to update folder kind" };
-    return { success: true, folders: r.result?.folders ?? [] };
+    const folders = r.result?.folders ?? [];
+    void mirrorCompanionFolders(deviceId, folders);
+    return { success: true, folders };
 }
 
 // ─── Async scan jobs (refresh-resilient progress) ──────────────────────────

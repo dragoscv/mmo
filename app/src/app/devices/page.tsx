@@ -1,8 +1,9 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { DevicesClient } from "./devices-client";
-import { getDevices } from "@/actions/devices";
+import { getDevices, getCachedCompanionFolders } from "@/actions/devices";
 import { CompanionOfflineBanner } from "@/components/companion/companion-offline-banner";
+import type { CompanionFolder } from "@/lib/companion-types";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,14 @@ export default async function DevicesPage() {
     }
 
     const userDevices = await getDevices();
+    // Hydrate the cached library folders for every device in parallel so
+    // the first paint shows the full list without waiting for the
+    // companion to come online or even respond. The client refreshes
+    // from the live companion on mount and reconciles silently.
+    const folderPairs = await Promise.all(
+        userDevices.map(async (d) => [d.id, await getCachedCompanionFolders(d.id)] as const),
+    );
+    const initialFolders: Record<string, CompanionFolder[]> = Object.fromEntries(folderPairs);
 
     return (
         <div className="flex flex-col h-full">
@@ -25,7 +34,7 @@ export default async function DevicesPage() {
 
             <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6">
                 <CompanionOfflineBanner context="devices" />
-                <DevicesClient initialDevices={userDevices} />
+                <DevicesClient initialDevices={userDevices} initialFolders={initialFolders} />
             </div>
         </div>
     );

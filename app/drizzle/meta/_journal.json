@@ -15,6 +15,13 @@
       "when": 1738700000000,
       "tag": "0015_device_tunnel",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1747497600000,
+      "tag": "0016_device_folders_mirror",
+      "breakpoints": true
     }
   ]
 }

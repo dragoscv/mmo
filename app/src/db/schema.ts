@@ -188,17 +188,25 @@ export const deviceCommands = pgTable(
     ],
 );
 
-export const deviceFolders = pgTable("device_folders", {
-    id: serial("id").primaryKey(),
-    deviceId: text("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
-    path: text("path").notNull(),
-    label: text("label"),
-    trackCount: integer("track_count").default(0),
-    totalSize: bigint("total_size", { mode: "number" }).default(0),
-    lastScannedAt: timestamp("last_scanned_at"),
-    isEnabled: boolean("is_enabled").default(true),
-    createdAt: timestamp("created_at").defaultNow(),
-});
+export const deviceFolders = pgTable(
+    "device_folders",
+    {
+        id: serial("id").primaryKey(),
+        deviceId: text("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+        path: text("path").notNull(),
+        label: text("label"),
+        /** Cached mirror of `CompanionFolder.kind` so the /devices page paints instantly even when the companion is offline. */
+        kind: text("kind"),
+        /** Cached mirror of `CompanionFolder.watch`. */
+        watch: boolean("watch").default(false),
+        trackCount: integer("track_count").default(0),
+        totalSize: bigint("total_size", { mode: "number" }).default(0),
+        lastScannedAt: timestamp("last_scanned_at"),
+        isEnabled: boolean("is_enabled").default(true),
+        createdAt: timestamp("created_at").defaultNow(),
+    },
+    (t) => [uniqueIndex("device_folders_device_path_uniq").on(t.deviceId, t.path)],
+);
 
 // ─── Recordings (file body lives in GCS — gcs_object_key) ───────────────────
 

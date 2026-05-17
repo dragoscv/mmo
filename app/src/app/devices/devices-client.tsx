@@ -118,6 +118,10 @@ const FOLDER_KIND_LABELS: Record<FolderKind, string> = {
 
 interface DevicesClientProps {
     initialDevices: Device[];
+    /** Cached library folders (per device id) hydrated from the DB on the
+     *  server. Lets the first paint show folders even when the companion
+     *  is offline; the client refreshes from the live companion on mount. */
+    initialFolders?: Record<string, CompanionFolder[]>;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -134,12 +138,12 @@ function authKey(d: { name: string; direction: string; backend: string }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export function DevicesClient({ initialDevices }: DevicesClientProps) {
+export function DevicesClient({ initialDevices, initialFolders }: DevicesClientProps) {
     useRenderCount("Page:/devices");
     const [devices, setDevices] = useState(initialDevices);
     const [isPending, startTransition] = useTransition();
     const [deviceStatuses, setDeviceStatuses] = useState<Record<string, boolean>>({});
-    const [folders, setFolders] = useState<Record<string, CompanionFolder[]>>({});
+    const [folders, setFolders] = useState<Record<string, CompanionFolder[]>>(initialFolders ?? {});
     const [trackCounts, setTrackCounts] = useState<Record<string, number>>({});
     /** Per-folder scan progress, keyed by folder path. Lives across
      *  refreshes because we re-fetch from the companion on mount. */

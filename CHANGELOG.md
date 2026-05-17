@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Cloud-cached library folders (web `0.3.9`)
+
+- **Mirror the companion `scanFolders` list into `device_folders`** with new `kind` + `watch` columns and a unique `(device_id, path)` index. Every successful `getCompanionFolders` / `addCompanionFolder` / `removeCompanionFolder` / `setCompanionFolderKind` / `setCompanionFolderWatch` writes through to the DB.
+- **Server-render the cached folder list on `/devices`** via a new `getCachedCompanionFolders` action and an `initialFolders` prop, so the page paints the user's library folders on first byte — even when the companion is asleep or unreachable.
+- **Graceful offline fallback**: if the live `list_folders` command queue call fails, `getCompanionFolders` falls back to the cached mirror instead of returning an empty list and wiping the UI.
+
 ### Performance — Parallel BFS video discovery (companion `1.0.21`)
 
 - **Replaced the serial `walkVideos` async generator with `discoverVideos` doing parallel BFS** — up to 16 directories are `readdir`-ed concurrently per round instead of one at a time. A 50 k-file Movies drive that previously took minutes to enumerate now finishes in seconds (wall time ≈ tree depth × one readdir, not file count × readdir).
