@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 import { companionLibrary, getCompanionLink } from "@/lib/companion-library";
+import { requireRate } from "@/lib/api-guard";
 
 const MIME_TYPES: Record<string, string> = {
     ".mp3": "audio/mpeg",
@@ -53,6 +54,11 @@ export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    // Per-IP rate limit: audio streaming is bandwidth-heavy and the local
+    // FS branch can also serve large files; cap at 120 requests/minute/IP
+    // (~2/sec, well above legitimate seek/restart patterns).
+    const blocked = requireRate(request, { bucket: "audio-stream", windowMs: 60_000, max: 120 });
+    if (blocked) return blocked;
     const { id } = await params;
     const trackId = parseInt(id);
 

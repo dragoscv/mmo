@@ -1,8 +1,12 @@
 import { DrivesClient } from "./drives-client";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default function DrivesPage() {
+export default async function DrivesPage() {
+    const session = await auth();
+    if (!session?.user?.id) redirect("/login?from=/drives");
     return (
         <div className="flex flex-col h-full">
             <div className="shrink-0 sticky top-0 z-20 bg-background/95 backdrop-blur-sm px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-3 border-b border-border">

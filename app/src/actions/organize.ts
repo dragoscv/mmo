@@ -11,6 +11,7 @@ import { revalidatePath } from "next/cache";
 import { moveTrackToGenreFolder } from "@/lib/organizer";
 import { companionLibrary, getCompanionLink } from "@/lib/companion-library";
 import { getSetting } from "@/actions/settings";
+import { auth } from "@/auth";
 
 /** Strip path-traversal characters from a single folder segment. We reject
  *  anything that would escape the configured `musicRoot` (`..`, `/`, `\\`,
@@ -27,6 +28,8 @@ function sanitizeGenreSegment(raw: string): string {
 }
 
 export async function organizeTrack(trackId: number, genre: string) {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "unauthorized" };
     const link = await getCompanionLink();
     if (!link) return { success: false, error: "Companion not connected" };
 
@@ -72,6 +75,8 @@ export async function organizeMultipleTracks(
     trackIds: number[],
     genre: string,
 ): Promise<{ moved: number; errors: number }> {
+    const session = await auth();
+    if (!session?.user?.id) return { moved: 0, errors: 0 };
     // Bound the loop. Each call does a companion fetch + filesystem move +
     // companion update; an unbounded array is a multi-second DoS primitive
     // against the user's companion + own disk. 1000 is well above any

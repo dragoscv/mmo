@@ -50,6 +50,11 @@ const nextConfig: NextConfig = {
     },
 
     experimental: {
+        // NOTE: `cacheComponents: true` (Next.js 16 opt-in caching via the
+        // `"use cache"` directive) is a worthwhile next step but requires
+        // wrapping every dynamic IO call (`auth()`, `cookies()`, db queries)
+        // in Suspense boundaries or marking pages dynamic explicitly. That
+        // migration is tracked separately so the build stays green here.
         serverActions: {
             allowedOrigins: [
                 "localhost:3000",
@@ -74,13 +79,17 @@ const nextConfig: NextConfig = {
         // Next.js' inline critical-CSS extraction; we accept it because the
         // dynamic-style attack surface in this app is tiny (no untrusted
         // content rendered into a `style` attribute).
+        const isProd = process.env.NODE_ENV === "production";
+        const scriptSrc = isProd
+            ? "script-src 'self' 'unsafe-inline' https://js.stripe.com https://accounts.google.com"
+            : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://accounts.google.com";
         const csp = [
             "default-src 'self'",
-            // Next.js needs `'unsafe-eval'` for the dev runtime (HMR + RSC
-            // bootstrap chunks). React Compiler builds also emit `eval` for
-            // the inline component cache. Stripe Checkout/Connect needs its
-            // own origins. Service worker (`/sw.js`) is same-origin.
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://accounts.google.com",
+            // `'unsafe-eval'` is needed for the Next.js dev runtime (HMR + RSC
+            // bootstrap chunks) and stripped in production builds. Stripe
+            // Checkout/Connect needs its own origins. Service worker (`/sw.js`)
+            // is same-origin.
+            scriptSrc,
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' data: https://fonts.gstatic.com",
             // Artwork / oEmbed thumbnails come from many CDNs; HTTPS-only.

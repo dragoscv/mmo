@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 import os from "node:os";
 import { companionLibrary, getCompanionLink } from "@/lib/companion-library";
+import { requireRate } from "@/lib/api-guard";
 
 const execFileAsync = promisify(execFile);
 
@@ -61,6 +62,11 @@ export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    // Waveform generation spawns ffmpeg + reads the full PCM; without a
+    // limit a hostile client can saturate CPU. 60/min/IP is plenty for
+    // typical browsing patterns (cache hits don't reach the spawn).
+    const blocked = requireRate(request, { bucket: "waveform", windowMs: 60_000, max: 60 });
+    if (blocked) return blocked;
     const { id } = await params;
     const trackId = parseInt(id);
 
