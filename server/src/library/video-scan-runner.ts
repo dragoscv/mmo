@@ -161,18 +161,46 @@ export async function runVideoScanJob(
     job: ScanJob,
     onUpdate: () => void = () => { /* noop */ },
 ): Promise<void> {
+    const t0 = Date.now();
+    console.log(`[video-scan] start job=${job.id} root="${job.folder}"`);
     try {
+        // Up-front sanity check — the #1 cause of "0 files found" reports
+        // is a stale folder path (drive unplugged, share unmounted). Catch
+        // it early and fail the job with a clear message instead of
+        // silently returning an empty discovery.
+        try {
+            const stat = await fs.promises.stat(job.folder);
+            if (!stat.isDirectory()) {
+                throw new Error(`Path is not a directory: ${job.folder}`);
+            }
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            console.warn(`[video-scan] root unreadable: ${msg}`);
+            failScanJob(job.id, `Folder not accessible: ${msg}`);
+            onUpdate();
+            return;
+        }
+
         job.status = "discovering";
         onUpdate();
         const files = await discover(job.folder, job, onUpdate);
+        const tDiscover = Date.now() - t0;
+        console.log(
+            `[video-scan] discovered ${files.length} video files in ${tDiscover}ms` +
+            (files.length > 0 ? ` (first: ${path.basename(files[0])})` : " (NONE FOUND — check folder kind + extensions)"),
+        );
         job.total = files.length;
         job.status = "scanning";
         onUpdate();
         const videos = await probeAll(files, job, job.folder, onUpdate);
+        const tTotal = Date.now() - t0;
+        console.log(`[video-scan] complete job=${job.id} probed=${videos.length} errored=${job.errored} totalMs=${tTotal}`);
         completeVideoScanJob(job.id, videos);
         onUpdate();
     } catch (err) {
-        failScanJob(job.id, err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[video-scan] job=${job.id} crashed: ${msg}`);
+        failScanJob(job.id, msg);
         onUpdate();
     }
 }

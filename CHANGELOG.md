@@ -12,6 +12,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Diagnostics — Video scan logging + clear failure (companion `1.0.22`)
+
+- **`runVideoScanJob` now logs lifecycle events** with a `[video-scan]` prefix: job start with root folder, discovery duration + file count (including a "NONE FOUND — check folder kind + extensions" hint when the discovery returns empty), probe completion with error count, and total wall time. Lets users diagnose "0 movies found" reports by sharing companion logs.
+- **Up-front root-folder accessibility check**: if the configured movies path is unreadable (drive unplugged, share unmounted, permission denied) the job fails fast with `Folder not accessible: <reason>` instead of silently completing with zero discoveries.
+
 ### Added — Cloud-cached library folders (web `0.3.9`)
 
 - **Mirror the companion `scanFolders` list into `device_folders`** with new `kind` + `watch` columns and a unique `(device_id, path)` index. Every successful `getCompanionFolders` / `addCompanionFolder` / `removeCompanionFolder` / `setCompanionFolderKind` / `setCompanionFolderWatch` writes through to the DB.
