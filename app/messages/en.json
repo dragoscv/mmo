@@ -40,6 +40,9 @@
         "settings": "Settings",
         "plugins": "Plugins",
         "profile": "Profile",
+        "profiles": "Profiles",
+        "watch": "Watch",
+        "collections": "Collections",
         "duplicates": "Duplicates",
         "learn": "Learn"
     },

@@ -461,6 +461,16 @@ function createWindow() {
     });
 
     let shown = false;
+    let queueDrained = false;
+    const drainPostPaintQueue = (reason: string) => {
+        if (queueDrained) return;
+        queueDrained = true;
+        renderHasPainted = true;
+        logLine("info", `draining post-paint queue (${reason})`);
+        for (const cb of postPaintQueue.splice(0)) {
+            try { cb(); } catch (err) { logLine("warn", "post-paint task failed:", err as Error); }
+        }
+    };
     const showOnce = (reason: string) => {
         if (shown || !mainWindow || mainWindow.isDestroyed()) return;
         shown = true;
@@ -470,27 +480,24 @@ function createWindow() {
         // before `quitAndInstall` and cleared here so the next normal
         // launch honours `startMinimized` again.
         const forceShowAfterUpdate = store.get("showOnceAfterUpdate") === true;
+        const shouldShow = forceShowAfterUpdate || !settings.startMinimized;
         if (forceShowAfterUpdate) {
             store.set("showOnceAfterUpdate", false);
             logLine("info", "post-update launch — forcing window show despite startMinimized");
-        } else if (settings.startMinimized) {
-            return;
         }
-        mainWindow.show();
-        mainWindow.focus();
-        logLine("info", `window shown (${reason})`);
-        // Signal that the renderer is now visible, so the heavy startup
-        // work (audify load, RtAudio enumeration) can proceed without
-        // blocking the splash animation. Without this gate, both ran on
-        // the same tick as window creation and surfaced as visible
-        // freezes (834 ms + 465 ms in 0.7.2's logs) that prevented
-        // `ready-to-show` from firing within the safety window.
-        setTimeout(() => {
-            renderHasPainted = true;
-            for (const cb of postPaintQueue.splice(0)) {
-                try { cb(); } catch (err) { logLine("warn", "post-paint task failed:", err as Error); }
-            }
-        }, 80);
+        if (shouldShow) {
+            mainWindow.show();
+            mainWindow.focus();
+            logLine("info", `window shown (${reason})`);
+        } else {
+            logLine("info", `window stays hidden (${reason}) — startMinimized=true`);
+        }
+        // Drain the post-paint queue regardless of window visibility.
+        // The HTTP server, audio inventory, virtual-audio reconcile and
+        // cloud-sync loop all live here and must run even in tray-only
+        // mode — otherwise the web app can never reach the companion
+        // (port 17899 stays closed) and pairing breaks silently.
+        setTimeout(() => drainPostPaintQueue(reason), shouldShow ? 80 : 0);
     };
     mainWindow.once("ready-to-show", () => showOnce("ready-to-show"));
     // Safety net: if `ready-to-show` never fires (observed on macOS ad-hoc

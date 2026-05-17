@@ -2,6 +2,10 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.2 — tray-only startup fix
+
+- **Critical**: the local HTTP server (`127.0.0.1:17899`) now starts even when `startMinimized` is enabled. Previously the post-paint task queue — which boots the Express server, audio inventory, virtual-audio reconcile and cloud-sync loop — only drained when the window was actually shown. Users running in tray-only mode never had a reachable companion, so the web app couldn't auto-detect it and pairing never completed. The queue now drains immediately on `ready-to-show` regardless of window visibility.
+
 ## 1.0.1 — auto-update polish
 
 - **One-click install**: added an "Install update & restart" button that appears on the auth screen as soon as a new version has finished downloading. Clicking it bypasses the OS update dialog and immediately runs the installer + relaunches the freshly-installed binary.
