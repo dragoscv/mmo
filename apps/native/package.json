@@ -1,0 +1,31 @@
+{
+    "name": "@mmo/native",
+    "version": "0.1.0",
+    "private": true,
+    "description": "MMO native shell — Tauri 2 (desktop) + Capacitor (mobile). Wraps https://muzicai.ro and lets the existing PWA service worker handle offline.",
+    "type": "module",
+    "scripts": {
+        "tauri:dev": "tauri dev",
+        "tauri:build": "tauri build",
+        "tauri:icon": "tauri icon ../../app/public/icon-512.png",
+        "cap:sync": "cap sync",
+        "cap:copy": "cap copy",
+        "cap:add:android": "cap add android",
+        "cap:add:ios": "cap add ios",
+        "cap:open:android": "cap open android",
+        "cap:open:ios": "cap open ios",
+        "android:build:debug": "cd android && ./gradlew assembleDebug",
+        "android:build:release": "cd android && ./gradlew assembleRelease bundleRelease",
+        "ios:build": "xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -archivePath ios/build/App.xcarchive archive"
+    },
+    "devDependencies": {
+        "@capacitor/android": "^7.0.0",
+        "@capacitor/cli": "^7.0.0",
+        "@capacitor/core": "^7.0.0",
+        "@capacitor/ios": "^7.0.0",
+        "@tauri-apps/cli": "^2.1.0"
+    },
+    "dependencies": {
+        "@tauri-apps/api": "^2.1.0"
+    }
+}
