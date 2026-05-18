@@ -66,6 +66,8 @@ import {
     Folder,
     Home,
     ArrowUp,
+    Terminal,
+    Trash,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -94,7 +96,7 @@ import {
     getDeviceDirectAccess,
 } from "@/actions/devices";
 import { directFetch } from "@/lib/companion-direct";
-import { connectDeviceWs, type DeviceWsClient } from "@/lib/device-ws";
+import { connectDeviceWs, type DeviceWsClient, type DeviceLogEntry } from "@/lib/device-ws";
 import {
     FOLDER_KINDS,
     type CompanionFolder,
@@ -183,7 +185,13 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
     const [pickerDebug, setPickerDebug] = useState<{ op: string; via: "tunnel" | "queue"; reason?: "no-tunnel" | "tunnel-fail"; ms: number; n?: number; err?: string } | null>(null);
     const [editingName, setEditingName] = useState<string | null>(null);
     const [editNameValue, setEditNameValue] = useState("");
-    const [openSection, setOpenSection] = useState<Record<string, "folders" | "audio" | null>>({});
+    const [openSection, setOpenSection] = useState<Record<string, "folders" | "audio" | "console" | null>>({});
+    /** Per-device live log ring streamed from the companion over WS.
+     *  Bounded so a chatty subsystem can't unbounded-grow client memory. */
+    const [deviceLogs, setDeviceLogs] = useState<Record<string, DeviceLogEntry[]>>({});
+    /** Per-device WS connection indicator so the console header can show
+     *  “streaming” / “disconnected” without re-rendering the whole card. */
+    const [deviceWsLive, setDeviceWsLive] = useState<Record<string, boolean>>({});
     const [audioInv, setAudioInv] = useState<Record<string, CompanionAudioInventory | null>>({});
     const [audioLoading, setAudioLoading] = useState<Record<string, boolean>>({});
     const [isLocalhost, setIsLocalhost] = useState(false);
@@ -701,9 +709,13 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
                 }
             }
         };
-        // Kick off immediately, then every 5 s.
+        // Kick off immediately, then every 30 s as a fallback. Live
+        // updates arrive over the WS `watch:event` frame; this poll is
+        // only here to drain events that fired while the WS was down
+        // (CF reconnect, brief offline window) and to recover after a
+        // tab restore.
         void tick();
-        const handle = setInterval(tick, 5_000);
+        const handle = setInterval(tick, 30_000);
         return () => { canceled = true; clearInterval(handle); };
     }, [devices]);
 
@@ -712,21 +724,47 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
      *  state the 750 ms poll loop fills. WS arrives before the next
      *  poll tick (typically <100 ms vs ~750 ms), so the UI updates
      *  smoothly; the poll loop becomes the fallback when the WS is
-     *  unreachable (CF outage, companion behind NAT, etc.). */
+     *  unreachable (CF outage, companion behind NAT, etc.).
+     *
+     *  Also drives the per-device "Console" section by appending
+     *  `log:line` frames and seeding from the `log:snapshot` frame the
+     *  companion sends on connect. Kept here so the WS stays open even
+     *  when the console panel is collapsed — the user can open it any
+     *  time and immediately see what happened since they loaded the page. */
     useEffect(() => {
-        const clients: DeviceWsClient[] = [];
+        const clients: { id: string; client: DeviceWsClient }[] = [];
         for (const device of devices) {
             const host = (device as { tunnelHostname?: string | null }).tunnelHostname;
             if (!host) continue;
             const c = connectDeviceWs(host);
-            clients.push(c);
+            clients.push({ id: device.id, client: c });
             c.onScanProgress((msg) => {
                 const job = msg.job as CompanionScanJob | undefined;
                 if (!job?.folder) return;
                 setScanProgress((p) => ({ ...p, [job.folder]: job }));
             });
+            // Live watcher feedback (no more waiting for the 5 s poll).
+            c.onWatchEvent(() => {
+                void getDeviceTrackCount(device.id).then((n) => {
+                    setTrackCounts((p) => ({ ...p, [device.id]: n }));
+                });
+            });
+            c.onConnection((connected) => {
+                setDeviceWsLive((p) => ({ ...p, [device.id]: connected }));
+            });
+            c.onLog((entries, kind) => {
+                setDeviceLogs((p) => {
+                    const prev = p[device.id] ?? [];
+                    // Snapshot replaces (it's the authoritative ring at
+                    // connect time); live frames append.
+                    const merged = kind === "snapshot" ? entries : [...prev, ...entries];
+                    // Bound to last 500 lines — same cap as the server ring.
+                    const capped = merged.length > 500 ? merged.slice(merged.length - 500) : merged;
+                    return { ...p, [device.id]: capped };
+                });
+            });
         }
-        return () => { for (const c of clients) c.close(); };
+        return () => { for (const { client } of clients) client.close(); };
     }, [devices]);
 
     function handleToggleWatch(deviceId: string, folderPath: string, watch: boolean) {
@@ -755,7 +793,7 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
         }
     }
 
-    function toggleSection(deviceId: string, section: "folders" | "audio") {
+    function toggleSection(deviceId: string, section: "folders" | "audio" | "console") {
         // Compute the next state from the *current* snapshot, then schedule
         // the side effect (audio fetch) for AFTER the state commits. Doing
         // it inside the setState updater triggers React's "setState during
@@ -854,6 +892,9 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
                                 openSection={sectionOpen}
                                 onToggleFolders={() => toggleSection(device.id, "folders")}
                                 onToggleAudio={() => toggleSection(device.id, "audio")}
+                                onToggleConsole={() => toggleSection(device.id, "console")}
+                                consoleLineCount={(deviceLogs[device.id] ?? []).length}
+                                consoleLive={deviceWsLive[device.id] ?? false}
                             >
                                 <AnimatePresence initial={false} mode="wait">
                                     {sectionOpen === "folders" && (
@@ -897,6 +938,23 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
                                                 isLocalhost={isLocalhost}
                                                 onRefresh={() => loadAudioInventory(device.id)}
                                                 onToggle={(d, was) => toggleAudioAuthorization(device.id, d, was)}
+                                            />
+                                        </motion.div>
+                                    )}
+                                    {sectionOpen === "console" && (
+                                        <motion.div
+                                            key="console"
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: "auto" }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            transition={{ duration: 0.18 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <ConsoleSection
+                                                entries={deviceLogs[device.id] ?? []}
+                                                live={deviceWsLive[device.id] ?? false}
+                                                hasTunnel={Boolean((device as { tunnelHostname?: string | null }).tunnelHostname)}
+                                                onClear={() => setDeviceLogs((p) => ({ ...p, [device.id]: [] }))}
                                             />
                                         </motion.div>
                                     )}
@@ -1108,16 +1166,20 @@ interface DeviceCardProps {
     onEditCancel: () => void;
     onEditSave: () => void;
     onRemove: () => void;
-    openSection: "folders" | "audio" | null;
+    openSection: "folders" | "audio" | "console" | null;
     onToggleFolders: () => void;
     onToggleAudio: () => void;
+    onToggleConsole: () => void;
+    consoleLineCount?: number;
+    consoleLive?: boolean;
     children: React.ReactNode;
 }
 
 function DeviceCard({
     device, isOnline, trackCount, folderCount, editingName, editValue,
     onEditStart, onEditChange, onEditCancel, onEditSave, onRemove,
-    openSection, onToggleFolders, onToggleAudio, children,
+    openSection, onToggleFolders, onToggleAudio, onToggleConsole,
+    consoleLineCount, consoleLive, children,
 }: DeviceCardProps) {
     return (
         <motion.div
@@ -1200,6 +1262,14 @@ function DeviceCard({
                                 icon={<AudioLines className="h-4 w-4" />}
                                 label="Audio"
                             />
+                            <SectionToggleButton
+                                active={openSection === "console"}
+                                onClick={onToggleConsole}
+                                icon={<Terminal className="h-4 w-4" />}
+                                label="Console"
+                                count={consoleLineCount}
+                                indicator={consoleLive ? "live" : undefined}
+                            />
                             <Button
                                 variant="ghost"
                                 size="icon-sm"
@@ -1232,13 +1302,14 @@ function DeviceCard({
 }
 
 function SectionToggleButton({
-    active, onClick, icon, label, count,
+    active, onClick, icon, label, count, indicator,
 }: {
     active: boolean;
     onClick: () => void;
     icon: React.ReactNode;
     label: string;
     count?: number;
+    indicator?: "live";
 }) {
     return (
         <Button
@@ -1249,6 +1320,12 @@ function SectionToggleButton({
         >
             {icon}
             <span className="text-xs">{label}</span>
+            {indicator === "live" && (
+                <span className="relative inline-flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                </span>
+            )}
             {count !== undefined && count > 0 && (
                 <Badge variant="outline" className="h-4 px-1 text-[10px]">{count}</Badge>
             )}
@@ -1546,6 +1623,142 @@ function FolderRow({
                 </div>
             )}
         </motion.li>
+    );
+}
+
+// ─── Live server log console ──────────────────────────────────────────────────
+
+interface ConsoleSectionProps {
+    entries: DeviceLogEntry[];
+    live: boolean;
+    hasTunnel: boolean;
+    onClear: () => void;
+}
+
+function ConsoleSection({ entries, live, hasTunnel, onClear }: ConsoleSectionProps) {
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+    const [autoScroll, setAutoScroll] = useState(true);
+    const [levelFilter, setLevelFilter] = useState<"all" | "info" | "warn" | "error">("all");
+
+    // Auto-scroll to bottom on new lines unless the user has scrolled up.
+    useEffect(() => {
+        if (!autoScroll) return;
+        const el = scrollRef.current;
+        if (!el) return;
+        el.scrollTop = el.scrollHeight;
+    }, [entries, autoScroll]);
+
+    const filtered = useMemo(() => {
+        if (levelFilter === "all") return entries;
+        return entries.filter((e) => e.level === levelFilter);
+    }, [entries, levelFilter]);
+
+    const counts = useMemo(() => {
+        let info = 0, warn = 0, error = 0;
+        for (const e of entries) {
+            if (e.level === "error") error++;
+            else if (e.level === "warn") warn++;
+            else info++;
+        }
+        return { info, warn, error };
+    }, [entries]);
+
+    function copyToClipboard() {
+        try {
+            const text = filtered.map((e) => e.line).join("\n");
+            void navigator.clipboard.writeText(text);
+            toast.success(`Copied ${filtered.length} line${filtered.length === 1 ? "" : "s"}`);
+        } catch {
+            toast.error("Copy failed");
+        }
+    }
+
+    return (
+        <div className="space-y-2 border-t pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-semibold">Server console</h4>
+                    {live ? (
+                        <Badge variant="default" className="h-5 gap-1 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/20">
+                            <span className="relative inline-flex h-1.5 w-1.5">
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+                                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            </span>
+                            <span className="text-[10px]">streaming</span>
+                        </Badge>
+                    ) : (
+                        <Badge variant="secondary" className="h-5 text-[10px]">
+                            {hasTunnel ? "disconnected" : "no tunnel"}
+                        </Badge>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">
+                        {counts.info} info · <span className="text-amber-400">{counts.warn} warn</span> ·{" "}
+                        <span className="text-red-400">{counts.error} err</span>
+                    </span>
+                </div>
+                <div className="flex items-center gap-1">
+                    {(["all", "info", "warn", "error"] as const).map((l) => (
+                        <Button
+                            key={l}
+                            size="sm"
+                            variant={levelFilter === l ? "secondary" : "ghost"}
+                            className="h-6 px-2 text-[10px] uppercase"
+                            onClick={() => setLevelFilter(l)}
+                        >
+                            {l}
+                        </Button>
+                    ))}
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={copyToClipboard}>
+                        Copy
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={onClear}>
+                        <Trash className="h-3 w-3" />
+                    </Button>
+                </div>
+            </div>
+
+            <div
+                ref={scrollRef}
+                onScroll={(e) => {
+                    const el = e.currentTarget;
+                    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
+                    setAutoScroll(atBottom);
+                }}
+                className="h-72 overflow-y-auto rounded-md border bg-black/40 p-2 font-mono text-[11px] leading-relaxed"
+            >
+                {filtered.length === 0 ? (
+                    <div className="flex h-full items-center justify-center text-muted-foreground">
+                        {live
+                            ? "Waiting for activity…"
+                            : hasTunnel
+                                ? "Connecting to companion…"
+                                : "This device has no tunnel — open the companion to enable remote streaming."}
+                    </div>
+                ) : (
+                    filtered.map((e, i) => (
+                        <div
+                            key={`${e.ts}-${i}`}
+                            className={cn(
+                                "whitespace-pre-wrap break-all",
+                                e.level === "error" && "text-red-300",
+                                e.level === "warn" && "text-amber-300",
+                                e.level === "info" && "text-zinc-300",
+                            )}
+                        >
+                            {e.line}
+                        </div>
+                    ))
+                )}
+            </div>
+            {!autoScroll && (
+                <button
+                    onClick={() => setAutoScroll(true)}
+                    className="text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                    Auto-scroll paused — click to resume
+                </button>
+            )}
+        </div>
     );
 }
 

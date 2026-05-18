@@ -18,6 +18,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { getLibrarySqlite } from "./db";
 
 export interface ScannedTrackPayload {
     filepath: string;
@@ -107,6 +108,113 @@ const FAILURE_TTL_MS = 15 * 60_000;
 
 const jobs = new Map<string, ScanJob>();
 
+/** Write-through to SQLite. Called on terminal-state transitions only
+ *  (create / complete / fail) — in-flight progress stays in RAM to keep
+ *  the SQLite WAL small. Best-effort: a write failure never propagates,
+ *  because the job state in RAM is still the source of truth for the
+ *  active session. */
+function persistJob(j: ScanJob): void {
+    try {
+        const sqlite = getLibrarySqlite();
+        sqlite
+            .prepare(
+                `INSERT INTO scan_jobs (id, folder, kind, status, discovered, scanned, errored, total, current_file, started_at, finished_at, error, origin)
+                 VALUES (@id, @folder, @kind, @status, @discovered, @scanned, @errored, @total, @currentFile, @startedAt, @finishedAt, @error, @origin)
+                 ON CONFLICT(id) DO UPDATE SET
+                   status=excluded.status,
+                   discovered=excluded.discovered,
+                   scanned=excluded.scanned,
+                   errored=excluded.errored,
+                   total=excluded.total,
+                   current_file=excluded.current_file,
+                   finished_at=excluded.finished_at,
+                   error=excluded.error`,
+            )
+            .run({
+                id: j.id,
+                folder: j.folder,
+                kind: j.kind,
+                status: j.status,
+                discovered: j.discovered,
+                scanned: j.scanned,
+                errored: j.errored,
+                total: j.total,
+                currentFile: j.currentFile,
+                startedAt: j.startedAt,
+                finishedAt: j.finishedAt,
+                error: j.error,
+                origin: j.origin,
+            });
+    } catch (e) {
+        // Library DB might not be open in unit tests / fresh installs.
+        // Never block the scan over a persistence failure.
+        if (process.env.DEBUG_SCAN_JOBS) {
+            // eslint-disable-next-line no-console
+            console.warn("[scan-jobs] persistJob failed:", e instanceof Error ? e.message : e);
+        }
+    }
+}
+
+/** Called once at companion boot. Mark any active scan rows from the
+ *  previous run as failed so the UI shows a clear state, and load
+ *  recently-finished jobs into RAM so a web refresh right after restart
+ *  still sees "100% — done" / "scan failed" for the last attempt. */
+export function hydrateScanJobsOnBoot(): void {
+    try {
+        const sqlite = getLibrarySqlite();
+        const now = Date.now();
+        // 1. Mark previously-active jobs as failed in DB.
+        sqlite
+            .prepare(
+                `UPDATE scan_jobs
+                 SET status='error', error='companion restarted before scan finished', finished_at=?
+                 WHERE status IN ('pending','discovering','scanning')`,
+            )
+            .run(now);
+
+        // 2. Load anything within the failure TTL into RAM so the UI's
+        //    refresh path still shows it. (Successful jobs older than
+        //    SUCCESS_TTL_MS won't be loaded — the UI already considers
+        //    them stale and the tracks payload was never persisted.)
+        const cutoff = now - FAILURE_TTL_MS;
+        const rows = sqlite
+            .prepare(
+                `SELECT id, folder, kind, status, discovered, scanned, errored, total, current_file, started_at, finished_at, error, origin
+                 FROM scan_jobs
+                 WHERE finished_at IS NOT NULL AND finished_at >= ?`,
+            )
+            .all(cutoff) as Array<Record<string, unknown>>;
+
+        for (const r of rows) {
+            const j: ScanJob = {
+                id: r.id as string,
+                folder: r.folder as string,
+                kind: (r.kind as ScanJobKind) ?? "audio",
+                status: r.status as ScanJobStatus,
+                discovered: (r.discovered as number) ?? 0,
+                scanned: (r.scanned as number) ?? 0,
+                errored: (r.errored as number) ?? 0,
+                currentFile: (r.current_file as string | null) ?? null,
+                total: (r.total as number) ?? -1,
+                startedAt: r.started_at as number,
+                finishedAt: r.finished_at as number | null,
+                error: (r.error as string | null) ?? null,
+                tracks: null,
+                videos: null,
+                origin: (r.origin as ScanJob["origin"]) ?? "manual",
+            };
+            jobs.set(j.id, j);
+        }
+        if (rows.length > 0) {
+            // eslint-disable-next-line no-console
+            console.log(`[scan-jobs] hydrated ${rows.length} job(s) from previous session`);
+        }
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("[scan-jobs] hydrateScanJobsOnBoot failed:", e instanceof Error ? e.message : e);
+    }
+}
+
 export function createScanJob(
     folder: string,
     origin: "manual" | "watcher" = "manual",
@@ -130,6 +238,7 @@ export function createScanJob(
         origin,
     };
     jobs.set(job.id, job);
+    persistJob(job);
     return job;
 }
 
@@ -169,6 +278,7 @@ export function completeScanJob(id: string, tracks: ScannedTrackPayload[]): void
     j.scanned = tracks.length;
     j.finishedAt = Date.now();
     j.currentFile = null;
+    persistJob(j);
 }
 
 /** Same as `completeScanJob` but for video jobs. */
@@ -181,6 +291,7 @@ export function completeVideoScanJob(id: string, videos: ScannedVideoPayload[]):
     j.scanned = videos.length;
     j.finishedAt = Date.now();
     j.currentFile = null;
+    persistJob(j);
 }
 
 export function failScanJob(id: string, error: string): void {
@@ -189,6 +300,7 @@ export function failScanJob(id: string, error: string): void {
     j.status = "error";
     j.error = error;
     j.finishedAt = Date.now();
+    persistJob(j);
 }
 
 export function clearJobTracks(id: string): void {
@@ -204,6 +316,14 @@ function gcJobs() {
         const ttl = j.status === "error" ? FAILURE_TTL_MS : SUCCESS_TTL_MS;
         if (now - j.finishedAt > ttl) jobs.delete(id);
     }
+    // Mirror the GC into the persistence layer so the SQLite file
+    // doesn't grow without bound. Best-effort.
+    try {
+        const sqlite = getLibrarySqlite();
+        sqlite
+            .prepare(`DELETE FROM scan_jobs WHERE finished_at IS NOT NULL AND finished_at < ?`)
+            .run(now - FAILURE_TTL_MS);
+    } catch { /* ignore */ }
 }
 
 let gcTimer: NodeJS.Timeout | null = null;

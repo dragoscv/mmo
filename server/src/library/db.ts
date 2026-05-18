@@ -175,6 +175,31 @@ function bootstrap(sqlite: Database.Database) {
             created_at TEXT DEFAULT (datetime('now'))
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_saved_drives_user_path ON saved_drives(user_id, path);
+
+        -- Scan-job persistence. Each row mirrors a ScanJob in scan-jobs.ts.
+        -- Only terminal states (complete/error) and the initial pending
+        -- row are written through — in-flight progress mutations stay in
+        -- RAM to avoid SQLite write amplification. On companion restart,
+        -- any rows still in pending/discovering/scanning get marked as
+        -- 'error: companion restarted' so the UI shows a clear state and
+        -- the user can retry the scan from scratch.
+        CREATE TABLE IF NOT EXISTS scan_jobs (
+            id TEXT PRIMARY KEY,
+            folder TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            status TEXT NOT NULL,
+            discovered INTEGER NOT NULL DEFAULT 0,
+            scanned INTEGER NOT NULL DEFAULT 0,
+            errored INTEGER NOT NULL DEFAULT 0,
+            total INTEGER NOT NULL DEFAULT -1,
+            current_file TEXT,
+            started_at INTEGER NOT NULL,
+            finished_at INTEGER,
+            error TEXT,
+            origin TEXT NOT NULL DEFAULT 'manual'
+        );
+        CREATE INDEX IF NOT EXISTS idx_scan_jobs_status ON scan_jobs(status);
+        CREATE INDEX IF NOT EXISTS idx_scan_jobs_started ON scan_jobs(started_at DESC);
     `);
 
     // ── Idempotent column migrations for existing DBs ──────────────────

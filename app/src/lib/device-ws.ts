@@ -16,6 +16,8 @@
  * caller's existing poll loop keeps the UI live (just at higher latency).
  */
 
+import { ReconnectingTimer } from "./ws-backoff";
+
 type ScanProgressListener = (msg: { type: "scan:progress"; job: unknown }) => void;
 type WatchEventListener = (msg: { type: "watch:event"; event: unknown }) => void;
 type ConnectionListener = (connected: boolean) => void;
@@ -37,9 +39,8 @@ export interface DeviceWsClient {
 
 export function connectDeviceWs(tunnelHostname: string): DeviceWsClient {
     let ws: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let closedByUser = false;
-    let backoffMs = 1000;
+    const reconnect = new ReconnectingTimer({ initialMs: 1000, maxMs: 30_000 });
     const scanListeners = new Set<ScanProgressListener>();
     const watchListeners = new Set<WatchEventListener>();
     const connListeners = new Set<ConnectionListener>();
@@ -52,16 +53,13 @@ export function connectDeviceWs(tunnelHostname: string): DeviceWsClient {
             const sock = new WebSocket(url);
             ws = sock;
             sock.onopen = () => {
-                backoffMs = 1000;
+                reconnect.reset();
                 for (const fn of connListeners) fn(true);
             };
             sock.onclose = () => {
                 ws = null;
                 for (const fn of connListeners) fn(false);
-                if (!closedByUser) {
-                    reconnectTimer = setTimeout(open, backoffMs);
-                    backoffMs = Math.min(backoffMs * 2, 30_000);
-                }
+                if (!closedByUser) reconnect.schedule(open);
             };
             sock.onerror = () => { /* close handler does cleanup */ };
             sock.onmessage = (ev) => {
@@ -72,15 +70,27 @@ export function connectDeviceWs(tunnelHostname: string): DeviceWsClient {
                         for (const fn of scanListeners) fn(msg as Parameters<ScanProgressListener>[0]);
                     } else if (msg.type === "watch:event") {
                         for (const fn of watchListeners) fn(msg as Parameters<WatchEventListener>[0]);
+                    } else if (msg.type === "log:line") {
+                        const entries = (msg as { entries?: unknown }).entries;
+                        if (Array.isArray(entries) && entries.length > 0) {
+                            for (const fn of logListeners) fn(entries as DeviceLogEntry[], "live");
+                        }
+                    } else if (msg.type === "log:snapshot") {
+                        const lines = (msg as { lines?: unknown }).lines;
+                        if (Array.isArray(lines) && lines.length > 0) {
+                            // Server sends raw "[iso] [level] text" strings — wrap
+                            // into DeviceLogEntry so the UI doesn't branch shapes.
+                            const entries: DeviceLogEntry[] = lines
+                                .filter((l): l is string => typeof l === "string")
+                                .map((line) => parseLogLine(line));
+                            for (const fn of logListeners) fn(entries, "snapshot");
+                        }
                     }
                 } catch { /* ignore malformed */ }
             };
         } catch {
             ws = null;
-            if (!closedByUser) {
-                reconnectTimer = setTimeout(open, backoffMs);
-                backoffMs = Math.min(backoffMs * 2, 30_000);
-            }
+            if (!closedByUser) reconnect.schedule(open);
         }
     };
 
@@ -99,13 +109,30 @@ export function connectDeviceWs(tunnelHostname: string): DeviceWsClient {
             connListeners.add(fn);
             return () => { connListeners.delete(fn); };
         },
+        onLog(fn) {
+            logListeners.add(fn);
+            return () => { logListeners.delete(fn); };
+        },
         close() {
             closedByUser = true;
-            if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+            reconnect.cancel();
             if (ws) { try { ws.close(); } catch { /* noop */ } ws = null; }
             scanListeners.clear();
             watchListeners.clear();
             connListeners.clear();
+            logListeners.clear();
         },
     };
+}
+
+/** Parse a server-side debug-ring line ("[iso] [level] message") back
+ *  into the structured shape the UI consumes. Falls back to "info" with
+ *  Date.now() when the prefix isn't recognised — keeps the console
+ *  resilient to format drift. */
+function parseLogLine(line: string): DeviceLogEntry {
+    const m = /^\[([^\]]+)\]\s+\[(info|warn|error)\]\s?(.*)$/i.exec(line);
+    if (!m) return { ts: Date.now(), level: "info", line };
+    const ts = Date.parse(m[1]!);
+    const level = m[2]!.toLowerCase() as DeviceLogEntry["level"];
+    return { ts: Number.isFinite(ts) ? ts : Date.now(), level, line };
 }

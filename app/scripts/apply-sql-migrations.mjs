@@ -197,6 +197,11 @@ async function applyPending(pending) {
         }
         process.stdout.write(`${CYAN}applying${RESET} ${tag} ${DIM}(${statements.length} statement(s))${RESET} ... `);
         try {
+            // Per-migration transaction: if ANY statement throws, the
+            // whole migration (schema changes + tracker insert) rolls
+            // back atomically. The throw below stops further migrations.
+            // Result: either a migration is fully applied AND tracked,
+            // or it's not — never half-applied/orphaned.
             await sql.begin(async (tx) => {
                 for (const stmt of statements) await tx.unsafe(stmt);
                 await tx.unsafe(`INSERT INTO ${TRACKER} (tag) VALUES ($1)`, [tag]);

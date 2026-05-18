@@ -34,6 +34,7 @@ import {
     startScanJobGc,
     stopScanJobGc,
     clearJobTracks,
+    hydrateScanJobsOnBoot,
 } from "./library/scan-jobs";
 import { runScanJob } from "./library/scan-runner";
 import { runVideoScanJob } from "./library/video-scan-runner";
@@ -81,6 +82,28 @@ function broadcastToWsClients(msg: string): void {
             try { c.send(msg); } catch { /* client disconnected mid-send */ }
         }
     }
+}
+
+/** Sliding-window rate limiter for /scan. Per-IP (the companion's auth
+ *  is a single device token, so IP is the most useful disambiguator).
+ *  Default budget: 10 scans / hour. Heavy enough for normal use, cheap
+ *  enough to short-circuit a noisy/malicious caller hammering the disk. */
+const SCAN_RATE_WINDOW_MS = 60 * 60_000;
+const SCAN_RATE_MAX = 10;
+const scanRateBuckets = new Map<string, number[]>();
+function checkScanRateLimit(key: string): { allowed: true } | { allowed: false; retryAfterSec: number } {
+    const now = Date.now();
+    const window = scanRateBuckets.get(key) ?? [];
+    const fresh = window.filter((t) => now - t < SCAN_RATE_WINDOW_MS);
+    if (fresh.length >= SCAN_RATE_MAX) {
+        const oldest = fresh[0]!;
+        const retryAfterSec = Math.max(1, Math.ceil((SCAN_RATE_WINDOW_MS - (now - oldest)) / 1000));
+        scanRateBuckets.set(key, fresh);
+        return { allowed: false, retryAfterSec };
+    }
+    fresh.push(now);
+    scanRateBuckets.set(key, fresh);
+    return { allowed: true };
 }
 
 // ─── Server Version ──────────────────────────────────────────────────────────
@@ -706,6 +729,22 @@ export async function startServer(): Promise<void> {
             return;
         }
 
+        // Per-IP scan budget — see checkScanRateLimit above. Tunneled
+        // requests come in via the CF tunnel container so they all share
+        // the loopback IP; that's still a useful proxy for "this companion
+        // is being hammered" because legitimate UI flows never need more
+        // than a couple scans per hour.
+        const ipKey = (req.ip || req.socket.remoteAddress || "unknown").replace(/^::ffff:/, "");
+        const rate = checkScanRateLimit(ipKey);
+        if (!rate.allowed) {
+            res.set("Retry-After", String(rate.retryAfterSec));
+            res.status(429).json({
+                error: `Too many scans — try again in ${rate.retryAfterSec}s.`,
+                retryAfterSec: rate.retryAfterSec,
+            });
+            return;
+        }
+
         // Same sibling-prefix + symlink-escape hardening as /audio/* and
         // /download/*. Without this, scanning `/srv/music_evil` would
         // pass when `/srv/music` is the configured scan folder — letting
@@ -1258,6 +1297,10 @@ export async function startServer(): Promise<void> {
     }, 10_000);
 
     // ─── Scan-job + watcher bootstrap ────────────────────────────────────
+    // Mark any scan-jobs left active by the previous process as failed
+    // and load recently-finished jobs into RAM so a UI refresh right
+    // after restart still sees the last attempt's outcome.
+    hydrateScanJobsOnBoot();
     startScanJobGc();
     startWatcherGc();
     // Restart any watchers the user had previously enabled.

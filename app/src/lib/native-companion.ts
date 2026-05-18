@@ -25,6 +25,8 @@
  * works, just at higher round-trip latency.
  */
 
+import { ReconnectingTimer } from "./ws-backoff";
+
 export const DEFAULT_COMPANION_PORT = 17899;
 export const DEFAULT_COMPANION_URL =
     typeof process !== "undefined" && process.env?.NEXT_PUBLIC_COMPANION_URL
@@ -336,7 +338,7 @@ function publishDiscoveryReport(
 export class NativeCompanionClient {
     private apiUrl: string;
     private ws: WebSocket | null = null;
-    private wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    private wsReconnect = new ReconnectingTimer({ initialMs: 1000, maxMs: 30_000 });
     private wsClosed = true;
     private pitchListeners = new Set<(p: NativePitch, s: NativeStatus | null) => void>();
     private levelListeners = new Set<(l: NativeLevels, p: NativePerf) => void>();
@@ -499,13 +501,14 @@ export class NativeCompanionClient {
             ws.binaryType = "arraybuffer";
             this.ws = ws;
             ws.onopen = () => {
+                this.wsReconnect.reset();
                 for (const fn of this.connectionListeners) fn(true);
             };
             ws.onclose = () => {
                 this.ws = null;
                 for (const fn of this.connectionListeners) fn(false);
                 if (!this.wsClosed) {
-                    this.wsReconnectTimer = setTimeout(() => this.connectWs(), 2000);
+                    this.wsReconnect.schedule(() => this.connectWs());
                 }
             };
             ws.onerror = () => { /* close handler does the cleanup */ };
@@ -552,17 +555,14 @@ export class NativeCompanionClient {
         } catch {
             this.ws = null;
             if (!this.wsClosed) {
-                this.wsReconnectTimer = setTimeout(() => this.connectWs(), 2000);
+                this.wsReconnect.schedule(() => this.connectWs());
             }
         }
     }
 
     disconnectWs(): void {
         this.wsClosed = true;
-        if (this.wsReconnectTimer) {
-            clearTimeout(this.wsReconnectTimer);
-            this.wsReconnectTimer = null;
-        }
+        this.wsReconnect.cancel();
         if (this.ws) {
             try { this.ws.close(); } catch { /* ignore */ }
             this.ws = null;
