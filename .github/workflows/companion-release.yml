@@ -204,6 +204,10 @@ jobs:
         # (server/src/cloudflared.ts). The binary is platform-specific
         # so each runner downloads its own from CF's GitHub releases.
         shell: bash
+        env:
+          # Lift the api.github.com anon rate limit (60/h/IP — shared
+          # across CI runners so trivially exhausted) to 5000/h.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm fetch:cloudflared
 
       - name: Reinstall production deps with npm (flat tree for electron-builder)

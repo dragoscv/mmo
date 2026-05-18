@@ -47,11 +47,25 @@ async function main() {
     }
 
     console.log(`[fetch-cloudflared] querying ${LATEST_API}`);
-    const meta = await fetch(LATEST_API, {
-        headers: { "User-Agent": "mmo-companion-build" },
-    }).then((r) => r.json());
-    const asset = meta.assets?.find((a) => a.name === assetName);
-    if (!asset) throw new Error(`Asset ${assetName} not found in latest release`);
+    // CI runners share an IP and blow through the 60 req/h anonymous
+    // limit on api.github.com. Send the auto-injected GITHUB_TOKEN when
+    // present to lift the limit to 5000/h.
+    const ghHeaders = { "User-Agent": "mmo-companion-build", accept: "application/vnd.github+json" };
+    if (process.env.GITHUB_TOKEN) ghHeaders.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    const metaRes = await fetch(LATEST_API, { headers: ghHeaders });
+    if (!metaRes.ok) {
+        const body = await metaRes.text().catch(() => "");
+        throw new Error(`GitHub API ${metaRes.status}: ${body.slice(0, 300)}`);
+    }
+    const meta = await metaRes.json();
+    if (!Array.isArray(meta.assets)) {
+        throw new Error(`Unexpected GitHub API response (no assets array): ${JSON.stringify(meta).slice(0, 300)}`);
+    }
+    const asset = meta.assets.find((a) => a.name === assetName);
+    if (!asset) {
+        const names = meta.assets.map((a) => a.name).join(", ");
+        throw new Error(`Asset ${assetName} not found in ${meta.tag_name ?? "latest"} release. Available: ${names}`);
+    }
     const url = asset.browser_download_url;
     console.log(`[fetch-cloudflared] downloading ${url}`);
 
