@@ -10,23 +10,11 @@
  * any non-renderer module (lan-announce, command-worker, etc.) is safe.
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import { app } from "electron";
-
-let LOG_FILE: string | null = null;
-try {
-    const dir = app.getPath("logs");
-    fs.mkdirSync(dir, { recursive: true });
-    LOG_FILE = path.join(dir, "main.log");
-} catch { /* not in electron context or no perms */ }
+import { pushDebugLog } from "./debug-log";
 
 export function log(level: "info" | "warn" | "error", ...args: unknown[]): void {
-    const line = `[${new Date().toISOString()}] [${level}] ${args
-        .map((a) => (a instanceof Error ? `${a.stack ?? a.message}` : typeof a === "string" ? a : JSON.stringify(a)))
-        .join(" ")}\n`;
-    if (LOG_FILE) {
-        try { fs.appendFileSync(LOG_FILE, line); } catch { /* ignore */ }
-    }
-    try { process.stderr.write(line); } catch { /* ignore */ }
+    // Route through the debug ring so the line shows up in the in-app
+    // Debug panel AND the per-device console streamed to the web app.
+    // pushDebugLog already writes to the same main.log + stderr.
+    pushDebugLog(level, ...args);
 }

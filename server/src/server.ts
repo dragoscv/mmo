@@ -51,6 +51,7 @@ import {
 import { startLanAnnounce, stopLanAnnounce } from "./lan-announce";
 import { listDrivesCached, listDirectoryCached, invalidateDirectoryCache, listFolders, invalidateExistsCache, probeAccess } from "./command-worker";
 import { log } from "./logger";
+import { getDebugLogSnapshot, subscribeDebugLog, type DebugLogEntry } from "./debug-log";
 
 const MIME_TYPES: Record<string, string> = {
     ".mp3": "audio/mpeg",
@@ -69,6 +70,18 @@ let httpServer: http.Server | null = null;
 let wss: WebSocketServer | null = null;
 let serverPort = 17899;
 const wsClients = new Set<WebSocket>();
+
+/** Send a string frame to all currently-open WS clients. Snapshots the
+ *  set up front so a `close` handler firing mid-broadcast can't mutate
+ *  the iterator (the spec is safe, but mid-iteration disconnects still
+ *  produce noisy logs from `send` on a closed socket). */
+function broadcastToWsClients(msg: string): void {
+    for (const c of Array.from(wsClients)) {
+        if (c.readyState === WebSocket.OPEN) {
+            try { c.send(msg); } catch { /* client disconnected mid-send */ }
+        }
+    }
+}
 
 // ─── Server Version ──────────────────────────────────────────────────────────
 // Resolved once at module load from the bundled package.json so the value
@@ -203,7 +216,11 @@ function isAllowedOrigin(origin: string | undefined): boolean {
         const settings = getSettings();
         const allowlist = settings.audioOriginAllowlist ?? [];
         for (const pattern of allowlist) {
-            if (pattern === "*") return true;
+            // SECURITY: explicit "*" is rejected to prevent accidental
+            // open-WS. If a user actually needs cross-origin access from
+            // an unknown site, they must add the exact origin. Wildcard
+            // subdomain patterns ("https://*.muzicai.ro") are still ok.
+            if (pattern === "*") continue;
             if (pattern === origin) return true;
             // Simple wildcard suffix support: "https://*.muzicai.ro"
             if (pattern.startsWith("https://*.") || pattern.startsWith("http://*.")) {
@@ -319,12 +336,16 @@ export async function startServer(): Promise<void> {
 
         authEvents.emit("authenticated", { deviceId, token, userName, userEmail, userImage });
 
+        const escapeHtml = (s: string) =>
+            s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] as string));
+        const displayName = escapeHtml(userName || userEmail || "user");
+
         res.send(`<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Connected!</title>
 <style>body{background:#0a0a0a;color:#fafafa;font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh}
 .c{text-align:center;padding:40px}.icon{font-size:52px;margin-bottom:16px}.ok{color:#22c55e}.name{color:#a855f7;font-weight:600}</style></head>
 <body><div class="c"><div class="icon">✓</div><h2 class="ok">Connected!</h2>
-<p style="color:#71717a">Signed in as <span class="name">${userName || userEmail || "user"}</span></p>
+<p style="color:#71717a">Signed in as <span class="name">${displayName}</span></p>
 <p style="margin-top:16px;color:#3f3f46;font-size:13px">You can close this tab and return to the companion app.</p></div></body></html>`);
     });
 
@@ -338,6 +359,19 @@ export async function startServer(): Promise<void> {
             platform: process.platform,
             uptime: process.uptime(),
         });
+    });
+
+    // ─── Live server logs (per-device console in the web app) ─────────────
+    //
+    // The Devices page hydrates each device card's console by GET'ing
+    // the recent ring on connect, then subscribes via WebSocket
+    // (`log:line` frames, see below) for new lines pushed in realtime.
+    app.get("/logs/recent", authMiddleware, (req, res) => {
+        const limitRaw = Number(req.query.limit ?? 200);
+        const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 200, 1), 500);
+        const snap = getDebugLogSnapshot();
+        const lines = snap.slice(Math.max(0, snap.length - limit));
+        res.json({ lines });
     });
 
     app.get("/info", authMiddleware, (_req, res) => {
@@ -410,8 +444,14 @@ export async function startServer(): Promise<void> {
         const range = req.headers.range;
         if (range) {
             const parts = range.replace(/bytes=/, "").split("-");
-            const start = parseInt(parts[0], 10);
-            const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+            const rawStart = parseInt(parts[0], 10);
+            const rawEnd = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+            const start = Number.isFinite(rawStart) ? rawStart : 0;
+            const end = Number.isFinite(rawEnd) ? Math.min(rawEnd, stat.size - 1) : stat.size - 1;
+            if (start < 0 || end < start || start >= stat.size) {
+                res.status(416).set("Content-Range", `bytes */${stat.size}`).json({ error: "Invalid range" });
+                return;
+            }
             const chunkSize = end - start + 1;
 
             res.writeHead(206, {
@@ -687,8 +727,7 @@ export async function startServer(): Promise<void> {
         // Fire-and-forget — runners never throw. Status updates are
         // visible via GET /scan/jobs/:id.
         const broadcast = () => {
-            const msg = JSON.stringify({ type: "scan:progress", job });
-            for (const c of wsClients) if (c.readyState === WebSocket.OPEN) c.send(msg);
+            broadcastToWsClients(JSON.stringify({ type: "scan:progress", job }));
         };
         if (isVideo) void runVideoScanJob(job, broadcast);
         else void runScanJob(job, broadcast);
@@ -1190,6 +1229,16 @@ export async function startServer(): Promise<void> {
     wss.on("connection", (ws) => {
         wsClients.add(ws);
         ws.send(JSON.stringify({ type: "connected", hostname: os.hostname() }));
+        // Seed the client's console with the recent log ring so the UI
+        // has context the moment it opens (instead of an empty pane
+        // until the next log line fires).
+        try {
+            const snap = getDebugLogSnapshot();
+            const recent = snap.slice(Math.max(0, snap.length - 200));
+            if (recent.length > 0) {
+                ws.send(JSON.stringify({ type: "log:snapshot", lines: recent }));
+            }
+        } catch { /* never let snapshot break the connection */ }
         ws.on("close", () => wsClients.delete(ws));
         ws.on("error", () => wsClients.delete(ws));
     });
@@ -1221,8 +1270,7 @@ export async function startServer(): Promise<void> {
     // Bridge watcher events onto the existing WebSocket fan-out so the
     // web app can react in realtime (in addition to the polling endpoint).
     watcherBus.on("event", (ev) => {
-        const msg = JSON.stringify({ type: "watch:event", event: ev });
-        for (const c of wsClients) if (c.readyState === WebSocket.OPEN) c.send(msg);
+        broadcastToWsClients(JSON.stringify({ type: "watch:event", event: ev }));
     });
 
     // Bridge cloud-sync apply ticks onto the same fan-out. Web clients
@@ -1231,12 +1279,31 @@ export async function startServer(): Promise<void> {
     // devices. Payload includes the entity set so React Query / SWR can
     // invalidate selectively.
     setOnAppliedListener((entities) => {
-        const msg = JSON.stringify({
+        broadcastToWsClients(JSON.stringify({
             type: "sync:applied",
             entities: Array.from(entities),
             timestamp: Date.now(),
-        });
-        for (const c of wsClients) if (c.readyState === WebSocket.OPEN) c.send(msg);
+        }));
+    });
+
+    // Bridge debug-log entries onto the WS fan-out so the web app's
+    // Devices page can render a realtime per-device console. Coalesce
+    // bursts into 80 ms windows so a chatty subsystem (e.g. cloudflared
+    // startup) doesn't fragment into 50+ tiny frames over the tunnel.
+    let logBatch: DebugLogEntry[] = [];
+    let logFlushTimer: NodeJS.Timeout | null = null;
+    const flushLogBatch = () => {
+        if (logFlushTimer) { clearTimeout(logFlushTimer); logFlushTimer = null; }
+        if (logBatch.length === 0) return;
+        const payload = JSON.stringify({ type: "log:line", entries: logBatch });
+        logBatch = [];
+        broadcastToWsClients(payload);
+    };
+    subscribeDebugLog((entry) => {
+        if (wsClients.size === 0) return;
+        logBatch.push(entry);
+        if (logBatch.length >= 50) { flushLogBatch(); return; }
+        if (!logFlushTimer) logFlushTimer = setTimeout(flushLogBatch, 80);
     });
 
     return new Promise<void>((resolve, reject) => {

@@ -22,6 +22,15 @@ type Fields = Record<string, unknown>;
 
 const isProd = process.env.NODE_ENV === "production";
 
+// Lazy import to keep this module loadable in test environments where
+// electron isn't available (debug-log.ts touches `electron.app`).
+type DebugLevel = "info" | "warn" | "error";
+let _pushDebugLog: ((level: DebugLevel, ...args: unknown[]) => void) | null = null;
+try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _pushDebugLog = (require("../debug-log") as { pushDebugLog?: typeof _pushDebugLog }).pushDebugLog ?? null;
+} catch { _pushDebugLog = null; }
+
 interface SentryLike {
     init(opts: Record<string, unknown>): void;
     captureException(err: unknown, hint?: { extra?: Record<string, unknown> }): void;
@@ -85,6 +94,15 @@ function emit(level: Level, msg: string, fields?: Fields, err?: unknown) {
         const extra = fields && Object.keys(fields).length > 0 ? fields : "";
         if (err) fn(tag, msg, extra, err);
         else fn(tag, msg, extra);
+    }
+
+    // Fan out to the debug ring so the line appears in the in-app Debug
+    // panel AND the live per-device console streamed to the web app.
+    if (_pushDebugLog && level !== "debug") {
+        const parts: unknown[] = [msg];
+        if (fields && Object.keys(fields).length > 0) parts.push(fields);
+        if (err) parts.push(err);
+        try { _pushDebugLog(level as DebugLevel, ...parts); } catch { /* ignore */ }
     }
 
     // Forward errors to Sentry only when both gates are open. The

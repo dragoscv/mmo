@@ -14,6 +14,17 @@ import { app } from "electron";
 const DEBUG_LOG_MAX = 500;
 const ring: string[] = [];
 
+export type DebugLogEntry = { ts: number; level: "info" | "warn" | "error"; line: string };
+const subscribers = new Set<(e: DebugLogEntry) => void>();
+
+/** Subscribe to live log lines. Returns an unsubscribe. Used by the
+ *  WS server to fan out `log:line` frames to connected web clients so
+ *  the Devices page can render a realtime console for each companion. */
+export function subscribeDebugLog(fn: (e: DebugLogEntry) => void): () => void {
+    subscribers.add(fn);
+    return () => { subscribers.delete(fn); };
+}
+
 let LOG_FILE: string | null = null;
 try {
     const dir = app.getPath("logs");
@@ -22,7 +33,8 @@ try {
 } catch { /* not in electron context or no perms */ }
 
 export function pushDebugLog(level: "info" | "warn" | "error", ...args: unknown[]): void {
-    const line = `[${new Date().toISOString()}] [${level}] ${args
+    const ts = Date.now();
+    const line = `[${new Date(ts).toISOString()}] [${level}] ${args
         .map((a) => (a instanceof Error ? `${a.stack ?? a.message}` : typeof a === "string" ? a : JSON.stringify(a)))
         .join(" ")}`;
     ring.push(line);
@@ -31,6 +43,12 @@ export function pushDebugLog(level: "info" | "warn" | "error", ...args: unknown[
         try { fs.appendFileSync(LOG_FILE, line + "\n"); } catch { /* ignore */ }
     }
     try { process.stderr.write(line + "\n"); } catch { /* ignore */ }
+    if (subscribers.size > 0) {
+        const entry: DebugLogEntry = { ts, level, line };
+        for (const fn of subscribers) {
+            try { fn(entry); } catch { /* never let a bad listener break logging */ }
+        }
+    }
 }
 
 export function getDebugLogSnapshot(): string[] {

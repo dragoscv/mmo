@@ -213,13 +213,25 @@ async function applyPending(pending) {
 
 try {
     await ensureTracker();
-    const pending = await printStatus();
-    if (STATUS_ONLY) {
-        // nothing more
-    } else if (MARK_APPLIED) {
-        await markApplied(pending);
+    // Postgres advisory lock: serialize concurrent migration runs across
+    // processes (two devs/CI jobs hitting the same DB at once). Lock key
+    // is a stable hash of "mmo-migrations" — int4 derived from arbitrary
+    // string. Released when session ends (sql.end() in finally).
+    const LOCK_KEY = 871234567; // stable arbitrary int for this app
+    const [{ locked }] = await sql.unsafe(`SELECT pg_try_advisory_lock($1) AS locked`, [LOCK_KEY]);
+    if (!locked) {
+        console.error(`${RED}Another migration run is in progress (advisory lock held).${RESET} Wait and retry.`);
+        process.exitCode = 1;
     } else {
-        await applyPending(pending);
+        const pending = await printStatus();
+        if (STATUS_ONLY) {
+            // nothing more
+        } else if (MARK_APPLIED) {
+            await markApplied(pending);
+        } else {
+            await applyPending(pending);
+        }
+        await sql.unsafe(`SELECT pg_advisory_unlock($1)`, [LOCK_KEY]);
     }
 } catch (e) {
     console.error(e.message || e);

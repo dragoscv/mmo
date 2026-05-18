@@ -20,10 +20,18 @@ type ScanProgressListener = (msg: { type: "scan:progress"; job: unknown }) => vo
 type WatchEventListener = (msg: { type: "watch:event"; event: unknown }) => void;
 type ConnectionListener = (connected: boolean) => void;
 
+export interface DeviceLogEntry {
+    ts: number;
+    level: "info" | "warn" | "error";
+    line: string;
+}
+type LogListener = (entries: DeviceLogEntry[], kind: "snapshot" | "live") => void;
+
 export interface DeviceWsClient {
     onScanProgress(fn: ScanProgressListener): () => void;
     onWatchEvent(fn: WatchEventListener): () => void;
     onConnection(fn: ConnectionListener): () => void;
+    onLog(fn: LogListener): () => void;
     close(): void;
 }
 
@@ -35,6 +43,7 @@ export function connectDeviceWs(tunnelHostname: string): DeviceWsClient {
     const scanListeners = new Set<ScanProgressListener>();
     const watchListeners = new Set<WatchEventListener>();
     const connListeners = new Set<ConnectionListener>();
+    const logListeners = new Set<LogListener>();
 
     const open = () => {
         if (closedByUser) return;
