@@ -18,7 +18,7 @@ export function useFocusMode() {
 }
 
 /** Routes that default to focus mode (sidebar + player bar hidden). */
-const FOCUS_ROUTES = ["/mixer", "/editor", "/remote"];
+const FOCUS_ROUTES = ["/mixer", "/daw", "/editor", "/live", "/visualizations"];
 
 export function FocusModeProvider({ children }: { children: ReactNode }) {
     const pathname = usePathname();

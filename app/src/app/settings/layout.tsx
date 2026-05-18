@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { SettingsSidebar } from "@/components/settings/settings-sidebar";
 
 export const metadata: Metadata = {
     title: { template: "%s · Settings · MMO", default: "Settings · MMO" },
 };
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
+    // No secondary sidebar — settings navigation now lives in the main
+    // app sidebar's drilled "Settings" view.
     return (
-        <div className="flex h-full min-h-screen">
-            <SettingsSidebar />
-            <div className="flex-1 min-w-0 overflow-y-auto">{children}</div>
+        <div className="h-full min-h-screen overflow-y-auto">
+            <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-8 md:py-8">
+                {children}
+            </div>
         </div>
     );
 }

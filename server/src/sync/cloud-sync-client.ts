@@ -73,7 +73,14 @@ export class CloudSyncClient {
     }
 
     private onError = (err: unknown) => {
-        log.warn("sync.tick failed", undefined, err);
+        // undici wraps the actual socket error in `cause`. Without unwrapping,
+        // every failure logs as a bare "TypeError: fetch failed" — useless
+        // for diagnosing the real issue (ENETUNREACH on broken IPv6 paths,
+        // EAI_AGAIN on DNS hiccups, ECONNREFUSED behind corp proxies, etc.).
+        const root = (err as { cause?: unknown })?.cause ?? err;
+        const msg = root instanceof Error ? `${root.name}: ${root.message}` : String(root);
+        const code = (root as { code?: string })?.code;
+        log.warn(`sync.tick failed${code ? ` [${code}]` : ""} — ${msg}`, undefined, err);
     };
 
     /** Run one push+pull cycle. */
@@ -106,6 +113,7 @@ export class CloudSyncClient {
                 authorization: `Bearer ${state.deviceToken}`,
             },
             body: JSON.stringify({ changes: wireChanges }),
+            signal: AbortSignal.timeout(15_000),
         });
         if (!res.ok) {
             // 402 = paywall; surface so the UI can prompt upgrade. The queue
@@ -127,7 +135,10 @@ export class CloudSyncClient {
         for (; ;) {
             const res = await fetch(
                 `${state.apiUrl}/api/sync?cursor=${state.lastPullCursor}`,
-                { headers: { authorization: `Bearer ${state.deviceToken}` } },
+                {
+                    headers: { authorization: `Bearer ${state.deviceToken}` },
+                    signal: AbortSignal.timeout(15_000),
+                },
             );
             if (!res.ok) throw new Error(`pull failed: ${res.status}`);
             const body = (await res.json()) as {

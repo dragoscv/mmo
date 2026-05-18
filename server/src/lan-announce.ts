@@ -176,9 +176,17 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
             // awaiting server action without waiting a full interval.
             queueMicrotask(() => { void postAnnounce(lanUrl); });
         }
-    } catch {
-        // Network down — re-queue so results survive the retry.
+    } catch (err) {
+        // Network down — re-queue so results survive the retry. Surface
+        // the underlying cause (undici hides it under `cause`) so this
+        // loop's failures are diagnosable: a quietly-broken announce
+        // loop is the #1 cause of the queue-based UI actions appearing
+        // to "do nothing" for tens of seconds at a time.
         pendingResults = sending.concat(pendingResults);
+        const root = (err as { cause?: unknown })?.cause ?? err;
+        const code = (root as { code?: string })?.code;
+        const msg = root instanceof Error ? `${root.name}: ${root.message}` : String(root);
+        log("warn", `[announce] post failed${code ? ` [${code}]` : ""} — ${msg}`);
     }
 }
 
