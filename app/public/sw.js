@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = "music-org-v5";
+const CACHE_NAME = "music-org-v6";
 
 // Precache only TRULY public assets — the offline fallback page and the
 // app manifest. Earlier versions of this SW precached `/library`,
@@ -183,13 +183,15 @@ self.addEventListener("fetch", (event) => {
     // Everything else: stale-while-revalidate
     event.respondWith(
         caches.match(request).then((cached) => {
-            const networkFetch = fetch(request).then((response) => {
-                if (response.ok) {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-                }
-                return response;
-            });
+            const networkFetch = fetch(request)
+                .then((response) => {
+                    if (response.ok) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+                    }
+                    return response;
+                })
+                .catch(() => cached || new Response("", { status: 504, statusText: "Offline" }));
             return cached || networkFetch;
         })
     );
