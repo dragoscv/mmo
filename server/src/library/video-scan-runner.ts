@@ -25,9 +25,9 @@ import {
     type ScannedVideoPayload,
 } from "./scan-jobs";
 
-async function discover(root: string, job: ScanJob, onUpdate: () => void): Promise<string[]> {
+async function discover(root: string, job: ScanJob, onUpdate: () => void): Promise<{ files: string[]; dirsVisited: number; dirsErrored: number; sampleErrors: Array<{ dir: string; error: string }> }> {
     let lastEmit = 0;
-    const files = await discoverVideos(root, {
+    const result = await discoverVideos(root, {
         concurrency: 16,
         onProgress: (p) => {
             job.discovered = p.files;
@@ -39,9 +39,9 @@ async function discover(root: string, job: ScanJob, onUpdate: () => void): Promi
             if (now - lastEmit > 50) { onUpdate(); lastEmit = now; }
         },
     });
-    job.discovered = files.length;
+    job.discovered = result.files.length;
     onUpdate();
-    return files;
+    return result;
 }
 
 /** "1920x1080" → "1080p". Returns null for unknown / tiny / null inputs. */
@@ -183,12 +183,35 @@ export async function runVideoScanJob(
 
         job.status = "discovering";
         onUpdate();
-        const files = await discover(job.folder, job, onUpdate);
+        const { files, dirsVisited, dirsErrored, sampleErrors } = await discover(job.folder, job, onUpdate);
         const tDiscover = Date.now() - t0;
-        console.log(
-            `[video-scan] discovered ${files.length} video files in ${tDiscover}ms` +
-            (files.length > 0 ? ` (first: ${path.basename(files[0])})` : " (NONE FOUND — check folder kind + extensions)"),
-        );
+        if (files.length === 0) {
+            const errSummary = sampleErrors.length > 0
+                ? ` First errors: ${sampleErrors.slice(0, 3).map((e) => `${path.basename(e.dir)}: ${e.error}`).join("; ")}`
+                : "";
+            console.warn(
+                `[video-scan] discovered 0 files in ${tDiscover}ms ` +
+                `(dirs visited=${dirsVisited}, errored=${dirsErrored}).${errSummary} ` +
+                `Check the folder is set to kind=movies/tv-shows and contains files with extensions: ` +
+                `mp4 mkv avi mov wmv flv webm m4v mpg mpeg ts m2ts 3gp ogv`,
+            );
+            if (dirsErrored > 0 && dirsVisited === 0) {
+                // Root itself was unreadable — surface a real error so the
+                // UI shows it instead of "complete: 0 movies".
+                failScanJob(
+                    job.id,
+                    `Could not read folder contents (${sampleErrors[0]?.error ?? "unknown"}). ` +
+                    `If this is an external/network drive, check it's connected and the companion has permission.`,
+                );
+                onUpdate();
+                return;
+            }
+        } else {
+            console.log(
+                `[video-scan] discovered ${files.length} video files in ${tDiscover}ms ` +
+                `(dirs visited=${dirsVisited}, errored=${dirsErrored}, first: ${path.basename(files[0])})`,
+            );
+        }
         job.total = files.length;
         job.status = "scanning";
         onUpdate();

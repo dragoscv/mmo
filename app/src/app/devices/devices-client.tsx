@@ -94,6 +94,7 @@ import {
     getDeviceDirectAccess,
 } from "@/actions/devices";
 import { directFetch } from "@/lib/companion-direct";
+import { connectDeviceWs, type DeviceWsClient } from "@/lib/device-ws";
 import {
     FOLDER_KINDS,
     type CompanionFolder,
@@ -704,6 +705,28 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
         void tick();
         const handle = setInterval(tick, 5_000);
         return () => { canceled = true; clearInterval(handle); };
+    }, [devices]);
+
+    /** Open one WebSocket per device with a tunnel hostname and merge
+     *  push-delivered scan:progress frames into the same scanProgress
+     *  state the 750 ms poll loop fills. WS arrives before the next
+     *  poll tick (typically <100 ms vs ~750 ms), so the UI updates
+     *  smoothly; the poll loop becomes the fallback when the WS is
+     *  unreachable (CF outage, companion behind NAT, etc.). */
+    useEffect(() => {
+        const clients: DeviceWsClient[] = [];
+        for (const device of devices) {
+            const host = (device as { tunnelHostname?: string | null }).tunnelHostname;
+            if (!host) continue;
+            const c = connectDeviceWs(host);
+            clients.push(c);
+            c.onScanProgress((msg) => {
+                const job = msg.job as CompanionScanJob | undefined;
+                if (!job?.folder) return;
+                setScanProgress((p) => ({ ...p, [job.folder]: job }));
+            });
+        }
+        return () => { for (const c of clients) c.close(); };
     }, [devices]);
 
     function handleToggleWatch(deviceId: string, folderPath: string, watch: boolean) {

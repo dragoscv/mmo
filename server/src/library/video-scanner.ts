@@ -77,6 +77,16 @@ export interface DiscoverProgress {
     currentDir: string;
 }
 
+export interface DiscoverResult {
+    files: string[];
+    /** Total directories successfully walked. */
+    dirsVisited: number;
+    /** Directories that failed (permission denied, vanished mid-scan). */
+    dirsErrored: number;
+    /** First few error messages, useful for the "0 found" report. */
+    sampleErrors: Array<{ dir: string; error: string }>;
+}
+
 /**
  * Parallel BFS video discovery.
  *
@@ -97,19 +107,25 @@ export interface DiscoverProgress {
 export async function discoverVideos(
     root: string,
     opts: { concurrency?: number; onProgress?: (p: DiscoverProgress) => void } = {},
-): Promise<string[]> {
+): Promise<DiscoverResult> {
     const concurrency = Math.max(1, opts.concurrency ?? 16);
     const onProgress = opts.onProgress;
     const results: string[] = [];
+    const sampleErrors: DiscoverResult["sampleErrors"] = [];
     let queue: string[] = [root];
     let dirsVisited = 0;
+    let dirsErrored = 0;
 
     async function processDir(dir: string): Promise<string[]> {
         const subdirs: string[] = [];
         let entries: import("node:fs").Dirent[];
         try {
             entries = await fs.readdir(dir, { withFileTypes: true });
-        } catch {
+        } catch (err) {
+            dirsErrored++;
+            if (sampleErrors.length < 10) {
+                sampleErrors.push({ dir, error: err instanceof Error ? err.message : String(err) });
+            }
             return subdirs;
         }
         for (const e of entries) {
@@ -141,7 +157,7 @@ export async function discoverVideos(
             if (subs.length > 0) queue = queue.concat(subs);
         }
     }
-    return results;
+    return { files: results, dirsVisited, dirsErrored, sampleErrors };
 }
 
 export function ffprobe(filePath: string): Promise<ProbedVideo | null> {
