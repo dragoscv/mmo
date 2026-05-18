@@ -1,6 +1,6 @@
 {
   "name": "music-organizer",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "scripts": {
@@ -26,7 +26,12 @@
     "e2e:install": "playwright install --with-deps chromium",
     "lhci": "lhci autorun --config=./lighthouserc.cjs",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node scripts/apply-sql-migrations.mjs",
+    "db:migrate:prod": "node scripts/apply-sql-migrations.mjs --prod",
+    "db:status": "node scripts/apply-sql-migrations.mjs --status",
+    "db:status:prod": "node scripts/apply-sql-migrations.mjs --prod --status",
+    "db:mark-applied": "node scripts/apply-sql-migrations.mjs --mark-applied",
+    "db:mark-applied:prod": "node scripts/apply-sql-migrations.mjs --prod --mark-applied",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

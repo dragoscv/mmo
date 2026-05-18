@@ -87,13 +87,12 @@ const newMigrations = files.filter((p) => {
     if (!STAGED) return true;
     return status.get(p) === "A";
 });
-const journalTouched = files.includes("app/drizzle/meta/_journal.json");
 
-if (newMigrations.length > 0 && journalTouched) {
+if (newMigrations.length > 0) {
     console.log(
         `${GREEN}✓${RESET} Schema changes include a new migration (${newMigrations
             .map((p) => p.replace(/^app\/drizzle\//, ""))
-            .join(", ")}) and an updated journal.`,
+            .join(", ")}).`,
     );
     process.exit(0);
 }
@@ -114,12 +113,9 @@ console.error(`  ${BOLD}Required:${RESET}`);
 console.error(
     `    ${DIM}-${RESET} A new file ${YELLOW}app/drizzle/XXXX_<name>.sql${RESET}`,
 );
-console.error(
-    `    ${DIM}-${RESET} An updated ${YELLOW}app/drizzle/meta/_journal.json${RESET}`,
-);
 console.error("");
 console.error(`  ${BOLD}Fix:${RESET}`);
-console.error(`    cd app && pnpm db:generate`);
+console.error(`    cd app && pnpm db:generate   ${DIM}# scaffolds the SQL file${RESET}`);
 console.error(`    git add app/drizzle`);
 console.error("");
 console.error(

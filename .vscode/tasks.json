@@ -232,6 +232,55 @@
       }
     },
     {
+      "label": "DB: Status (local)",
+      "type": "shell",
+      "command": "pnpm db:status",
+      "options": { "cwd": "${workspaceFolder}/app" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "DB: Status (production)",
+      "type": "shell",
+      "command": "pnpm db:status:prod",
+      "options": { "cwd": "${workspaceFolder}/app" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "DB: Migrate (local)",
+      "type": "shell",
+      "command": "pnpm db:migrate",
+      "options": { "cwd": "${workspaceFolder}/app" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "DB: Migrate (production)",
+      "type": "shell",
+      "command": "pnpm db:migrate:prod",
+      "options": { "cwd": "${workspaceFolder}/app" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "DB: Mark Pending Migrations Applied (production)",
+      "detail": "Records all pending migrations as applied on prod WITHOUT running them. Use once when adopting the runner on a DB that already has the schema.",
+      "type": "shell",
+      "command": "pnpm db:mark-applied:prod -- --yes",
+      "options": { "cwd": "${workspaceFolder}/app" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "DB: Generate Migration (from schema diff)",
+      "type": "shell",
+      "command": "pnpm db:generate",
+      "options": { "cwd": "${workspaceFolder}/app" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
       "label": "Type Check",
       "type": "shell",
       "command": "pnpm exec tsc --noEmit",
