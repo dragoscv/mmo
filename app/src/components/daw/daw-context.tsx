@@ -11,6 +11,7 @@ import {
     type ReactNode,
 } from "react";
 import { useRenderCount } from "@/lib/dev-debugger";
+import { useProjectAutosave } from "@/hooks/use-project-autosave";
 import {
     DAWEngine,
     createDefaultProject,
@@ -482,6 +483,21 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         isDirty: false,
         focusMode: true,
     }));
+
+    // Cloud autosave write-through. localStorage `saveProject` keeps a
+    // local cache for instant boot; this hook fans the same edits out to
+    // the cloud (debounced 800ms) and queues them in IndexedDB when
+    // offline. The hook is a no-op when there is no signed-in session;
+    // it never throws and never blocks UI updates.
+    useProjectAutosave({
+        kind: "daw",
+        externalId: state.project.id,
+        name: state.project.name,
+        document: state.project as unknown as Record<string, unknown>,
+        extras: {
+            bpm: state.project.tempo,
+        },
+    });
 
     // Restore persisted UI state after hydration (client-only)
     useEffect(() => {

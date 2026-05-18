@@ -53,8 +53,12 @@ export function MobileSidebarTrigger() {
 function useTranslatedLabel() {
     const t = useTranslations("nav");
     return (key: string, fallback: string) => {
+        // next-intl 3+ surfaces missing keys via `.has()`; it doesn't throw.
+        const has = (t as unknown as { has?: (k: string) => boolean }).has;
+        if (typeof has === "function" && !has.call(t, key)) return fallback;
         try {
-            return t(key);
+            const out = t(key);
+            return out === key ? fallback : out;
         } catch {
             return fallback;
         }
@@ -576,18 +580,46 @@ function ParentRow(props: {
     );
 }
 
-// ─── Recent projects (placeholder per-parent) ────────────────────────────
+// ─── Recent projects (cloud-backed when signed in, localStorage fallback) ─
+//
+// Parent → project kind mapping. Apps whose `parentKey` matches one of
+// these query the cloud via the `listProjects` server action; others
+// fall back to the localStorage `recent-projects:<key>` cache.
+const PARENT_TO_PROJECT_KIND: Record<string, "daw" | "editor" | "live" | "mixer" | "visualization"> = {
+    music: "daw",
+    tools: "visualization",
+};
+
 function RecentProjects({ parentKey }: { parentKey: string }) {
-    // Per-app project history lives in localStorage at `recent-projects:<key>`.
-    // Apps (DAW, Sound Editor, Recordings) push entries shaped `{ name, href }`.
     const [items, setItems] = useState<{ name: string; href: string }[]>([]);
+
     useEffect(() => {
-        try {
-            const raw = localStorage.getItem(`recent-projects:${parentKey}`);
-            if (!raw) return;
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) setItems(parsed.slice(0, 6));
-        } catch { /* ignore */ }
+        let cancelled = false;
+        const kind = PARENT_TO_PROJECT_KIND[parentKey];
+
+        async function load() {
+            if (kind) {
+                try {
+                    const mod = await import("@/actions/projects");
+                    const rows = await mod.listProjects(kind);
+                    if (cancelled) return;
+                    const hrefBase = kind === "daw" ? "/daw" : kind === "editor" ? "/editor" : `/${kind}`;
+                    setItems(rows.slice(0, 6).map((r) => ({
+                        name: r.name,
+                        href: `${hrefBase}?project=${encodeURIComponent(r.externalId)}`,
+                    })));
+                    return;
+                } catch { /* fall through to localStorage */ }
+            }
+            try {
+                const raw = localStorage.getItem(`recent-projects:${parentKey}`);
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && !cancelled) setItems(parsed.slice(0, 6));
+            } catch { /* ignore */ }
+        }
+        void load();
+        return () => { cancelled = true; };
     }, [parentKey]);
 
     return (

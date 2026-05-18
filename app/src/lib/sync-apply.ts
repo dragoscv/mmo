@@ -30,6 +30,13 @@ import {
     cuepoints,
     syncLog,
 } from "@/db/schema";
+import {
+    PROJECT_TABLES,
+    PROJECT_SYNC_ENTITY,
+    projectSnapshots,
+    projectAssets,
+    type ProjectKind,
+} from "@/db/schema-projects";
 import { and, eq, sql } from "drizzle-orm";
 
 export type SyncEntity =
@@ -38,7 +45,14 @@ export type SyncEntity =
     | "playlist_tracks"
     | "tags"
     | "track_tags"
-    | "cuepoints";
+    | "cuepoints"
+    | "daw_projects"
+    | "editor_projects"
+    | "live_sessions"
+    | "mixer_setups"
+    | "visualization_presets"
+    | "project_snapshots"
+    | "project_assets";
 
 export interface SyncChange {
     entity: SyncEntity | string;
@@ -427,6 +441,16 @@ export async function applyChange(
         case "playlist_tracks": return applyPlaylistTrackUpsert(userId, change);
         case "track_tags": return applyTrackTagUpsert(userId, change);
         case "cuepoints": return applyCuepointUpsert(userId, change);
+        case "daw_projects":
+        case "editor_projects":
+        case "live_sessions":
+        case "mixer_setups":
+        case "visualization_presets":
+            return applyProjectUpsert(userId, change);
+        case "project_snapshots":
+            return applyProjectSnapshotUpsert(userId, change);
+        case "project_assets":
+            return applyProjectAssetUpsert(userId, change);
         default:
             return { changed: false, error: `Unknown entity: ${change.entity}` };
     }
@@ -434,3 +458,197 @@ export async function applyChange(
 
 // Re-export `sql` so the route file can use it without a separate import.
 export { sql };
+
+// ─── Project entities ────────────────────────────────────────────────────
+
+const PROJECT_ENTITY_TO_KIND: Record<string, ProjectKind> = {
+    daw_projects: "daw",
+    editor_projects: "editor",
+    live_sessions: "live",
+    mixer_setups: "mixer",
+    visualization_presets: "visualization",
+};
+
+const FORBIDDEN_PROJECT_FIELDS = new Set([
+    "id", "userId", "user_id",
+    "externalId", "external_id",
+    "syncVersion", "sync_version",
+    "fieldVersions", "field_versions",
+    "createdAt", "created_at",
+    "originDeviceId", "origin_device_id",
+]);
+
+/**
+ * Per-row LWW for any of the project tables — the whole `document` is
+ * one of the tracked fields, so a winning write replaces the project
+ * state atomically. Per-field LWW still applies to siblings (`name`,
+ * `bpm`, etc.) so a stale rename can't clobber a fresh document edit.
+ */
+export async function applyProjectUpsert(
+    userId: string,
+    change: SyncChange,
+): Promise<ApplyResult> {
+    const kind = PROJECT_ENTITY_TO_KIND[change.entity];
+    if (!kind) return { changed: false, error: `Not a project entity: ${change.entity}` };
+    const table = PROJECT_TABLES[kind] as typeof PROJECT_TABLES[ProjectKind];
+    const externalId = change.entityId;
+    if (!externalId) return { changed: false, error: "Missing externalId" };
+
+    const existing = await db
+        .select({ id: table.id, fv: table.fieldVersions, deletedAt: table.deletedAt })
+        .from(table)
+        .where(and(eq(table.userId, userId), eq(table.externalId, externalId)))
+        .limit(1);
+
+    if (change.op === "delete") {
+        if (existing.length === 0) return { changed: false, skipped: true };
+        const fv = (existing[0].fv ?? {}) as Record<string, string>;
+        if (fv.deletedAt && fv.deletedAt >= change.updatedAt) {
+            return { changed: false, skipped: true, rowId: existing[0].id };
+        }
+        await db
+            .update(table)
+            .set({
+                deletedAt: new Date(change.updatedAt),
+                fieldVersions: { ...fv, deletedAt: change.updatedAt },
+                updatedAt: new Date(change.updatedAt),
+            } as never)
+            .where(eq(table.id, existing[0].id));
+        return { changed: true, rowId: existing[0].id };
+    }
+
+    const payload = (change.payload ?? {}) as Record<string, unknown>;
+    const stored = (existing[0]?.fv ?? {}) as Record<string, string>;
+    const accepted: Record<string, unknown> = {};
+    const nextFv: Record<string, string> = { ...stored };
+    for (const [key, value] of Object.entries(payload)) {
+        if (FORBIDDEN_PROJECT_FIELDS.has(key)) continue;
+        const storedTs = stored[key];
+        if (storedTs && storedTs >= change.updatedAt) continue;
+        accepted[key] = value;
+        nextFv[key] = change.updatedAt;
+    }
+
+    if (existing.length === 0) {
+        const inserted = await db
+            .insert(table)
+            .values({
+                userId,
+                externalId,
+                ...accepted,
+                fieldVersions: nextFv,
+                updatedAt: new Date(change.updatedAt),
+            } as never)
+            .returning({ id: table.id });
+        return { changed: true, rowId: inserted[0]?.id };
+    }
+    if (Object.keys(accepted).length === 0) {
+        return { changed: false, skipped: true, rowId: existing[0].id };
+    }
+    await db
+        .update(table)
+        .set({
+            ...accepted,
+            fieldVersions: nextFv,
+            updatedAt: new Date(change.updatedAt),
+        } as never)
+        .where(eq(table.id, existing[0].id));
+    return { changed: true, rowId: existing[0].id };
+}
+
+/** Snapshots are immutable; upsert is insert-if-absent. Delete tombstones the row. */
+export async function applyProjectSnapshotUpsert(
+    userId: string,
+    change: SyncChange,
+): Promise<ApplyResult> {
+    const externalId = change.entityId;
+    if (!externalId) return { changed: false, error: "Missing externalId" };
+
+    if (change.op === "delete") {
+        const r = await db
+            .delete(projectSnapshots)
+            .where(and(eq(projectSnapshots.userId, userId), eq(projectSnapshots.externalId, externalId)));
+        return { changed: (r as unknown as { rowCount?: number }).rowCount !== 0 };
+    }
+    const payload = (change.payload ?? {}) as Record<string, unknown>;
+    await db
+        .insert(projectSnapshots)
+        .values({
+            userId,
+            externalId,
+            projectKind: String(payload.projectKind ?? ""),
+            projectExternalId: String(payload.projectExternalId ?? ""),
+            label: payload.label == null ? null : String(payload.label),
+            auto: payload.auto == null ? true : Boolean(payload.auto),
+            document: (payload.document ?? {}) as Record<string, unknown>,
+            gitCommitSha: payload.gitCommitSha == null ? null : String(payload.gitCommitSha),
+        })
+        .onConflictDoNothing();
+    return { changed: true };
+}
+
+/** Project assets — per-row LWW by externalId. */
+export async function applyProjectAssetUpsert(
+    userId: string,
+    change: SyncChange,
+): Promise<ApplyResult> {
+    const externalId = change.entityId;
+    if (!externalId) return { changed: false, error: "Missing externalId" };
+
+    const existing = await db
+        .select({ id: projectAssets.id, fv: projectAssets.fieldVersions })
+        .from(projectAssets)
+        .where(and(eq(projectAssets.userId, userId), eq(projectAssets.externalId, externalId)))
+        .limit(1);
+
+    if (change.op === "delete") {
+        if (existing.length === 0) return { changed: false, skipped: true };
+        await db
+            .update(projectAssets)
+            .set({ deletedAt: new Date(change.updatedAt), updatedAt: new Date(change.updatedAt) })
+            .where(eq(projectAssets.id, existing[0].id));
+        return { changed: true, rowId: existing[0].id };
+    }
+
+    const payload = (change.payload ?? {}) as Record<string, unknown>;
+    const stored = (existing[0]?.fv ?? {}) as Record<string, string>;
+    const accepted: Record<string, unknown> = {};
+    const nextFv: Record<string, string> = { ...stored };
+    for (const [key, value] of Object.entries(payload)) {
+        if (FORBIDDEN_PROJECT_FIELDS.has(key)) continue;
+        const storedTs = stored[key];
+        if (storedTs && storedTs >= change.updatedAt) continue;
+        accepted[key] = value;
+        nextFv[key] = change.updatedAt;
+    }
+
+    if (existing.length === 0) {
+        const inserted = await db
+            .insert(projectAssets)
+            .values({
+                userId,
+                externalId,
+                sha256: String(payload.sha256 ?? ""),
+                name: String(payload.name ?? ""),
+                ...accepted,
+                fieldVersions: nextFv,
+                updatedAt: new Date(change.updatedAt),
+            } as never)
+            .returning({ id: projectAssets.id });
+        return { changed: true, rowId: inserted[0]?.id };
+    }
+    if (Object.keys(accepted).length === 0) {
+        return { changed: false, skipped: true, rowId: existing[0].id };
+    }
+    await db
+        .update(projectAssets)
+        .set({
+            ...accepted,
+            fieldVersions: nextFv,
+            updatedAt: new Date(change.updatedAt),
+        } as never)
+        .where(eq(projectAssets.id, existing[0].id));
+    return { changed: true, rowId: existing[0].id };
+}
+
+export { PROJECT_SYNC_ENTITY };

@@ -142,6 +142,8 @@ export async function runScanJob(
     job: ScanJob,
     onUpdate: () => void = () => { /* noop */ },
 ): Promise<void> {
+    const t0 = Date.now();
+    console.log(`[scan] start job=${job.id} root="${job.folder}"`);
     try {
         job.status = "discovering";
         onUpdate();
@@ -152,8 +154,11 @@ export async function runScanJob(
         const tracks = await parseAll(files, job, onUpdate);
         completeScanJob(job.id, tracks);
         onUpdate();
+        console.log(`[scan] complete job=${job.id} files=${files.length} errored=${job.errored} totalMs=${Date.now() - t0}`);
     } catch (err) {
-        failScanJob(job.id, err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
+        failScanJob(job.id, msg);
         onUpdate();
+        console.error(`[scan] failed job=${job.id} err=${msg}`);
     }
 }

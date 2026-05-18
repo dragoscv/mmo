@@ -36,6 +36,13 @@ const VALID_ENTITIES = new Set([
     "tags",
     "track_tags",
     "cuepoints",
+    "daw_projects",
+    "editor_projects",
+    "live_sessions",
+    "mixer_setups",
+    "visualization_presets",
+    "project_snapshots",
+    "project_assets",
 ]);
 
 const VALID_OPS = new Set(["upsert", "delete"]);

@@ -875,3 +875,6 @@ export type WatchHistoryRow = typeof watchHistory.$inferSelect;
 export type VideoRatingRow = typeof videoRatings.$inferSelect;
 export type VideoCollectionRow = typeof videoCollections.$inferSelect;
 export type VideoCollectionItemRow = typeof videoCollectionItems.$inferSelect;
+
+// ─── Project persistence (DAW/Editor/Live/Mixer/Viz) ────────────────────────
+export * from "./schema-projects";

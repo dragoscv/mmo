@@ -21,6 +21,7 @@ import {
 import type { ScaleConfig } from "./audio/pitch-dsp";
 import { createLibraryRouter } from "./library/routes";
 import { createSyncRouter } from "./sync/http-router";
+import { createProjectsRouter } from "./projects/router";
 import { setOnAppliedListener } from "./sync";
 import { closeLibraryDb } from "./library/db";
 import { createPluginsRouter } from "./plugins/routes";
@@ -89,7 +90,11 @@ function broadcastToWsClients(msg: string): void {
  *  Default budget: 10 scans / hour. Heavy enough for normal use, cheap
  *  enough to short-circuit a noisy/malicious caller hammering the disk. */
 const SCAN_RATE_WINDOW_MS = 60 * 60_000;
-const SCAN_RATE_MAX = 10;
+// Tunneled (Vercel→cloudflared→loopback) scan requests all collapse to
+// the same IP bucket, so the per-IP budget effectively becomes per-device.
+// 60/h is still strict against accidental loops and trivial to exceed by
+// a malicious caller, but high enough that legitimate UI flows never hit it.
+const SCAN_RATE_MAX = 60;
 const scanRateBuckets = new Map<string, number[]>();
 function checkScanRateLimit(key: string): { allowed: true } | { allowed: false; retryAfterSec: number } {
     const now = Date.now();
@@ -724,19 +729,17 @@ export async function startServer(): Promise<void> {
 
     app.post("/scan", authMiddleware, (req, res) => {
         const { folder } = req.body;
+        const ipKey = (req.ip || req.socket.remoteAddress || "unknown").replace(/^::ffff:/, "");
+        log("info", `[scan] POST received ip=${ipKey} folder=${folder ?? "<missing>"}`);
         if (!folder || typeof folder !== "string") {
+            log("warn", `[scan] rejected: missing/invalid folder`);
             res.status(400).json({ error: "No folder specified" });
             return;
         }
 
-        // Per-IP scan budget — see checkScanRateLimit above. Tunneled
-        // requests come in via the CF tunnel container so they all share
-        // the loopback IP; that's still a useful proxy for "this companion
-        // is being hammered" because legitimate UI flows never need more
-        // than a couple scans per hour.
-        const ipKey = (req.ip || req.socket.remoteAddress || "unknown").replace(/^::ffff:/, "");
         const rate = checkScanRateLimit(ipKey);
         if (!rate.allowed) {
+            log("warn", `[scan] rate-limited ip=${ipKey} retryAfter=${rate.retryAfterSec}s budget=${SCAN_RATE_MAX}/h`);
             res.set("Retry-After", String(rate.retryAfterSec));
             res.status(429).json({
                 error: `Too many scans — try again in ${rate.retryAfterSec}s.`,
@@ -745,26 +748,22 @@ export async function startServer(): Promise<void> {
             return;
         }
 
-        // Same sibling-prefix + symlink-escape hardening as /audio/* and
+        // Sibling-prefix + symlink-escape hardening as /audio/* and
         // /download/*. Without this, scanning `/srv/music_evil` would
         // pass when `/srv/music` is the configured scan folder — letting
         // an attacker queue arbitrary directory walks.
         const resolved = resolveAllowedFolder(folder, settings.scanFolders);
         if (!resolved) {
+            log("warn", `[scan] rejected: folder not in allowed paths folder=${folder} allowed=${settings.scanFolders.map((f) => f.path).join("|")}`);
             res.status(403).json({ error: "Folder not in allowed paths" });
             return;
         }
 
-        // Per-folder kind decides which runner walks the tree:
-        // video files (movies / tv-shows) go through ffprobe + filename
-        // parsing; everything else (music / samples / recordings / other)
-        // uses the audio metadata runner.
         const cfg = settings.scanFolders.find((f) => f.path === resolved);
         const kind = cfg?.kind ?? "music";
         const isVideo = kind === "movies" || kind === "tv-shows";
         const job = createScanJob(resolved, "manual", isVideo ? "video" : "audio");
-        // Fire-and-forget — runners never throw. Status updates are
-        // visible via GET /scan/jobs/:id.
+        log("info", `[scan] queued job=${job.id} kind=${isVideo ? "video" : "audio"} folder=${resolved}`);
         const broadcast = () => {
             broadcastToWsClients(JSON.stringify({ type: "scan:progress", job }));
         };
@@ -866,6 +865,13 @@ export async function startServer(): Promise<void> {
     // tick — the web app can fire-and-forget a push immediately after
     // a user edit lands in cloud Postgres.
     app.use("/v1/sync", createSyncRouter(authMiddleware));
+
+    // ─── Project asset blobs (audio takes, samples, bounces) ─────────────
+    //
+    // Content-addressed store under `{userData}/project-assets/{sha[:2]}/{sha}`.
+    // Web clients POST base64-encoded bytes and later GET them as a stream.
+    // Cloud Postgres holds the metadata row (project_assets) pointing here.
+    app.use("/projects", createProjectsRouter(authMiddleware));
 
     // ─── Audio plugin host (VST3 / AU / LV2 via pedalboard) ──────────────
     //
