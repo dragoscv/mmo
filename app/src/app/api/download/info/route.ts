@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { spawn } from "child_process";
 import { requireSessionWithRate } from "@/lib/api-guard";
 import { validatePublicHttpUrl } from "@/lib/url-guard";
+import { resolveYtDlpBinary } from "@/lib/yt-dlp-bin";
+
+// Spawns yt-dlp (child_process) and may download a standalone binary into
+// /tmp on first cold start, so this must run on the Node.js runtime, never
+// Edge. Allow extra time for the one-off cold-start binary download.
+export const runtime = "nodejs";
+export const maxDuration = 120;
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -67,9 +74,16 @@ function classifyFormat(f: Record<string, unknown>): "audio" | "video" | "audio+
     return "audio";
 }
 
-function runYtDlp(args: string[], timeoutMs = 30_000): Promise<string> {
+async function runYtDlp(args: string[], timeoutMs = 30_000): Promise<string> {
+    let bin: string;
+    try {
+        bin = await resolveYtDlpBinary();
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`yt-dlp is not available: ${msg}`);
+    }
     return new Promise((resolve, reject) => {
-        const proc = spawn("yt-dlp", args, { windowsHide: true });
+        const proc = spawn(bin, args, { windowsHide: true });
         let stdout = "";
         let stderr = "";
 

@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — yt-dlp missing on serverless ("spawn yt-dlp ENOENT") (web `0.3.17`)
+
+- **`/api/download/info` and `/api/download/search` failed with `Failed to run yt-dlp: spawn yt-dlp ENOENT. Is yt-dlp installed?`** on the cloud build. Both routes did `spawn("yt-dlp", …)`, which relies on a `yt-dlp` binary being on `PATH`. That binary exists on a dev machine / the desktop companion but **not** in the Vercel serverless sandbox, so every download-info / search request from the extension (e.g. opening `https://muzicai.ro/download?url=…&auto=1`) returned a 500.
+- **New `app/src/lib/yt-dlp-bin.ts` resolves a usable yt-dlp executable at runtime** with precedence: (1) `YT_DLP_PATH` env override, (2) a system `yt-dlp` on `PATH` (probed once via `--version` — fast path for local dev + companion), then (3) the official **self-contained standalone** binary, downloaded on first use into a writable temp cache (`/tmp` on Vercel). The Linux build bundles its own Python so it runs in the bare lambda with zero system dependencies. The resolved path is memoised across warm invocations and concurrent cold starts share one in-flight download via a promise latch; the binary is written atomically (temp + rename) so a crash mid-download can't leave a truncated executable. Pin the release with `YT_DLP_VERSION` (defaults to a known-good tag). Zero new npm dependencies — Node builtins only.
+- **Both routes now run on the Node.js runtime explicitly (`export const runtime = "nodejs"`) with `maxDuration = 120`** so the one-off cold-start binary download (~30 MB) can't be cut off by the default function timeout.
+
 ### Diagnostics — Video scan logging + clear failure (companion `1.0.22`)
 
 - **`runVideoScanJob` now logs lifecycle events** with a `[video-scan]` prefix: job start with root folder, discovery duration + file count (including a "NONE FOUND — check folder kind + extensions" hint when the discovery returns empty), probe completion with error count, and total wall time. Lets users diagnose "0 movies found" reports by sharing companion logs.
