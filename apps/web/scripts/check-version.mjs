@@ -158,7 +158,7 @@ const significant = changed.filter(
 );
 if (significant.length === 0) process.exit(0);
 
-const pkgRel = "app/package.json";
+const pkgRel = "apps/web/package.json";
 const currentPkg = STAGED
     ? readVersionStaged(PKG, pkgRel)
     : readVersionFromHEAD(PKG);

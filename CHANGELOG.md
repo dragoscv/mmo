@@ -12,6 +12,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — `google-auth-library` missing after monorepo move (web `0.4.2`)
+
+- **`apps/web/src/actions/generate.ts` and `apps/web/src/lib/google-id-token.ts` import `google-auth-library` directly, but it was never declared in `apps/web/package.json`** — it only resolved by accident as a hoisted transitive dependency of `@google-cloud/storage`. After the `app/` → `apps/web/` move and a clean `pnpm install` (split-lockfile, no shared hoisting), the package was no longer hoisted and `tsc` failed with `TS2307: Cannot find module 'google-auth-library'`. Declared it explicitly (`^9.15.1`, the version already in the tree) so the build is deterministic.
+
 ### Changed — Monorepo hygiene & workspace fix (web `0.4.1`)
 
 - **`packages/*` now declared in `pnpm-workspace.yaml`**. The four shared-core packages (`@mmo/ai`, `@mmo/audio-gen`, `@mmo/ai-mcp`, `@mmo/sdk`) had valid `package.json` files but were missing from the workspace, so `pnpm -r` ignored them. They are still consumed via tsconfig path aliases (not `workspace:*`) to preserve the split-lockfile design.

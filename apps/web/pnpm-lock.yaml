@@ -83,6 +83,9 @@ importers:
       framer-motion:
         specifier: ^12.38.0
         version: 12.38.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      google-auth-library:
+        specifier: ^9.15.1
+        version: 9.15.1
       hls.js:
         specifier: ^1.6.16
         version: 1.6.16
