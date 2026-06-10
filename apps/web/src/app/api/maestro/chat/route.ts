@@ -13,8 +13,8 @@ import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from 
 import { eq } from "drizzle-orm";
 
 export const runtime = "nodejs";
-// Long enough to cover ACE-Step cloud cold-start (HF model download) + a 240s song generation.
-export const maxDuration = 900;
+// Vercel Pro plan limit is 800s. ACE-Step cloud cold-start + 240s song generation fits within this.
+export const maxDuration = 800;
 
 const SYSTEM_PROMPT = `You are Maestro, the in-app AI agent for MMO — a DJ + DAW workstation.
 
