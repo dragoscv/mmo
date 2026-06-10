@@ -12,6 +12,699 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — MIXAI trigger editor in the visual builder (`apps/mixai` `0.1.38`)
+
+- **The visual macro builder can now author automation triggers**, completing
+  the 0.1.37 feature's UX (previously triggers were JSON/catalog-only):
+  - `src/plugins/builder.tsx`: new "Automation triggers" section — add/remove
+    triggers, each with a condition row (`When <deck> <metric> <op> <value>`),
+    a cooldown field, and an editable macro step list (reusing the same
+    `StepFields` UI as buttons). `buildSpec()` includes `triggers` when present,
+    so Install / Copy JSON round-trip them.
+
+### Added — MIXAI declarative automation triggers (`apps/mixai` `0.1.37`)
+
+- **Plugins can now react to the mix.** A declarative plugin may declare
+  `triggers`: when a watched deck metric crosses a threshold, a macro runs —
+  no code, still shareable:
+  - `src/plugins/external.tsx`: new `MacroTrigger` (deck + `metric`
+    [`remaining`/`position`/`progress`/`bpm`/`volume`] + `op` lt/gt + `value` +
+    `steps` + optional `cooldownMs`); `parseTrigger` validates it; `readMetric`
+    / `triggerMet` evaluate conditions; `ExternalPluginSpec.triggers` added.
+  - `src/plugins/host.tsx`: new `PluginAutomation` runtime (mounted in
+    `App.tsx`) subscribes to the shared ~30 Hz mixer state stream and fires
+    each trigger on the false→true **edge** of its condition, honouring a
+    per-trigger cooldown so it never spams.
+  - `src/plugins/catalog.ts`: new **End-of-Track Alert** automation example
+    (notifies when a deck has < 20s remaining, 30s cooldown).
+- Triggers ride inside the spec/`externalSpecs`, so they survive plugin
+  export/import **and** account profile sync.
+
+### Added — MIXAI customizable, profile-synced keybinds (`apps/mixai` `0.1.36`)
+
+- **Every keyboard shortcut is now remappable.** The cheat-sheet overlay (`?`)
+  is also a live keybind editor:
+  - NEW `src/state/keybind-store.ts`: persists a `shortcutId → KeyboardEvent.code`
+    override map (localStorage `mixai-keybinds`) and resolves the effective
+    code→action map (`resolveBindings`). Sanitises unknown ids so a stale/
+    tampered store can't break input.
+  - `src/lib/shortcuts.ts`: added stable `shortcutId()`, `ALL_SHORTCUTS`,
+    `SHORTCUTS_BY_ID`, and a `codeLabel()` pretty-printer.
+  - `src/lib/use-shortcuts.ts`: the live handler now reads the resolved
+    bindings from the keybind store instead of the static default map.
+  - `src/components/ShortcutsOverlay.tsx`: click any key to capture a new one
+    (Esc cancels), per-binding reset (↺) and a global "Reset all".
+- **Keybinds travel with the account:** added to `ProfileSnapshot` + validated
+  in `importProfile`, and wired through `SettingsPanel` export/restore (clipboard
+  + companion cloud) — so a DJ's remaps follow them to any device.
+
+### Added — MIXAI hotkey-triggerable macros (`apps/mixai` `0.1.35`)
+
+- **Macros are now instantly playable from the keyboard.** Any macro button in
+  a declarative plugin can declare a `hotkey` (e.g. `"shift+a"`); while the
+  plugin is enabled it fires globally:
+  - `src/plugins/external.tsx`: `MacroButton` gained an optional `hotkey`;
+    new `normalizeHotkey` / `hotkeyFromEvent` / `formatHotkey` helpers canon-
+    icalise bindings (sorted modifiers + key); `parseExternalSpec` validates
+    and stores it; `runMacro` is now exported. The generated panel shows a
+    hotkey badge next to each button.
+  - `src/plugins/host.tsx`: new `PluginHotkeys` global `keydown` listener
+    (mounted once in `App.tsx`) maps enabled-plugin hotkeys → macros, skipping
+    input/textarea/select/contenteditable targets so bindings never fight the UI.
+  - `src/plugins/builder.tsx`: per-button hotkey input (normalised on blur).
+  - `src/plugins/catalog.ts`: Quick Drop ships `shift+a` / `shift+b` examples.
+- Hotkeys travel inside the shareable spec and `externalSpecs`, so they survive
+  plugin export/import **and** account profile sync (0.1.34).
+
+### Added — MIXAI HID + plugin profile sync (`apps/mixai` `0.1.34`)
+
+- **Account sync now carries the whole setup** — closes the "restore everything
+  on another device" gap:
+  - `src/lib/profile.ts`: `ProfileSnapshot` gained `hidPreset` (active HID
+    controller mapping) and `externalPlugins` (installed declarative plugin
+    specs); `importProfile` validates both via `importHidPreset` /
+    `parseExternalSpec` so a tampered backup can't inject junk.
+  - `SettingsPanel` profile export/restore (clipboard **and** companion cloud
+    save/load) now includes the HID mapping and re-installs external plugins
+    through the validated `installExternal` path.
+- **Docs:** `docs/mixai/00-architecture-and-plan.md` milestone checklist updated
+  to reflect shipped v0.1/v0.2 and v0.3-in-progress state.
+
+### Added — MIXAI more controller presets (`apps/mixai` `0.1.33`)
+
+- **Wider "out of the box" hardware support** for the MIDI + HID device pickers:
+  - `src/lib/device-presets.ts` (MIDI): added Pioneer DDJ-400, Pioneer DDJ-SB3,
+    Traktor Kontrol S4 MK3, Denon DJ MC7000, Roland DJ-202, and Reloop Beatmix —
+    bringing the built-in MIDI list to 11 controllers across Pioneer, Numark,
+    Native Instruments, Hercules, Denon, Roland and Reloop.
+  - `src/lib/hid-device-presets.ts` (HID): added Pioneer DDJ-1000 and Pioneer
+    CDJ-2000NXS2 scaffolds (with correct vendor/product ids for auto-suggest).
+  - All presets remain honest starting points: the MIDI ones follow standard
+    channel/CC conventions; the HID ones are relearn-from scaffolds. Any offset
+    that's slightly off is one MIDI/HID-Learn away from fixed, then shareable.
+
+### Added — MIXAI plugin catalog (`apps/mixai` `0.1.32`)
+
+- **One-click ready-made macros** — completes the plugin story (loader → builder
+  → catalog):
+  - New `src/plugins/catalog.ts`: a curated `PLUGIN_CATALOG` of declarative macro
+    plugins — Quick Drop (sync+play+slam crossfader), EQ Slam (kill/restore bass),
+    Filter Fade (build-up sweeps), Echo Out (1-bar echo tail then cut), Center
+    Reset (snap to neutral). They double as worked examples of the spec format.
+  - `host.tsx`: a `PluginCatalog` browser in the Plugin Manager with per-entry
+    Install buttons that show **Installed** once added; installs go through the
+    same validated `installExternal` path (no special privileges, data-only).
+
+### Added — MIXAI visual macro plugin builder (`apps/mixai` `0.1.31`)
+
+- **Make a plugin without writing JSON** — a friendly front-end to the
+  declarative loader shipped in `0.1.30`:
+  - New `src/plugins/builder.tsx`: a `PluginBuilder` form to set metadata
+    (id / name / author / icon / category / description) and assemble macro
+    buttons, each a sequence of curated engine steps (`play`/`pause`/`setVolume`/
+    `setEq`/`setFilter`/`setCrossfader`/`sync`/`setFx*`/`notify`/`wait`) with
+    kind-specific fields (deck pickers, EQ band, FX kind, numeric values).
+  - Builds an `ExternalPluginSpec` live and either **Install**s it (through the
+    same `installExternal` validation path) or **Copy JSON**s the shareable spec
+    to the clipboard.
+  - Mounted in the Plugin Manager under the paste-JSON loader. Same security
+    posture: data-only, no `eval`, reaches the app solely via the curated engine.
+
+### Added — MIXAI external plugin loading (`apps/mixai` `0.1.30`)
+
+- **Third-party plugins, the safe-first way** — users can now install plugins
+  that ship outside the binary, without executing arbitrary code:
+  - New `src/plugins/external.tsx`: a **declarative** plugin format. A plugin is
+    pure data (metadata + "macro" buttons), where each button runs a sequence of
+    *curated* engine actions (`play`/`pause`/`setVolume`/`setEq`/`setFilter`/
+    `setCrossfader`/`sync`/`setFx*`/`notify`/`wait`). `parseExternalSpec` fully
+    validates every field and step (decks, bands, finite numbers, capped waits)
+    before anything is trusted; `compileExternalPlugin` turns a valid spec into a
+    real `MixaiPlugin` with a generated button panel.
+  - `plugin-store.ts`: external specs persist to `localStorage`
+    (`mixai-external-plugins`), are re-validated + recompiled on startup, and
+    merge with the built-ins. New `installExternal(json)` (upsert, rejects ids
+    that collide with built-ins, gated by `isValidPlugin`), `removeExternal(id)`,
+    and `isExternal(id)`.
+  - `host.tsx`: the Plugin Manager gains a "Load plugin from JSON" paste box with
+    inline validation errors, plus an **External** badge and ✕ remove button on
+    installed external plugins.
+  - Security posture: because external plugins are *data only* and reach the app
+    solely through the curated `PluginContext.engine`, there is **no `eval` and no
+    arbitrary code** yet. Code-bearing plugins behind a worker/iframe sandbox can
+    build on this same loader + manager later.
+
+### Added — MIXAI HID LED/feedback output (`apps/mixai` `0.1.29`)
+
+- **Closes the HID loop** — controllers can now light up to reflect transport
+  state, the output half of the read/write story (the MIDI module already
+  captured an LED output port; HID gets the same now):
+  - Rust `hid.rs`: the reader thread now also owns *writes* — output reports are
+    queued via an `mpsc` channel and flushed between reads, so the non-`Sync`
+    `HidDevice` is never shared across threads. New `hid_write_report(bytes)`
+    command + `engine.hidWriteReport`.
+  - New `src/lib/hid-feedback.ts`: a **state-diffing** LED driver. Given a
+    preset's `feedback` mappings it computes the desired output report from the
+    mixer snapshot (play / cue / sync / loop / on-air per deck) and only writes
+    when a byte actually changes — no 30 Hz spam. ORs bit-flags that share a byte.
+  - `HidPreset` gained optional `feedback: HidFeedback[]` + `outputReportId`,
+    carried through export/import (validated). The DDJ-FLX4 (HID) preset ships a
+    play/cue/sync/loop feedback scaffold.
+  - `App.tsx` pushes feedback on every mixer tick; the diff cache resets on
+    connect/disconnect and preset change.
+- Output report layouts are firmware-specific, so feedback maps are honest
+  scaffolds (relearn-from), same as the input mappings.
+- Validated: `cargo build` clean, `pnpm build` (~301 KB, 74 modules).
+
+### Added — MIXAI built-in HID device presets (`apps/mixai` `0.1.28`)
+
+- **Ready-made HID mappings for known gear** so users don't have to learn every
+  control by hand — the HID equivalent of the MIDI device-preset picker:
+  - New `src/lib/hid-device-presets.ts`: a compact positional-layout builder
+    (`deckBase`/`deckStride`, per-action axis offsets + button `[offset, mask]`,
+    contiguous-bit performance pads, master axes) expanded into full
+    `HidPreset`s. Ships Pioneer DDJ-FLX4 (HID), Pioneer CDJ-3000 (HID, single
+    deck → A), a Numark scaffold, and a clean Generic 2-deck layout — each
+    tagged with its USB vendor/product id.
+  - `presetForDevice(vendorId, productId)` matches a connected device (exact
+    product, then vendor fallback) to suggest the right preset.
+  - Settings → HID controllers gained a **Device preset** dropdown and a
+    **"Use suggested: …"** button that appears when the connected device matches
+    a known preset. Picking one loads it into the HID mapping store (persisted).
+- HID report layouts are proprietary/firmware-specific, so these are honest
+  scaffolds: the structure + ids are right, and any off offset is one HID-Learn
+  (0.1.27) away from fixed — then shareable back to the community.
+- Frontend-only. Validated: `pnpm build` (~299 KB, 73 modules).
+
+### Added — MIXAI HID input mapping + learn (`apps/mixai` `0.1.27`)
+
+- **Maps the raw HID stream to engine actions** — the layer that sits on top of
+  the 0.1.26 HID foundation, mirroring the MIDI mapping/learn model but for
+  *positional* HID reports:
+  - New `src/lib/hid-mapping.ts` (pure/typed): `HidPreset { name, vendorId,
+    productId, mappings }` where each `HidMapping` addresses a control by
+    `byteIndex` + `mask` (buttons) or whole byte (axes), plus action + deck.
+    `export/importHidPreset` (versioned JSON, validated), `upsert/removeHidMapping`
+    (dedup by byte+mask so re-learning rebinds). Reuses the MIDI action union and
+    labels — identical engine surface.
+  - New `src/state/hid-store.ts` (zustand, persisted to localStorage): receives
+    `hid://input` reports and either **dispatches** mapped controls (button rising
+    edges + axis value changes) to `engine.*` with the *same value scaling* as the
+    Rust MIDI `map_to_command` (volume 0..1, tempo 0.5..1.5, filter/crossfader
+    −1..1, EQ ±, master ×1.5), or **learns** by diffing consecutive reports to
+    detect the changed byte/bit and surface a bind candidate.
+  - `App.tsx` subscribes to `hid://input` once and feeds the store so mappings
+    work app-wide.
+  - Settings → HID controllers gained **HID Learn → bind** (action + deck
+    selects), a live bindings table with per-row delete, and **Share / Import**
+    of mappings (clipboard + paste) — the same authoring loop as MIDI.
+- Frontend-only (no Rust changes). Validated: `pnpm build` (~296 KB, 72 modules).
+
+### Added — MIXAI HID device foundation (`apps/mixai` `0.1.26`)
+
+- **Native HID layer** (`hidapi`, MIT) for CDJs and HID-class DJ gear that
+  don't speak MIDI — the foundation the per-model jog/screen decoders build on:
+  - New Rust module `src-tauri/src/hid.rs`: `HidState` (Tauri-managed),
+    `list_devices()` (enumerates all HID devices, DJ gear bubbled to the top via
+    a small known-vendor/product registry — Pioneer DJ, NI, Numark, Hercules),
+    `connect(path)` (opens the device and spawns a non-blocking reader thread
+    that streams raw input reports to the UI as a `hid://input` event with
+    bytes + hex), and `disconnect()` (signals the thread to stop).
+  - Commands `list_hid_devices`, `hid_connect`, `hid_disconnect`,
+    `hid_open_path` registered in `lib.rs`, mirroring the MIDI plumbing.
+  - Frontend: `engine.listHidDevices/hidConnect/hidDisconnect/hidOpenPath`
+    wrappers, `HidDeviceInfo`/`HidInputEvent` types, `subscribeHidInput` event
+    helper, and a **HID controllers** section in Settings to enumerate, connect,
+    and watch the live raw report stream (debug view).
+- Intentionally foundation-only: raw reports now, model-specific decoding
+  (jog ticks, platter touch, fader positions) lands on top of this stream next.
+- Validated: `cargo build` clean, `pnpm build` (~288 KB, 70 modules).
+
+### Added — MIXAI built-in plugins: VU Scope + Filter Riser (`apps/mixai` `0.1.25`)
+
+- **Two more reference plugins** that exercise the remaining SDK categories and
+  prove out the contract end-to-end:
+  - 📈 **VU Scope** (*visual*) — a scrolling master-output meter painted on an
+    HTML canvas, driven directly from the 30 Hz state stream with a rolling
+    buffer in a ref (no per-frame React re-render).
+  - 🎚️ **Filter Riser** (*effect*) — a one-tap, beat-timed HPF build-up macro
+    that eases the deck filter from neutral to full HPF over 4/8/16/32 beats
+    then snaps back on the drop. Uses the safe `engine.setFilter` subset,
+    `ctx.notify`, and persists its deck + length via `saveSettings`/`loadSettings`.
+- All four SDK categories (utility, assistant, visual, effect) now ship a
+  working built-in example.
+- Validated: `pnpm typecheck` clean, `pnpm build` (~286 KB, 70 modules).
+  Frontend-only.
+
+### Added — MIXAI Plugin SDK foundation (`apps/mixai` `0.1.24`)
+
+- **Extensions, the right way.** New typed Plugin SDK (`src/plugins/sdk.ts`):
+  a plugin is declarative data — metadata + an optional React panel + optional
+  `onEnable`/`onDisable` hooks. Plugins never import the engine, stores or Tauri;
+  everything they can touch arrives through a curated `PluginContext`
+  (`getState`, 30 Hz `subscribe`, a safe transport/mix `engine` subset, `notify`,
+  and namespaced `saveSettings`/`loadSettings`). This keeps the surface small and
+  ready to sandbox third-party plugins in a worker later.
+- **Registry + host.** `plugin-store.ts` holds the registry, the enabled set
+  (persisted to localStorage), a single shared 30 Hz state fan-out, and a toast
+  channel. `host.tsx` adds a `PluginDock` (renders enabled panels in the right
+  rail), a `PluginToasts` layer, and a `PluginManager` (Settings → Plugins) to
+  toggle plugins on/off.
+- **Two reference built-ins** that double as docs: **Phrase Counter** (live
+  bar + 16-bar phrase position per playing deck) and **Key Clash Guard**
+  (warns when the two on-air decks are in clashing Camelot keys during a blend,
+  using `onEnable`/`onDisable` + `ctx.notify`).
+- Validated: `pnpm typecheck` clean, `pnpm build` (~283 KB, 70 modules).
+  Frontend-only.
+
+### Added — MIXAI account profile sync via companion (`apps/mixai` `0.1.23`, `server` `1.0.27`)
+
+- **Real account sync, not just a copy/paste code.** Settings → Profile backup
+  now has **Save to cloud** / **Load from cloud** buttons that store the full
+  profile snapshot (theme, custom themes, deck layout, companion connection,
+  MIDI mapping) on the MMO Companion keyed by your signed-in user, so any
+  machine paired to your library can pull the same setup.
+- Companion: new `/mixai-profile` router (`GET` returns the stored blob or
+  `null`; `PUT` upserts it) backed by a lazily-created `mixai_profiles` SQLite
+  table (one JSON blob per user, 256 KB cap). Auth is the existing
+  `X-Device-Token` + `X-User-Id` pair.
+- MIXAI bridge: new Rust commands `companion_get_profile` / `companion_put_profile`
+  (proxy through reqwest, never the webview), and `engine.companionGetProfile` /
+  `engine.companionPutProfile` wrappers.
+- The cloud buttons are gated on a configured companion (device token + user id);
+  paste-restore and clipboard-export still work fully offline.
+- Validated: `server` `tsc --noEmit` clean, `cargo build` clean, `pnpm build`
+  (~275 KB, 67 modules).
+
+### Added — MIXAI profile backup & restore (`apps/mixai` `0.1.22`)
+
+- **Move your whole setup between machines.** Settings → Profile backup exports
+  everything local — active theme, all custom themes, deck layout, muzicai.ro /
+  companion connection, and the active MIDI mapping — into one portable code
+  (copied to clipboard), and restores it all from a pasted code.
+- This is the local-first precursor to muzicai.ro account sync: the same snapshot
+  shape will later be pushed to / pulled from the signed-in account.
+- Restore is **lenient and validated** — each section is parsed independently
+  (custom themes validated per-token, companion config, MIDI preset via the
+  existing `importPreset`), so a partial or older backup still restores whatever
+  it can; custom themes merge by id (imported wins).
+- New `src/lib/profile.ts` (`exportProfile`/`importProfile` + `ProfileSnapshot`),
+  `ui-store.restoreProfile`, and a `ProfileSection` in the settings panel.
+- Validated: `pnpm typecheck` clean, `pnpm build` (~273 KB, 67 modules).
+  Frontend-only.
+
+### Added — MIXAI keyboard shortcuts (`apps/mixai` `0.1.21`)
+
+- **Pro deck control from the laptop keyboard — no controller required.** A
+  Serato/rekordbox-style split layout drives Deck A with the left hand (Q play,
+  A cue, S sync, Z/X nudge, W loop, 1–4 hot-cues) and Deck B with the right
+  (P play, ; cue, L sync, ,/. nudge, O loop, 7–0 hot-cues). Arrow keys crossfade
+  (←/→ to A/B, ↓ center).
+- **Built-in cheat-sheet overlay.** Press **?** (or the new ⌨ Keys button in the
+  top bar) for a grouped reference of every binding.
+- Shortcuts are suppressed while typing in inputs/textareas/selects and never
+  swallow Ctrl/Cmd/Alt combos, so library search and OS shortcuts keep working.
+- All actions route through existing engine commands (play/pause/cue/sync/loop/
+  hot-cue/seek/crossfader) and read live deck state for correct toggles. New
+  files: `src/lib/shortcuts.ts` (documented binding table), `src/lib/use-shortcuts.ts`
+  (hook + dispatcher), `src/components/ShortcutsOverlay.tsx`.
+- Validated: `pnpm typecheck` clean, `pnpm build` (~270 KB, 66 modules).
+
+### Added — MIXAI built-in device preset picker (`apps/mixai` `0.1.20`)
+
+- **MIDI for every console brand, out of the box.** A new "Device preset"
+  dropdown in Settings → MIDI ships ready-to-use mappings for the most common
+  2-deck controllers: **Pioneer DDJ-FLX4** (matches the native default exactly),
+  **Numark Mixtrack Pro**, **Traktor Kontrol S2**, **Hercules DJControl Inpulse**,
+  and a **Generic 2-deck MIDI** fallback.
+- Picking a preset applies it live via `engine.midiSetPreset`, so the controller
+  works immediately — and every binding is still fine-tunable with the
+  `0.1.19` learn→bind editor and shareable via the export code.
+- New `src/lib/device-presets.ts` synthesizes each preset from a compact layout
+  description (per-deck Note/CC/pad status bytes + control numbers), keeping the
+  table tiny and easy to extend with more controllers.
+- Validated: `pnpm typecheck` clean, `pnpm build` (~265 KB, 63 modules).
+  Frontend-only — reuses the `0.1.18` native `midi_set_preset` command.
+
+### Added — MIXAI MIDI learn→bind editor (`apps/mixai` `0.1.19`)
+
+- **Create and edit mappings, not just import them.** MIDI Learn now captures
+  the last-touched control and lets you bind it to any action + deck inline:
+  pick the action and target deck, hit **Bind**, done. Re-learning the same
+  physical control rebinds it (deduped by status+note) instead of piling up
+  duplicates.
+- **Per-binding delete.** Each row in the bindings table now has a remove
+  button; deletes are written to the live preset immediately.
+- Control kind (Note vs CC) is inferred from the MIDI status byte
+  (`0xB0..0xBF` → CC, otherwise Note), so users don't have to know the wire
+  format. All edits go through `engine.midiSetPreset`, so they take effect on
+  the controller instantly and are shareable via the existing export code.
+- New `src/lib/midi-preset.ts` helpers: `ALL_ACTIONS`, `controlTypeFromStatus`,
+  `upsertMapping`, `removeMapping` (all pure/immutable).
+- Validated: `pnpm typecheck` clean, `pnpm build` (~262 KB). Frontend-only —
+  reuses the `0.1.18` native `midi_set_preset` command.
+
+### Added — MIXAI shareable MIDI mappings (`apps/mixai` `0.1.18`)
+
+- **Share your controller mapping.** The active MIDI preset can now be inspected,
+  exported as a compact code (copy to clipboard) and imported from a shared code
+  — the same marketplace foundation as custom themes, now for controller layouts.
+- **Native (Rust)**: `midi.rs` gains `get_preset`/`set_preset` (the live input
+  callback already reads the shared `Preset`, so an imported mapping takes effect
+  immediately); exposed as `midi_get_preset`/`midi_set_preset` Tauri commands.
+- **Frontend**: new `MidiPreset`/`MidiMapping`/`MidiAction` types mirroring the
+  Rust model; `engine.midiGetPreset`/`midiSetPreset` wrappers; `src/lib/midi-preset.ts`
+  with versioned `exportPreset`/`importPreset` (every binding validated — status/
+  midino byte range, known action, note/cc type, valid deck — malformed payloads
+  rejected) and an `actionLabel` helper.
+- **UI**: Settings → MIDI controllers now shows the active preset name, binding
+  count, a scrollable bindings table (action · deck · CC/Note + status), a
+  **Share** button and a paste-to-import field with validation. The preset is
+  (re)loaded on connect so device auto-mapping is reflected.
+- Validated: `cargo build` (app) clean, `pnpm typecheck` clean, `pnpm build`
+  (~260 KB).
+
+### Added — MIXAI custom & shareable themes (`apps/mixai` `0.1.17`)
+
+- **Make it yours, then share it.** Beyond the three built-in themes, users can
+  now create unlimited **custom themes**, live-edit their colors with native
+  swatches, and **share** them as a compact code (copy to clipboard / paste to
+  import) — the foundation for a future themes marketplace.
+- **Theme model** (`src/themes/themes.ts`): added `CustomTheme` (namespaced
+  `custom:<uuid>` ids), an `EDITABLE_TOKENS` palette (background, surfaces, text,
+  accents, deck colors, good/warn/danger), `makeCustomTheme`/`blankCustomTheme`
+  (colors + motion → full token set via per-motion structural tokens so themes
+  stay coherent), and versioned `exportTheme`/`importTheme` JSON serialization
+  (malformed payloads rejected, missing colors backfilled). New `applyThemeDef`
+  applies any theme object; `applyTheme` delegates to it.
+- **Store** (`src/state/ui-store.ts`): `theme` widened to `ThemeId | custom:*`;
+  persists `customThemes` to localStorage; actions `addCustomTheme`,
+  `updateCustomThemeColor` (live re-applies when active), `renameCustomTheme`,
+  `deleteCustomTheme` (falls back to Neon Glass), `importThemeString`, and
+  `applyActiveTheme` (resolves built-in/custom on startup — `main.tsx` now uses
+  it so custom themes survive reload with no flash).
+- **UI**: the Settings → Theme section gains a `+ New` button, a color-swatch
+  editor with rename/Share/Delete for the active custom theme, and a paste-to-
+  import field with validation. A `toHex` helper coerces rgb()/short-hex tokens
+  for the native color picker.
+- Frontend-only (no Rust changes). Validated: `pnpm typecheck` clean,
+  `pnpm build` (~256 KB).
+
+### Added — MIXAI auto-queue: autonomous set building (`apps/mixai` `0.1.16`)
+
+- **The AI DJ now picks its own tracks.** With **AUTO-QUEUE** on, auto-mix loads
+  the best harmonic match from the muzicai.ro library onto the idle deck before
+  each blend — turning the auto-mixer into a fully autonomous, hands-off set
+  builder that keeps the dancefloor moving with key- and BPM-compatible choices.
+- **Selection** reuses the harmonic scoring (`transitionScore`): for the on-air
+  deck's key + BPM it ranks the visible library, skips tracks already loaded on
+  any deck or played this session, and loads the top match. After each
+  transition it also **pre-loads the next match** onto the freed deck so the
+  following blend is ready early.
+- **Refactor**: extracted the companion track-load flow (optimistic metadata →
+  local-decode-with-stream-fallback → waveform peaks → Camelot key → auto-attach
+  stems) into a hook-free `src/lib/load-track.ts` shared by the Library browser
+  and the auto-mix store. The library keeps the auto-mix candidate **pool** in
+  sync with what's visible.
+- **UI**: an **AUTO-QUEUE** toggle joins BEAT-SYNC in the auto-mix panel; the
+  status line shows the track being queued.
+- Frontend-only (no Rust changes). Validated: `pnpm typecheck` clean,
+  `pnpm build` (~250 KB).
+
+### Added — MIXAI auto-mix "AI DJ" (`apps/mixai` `0.1.15`)
+
+- **Hands-free mixing.** A frontend orchestrator that beat-syncs the idle deck
+  and crossfades into it a few seconds before the on-air track ends — a true
+  "AI DJ" built entirely on the existing public engine commands a human would
+  use (`sync` / `play` / `setCrossfader` / `pause`), so it never touches the
+  audio thread and is fully cancellable.
+- **State machine** (`src/state/auto-mix-store.ts`): watches deck transport via
+  the regular 30 Hz `mixer://state` snapshot; when the on-air deck's remaining
+  time drops below the **lead-in** window it optionally beat-syncs the other
+  deck, starts it, and ramps the crossfader to the far side over the
+  **crossfade** duration using an easeInOutSine curve, then pauses the outgoing
+  deck and flips "on air". Re-entrancy-guarded; adopts whichever main deck is
+  already playing when armed.
+- **UI** (`src/components/AutoMixPanel.tsx`): ON/OFF arm, live status line with
+  an on-air indicator dot (deck-coloured / amber while mixing), Crossfade (2–30 s)
+  and Lead-in (4–40 s) sliders, a BEAT-SYNC toggle, and a **MIX NOW** button to
+  force the next blend. Mounted in the right column above the crossfader.
+- Frontend-only (no Rust changes). Validated: `pnpm typecheck` clean,
+  `pnpm build` (~248 KB). First step toward full automated set building on the
+  harmonic mix-assist scoring.
+
+### Added — MIXAI harmonic mix-assist (`apps/mixai` `0.1.14`)
+
+- **AI-style "what mixes next" suggestions.** First v0.3 feature: a harmonic
+  mix-assist that ranks the muzicai.ro library by how well each track would mix
+  into a playing deck, using **Camelot-wheel** key compatibility + BPM proximity.
+- **Camelot logic** (`src/lib/harmonic.ts`, pure/typed): `parseCamelot` (e.g.
+  `8A`), `keyCompatibility` scoring the classic moves — Perfect (same key, 1.0),
+  Relative major/minor (0.92), Adjacent ±1 (0.85), Energy-boost +7 / fifth
+  (0.6), Whole-step ±2 (0.45), Diagonal energy mix (0.55), else Clash (0).
+  `bpmCloseness` folds ½×/2× octaves into a ±6 % window; `transitionScore`
+  blends key (70 %) + BPM (30 %) and computes the signed pitch-bend %% needed to
+  beat-match.
+- **UI**: a **MIX ASSIST** bar above the companion track list lets you pick which
+  loaded deck to mix *into* (or OFF). When on, tracks re-sort by transition score
+  and each row shows a colour-coded match badge (green ≥80 % / amber ≥55 %) with
+  the move label and tempo-nudge tooltip. The playing deck's Camelot key is now
+  recorded on load via a transient `deckKeys` map in the mixer store.
+- Frontend-only (no Rust changes). Validated: `pnpm typecheck` clean,
+  `pnpm build` (~244 KB).
+
+### Added — MIXAI one-shot sampler (`apps/mixai` `0.1.13`)
+
+- **8-pad one-shot sampler.** A pad bank that plays short stereo samples (DJ
+  drops, stabs, vocal shouts, loops) straight into the master bus. Click a
+  loaded pad to fire it from the start; re-triggering restarts instantly.
+  Per-pad gain, one-shot vs. **loop** toggle, load (⊕) and clear (✕).
+- **RT-safe** (`mixai-core::sampler`): each `Pad` holds an optional `TrackBuffer`
+  loaded off the audio thread (moved in via `Command::LoadSample`); the cpal
+  callback only reads buffers and advances a per-pad cursor — no locks, no
+  allocation. Linear-interpolated playback with a source/engine sample-rate
+  ratio so 44.1 kHz samples play correctly at any device rate; gains are
+  one-pole smoothed for click-free level changes. Pads sum into the master
+  *after* the deck/crossfader mix, so they go through master volume, soft-clip
+  and the recording tap. Permissive (MIT OR Apache-2.0).
+- Full stack: new `Command::{LoadSample,ClearSample,TriggerSample,StopSample,`
+  `SetSampleGain,SetSampleLooping}` + drain handlers + `Sampler` mixed in
+  `Mixer::render`; Engine `load_sample`/`trigger_sample`/… methods; Tauri
+  commands `sampler_{load,clear,trigger,stop,set_gain,set_looping}` (load
+  decodes the file natively via `decoder::decode_file`); `engine.sampler*`
+  bridge wrappers; `state/sampler-store.ts` (transient pad metadata) and a
+  `SamplerPanel.tsx` 8-pad UI mounted under the crossfader.
+- Validated: `cargo build` (core + app), `cargo test` **8/8** (3 new sampler
+  tests: one-shot plays-then-stops, untriggered-silent, loop-keeps-playing),
+  `pnpm typecheck` clean, `pnpm build` (~240 KB). This completes the v0.2
+  milestone (stems, recording, streaming output, 4-deck, FX, sampler all done).
+
+### Added — MIXAI beat-synced FX (`apps/mixai` `0.1.12`)
+
+- **Per-deck FX unit: echo + reverb.** Each deck now has a real-time effects
+  insert (post-fader, so tails follow the channel fader) with two effects:
+  a **beat-synced feedback echo** whose delay length tracks the deck's effective
+  BPM × tempo × beat division (¼/½/1/2 beats), and a **Schroeder reverb**
+  (4 comb + 2 all-pass per channel, stereo-spread, scaled to the sample rate).
+- **RT-safe DSP** (`mixai-core::fx`): ring-buffer delay line and comb/all-pass
+  sections are preallocated once at deck creation — the cpal callback only
+  reads/writes existing storage (no locks, no allocation). The wet/dry mix is
+  one-pole **smoothed** so enabling/disabling and blending are click-free, and
+  switching effect type clears the tails so old audio never bleeds through.
+  Licensing stays permissive (MIT OR Apache-2.0) — the reverb is an original
+  Schroeder/Freeverb-style implementation, no GPL code.
+- **Echo time auto-tracks the grid:** the delay length is recomputed whenever
+  the track loads or the tempo fader moves, so the echo stays locked to the beat
+  while pitch-bending.
+- **`FxPanel` UI** on each deck: OFF/ECHO/REVERB selector, a WET blend slider
+  with live percentage, and ¼/½/1/2 beat-division buttons — styled to match the
+  existing stem/pad panels with the deck accent colour and smooth transitions.
+- Full stack wired end-to-end: new `Command::{SetFxKind,SetFxWet,SetFxBeats}`
+  + drain handlers + `Deck` methods (`set_fx_kind`/`set_fx_wet`/`set_fx_beats`,
+  `recompute_fx_time`), `DeckState.{fxKind,fxWet,fxBeats}` surfaced to the UI
+  mirror, Tauri commands `deck_set_fx_{kind,wet,beats}`, and `engine.setFx*`
+  bridge wrappers. Validated: `cargo build` (core + app), `cargo test`
+  (5/5 incl. 3 new FX tests: off-passthrough, echo bounded/finite, reverb
+  decays), `pnpm typecheck` clean, `pnpm build` (~237 KB).
+
+### Added — MIXAI remote streaming (`apps/mixai` `0.1.11`)
+
+- **Play tracks from a companion on another machine.** Until now companion
+  tracks loaded from their local `filepath` — fine when the companion runs on
+  the same box, but useless over LAN / Cloudflare tunnel. Loading a muzicai.ro
+  track now tries a direct local decode first and, if the file isn't on local
+  disk, transparently **streams the encoded bytes** from the companion's
+  range-aware `GET /audio/<filepath>` route and decodes them in-memory.
+- **In-memory decoder** (`mixai-core::decoder::decode_bytes`): the symphonia
+  decode loop was factored into a shared `decode_stream(MediaSourceStream)` so
+  both `decode_file` (disk) and `decode_bytes` (a `Cursor<Vec<u8>>` from HTTP)
+  produce the same `TrackBuffer` — full buffer so waveform peaks, beatgrid and
+  instant seek all still work on streamed tracks.
+- **Rust-side fetch** (`src-tauri/src/companion.rs::fetch_track_audio`): resolves
+  the track's filepath, then GETs `/audio/<encoded>` with a 120 s transfer
+  timeout (whole file over a tunnel). The megabytes stay in the Rust process —
+  only the decoded handle + peaks cross the JS IPC boundary. New Tauri command
+  `load_track_stream` (async) shares the analyse/mirror/load path with
+  `load_track` via a new `load_decoded` helper.
+
+### Added — MIXAI live stems (`apps/mixai` `0.1.10`)
+
+- **Live per-stem control — the headline DJ feature.** Each deck now has a
+  **STEMS** panel with four vertical faders + mute (M) / solo (S) for vocals,
+  drums, bass and melody. Blend, mute or solo any stem on the fly while the
+  track plays; an ON/OFF switch toggles stem playback vs. the full mix.
+- **RT-safe stem mixing engine** (`mixai-core::stretch::StemMix`): playback now
+  reads through a `StemMix` source that sums up to four stereo layers with
+  smoothed per-stem gains. Both playback paths use it — the WSOLA key-lock
+  stretcher (`process_hop`/`find_best_delta` refactored to consume `&StemMix`)
+  and the varispeed path — so stems work with key-lock on or off, with no locks
+  or allocation in the audio callback. Gains smooth over ~20 ms (click-free).
+- **Deck stem state** (`mixai-core::deck`): optional 4-layer buffers, smoothed
+  `stem_gain[4]`, `set_stems`/`set_stems_active`/`set_stem_gain`; cleared on new
+  track load. New `Command::{LoadStems,SetStemsActive,SetStemGain}` + engine
+  methods; `DeckState` surfaces `hasStems`/`stemsActive`/`stemGains` to the UI.
+- **Tauri commands** `load_stems` (decodes up to four local stem WAVs off the
+  audio thread), `deck_set_stems_active`, `deck_set_stem_gain`.
+- **Companion stem integration** (`src-tauri/src/companion.rs`): `companion_tracks`
+  now reports `stemsStatus`; new `companion_track_stems` (reads a track's stem
+  paths), `companion_request_stems` (POST `/analyze {stems:true}` → job id) and
+  `companion_stem_job` (poll progress; the companion's 4th stem `other` maps to
+  MIXAI's `melody` slot). The Library auto-attaches stems when loading a track
+  whose `stemsStatus === "ready"`, and shows a ✦ generate button with live
+  progress for tracks not yet separated.
+
+### Added — MIXAI muzicai.ro library via Companion (`apps/mixai` `0.1.9`)
+
+- **Browse & load your synced library.** The Library panel now has a
+  **muzicai.ro / Local file** source toggle. The muzicai.ro tab lists tracks
+  from the local MMO Companion (`server/`, `http://127.0.0.1:17899`) with live
+  search, BPM and Camelot key, and one-click load to Deck A/B. Because the
+  companion runs on the same machine, tracks load from their local `filepath`
+  through the existing decoder (full BPM/beatgrid/peaks analysis applies).
+- **Native HTTP proxy** (`src-tauri/src/companion.rs`, `reqwest` with rustls):
+  the companion's CORS allowlist rejects the Tauri webview origin, so all
+  `/library/*` calls go through Rust, which also keeps the device token out of
+  the webview. Auth uses `X-Device-Token` + `X-User-Id` headers.
+- New Tauri commands `companion_status` (probes `/health` + reports auth),
+  `companion_configure`, `companion_tracks`, `companion_toggle_favorite`;
+  `engine.ts` wrappers; a managed `CompanionState`.
+- **Settings → muzicai.ro library**: status dot (offline / online / paired),
+  editable companion URL, device token and user id, persisted to localStorage
+  (`mixai-companion`) and pushed to the proxy on startup + on change.
+
+### Added — MIXAI master recording (`apps/mixai` `0.1.8`)
+
+- **Record the master mix to WAV.** A REC button in the top bar opens a native
+  save dialog (`@tauri-apps/plugin-dialog`), then captures the post-fader stereo
+  output to a 32-bit float WAV at the engine sample rate. The button shows a
+  pulsing indicator and a live `mm:ss` elapsed timer; click again to stop and
+  finalize the file.
+- **RT-safe capture pipeline** (`mixai-core::recorder`): the audio callback only
+  accumulates mixed samples into a block buffer and `try_send`s full blocks into
+  a bounded channel — never opens files, never locks, never allocates on the hot
+  path. A dedicated writer thread drains the channel and writes with `hound`
+  (MIT/Apache, keeps the permissive-DSP promise). On backpressure the RT thread
+  drops a block rather than risk a master-output dropout.
+- New `Command::SetRecording`, `Engine::{start,stop,is}_recording`, Tauri
+  commands `start_recording`/`stop_recording`/`is_recording`, and
+  `engine.ts` wrappers `startRecording`/`stopRecording`/`isRecording`.
+
+### Added — MIXAI real key-lock / time-stretch (`apps/mixai` `0.1.7`)
+
+- **Pitch-preserving tempo** via a new pure-Rust WSOLA stretcher
+  (`mixai-core::stretch`, permissive — no C++ toolchain, ships in the binary).
+  When **key-lock** is on, the deck pulls from the stretcher (overlap-add
+  grains with waveform-similarity alignment) so changing tempo no longer
+  changes pitch; with key-lock off it stays varispeed (turntable feel). The
+  stretcher re-primes cleanly on load/seek/cue-jump/key-lock toggle/loop wrap.
+  Covered by unit tests (bounded/finite output, tempo-correct position
+  advance). This completes the v0.1 audio engine ("It mixes, beautifully").
+
+### Added — MIXAI beat sync (`apps/mixai` `0.1.6`)
+
+- **Tempo beat-sync** (`deck_sync`): matches a deck's effective BPM to the
+  master deck (prefers a playing, loaded deck with a known BPM), clamped to the
+  engine's ±50% tempo range. Exposed as a `SYNC` button on each deck and via
+  `engine.sync`. Builds on the BPM/beatgrid detection. (Phase-accurate beat
+  alignment + continuous sync follow.)
+
+### Added — MIXAI local file loading (`apps/mixai` `0.1.5`)
+
+- **Open local audio files** straight onto a deck via the native file picker
+  (`engine.pickAudioFile` using the Tauri dialog plugin; mp3/wav/flac/aac/m4a/
+  ogg/aiff). The Library now has "Open local file → Deck A/B" actions that
+  decode, analyse (BPM/beatgrid), compute peaks and load in one step. Remote
+  muzicai.ro library + companion sync land next.
+
+### Added — MIXAI MIDI controllers (`apps/mixai` `0.1.4`)
+
+- **Native MIDI input** via `midir` (MIT) in a new `src-tauri/src/midi.rs`,
+  porting the web app's data-driven mapping model (`Mapping {status, midino,
+  type, action, deck}` → semantic `MidiAction` → engine `Command`). Ships a
+  built-in **Pioneer DDJ-FLX4** preset (transport, EQ/filter/volume/tempo,
+  loops, 8 hot-cue pads per deck, crossfader, master) and a **MIDI-learn**
+  mode that emits `midi://learn` so any controller can be bound.
+- Tauri commands `list_midi_inputs` / `midi_connect` / `midi_disconnect` /
+  `midi_set_learn`, typed `engine.ts` wrappers, a `subscribeMidiLearn` event
+  subscription, and a real MIDI device/learn panel in Settings (replacing the
+  placeholder). LED output port is captured for the upcoming feedback layer.
+
+### Added — MIXAI BPM + beatgrid analysis (`apps/mixai` `0.1.3`)
+
+- **Offline tempo + beat-phase detection** (`mixai-core::analysis`, fully
+  permissive / no GPL deps): energy-novelty onset envelope → autocorrelation
+  tempo estimate (folded into a 90–180 BPM band to fix octave errors) → beat
+  comb to find the first-downbeat phase. `load_track` now auto-detects BPM
+  when the library doesn't supply it and stores the beatgrid anchor
+  (`DeckState.firstBeat`). The waveform overlay renders beatgrid lines with
+  emphasised downbeats. Sets up sync/quantize and quantized hot-cues/loops.
+
+### Added — MIXAI real waveform peaks (`apps/mixai` `0.1.2`)
+
+- **Real waveform overview**: peaks are downsampled from the decoded audio at
+  load time (`TrackBuffer::compute_peaks`, 2000 bins of mono peak amplitude)
+  and returned by `load_track`, replacing the procedural placeholder. The
+  `Waveform` canvas now renders played/unplayed split, the active loop region
+  (amber shading), hot-cue markers, and the playhead, all driven by the live
+  deck snapshot. Peaks are kept per-deck in the mixer store (transient, not in
+  `MixerState`). Falls back to a faint procedural pattern when no track loaded.
+
+### Added — MIXAI hot cues + loops (`apps/mixai` `0.1.1`)
+
+- **8 hot-cue pads per deck**: set at the live playhead, click to jump,
+  Shift+click to clear. State is owned by the Rust core and captured at the
+  RT playhead, published back through the atomic snapshot so the pads light up
+  from the 30 Hz `mixer://state` feed.
+- **Beat loops + manual loops**: 1/2/4/8-beat loops sized from the track BPM,
+  manual loop IN/OUT, loop toggle/exit, and ½ / ×2 loop halving/doubling.
+  Seamless sample-accurate wrap-around in the deck render path.
+- New `Command` variants (`SetHotCue`/`JumpHotCue`/`ClearHotCue`/`LoopIn`/
+  `LoopOut`/`LoopToggle`/`LoopExit`/`Beatloop`/`LoopScale`), matching Tauri
+  commands, typed `engine.ts` wrappers, and a new `PerformancePads` UI
+  component wired into each deck. `DeckState` gained `hotCues`/`loopActive`/
+  `loopStart`/`loopEnd`.
+
+### Added — MIXAI native DJ app scaffold (`apps/mixai`)
+
+- **New flagship native DJ application `@mmo/mixai`** under `apps/mixai/`, a
+  greenfield Tauri 2 app aimed at combining the best of rekordbox/Serato/Traktor/
+  VirtualDJ/djay with muzicai.ro + AI integration. Architecture & roadmap live in
+  [`docs/mixai/00-architecture-and-plan.md`](docs/mixai/00-architecture-and-plan.md).
+- **Rust real-time audio core (`mixai-core`, MIT/Apache-2.0)**: `cpal` output
+  stream, `symphonia` decode, native DSP signal chain (RBJ biquad 3-band EQ +
+  bipolar LPF/HPF filter + equal-power crossfader + soft-clip master limiter),
+  lock-free `crossbeam` command queue and an atomic snapshot published to the UI.
+  Deliberately permissive-only DSP so the engine stays distributable inside a
+  proprietary/commercial build (GPL analysis libs stay out-of-process).
+- **Tauri bridge**: `#[tauri::command]` surface (device list, load/play/pause/
+  seek, volume/tempo/key-lock/EQ/filter/cue, crossfader, master) plus a 30 Hz
+  `mixer://state` event pump driving live meters/transport in the UI.
+- **React 19 + Vite + TS UI**: themeable from day one with 3 shipped themes
+  (Neon Glass / Studio Metal / Flat Pro), 2- and 4-deck layouts, decks with
+  waveform + transport + tempo + key-lock, channel strips (EQ/filter/VU/fader/
+  cue), crossfader + master, library browser, and an audio/MIDI/theme settings
+  panel. Frontend, Rust core and full Tauri app all compile clean.
+
 ### Changed — Documentation consolidated under `docs/` (web `0.4.3`)
 
 - **Moved the root knowledge-base folders into `docs/`**: `concept/`, `organizare/`, `genuri/`, `echipament/`, `glosar/`, and `versuri/` now live at `docs/concept/`, `docs/organizare/`, etc. The repo root is now limited to code (`apps/`, `packages/`, `server/`, `infra/`) plus top-level meta files, matching a conventional monorepo layout.

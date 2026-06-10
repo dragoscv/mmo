@@ -22,6 +22,7 @@ import type { ScaleConfig } from "./audio/pitch-dsp";
 import { createLibraryRouter } from "./library/routes";
 import { createSyncRouter } from "./sync/http-router";
 import { createProjectsRouter } from "./projects/router";
+import { createProfileRouter } from "./profile/routes";
 import { attachYjsWs } from "./collab/yjs-ws";
 import { attachWatchPartyWs, createWatchPartyRouter } from "./library/watch-party";
 import { setOnAppliedListener } from "./sync";
@@ -1062,6 +1063,14 @@ export async function startServer(): Promise<void> {
     // Web clients POST base64-encoded bytes and later GET them as a stream.
     // Cloud Postgres holds the metadata row (project_assets) pointing here.
     app.use("/projects", createProjectsRouter(authMiddleware));
+
+    // ─── MIXAI profile sync ──────────────────────────────────────────────
+    //
+    // Stores the MIXAI desktop app's settings backup (themes, deck layout,
+    // MIDI mapping, companion config) as one opaque JSON blob per user, so
+    // the app can sync preferences across machines. See
+    // `server/src/profile/routes.ts`.
+    app.use("/mixai-profile", createProfileRouter(authMiddleware));
 
     // ─── Audio plugin host (VST3 / AU / LV2 via pedalboard) ──────────────
     //

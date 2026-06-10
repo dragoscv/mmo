@@ -1,0 +1,45 @@
+[package]
+name = "mixai"
+version = "0.1.0"
+description = "MIXAI — native DJ software"
+authors = ["mwrty <vladulescu.catalin@gmail.com>"]
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/dragoscv/mmo"
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "mixai_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+env_logger = "0.11"
+# The audio engine (local path crate, permissive-licensed).
+mixai-core = { path = "crates/mixai-core" }
+# Cross-platform MIDI I/O (MIT) for DJ controller support.
+midir = "0.10"
+# Cross-platform HID I/O (MIT) for CDJs and HID-class DJ controllers.
+hidapi = "2"
+# HTTP client to talk to the MMO Companion library API (rustls = no OpenSSL).
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+[features]
+# Forward the ASIO opt-in to the core for low-latency Windows builds.
+asio = ["mixai-core/asio"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+incremental = false
+opt-level = 3
+strip = true
