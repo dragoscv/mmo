@@ -12,6 +12,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed — Monorepo hygiene & workspace fix (web `0.4.1`)
+
+- **`packages/*` now declared in `pnpm-workspace.yaml`**. The four shared-core packages (`@mmo/ai`, `@mmo/audio-gen`, `@mmo/ai-mcp`, `@mmo/sdk`) had valid `package.json` files but were missing from the workspace, so `pnpm -r` ignored them. They are still consumed via tsconfig path aliases (not `workspace:*`) to preserve the split-lockfile design.
+- **Removed ~25 tracked one-off artifacts** that predated the `*.log` gitignore rule: eslint dumps (`eslint*.json/.txt`), ad-hoc analysis scripts (`_scan.js`, `analyze.js`, `parse.js`, `lc.json`), `build-output.txt`, and stale `.log` files at the repo root and under `app/`. Added matching `.gitignore` patterns so they can't be re-committed. Kept `app/.eslint-baseline.json` (used by `lint:baseline`/`lint:check`) and `app/components.json` (shadcn).
+
 ### Added — AI generation, training, Maestro, Watch & Voice feature set (web `0.4.0`)
 
 - **Large feature drop committed**: AI music/voice generation (`/generate`, `/voice-wizard`), LoRA training pipeline (`/training`, `/lora`), the Maestro coaching surface (`/maestro`), an expanded Watch experience (continue/discover/stats/settings, Trakt sync, watch-party, bookmarks, external ratings), normalized project schema, and a CodAI/MCP copilot. New Drizzle migrations `0018`–`0026`, server-side Python sidecars, and supporting infra (Azure ML, Cloud Run, Vertex, Terraform) are included.

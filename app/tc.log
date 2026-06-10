@@ -1,5 +1,0 @@
-ΓÇëWARNΓÇë Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.1.0","pnpm":"10.11.0"})
-
-> music-organizer@0.2.0 typecheck E:\gh\mmo\app
-> tsc --noEmit
-

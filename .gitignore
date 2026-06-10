@@ -19,6 +19,17 @@ node_modules/
 /app/tsc-errors.log
 /app/tsc-report.txt
 
+# One-off lint/typecheck/test dumps & ad-hoc analysis scripts (never commit)
+eslint-out.json
+eslint-out.txt
+eslint-snapshot.json
+eslint-compact.txt
+/build-output.txt
+/app/lc.json
+/app/_scan.js
+/app/analyze.js
+/app/parse.js
+
 # SQLite WAL / SHM sidecar files (data/music-organizer.db itself is dev-only too)
 *.db-shm
 *.db-wal
