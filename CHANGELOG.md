@@ -5,12 +5,18 @@ All notable changes to **MMO — Multi Media Organizer** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 > Web app and companion are versioned independently:
-> - **Web app** (`app/`): see [`app/package.json`](app/package.json) — currently `0.3.0`
+> - **Web app** (`apps/web/`): see [`apps/web/package.json`](apps/web/package.json) — currently `0.4.2`
 > - **MMO Companion** (`server/`): see [`server/package.json`](server/package.json) — currently `1.0.14`, releases at [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
 
 ---
 
 ## [Unreleased]
+
+### Changed — Documentation consolidated under `docs/` (web `0.4.3`)
+
+- **Moved the root knowledge-base folders into `docs/`**: `concept/`, `organizare/`, `genuri/`, `echipament/`, `glosar/`, and `versuri/` now live at `docs/concept/`, `docs/organizare/`, etc. The repo root is now limited to code (`apps/`, `packages/`, `server/`, `infra/`) plus top-level meta files, matching a conventional monorepo layout.
+- **`/learn` URLs are unchanged.** `apps/web/scripts/sync-learn-content.mjs` was rewired to map each section slug (`concept`, `docs`, `organizare`, `genuri`, `echipament`, `glosar`) to its new `docs/…` source path. The `docs` learn section skips the relocated sub-corpora (and `versuri`) so nothing is double-listed, keeping `/learn/<slug>` stable for SEO.
+- **Re-pointed every relative cross-link**: links inside the moved docs (`../README.md` → `../../README.md`, `../docs/…` → `../…`, plus `app/` → `apps/web/` and `extension/` → `apps/extension/`), the root `README.md` / `README.en.md` / `NAVIGARE.md` tables and structure trees, and the back-links from `docs/{aplicatie,arhitectura,avansat,incepator,profesional}/`. A full crawl confirms zero new broken links (legacy archive docs and pre-existing aspirational stubs excluded).
 
 ### Fixed — `google-auth-library` missing after monorepo move (web `0.4.2`)
 

@@ -1,6 +1,6 @@
 # 🟡 Organizare Avansată — My Tag, Related Tracks, Rating System
 
-> ⚠️ **Context**: organizare în **rekordbox**. Pentru MMO → [`organizare/`](../../organizare/) + [`docs/aplicatie/settings.md`](../aplicatie/settings.md).
+> ⚠️ **Context**: organizare în **rekordbox**. Pentru MMO → [`organizare/`](../organizare/) + [`docs/aplicatie/settings.md`](../aplicatie/settings.md).
 
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../README.md#-avansat)
 

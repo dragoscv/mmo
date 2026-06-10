@@ -165,7 +165,7 @@ H:\Music\
     └── FX\
 ```
 
-> **Detalii complete:** [Structură Foldere](../../organizare/structura-foldere.md)
+> **Detalii complete:** [Structură Foldere](../organizare/structura-foldere.md)
 
 ---
 

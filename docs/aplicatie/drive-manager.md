@@ -64,7 +64,7 @@
 - ✅ **Etichetă** (label) sugestiv ("CDJ-MAIN", "CDJ-BACKUP")
 - ✅ **Test inițial** pe CDJ-ul tău acasă înainte de gig
 
-> Pentru ghid complet de export USB → [`organizare/export-usb.md`](../../organizare/export-usb.md)
+> Pentru ghid complet de export USB → [`organizare/export-usb.md`](../organizare/export-usb.md)
 
 ---
 

@@ -123,7 +123,7 @@
 - **Voice Processor**: experimental, calitate variabilă
 - **Export**: WAV bun, MP3 dependent de bibliotecă (uneori cu artefacte)
 
-> Roadmap full DAW v1: vezi [`concept/functionalitati.md`](../../concept/functionalitati.md)
+> Roadmap full DAW v1: vezi [`concept/functionalitati.md`](../concept/functionalitati.md)
 
 ---
 

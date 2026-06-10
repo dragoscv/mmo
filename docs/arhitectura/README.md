@@ -1,7 +1,7 @@
 # 🏗️ Arhitectură MMO — Documentație tehnică
 
 > Această secțiune descrie **cum este construit** suite-ul MMO.
-> Pentru **de ce** îl construim → vezi [`concept/`](../../concept/).
+> Pentru **de ce** îl construim → vezi [`concept/`](../concept/).
 > Pentru **cum îl folosești** → vezi [`docs/aplicatie/`](../aplicatie/), [`docs/companion/`](../companion/), [`docs/extension/`](../extension/).
 
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md)

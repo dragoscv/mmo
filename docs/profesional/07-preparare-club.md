@@ -6,7 +6,7 @@
 
 | ← Prev | Next → |
 |:---|---:|
-| [← Streaming & Recording](06-streaming-live.md) | [📁 Organizare →](../../organizare/README.md) |
+| [← Streaming & Recording](06-streaming-live.md) | [📁 Organizare →](../organizare/README.md) |
 
 ---
 
@@ -130,6 +130,6 @@ Dacă ai bifat toate checklist-urile de mai sus, ești **pregătit**.
 
 | ← Prev | Next → |
 |:---|---:|
-| [← Streaming & Recording](06-streaming-live.md) | [📁 Organizare →](../../organizare/README.md) |
+| [← Streaming & Recording](06-streaming-live.md) | [📁 Organizare →](../organizare/README.md) |
 
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md)

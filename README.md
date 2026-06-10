@@ -22,7 +22,7 @@ MMO (**Multi Media Organizer**) este o suită completă pentru organizarea, anal
 | 🖥️ **MMO Companion** | App Electron desktop — server local audio + bridge nativ | [`server/`](server/) |
 | 🧩 **Browser Extension** | Detectează & descarcă audio din 15+ platforme streaming | [`apps/extension/`](apps/extension/) |
 | ☁️ **Infrastructură** | Server TURN/STUN pe GCP pentru WebRTC remote | [`infra/terraform/`](infra/terraform/) |
-| 📚 **Documentație** | Ghiduri DJ rekordbox, organizare, genuri, echipament | [`docs/`](docs/), [`organizare/`](organizare/), [`genuri/`](genuri/), [`echipament/`](echipament/) |
+| 📚 **Documentație** | Ghiduri DJ rekordbox, organizare, genuri, echipament | [`docs/`](docs/), [`organizare/`](docs/organizare/), [`genuri/`](docs/genuri/), [`echipament/`](docs/echipament/) |
 
 ---
 
@@ -177,10 +177,10 @@ pnpm dev                            # pornește Electron în dev mode
 | 🟢 [Începător](docs/incepator/) | Ce e rekordbox, instalare, prima bibliotecă, primul mix, export USB de bază |
 | 🟡 [Avansat](docs/avansat/) | Beatgrid, hot cues, smart playlists, mixaj armonic, FX, recording |
 | 🔴 [Profesional](docs/profesional/) | Workflow pro, multi-device, live hybrid, backup, streaming, gig prep |
-| 📁 [Organizare](organizare/) | Structură foldere, sistem taguri, naming, watch, drive-uri, USB |
-| 🎵 [Genuri](genuri/) | Techno, tech-house, acid, psy, bounce, manele, populară, balkanică, latino, fuziune |
-| 🔌 [Echipament](echipament/) | DDJ-FLX4, Circuit Tracks, MIDI, cabluri, setup-uri, upgrade path |
-| 📖 [Glosar](glosar/glosar.md) | Toți termenii A-Z (BPM, key, cue, FX, stems, etc.) |
+| 📁 [Organizare](docs/organizare/) | Structură foldere, sistem taguri, naming, watch, drive-uri, USB |
+| 🎵 [Genuri](docs/genuri/) | Techno, tech-house, acid, psy, bounce, manele, populară, balkanică, latino, fuziune |
+| 🔌 [Echipament](docs/echipament/) | DDJ-FLX4, Circuit Tracks, MIDI, cabluri, setup-uri, upgrade path |
+| 📖 [Glosar](docs/glosar/glosar.md) | Toți termenii A-Z (BPM, key, cue, FX, stems, etc.) |
 
 ---
 
@@ -263,12 +263,13 @@ mmo/
 │   ├── extension/          Ghid Extensie browser
 │   ├── incepator/          🟢 Rekordbox 101
 │   ├── avansat/            🟡 Rekordbox tehnici avansate
-│   └── profesional/        🔴 Rekordbox workflow pro
-├── concept/                💡 Concept produs & decizii
-├── organizare/             📁 Sistem organizare muzică
-├── genuri/                 🎵 Ghiduri per gen muzical
-├── echipament/             🔌 Hardware DJ
-├── glosar/                 📖 Termeni A-Z
+│   ├── profesional/        🔴 Rekordbox workflow pro
+│   ├── concept/            💡 Concept produs & decizii
+│   ├── organizare/         📁 Sistem organizare muzică
+│   ├── genuri/             🎵 Ghiduri per gen muzical
+│   ├── echipament/         🔌 Hardware DJ
+│   ├── glosar/             📖 Termeni A-Z
+│   └── versuri/            🎤 Versuri (lyrics)
 ├── artifacts/              📦 Build-uri releases (DMG/EXE/AppImage)
 ├── README.md               👈 Ești aici
 ├── README.en.md            English mirror

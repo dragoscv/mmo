@@ -205,14 +205,14 @@ mindmap
 
 | Document | Descriere |
 |----------|-----------|
-| [Structură Foldere](organizare/structura-foldere.md) | Arhitectura folderelor |
-| [Sistem Taguri](organizare/sistem-taguri.md) | 7 dimensiuni de tagging |
-| [Convenții Fișiere](organizare/conventii-fisiere.md) | Naming + ID3 |
-| [Workflow Scanare](organizare/workflow-scanare.md) | Auto-scan, watch |
-| [Gestionare Drive-uri](organizare/gestionare-drive-uri.md) | Multi-drive |
-| [Export USB](organizare/export-usb.md) | FAT32, Pioneer folder |
-| [BPM / Key / Energy](organizare/bpm-key-energy.md) | Categorizare |
-| [Index](organizare/README.md) | Pagina principală secțiune |
+| [Structură Foldere](docs/organizare/structura-foldere.md) | Arhitectura folderelor |
+| [Sistem Taguri](docs/organizare/sistem-taguri.md) | 7 dimensiuni de tagging |
+| [Convenții Fișiere](docs/organizare/conventii-fisiere.md) | Naming + ID3 |
+| [Workflow Scanare](docs/organizare/workflow-scanare.md) | Auto-scan, watch |
+| [Gestionare Drive-uri](docs/organizare/gestionare-drive-uri.md) | Multi-drive |
+| [Export USB](docs/organizare/export-usb.md) | FAT32, Pioneer folder |
+| [BPM / Key / Energy](docs/organizare/bpm-key-energy.md) | Categorizare |
+| [Index](docs/organizare/README.md) | Pagina principală secțiune |
 
 ---
 
@@ -220,17 +220,17 @@ mindmap
 
 | Gen | BPM | Document |
 |-----|-----|----------|
-| Techno | 125–145 | [techno.md](genuri/techno.md) |
-| Tech House | 122–128 | [tech-house.md](genuri/tech-house.md) |
-| Acid | 125–140 | [acid.md](genuri/acid.md) |
-| Psytrance | 138–150 | [psytrance.md](genuri/psytrance.md) |
-| Bounce | 150–165 | [bounce.md](genuri/bounce.md) |
-| Manele | 85–130 | [manele.md](genuri/manele.md) |
-| Populară | 80–140 | [populara.md](genuri/populara.md) |
-| Balkanică | 90–160 | [balkanica.md](genuri/balkanica.md) |
-| Latino | 85–130 | [latino.md](genuri/latino.md) |
-| Fuziune | variabil | [fuziune.md](genuri/fuziune.md) |
-| [Index](genuri/README.md) | — | Pagina principală |
+| Techno | 125–145 | [techno.md](docs/genuri/techno.md) |
+| Tech House | 122–128 | [tech-house.md](docs/genuri/tech-house.md) |
+| Acid | 125–140 | [acid.md](docs/genuri/acid.md) |
+| Psytrance | 138–150 | [psytrance.md](docs/genuri/psytrance.md) |
+| Bounce | 150–165 | [bounce.md](docs/genuri/bounce.md) |
+| Manele | 85–130 | [manele.md](docs/genuri/manele.md) |
+| Populară | 80–140 | [populara.md](docs/genuri/populara.md) |
+| Balkanică | 90–160 | [balkanica.md](docs/genuri/balkanica.md) |
+| Latino | 85–130 | [latino.md](docs/genuri/latino.md) |
+| Fuziune | variabil | [fuziune.md](docs/genuri/fuziune.md) |
+| [Index](docs/genuri/README.md) | — | Pagina principală |
 
 ---
 
@@ -238,12 +238,12 @@ mindmap
 
 | Document | Descriere |
 |----------|-----------|
-| [DDJ-FLX4](echipament/ddj-flx4.md) | Controller principal |
-| [Circuit Tracks](echipament/circuit-tracks.md) | Groovebox live |
-| [MIDI Keyboard](echipament/midi-keyboard.md) | Claviatură live |
-| [Upgrade Path](echipament/upgrade-path.md) | Drumul de upgrade |
-| [Cabluri](echipament/cabluri-conexiuni.md) | Conexiuni & signal flow |
-| [Setup-uri](echipament/setup-uri.md) | Configurații |
+| [DDJ-FLX4](docs/echipament/ddj-flx4.md) | Controller principal |
+| [Circuit Tracks](docs/echipament/circuit-tracks.md) | Groovebox live |
+| [MIDI Keyboard](docs/echipament/midi-keyboard.md) | Claviatură live |
+| [Upgrade Path](docs/echipament/upgrade-path.md) | Drumul de upgrade |
+| [Cabluri](docs/echipament/cabluri-conexiuni.md) | Conexiuni & signal flow |
+| [Setup-uri](docs/echipament/setup-uri.md) | Configurații |
 
 ---
 
@@ -251,7 +251,7 @@ mindmap
 
 | Document | Descriere |
 |----------|-----------|
-| [Glosar A-Z](glosar/glosar.md) | Toți termenii (DJ, audio, web, MIDI, WebRTC, etc.) |
+| [Glosar A-Z](docs/glosar/glosar.md) | Toți termenii (DJ, audio, web, MIDI, WebRTC, etc.) |
 
 ---
 
@@ -259,12 +259,12 @@ mindmap
 
 | Document | Descriere |
 |----------|-----------|
-| [concept/README.md](concept/README.md) | Brief produs MMO |
-| [concept/arhitectura.md](concept/arhitectura.md) | Decizii arhitecturale & istorie |
-| [concept/functionalitati.md](concept/functionalitati.md) | Roadmap & feature matrix |
-| [concept/ui-ux.md](concept/ui-ux.md) | Sistem design UI |
-| [concept/drive-manager.md](concept/drive-manager.md) | Concept Drive Manager |
-| [concept/scanner.md](concept/scanner.md) | Concept Scanner |
+| [concept/README.md](docs/concept/README.md) | Brief produs MMO |
+| [concept/arhitectura.md](docs/concept/arhitectura.md) | Decizii arhitecturale & istorie |
+| [concept/functionalitati.md](docs/concept/functionalitati.md) | Roadmap & feature matrix |
+| [concept/ui-ux.md](docs/concept/ui-ux.md) | Sistem design UI |
+| [concept/drive-manager.md](docs/concept/drive-manager.md) | Concept Drive Manager |
+| [concept/scanner.md](docs/concept/scanner.md) | Concept Scanner |
 
 ---
 
@@ -272,7 +272,7 @@ mindmap
 
 | Path | Descriere |
 |------|-----------|
-| [app/README.md](app/README.md) | Setup web app dev |
+| [apps/web/README.md](apps/web/README.md) | Setup web app dev |
 | [server/README.md](server/README.md) | Setup MMO Companion dev |
 | [apps/extension/README.md](apps/extension/README.md) | Setup extensie dev |
 | [infra/terraform/README.md](infra/terraform/README.md) | Provisioning infra |
@@ -287,8 +287,8 @@ mindmap
 |----------|-------------------|
 | [docs/legacy-readme-rekordbox.md](docs/legacy-readme-rekordbox.md) | README-ul original "rekordbox-mwrty" |
 | [docs/legacy-navigare.md](docs/legacy-navigare.md) | NAVIGARE.md original |
-| [concept/legacy-app-readme.md](concept/legacy-app-readme.md) | concept/README.md original |
-| [concept/legacy-arhitectura.md](concept/legacy-arhitectura.md) | concept/arhitectura.md original (focus app web) |
+| [concept/legacy-app-readme.md](docs/concept/legacy-app-readme.md) | concept/README.md original |
+| [concept/legacy-arhitectura.md](docs/concept/legacy-arhitectura.md) | concept/arhitectura.md original (focus app web) |
 
 ---
 

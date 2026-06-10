@@ -112,7 +112,7 @@ După scan:
 
 ## 💡 Tips
 
-- **Convenții fișiere**: folosește `Artist - Title (Remix) [Label].mp3` — vezi [`organizare/conventii-fisiere.md`](../../organizare/conventii-fisiere.md)
+- **Convenții fișiere**: folosește `Artist - Title (Remix) [Label].mp3` — vezi [`organizare/conventii-fisiere.md`](../organizare/conventii-fisiere.md)
 - **Inbox workflow**: ține un folder `Inbox` ca watch folder; mută acolo download-uri proaspete; după scan + organizare, mută în foldere genre
 - **Re-scan**: re-scanarea aceluiași folder e sigură; nu duplicates, doar adaugă cele noi
 

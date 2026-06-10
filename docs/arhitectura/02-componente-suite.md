@@ -24,7 +24,7 @@
 - ↔ **Extension**: extensia face `fetch` la web app (CORS configurat în extensie)
 - ↔ **TURN**: web app emite credențiale ephemeral la `/api/turn-credentials`; browser-ul folosește credențialele direct cu coturn
 
-→ Detalii: [`app/README.md`](../../app/README.md)
+→ Detalii: [`app/README.md`](../../apps/web/README.md)
 
 ---
 
@@ -76,7 +76,7 @@
 - Background SW → web app: `fetch` la `https://muzicai.ro/api/download/info` (sau `localhost:3000` în dev)
 - Storage: `chrome.storage.local` pentru config (URL web app, queue offline)
 
-→ Detalii: [`extension/README.md`](../../extension/README.md), [`docs/extension/`](../extension/)
+→ Detalii: [`extension/README.md`](../../apps/extension/README.md), [`docs/extension/`](../extension/)
 
 ---
 

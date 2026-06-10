@@ -18,11 +18,11 @@ MMO (**Multi Media Organizer**) is a complete suite for organizing, analyzing, m
 
 | Component | Purpose | Path |
 |---|---|---|
-| 🌐 **Web App** | Library, mixer, DAW, live, scanner, recordings, visualizations | [`app/`](app/) |
+| 🌐 **Web App** | Library, mixer, DAW, live, scanner, recordings, visualizations | [`apps/web/`](apps/web/) |
 | 🖥️ **MMO Companion** | Electron desktop app — local audio server + native bridge | [`server/`](server/) |
-| 🧩 **Browser Extension** | Detects & downloads audio from 15+ streaming platforms | [`extension/`](extension/) |
+| 🧩 **Browser Extension** | Detects & downloads audio from 15+ streaming platforms | [`apps/extension/`](apps/extension/) |
 | ☁️ **Infrastructure** | TURN/STUN server on GCP for WebRTC remote | [`infra/terraform/`](infra/terraform/) |
-| 📚 **Docs** | Rekordbox DJ guides, organization, genres, gear | [`docs/`](docs/), [`organizare/`](organizare/), [`genuri/`](genuri/), [`echipament/`](echipament/) |
+| 📚 **Docs** | Rekordbox DJ guides, organization, genres, gear | [`docs/`](docs/), [`organizare/`](docs/organizare/), [`genuri/`](docs/genuri/), [`echipament/`](docs/echipament/) |
 
 > **Note**: end-user docs (genres, gear, music theory) are written in **Romanian**. This README and architectural docs have an English mirror. Code, comments, commit messages, and issue tracker are in **English**.
 
@@ -144,7 +144,7 @@ pnpm dev                            # starts Electron in dev mode
 
 ## 🛠️ Tech Stack
 
-**Web App** ([app/](app/))
+**Web App** ([apps/web/](apps/web/))
 - Next.js 16 (App Router, RSC, Server Actions, Turbopack, React Compiler)
 - React 19.2 + TypeScript 5.8 strict
 - Drizzle ORM + better-sqlite3 (local) / Postgres (prod)
@@ -159,7 +159,7 @@ pnpm dev                            # starts Electron in dev mode
 - Native audio + watch folders (chokidar)
 - Auto-update via GitHub Releases
 
-**Extension** ([extension/](extension/))
+**Extension** ([apps/extension/](apps/extension/))
 - Chrome Manifest V3
 - Content scripts for 15 platforms
 - Background service worker
@@ -175,21 +175,25 @@ pnpm dev                            # starts Electron in dev mode
 
 ```
 mmo/
-├── app/                    🌐 Next.js 16 web app
+├── apps/
+│   ├── web/                🌐 Next.js 16 web app
+│   ├── extension/          🧩 Browser extension
+│   └── native/             📱 Tauri (desktop) + Capacitor (mobile)
+├── packages/               📦 Shared core (@mmo/ai, audio-gen, ai-mcp, sdk)
 ├── server/                 🖥️ MMO Companion (Electron)
-├── extension/              🧩 Browser extension
 ├── infra/terraform/        ☁️ Coturn TURN/STUN on GCP
 ├── docs/                   📚 Technical & user docs
 │   ├── arhitectura/        Umbrella architecture
 │   ├── aplicatie/          Per-module web app guides
 │   ├── companion/          Companion desktop guide
 │   ├── extension/          Browser extension guide
-│   └── incepator/, avansat/, profesional/   Rekordbox guides (RO)
-├── concept/                💡 Product concept & decisions
-├── organizare/             📁 Music organization system (RO)
-├── genuri/                 🎵 Per-genre guides (RO)
-├── echipament/             🔌 DJ hardware (RO)
-├── glosar/                 📖 Terminology A-Z (RO)
+│   ├── incepator/, avansat/, profesional/   Rekordbox guides (RO)
+│   ├── concept/            💡 Product concept & decisions
+│   ├── organizare/         📁 Music organization system (RO)
+│   ├── genuri/             🎵 Per-genre guides (RO)
+│   ├── echipament/         🔌 DJ hardware (RO)
+│   ├── glosar/             📖 Terminology A-Z (RO)
+│   └── versuri/            🎤 Lyrics (RO)
 ├── artifacts/              📦 Release builds (DMG/EXE/AppImage)
 ├── README.md               🇷🇴 Romanian (primary)
 ├── README.en.md            👈 You are here

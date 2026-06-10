@@ -188,7 +188,7 @@ graph TD
 | **Waveform** | Reprezentarea vizuală a sunetului |
 | **Crate** | Termen alternativ pentru playlist/folder |
 
-> **📖 Nu înțelegi un termen?** → [Glosar Complet](../../glosar/glosar.md)
+> **📖 Nu înțelegi un termen?** → [Glosar Complet](../glosar/glosar.md)
 
 ---
 
