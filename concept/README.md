@@ -23,7 +23,7 @@ Componentele lucrează împreună, dar **fiecare are sens singură** — poți f
 
 | Componentă | Rol în experiența utilizatorului | Audiență primară |
 |---|---|---|
-| **Web App** ([`app/`](../app/)) | Centrul experienței: bibliotecă, mixaj, DAW, live, settings, recordings | Toți DJ-ii / producătorii |
+| **Web App** ([`apps/web/`](../apps/web/)) | Centrul experienței: bibliotecă, mixaj, DAW, live, settings, recordings | Toți DJ-ii / producătorii |
 | **MMO Companion** ([`server/`](../server/)) | "Punte" nativă pentru audio/MIDI/file system care nu funcționează în browser | Useri pro care vor latență joasă, hardware MIDI, watch folders OS-level |
 | **Browser Extension** ([`extension/`](../extension/)) | "One-click capture" din 15+ platforme streaming în bibliotecă | Curatori, crate-diggeri, oameni care descoperă tracks online |
 | **Infra TURN** ([`infra/terraform/`](../infra/terraform/)) | Relay WebRTC pentru remote/colaborare când peers sunt în spatele NAT-uri stricte | Useri care fac mixuri colaborative, B2B, lecții remote |
@@ -61,13 +61,13 @@ docs/arhitectura/  ─── CUM se conectează componentele
 docs/aplicatie/, docs/companion/, docs/extension/  ─── CUM le folosești
    │
    ▼
-app/README.md, server/README.md, extension/README.md  ─── CUM le rulezi în dev
+apps/web/README.md, server/README.md, apps/extension/README.md  ─── CUM le rulezi în dev
 ```
 
 Dacă vrei să **înțelegi viziunea** → rămâi aici (`concept/`).
 Dacă vrei să **înțelegi codul** → mergi la `docs/arhitectura/`.
 Dacă vrei să **înveți să folosești** → mergi la `docs/aplicatie/` (sau `docs/companion/`, `docs/extension/`).
-Dacă vrei să **contribui** → mergi la README-ul componentei (ex. `app/README.md`).
+Dacă vrei să **contribui** → mergi la README-ul componentei (ex. `apps/web/README.md`).
 
 ---
 

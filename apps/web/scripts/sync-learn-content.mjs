@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Copy the repo-root markdown corpus into `app/learn-content/` so the
- * `/learn` route can read it at runtime. Source folders live one level
- * up (`../{concept,docs,organizare,genuri,echipament,glosar}`) which is
+ * Copy the repo-root markdown corpus into `apps/web/learn-content/` so the
+ * `/learn` route can read it at runtime. Source folders live at the repo
+ * root (`../../{concept,docs,organizare,genuri,echipament,glosar}`) which is
  * fine in dev and on Vercel during the build phase, but at runtime we
- * need them inside `app/` so Next.js outputFileTracing bundles them
+ * need them inside `apps/web/` so Next.js outputFileTracing bundles them
  * into the serverless function. Idempotent — wipes the destination
  * each time so deletions in the source propagate.
  */
@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
-const SOURCE_BASE = resolve(ROOT, "..");
+const SOURCE_BASE = resolve(ROOT, "..", "..");
 const DEST = resolve(ROOT, "learn-content");
 
 // Six top-level folders the user asked us to surface under /learn.

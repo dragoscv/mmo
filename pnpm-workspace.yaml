@@ -9,7 +9,6 @@
 # A future PR can flip the flag and consolidate lockfiles in one go.
 
 packages:
-    - "app"
     - "server"
     - "apps/*"
     - "packages/*"

@@ -21,7 +21,7 @@
 
 ## 💡 Pentru MMO
 
-- **DDJ-FLX4** funcționează plug-and-play în [`docs/aplicatie/mixer.md`](../docs/aplicatie/mixer.md) (driver în `app/src/lib/controllers/drivers/ddj-flx4.ts`)
+- **DDJ-FLX4** funcționează plug-and-play în [`docs/aplicatie/mixer.md`](../docs/aplicatie/mixer.md) (driver în `apps/web/src/lib/controllers/drivers/ddj-flx4.ts`)
 - **MIDI keyboards** suportate prin Web MIDI API (cu Chrome/Edge) — folosești în [`docs/aplicatie/daw-editor.md`](../docs/aplicatie/daw-editor.md)
 - **Audio interface** recomandat pentru [`docs/aplicatie/live.md`](../docs/aplicatie/live.md) cu [Companion](../docs/companion/README.md) pentru latență minimă
 - **Coturn server** propriu pentru [`docs/aplicatie/remote.md`](../docs/aplicatie/remote.md) — vezi [`infra/terraform/`](../infra/terraform/)

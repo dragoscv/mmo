@@ -11,7 +11,7 @@ These four packages are the MMO **shared core**:
 
 ## Consumption
 
-Right now the packages are consumed via **TypeScript path aliases** (see `app/tsconfig.json` → `paths`), not via pnpm `workspace:*`. This sidesteps the split-lockfile constraint (see root `.npmrc`) until we're ready to consolidate lockfiles. Each package's `package.json` is already valid so they can be promoted to true workspace deps with one PR later.
+Right now the packages are consumed via **TypeScript path aliases** (see `apps/web/tsconfig.json` → `paths`), not via pnpm `workspace:*`. This sidesteps the split-lockfile constraint (see root `.npmrc`) until we're ready to consolidate lockfiles. Each package's `package.json` is already valid so they can be promoted to true workspace deps with one PR later.
 
 ## Architecture
 

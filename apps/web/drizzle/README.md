@@ -1,7 +1,7 @@
 # Drizzle migrations
 
 The production migration runner is **not** `drizzle-kit migrate` — it's
-`app/scripts/apply-sql-migrations.mjs`, driven by these npm scripts:
+`apps/web/scripts/apply-sql-migrations.mjs`, driven by these npm scripts:
 
 | Script | Purpose |
 | --- | --- |
@@ -26,11 +26,11 @@ would emit a massive migration re-doing 0001–0016.
 
 To author a new migration safely until snapshots are regenerated:
 
-1. Hand-author `app/drizzle/NNNN_<name>.sql`.
+1. Hand-author `apps/web/drizzle/NNNN_<name>.sql`.
 2. Append a new entry to `meta/_journal.json` (`idx`, `version: "7"`,
    `when: Date.now()`, `tag`, `breakpoints: true`).
 3. Run `pnpm db:migrate` (and `db:migrate:prod`).
-4. The pre-commit guard (`app/scripts/check-migrations.mjs`) requires a
+4. The pre-commit guard (`apps/web/scripts/check-migrations.mjs`) requires a
    matching `NNNN_*.sql` file when `src/db/**` changes.
 
 To rebuild snapshots (one-off cleanup, not yet done):

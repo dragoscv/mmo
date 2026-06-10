@@ -7,7 +7,7 @@
     "scripts": {
         "tauri:dev": "tauri dev",
         "tauri:build": "tauri build",
-        "tauri:icon": "tauri icon ../../app/public/icon-512.png",
+        "tauri:icon": "tauri icon ../web/public/icon-512.png",
         "cap:sync": "cap sync",
         "cap:copy": "cap copy",
         "cap:add:android": "cap add android",

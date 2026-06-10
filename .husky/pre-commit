@@ -1,8 +1,8 @@
 # Only runs when files under apps/extension/ are staged.
 node apps/extension/scripts/check-version.mjs --staged
 
-# Only runs when files under app/ (the Next.js web app) are staged.
-node app/scripts/check-version.mjs --staged
+# Only runs when files under apps/web/ (the Next.js web app) are staged.
+node apps/web/scripts/check-version.mjs --staged
 
 # Fails if app/src/db schema changed without a matching new drizzle migration.
-node app/scripts/check-migrations.mjs --staged
+node apps/web/scripts/check-migrations.mjs --staged

@@ -1,6 +1,6 @@
 # 🌐 Web App — Setup pentru dezvoltatori
 
-> Setup, comenzi și convenții pentru lucrul la **MMO Web App** (`app/`).
+> Setup, comenzi și convenții pentru lucrul la **MMO Web App** (`apps/web/`).
 > Pentru ghiduri user → [`docs/aplicatie/`](../docs/aplicatie/).
 > Pentru arhitectură → [`docs/arhitectura/`](../docs/arhitectura/).
 
@@ -11,7 +11,7 @@
 ## ⚡ Quick start
 
 ```bash
-cd app
+cd apps/web
 pnpm install
 cp .env.example .env.local         # editează secretele (vezi mai jos)
 pnpm db:generate                    # generează migrations din schema Drizzle
@@ -40,7 +40,7 @@ pnpm dev                            # → http://localhost:3000
 ## 🗂️ Structura
 
 ```
-app/
+apps/web/
 ├── src/
 │   ├── app/                    Next.js App Router
 │   │   ├── (rute)/             ~17 rute publice (library, mixer, daw, etc.)
@@ -89,7 +89,7 @@ app/
 
 ## 🔐 Variabile de mediu
 
-> ⚠️ `app/.env.example` lipsește momentan — TBD.
+> ⚠️ `apps/web/.env.example` lipsește momentan — TBD.
 
 Variabile minim necesare pentru dev:
 

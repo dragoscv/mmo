@@ -50,7 +50,7 @@ Reveal the secret with:
 terraform output -raw turn_shared_secret
 ```
 
-Then add to `app/.env.local`:
+Then add to `apps/web/.env.local`:
 
 ```
 TURN_HOST=34.X.Y.Z:3478
@@ -147,7 +147,7 @@ truth — rotate it in `random_password` then re-apply.
 ### Reading secrets
 
 ```pwsh
-# DATABASE_URL (paste into app/.env.local and Vercel env)
+# DATABASE_URL (paste into apps/web/.env.local and Vercel env)
 gcloud secrets versions access latest --secret=mmo-database-url
 
 # Service account JSON key (post-apply)

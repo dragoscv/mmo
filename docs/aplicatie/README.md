@@ -1,7 +1,7 @@
 # 🌐 Aplicație Web — Ghiduri pe modul
 
 > Ghiduri **end-user** pentru fiecare modul al web app-ului MMO.
-> Pentru setup development → [`app/README.md`](../../app/README.md).
+> Pentru setup development → [`apps/web/README.md`](../../apps/web/README.md).
 > Pentru arhitectură → [`docs/arhitectura/`](../arhitectura/).
 
 [🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md)

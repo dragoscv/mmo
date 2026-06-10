@@ -18,9 +18,9 @@ MMO (**Multi Media Organizer**) este o suită completă pentru organizarea, anal
 
 | Componentă | Ce face | Cale |
 |---|---|---|
-| 🌐 **Web App** | Bibliotecă, mixer, DAW, live, scanner, recordings, vizualizări | [`app/`](app/) |
+| 🌐 **Web App** | Bibliotecă, mixer, DAW, live, scanner, recordings, vizualizări | [`apps/web/`](apps/web/) |
 | 🖥️ **MMO Companion** | App Electron desktop — server local audio + bridge nativ | [`server/`](server/) |
-| 🧩 **Browser Extension** | Detectează & descarcă audio din 15+ platforme streaming | [`extension/`](extension/) |
+| 🧩 **Browser Extension** | Detectează & descarcă audio din 15+ platforme streaming | [`apps/extension/`](apps/extension/) |
 | ☁️ **Infrastructură** | Server TURN/STUN pe GCP pentru WebRTC remote | [`infra/terraform/`](infra/terraform/) |
 | 📚 **Documentație** | Ghiduri DJ rekordbox, organizare, genuri, echipament | [`docs/`](docs/), [`organizare/`](organizare/), [`genuri/`](genuri/), [`echipament/`](echipament/) |
 
@@ -188,7 +188,7 @@ pnpm dev                            # pornește Electron în dev mode
 
 ### Stack tehnologic
 
-**Web App** ([app/](app/))
+**Web App** ([apps/web/](apps/web/))
 - Next.js 16 (App Router, RSC, Server Actions, Turbopack, React Compiler)
 - React 19.2 + TypeScript 5.8 strict
 - Drizzle ORM + better-sqlite3 (local) / Postgres (prod)
@@ -203,7 +203,7 @@ pnpm dev                            # pornește Electron în dev mode
 - Audio nativ + watch folders (chokidar)
 - Auto-update prin GitHub Releases
 
-**Extension** ([extension/](extension/))
+**Extension** ([apps/extension/](apps/extension/))
 - Chrome Manifest V3
 - Content scripts pentru 15 platforme
 - Service worker background
@@ -222,7 +222,7 @@ pnpm dev                            # pornește Electron în dev mode
 | [docs/arhitectura/03-stack-tehnologic.md](docs/arhitectura/03-stack-tehnologic.md) | Lista completă tooling + de ce |
 | [docs/arhitectura/04-fluxuri-date.md](docs/arhitectura/04-fluxuri-date.md) | Web ↔ Companion ↔ Extension ↔ TURN |
 | [docs/arhitectura/05-securitate-auth.md](docs/arhitectura/05-securitate-auth.md) | Auth.js, TURN credentials, CORS, CSP |
-| [app/README.md](app/README.md) | Setup web app dev |
+| [apps/web/README.md](apps/web/README.md) | Setup web app dev |
 | [server/README.md](server/README.md) | Setup companion dev |
 | [apps/extension/README.md](apps/extension/README.md) | Setup extensie dev |
 | [infra/terraform/README.md](infra/terraform/README.md) | Provisioning infrastructură |
@@ -249,9 +249,12 @@ Pentru harta completă a documentației: [**NAVIGARE.md**](NAVIGARE.md)
 
 ```
 mmo/
-├── app/                    🌐 Web app Next.js 16
+├── apps/
+│   ├── web/                🌐 Web app Next.js 16
+│   ├── extension/          🧩 Browser extension
+│   └── native/             📱 Tauri (desktop) + Capacitor (mobile)
+├── packages/               📦 Shared core (@mmo/ai, audio-gen, ai-mcp, sdk)
 ├── server/                 🖥️ MMO Companion (Electron)
-├── extension/              🧩 Browser extension
 ├── infra/terraform/        ☁️ Coturn TURN/STUN pe GCP
 ├── docs/                   📚 Documentație tehnică & user guides
 │   ├── arhitectura/        Arhitectură umbrella

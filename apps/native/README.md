@@ -31,7 +31,7 @@ cd apps/native
 pnpm install
 
 # Desktop (Tauri)
-pnpm tauri:icon            # one-off: generates icons from app/public/icon-512.png
+pnpm tauri:icon            # one-off: generates icons from apps/web/public/icon-512.png
 pnpm tauri:dev             # opens the desktop shell against muzicai.ro
 
 # Mobile (Capacitor)

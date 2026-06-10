@@ -149,7 +149,7 @@ xcode-select --install
 ```
 
 ### Port 17899 ocupat
-Schimbă în `src/server.ts` (constanta `PORT`). Dacă schimbi, actualizează și web app-ul (`app/src/lib/native-companion.ts`).
+Schimbă în `src/server.ts` (constanta `PORT`). Dacă schimbi, actualizează și web app-ul (`apps/web/src/lib/native-companion.ts`).
 
 ### Auto-update eșuează în dev
 `electron-updater` e dezactivat în dev mode (verificat prin `app.isPackaged`). Funcționează doar în builduri pachetate.
