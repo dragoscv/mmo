@@ -26,6 +26,7 @@ import { usePerformanceStats } from "@/hooks/use-performance-stats";
 import Link from "next/link";
 import { VoiceProcessor } from "@/components/daw/daw-voice-processor";
 import { EditorPluginsPanel } from "@/components/editor/editor-plugins-panel";
+import { ProjectChrome } from "@/components/projects/project-chrome";
 import { AudioDeviceSelect } from "@/components/ui/audio-device-select";
 import {
     useDAWSettings,
@@ -405,6 +406,13 @@ function EditorToolbar({ onFileOpen, showHistory, onToggleHistory, onToggleSetti
 
             {/* Focus Mode */}
             <FocusModeBtn />
+
+            <ProjectChrome
+                kind="editor"
+                externalId={editor.project.id || null}
+                getCurrentDocument={() => editor.project as unknown as Record<string, unknown>}
+                className="ml-1"
+            />
 
             <Sep />
 

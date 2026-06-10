@@ -225,9 +225,29 @@ export async function createSnapshot(
     projectExternalId: string,
     document: Record<string, unknown>,
     label?: string,
-): Promise<{ externalId: string }> {
+): Promise<{ externalId: string; gitCommitSha: string | null }> {
     const userId = await requireUserId();
     const externalId = crypto.randomUUID();
+
+    // Best-effort GitHub commit. If the user hasn't linked GitHub yet,
+    // commitSnapshot returns null and we just persist the snapshot row.
+    let gitCommitSha: string | null = null;
+    try {
+        const { commitSnapshot } = await import("@/lib/git/github");
+        const res = await commitSnapshot({
+            userId,
+            projectKind: kind,
+            projectExternalId,
+            snapshotExternalId: externalId,
+            label: label ?? null,
+            document,
+        });
+        if (res) gitCommitSha = res.sha;
+    } catch (err) {
+        // Don't block the snapshot on a transient GitHub error.
+        console.warn("[createSnapshot] github commit failed:", err);
+    }
+
     await db.insert(projectSnapshots).values({
         userId,
         externalId,
@@ -236,6 +256,7 @@ export async function createSnapshot(
         label: label ?? null,
         auto: !label,
         document,
+        gitCommitSha,
     });
     await appendLog(userId, "project_snapshots", externalId, "upsert", {
         projectKind: kind,
@@ -243,8 +264,30 @@ export async function createSnapshot(
         label: label ?? null,
         auto: !label,
         document,
+        gitCommitSha,
     });
-    return { externalId };
+
+    // Retention: keep the 50 most-recent auto snapshots per project.
+    // Manual (labeled) snapshots are NEVER pruned automatically.
+    if (!label) {
+        const autoRows = await db
+            .select({ id: projectSnapshots.id, externalId: projectSnapshots.externalId })
+            .from(projectSnapshots)
+            .where(and(
+                eq(projectSnapshots.userId, userId),
+                eq(projectSnapshots.projectKind, kind),
+                eq(projectSnapshots.projectExternalId, projectExternalId),
+                eq(projectSnapshots.auto, true),
+            ))
+            .orderBy(desc(projectSnapshots.createdAt));
+        const stale = autoRows.slice(50);
+        for (const s of stale) {
+            await db.delete(projectSnapshots).where(eq(projectSnapshots.id, s.id));
+            await appendLog(userId, "project_snapshots", s.externalId, "delete", null);
+        }
+    }
+
+    return { externalId, gitCommitSha };
 }
 
 export async function getSnapshot(

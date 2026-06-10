@@ -20,6 +20,7 @@ import {
 import { LiveEngine, type LiveEngineState } from "@/lib/live-engine";
 import type { FxInsert, FxType } from "@/lib/audio-fx-engine";
 import { useRenderCount } from "@/lib/dev-debugger";
+import { useProjectAutosave } from "@/hooks/use-project-autosave";
 import { FX_DEFAULTS } from "@/lib/audio-fx-engine";
 import { useWebRTCAudioStream, type WebRTCAudioStreamApi } from "@/components/remote/use-webrtc-audio-stream";
 import { uploadRecording } from "@/lib/upload-recording";
@@ -581,6 +582,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
 
     return (
         <LiveContextRef.Provider value={value}>
+            <LiveAutosave engineState={value} voiceChain={voiceChain} />
             {value ? children : (
                 <div className="flex items-center justify-center h-full text-white/40 text-sm">
                     Initializing live engine…
@@ -589,4 +591,43 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         </LiveContextRef.Provider>
     );
     /* eslint-enable react-hooks/refs */
+}
+
+function LiveAutosave({
+    engineState,
+    voiceChain,
+}: {
+    engineState: LiveContextValue | null;
+    voiceChain: FxInsert[];
+}) {
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    useEffect(() => {
+        try {
+            const KEY = "mmo:live:session-id";
+            let id = localStorage.getItem(KEY);
+            if (!id) {
+                id = (crypto.randomUUID?.() ?? `live-${Date.now()}`);
+                localStorage.setItem(KEY, id);
+            }
+            setSessionId(id);
+        } catch { /* ignore */ }
+    }, []);
+    const document = engineState
+        ? {
+            masterVolume: engineState.masterVolume,
+            monitorVolume: engineState.monitorVolume,
+            tempo: engineState.tempo,
+            keyIndex: engineState.keyIndex,
+            scaleIndex: engineState.scaleIndex,
+            voiceChain,
+        }
+        : { voiceChain };
+    useProjectAutosave({
+        kind: "live",
+        externalId: sessionId,
+        name: "Live Session",
+        document: document as Record<string, unknown>,
+        enabled: Boolean(sessionId && engineState),
+    });
+    return null;
 }

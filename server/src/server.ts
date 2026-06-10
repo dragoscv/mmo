@@ -22,9 +22,15 @@ import type { ScaleConfig } from "./audio/pitch-dsp";
 import { createLibraryRouter } from "./library/routes";
 import { createSyncRouter } from "./sync/http-router";
 import { createProjectsRouter } from "./projects/router";
+import { attachYjsWs } from "./collab/yjs-ws";
+import { attachWatchPartyWs, createWatchPartyRouter } from "./library/watch-party";
 import { setOnAppliedListener } from "./sync";
 import { closeLibraryDb } from "./library/db";
 import { createPluginsRouter } from "./plugins/routes";
+import { createRenderRouter } from "./render/router";
+import { createVoiceRouter } from "./voice/router";
+import { voiceHost } from "./voice/host";
+import { engineRegistry } from "./voice/engines";
 import { createVideoRouter, shutdownVideoSubsystem } from "./library/video-routes";
 import { buildCompanionMetrics } from "./metrics";
 import {
@@ -39,7 +45,7 @@ import {
 } from "./library/scan-jobs";
 import { runScanJob } from "./library/scan-runner";
 import { runVideoScanJob } from "./library/video-scan-runner";
-import { resolveAllowedFile, resolveAllowedFolder, isPathInAllowedFolder } from "./lib/path-guard";
+import { resolveAllowedFile, isPathInAllowedFolder } from "./lib/path-guard";
 import {
     startWatcher,
     stopWatcher,
@@ -606,6 +612,183 @@ export async function startServer(): Promise<void> {
         res.json({ folders: await listFolders() });
     });
 
+    // ─── TTS / vocal synthesis (Piper-TTS sidecar) ───────────────────
+    // One-shot spawn per request — vocal jobs are short (1-10s) and infrequent,
+    // so the analyzer-style long-lived sidecar pattern is overkill.
+    // Requires `pip install piper-tts` on the companion machine.
+    app.post("/synthesize/voice", authMiddleware, express.json({ limit: "256kb" }), async (req, res) => {
+        const text = String(req.body?.text ?? "").trim();
+        const voice = String(req.body?.voice ?? "neutral").toLowerCase();
+        const rate = Number(req.body?.rate ?? 1.0);
+        const pitchSemitones = Number(req.body?.pitchSemitones ?? 0);
+        if (!text) { res.status(400).json({ error: "empty-text" }); return; }
+        if (!["male", "female", "neutral"].includes(voice)) {
+            res.status(400).json({ error: "bad-voice" }); return;
+        }
+
+        const { spawn } = await import("node:child_process");
+        const python = process.env.MMO_PYTHON
+            || (process.platform === "win32" ? "python" : "python3");
+        const candidates = [
+            path.join((process as NodeJS.Process & { resourcesPath?: string }).resourcesPath ?? "", "python", "tts.py"),
+            path.join(__dirname, "..", "..", "python", "tts.py"),
+            path.join(process.cwd(), "python", "tts.py"),
+        ];
+        const script = candidates.find(c => c && fs.existsSync(c)) ?? candidates[candidates.length - 1];
+
+        const outDir = path.join(os.tmpdir(), "mmo-tts");
+        try { fs.mkdirSync(outDir, { recursive: true }); } catch { /* ignore */ }
+        const outPath = path.join(outDir, `voice-${crypto.randomUUID()}.wav`);
+
+        const child = spawn(python, [script], { stdio: ["pipe", "pipe", "pipe"] });
+        const jobId = crypto.randomUUID();
+        let resolved = false;
+        let stderrBuf = "";
+        const finish = (status: number, payload: Record<string, unknown>) => {
+            if (resolved) return;
+            resolved = true;
+            try { child.kill(); } catch { /* ignore */ }
+            res.status(status).json(payload);
+        };
+
+        child.stderr.on("data", (chunk: Buffer) => { stderrBuf += chunk.toString(); });
+        child.on("error", (err) => finish(500, { error: `spawn-failed: ${err.message}. Set MMO_PYTHON if python is not on PATH.` }));
+        child.on("exit", (code) => {
+            if (!resolved) {
+                finish(500, { error: `tts-exit-${code}`, stderr: stderrBuf.slice(0, 2000) });
+            }
+        });
+
+        let buf = "";
+        child.stdout.on("data", (chunk: Buffer) => {
+            buf += chunk.toString();
+            let nl: number;
+            while ((nl = buf.indexOf("\n")) >= 0) {
+                const line = buf.slice(0, nl).trim();
+                buf = buf.slice(nl + 1);
+                if (!line) continue;
+                try {
+                    const evt = JSON.parse(line);
+                    if (evt.kind === "hello") {
+                        child.stdin.write(JSON.stringify({
+                            id: jobId, kind: "synthesize", text, voice, rate, pitchSemitones, outPath,
+                        }) + "\n");
+                    } else if (evt.kind === "result" && evt.id === jobId) {
+                        if (evt.ok) {
+                            // Stream the WAV bytes back to the caller; the web
+                            // server persists them into the generated-assets store.
+                            try {
+                                const bytes = fs.readFileSync(evt.data.path);
+                                res.setHeader("Content-Type", "audio/wav");
+                                res.setHeader("Content-Length", String(bytes.length));
+                                res.setHeader("X-Duration-Sec", String(evt.data.durationSec ?? 0));
+                                res.setHeader("X-Sample-Rate", String(evt.data.sampleRate ?? 0));
+                                res.setHeader("X-Voice-Model", String(evt.data.voiceModel ?? ""));
+                                resolved = true;
+                                res.status(200).end(bytes);
+                                try { fs.unlinkSync(evt.data.path); } catch { /* ignore */ }
+                                try { child.kill(); } catch { /* ignore */ }
+                            } catch (err) {
+                                finish(500, { error: `read-output-failed: ${(err as Error).message}` });
+                            }
+                        } else {
+                            finish(500, { ok: false, error: evt.error ?? "tts-failed" });
+                        }
+                    }
+                } catch { /* ignore parse errors */ }
+            }
+        });
+
+        // Safety timeout — Piper rarely needs more than a few seconds even on CPU.
+        setTimeout(() => finish(504, { error: "tts-timeout" }), 60000);
+    });
+
+    // Melody-aligned singing (Piper + PSOLA pitch-correct). Same sidecar,
+    // different kind. Body adds {tempo, melody:[{beat,durationBeats,midiPitch}]}.
+    app.post("/sing/voice", authMiddleware, express.json({ limit: "512kb" }), async (req, res) => {
+        const text = String(req.body?.text ?? "").trim();
+        const voice = String(req.body?.voice ?? "neutral").toLowerCase();
+        const tempo = Number(req.body?.tempo ?? 120);
+        const melody = Array.isArray(req.body?.melody) ? req.body.melody : [];
+        if (!text) { res.status(400).json({ error: "empty-text" }); return; }
+        if (!["male", "female", "neutral"].includes(voice)) {
+            res.status(400).json({ error: "bad-voice" }); return;
+        }
+        if (melody.length === 0) { res.status(400).json({ error: "empty-melody" }); return; }
+
+        const { spawn } = await import("node:child_process");
+        const python = process.env.MMO_PYTHON
+            || (process.platform === "win32" ? "python" : "python3");
+        const candidates = [
+            path.join((process as NodeJS.Process & { resourcesPath?: string }).resourcesPath ?? "", "python", "tts.py"),
+            path.join(__dirname, "..", "..", "python", "tts.py"),
+            path.join(process.cwd(), "python", "tts.py"),
+        ];
+        const script = candidates.find(c => c && fs.existsSync(c)) ?? candidates[candidates.length - 1];
+
+        const outDir = path.join(os.tmpdir(), "mmo-tts");
+        try { fs.mkdirSync(outDir, { recursive: true }); } catch { /* ignore */ }
+        const outPath = path.join(outDir, `sing-${crypto.randomUUID()}.wav`);
+
+        const child = spawn(python, [script], { stdio: ["pipe", "pipe", "pipe"] });
+        const jobId = crypto.randomUUID();
+        let resolved = false;
+        let stderrBuf = "";
+        const finish = (status: number, payload: Record<string, unknown>) => {
+            if (resolved) return;
+            resolved = true;
+            try { child.kill(); } catch { /* ignore */ }
+            res.status(status).json(payload);
+        };
+
+        child.stderr.on("data", (chunk: Buffer) => { stderrBuf += chunk.toString(); });
+        child.on("error", (err) => finish(500, { error: `spawn-failed: ${err.message}` }));
+        child.on("exit", (code) => {
+            if (!resolved) finish(500, { error: `sing-exit-${code}`, stderr: stderrBuf.slice(0, 2000) });
+        });
+
+        let buf = "";
+        child.stdout.on("data", (chunk: Buffer) => {
+            buf += chunk.toString();
+            let nl: number;
+            while ((nl = buf.indexOf("\n")) >= 0) {
+                const line = buf.slice(0, nl).trim();
+                buf = buf.slice(nl + 1);
+                if (!line) continue;
+                try {
+                    const evt = JSON.parse(line);
+                    if (evt.kind === "hello") {
+                        child.stdin.write(JSON.stringify({
+                            id: jobId, kind: "sing", text, voice, tempo, melody, outPath,
+                        }) + "\n");
+                    } else if (evt.kind === "result" && evt.id === jobId) {
+                        if (evt.ok) {
+                            try {
+                                const bytes = fs.readFileSync(evt.data.path);
+                                res.setHeader("Content-Type", "audio/wav");
+                                res.setHeader("Content-Length", String(bytes.length));
+                                res.setHeader("X-Duration-Sec", String(evt.data.durationSec ?? 0));
+                                res.setHeader("X-Sample-Rate", String(evt.data.sampleRate ?? 0));
+                                res.setHeader("X-Voice-Model", String(evt.data.voiceModel ?? ""));
+                                resolved = true;
+                                res.status(200).end(bytes);
+                                try { fs.unlinkSync(evt.data.path); } catch { /* ignore */ }
+                                try { child.kill(); } catch { /* ignore */ }
+                            } catch (err) {
+                                finish(500, { error: `read-output-failed: ${(err as Error).message}` });
+                            }
+                        } else {
+                            finish(500, { ok: false, error: evt.error ?? "sing-failed" });
+                        }
+                    }
+                } catch { /* ignore parse errors */ }
+            }
+        });
+
+        // Singing involves N synth calls + N pitch-shifts; allow more time.
+        setTimeout(() => finish(504, { error: "sing-timeout" }), 180000);
+    });
+
     /**
      * Open a native OS folder-picker on the companion machine and add the
      * chosen folder to scanFolders. This is the canonical way for the web
@@ -728,9 +911,9 @@ export async function startServer(): Promise<void> {
     // `tracks` from the same endpoint and ingests through /library.
 
     app.post("/scan", authMiddleware, (req, res) => {
-        const { folder } = req.body;
+        const { folder, kind: requestedKind } = req.body ?? {};
         const ipKey = (req.ip || req.socket.remoteAddress || "unknown").replace(/^::ffff:/, "");
-        log("info", `[scan] POST received ip=${ipKey} folder=${folder ?? "<missing>"}`);
+        log("info", `[scan] POST received ip=${ipKey} folder=${folder ?? "<missing>"} kind=${requestedKind ?? "<auto>"}`);
         if (!folder || typeof folder !== "string") {
             log("warn", `[scan] rejected: missing/invalid folder`);
             res.status(400).json({ error: "No folder specified" });
@@ -748,19 +931,26 @@ export async function startServer(): Promise<void> {
             return;
         }
 
-        // Sibling-prefix + symlink-escape hardening as /audio/* and
-        // /download/*. Without this, scanning `/srv/music_evil` would
-        // pass when `/srv/music` is the configured scan folder — letting
-        // an attacker queue arbitrary directory walks.
-        const resolved = resolveAllowedFolder(folder, settings.scanFolders);
-        if (!resolved) {
-            log("warn", `[scan] rejected: folder not in allowed paths folder=${folder} allowed=${settings.scanFolders.map((f) => f.path).join("|")}`);
-            res.status(403).json({ error: "Folder not in allowed paths" });
+        // Folder allow-list removed — cloud picks any folder for scan.
+        // Still reject NUL / oversize / nonexistent / unreadable paths
+        // and follow symlinks once to canonicalize.
+        if (folder.length > 4096 || /[\x00-\x1F]/.test(folder)) {
+            log("warn", `[scan] rejected: invalid folder string`);
+            res.status(400).json({ error: "Invalid folder path" });
+            return;
+        }
+        let resolved: string;
+        try { resolved = fs.realpathSync(path.resolve(folder)); } catch {
+            log("warn", `[scan] rejected: folder not found folder=${folder}`);
+            res.status(404).json({ error: "Folder not found" });
             return;
         }
 
         const cfg = settings.scanFolders.find((f) => f.path === resolved);
-        const kind = cfg?.kind ?? "music";
+        const validKinds = new Set(["music", "movies", "tv-shows", "downloads"]);
+        const kind = (typeof requestedKind === "string" && validKinds.has(requestedKind))
+            ? requestedKind
+            : cfg?.kind ?? "music";
         const isVideo = kind === "movies" || kind === "tv-shows";
         const job = createScanJob(resolved, "manual", isVideo ? "video" : "audio");
         log("info", `[scan] queued job=${job.id} kind=${isVideo ? "video" : "audio"} folder=${resolved}`);
@@ -882,6 +1072,22 @@ export async function startServer(): Promise<void> {
 
     app.use("/plugins", createPluginsRouter(authMiddleware));
 
+    // ─── Project render queue (web-bounce uploads, native render TBD) ───
+    //
+    // The web app does the OfflineAudioContext render in-browser and uploads
+    // the resulting WAV/MP3 here so paired devices can download it. See
+    // `server/src/render/host.ts`.
+    app.use("/render", createRenderRouter(authMiddleware));
+
+    // ─── Voice cloning (XTTS-v2 / F5-TTS via long-lived Python sidecar) ─
+    //
+    // Generates synthesized speech (and per-syllable sung audio) in the
+    // user's own cloned voice for the /voice-wizard page and the Maestro
+    // `synthesizeVocal` tool. Local-only — voice samples never leave the
+    // companion machine. See `server/src/voice/host.ts`.
+
+    app.use("/voice", createVoiceRouter(authMiddleware));
+
     // ─── Video pillar (movies, tv shows, HLS transcode, TMDB cache) ──────
     //
     // Local file index + on-demand HLS transcode pipeline. The web app
@@ -890,6 +1096,7 @@ export async function startServer(): Promise<void> {
     // `server/src/library/video-routes.ts` for the route shape.
 
     app.use("/video", createVideoRouter(authMiddleware));
+    app.use("/video", createWatchPartyRouter(authMiddleware));
 
     // ─── Native low-latency audio engine ─────────────────────────────────
     //
@@ -1288,6 +1495,13 @@ export async function startServer(): Promise<void> {
         ws.on("error", () => wsClients.delete(ws));
     });
 
+    // Optional Yjs bridge for real-time collab on project documents.
+    // No-op if y-websocket isn't installed yet.
+    attachYjsWs(httpServer, isAllowedOrigin);
+
+    // Watch Party — co-watch rooms over WebSocket.
+    attachWatchPartyWs(httpServer, isAllowedOrigin, () => store.get("deviceToken") as string | undefined);
+
     // Heartbeat
     setInterval(() => {
         const msg = JSON.stringify({
@@ -1405,6 +1619,8 @@ export async function stopServer(): Promise<void> {
 
     try { closeLibraryDb(); } catch { /* ignore */ }
     try { shutdownVideoSubsystem(); } catch { /* ignore */ }
+    try { voiceHost.shutdown(); } catch { /* ignore */ }
+    try { engineRegistry.shutdown(); } catch { /* ignore */ }
 
     return new Promise<void>((resolve) => {
         if (httpServer) {

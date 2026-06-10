@@ -1,0 +1,5 @@
+flask>=3.0
+gunicorn>=22.0
+google-cloud-storage>=2.18
+# ACE-Step pulls these transitively but we pin the loud-failures:
+# transformers, diffusers, accelerate come in via the git install.

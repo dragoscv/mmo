@@ -73,3 +73,34 @@ export async function subtitleSearchUrl(input: SubtitleSearchInput): Promise<{ u
     if (input.lang) params.set("lang", input.lang);
     return { url: `${COMPANION_BASE}/video/subs/search?${params}` };
 }
+
+/** Returns a ready-to-fetch authenticated companion URL for subtitle
+ *  search, plus the (apiUrl, token, userId) handle so the caller can
+ *  build matching download URLs. Replaces the legacy localStorage-based
+ *  auth in `SubtitlePicker` \u2014 those keys were never written, so the
+ *  picker always rendered "Companion neconectat" even when the
+ *  companion was clearly working. */
+export async function getSubtitleSearchAuthorized(
+    input: SubtitleSearchInput,
+): Promise<{ searchUrl: string; apiUrl: string; token: string; userId: string } | null> {
+    const { getPlaybackHandle } = await import("@/lib/companion-video");
+    const handle = await getPlaybackHandle();
+    if (!handle) return null;
+    const params = new URLSearchParams();
+    if (input.title) params.set("title", input.title);
+    if (input.year) params.set("year", String(input.year));
+    if (input.tmdbId) params.set("tmdb", String(input.tmdbId));
+    if (input.imdbId) params.set("imdb", input.imdbId);
+    if (input.kind) params.set("kind", input.kind);
+    if (input.season != null) params.set("season", String(input.season));
+    if (input.episode != null) params.set("episode", String(input.episode));
+    if (input.lang) params.set("lang", input.lang);
+    params.set("t", handle.token);
+    params.set("u", handle.userId);
+    return {
+        searchUrl: `${handle.apiUrl}/video/subs/search?${params}`,
+        apiUrl: handle.apiUrl,
+        token: handle.token,
+        userId: handle.userId,
+    };
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@mmo/audio-gen",
+  "version": "0.0.1",
+  "private": true,
+  "description": "MMO generative audio core. Browser-side instant synths (T0), WebGPU/WASM micro-models (T1), and bridges to companion-hosted MusicGen / Stable Audio Open (T2).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./synth": "./src/synth/index.ts",
+    "./drum": "./src/drum/index.ts",
+    "./loop": "./src/loop/index.ts",
+    "./midi": "./src/midi/index.ts",
+    "./render": "./src/render/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

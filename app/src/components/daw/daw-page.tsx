@@ -77,6 +77,7 @@ export function DAWPage() {
                 break;
             case "KeyM": if (!ctrl) daw.setTool("mute"); break;
             case "KeyA": if (!ctrl) daw.setTool("automation"); break;
+            case "KeyH": if (!ctrl) daw.setTool("pan"); break;
             case "Digit1": if (ctrl) { e.preventDefault(); daw.setSnap("1/1"); } break;
             case "Digit2": if (ctrl) { e.preventDefault(); daw.setSnap("1/2"); } break;
             case "Digit3": if (ctrl) { e.preventDefault(); daw.setSnap("1/4"); } break;

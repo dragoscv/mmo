@@ -23,7 +23,8 @@
         "@capacitor/cli": "^7.0.0",
         "@capacitor/core": "^7.0.0",
         "@capacitor/ios": "^7.0.0",
-        "@tauri-apps/cli": "^2.1.0"
+        "@tauri-apps/cli": "^2.1.0",
+        "typescript": "^5.8.3"
     },
     "dependencies": {
         "@tauri-apps/api": "^2.1.0"

@@ -20,6 +20,17 @@ tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Desktop auth flow: tiny local HTTP listener captures the OAuth
+# callback after the user signs in via the system browser, mirroring
+# the Electron companion's `/auth/callback` endpoint.
+tiny_http = "0.12"
+uuid = { version = "1", features = ["v4"] }
+open = "5"
+tokio = { version = "1", features = ["sync", "time", "rt-multi-thread", "macros"] }
+url = "2"
+# Persistent render-job queue (apps/native/src-tauri/src/render_jobs.rs).
+# `bundled` avoids needing a system SQLite on Windows.
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [profile.release]
 panic = "abort"

@@ -41,6 +41,37 @@ pip install "audio-separator[cpu]" librosa pyloudnorm pyacoustid soundfile numpy
 pip install onnxruntime-silicon
 ```
 
+### Voice cloning (XTTS-v2 / F5-TTS) — optional, for `/voice-wizard`
+
+The companion's `voice_clone.py` sidecar uses [Coqui TTS](https://github.com/coqui-ai/TTS)
+for zero-shot voice cloning (XTTS-v2 multilingual model) plus `librosa` for
+the sung-mode pitch alignment.
+
+> **Use Python 3.10–3.12.** Coqui-TTS depends on PyTorch + torchcodec
+> wheels that are not yet published for Python 3.13. On Windows we ship
+> `dev-companion.ps1` defaulting `MMO_PYTHON` to `C:\Python312\python.exe`.
+
+```bash
+pip install --prefer-binary "coqui-tts[codec]" "transformers<5,>=4.57" soundfile numpy librosa
+pip install --prefer-binary torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+```
+
+Notes:
+
+- `coqui-tts 0.27.x` pins `transformers>=4.57` but breaks on the 5.x line
+  (`isin_mps_friendly` removed) — keep the upper bound.
+- The `[codec]` extra pulls in `torchcodec`, required since PyTorch 2.9
+  for audio I/O.
+- For CUDA, drop the `--index-url cpu` flag and follow
+  <https://pytorch.org/get-started/locally/>.
+
+First inference downloads ~2 GB of model weights into the user's HuggingFace
+cache. The XTTS-v2 weights ship under the **Coqui Public Model License (CPML)**
+which permits non-commercial / personal use — appropriate for cloning *your own*
+voice inside MMO. The wrapper auto-accepts the CPML by setting
+`COQUI_TOS_AGREED=1`. F5-TTS is detected automatically when its Python package
+is on `PATH`; otherwise `provider="f5"` is reported as "not-implemented".
+
 ### Chromaprint binary (`fpcalc`) — required for fingerprinting
 
 `pyacoustid` calls the native `fpcalc` binary. Install it once:

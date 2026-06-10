@@ -15,8 +15,7 @@
  * paste into a chat for diagnosis.
  */
 
-import { useEffect, useRef } from "react";
-import { bumpRenderCount, getReport, type DebugReport } from "./store";
+import { getReport, type DebugReport } from "./store";
 
 export {
     dlog, dmark, dtime, dtimeAsync, addNote, clearAll,
@@ -34,18 +33,11 @@ export type {
     WebVitals, AudioSnapshot, RafSchedulerSnapshot, DebugReport,
 } from "./store";
 
-/**
- * Count renders of a component and the time delta between them.
- * Call at the top of the component body. Zero cost when overlay is closed
- * (writes to a Map; no React state, no re-renders).
- */
-export function useRenderCount(name: string) {
-    bumpRenderCount(name);
-    const lastRef = useRef(0);
-    useEffect(() => {
-        lastRef.current = performance.now();
-    });
-}
+// Client-only React hook; safe to re-export because the underlying module
+// has a "use client" directive — Next treats this as a client reference
+// even when imported from a server module (the server-side `dlog` etc.
+// remain available without dragging React in).
+export { useRenderCount } from "./use-render-count";
 
 /** Format the report as a compact, copy-pasteable Markdown block. */
 export function formatReport(r: DebugReport): string {

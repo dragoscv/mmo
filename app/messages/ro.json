@@ -1,6 +1,30 @@
 {
     "appName": "MMO",
     "tagline": "Multi Media Organizer pentru DJ-i și producători",
+    "watch": {
+        "rows": {
+            "continue": "Continuă vizionarea",
+            "recentMovies": "Filme adăugate recent",
+            "recentShows": "Seriale adăugate recent",
+            "trending": "În trend pe TMDB",
+            "forYouMovies": "Pentru tine — filme",
+            "forYouShows": "Pentru tine — seriale",
+            "seeAll": "Vezi tot"
+        },
+        "moviesPage": {
+            "title": "Filmele tale",
+            "noResults": "Niciun film care să corespundă filtrelor.",
+            "empty": "Niciun film încă.",
+            "runScan": "Rulează un scan."
+        },
+        "showsPage": {
+            "title": "Serialele tale"
+        },
+        "continuePage": {
+            "title": "Continuă vizionarea",
+            "lead": "Reia exact de unde ai rămas pe orice ecran asociat profilului tău."
+        }
+    },
     "empty": {
         "features": {
             "dashboard": "panoul tău principal",
@@ -36,6 +60,7 @@
         "drives": "Drive Manager",
         "playlists": "Playlisturi",
         "recordings": "Înregistrări",
+        "voice-wizard": "Asistent Voce",
         "devices": "Dispozitive",
         "settings": "Setări",
         "plugins": "Pluginuri",
@@ -43,6 +68,13 @@
         "profiles": "Profile",
         "watch": "Vizionare",
         "watch-browse": "Explorează",
+        "watch-movies": "Filme",
+        "watch-shows": "Seriale",
+        "watch-continue": "Continuă vizionarea",
+        "watch-stats": "Statistici",
+        "watch-collections": "Colecții",
+        "watch-profiles": "Profiluri",
+        "watch-settings": "Setări",
         "collections": "Colecții",
         "duplicates": "Duplicate-uri",
         "learn": "Învață",

@@ -1,0 +1,7 @@
+# Azure Quota Request IDs filed (May 2026)
+# Poll status: ./infra/azureml/check-quota.ps1
+
+# All in westeurope:
+A100_REQ_ID=97e92915-84a9-41fe-868b-ac9e6bfa4a25  # StandardNCADSA100v4Family -> 24 vCPU (1x NC24ads_A100_v4)
+T4_REQ_ID=92efbc80-3292-4f76-baee-8e95972d2d93    # Standard NCASv3_T4 Family -> 8 vCPU (fallback)
+TOTAL_REQ_ID=6dedbf91-4cf6-40f3-870b-026488a91d58 # cores (Total Regional vCPUs) -> 32

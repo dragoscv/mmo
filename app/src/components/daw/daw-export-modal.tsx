@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useDAW } from "./daw-context";
 import { cn } from "@/lib/utils";
+import { isTauri, tauriInvoke } from "@/lib/tauri-bridge";
+import { RenderJobsPanel } from "@/components/daw/render-jobs-panel";
 import {
     X, Download, FileAudio, Check, Loader2, Music,
     ChevronDown, ChevronRight, Tag, Save, Sparkles,
@@ -193,18 +195,28 @@ export function DAWExportModal() {
     const [exportedSize, setExportedSize] = useState("");
     const [error, setError] = useState<string | null>(null);
 
+    const applyConfig = useCallback((c: ExportConfig) => {
+        setFormat(c.format);
+        setSampleRate(c.sampleRate);
+        setBitDepth(c.bitDepth);
+        setBitRate(c.bitRate);
+        setChannels(c.channels);
+        setNormalize(c.normalize);
+        setDither(c.dither);
+        setLimitPeak(c.limitPeak);
+        setTailSec(c.tailSec);
+    }, []);
+
     // Load saved config on mount
     useEffect(() => {
         const saved = loadSavedConfig();
         if (saved) {
             applyConfig(saved);
-            // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only localStorage hydration after SSR
             setRememberConfig(true);
             setPreset(detectPreset(saved));
         }
         setInitialized(true);
-         
-    }, []);
+    }, [applyConfig]);
 
     const currentConfig = useCallback((): ExportConfig => ({
         format, sampleRate, bitDepth, bitRate, channels, normalize, dither, limitPeak, tailSec,
@@ -220,17 +232,6 @@ export function DAWExportModal() {
         }
     }, [initialized, rememberConfig, currentConfig]);
 
-    function applyConfig(c: ExportConfig) {
-        setFormat(c.format);
-        setSampleRate(c.sampleRate);
-        setBitDepth(c.bitDepth);
-        setBitRate(c.bitRate);
-        setChannels(c.channels);
-        setNormalize(c.normalize);
-        setDither(c.dither);
-        setLimitPeak(c.limitPeak);
-        setTailSec(c.tailSec);
-    }
 
     function applyPreset(key: PresetKey) {
         setPreset(key);
@@ -283,6 +284,15 @@ export function DAWExportModal() {
                 );
                 setDone(true);
                 setProgress(100);
+                // Record the export in the native render-jobs SQLite history
+                // so the Tauri shell can show "recent renders" + survive restarts.
+                if (isTauri()) {
+                    void tauriInvoke("enqueue_render", {
+                        projectExternalId: project.id,
+                        format,
+                        mode: "native",
+                    });
+                }
             } else {
                 setError("Export failed — engine not initialized");
             }
@@ -610,6 +620,15 @@ export function DAWExportModal() {
                             {error}
                         </div>
                     )}
+
+                    <details className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-2">
+                        <summary className="cursor-pointer text-[10px] uppercase tracking-wider text-white/40 hover:text-white/60">
+                            Render history
+                        </summary>
+                        <div className="mt-2">
+                            <RenderJobsPanel />
+                        </div>
+                    </details>
                 </div>
 
                 {/* Footer */}

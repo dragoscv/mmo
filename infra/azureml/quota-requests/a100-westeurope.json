@@ -1,0 +1,13 @@
+{
+  "properties": {
+    "limit": {
+      "value": 24,
+      "limitObjectType": "LimitValue",
+      "limitType": "Independent"
+    },
+    "name": {
+      "value": "StandardNCADSA100v4Family"
+    },
+    "resourceType": "dedicated"
+  }
+}

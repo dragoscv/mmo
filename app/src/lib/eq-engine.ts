@@ -75,6 +75,7 @@ export const EQ_PRESETS: EQPreset[] = [
     { name: "Vocal", bands: [-2, -1, 0, 2, 4, 4, 3, 1, 0, -1], icon: "🎙️" },
     { name: "Late Night", bands: [-3, -1, 0, 1, 2, 2, 1, 0, -2, -4], icon: "🌙" },
     { name: "Loudness", bands: [4, 3, 0, 0, -1, 0, -1, 0, 3, 4], icon: "📢" },
+    { name: "Cinema", bands: [4, 3, 1, 0, 3, 4, 2, 1, 2, 3], icon: "🎬" },
 ];
 
 export const DEFAULT_EFFECTS: EffectState = {

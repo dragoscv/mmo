@@ -27,6 +27,7 @@ import type {
     CompanionScanJob,
     CompanionWatchEvent,
     CompanionAudioInventory,
+    FolderKind,
 } from "./companion-types";
 
 // Re-export the public types/constants from the client-safe module so
@@ -157,9 +158,9 @@ export const companionControl = {
         );
         return r.authorized;
     },
-    async startScan(deviceId: string, folderPath: string): Promise<CompanionScanJob> {
+    async startScan(deviceId: string, folderPath: string, kind?: FolderKind): Promise<CompanionScanJob> {
         const r = await call<{ jobId: string; job: CompanionScanJob }>(
-            deviceId, "POST", "/scan", { folder: folderPath }, 15_000,
+            deviceId, "POST", "/scan", { folder: folderPath, kind }, 15_000,
         );
         return r.job;
     },

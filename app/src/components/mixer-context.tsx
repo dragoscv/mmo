@@ -11,6 +11,7 @@ import {
     type ReactNode,
 } from "react";
 import { useRenderCount } from "@/lib/dev-debugger";
+import { useProjectAutosave } from "@/hooks/use-project-autosave";
 import {
     MixerEngine,
     DEFAULT_DECK_STATE,
@@ -1660,8 +1661,49 @@ export function MixerProvider({ children }: { children: ReactNode }) {
     return (
         <MixerActionsContext.Provider value={actions}>
             <MixerStateContext.Provider value={state}>
+                <MixerAutosave state={state} />
                 {children}
             </MixerStateContext.Provider>
         </MixerActionsContext.Provider>
     );
+}
+
+/**
+ * Side-effect-only component: derives a stable mixer-setup id and
+ * runs `useProjectAutosave` against the current MixerState. Kept as a
+ * child so it doesn't add another render to the heavyweight Provider
+ * body. The setup-id is generated on first mount and persisted to
+ * localStorage so reloads continue saving to the same row.
+ */
+function MixerAutosave({ state }: { state: MixerState }) {
+    const [setupId, setSetupId] = useState<string | null>(null);
+    useEffect(() => {
+        try {
+            const KEY = "mmo:mixer:setup-id";
+            let id = localStorage.getItem(KEY);
+            if (!id) {
+                id = (crypto.randomUUID?.() ?? `mixer-${Date.now()}`);
+                localStorage.setItem(KEY, id);
+            }
+            setSetupId(id);
+        } catch { /* ignore */ }
+    }, []);
+    // Project document = serializable subset of mixer state.
+    const document = {
+        deckA: state.deckA, deckB: state.deckB, deckC: state.deckC, deckD: state.deckD,
+        deckMode: state.deckMode,
+        crossfader: state.crossfader, crossfaderCurve: state.crossfaderCurve,
+        masterVolume: state.masterVolume, headphoneVolume: state.headphoneVolume,
+        headphoneMix: state.headphoneMix,
+        eqMode: state.eqMode, tempoRange: state.tempoRange,
+        automixConfig: state.automixConfig, waveformMode: state.waveformMode,
+    } as Record<string, unknown>;
+    useProjectAutosave({
+        kind: "mixer",
+        externalId: setupId,
+        name: "Mixer Setup",
+        document,
+        enabled: Boolean(setupId),
+    });
+    return null;
 }

@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, createContext, useCo
 import { createPortal } from "react-dom";
 import { useLive } from "./live-context";
 import { useFocusMode } from "@/components/focus-mode-context";
+import { ProjectChrome } from "@/components/projects/project-chrome";
 import { cn } from "@/lib/utils";
 import { useRenderCount } from "@/lib/dev-debugger";
 import {
@@ -648,6 +649,14 @@ function MasterBar() {
     const live = useLive();
     const { isFocusMode, toggleFocusMode } = useFocusMode();
     const [tapAnim, setTapAnim] = useState(0);
+    const [sessionId, setSessionId] = useState<string | null>(null);
+
+    useEffect(() => {
+        try {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror LiveAutosave id derivation
+            setSessionId(localStorage.getItem("mmo:live:session-id"));
+        } catch { /* ignore */ }
+    }, []);
 
     const handleTap = useCallback(() => {
         live.tapBpm();
@@ -731,6 +740,18 @@ function MasterBar() {
                 </button>
 
                 <LiveSettingsButton />
+
+                {sessionId && (
+                    <ProjectChrome
+                        kind="live"
+                        externalId={sessionId}
+                        getCurrentDocument={() => ({
+                            masterVolume: live.masterVolume,
+                            monitorVolume: live.monitorVolume,
+                            tempo: live.tempo,
+                        }) as Record<string, unknown>}
+                    />
+                )}
 
                 <button onClick={toggleFocusMode}
                     className="flex items-center justify-center w-9 rounded-xl bg-white/[0.03] text-white/40 hover:bg-white/[0.06] border border-white/[0.06] transition-colors cursor-pointer"

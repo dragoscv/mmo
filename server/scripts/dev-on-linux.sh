@@ -126,7 +126,7 @@ else
          --remote-debugging-port=$DEVTOOLS_PORT \
          '--remote-allow-origins=*' \
          --no-sandbox \
-         dist/main.js \
+         . \
          >/tmp/companion-dev.log 2>&1 </dev/null & \
        disown; \
        sleep 6; \

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useDAW } from "./daw-context";
 import { cn } from "@/lib/utils";
 import {
@@ -186,6 +186,7 @@ function EffectEditor({ track, insert }: { track: { id: string }; insert: Insert
     const params = insert.params;
 
     const paramEntries = Object.entries(params);
+    const otherTracks = daw.project.tracks.filter(t => t.id !== track.id);
 
     return (
         <div>
@@ -204,6 +205,25 @@ function EffectEditor({ track, insert }: { track: { id: string }; insert: Insert
                 </div>
             </div>
 
+            {insert.type === "sidechain" ? (
+                <div className="mb-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[9px] text-white/30 uppercase">Key source</span>
+                        <select
+                            value={insert.sidechainSourceTrackId ?? ""}
+                            onChange={(e) => daw.setSidechainSource(track.id, insert.id, e.currentTarget.value || undefined)}
+                            className="flex-1 h-7 px-2 rounded bg-white/5 border border-white/10 text-[11px] text-white/80"
+                        >
+                            <option value="">— self (none) —</option>
+                            {otherTracks.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <DuckingMeter trackId={track.id} />
+                </div>
+            ) : null}
+
             <div className="grid grid-cols-2 gap-3">
                 {paramEntries.map(([key, value]) => (
                     <ParamControl
@@ -214,6 +234,39 @@ function EffectEditor({ track, insert }: { track: { id: string }; insert: Insert
                     />
                 ))}
             </div>
+        </div>
+    );
+}
+
+function DuckingMeter({ trackId }: { trackId: string }) {
+    const daw = useDAW();
+    const [db, setDb] = useState(0);
+    const raf = useRef(0);
+    useEffect(() => {
+        let alive = true;
+        const tick = () => {
+            if (!alive) return;
+            const engine = daw.getEngine();
+            const d = engine?.getDuckingDb?.(trackId) ?? 0;
+            setDb(d);
+            raf.current = requestAnimationFrame(tick);
+        };
+        raf.current = requestAnimationFrame(tick);
+        return () => { alive = false; cancelAnimationFrame(raf.current); };
+    }, [daw, trackId]);
+    const pct = Math.min(100, (db / 36) * 100);
+    return (
+        <div className="flex items-center gap-2">
+            <span className="text-[9px] text-white/30 uppercase w-16">Ducking</span>
+            <div className="flex-1 h-2 rounded bg-white/5 overflow-hidden">
+                <div
+                    className="h-full bg-amber-400/80 transition-[width] duration-75"
+                    style={{ width: `${pct}%` }}
+                />
+            </div>
+            <span className="text-[9px] text-white/40 font-mono tabular-nums w-12 text-right">
+                -{db.toFixed(1)} dB
+            </span>
         </div>
     );
 }

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": { "type": "string" },
+    "location": { "type": "string" },
+    "storageAccount": { "type": "string" },
+    "keyVault": { "type": "string" },
+    "appInsights": { "type": "string" },
+    "containerRegistry": { "type": "string" }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.MachineLearningServices/workspaces",
+      "apiVersion": "2024-04-01",
+      "name": "[parameters('workspaceName')]",
+      "location": "[parameters('location')]",
+      "identity": { "type": "SystemAssigned" },
+      "sku": { "name": "Basic", "tier": "Basic" },
+      "properties": {
+        "friendlyName": "[parameters('workspaceName')]",
+        "storageAccount": "[parameters('storageAccount')]",
+        "keyVault": "[parameters('keyVault')]",
+        "applicationInsights": "[parameters('appInsights')]",
+        "containerRegistry": "[parameters('containerRegistry')]",
+        "publicNetworkAccess": "Enabled",
+        "hbiWorkspace": false,
+        "v1LegacyMode": false
+      }
+    }
+  ],
+  "outputs": {
+    "workspaceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('workspaceName'))]"
+    }
+  }
+}

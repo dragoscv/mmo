@@ -1,0 +1,24 @@
+$schema: https://azuremlschemas.azureedge.net/latest/environment.schema.json
+name: acestep-train
+version: 1
+description: ACE-Step LoRA training environment (PyTorch 2.8 + CUDA 12.9 + Lightning + PEFT + acestep 0.2.0).
+image: mcr.microsoft.com/azureml/curated/acpt-pytorch-2.8-cuda12.9:latest
+conda_file:
+  channels:
+    - conda-forge
+  dependencies:
+    - python=3.12
+    - pip
+    - pip:
+        - acestep==0.2.0
+        - transformers==4.50.3
+        - pytorch-lightning==2.5.1
+        - peft==0.19.1
+        - diffusers>=0.27
+        - accelerate
+        - loguru
+        - tqdm
+        - matplotlib
+        - datasets
+        - librosa
+        - soundfile

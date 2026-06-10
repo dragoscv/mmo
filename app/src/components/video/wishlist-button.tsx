@@ -3,6 +3,7 @@
 import { useTransition, useState } from "react";
 import { toggleWishlist } from "@/actions/video-collections";
 import { Heart } from "lucide-react";
+import { toast } from "sonner";
 
 export function WishlistButton({ movieId, tvShowId, initial }: {
     movieId?: number; tvShowId?: number; initial: boolean;
@@ -14,8 +15,17 @@ export function WishlistButton({ movieId, tvShowId, initial }: {
             type="button"
             disabled={pending}
             onClick={() => start(async () => {
-                const r = await toggleWishlist({ movieId, tvShowId });
-                if ("added" in r) setOn(r.added === true);
+                try {
+                    const r = await toggleWishlist({ movieId, tvShowId });
+                    if ("added" in r) {
+                        setOn(r.added === true);
+                        toast.success(r.added ? "Added to wishlist" : "Removed from wishlist");
+                    } else if ("error" in r) {
+                        toast.error("Acțiune eșuată");
+                    }
+                } catch {
+                    toast.error("Acțiune eșuată");
+                }
             })}
             aria-pressed={on}
             style={{
@@ -27,7 +37,7 @@ export function WishlistButton({ movieId, tvShowId, initial }: {
             }}
         >
             <Heart fill={on ? "#fff" : "none"} size={14} />
-            {on ? "În wishlist" : "Adaugă la wishlist"}
+            {on ? "In wishlist" : "Add to wishlist"}
         </button>
     );
 }

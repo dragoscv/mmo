@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { videoFiles, movies, tvEpisodes, tvShows, watchHistory, watchProfiles } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { getPlaybackHandle, companionHlsUrl, companionDirectUrl } from "@/lib/companion-video";
+import { getPlaybackHandle, companionHlsUrl, companionDirectUrl, canBrowserDirectPlay } from "@/lib/companion-video";
 import { notFound } from "next/navigation";
 import { PlayerHost } from "./_player-host";
 import { getActiveProfileId } from "@/lib/active-profile";
@@ -80,7 +80,9 @@ export default async function PlayPage({ params, searchParams }: {
 
     const startSec = parseInt(start, 10) || 0;
     const hlsUrl = companionHlsUrl(handle.apiUrl, lookup.fileId, q, handle.token, handle.userId, startSec);
-    const directUrl = companionDirectUrl(handle.apiUrl, lookup.fileId, handle.token, handle.userId);
+    const directUrl = canBrowserDirectPlay(dbFile.container, dbFile.videoCodec, dbFile.audioCodec)
+        ? companionDirectUrl(handle.apiUrl, lookup.fileId, handle.token, handle.userId)
+        : null;
 
     // Resume from history
     const prof = activeProfileId ? await db.select().from(watchProfiles).where(eq(watchProfiles.id, activeProfileId)).limit(1).then(r => r[0] ?? null) : null;

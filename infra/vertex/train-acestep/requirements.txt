@@ -1,0 +1,28 @@
+# ACE-Step LoRA training dependencies (in addition to torch, installed
+# separately in the Dockerfile against CUDA 12.4 wheels). Versions are
+# pinned to satisfy upstream ACE-Step (see external/ACE-Step/requirements.txt).
+peft>=0.17.0
+transformers==4.50.0
+accelerate==1.6.0
+diffusers==0.33.1
+datasets==3.4.1
+soundfile==0.13.1
+librosa==0.11.0
+pytorch_lightning==2.5.1
+matplotlib==3.10.1
+loguru==0.7.3
+pypinyin==0.53.0
+py3langid==0.3.0
+hangul-romanize==0.1.0
+num2words==0.5.14
+spacy==3.8.4
+cutlet
+fugashi[unidic-lite]
+click
+tensorboard
+tensorboardX
+einops==0.8.0
+omegaconf==2.3.0
+mlflow-skinny==2.16.2
+google-cloud-storage==2.18.2
+google-cloud-aiplatform==1.71.1

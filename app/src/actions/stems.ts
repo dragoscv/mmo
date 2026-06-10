@@ -180,3 +180,20 @@ export async function getStemsStats(): Promise<{
         return { total: 0, ready: 0, pending: 0, processing: 0, error: 0 };
     }
 }
+
+export type StemKind = "vocals" | "drums" | "bass" | "other";
+
+/** Build authenticated stem URLs for a track. Returns null when not paired. */
+export async function getStemUrls(stemTrackId: number): Promise<Record<StemKind, string> | null> {
+    const link = await getCompanionLink();
+    if (!link) return null;
+    const kinds: StemKind[] = ["vocals", "drums", "bass", "other"];
+    const out = {} as Record<StemKind, string>;
+    for (const k of kinds) {
+        const u = new URL(`${link.apiUrl}/library/stems/${stemTrackId}/${k}.wav`);
+        u.searchParams.set("t", link.token);
+        u.searchParams.set("u", link.userId);
+        out[k] = u.toString();
+    }
+    return out;
+}

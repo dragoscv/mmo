@@ -1,0 +1,13 @@
+{
+  "location": "WESTEUROPE_PLACEHOLDER",
+  "kind": "web",
+  "properties": {
+    "Application_Type": "web",
+    "Flow_Type": "Bluefield",
+    "Request_Source": "rest",
+    "WorkspaceResourceId": "LAW_ID_PLACEHOLDER",
+    "IngestionMode": "LogAnalytics",
+    "publicNetworkAccessForIngestion": "Enabled",
+    "publicNetworkAccessForQuery": "Enabled"
+  }
+}

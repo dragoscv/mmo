@@ -1,0 +1,8 @@
+flask>=3.0
+gunicorn>=22.0
+google-cloud-storage>=2.18
+numpy>=1.26
+soundfile>=0.12
+librosa>=0.10
+# XTTS / F5 / Fish are heavy and have conflicting deps. Pull them in
+# explicitly when the storage layer is wired.

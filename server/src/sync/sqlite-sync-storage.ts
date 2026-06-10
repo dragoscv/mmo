@@ -93,15 +93,23 @@ const FORBIDDEN_TRACK_FIELDS: ReadonlySet<string> = new Set([
 export interface SqliteSyncStorageOptions {
     /** Initial state to write if no row exists (typically loaded from settings). */
     seed?: { apiUrl: string; deviceToken: string };
+    /** Called on every `load()` to refresh credentials from the live
+     *  settings store. Returning `null` keeps the persisted values; any
+     *  other return is merged into the in-memory state (and written back
+     *  on the next `save()`). Lets the user change `webAppUrl` or
+     *  re-pair the device without restarting the companion. */
+    getSeed?: () => { apiUrl: string; deviceToken: string } | null;
     /** Inject a logger; defaults to `console.warn` for failures. */
     logger?: (msg: string, err?: unknown) => void;
 }
 
 export class SqliteSyncStorage implements SyncStorage {
     private readonly logger: NonNullable<SqliteSyncStorageOptions["logger"]>;
+    private readonly getSeed?: SqliteSyncStorageOptions["getSeed"];
 
     constructor(private readonly db: SqliteDb, opts: SqliteSyncStorageOptions = {}) {
         this.logger = opts.logger ?? ((msg, err) => console.warn(msg, err));
+        this.getSeed = opts.getSeed;
         this.db.exec(BOOTSTRAP_SQL);
         if (opts.seed) {
             const existing = this.db
@@ -123,10 +131,24 @@ export class SqliteSyncStorage implements SyncStorage {
                 "SELECT api_url, device_token, last_pull_cursor FROM sync_state WHERE id = 1",
             )
             .get();
-        if (!row) return null;
+
+        // Pull fresh credentials from the live settings store. The
+        // persisted row may be stale (user changed `webAppUrl`, re-paired,
+        // or wiped device token) and otherwise we'd keep hitting the
+        // wrong endpoint forever.
+        const fresh = this.getSeed?.() ?? null;
+        if (!row) {
+            if (!fresh) return null;
+            this.db
+                .prepare(
+                    "INSERT INTO sync_state (id, api_url, device_token) VALUES (1, ?, ?)",
+                )
+                .run(fresh.apiUrl, fresh.deviceToken);
+            return { apiUrl: fresh.apiUrl, deviceToken: fresh.deviceToken, lastPullCursor: 0 };
+        }
         return {
-            apiUrl: row.api_url,
-            deviceToken: row.device_token,
+            apiUrl: fresh?.apiUrl ?? row.api_url,
+            deviceToken: fresh?.deviceToken ?? row.device_token,
             lastPullCursor: Number(row.last_pull_cursor) || 0,
         };
     }

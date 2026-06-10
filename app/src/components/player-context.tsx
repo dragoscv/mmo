@@ -9,11 +9,71 @@ import {
     useEffect,
     type ReactNode,
 } from "react";
+import { getCinemaSettings } from "@/hooks/use-cinema-settings";
 import type { Track } from "@/db/schema";
 import { audioPreloadCache } from "@/lib/audio-preload-cache";
 import { useRenderCount, dlog } from "@/lib/dev-debugger";
 
 type RepeatMode = "off" | "one" | "all";
+
+/** Serializable description of a playable video — passed through server
+ *  actions so it must contain only primitive / JSON-safe fields. */
+export interface VideoMedia {
+    fileId: number;
+    movieId?: number | null;
+    episodeId?: number | null;
+    /** Show id when this video is an episode — used for per-show prefs. */
+    showId?: number | null;
+    title: string;
+    subtitle?: string;
+    poster?: string | null;
+    hlsUrl: string;
+    directUrl?: string | null;
+    durationSec?: number | null;
+    startSec?: number;
+    /** TMDB / IMDB metadata for subtitle picker. */
+    subtitleQuery?: {
+        title?: string;
+        tmdbId?: number;
+        imdbId?: string;
+        kind?: "movie" | "tv";
+        season?: number;
+        episode?: number;
+    };
+    /** Optional intro skip range (seconds). UI shows "Skip Intro" while playhead is inside. */
+    introMarker?: { start: number; end: number };
+    /** Optional chapters for the chapter-skip UI. */
+    chapters?: Array<{ start: number; title: string }>;
+    /** WebVTT URL with sprite#xywh cues for scrubber preview thumbnails. */
+    thumbsVttUrl?: string;
+    /** Optional recap window (start/end in seconds) when previous episode
+     *  chromaprint match yields one. */
+    recapMarker?: { start: number; end: number };
+    /** Time (s) where end-credits start — drives the Skip Credits button. */
+    creditsStartSec?: number;
+    /** EBU R128 normalization gain in dB (negative or positive). */
+    loudnessGainDb?: number;
+    /** Per-stream audio tracks parsed from ffprobe. */
+    audioTracks?: Array<{ index: number; lang?: string; label?: string; codec?: string }>;
+    /** Embedded subtitle streams (text-based: subrip/ass/mov_text/webvtt).
+     *  Each entry points to the companion's WebVTT extraction endpoint —
+     *  the actual ffmpeg conversion only happens when the browser fetches
+     *  the URL, so listing them is free. Image-based subs (PGS, DVDsub)
+     *  are filtered out server-side. */
+    embeddedSubtitles?: Array<{
+        src: string;
+        lang: string;
+        label: string;
+        sdh?: boolean;
+        forced?: boolean;
+        codec?: string;
+        default?: boolean;
+    }>;
+    /** Should playback begin automatically when this media loads?
+     *  Defaults to true. Set to false when restoring a previously-
+     *  playing video on page reload — we want the user to press play. */
+    autoplay?: boolean;
+}
 
 interface PlayerState {
     currentTrack: Track | null;
@@ -28,6 +88,16 @@ interface PlayerState {
     isNowPlayingOpen: boolean;
     requestedView: string | null;
     playHistory: Track[];
+    /** When set, the player is in video mode. Audio is paused. */
+    currentVideo: VideoMedia | null;
+    videoQueue: VideoMedia[];
+    videoQueueIndex: number;
+    videoCurrentTime: number;
+    videoDuration: number;
+    /** True when video is playing in a floating PiP-style overlay. */
+    videoDetached: boolean;
+    /** Which media drove the bar most recently (most-recent-wins UI). */
+    lastMediaType: "audio" | "video" | null;
 }
 
 interface PlayerActions {
@@ -54,6 +124,25 @@ interface PlayerActions {
     clearRequestedView: () => void;
     getAnalyserNode: () => AnalyserNode | null;
     getAudioNodes: () => { ctx: AudioContext; source: MediaElementAudioSourceNode; analyser: AnalyserNode } | null;
+    getVideoNodes: () => { ctx: AudioContext; source: MediaElementAudioSourceNode; analyser: AnalyserNode } | null;
+    // ─── Video ──────────────────────────────────────────────────────
+    playVideo: (video: VideoMedia, queue?: VideoMedia[]) => void;
+    closeVideo: () => void;
+    nextVideo: () => void;
+    prevVideo: () => void;
+    seekVideo: (time: number) => void;
+    videoTogglePlay: () => void;
+    setVideoDetached: (detached: boolean) => void;
+    /** Called by the canonical <VideoPlayer> mount to register its <video>
+     *  element. Pipes audio into the shared AudioContext and mirrors
+     *  play/pause/seek into PlayerState. Pass null to unregister. */
+    registerVideoElement: (el: HTMLVideoElement | null) => void;
+    /** Apply EBU R128 normalization gain (in dB). Pass 0/undefined to reset. */
+    setVideoGainDb: (db: number | undefined) => void;
+    /** Append a video to the end of the video queue. */
+    addToVideoQueue: (video: VideoMedia) => void;
+    /** Insert a video right after the currently-playing one (Play Next). */
+    playVideoNext: (video: VideoMedia) => void;
 }
 
 type PlayerContextType = PlayerState & PlayerActions;
@@ -78,6 +167,11 @@ interface PersistedState {
     currentTime: number;
     playHistory: Track[];
     isNowPlayingOpen?: boolean;
+    currentVideo?: VideoMedia | null;
+    videoQueue?: VideoMedia[];
+    videoQueueIndex?: number;
+    videoCurrentTime?: number;
+    lastMediaType?: "audio" | "video" | null;
 }
 
 function loadPersistedState(): Partial<PlayerState> {
@@ -98,6 +192,11 @@ function loadPersistedState(): Partial<PlayerState> {
             playHistory: saved.playHistory ?? [],
             isPlaying: false,
             isNowPlayingOpen: restoreNowPlaying ? (saved.isNowPlayingOpen ?? false) : false,
+            currentVideo: saved.currentVideo ?? null,
+            videoQueue: saved.videoQueue ?? [],
+            videoQueueIndex: saved.videoQueueIndex ?? -1,
+            videoCurrentTime: saved.videoCurrentTime ?? 0,
+            lastMediaType: saved.lastMediaType ?? null,
         };
     } catch {
         return {};
@@ -116,6 +215,11 @@ function savePersistedState(s: PlayerState) {
             currentTime: s.currentTime,
             playHistory: s.playHistory.slice(0, 50),
             isNowPlayingOpen: s.isNowPlayingOpen,
+            currentVideo: s.currentVideo,
+            videoQueue: s.videoQueue.slice(0, 50),
+            videoQueueIndex: s.videoQueueIndex,
+            videoCurrentTime: s.videoCurrentTime,
+            lastMediaType: s.lastMediaType,
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
@@ -129,6 +233,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+    const videoElRef = useRef<HTMLVideoElement | null>(null);
+    const videoSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+    const videoGainRef = useRef<GainNode | null>(null);
+    const videoElListenersRef = useRef<{ el: HTMLVideoElement; cleanup: () => void } | null>(null);
 
     // Safe play helper — resumes AudioContext (browser autoplay policy) and
     // catches AbortError when src changes mid-play
@@ -153,14 +261,32 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         isNowPlayingOpen: false,
         requestedView: null,
         playHistory: [],
+        currentVideo: null,
+        videoQueue: [],
+        videoQueueIndex: -1,
+        videoCurrentTime: 0,
+        videoDuration: 0,
+        videoDetached: false,
+        lastMediaType: null,
     });
 
     // Restore persisted state after mount to avoid hydration mismatch
     useEffect(() => {
         const persisted = loadPersistedState();
-        if (persisted.currentTrack) {
+        if (persisted.currentTrack || persisted.currentVideo) {
+            // Bake the saved playhead into the VideoMedia so VideoPlayer
+            // resumes at the right position on first mount.
+            const restoredVideo = persisted.currentVideo
+                ? { ...persisted.currentVideo, startSec: persisted.videoCurrentTime ?? persisted.currentVideo.startSec ?? 0, autoplay: false }
+                : null;
             // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only localStorage hydration after SSR
-            setState((prev) => ({ ...prev, ...persisted }));
+            setState((prev) => ({
+                ...prev,
+                ...persisted,
+                currentVideo: restoredVideo,
+                lastMediaType: persisted.lastMediaType ?? (restoredVideo ? "video" : persisted.currentTrack ? "audio" : null),
+                requestedView: restoredVideo ? "video" : null,
+            }));
         }
     }, []);
 
@@ -248,12 +374,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const history = s.currentTrack
             ? [s.currentTrack, ...s.playHistory].slice(0, 100)
             : s.playHistory;
+        // Starting audio playback always supersedes video — close any active video.
+        if (s.currentVideo) videoElRef.current?.pause();
         return {
             currentTrack: newTrack,
             queueIndex: newIndex,
             isPlaying: true,
             currentTime: 0,
             playHistory: history,
+            lastMediaType: "audio",
+            // Drop any active video so the bar/now-playing flips to audio.
+            currentVideo: null,
+            videoQueue: [],
+            videoQueueIndex: -1,
+            videoCurrentTime: 0,
+            videoDuration: 0,
+            videoDetached: false,
         };
     };
 
@@ -274,18 +410,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     useEffect(() => { stateRef.current = state; });
 
     useEffect(() => {
-        // Save immediately on track/queue/settings changes
-        // But debounce currentTime saves (every 5 seconds)
-        const timeDiff = Math.abs(state.currentTime - lastSavedTimeRef.current);
-        if (timeDiff >= 5 || state.currentTrack?.id !== undefined) {
+        // Save immediately on track/queue/settings changes; debounce
+        // currentTime / videoCurrentTime saves (every 5 seconds).
+        const audioTimeDiff = Math.abs(state.currentTime - lastSavedTimeRef.current);
+        const videoTimeDiff = Math.abs(state.videoCurrentTime - lastSavedTimeRef.current);
+        if (audioTimeDiff >= 5 || videoTimeDiff >= 5 || state.currentTrack?.id !== undefined || state.currentVideo?.fileId !== undefined) {
             clearTimeout(saveTimerRef.current);
             saveTimerRef.current = setTimeout(() => {
                 savePersistedState(state);
-                lastSavedTimeRef.current = state.currentTime;
+                lastSavedTimeRef.current = state.currentVideo ? state.videoCurrentTime : state.currentTime;
             }, 500);
         }
         return () => clearTimeout(saveTimerRef.current);
-    }, [state.currentTrack?.id, state.queueIndex, state.volume, state.shuffle, state.repeat, state.queue.length, state.playHistory.length, state.currentTime]);
+    }, [state.currentTrack?.id, state.currentVideo?.fileId, state.queueIndex, state.videoQueueIndex, state.volume, state.shuffle, state.repeat, state.queue.length, state.videoQueue.length, state.playHistory.length, state.currentTime, state.videoCurrentTime, state.isNowPlayingOpen, state.lastMediaType]);
 
     // Force save on page unload (refresh/close)
     useEffect(() => {
@@ -430,6 +567,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         };
     }, []);
 
+    const getVideoNodes = useCallback(() => {
+        if (!audioContextRef.current || !videoSourceRef.current || !analyserRef.current) return null;
+        if (audioContextRef.current.state === "suspended") {
+            audioContextRef.current.resume();
+        }
+        return {
+            ctx: audioContextRef.current,
+            source: videoSourceRef.current,
+            analyser: analyserRef.current,
+        };
+    }, []);
+
     const play = useCallback((track: Track, queue?: Track[]) => {
         const audio = audioRef.current;
         if (!audio) return;
@@ -545,6 +694,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const setVolume = useCallback((volume: number) => {
         const audio = audioRef.current;
         if (audio) audio.volume = volume;
+        const v = videoElRef.current;
+        if (v) v.volume = volume;
         setState((s) => ({ ...s, volume }));
     }, []);
 
@@ -652,6 +803,195 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, requestedView: null }));
     }, []);
 
+    // ─── Video playback ──────────────────────────────────────────────────
+    const playVideo = useCallback((video: VideoMedia, queue?: VideoMedia[]) => {
+        // Stop audio completely so the bar/now-playing surfaces flip cleanly to video.
+        const audio = audioRef.current;
+        if (audio) {
+            audio.pause();
+            audio.removeAttribute("src");
+            audio.load();
+        }
+        setState((s) => {
+            const newQueue = queue && queue.length ? queue : [video];
+            const idx = newQueue.findIndex((vv) => vv.fileId === video.fileId);
+            return {
+                ...s,
+                currentTrack: null,
+                queue: [],
+                queueIndex: -1,
+                isPlaying: false,
+                currentTime: 0,
+                duration: 0,
+                currentVideo: video,
+                videoQueue: newQueue,
+                videoQueueIndex: idx >= 0 ? idx : 0,
+                videoCurrentTime: video.startSec ?? 0,
+                videoDuration: video.durationSec ?? 0,
+                isNowPlayingOpen: true,
+                requestedView: "video",
+                lastMediaType: "video",
+            };
+        });
+    }, []);
+
+    const addToVideoQueue = useCallback((video: VideoMedia) => {
+        setState((s) => {
+            // Dedupe by fileId; ignore if already in queue.
+            if (s.videoQueue.some(v => v.fileId === video.fileId)) return s;
+            return { ...s, videoQueue: [...s.videoQueue, video] };
+        });
+    }, []);
+
+    const playVideoNext = useCallback((video: VideoMedia) => {
+        setState((s) => {
+            const filtered = s.videoQueue.filter(v => v.fileId !== video.fileId);
+            const insertAt = Math.max(0, s.videoQueueIndex + 1);
+            const next = [...filtered.slice(0, insertAt), video, ...filtered.slice(insertAt)];
+            return { ...s, videoQueue: next };
+        });
+    }, []);
+
+        const closeVideo = useCallback(() => {
+        videoElRef.current?.pause();
+        setState((s) => ({
+            ...s,
+            currentVideo: null,
+            videoQueue: [],
+            videoQueueIndex: -1,
+            videoCurrentTime: 0,
+            videoDuration: 0,
+            videoDetached: false,
+        }));
+    }, []);
+
+    const nextVideo = useCallback(() => {
+        setState((s) => {
+            const idx = s.videoQueueIndex + 1;
+            const nxt = s.videoQueue[idx];
+            if (!nxt) return s;
+            return {
+                ...s,
+                currentVideo: nxt,
+                videoQueueIndex: idx,
+                videoCurrentTime: nxt.startSec ?? 0,
+                videoDuration: nxt.durationSec ?? 0,
+            };
+        });
+    }, []);
+
+    const prevVideo = useCallback(() => {
+        const v = videoElRef.current;
+        if (v && v.currentTime > 3) {
+            v.currentTime = 0;
+            return;
+        }
+        setState((s) => {
+            const idx = s.videoQueueIndex - 1;
+            const p = s.videoQueue[idx];
+            if (!p) return s;
+            return {
+                ...s,
+                currentVideo: p,
+                videoQueueIndex: idx,
+                videoCurrentTime: p.startSec ?? 0,
+                videoDuration: p.durationSec ?? 0,
+            };
+        });
+    }, []);
+
+    const seekVideo = useCallback((time: number) => {
+        const v = videoElRef.current;
+        if (v && isFinite(time)) v.currentTime = Math.max(0, time);
+    }, []);
+
+    const videoTogglePlay = useCallback(() => {
+        const v = videoElRef.current;
+        if (!v) return;
+        if (v.paused) {
+            void v.play().catch(() => { /* user gesture required */ });
+        } else {
+            v.pause();
+        }
+    }, []);
+
+    const setVideoDetached = useCallback((detached: boolean) => {
+        setState((s) => ({ ...s, videoDetached: detached }));
+    }, []);
+
+    const setVideoGainDb = useCallback((db: number | undefined) => {
+        const g = videoGainRef.current;
+        if (!g) return;
+        const linear = db == null ? 1 : Math.pow(10, db / 20);
+        g.gain.value = Math.max(0, Math.min(8, linear));
+    }, []);
+
+        const registerVideoElement = useCallback((el: HTMLVideoElement | null) => {
+        if (videoElListenersRef.current && videoElListenersRef.current.el !== el) {
+            videoElListenersRef.current.cleanup();
+            videoElListenersRef.current = null;
+        }
+        videoElRef.current = el;
+        if (!el) return;
+
+        el.volume = stateRef.current.volume;
+
+        const ctx = audioContextRef.current;
+        const analyser = analyserRef.current;
+        if (ctx && analyser && !videoSourceRef.current) {
+            try {
+                const src = ctx.createMediaElementSource(el);
+                const gain = ctx.createGain();
+                src.connect(gain).connect(analyser);
+                analyser.connect(ctx.destination);
+                videoSourceRef.current = src;
+                videoGainRef.current = gain;
+            } catch {
+                // already attached to another graph (e.g. HMR) — ignore
+            }
+        }
+
+        const onTime = () => {
+            setState((cur) => (cur.currentVideo ? { ...cur, videoCurrentTime: el.currentTime } : cur));
+        };
+        const onDur = () => {
+            setState((cur) => (cur.currentVideo ? { ...cur, videoDuration: el.duration || 0 } : cur));
+        };
+        const onPlay = () => setState((cur) => ({ ...cur, isPlaying: true }));
+        const onPause = () => setState((cur) => ({ ...cur, isPlaying: false }));
+        const onEnded = () => {
+            const cs = getCinemaSettings();
+            setState((cur) => {
+                const idx = cur.videoQueueIndex + 1;
+                const nxt = cur.videoQueue[idx];
+                // Always pause first; VideoPlayerHost's countdown overlay handles advance when
+                // autoplayNextEpisode is on. If autoplay is off OR there's no next item, just pause.
+                if (!nxt || !cs.autoplayNextEpisode) return { ...cur, isPlaying: false };
+                // Countdown > 0: leave state as-is so the overlay can show; it will call nextVideo().
+                if (cs.autoplayCountdownSec > 0) return { ...cur, isPlaying: false };
+                // Instant advance.
+                return { ...cur, currentVideo: nxt, videoQueueIndex: idx, videoCurrentTime: nxt.startSec ?? 0 };
+            });
+        };
+
+        el.addEventListener("timeupdate", onTime);
+        el.addEventListener("durationchange", onDur);
+        el.addEventListener("play", onPlay);
+        el.addEventListener("pause", onPause);
+        el.addEventListener("ended", onEnded);
+
+        videoElListenersRef.current = {
+            el,
+            cleanup: () => {
+                el.removeEventListener("timeupdate", onTime);
+                el.removeEventListener("durationchange", onDur);
+                el.removeEventListener("play", onPlay);
+                el.removeEventListener("pause", onPause);
+                el.removeEventListener("ended", onEnded);
+            },
+        };
+    }, []);
+
     // ─── Media Session action handlers ──────────────────────────────────
     useEffect(() => {
         if (!("mediaSession" in navigator)) return;
@@ -711,6 +1051,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 clearRequestedView,
                 getAnalyserNode,
                 getAudioNodes,
+                getVideoNodes,
+                playVideo,
+                closeVideo,
+                nextVideo,
+                prevVideo,
+                seekVideo,
+                videoTogglePlay,
+                setVideoDetached,
+                registerVideoElement,
+                setVideoGainDb,
+                addToVideoQueue,
+                playVideoNext,
             }}
         >
             {children}

@@ -50,6 +50,7 @@ import {
     Grid3X3,
     ChevronRight,
     SlidersHorizontal,
+    Film,
 } from "lucide-react";
 import {
     Tooltip,
@@ -62,6 +63,7 @@ import { Equalizer } from "./equalizer";
 import { useEQ } from "./eq-context";
 import { PerformanceInline, SessionRestoreIndicator } from "./performance-stats";
 import { TrackContextMenu } from "./track-actions";
+import { SortableUpNext } from "./sortable-up-next";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Dynamic imports for heavy components (code-split, no SSR)
@@ -110,7 +112,7 @@ interface RecommendedTrack {
 }
 
 type TabType = "queue" | "recommended" | "lyrics";
-type LeftView = "artwork" | "visualization" | "equalizer" | "mixer";
+type LeftView = "artwork" | "visualization" | "equalizer" | "mixer" | "video";
 
 export function NowPlaying() {
     const player = usePlayer();
@@ -130,13 +132,13 @@ export function NowPlaying() {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only hydration flag
         setHasMounted(true);
         const urlView = new URLSearchParams(window.location.search).get("view");
-        if (urlView === "mixer" || urlView === "artwork" || urlView === "visualization" || urlView === "equalizer") {
+        if (urlView === "mixer" || urlView === "artwork" || urlView === "visualization" || urlView === "equalizer" || urlView === "video") {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only browser hydration
             setLeftView(urlView);
             return;
         }
         const saved = localStorage.getItem("mmo-np-left-view");
-        if (saved === "artwork" || saved === "visualization" || saved === "equalizer" || saved === "mixer") {
+        if (saved === "artwork" || saved === "visualization" || saved === "equalizer" || saved === "mixer" || saved === "video") {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only browser hydration
             setLeftView(saved);
         }
@@ -153,7 +155,7 @@ export function NowPlaying() {
     useEffect(() => {
         if (player.requestedView) {
             const v = player.requestedView;
-            if (v === "artwork" || v === "visualization" || v === "equalizer" || v === "mixer") {
+            if (v === "artwork" || v === "visualization" || v === "equalizer" || v === "mixer" || v === "video") {
                 // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror external player state
                 setLeftView(v);
             }
@@ -161,11 +163,19 @@ export function NowPlaying() {
         }
     }, [player.requestedView, player.clearRequestedView]);
 
+    // When a video becomes the active media, surface the Video left view automatically.
+    useEffect(() => {
+        if (player.currentVideo) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror external media state
+            setLeftView("video");
+        }
+    }, [player.currentVideo?.fileId]);
+
     // Handle ?view= URL query param — open now playing with the requested view.
     // Same rationale as above: external (URL) state propagates into local view.
     useEffect(() => {
         const urlView = searchParams.get("view");
-        if (urlView && (urlView === "mixer" || urlView === "artwork" || urlView === "visualization" || urlView === "equalizer")) {
+        if (urlView && (urlView === "mixer" || urlView === "artwork" || urlView === "visualization" || urlView === "equalizer" || urlView === "video")) {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror external URL state
             setLeftView(urlView);
             if (!player.isNowPlayingOpen) {
@@ -393,9 +403,27 @@ export function NowPlaying() {
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
         >
-            {/* Background - genre gradient for non-mixer views, personalized for mixer */}
+            {/* Background - genre gradient for non-mixer views, personalized for mixer, video for video mode */}
             {leftView === "mixer" ? (
                 <div className="absolute inset-0" style={getMixerBackgroundStyle(personalization)} />
+            ) : leftView === "video" ? (
+                <div className="absolute inset-0 bg-black">
+                    {player.currentVideo ? (
+                        <div
+                            id="np-video-tab-mount"
+                            className="absolute inset-0"
+                            style={{ viewTransitionName: `np-video-${player.currentVideo.fileId}` }}
+                        />
+                    ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-white/30">
+                            <div className="text-center">
+                                <Film className="h-14 w-14 mx-auto mb-4 opacity-40" />
+                                <p className="text-sm font-medium">No video playing</p>
+                                <p className="text-xs mt-1">Open a movie or episode from the Watch tab to start.</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
             ) : (
                 <>
                     <div className={cn("absolute inset-0 bg-gradient-to-b to-[#0a0a0a]", gradient)} />
@@ -404,9 +432,13 @@ export function NowPlaying() {
             )}
 
             {/* Content */}
-            <div className="relative flex flex-col h-full">
+            <div className={cn("relative flex flex-col h-full", leftView === "video" && "pointer-events-none")}>
+                {/* Top scrim — fades dark over the video so the top bar stays readable */}
+                {leftView === "video" && (
+                    <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/80 via-black/40 to-transparent pointer-events-none" />
+                )}
                 {/* Top Bar */}
-                <div className="relative flex items-center justify-between px-4 sm:px-6 py-3">
+                <div className={cn("relative flex items-center justify-between px-4 sm:px-6 py-3", leftView === "video" && "pointer-events-auto")}>
                     <button
                         onClick={handleClose}
                         className="flex items-center gap-2 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer shrink-0"
@@ -416,7 +448,10 @@ export function NowPlaying() {
                     </button>
 
                     {/* View Switcher — absolute-centered to full header width */}
-                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-white/5 rounded-lg p-0.5 animate-[fadeIn_400ms_100ms_both]">
+                    <div className={cn(
+                        "absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-lg p-0.5 animate-[fadeIn_400ms_100ms_both]",
+                        leftView === "video" ? "bg-black/60 backdrop-blur-md ring-1 ring-white/10" : "bg-white/5"
+                    )}>
                         <button
                             onClick={() => setLeftView("artwork")}
                             className={cn(
@@ -429,6 +464,20 @@ export function NowPlaying() {
                             <ImageIcon className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Artwork</span>
                         </button>
+                        {player.currentVideo && (
+                            <button
+                                onClick={() => setLeftView("video")}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
+                                    leftView === "video"
+                                        ? "bg-white/10 text-white"
+                                        : "text-white/40 hover:text-white/70"
+                                )}
+                            >
+                                <Film className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline">Video</span>
+                            </button>
+                        )}
                         <button
                             onClick={() => setLeftView("visualization")}
                             className={cn(
@@ -457,18 +506,41 @@ export function NowPlaying() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                        {/* Episode prev/next (video mode only) */}
+                        {leftView === "video" && player.currentVideo && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => player.prevVideo()}
+                                    disabled={player.videoQueueIndex <= 0}
+                                    className="px-2.5 py-1.5 rounded-md bg-black/50 backdrop-blur hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-white/90 transition-colors"
+                                    title="Previous in queue"
+                                >
+                                    ◀ Prev
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => player.nextVideo()}
+                                    disabled={player.videoQueueIndex >= player.videoQueue.length - 1}
+                                    className="px-2.5 py-1.5 rounded-md bg-black/50 backdrop-blur hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed text-xs text-white/90 transition-colors"
+                                    title="Next episode in queue"
+                                >
+                                    Next ▶
+                                </button>
+                            </>
+                        )}
                         {/* Session restore indicator */}
                         {leftView === "mixer" && <SessionRestoreIndicator className="hidden md:flex" />}
                         {/* Performance stats inline */}
                         {personalization.performanceStatsPosition === "on" && leftView === "mixer" && (
                             <PerformanceInline className="hidden md:flex" />
                         )}
-                        {/* Queue toggle (always visible in mixer, mobile-only otherwise) */}
+                        {/* Queue toggle (always visible in mixer/video, mobile-only otherwise) */}
                         <button
                             onClick={() => setMobilePanel((v) => !v)}
                             className={cn(
                                 "p-2 rounded-lg transition-colors cursor-pointer",
-                                leftView !== "mixer" && "lg:hidden",
+                                leftView !== "mixer" && leftView !== "video" && "lg:hidden",
                                 mobilePanel ? "bg-purple-500/20 text-purple-400" : "hover:bg-white/10"
                             )}
                         >
@@ -481,9 +553,9 @@ export function NowPlaying() {
                 </div>
 
                 {/* Main Content Area */}
-                <div className={cn("flex-1 flex gap-6 pb-4 overflow-hidden", leftView === "mixer" ? "px-0" : "px-4 sm:px-6")}>
+                <div className={cn("flex-1 flex gap-6 pb-4 overflow-hidden", leftView === "mixer" || leftView === "video" ? "px-0" : "px-4 sm:px-6", leftView === "video" && "pointer-events-none")}>
                     {/* Left Side - Artwork/Visualization + Controls */}
-                    <div className={cn("flex-1 flex flex-col w-full", leftView === "mixer" ? "" : "items-center justify-center max-w-2xl mx-auto")}>
+                    <div className={cn("flex-1 flex flex-col w-full", leftView === "mixer" || leftView === "video" ? "" : "items-center justify-center max-w-2xl mx-auto")}>
                         {leftView === "artwork" && currentTrack && (
                             <AnimatePresence mode="wait">
                                 <motion.div
@@ -881,6 +953,10 @@ export function NowPlaying() {
                                 <MixerView />
                             </div>
                         )}
+
+                        {/* leftView === "video" intentionally renders nothing in the main flow.
+                            The canonical <VideoPlayer> portals into the absolute background mount
+                            and provides its own title, controls, and bookmark panel. */}
                     </div>
 
                     {/* Right Side - Queue / Recommended / Lyrics */}
@@ -890,7 +966,7 @@ export function NowPlaying() {
                             <div
                                 className={cn(
                                     "fixed inset-0 z-[65] bg-black/60 transition-opacity duration-300",
-                                    leftView !== "mixer" && "lg:hidden",
+                                    leftView !== "mixer" && leftView !== "video" && "lg:hidden",
                                     mobilePanel ? "opacity-100" : "opacity-0 pointer-events-none"
                                 )}
                                 onClick={() => setMobilePanel(false)}
@@ -907,8 +983,8 @@ export function NowPlaying() {
                                     "overflow-hidden",
                                     // Slide in/out
                                     mobilePanel ? "translate-x-0" : "translate-x-full",
-                                    // Desktop (non-mixer): static sidebar, always visible
-                                    leftView !== "mixer" && [
+                                    // Desktop (non-mixer, non-video): static sidebar, always visible
+                                    leftView !== "mixer" && leftView !== "video" && [
                                         "lg:relative lg:inset-auto lg:z-auto lg:w-96 lg:shrink-0 lg:max-w-none",
                                         "lg:translate-x-0 lg:transition-none",
                                         "lg:bg-black/30 lg:backdrop-blur-none lg:rounded-2xl lg:border lg:border-white/5",
@@ -917,7 +993,7 @@ export function NowPlaying() {
                                 )}
                             >
                                 {/* Handle bar (visible when panel is overlay) */}
-                                <div className={cn("flex justify-center pt-3 pb-1", leftView !== "mixer" && "lg:hidden")}>
+                                <div className={cn("flex justify-center pt-3 pb-1", leftView !== "mixer" && leftView !== "video" && "lg:hidden")}>
                                     <div className="w-8 h-1 rounded-full bg-white/20" />
                                 </div>
                                 {/* Tabs */}
@@ -1096,48 +1172,14 @@ export function NowPlaying() {
                                                         </button>
                                                     </div>
                                                     <AnimatePresence mode="popLayout" initial={false}>
-                                                        {upNext.slice(0, 50).map((track, idx) => (
-                                                            <motion.div
-                                                                key={`next-${track.id}-${queueIndex + 1 + idx}`}
-                                                                layout
-                                                                initial={{ opacity: 0, y: 12 }}
-                                                                animate={{ opacity: 1, y: 0 }}
-                                                                exit={{ opacity: 0, x: -30, transition: { duration: 0.2 } }}
-                                                                transition={{ duration: 0.3, delay: Math.min(idx * 0.04, 0.12), ease: [0.4, 0, 0.2, 1] }}
-                                                            >
-                                                                <TrackContextMenu track={track} onMutate={() => { }}>
-                                                                    <div
-                                                                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors group cursor-pointer"
-                                                                        onClick={() => player.playFromQueue(queueIndex + 1 + idx)}
-                                                                    >
-                                                                        <span className="text-xs text-white/30 w-5 text-center tabular-nums">
-                                                                            {idx + 1}
-                                                                        </span>
-                                                                        <div className="min-w-0 flex-1">
-                                                                            <p className="text-sm truncate">{track.title || track.filename}</p>
-                                                                            <p className="text-xs text-white/40 truncate">
-                                                                                {track.artist || "Unknown"}
-                                                                            </p>
-                                                                        </div>
-                                                                        {track.isFavorite && (
-                                                                            <Heart className="h-3 w-3 fill-rose-500 text-rose-500 shrink-0" />
-                                                                        )}
-                                                                        <span className="text-xs text-white/30 tabular-nums shrink-0">
-                                                                            {formatDuration(track.duration)}
-                                                                        </span>
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                player.removeFromQueue(queueIndex + 1 + idx);
-                                                                            }}
-                                                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded transition-all cursor-pointer"
-                                                                        >
-                                                                            <X className="h-3 w-3 text-white/50" />
-                                                                        </button>
-                                                                    </div>
-                                                                </TrackContextMenu>
-                                                            </motion.div>
-                                                        ))}
+                                                        <motion.div
+                                                            key="sortable-up-next"
+                                                            initial={{ opacity: 0 }}
+                                                            animate={{ opacity: 1 }}
+                                                            exit={{ opacity: 0 }}
+                                                        >
+                                                            <SortableUpNext items={upNext.slice(0, 50)} startIndex={queueIndex + 1} />
+                                                        </motion.div>
                                                     </AnimatePresence>
                                                 </>
                                             )}

@@ -62,19 +62,14 @@ export async function getCompanionLink(): Promise<CompanionLink | null> {
     const chosen = local ?? usable[0];
     const bearer = await materializeDeviceToken(chosen);
     if (!bearer) return null;
-    // Prefer the device's self-announced LAN URL over a loopback
-    // api_url. Server-side fetches from Vercel can't reach
-    // 127.0.0.1 / localhost on the user's machine — they always hit
-    // the Vercel container's own loopback. The LAN URL is the only
-    // server-reachable one when both are populated, and only when
-    // the Vercel function itself sits on the same LAN (rare — but
-    // harmless when not: the fetch just times out). When apiUrl is
-    // already non-loopback we leave it alone.
-    let chosenUrl = chosen.apiUrl!;
-    if (isLoopbackUrl(chosenUrl) && chosen.lanUrl) {
-        chosenUrl = chosen.lanUrl;
-    }
-    return { apiUrl: chosenUrl, token: bearer, deviceId: chosen.id, userId };
+    // Prefer the device's self-announced LAN URL when present. The
+    // companion writes this on every startup with whatever port it's
+    // actually bound to; the static `api_url` recorded at pairing time
+    // is often stale (different port after a reinstall, container
+    // restart, etc.). Falling back to apiUrl only when lanUrl is empty.
+    let chosenUrl = chosen.lanUrl ?? chosen.apiUrl!;
+    if (!chosenUrl) chosenUrl = chosen.apiUrl!;
+    return { apiUrl: chosenUrl.replace(/\/+$/, ""), token: bearer, deviceId: chosen.id, userId };
 }
 
 /** Resolve a CompanionLink for an explicit device id owned by the
@@ -96,8 +91,8 @@ export async function getCompanionLinkForDevice(
     if (!row || !row.apiUrl) return null;
     const bearer = await materializeDeviceToken(row);
     if (!bearer) return null;
-    const url = isLoopbackUrl(row.apiUrl) && row.lanUrl ? row.lanUrl : row.apiUrl;
-    return { apiUrl: url, token: bearer, deviceId: row.id, userId };
+    const url = row.lanUrl ?? row.apiUrl;
+    return { apiUrl: url.replace(/\/+$/, ""), token: bearer, deviceId: row.id, userId };
 }
 
 // ─── Low-level fetch helper ─────────────────────────────────────────────────
@@ -270,6 +265,20 @@ export const companionLibrary = {
             const r = await call<{ track: CompanionTrack }>(link, "GET", `/tracks/${id}`);
             return r.track;
         } catch { return null; }
+    },
+    /** Stream the raw source audio file for a track. Caller owns the
+     *  response; close/consume the body promptly. */
+    async fetchTrackAudio(link: CompanionLink, id: number): Promise<Response> {
+        const url = `${link.apiUrl}/library/tracks/${id}/audio`;
+        const res = await fetch(url, {
+            headers: { "X-Device-Token": link.token, "X-User-Id": link.userId },
+            signal: AbortSignal.timeout(120_000),
+            cache: "no-store",
+        });
+        if (!res.ok) {
+            throw new Error(`Companion GET /library/tracks/${id}/audio failed (${res.status})`);
+        }
+        return res;
     },
     async updateTrack(link: CompanionLink, id: number, data: Partial<CompanionTrack>): Promise<void> {
         await call(link, "PATCH", `/tracks/${id}`, data);

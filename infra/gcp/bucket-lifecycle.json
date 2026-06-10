@@ -1,0 +1,23 @@
+{
+  "lifecycle": {
+    "rule": [
+      {
+        "condition": {
+          "age": 90
+        },
+        "action": {
+          "type": "SetStorageClass",
+          "storageClass": "ARCHIVE"
+        }
+      },
+      {
+        "condition": {
+          "age": 365
+        },
+        "action": {
+          "type": "Delete"
+        }
+      }
+    ]
+  }
+}

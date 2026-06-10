@@ -1,0 +1,13 @@
+{
+  "properties": {
+    "limit": {
+      "value": 8,
+      "limitObjectType": "LimitValue",
+      "limitType": "Independent"
+    },
+    "name": {
+      "value": "Standard NCASv3_T4 Family"
+    },
+    "resourceType": "dedicated"
+  }
+}

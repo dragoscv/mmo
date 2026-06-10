@@ -14,7 +14,11 @@
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import * as schema from "./schema";
+import * as schemaCore from "./schema";
+import * as schemaAi from "./schema-ai";
+import * as schemaTraining from "./schema-training";
+
+const schema = { ...schemaCore, ...schemaAi, ...schemaTraining };
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {

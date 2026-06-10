@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const COMPANION_BASE = process.env.NEXT_PUBLIC_COMPANION_BASE_URL || "http://127.0.0.1:17899";
+import { getSubtitleSearchAuthorized } from "@/actions/subtitles";
 
 interface SubtitleResult {
     provider: string;
@@ -14,22 +13,19 @@ interface SubtitleResult {
     downloadToken: string;
 }
 
-interface AuthHandle {
+interface CompanionHandle {
+    apiUrl: string;
     token: string;
     userId: string;
 }
 
-function readAuth(): AuthHandle | null {
-    if (typeof window === "undefined") return null;
-    const token = window.localStorage.getItem("mmo-device-token") ?? "";
-    const userId = window.localStorage.getItem("mmo-user-id") ?? "";
-    if (!token || !userId) return null;
-    return { token, userId };
-}
-
-export function SubtitlePicker({ query, onPick }: {
+export function SubtitlePicker({ query, onPick, autoSelectLangs, preferSdh }: {
     query: { title?: string; tmdbId?: number; imdbId?: string; kind?: "movie" | "tv"; season?: number; episode?: number };
     onPick: (track: { src: string; lang: string; label: string }) => void;
+    /** Priority list of language codes to auto-pick on mount (e.g. ["en","ro"]). */
+    autoSelectLangs?: string[];
+    /** Prefer SDH/CC variants when auto-selecting. */
+    preferSdh?: boolean;
 }) {
     const [open, setOpen] = useState(false);
     const [lang, setLang] = useState("ro,en");
@@ -37,34 +33,80 @@ export function SubtitlePicker({ query, onPick }: {
     const [results, setResults] = useState<SubtitleResult[]>([]);
     const [error, setError] = useState<string | null>(null);
 
+    const buildDownloadUrl = (r: SubtitleResult, handle: CompanionHandle) =>
+        `${handle.apiUrl}/video/subs/download?provider=${r.provider}&id=${encodeURIComponent(r.downloadToken)}&lang=${r.language}&t=${encodeURIComponent(handle.token)}&u=${encodeURIComponent(handle.userId)}`;
+
+    // Auto-select best match on mount (runs once per query identity)
+    useEffect(() => {
+        if (!autoSelectLangs || autoSelectLangs.length === 0) return;
+        let cancelled = false;
+        (async () => {
+            const handle = await getSubtitleSearchAuthorized({
+                ...query,
+                lang: autoSelectLangs.join(","),
+            });
+            if (!handle || cancelled) return;
+            const resp = await fetch(handle.searchUrl).catch(() => null);
+            if (!resp || !resp.ok || cancelled) return;
+            const j = await resp.json().catch(() => null) as { results?: SubtitleResult[] } | null;
+            const all = j?.results ?? [];
+            if (!all.length) return;
+            for (const lc of autoSelectLangs) {
+                const subset = all.filter((r) => r.language.toLowerCase() === lc.toLowerCase());
+                if (!subset.length) continue;
+                const sorted = [...subset].sort((a, b) => {
+                    if (preferSdh) {
+                        const sdhA = /sdh|cc|hi\b/i.test(a.release ?? a.title) ? 1 : 0;
+                        const sdhB = /sdh|cc|hi\b/i.test(b.release ?? b.title) ? 1 : 0;
+                        if (sdhA !== sdhB) return sdhB - sdhA;
+                    }
+                    return (b.downloads ?? 0) - (a.downloads ?? 0);
+                });
+                const pick = sorted[0];
+                onPick({
+                    src: buildDownloadUrl(pick, handle),
+                    lang: pick.language,
+                    label: `${pick.language.toUpperCase()} · ${pick.release ?? pick.title}`,
+                });
+                return;
+            }
+        })();
+        return () => { cancelled = true; };
+    // Re-run only when the underlying media identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [query.tmdbId, query.imdbId, query.title, query.season, query.episode]);
+
     useEffect(() => {
         if (!open) return;
-        const auth = readAuth();
-        if (!auth) { setError("Companion neconectat"); return; }
-        const params = new URLSearchParams();
-        if (query.title) params.set("title", query.title);
-        if (query.tmdbId) params.set("tmdb", String(query.tmdbId));
-        if (query.imdbId) params.set("imdb", query.imdbId);
-        if (query.kind) params.set("kind", query.kind);
-        if (query.season != null) params.set("season", String(query.season));
-        if (query.episode != null) params.set("episode", String(query.episode));
-        if (lang) params.set("lang", lang);
+        let cancelled = false;
         setLoading(true);
         setError(null);
-        fetch(`${COMPANION_BASE}/video/subs/search?${params}`, {
-            headers: { "X-Device-Token": auth.token, "X-User-Id": auth.userId },
-        })
-            .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-            .then((j: { results?: SubtitleResult[] }) => setResults(j.results ?? []))
-            .catch(e => setError(e.message))
-            .finally(() => setLoading(false));
-    }, [open, lang, query.title, query.tmdbId, query.imdbId, query.kind, query.season, query.episode]);
+        (async () => {
+            const handle = await getSubtitleSearchAuthorized({ ...query, lang });
+            if (cancelled) return;
+            if (!handle) { setError("Companion neconectat"); setLoading(false); return; }
+            try {
+                const resp = await fetch(handle.searchUrl);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const j = await resp.json() as { results?: SubtitleResult[] };
+                if (!cancelled) setResults(j.results ?? []);
+            } catch (e) {
+                if (!cancelled) setError((e as Error).message);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [open, lang, query.title, query.tmdbId, query.imdbId, query.kind, query.season, query.episode, query]);
 
-    const pick = (r: SubtitleResult) => {
-        const auth = readAuth();
-        if (!auth) return;
-        const url = `${COMPANION_BASE}/video/subs/download?provider=${r.provider}&id=${encodeURIComponent(r.downloadToken)}&lang=${r.language}&t=${encodeURIComponent(auth.token)}&u=${encodeURIComponent(auth.userId)}`;
-        onPick({ src: url, lang: r.language, label: `${r.language.toUpperCase()} · ${r.release ?? r.title}` });
+    const pick = async (r: SubtitleResult) => {
+        const handle = await getSubtitleSearchAuthorized(query);
+        if (!handle) return;
+        onPick({
+            src: buildDownloadUrl(r, handle),
+            lang: r.language,
+            label: `${r.language.toUpperCase()} · ${r.release ?? r.title}`,
+        });
         setOpen(false);
     };
 
@@ -83,7 +125,7 @@ export function SubtitlePicker({ query, onPick }: {
             </button>
             {open && (
                 <div role="dialog" style={{
-                    position: "absolute", bottom: "calc(100% + 6px)", right: 0, width: 360, maxHeight: 380, overflow: "auto",
+                    position: "absolute", top: "calc(100% + 6px)", right: 0, width: 360, maxHeight: 380, overflow: "auto",
                     background: "rgba(20,20,22,.96)", color: "#fff", border: "1px solid rgba(255,255,255,.1)", borderRadius: 8,
                     padding: 10, zIndex: 100, boxShadow: "0 8px 24px rgba(0,0,0,.5)",
                 }}>

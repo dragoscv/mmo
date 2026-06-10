@@ -1,7 +1,11 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+import GitHub from "next-auth/providers/github";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/db";
+import { userOauthTokens } from "@/db/schema-projects-normalized";
+import { encryptToken } from "@/lib/token-crypto";
+import { eq, and } from "drizzle-orm";
 
 // Optional: comma-separated list of email addresses allowed to sign in.
 // Empty / unset = open registration. Useful for self-hosted single-tenant
@@ -20,15 +24,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             clientId: process.env.AUTH_GOOGLE_ID,
             clientSecret: process.env.AUTH_GOOGLE_SECRET,
         }),
+        GitHub({
+            clientId: process.env.AUTH_GITHUB_ID,
+            clientSecret: process.env.AUTH_GITHUB_SECRET,
+            // `repo` is needed to create private mmo-projects repo.
+            authorization: { params: { scope: "read:user repo" } },
+        }),
     ],
     pages: {
         signIn: "/login",
     },
     callbacks: {
         async signIn({ user, account }) {
-            // Defence in depth: only the configured Google provider may
-            // create accounts. If a future provider is wired up by mistake
-            // (or via env override) it will be rejected here.
+            // Sign-in is restricted to Google. GitHub is allowed only as a
+            // "link" flow for users already signed in via Google — handled
+            // by Auth.js: `account.provider === "github"` arrives with the
+            // existing user attached, so we accept it as a link.
+            if (account?.provider === "github") return true;
             if (account?.provider !== "google") return false;
 
             // Google federation gives us `email_verified`; refuse unverified
@@ -64,6 +76,46 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 session.user.id = user.id;
             }
             return session;
+        },
+    },
+    events: {
+        /**
+         * Persist GitHub access tokens encrypted in user_oauth_tokens.
+         * Fires when the user goes through the GitHub OAuth flow while
+         * already signed in (link flow).
+         */
+        async linkAccount({ user, account, profile }) {
+            if (account.provider !== "github" || !account.access_token || !user.id) return;
+            const enc = await encryptToken(account.access_token);
+            const refreshEnc = account.refresh_token ? await encryptToken(account.refresh_token) : null;
+            const login = (profile as { login?: string } | undefined)?.login ?? null;
+            const expiresAt = account.expires_at ? new Date(account.expires_at * 1000) : null;
+            const existing = await db
+                .select({ id: userOauthTokens.id })
+                .from(userOauthTokens)
+                .where(and(eq(userOauthTokens.userId, user.id), eq(userOauthTokens.provider, "github")))
+                .limit(1);
+            if (existing.length === 0) {
+                await db.insert(userOauthTokens).values({
+                    userId: user.id,
+                    provider: "github",
+                    providerUserId: account.providerAccountId,
+                    login,
+                    accessTokenEnc: enc,
+                    refreshTokenEnc: refreshEnc,
+                    scope: account.scope ?? null,
+                    expiresAt,
+                });
+            } else {
+                await db.update(userOauthTokens).set({
+                    accessTokenEnc: enc,
+                    refreshTokenEnc: refreshEnc,
+                    scope: account.scope ?? null,
+                    expiresAt,
+                    login,
+                    updatedAt: new Date(),
+                }).where(eq(userOauthTokens.id, existing[0].id));
+            }
         },
     },
 });

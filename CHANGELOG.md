@@ -12,6 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — AI generation, training, Maestro, Watch & Voice feature set (web `0.4.0`)
+
+- **Large feature drop committed**: AI music/voice generation (`/generate`, `/voice-wizard`), LoRA training pipeline (`/training`, `/lora`), the Maestro coaching surface (`/maestro`), an expanded Watch experience (continue/discover/stats/settings, Trakt sync, watch-party, bookmarks, external ratings), normalized project schema, and a CodAI/MCP copilot. New Drizzle migrations `0018`–`0026`, server-side Python sidecars, and supporting infra (Azure ML, Cloud Run, Vertex, Terraform) are included.
+- **Repository hygiene**: `.azure-openai.json`, `.azure-speech.json`, and the vendored `external/` upstream repos are now git-ignored so local credential blobs and embedded git repos are never committed.
+- App and companion both build clean (`next build --webpack` + `tsc`).
+
 ### Fixed — yt-dlp missing on serverless ("spawn yt-dlp ENOENT") (web `0.3.17`)
 
 - **`/api/download/info` and `/api/download/search` failed with `Failed to run yt-dlp: spawn yt-dlp ENOENT. Is yt-dlp installed?`** on the cloud build. Both routes did `spawn("yt-dlp", …)`, which relies on a `yt-dlp` binary being on `PATH`. That binary exists on a dev machine / the desktop companion but **not** in the Vercel serverless sandbox, so every download-info / search request from the extension (e.g. opening `https://muzicai.ro/download?url=…&auto=1`) returned a 500.

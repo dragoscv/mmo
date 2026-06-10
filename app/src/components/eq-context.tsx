@@ -42,6 +42,10 @@ interface EQActions {
     // Engine access
     getCompressorReduction: () => number;
     connectEngine: (ctx: AudioContext, source: MediaElementAudioSourceNode, analyser: AnalyserNode) => void;
+    /** Route an additional source (e.g. video) through the existing engine.
+     *  Idempotent per-source. The source's existing analyser connection is
+     *  preserved so visualizations keep working. */
+    connectVideoSource: (source: MediaElementAudioSourceNode, analyser: AnalyserNode) => void;
 }
 
 type EQContextType = EQState & EQActions;
@@ -89,6 +93,7 @@ export function useEQ() {
 export function EQProvider({ children }: { children: ReactNode }) {
     const engineRef = useRef<EQEngine | null>(null);
     const connectedRef = useRef(false);
+    const videoSourcesRef = useRef<WeakSet<MediaElementAudioSourceNode>>(new WeakSet());
 
     const [state, setState] = useState<EQState>(() => {
         const saved = loadEQState();
@@ -156,6 +161,19 @@ export function EQProvider({ children }: { children: ReactNode }) {
         connectedRef.current = true;
     }, []);
 
+    // Route a second source (typically the <video> element) through the same engine.
+    const connectVideoSource = useCallback((source: MediaElementAudioSourceNode, analyser: AnalyserNode) => {
+        const engine = engineRef.current;
+        if (!engine) return;
+        if (videoSourcesRef.current.has(source)) return;
+        try {
+            source.disconnect(analyser);
+        } catch { /* not connected */ }
+        source.connect(engine.input);
+        // engine.output is already connected to the analyser; one fan-in works for both.
+        videoSourcesRef.current.add(source);
+    }, []);
+
     // Auto-connect to player's audio nodes
     const player = usePlayer();
     useEffect(() => {
@@ -164,6 +182,14 @@ export function EQProvider({ children }: { children: ReactNode }) {
         if (!nodes) return;
         connectEngine(nodes.ctx, nodes.source, nodes.analyser);
     });
+
+    // Route video source through the same engine when it becomes available.
+    useEffect(() => {
+        if (!player.currentVideo) return;
+        const vnodes = player.getVideoNodes();
+        if (!vnodes) return;
+        connectVideoSource(vnodes.source, vnodes.analyser);
+    }, [player.currentVideo, player, connectVideoSource]);
 
     const toggle = useCallback(() => {
         setState(s => ({ ...s, enabled: !s.enabled }));
@@ -296,6 +322,7 @@ export function EQProvider({ children }: { children: ReactNode }) {
             getEasyTreble,
             getCompressorReduction,
             connectEngine,
+            connectVideoSource,
         }}>
             {children}
         </EQContext.Provider>

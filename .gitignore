@@ -44,3 +44,23 @@ __pycache__/
 *.log
 
 artifacts/
+
+# Dev tunnel sentinel (written by scripts/dev-tunnel.ps1)
+.vscode/.dev-tunnel-url
+.vercel
+
+# Azure resource names (local-only, contains globally unique random suffixes)
+.azure-names.txt
+.venvs/
+.test/
+_test_acestep/
+_test_full_pipeline/
+_test_stems/
+.azure-sp.json
+
+# Azure / cloud credential blobs (local-only, contain secrets)
+.azure-openai.json
+.azure-speech.json
+
+# Embedded upstream repos vendored locally (not tracked as submodules)
+external/

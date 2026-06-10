@@ -124,7 +124,7 @@ else
          --inspect=0.0.0.0:$INSPECT_PORT \
          --remote-debugging-port=$DEVTOOLS_PORT \
          '--remote-allow-origins=*' \
-         dist/main.js \
+         . \
          >/tmp/companion-dev.log 2>&1 & \
        disown; \
        sleep 6; \

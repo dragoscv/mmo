@@ -52,6 +52,8 @@ export interface SyncStorage {
 export class CloudSyncClient {
     private timer: NodeJS.Timeout | null = null;
     private inFlight = false;
+    private lastErrorKey: string | null = null;
+    private repeatErrorCount = 0;
     /** Optional listener invoked once per pull tick that applied at least
      *  one remote change. Use it to broadcast a "refresh your queries"
      *  hint to web clients (over the existing /ws fan-out). The set of
@@ -80,8 +82,35 @@ export class CloudSyncClient {
         const root = (err as { cause?: unknown })?.cause ?? err;
         const msg = root instanceof Error ? `${root.name}: ${root.message}` : String(root);
         const code = (root as { code?: string })?.code;
+
+        // Dedupe noisy transient network errors. When the cloud endpoint
+        // is unreachable (e.g. the web app isn't running in dev), we'd
+        // otherwise spam the debug log every 30 s. Log the first one,
+        // then a heartbeat every ~5 minutes, and a recovery line when
+        // the error stops repeating.
+        const key = code ?? msg;
+        if (key === this.lastErrorKey) {
+            this.repeatErrorCount++;
+            if (this.repeatErrorCount % 10 === 0) {
+                log.warn(`sync.tick still failing [${key}] x${this.repeatErrorCount}`);
+            }
+            return;
+        }
+        if (this.lastErrorKey && this.repeatErrorCount > 0) {
+            log.info(`sync.tick recovered from [${this.lastErrorKey}] after ${this.repeatErrorCount + 1} failures`);
+        }
+        this.lastErrorKey = key;
+        this.repeatErrorCount = 0;
         log.warn(`sync.tick failed${code ? ` [${code}]` : ""} — ${msg}`, undefined, err);
     };
+
+    private clearError() {
+        if (this.lastErrorKey) {
+            log.info(`sync.tick recovered from [${this.lastErrorKey}] after ${this.repeatErrorCount + 1} failures`);
+            this.lastErrorKey = null;
+            this.repeatErrorCount = 0;
+        }
+    }
 
     /** Run one push+pull cycle. */
     async tick(): Promise<{ pushed: number; pulled: number }> {
@@ -94,6 +123,7 @@ export class CloudSyncClient {
             const pushed = await this.pushOnce(state);
             const pulled = await this.pullOnce(state);
             await this.storage.save(state);
+            this.clearError();
             return { pushed, pulled };
         } finally {
             this.inFlight = false;

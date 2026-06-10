@@ -1,10 +1,12 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { videoCollections, videoCollectionItems, movies, tvShows, watchProfiles } from "@/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { videoCollections, videoCollectionItems, movies, tvShows, watchProfiles, videoFiles } from "@/db/schema";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import Link from "next/link";
 import { getActiveProfileId } from "@/lib/active-profile";
-import { PosterCard, PosterRow } from "@/components/video/poster-card";
+import { PosterCard } from "@/components/video/poster-card";
+import { PosterRow } from "@/components/video/poster-row";
+import { buildMoviePosterProps, buildShowPosterProps } from "@/lib/poster-card-builder";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,25 @@ export default async function CollectionsPage() {
                         .orderBy(videoCollectionItems.sortOrder)
                         .limit(20);
 
+                    const movieIds = items.map((it) => it.m?.id).filter((x): x is number => x != null);
+                    const files = movieIds.length
+                        ? await db.select({
+                            movieId: videoFiles.movieId,
+                            width: videoFiles.width, height: videoFiles.height,
+                            hdr: videoFiles.hdr, videoCodec: videoFiles.videoCodec,
+                            audioCodec: videoFiles.audioCodec, bitrateKbps: videoFiles.bitrateKbps,
+                            audioTracks: videoFiles.audioTracks, subtitleTracks: videoFiles.subtitleTracks,
+                        }).from(videoFiles)
+                            .where(and(eq(videoFiles.userId, session.user!.id!), inArray(videoFiles.movieId, movieIds)))
+                        : [];
+                    const filesByMovie = new Map<number, typeof files>();
+                    for (const f of files) {
+                        if (f.movieId == null) continue;
+                        const arr = filesByMovie.get(f.movieId) ?? [];
+                        arr.push(f);
+                        filesByMovie.set(f.movieId, arr);
+                    }
+
                     return (
                         <section key={c.id}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "0 .25rem .75rem" }}>
@@ -79,16 +100,23 @@ export default async function CollectionsPage() {
                                     {items.map(({ i, m, s }) => {
                                         if (m) {
                                             return (
-                                                <PosterCard key={i.id} href={`/watch/movies/${m.id}`}
-                                                    title={m.title} year={m.year ?? undefined}
-                                                    posterPath={m.posterPath} />
+                                                <PosterCard
+                                                    key={i.id}
+                                                    {...buildMoviePosterProps(m, {
+                                                        files: filesByMovie.get(m.id) ?? [],
+                                                        inWishlist: c.kind === "wishlist",
+                                                    })}
+                                                />
                                             );
                                         }
                                         if (s) {
                                             return (
-                                                <PosterCard key={i.id} href={`/watch/shows/${s.id}`}
-                                                    title={s.title} year={s.firstAirYear ?? undefined}
-                                                    posterPath={s.posterPath} />
+                                                <PosterCard
+                                                    key={i.id}
+                                                    {...buildShowPosterProps(s, {
+                                                        inWishlist: c.kind === "wishlist",
+                                                    })}
+                                                />
                                             );
                                         }
                                         return null;

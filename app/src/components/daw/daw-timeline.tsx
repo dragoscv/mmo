@@ -226,9 +226,10 @@ export function DAWTimeline() {
                 startBeat: beat,
                 currentBeat: beat,
             });
-        } else if (e.pointerType !== "mouse" && daw.tool === "select") {
-            // Touch / pen on empty lane area in select mode → pan the timeline.
+        } else if (daw.tool === "pan" || (e.pointerType !== "mouse" && daw.tool === "select")) {
+            // Hand tool (mouse) OR touch/pen on empty lane in select mode → pan the timeline.
             // Horizontal drag scrolls beats; vertical drag scrolls the track list.
+            e.stopPropagation();
             try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
             setDrag({
                 type: "pan",
@@ -515,6 +516,7 @@ export function DAWTimeline() {
     // ─── Cursor based on active tool ────────────────────────────────
     const toolCursor: Record<string, string> = {
         select: "default",
+        pan: drag?.type === "pan" ? "grabbing" : "grab",
         draw: "crosshair",
         erase: "pointer",
         slice: "col-resize",
@@ -523,6 +525,28 @@ export function DAWTimeline() {
     };
 
     const playheadX = (daw.currentBeat - daw.scrollX) * pxPerBeat;
+
+    // ─── Follow-playhead auto-scroll ────────────────────────────────
+    // Keep the playhead within the visible timeline range while playing.
+    // When the user is actively dragging (pan/move/etc.) we leave scroll
+    // alone so a manual interaction always wins. Trigger when the
+    // playhead enters the last 20% of the visible width and re-center.
+    useEffect(() => {
+        if (!daw.isPlaying || drag) return;
+        const ruler = containerRef.current?.querySelector<HTMLDivElement>("[data-ruler-viewport]");
+        const visiblePx = ruler?.clientWidth ?? trackAreaRef.current?.clientWidth ?? 0;
+        if (visiblePx <= 0) return;
+        const visibleBeats = visiblePx / pxPerBeat;
+        const leadIn = visibleBeats * 0.2;   // catch when we leave on the left
+        const leadOut = visibleBeats * 0.8;  // re-center before we leave on the right
+        const beatInView = daw.currentBeat - daw.scrollX;
+        if (beatInView < leadIn || beatInView > leadOut) {
+            const newScrollX = Math.max(0, daw.currentBeat - visibleBeats * 0.3);
+            if (Math.abs(newScrollX - daw.scrollX) > 0.01) {
+                daw.setScroll(newScrollX, daw.scrollY);
+            }
+        }
+    }, [daw, daw.currentBeat, daw.isPlaying, daw.scrollX, daw.scrollY, pxPerBeat, drag]);
 
     return (
         <div
@@ -544,6 +568,7 @@ export function DAWTimeline() {
                     <AddTrackMenu />
                 </div>
                 <div
+                    data-ruler-viewport
                     className="flex-1 bg-[var(--daw-surface)] border-b border-[var(--daw-border)] relative overflow-hidden cursor-pointer"
                     onClick={handleRulerClick}
                     onContextMenu={handleRulerContextMenu}
@@ -986,7 +1011,7 @@ function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, isActive
     return (
         <div
             className={cn(
-                "absolute top-1 rounded-md overflow-hidden group transition-shadow duration-150",
+                "absolute top-1 rounded-md overflow-hidden group transition-shadow duration-150 flex flex-col",
                 selected
                     ? "ring-1 ring-[var(--daw-accent)] shadow-[0_0_12px_var(--daw-accent-glow)]"
                     : (isActive && ds.activeClipHighlight)
@@ -1110,14 +1135,39 @@ function ClipBlock({ clip, track, scrollX, pxPerBeat, height, selected, isActive
 
 function WaveformPreview({ peaks, color, style, colorMode }: { peaks: Float32Array; color: string; style: WaveformStyle; colorMode: WaveformColorMode }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    // Track the canvas' actual CSS size so we can resize the backing store
+    // when the clip is zoomed/resized. Without this the canvas stays 200×40
+    // and the browser stretches a low-res bitmap — waveform looks wrong at
+    // anything but the default zoom.
+    const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ro = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const cr = entry.contentRect;
+                const w = Math.max(1, Math.floor(cr.width));
+                const h = Math.max(1, Math.floor(cr.height));
+                setSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+            }
+        });
+        ro.observe(canvas);
+        return () => ro.disconnect();
+    }, []);
 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
-        const w = canvas.width;
-        const h = canvas.height;
+        const dpr = typeof window !== "undefined" ? Math.min(2, window.devicePixelRatio || 1) : 1;
+        const cssW = size.w || canvas.clientWidth || 200;
+        const cssH = size.h || canvas.clientHeight || 40;
+        const w = Math.max(1, Math.floor(cssW * dpr));
+        const h = Math.max(1, Math.floor(cssH * dpr));
+        if (canvas.width !== w) canvas.width = w;
+        if (canvas.height !== h) canvas.height = h;
         ctx.clearRect(0, 0, w, h);
 
         const baseColor = colorMode === "mono" ? "#888888" : color;
@@ -1203,9 +1253,9 @@ function WaveformPreview({ peaks, color, style, colorMode }: { peaks: Float32Arr
                 }
             }
         }
-    }, [peaks, color, style, colorMode]);
+    }, [peaks, color, style, colorMode, size.w, size.h]);
 
-    return <canvas ref={canvasRef} className="w-full h-full" width={200} height={40} />;
+    return <canvas ref={canvasRef} className="w-full h-full block" />;
 }
 
 function MidiPreview({ notes, length, color }: { notes: { pitch: number; start: number; duration: number }[]; length: number; color: string }) {
@@ -1351,6 +1401,14 @@ function AutomationCurve({ lane, scrollX, pxPerBeat, height }: {
     height: number;
 }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const daw = useDAW();
+    const mode = lane.mode ?? "read";
+    const MODES: Array<{ key: "read" | "write" | "touch" | "latch"; label: string }> = [
+        { key: "read", label: "R" },
+        { key: "write", label: "W" },
+        { key: "touch", label: "T" },
+        { key: "latch", label: "L" },
+    ];
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -1416,14 +1474,51 @@ function AutomationCurve({ lane, scrollX, pxPerBeat, height }: {
         ctx.fill();
     }, [lane, scrollX, pxPerBeat, height]);
 
-    if (lane.points.length < 2) return null;
+    if (lane.points.length < 2) {
+        return (
+            <div className="absolute top-1 left-1 z-10 flex items-center gap-0.5 pointer-events-auto" style={{ background: "rgba(0,0,0,0.55)", borderRadius: 4, padding: "1px 2px" }}>
+                <span className="text-[9px] font-medium opacity-70 mr-1" style={{ color: lane.color }}>{lane.parameter}</span>
+                {MODES.map(m => (
+                    <button
+                        key={m.key}
+                        title={`Automation ${m.key}`}
+                        onClick={() => daw.setAutomationLaneMode(lane.id, m.key)}
+                        className="text-[9px] px-1 rounded leading-none h-3.5"
+                        style={{
+                            background: mode === m.key ? lane.color : "transparent",
+                            color: mode === m.key ? "#000" : "#fff",
+                            fontWeight: mode === m.key ? 700 : 500,
+                        }}
+                    >{m.label}</button>
+                ))}
+            </div>
+        );
+    }
 
     return (
-        <canvas
-            ref={canvasRef}
-            className="absolute top-0 left-0 w-full h-full pointer-events-none z-5"
-            width={2000}
-            height={height}
-        />
+        <>
+            <canvas
+                ref={canvasRef}
+                className="absolute top-0 left-0 w-full h-full pointer-events-none z-5"
+                width={2000}
+                height={height}
+            />
+            <div className="absolute top-1 left-1 z-10 flex items-center gap-0.5 pointer-events-auto" style={{ background: "rgba(0,0,0,0.55)", borderRadius: 4, padding: "1px 2px" }}>
+                <span className="text-[9px] font-medium opacity-70 mr-1" style={{ color: lane.color }}>{lane.parameter}</span>
+                {MODES.map(m => (
+                    <button
+                        key={m.key}
+                        title={`Automation ${m.key}`}
+                        onClick={() => daw.setAutomationLaneMode(lane.id, m.key)}
+                        className="text-[9px] px-1 rounded leading-none h-3.5"
+                        style={{
+                            background: mode === m.key ? lane.color : "transparent",
+                            color: mode === m.key ? "#000" : "#fff",
+                            fontWeight: mode === m.key ? 700 : 500,
+                        }}
+                    >{m.label}</button>
+                ))}
+            </div>
+        </>
     );
 }

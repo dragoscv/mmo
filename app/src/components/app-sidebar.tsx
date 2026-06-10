@@ -135,9 +135,14 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                     className="shrink-0 rounded-lg shadow-[0_0_12px_rgba(139,92,246,0.25)]"
                 />
                 {!collapsed && (
-                    <span className="text-[15px] font-bold tracking-tight text-sidebar-foreground whitespace-nowrap overflow-hidden">
-                        MMO
-                    </span>
+                    <div className="flex flex-col min-w-0 leading-tight">
+                        <span className="text-[15px] font-bold tracking-tight text-sidebar-foreground whitespace-nowrap overflow-hidden">
+                            MMO
+                        </span>
+                        <span className="text-[10px] text-sidebar-foreground/30 whitespace-nowrap">
+                            v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
+                        </span>
+                    </div>
                 )}
             </div>
 
@@ -230,23 +235,19 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                     </div>
                 ) : (
                     <>
-                        <UserCard />
-                        <DownloadHubButton />
-                        <div className="flex items-center justify-end px-2">
+                        <div className="flex items-center gap-1.5">
+                            <div className="flex-1 min-w-0">
+                                <DownloadHubButton />
+                            </div>
                             <button
                                 onClick={() => setLegendOpen(true)}
-                                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                                 title="Legend & Help"
                             >
                                 <HelpCircle className="h-4 w-4" />
                             </button>
                         </div>
-                        <div className="px-2">
-                            <p className="text-[11px] text-sidebar-foreground/20">
-                                MMO v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
-                            </p>
-                            <p className="text-[11px] text-sidebar-foreground/15">by mwrty</p>
-                        </div>
+                        <UserCard />
                     </>
                 )}
             </div>

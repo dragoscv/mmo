@@ -8,6 +8,7 @@ import { AnalysisProvider } from "@/components/analysis-provider";
 import { AudioPlayer } from "@/components/audio-player";
 import { NowPlaying } from "@/components/now-playing";
 import { StickyNowPlaying } from "@/components/sticky-now-playing";
+import { VideoPlayerHost } from "@/components/video/player-host";
 import { PlayerAwareLayout } from "@/components/player-aware-layout";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SelectionProvider } from "@/components/selection-provider";
@@ -19,9 +20,12 @@ import { MobileHeader } from "@/components/mobile-header";
 import { ConfirmLoadDialog } from "@/components/confirm-load-dialog";
 import { FocusModeProvider } from "@/components/focus-mode-context";
 import { FocusAwareSidebar, FocusAwareMobileHeader, FocusAwareNowPlayingBar } from "@/components/focus-aware-shell";
+import { ShortcutsOverlay } from "@/components/shortcuts-overlay";
+import { CinemaSettingsSync } from "@/components/cinema-settings-sync";
 import { AuthProvider } from "@/components/auth-provider";
 import { PreferencesSync } from "@/components/preferences-sync";
 import { CompanionStatusProvider } from "@/components/companion/companion-status-provider";
+import { MaestroChatDock } from "@/components/maestro/chat-dock";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 // NOTE: globals.css is pre-compiled by `@tailwindcss/cli` into `public/globals.css`
@@ -114,7 +118,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                                                             <FocusAwareMobileHeader>
                                                                 <MobileHeader />
                                                             </FocusAwareMobileHeader>
-                                                            <main className="flex-1 min-h-0">
+                                                            <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
                                                                 {children}
                                                             </main>
                                                         </div>
@@ -125,6 +129,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                                                             <NowPlaying />
                                                         </Suspense>
                                                         <StickyNowPlaying />
+                                                        <VideoPlayerHost />
                                                         <ConfirmLoadDialog />
                                                     </FocusAwareNowPlayingBar>
                                                 </FocusModeProvider>
@@ -142,6 +147,9 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                                             },
                                         }}
                                     />
+                                    <ShortcutsOverlay />
+                                    <CinemaSettingsSync />
+                                    <MaestroChatDock />
                                 </PlayerProvider>
                             </SidebarProvider>
                         </SelectionProvider>

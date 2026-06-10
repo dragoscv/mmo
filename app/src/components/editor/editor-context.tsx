@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useCallback, useRef, useState, useEffect, type ReactNode } from "react";
 import { useRenderCount } from "@/lib/dev-debugger";
+import { useProjectAutosave } from "@/hooks/use-project-autosave";
 import {
     type HistoryState,
     type HistoryEntry,
@@ -821,6 +822,24 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         isSeparatingStems, stemsProgress, separateStems, extractStem,
         peakL, peakR,
     };
+
+    // Persist + sync: writes to Postgres via server action with offline
+    // fallback. Disabled until a buffer is loaded so we don't autosave the
+    // empty default project.
+    useProjectAutosave({
+        kind: "editor",
+        externalId: project.id || null,
+        name: project.name,
+        document: {
+            id: project.id, name: project.name, sourceUrl: project.sourceUrl,
+            sampleRate: project.sampleRate, channels: project.channels,
+            duration: project.duration,
+            markers: project.markers, regions: project.regions,
+            editHistory: project.editHistory,
+        },
+        extras: { duration: project.duration },
+        enabled: Boolean(project.id) && buffer !== null,
+    });
 
     return (
         <EditorContext value={value}>

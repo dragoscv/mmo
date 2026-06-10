@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useRenderCount } from "@/lib/dev-debugger";
 import { useProjectAutosave } from "@/hooks/use-project-autosave";
+import { getProject as fetchProjectFromServer } from "@/actions/projects";
 import {
     DAWEngine,
     createDefaultProject,
@@ -247,6 +248,7 @@ interface DAWActions {
     removeInsert: (trackId: string, insertId: string) => void;
     toggleInsert: (trackId: string, insertId: string) => void;
     setInsertParam: (trackId: string, insertId: string, param: string, value: number) => void;
+    setSidechainSource: (trackId: string, insertId: string, sourceTrackId: string | undefined) => void;
     reorderInserts: (trackId: string, fromIndex: number, toIndex: number) => void;
     // Sends
     addSend: (trackId: string, returnTrackId: string) => void;
@@ -258,6 +260,9 @@ interface DAWActions {
     addAutomationPoint: (laneId: string, time: number, value: number) => void;
     removeAutomationPoint: (laneId: string, pointIndex: number) => void;
     moveAutomationPoint: (laneId: string, pointIndex: number, time: number, value: number) => void;
+    setAutomationLaneMode: (laneId: string, mode: "read" | "write" | "touch" | "latch") => void;
+    recordAutomationTouch: (laneId: string, value: number) => void;
+    releaseAutomationTouch: (laneId: string) => void;
     toggleAutomationVisibility: () => void;
     // Panels
     togglePanel: (panel: "pianoRoll" | "mixer" | "stepSequencer" | "browser" | "effectsRack" | "synth" | "automation" | "history" | "clipboard" | "voiceProcessor") => void;
@@ -430,6 +435,59 @@ function updateProjectUrl(projectId: string) {
     const url = new URL(window.location.href);
     url.searchParams.set("project", projectId);
     window.history.replaceState({}, "", url.toString());
+}
+
+/** Fetch+decode audio for every clip in `doc` that has a sourceUrl but no
+ *  decoded buffer, then patch state with the loaded buffer + waveform peaks.
+ *  Used after loading from localStorage AND after server hydration / polling
+ *  hot-swap, so Maestro-added clips are actually audible. */
+function hydrateClipAudioBuffers(
+    engine: DAWEngine,
+    doc: DAWProject,
+    setState: React.Dispatch<React.SetStateAction<DAWState>>,
+) {
+    const todo: { trackId: string; clipId: string; sourceUrl: string; name: string }[] = [];
+    for (const track of doc.tracks) {
+        for (const clip of track.clips) {
+            if (clip.type === "audio" && clip.audio?.sourceUrl && !clip.audio.buffer) {
+                todo.push({
+                    trackId: track.id,
+                    clipId: clip.id,
+                    sourceUrl: clip.audio.sourceUrl,
+                    name: clip.audio.name || clip.name,
+                });
+            }
+        }
+    }
+    if (todo.length === 0) return;
+    void Promise.all(todo.map(async ({ trackId, clipId, sourceUrl, name }) => {
+        try {
+            const buffer = await engine.loadAudioBuffer(sourceUrl);
+            const peaks = engine.computeWaveformPeaks(buffer);
+            setState(prev => ({
+                ...prev,
+                project: {
+                    ...prev.project,
+                    tracks: prev.project.tracks.map(t => t.id !== trackId ? t : {
+                        ...t,
+                        clips: t.clips.map(c => c.id !== clipId ? c : {
+                            ...c,
+                            audio: {
+                                ...c.audio!,
+                                buffer,
+                                waveformPeaks: peaks,
+                                duration: buffer.duration,
+                                name,
+                            },
+                            length: engine.secondsToBeats(buffer.duration, prev.project.tempo),
+                        }),
+                    }),
+                },
+            }));
+        } catch {
+            // Clip stays empty; user can re-import manually.
+        }
+    }));
 }
 
 export function DAWProvider({ children }: { children: ReactNode }) {
@@ -637,11 +695,18 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             });
         };
 
-        // Load saved project from localStorage (client-only, after hydration)
+        // Load saved project from localStorage (client-only, after hydration).
+        // If the URL specifies a project that isn't in local cache, keep the URL
+        // as-is so the server-hydration effect below can fetch it; otherwise
+        // align the URL to whatever we loaded.
         const saved = loadInitialProject();
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlProjectId = urlParams.get("project");
         // eslint-disable-next-line react-hooks/set-state-in-effect -- engine initialization with persisted project
         setState(prev => ({ ...prev, project: saved }));
-        updateProjectUrl(saved.id);
+        if (!urlProjectId || urlProjectId === saved.id) {
+            updateProjectUrl(saved.id);
+        }
 
         // Create channels for initial tracks
         for (const track of saved.tracks) {
@@ -650,52 +715,127 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         engine.createChannel(saved.masterTrack.id, "master");
 
         // Reload audio buffers for clips that have sourceUrl but lost buffer on save
-        const clipsToReload: { trackId: string; clipId: string; sourceUrl: string; name: string }[] = [];
-        for (const track of saved.tracks) {
-            for (const clip of track.clips) {
-                if (clip.type === "audio" && clip.audio?.sourceUrl && !clip.audio.buffer) {
-                    clipsToReload.push({ trackId: track.id, clipId: clip.id, sourceUrl: clip.audio.sourceUrl, name: clip.audio.name || clip.name });
-                }
-            }
-        }
-        if (clipsToReload.length > 0) {
-            Promise.all(clipsToReload.map(async ({ trackId, clipId, sourceUrl, name }) => {
-                try {
-                    const buffer = await engine.loadAudioBuffer(sourceUrl);
-                    const peaks = engine.computeWaveformPeaks(buffer);
-                    setState(prev => ({
-                        ...prev,
-                        project: {
-                            ...prev.project,
-                            tracks: prev.project.tracks.map(t => t.id !== trackId ? t : {
-                                ...t,
-                                clips: t.clips.map(c => c.id !== clipId ? c : {
-                                    ...c,
-                                    audio: {
-                                        ...c.audio!,
-                                        buffer,
-                                        waveformPeaks: peaks,
-                                        duration: buffer.duration,
-                                        name,
-                                    },
-                                    length: engine.secondsToBeats(buffer.duration, saved.tempo),
-                                }),
-                            }),
-                        },
-                    }));
-                } catch {
-                    // Failed to reload audio, clip stays empty
-                }
-            }));
-        }
+        hydrateClipAudioBuffers(engine, saved, setState);
 
         return () => {
             cancelAnimationFrame(meterRAF.current);
             engine.destroy();
             engineRef.current = null;
         };
-         
+
     }, []);
+
+    // Server-side project hydration: if the URL has ?project=<id> but our
+    // local cache didn't have it (e.g. project was created on another device,
+    // or written by Maestro), fetch the JSON document from the server and
+    // hot-swap it into state. Runs once after mount.
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const params = new URLSearchParams(window.location.search);
+        const urlProjectId = params.get("project");
+        if (!urlProjectId) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const server = await fetchProjectFromServer("daw", urlProjectId);
+                if (cancelled || !server) return;
+                const doc = server.document as unknown as DAWProject;
+                if (!doc || !Array.isArray(doc.tracks)) return;
+                setState(prev => {
+                    // If state already shows this exact project from localStorage, keep it.
+                    if (prev.project.id === doc.id && prev.project.tracks.length > 0) return prev;
+                    const engine = engineRef.current;
+                    if (engine) {
+                        prev.project.tracks.forEach(t => engine.removeChannel(t.id));
+                        doc.tracks.forEach(t => engine.createChannel(t.id, t.type));
+                        if (doc.masterTrack) engine.createChannel(doc.masterTrack.id, "master");
+                    }
+                    return {
+                        ...prev,
+                        project: doc,
+                        isPlaying: false,
+                        isRecording: false,
+                        currentBeat: 0,
+                        selectedTrackId: null,
+                        selectedClipId: null,
+                        history: createHistory(doc, "Loaded from cloud"),
+                        isDirty: false,
+                    };
+                });
+                updateProjectUrl(doc.id);
+                // Decode any clip audio that arrived from the server.
+                const engine = engineRef.current;
+                if (engine) hydrateClipAudioBuffers(engine, doc, setState);
+                // Also persist to localStorage so subsequent reloads are instant
+                try { saveProject(doc); } catch { /* ignore */ }
+            } catch {
+                // Server unreachable or unauthenticated — keep local state
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    // Periodic poll for external updates (e.g. Maestro edits while the UI is open).
+    // Compares server's `updatedAt` against our last applied timestamp; if newer
+    // AND we are not in the middle of typing locally (no dirty state), hot-swap.
+    // 4 s interval keeps it cheap.
+    const lastAppliedAtRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const interval = window.setInterval(async () => {
+            try {
+                const externalId = state.project.id;
+                if (!externalId) return;
+                if (state.isDirty) return; // don't trash unsaved local edits
+                const server = await fetchProjectFromServer("daw", externalId);
+                if (!server) return;
+                const serverAt = server.updatedAt ?? "";
+                if (!serverAt) return;
+                if (lastAppliedAtRef.current === serverAt) return;
+                // First observation: just record, don't reload.
+                if (lastAppliedAtRef.current === null) {
+                    lastAppliedAtRef.current = serverAt;
+                    return;
+                }
+                const doc = server.document as unknown as DAWProject;
+                if (!doc || !Array.isArray(doc.tracks)) return;
+                // Only swap if the doc actually differs from what we have.
+                const stale = JSON.stringify({ t: state.project.tempo, c: state.project.tracks.length, n: state.project.tracks.reduce((acc, t) => acc + t.clips.length, 0) })
+                    !== JSON.stringify({ t: doc.tempo, c: doc.tracks.length, n: doc.tracks.reduce((acc: number, t: { clips: unknown[] }) => acc + (t.clips?.length ?? 0), 0) });
+                if (!stale) {
+                    lastAppliedAtRef.current = serverAt;
+                    return;
+                }
+                lastAppliedAtRef.current = serverAt;
+                setState(prev => {
+                    if (prev.isDirty) return prev;
+                    const engine = engineRef.current;
+                    if (engine) {
+                        prev.project.tracks.forEach(t => engine.removeChannel(t.id));
+                        doc.tracks.forEach(t => engine.createChannel(t.id, t.type));
+                        if (doc.masterTrack) engine.createChannel(doc.masterTrack.id, "master");
+                    }
+                    return {
+                        ...prev,
+                        project: doc,
+                        history: createHistory(doc, "Refreshed from cloud"),
+                        isDirty: false,
+                    };
+                });
+                const engine = engineRef.current;
+                if (engine) hydrateClipAudioBuffers(engine, doc, setState);
+                try { saveProject(doc); } catch { /* ignore */ }
+            } catch { /* ignore poll errors */ }
+        }, 4000);
+        return () => window.clearInterval(interval);
+    }, [state.project.id, state.isDirty, state.project.tempo, state.project.tracks]);
+
+    // Mirror current project id into URL on every change so the link is always
+    // shareable (covers hot-swap from cloud poll, autosave-created ids, etc.).
+    useEffect(() => {
+        if (!state.project.id) return;
+        updateProjectUrl(state.project.id);
+    }, [state.project.id]);
 
     // Sync step pattern and playback mode to engine
     useEffect(() => {
@@ -745,6 +885,17 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             tracks: p.tracks.map(t => t.id === trackId ? updater(t) : t),
         }));
     }, [updateProject]);
+
+    // Forward-declared so the lower-half action setters can call into
+    // automation recording without violating the useCallback order rules.
+    // The actual implementation is defined far below alongside the rest
+    // of the automation API; assigned via the ref-update useEffect just
+    // after. Calls before assignment are no-ops, which is what we want
+    // during the first render anyway.
+    const recordParamLanesRef = useRef<(trackId: string, parameter: string, value: number) => void>(() => {});
+    const recordParamLanes = useCallback((trackId: string, parameter: string, value: number) => {
+        recordParamLanesRef.current(trackId, parameter, value);
+    }, []);
 
     const findClip = useCallback((clipId: string): { track: DAWTrack; clip: Clip } | null => {
         for (const track of state.project.tracks) {
@@ -920,12 +1071,14 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     const setTrackVolume = useCallback((id: string, vol: number) => {
         engineRef.current?.getChannel(id)?.setVolume(vol);
         updateTrack(id, t => ({ ...t, volume: vol }));
-    }, [updateTrack]);
+        recordParamLanes(id, "volume", vol);
+    }, [updateTrack, recordParamLanes]);
 
     const setTrackPan = useCallback((id: string, pan: number) => {
         engineRef.current?.getChannel(id)?.setPan(pan);
         updateTrack(id, t => ({ ...t, pan }));
-    }, [updateTrack]);
+        recordParamLanes(id, "pan", pan);
+    }, [updateTrack, recordParamLanes]);
 
     const toggleTrackMute = useCallback((id: string) => {
         updateTrack(id, t => {
@@ -1436,6 +1589,13 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         }));
     }, [updateTrack]);
 
+    const setSidechainSource = useCallback((trackId: string, insertId: string, sourceTrackId: string | undefined) => {
+        updateTrack(trackId, t => ({
+            ...t,
+            inserts: t.inserts.map(i => i.id === insertId ? { ...i, sidechainSourceTrackId: sourceTrackId } : i),
+        }));
+    }, [updateTrack]);
+
     const reorderInserts = useCallback((trackId: string, fromIndex: number, toIndex: number) => {
         pushUndoNamed("Reorder Effects", "ArrowUpDown");
         updateTrack(trackId, t => {
@@ -1464,7 +1624,8 @@ export function DAWProvider({ children }: { children: ReactNode }) {
             ...t,
             sends: t.sends.map(s => s.returnTrackId === returnTrackId ? { ...s, amount } : s),
         }));
-    }, [updateTrack]);
+        recordParamLanes(trackId, `send:${returnTrackId}`, amount);
+    }, [updateTrack, recordParamLanes]);
 
     // ─── Automation ──────────────────────────────────────────────────────
 
@@ -1536,6 +1697,82 @@ export function DAWProvider({ children }: { children: ReactNode }) {
     const toggleAutomationVisibility = useCallback(() => {
         setState(prev => ({ ...prev, showAutomation: !prev.showAutomation }));
     }, []);
+
+    // ─── Automation modes: write / touch / latch ────────────────────────
+    //
+    // The engine writes envelope points captured from live user gestures
+    // (knobs / faders) into the active lane while the transport is
+    // playing. Modes follow standard DAW semantics:
+    //   - read  : envelopes drive parameters, no recording (default).
+    //   - write : recording erases any existing points in the touch
+    //             window and writes the new value, every render block.
+    //   - touch : recording while the gesture is held; releases revert
+    //             to existing envelope on lift.
+    //   - latch : recording starts on first touch, keeps writing the
+    //             last-held value until transport stops.
+    //
+    // The actual point write lives in `recordAutomationTouch` below; the
+    // UI is expected to call it from input handlers (knob onPointerMove)
+    // and `releaseAutomationTouch` from onPointerUp.
+    const touchedLanesRef = useRef<Map<string, number>>(new Map());
+    const setAutomationLaneMode = useCallback((laneId: string, mode: "read" | "write" | "touch" | "latch") => {
+        updateProject(p => ({
+            ...p,
+            tracks: p.tracks.map(t => ({
+                ...t,
+                automationLanes: t.automationLanes.map(l => l.id === laneId ? { ...l, mode } : l),
+            })),
+        }));
+    }, [updateProject]);
+
+    const recordAutomationTouch = useCallback((laneId: string, value: number) => {
+        if (!engineRef.current?.getIsPlaying()) return;
+        const beat = engineRef.current.getCurrentBeat();
+        touchedLanesRef.current.set(laneId, value);
+        updateProject(p => ({
+            ...p,
+            tracks: p.tracks.map(t => ({
+                ...t,
+                automationLanes: t.automationLanes.map(l => {
+                    if (l.id !== laneId) return l;
+                    if (l.mode === "read") return l;
+                    // Window around the current beat — erase old points so
+                    // we don't pile up duplicates while a knob is held.
+                    const W = 0.05;
+                    const kept = l.points.filter((pt) => Math.abs(pt.time - beat) > W);
+                    return {
+                        ...l,
+                        points: [...kept, { time: beat, value, curve: "linear" as const }].sort((a, b) => a.time - b.time),
+                    };
+                }),
+            })),
+        }));
+    }, [updateProject]);
+
+    const releaseAutomationTouch = useCallback((laneId: string) => {
+        const last = touchedLanesRef.current.get(laneId);
+        touchedLanesRef.current.delete(laneId);
+        if (last == null) return;
+        // For latch we'd keep writing until transport stop. The engine
+        // doesn't yet run a write loop, so latch behaves like touch today;
+        // the held value persists in the lane until the user changes it.
+    }, []);
+
+    // Bridge the forward-declared ref to the real implementation. Any
+    // mixer/knob setter (volume/pan/send) that fires while the transport
+    // is playing now writes a point into every enabled lane it matches.
+    useEffect(() => {
+        recordParamLanesRef.current = (trackId, parameter, value) => {
+            const tracks = state.project.tracks;
+            const track = tracks.find(t => t.id === trackId);
+            if (!track) return;
+            for (const lane of track.automationLanes ?? []) {
+                if (lane.parameter !== parameter) continue;
+                if (lane.mode === "read") continue;
+                recordAutomationTouch(lane.id, value);
+            }
+        };
+    }, [state.project.tracks, recordAutomationTouch]);
 
     // ─── Panels ──────────────────────────────────────────────────────────
 
@@ -2034,6 +2271,30 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         }));
     }, [findClip, pushUndoNamed, updateProject]);
 
+    // ─── Live send routing ───────────────────────────────────────────────
+    //
+    // applySends is idempotent and very cheap. Recomputing whenever the
+    // tracks array (or any track's sends) changes keeps live playback in
+    // sync with the UI without waiting for the next play() call.
+    const sendsSignature = useMemo(() => state.project.tracks
+        .map((t) => `${t.id}:${(t.sends ?? []).map((s) => `${s.returnTrackId}/${s.amount}/${s.preFader ? 1 : 0}`).join(",")}`)
+        .join("|"),
+        [state.project.tracks]);
+    useEffect(() => {
+        engineRef.current?.applySends(state.project);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sendsSignature]);
+
+    // ─── Live insert (FX) routing ────────────────────────────────────────
+    const insertsSignature = useMemo(() => state.project.tracks
+        .map((t) => `${t.id}:${(t.inserts ?? []).map((i) => `${i.type}/${i.enabled ? 1 : 0}/${JSON.stringify(i.params ?? {})}`).join(",")}`)
+        .join("|"),
+        [state.project.tracks]);
+    useEffect(() => {
+        engineRef.current?.applyInserts(state.project);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [insertsSignature]);
+
     // ─── Auto-save ───────────────────────────────────────────────────────
 
     useEffect(() => {
@@ -2069,10 +2330,12 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         selectNotes, clearSelection, openPianoRoll, closePianoRoll,
         playSynthNote, stopSynthNote, setSynthConfig,
         toggleStep, setStepVelocity, setPatternSteps, setPatternSwing, clearPattern,
-        addInsert, removeInsert, toggleInsert, setInsertParam, reorderInserts,
+        addInsert, removeInsert, toggleInsert, setInsertParam, setSidechainSource, reorderInserts,
         addSend, removeSend, setSendAmount,
         addAutomationLane, removeAutomationLane, addAutomationPoint,
-        removeAutomationPoint, moveAutomationPoint, toggleAutomationVisibility,
+        removeAutomationPoint, moveAutomationPoint,
+        setAutomationLaneMode, recordAutomationTouch, releaseAutomationTouch,
+        toggleAutomationVisibility,
         togglePanel,
         newProject, openProject, saveCurrentProject, renameProject,
         setProjectModal, setSettingsModal, setExportModal, toggleFocusMode, setBrowserTab,
@@ -2098,10 +2361,12 @@ export function DAWProvider({ children }: { children: ReactNode }) {
         selectNotes, clearSelection, openPianoRoll, closePianoRoll,
         playSynthNote, stopSynthNote, setSynthConfig,
         toggleStep, setStepVelocity, setPatternSteps, setPatternSwing, clearPattern,
-        addInsert, removeInsert, toggleInsert, setInsertParam, reorderInserts,
+        addInsert, removeInsert, toggleInsert, setInsertParam, setSidechainSource, reorderInserts,
         addSend, removeSend, setSendAmount,
         addAutomationLane, removeAutomationLane, addAutomationPoint,
-        removeAutomationPoint, moveAutomationPoint, toggleAutomationVisibility,
+        removeAutomationPoint, moveAutomationPoint,
+        setAutomationLaneMode, recordAutomationTouch, releaseAutomationTouch,
+        toggleAutomationVisibility,
         togglePanel,
         newProject, openProject, saveCurrentProject, renameProject,
         setProjectModal, setSettingsModal, setExportModal, toggleFocusMode, setBrowserTab,

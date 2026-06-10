@@ -66,7 +66,10 @@ resource "google_sql_database_instance" "mmo" {
         name  = "allow-all"
         value = "0.0.0.0/0"
       }
-      require_ssl = true
+      // require_ssl was deprecated in google provider v6. Use the
+      // explicit ssl_mode enum instead. ENCRYPTED_ONLY = TLS required
+      // but no cert verification (same effective semantics).
+      ssl_mode = "ENCRYPTED_ONLY"
     }
 
     insights_config {

@@ -1,0 +1,9 @@
+flask>=3.0
+gunicorn>=22.0
+google-cloud-storage>=2.18
+numpy>=1.26
+soundfile>=0.12
+librosa>=0.10
+faiss-cpu>=1.8
+fairseq @ git+https://github.com/facebookresearch/fairseq@main
+# RVC inference shim: minimal subset until full RVC pkg is wired.

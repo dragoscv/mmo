@@ -96,6 +96,10 @@ const nextConfig: NextConfig = {
                 "*.devtunnels.ms",
             ],
         },
+        // Wrap client navigations in document.startViewTransition() so paired
+        // elements (poster ↔ detail hero) morph cinematically. Pairing is
+        // done with matching `view-transition-name` CSS on both ends.
+        viewTransition: true,
         // NOTE: `turbopackFileSystemCacheForDev` was enabled here for faster
         // cold restarts but caused `ChunkLoadError` / `chunk.reason.enqueueModel
         // is not a function` during client navigation in Next.js 16.2.x — the
@@ -128,13 +132,17 @@ const nextConfig: NextConfig = {
             "font-src 'self' data: https://fonts.gstatic.com",
             // Artwork / oEmbed thumbnails come from many CDNs; HTTPS-only.
             "img-src 'self' data: blob: https:",
-            "media-src 'self' blob: https:",
+            // `http:` allows companion server streams on the LAN (private IPs:
+            // 10.x, 172.16-31.x, 192.168.x — CSP can't express CIDR ranges).
+            "media-src 'self' blob: https: http:",
             // SSE relay, devices, sync, Auth.js callbacks, Stripe webhooks.
-            // Companion probes hit 127.0.0.1 (default for native fetches on
-            // some browsers when the URL is typed without DNS) and localhost.
-            "connect-src 'self' http://localhost:* http://127.0.0.1:* https: wss: ws:",
-            // Stripe Elements + Auth.js Google one-tap iframes.
-            "frame-src 'self' https://js.stripe.com https://accounts.google.com https://hooks.stripe.com",
+            // Companion probes hit 127.0.0.1, localhost, and LAN IPs (the
+            // user's home router assigns 192.168.x). `http:` here is needed
+            // for cross-host LAN companions.
+            "connect-src 'self' http: https: wss: ws:",
+            // Stripe Elements + Auth.js Google one-tap iframes + YouTube
+            // trailer embeds (HeroTrailer, PosterPopover, TrailerModal).
+            "frame-src 'self' https://js.stripe.com https://accounts.google.com https://hooks.stripe.com https://www.youtube-nocookie.com https://www.youtube.com",
             "frame-ancestors 'self'",
             "object-src 'none'",
             "base-uri 'self'",

@@ -18,6 +18,8 @@ import {
     ListMusic,
     Heart,
     Disc3,
+    Film,
+    X,
 } from "lucide-react";
 import { useRef, useCallback, useEffect, useState } from "react";
 import { TrackContextMenu } from "./track-actions";
@@ -94,6 +96,10 @@ export function AudioPlayer() {
 
     const { openMobile } = useSidebar();
     const swipe = useBarSwipe(openNowPlaying, openMobile);
+
+    if (!currentTrack && player.currentVideo) {
+        return <VideoNowPlayingBar />;
+    }
 
     if (!currentTrack) {
         // Minimal bar when no track is loaded — allows opening Now Playing
@@ -473,5 +479,123 @@ function BarWaveformBg({
             ref={canvasRef}
             className="absolute inset-0 w-full h-full pointer-events-none"
         />
+    );
+}
+
+/* ─── Video Now Playing Bar ──────────────────────────────────────────────
+ *  Rendered in the same slot as the audio bar, but only when a video is
+ *  active and no audio track is loaded. Shows poster, title, scrubber and
+ *  basic transport, all bound to the video element registered with the
+ *  player context. */
+function VideoNowPlayingBar() {
+    const player = usePlayer();
+    const v = player.currentVideo;
+    const pct = player.videoDuration > 0 ? (player.videoCurrentTime / player.videoDuration) * 100 : 0;
+
+    const onSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        if (player.videoDuration <= 0) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+        player.seekVideo(ratio * player.videoDuration);
+    }, [player]);
+
+    if (!v) return null;
+
+    return (
+        <div className="fixed bottom-0 left-0 right-0 z-50">
+            <div className="absolute -top-8 left-0 right-0 h-8 bg-gradient-to-t from-background/80 to-transparent pointer-events-none" />
+            <div className="relative bg-card/95 border-t border-border pb-[env(safe-area-inset-bottom)]">
+                {/* Scrubber */}
+                <div
+                    className="h-1.5 bg-white/10 cursor-pointer group"
+                    onClick={onSeek}
+                >
+                    <div
+                        className="h-full bg-gradient-to-r from-fuchsia-500 to-purple-500 transition-[width] duration-100"
+                        style={{ width: `${pct}%` }}
+                    />
+                </div>
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2 h-[60px]">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const open = () => player.openNowPlayingView("video");
+                            if (typeof document !== "undefined" && typeof document.startViewTransition === "function") {
+                                document.startViewTransition(open);
+                            } else {
+                                open();
+                            }
+                        }}
+                        className="flex items-center gap-3 min-w-0 text-left cursor-pointer group"
+                    >
+                        <div className="relative h-10 w-16 rounded-md overflow-hidden bg-black ring-1 ring-border flex-shrink-0">
+                            {v.poster ? (
+                                // eslint-disable-next-line @next/next/no-img-element -- TMDB images are external, intentionally bypass next/image
+                                <img src={v.poster} alt="" className="h-full w-full object-cover" style={{ viewTransitionName: `np-video-${v.fileId}` }} />
+                            ) : (
+                                <div className="h-full w-full flex items-center justify-center text-white/40">
+                                    <Film className="h-4 w-4" />
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-foreground truncate group-hover:text-purple-300 transition-colors">{v.title}</p>
+                            {v.subtitle && <p className="text-[10px] text-muted-foreground truncate">{v.subtitle}</p>}
+                            <p className="text-[10px] text-muted-foreground/60 font-mono">
+                                {formatDuration(player.videoCurrentTime)} / {formatDuration(player.videoDuration || (v.durationSec ?? 0))}
+                            </p>
+                        </div>
+                    </button>
+
+                    <div className="flex items-center gap-1 justify-self-center">
+                        <button
+                            type="button"
+                            onClick={() => player.prevVideo()}
+                            className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-30"
+                            disabled={player.videoQueueIndex <= 0}
+                            title="Previous"
+                        >
+                            <SkipBack className="h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => player.videoTogglePlay()}
+                            className="h-9 w-9 rounded-full bg-foreground text-background flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
+                            title="Play / Pause"
+                        >
+                            {player.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => player.nextVideo()}
+                            className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-30"
+                            disabled={player.videoQueueIndex >= player.videoQueue.length - 1}
+                            title="Next"
+                        >
+                            <SkipForward className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-1 justify-self-end">
+                        <button
+                            type="button"
+                            onClick={() => player.openNowPlayingView("video")}
+                            className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                            title="Open Now Playing"
+                        >
+                            <ChevronUp className="h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => player.closeVideo()}
+                            className="p-2 text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
+                            title="Close video"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }

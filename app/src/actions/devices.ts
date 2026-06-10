@@ -414,13 +414,17 @@ export async function getLocalCompanion(): Promise<{ apiUrl: string; token: stri
 
 // ─── Companion-owned folders ───────────────────────────────────────────────
 //
-// Folders live ON the companion (truth = scanFolders in electron-store).
-// The web app no longer mirrors them in its own DB — these actions are
-// thin proxies. The legacy `deviceFolders` table is kept only for stale
-// per-folder stats; new flows ignore it.
+// Truth lives on the companion (electron-store `scanFolders`). We mirror
+// every successful list/add/remove/kind/watch into `device_folders` so
+// the /devices page paints instantly on refresh — even if the companion
+// is currently offline — and so server-rendered initial markup can ship
+// the folder list without a client round-trip.
 
 /** Write-through: replace the cached folder set for a device. Best-effort. */
-async function mirrorCompanionFolders(deviceId: string, list: CompanionFolder[]): Promise<void> {
+async function mirrorCompanionFolders(
+    deviceId: string,
+    list: CompanionFolder[],
+): Promise<void> {
     try {
         await db.transaction(async (tx) => {
             await tx.delete(deviceFolders).where(eq(deviceFolders.deviceId, deviceId));
@@ -438,7 +442,9 @@ async function mirrorCompanionFolders(deviceId: string, list: CompanionFolder[])
     }
 }
 
-/** Read the cached folder set without touching the companion. */
+/** Read the cached folder set without touching the companion. Returns
+ *  `CompanionFolder[]` so callers can swap it in for `getCompanionFolders`
+ *  output during cold paint / offline fallback. */
 export async function getCachedCompanionFolders(deviceId: string): Promise<CompanionFolder[]> {
     if (await assertDeviceOwnership(deviceId)) return [];
     const rows = await db
@@ -452,6 +458,8 @@ export async function getCachedCompanionFolders(deviceId: string): Promise<Compa
         .where(eq(deviceFolders.deviceId, deviceId));
     return rows.map((r) => ({
         path: r.path,
+        // We can't know `exists` without hitting the companion. Assume true
+        // for cached display; the live refresh will correct it.
         exists: true,
         label: r.label ?? (r.path.split(/[/\\]/).pop() || r.path),
         kind: (r.kind ?? undefined) as FolderKind | undefined,
@@ -461,14 +469,37 @@ export async function getCachedCompanionFolders(deviceId: string): Promise<Compa
 
 export async function getCompanionFolders(deviceId: string): Promise<CompanionFolder[]> {
     if (await assertDeviceOwnership(deviceId)) return [];
+
+    // FAST PATH: direct HTTP via the Cloudflare Tunnel (~30-80 ms). The
+    // queue path below takes a full announce cycle (up to 3 s when idle,
+    // longer if the companion's outbound fetch to muzicai.ro is unhealthy
+    // — which is exactly the symptom that pushed us to fix this).
+    try {
+        const list = await companionControl.listFolders(deviceId);
+        void mirrorCompanionFolders(deviceId, list);
+        return list;
+    } catch (e) {
+        // Tunnel unreachable (no hostname yet, CF outage, companion offline).
+        // Log once so we can diagnose silent fallbacks instead of always
+        // taking the slow announce path. Falls through to queue.
+        console.warn(
+            `[devices.getCompanionFolders] tunnel failed for ${deviceId}, falling back to queue:`,
+            e instanceof Error ? `${e.message}${(e as { cause?: unknown }).cause ? ` (cause: ${String((e as { cause?: { code?: string; message?: string } }).cause?.code ?? (e as { cause?: { message?: string } }).cause?.message ?? "")})` : ""}` : e,
+        );
+    }
+
     const r = await enqueueDeviceCommand<{ folders: CompanionFolder[] }>(
         deviceId, "list_folders", null, { timeoutMs: 8_000 },
     );
     if (r.ok) {
         const list = r.result?.folders ?? [];
+        // Fire-and-forget mirror so the read path stays fast.
         void mirrorCompanionFolders(deviceId, list);
         return list;
     }
+    // Companion unreachable on both transports — fall back to the cached
+    // mirror so the user still sees their library folders on a
+    // stale-but-known basis.
     return getCachedCompanionFolders(deviceId);
 }
 
@@ -576,9 +607,9 @@ export async function setCompanionFolderWatch(
         deviceId, "set_folder_watch", { path: folderPath, watch }, { timeoutMs: 8_000 },
     );
     if (!r.ok) return { error: r.error ?? "Failed to toggle watcher" };
-    const folders = r.result?.folders ?? [];
-    void mirrorCompanionFolders(deviceId, folders);
-    return { success: true, folders };
+    const list = r.result?.folders ?? [];
+    void mirrorCompanionFolders(deviceId, list);
+    return { success: true, folders: list };
 }
 
 /** Update the purpose label of a folder (music / movies / tv-shows / ...). */
@@ -593,23 +624,32 @@ export async function setCompanionFolderKind(
         deviceId, "set_folder_kind", { path: folderPath, kind }, { timeoutMs: 8_000 },
     );
     if (!r.ok) return { error: r.error ?? "Failed to update folder kind" };
-    const folders = r.result?.folders ?? [];
-    void mirrorCompanionFolders(deviceId, folders);
-    return { success: true, folders };
+    const list = r.result?.folders ?? [];
+    void mirrorCompanionFolders(deviceId, list);
+    return { success: true, folders: list };
 }
 
 // ─── Async scan jobs (refresh-resilient progress) ──────────────────────────
 
-/** Kick off a scan. Returns the freshly-created job (status:"pending"). */
+/** Kick off a scan. Returns the freshly-created job (status:"pending").
+ *  When `kind` is provided the companion will use it directly instead of
+ *  looking up its local folder config — needed because cloud-added
+ *  folders may not be in the companion's `settings.scanFolders` list. */
 export async function startCompanionScan(
     deviceId: string,
     folderPath: string,
+    kind?: FolderKind,
 ): Promise<{ success: true; job: CompanionScanJob } | { error: string }> {
     try {
-        const job = await companionControl.startScan(deviceId, folderPath);
+        const job = await companionControl.startScan(deviceId, folderPath, kind);
         return { success: true, job };
     } catch (e) {
-        return { error: e instanceof Error ? e.message : String(e) };
+        const msg = e instanceof Error ? e.message : String(e);
+        const cause = (e as { cause?: { code?: string; message?: string } })?.cause;
+        const detail = cause?.code ?? cause?.message;
+        const full = detail ? `${msg} [${detail}]` : msg;
+        console.warn(`[devices.startCompanionScan] failed for ${deviceId} folder=${folderPath}: ${full}`);
+        return { error: full };
     }
 }
 
@@ -651,7 +691,9 @@ export async function ingestCompanionScanJob(
     | { error: string }
 > {
     try {
+        console.log(`[ingest-audio] start device=${deviceId} job=${jobId}`);
         const job = await companionControl.getScanJob(deviceId, jobId);
+        console.log(`[ingest-audio] job folder="${job.folder}" kind=${job.kind} status=${job.status} tracks=${job.tracks?.length ?? 0}`);
         if (job.status !== "complete" || !job.tracks) return { error: "Job not complete" };
         // Per-device lookup (not getCompanionLink) so this works for
         // LAN/Tailscale companions whose api_url isn't on localhost.
@@ -689,8 +731,10 @@ export async function ingestCompanionScanJob(
             ));
         revalidatePath("/devices");
         revalidatePath("/library");
+        console.log(`[ingest-audio] done inserted=${r.inserted} skipped=${r.skipped} total=${job.tracks.length}`);
         return { success: true, inserted: r.inserted, skipped: r.skipped, total: job.tracks.length };
     } catch (e) {
+        console.error(`[ingest-audio] crashed device=${deviceId} job=${jobId}: ${e instanceof Error ? e.message : String(e)}`);
         return { error: e instanceof Error ? e.message : String(e) };
     }
 }
@@ -773,11 +817,25 @@ export async function setCompanionAuthorizedAudioDevices(
 
 // ─── Cloudflare tunnel helpers ──────────────────────────────────────────────
 
+// Per-process memo of the last ingress port written per device, so the
+// announce-route hot path doesn't fire a CF API call on every 3s tick.
+const ingressPortByDevice = new Map<string, number>();
+function shouldUpdateIngress(deviceId: string, port: number): boolean {
+    return ingressPortByDevice.get(deviceId) !== port;
+}
+function rememberIngressPort(deviceId: string, port: number): void {
+    ingressPortByDevice.set(deviceId, port);
+}
+
 /**
  * Idempotently provision the per-device Cloudflare Tunnel + DNS record.
  * Returns the bootstrap (`tunnelHostname` + `tunnelToken`) the companion
  * needs to start `cloudflared`, or null when CF is not configured or
  * the API call fails. Safe to call on every heartbeat.
+ *
+ * When opts.port is provided, the existing tunnel's ingress config is
+ * updated to point at that port (deduped per-process so the 3s announce
+ * loop doesn't burn CF API quota).
  */
 export async function ensureDeviceTunnel(
     deviceId: string,
@@ -798,10 +856,23 @@ export async function ensureDeviceTunnel(
     if (!row) return null;
     if (row.tunnelId && row.tunnelHostname && row.tunnelTokenEncrypted) {
         try {
-            return {
+            const decoded = {
                 tunnelHostname: row.tunnelHostname,
                 tunnelToken: decryptDeviceToken(row.tunnelTokenEncrypted),
             };
+            if (opts.port && shouldUpdateIngress(deviceId, opts.port)) {
+                try {
+                    await updateDeviceTunnelIngress(cfg, {
+                        tunnelId: row.tunnelId,
+                        hostname: row.tunnelHostname,
+                        port: opts.port,
+                    });
+                    rememberIngressPort(deviceId, opts.port);
+                } catch (err) {
+                    console.warn("[devices] tunnel ingress update failed:", err instanceof Error ? err.message : err);
+                }
+            }
+            return decoded;
         } catch { /* fall through and re-provision */ }
     }
     try {
@@ -814,6 +885,7 @@ export async function ensureDeviceTunnel(
                 tunnelTokenEncrypted: encryptDeviceToken(t.tunnelToken),
             })
             .where(eq(devices.id, deviceId));
+        if (opts.port) rememberIngressPort(deviceId, opts.port);
         return { tunnelHostname: t.hostname, tunnelToken: t.tunnelToken };
     } catch (err) {
         console.warn("[devices] ensureDeviceTunnel failed:", err instanceof Error ? err.message : err);
@@ -853,20 +925,8 @@ export async function getDeviceDirectAccess(
 /**
  * Pull a completed video-kind scan job from the companion and persist
  * its results into the cloud schema (movies / tvShows / tvSeasons /
- * tvEpisodes / videoFiles).
- *
- * Behaviour:
- *  - Movies folder → group by (lowercased title, year), upsert a single
- *    `movies` row per group. Each scanned file becomes a `videoFiles`
- *    row keyed by `(deviceId, path)`; multiple files for the same movie
- *    (e.g. different resolutions) are preserved naturally because their
- *    paths differ.
- *  - TV shows folder → group by `showHint || parsedTitle`, then season,
- *    then episode. Files missing season/episode metadata count as
- *    `skipped` rather than being silently dropped.
- *
- * No TMDB enrichment in this slice — titles come from the filename
- * parser, `tmdbId` stays null.
+ * tvEpisodes / videoFiles). No TMDB enrichment in this slice — titles
+ * come from the filename parser, `tmdbId` stays null.
  */
 export async function ingestCompanionVideoScanJob(
     deviceId: string,
@@ -880,6 +940,8 @@ export async function ingestCompanionVideoScanJob(
     files: number;
     skipped: number;
 } | { error: string }> {
+  try {
+    console.log(`[ingest-video] start device=${deviceId} job=${jobId}`);
     const session = await auth();
     if (!session?.user?.id) return { error: "Not authenticated" };
     const ownership = await assertDeviceOwnership(deviceId);
@@ -892,14 +954,29 @@ export async function ingestCompanionVideoScanJob(
         .limit(1);
     if (!device) return { error: "Device not found" };
 
-    const job = await companionControl.getScanJob(deviceId, jobId).catch(() => null);
+    const job = await companionControl.getScanJob(deviceId, jobId).catch((e) => {
+        console.warn(`[ingest-video] getScanJob threw: ${e instanceof Error ? e.message : String(e)}`);
+        return null;
+    });
     if (!job) return { error: "Scan job not found on companion" };
+    console.log(`[ingest-video] job folder="${job.folder}" kind=${job.kind} status=${job.status} videos=${job.videos?.length ?? 0}`);
     if (job.status !== "complete") return { error: `Scan job is ${job.status}` };
     if (job.kind !== "video" || !job.videos) return { error: "Not a video scan job" };
 
-    const folders = await companionControl.listFolders(deviceId).catch(() => [] as CompanionFolder[]);
-    const folderCfg = folders.find((f) => f.path === job.folder);
-    const folderKind: FolderKind | undefined = folderCfg?.kind;
+    // Source of truth for kind is the cloud's deviceFolders row — the
+    // companion's local config may be empty when the folder was added
+    // from the web UI rather than from the desktop app.
+    const [folderRow] = await db
+        .select({ kind: deviceFolders.kind })
+        .from(deviceFolders)
+        .where(and(eq(deviceFolders.deviceId, deviceId), eq(deviceFolders.path, job.folder)))
+        .limit(1);
+    let folderKind: FolderKind | undefined = folderRow?.kind as FolderKind | undefined;
+    if (folderKind !== "movies" && folderKind !== "tv-shows") {
+        // Fallback to the companion's local config (older desktop-added folders).
+        const folders = await companionControl.listFolders(deviceId).catch(() => [] as CompanionFolder[]);
+        folderKind = folders.find((f) => f.path === job.folder)?.kind;
+    }
     if (folderKind !== "movies" && folderKind !== "tv-shows") {
         return { error: `Folder kind ${folderKind ?? "unknown"} is not a video kind` };
     }
@@ -947,8 +1024,6 @@ export async function ingestCompanionVideoScanJob(
         }
 
         for (const g of groups.values()) {
-            // No TMDB id → can't use the (userId, tmdbId) unique index.
-            // Look up by (userId, title, year) and insert if absent.
             const [existing] = await db
                 .select({ id: movies.id })
                 .from(movies)
@@ -1041,8 +1116,6 @@ export async function ingestCompanionVideoScanJob(
             }
 
             for (const [seasonNum, sFiles] of bySeason) {
-                // Upsert season; onConflictDoNothing keeps the original
-                // row when one already exists for this (show, season).
                 await db
                     .insert(tvSeasons)
                     .values({ showId, seasonNumber: seasonNum })
@@ -1068,7 +1141,6 @@ export async function ingestCompanionVideoScanJob(
                         })
                         .onConflictDoUpdate({
                             target: [tvEpisodes.showId, tvEpisodes.seasonNumber, tvEpisodes.episodeNumber],
-                            // Touch a no-op field so returning() always fires.
                             set: { seasonNumber: seasonNum },
                         })
                         .returning({ id: tvEpisodes.id });
@@ -1115,6 +1187,7 @@ export async function ingestCompanionVideoScanJob(
     revalidatePath("/devices");
     revalidatePath("/watch");
 
+    console.log(`[ingest-video] done kind=${folderKind} movies=${movieCount} shows=${showCount} seasons=${seasonCount} episodes=${episodeCount} files=${fileCount} skipped=${skipped}`);
     return {
         success: true,
         movies: movieCount,
@@ -1124,5 +1197,10 @@ export async function ingestCompanionVideoScanJob(
         files: fileCount,
         skipped,
     };
+  } catch (e) {
+    const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
+    console.error(`[ingest-video] crashed device=${deviceId} job=${jobId}: ${msg}`);
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }
 

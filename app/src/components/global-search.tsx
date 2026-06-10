@@ -38,6 +38,10 @@ import {
   Sparkles,
   Copy,
   BookOpen,
+  Film,
+  Tv,
+  Layers,
+  Mic,
 } from "lucide-react";
 import { cn, formatDuration, formatKey } from "@/lib/utils";
 import { useDAWSettings } from "@/hooks/use-daw-settings";
@@ -55,6 +59,7 @@ const PAGES = [
   { label: "Scanner", key: "scanner", href: "/scanner", icon: ScanSearch, keywords: "scan import analyze folder" },
   { label: "Drives", key: "drives", href: "/drives", icon: HardDrive, keywords: "usb disk drive export" },
   { label: "Settings", key: "settings", href: "/settings", icon: Settings, keywords: "preferences config options" },
+  { label: "Voice Wizard", key: "voice-wizard", href: "/voice-wizard", icon: Mic, keywords: "voice clone tts wizard xtts synthesize sing" },
 ] as const;
 
 interface GlobalSearchProps {
@@ -149,13 +154,19 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
       results.artists.length > 0 ||
       results.albums.length > 0 ||
       results.genres.length > 0 ||
-      results.playlists.length > 0);
+      results.playlists.length > 0 ||
+      results.movies.length > 0 ||
+      results.shows.length > 0 ||
+      results.projects.length > 0);
   const totalResults = results
     ? results.tracks.length +
       results.artists.length +
       results.albums.length +
       results.genres.length +
-      results.playlists.length
+      results.playlists.length +
+      results.movies.length +
+      results.shows.length +
+      results.projects.length
     : 0;
 
   return (
@@ -502,6 +513,97 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                           <span className="text-[11px] text-muted-foreground/50">
                             {pl.trackCount} track{pl.trackCount !== 1 ? "s" : ""}
                           </span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </>
+                )}
+
+                {/* Movies */}
+                {results.movies.length > 0 && (
+                  <>
+                    <CommandSeparator className="my-1" />
+                    <CommandGroup heading="Films">
+                      {results.movies.map((m) => (
+                        <CommandItem
+                          key={`movie-${m.id}`}
+                          value={`movie-${m.id}-${m.title}`}
+                          onSelect={() => navigate(`/watch/movies/${m.id}`)}
+                          className="gap-3 rounded-lg px-3 py-2"
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-red-500/15 to-rose-500/10 overflow-hidden">
+                            {m.posterPath ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={`https://image.tmdb.org/t/p/w92${m.posterPath}`} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <Film className="h-3.5 w-3.5 text-red-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{m.title}</p>
+                            {m.year && <p className="text-xs text-muted-foreground">{m.year}</p>}
+                          </div>
+                          {m.rating != null && m.rating > 0 && (
+                            <span className="text-[11px] text-amber-400">★ {m.rating.toFixed(1)}</span>
+                          )}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </>
+                )}
+
+                {/* TV Shows */}
+                {results.shows.length > 0 && (
+                  <>
+                    <CommandSeparator className="my-1" />
+                    <CommandGroup heading="Series">
+                      {results.shows.map((s) => (
+                        <CommandItem
+                          key={`show-${s.id}`}
+                          value={`show-${s.id}-${s.title}`}
+                          onSelect={() => navigate(`/watch/shows/${s.id}`)}
+                          className="gap-3 rounded-lg px-3 py-2"
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500/15 to-purple-500/10 overflow-hidden">
+                            {s.posterPath ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={`https://image.tmdb.org/t/p/w92${s.posterPath}`} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <Tv className="h-3.5 w-3.5 text-fuchsia-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{s.title}</p>
+                            {s.firstAirYear && <p className="text-xs text-muted-foreground">{s.firstAirYear}</p>}
+                          </div>
+                          {s.rating != null && s.rating > 0 && (
+                            <span className="text-[11px] text-amber-400">★ {s.rating.toFixed(1)}</span>
+                          )}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </>
+                )}
+
+                {/* Projects */}
+                {results.projects.length > 0 && (
+                  <>
+                    <CommandSeparator className="my-1" />
+                    <CommandGroup heading="Projects">
+                      {results.projects.map((p) => (
+                        <CommandItem
+                          key={`proj-${p.kind}-${p.id}`}
+                          value={`proj-${p.kind}-${p.id}-${p.name}`}
+                          onSelect={() => navigate(p.href)}
+                          className="gap-3 rounded-lg px-3 py-2"
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/15 to-teal-500/10">
+                            <Layers className="h-3.5 w-3.5 text-emerald-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{p.name}</p>
+                            <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider">{p.kind}</p>
+                          </div>
                         </CommandItem>
                       ))}
                     </CommandGroup>

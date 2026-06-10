@@ -1,0 +1,7 @@
+flask==3.0.3
+gunicorn==23.0.0
+google-cloud-storage==2.18.2
+transformers==4.45.2
+soundfile==0.12.1
+librosa==0.10.2
+numpy<2.0

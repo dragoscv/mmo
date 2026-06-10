@@ -1,0 +1,15 @@
+{
+  "name": "@mmo/ai-mcp",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Model Context Protocol server exposing MMO's Maestro tool catalogue over stdio + HTTP/SSE + WebSocket so any MCP client (Claude Desktop, Cursor, VS Code, etc.) can drive MMO.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "bin": {
+    "mmo-mcp": "./src/cli.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

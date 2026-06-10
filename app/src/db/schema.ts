@@ -674,6 +674,9 @@ export const movies = pgTable(
         ratingCount: integer("rating_count"),
         ageRating: text("age_rating"),
         dominantColor: text("dominant_color"),
+        /** Cached scraped scores from IMDB, Rotten Tomatoes, CineMagia. */
+        externalRatings: jsonb("external_ratings"),
+        externalRatingsFetchedAt: timestamp("external_ratings_fetched_at"),
         addedAt: timestamp("added_at").defaultNow(),
         updatedAt: timestamp("updated_at").defaultNow(),
     },
@@ -705,6 +708,8 @@ export const tvShows = pgTable(
         ageRating: text("age_rating"),
         status: text("status"),
         dominantColor: text("dominant_color"),
+        externalRatings: jsonb("external_ratings"),
+        externalRatingsFetchedAt: timestamp("external_ratings_fetched_at"),
         addedAt: timestamp("added_at").defaultNow(),
         updatedAt: timestamp("updated_at").defaultNow(),
     },
@@ -748,6 +753,8 @@ export const tvEpisodes = pgTable(
         introStartSec: real("intro_start_sec"),
         introEndSec: real("intro_end_sec"),
         creditsStartSec: real("credits_start_sec"),
+        recapStartSec: real("recap_start_sec"),
+        recapEndSec: real("recap_end_sec"),
     },
     (t) => [
         uniqueIndex("tv_episodes_show_se_ep_uniq").on(t.showId, t.seasonNumber, t.episodeNumber),
@@ -780,6 +787,8 @@ export const videoFiles = pgTable(
         hash: text("hash"),
         mtime: timestamp("mtime"),
         scannedAt: timestamp("scanned_at").defaultNow(),
+        loudnessIntegrated: real("loudness_integrated"),
+        loudnessGainDb: real("loudness_gain_db"),
     },
     (t) => [
         index("video_files_user_idx").on(t.userId),
@@ -864,6 +873,26 @@ export const videoCollectionItems = pgTable(
     ],
 );
 
+export const videoBookmarks = pgTable(
+    "video_bookmarks",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        profileId: bigint("profile_id", { mode: "number" }).notNull().references(() => watchProfiles.id, { onDelete: "cascade" }),
+        kind: text("kind").notNull(), // 'movie' | 'episode'
+        movieId: bigint("movie_id", { mode: "number" }).references(() => movies.id, { onDelete: "cascade" }),
+        episodeId: bigint("episode_id", { mode: "number" }).references(() => tvEpisodes.id, { onDelete: "cascade" }),
+        fileId: bigint("file_id", { mode: "number" }).references(() => videoFiles.id, { onDelete: "set null" }),
+        timeSec: real("time_sec").notNull(),
+        label: text("label"),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+    },
+    (t) => [
+        index("video_bookmarks_profile_idx").on(t.profileId),
+        index("video_bookmarks_movie_idx").on(t.movieId),
+        index("video_bookmarks_episode_idx").on(t.episodeId),
+    ],
+);
+
 export type WatchProfileRow = typeof watchProfiles.$inferSelect;
 export type CompanionDeviceRow = typeof companionDevices.$inferSelect;
 export type MovieRow = typeof movies.$inferSelect;
@@ -875,6 +904,4 @@ export type WatchHistoryRow = typeof watchHistory.$inferSelect;
 export type VideoRatingRow = typeof videoRatings.$inferSelect;
 export type VideoCollectionRow = typeof videoCollections.$inferSelect;
 export type VideoCollectionItemRow = typeof videoCollectionItems.$inferSelect;
-
-// ─── Project persistence (DAW/Editor/Live/Mixer/Viz) ────────────────────────
-export * from "./schema-projects";
+export type VideoBookmarkRow = typeof videoBookmarks.$inferSelect;

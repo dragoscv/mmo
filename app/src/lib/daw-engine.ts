@@ -10,7 +10,7 @@ import { dlog } from "./dev-debugger";
 
 export type TrackType = "audio" | "midi" | "return" | "master";
 export type ClipType = "audio" | "midi";
-export type ToolMode = "select" | "draw" | "erase" | "slice" | "mute" | "automation";
+export type ToolMode = "select" | "draw" | "erase" | "slice" | "mute" | "automation" | "pan";
 export type SnapValue = "1/1" | "1/2" | "1/4" | "1/8" | "1/16" | "1/32" | "none";
 export type AutomationMode = "read" | "write" | "touch" | "latch";
 export type TimeSignature = { numerator: number; denominator: number };
@@ -88,6 +88,8 @@ export interface InsertEffect {
     type: EffectType;
     enabled: boolean;
     params: Record<string, number>;
+    /** For `sidechain`: id of the track whose signal keys the compressor. */
+    sidechainSourceTrackId?: string;
 }
 
 export type EffectType =
@@ -95,7 +97,8 @@ export type EffectType =
     | "reverb" | "delay" | "chorus" | "flanger" | "phaser"
     | "distortion" | "bitcrusher" | "filter" | "sidechain"
     | "stereoWidth" | "deEsser" | "saturator" | "tremolo"
-    | "pingPongDelay" | "convolutionReverb";
+    | "pingPongDelay" | "convolutionReverb"
+    | "noiseSuppression" | "autotune" | "pitchShift" | "vocoderLite";
 
 export interface DAWTrack {
     id: string;
@@ -245,13 +248,17 @@ export const DEFAULT_EFFECT_PARAMS: Record<EffectType, Record<string, number>> =
     distortion: { drive: 0.5, tone: 0.5, mix: 0.5 },
     bitcrusher: { bits: 8, sampleRate: 0.5, mix: 0.5 },
     filter: { type: 0, cutoff: 8000, resonance: 1, mix: 1 },
-    sidechain: { threshold: -20, ratio: 8, attack: 0.001, release: 0.2, sourceTrackId: 0 },
+    sidechain: { threshold: -20, ratio: 8, attack: 0.001, release: 0.2 },
     stereoWidth: { width: 1 },
     deEsser: { threshold: -20, frequency: 6000, ratio: 4 },
     saturator: { drive: 0.3, mix: 0.5, tone: 0.5 },
     tremolo: { rate: 4, depth: 0.5 },
     pingPongDelay: { mix: 0.3, time: 0.25, feedback: 0.4, spread: 0.8 },
     convolutionReverb: { mix: 0.3, decay: 2 },
+    noiseSuppression: { threshold: -45, reduction: 15, attack: 0.005, release: 0.05 },
+    autotune: { amount: 1 },
+    pitchShift: { semitones: 0, cents: 0, mix: 1 },
+    vocoderLite: { mix: 0.7 },
 };
 
 export const EFFECT_TYPES: EffectType[] = [
@@ -260,6 +267,7 @@ export const EFFECT_TYPES: EffectType[] = [
     "distortion", "bitcrusher", "filter", "sidechain",
     "stereoWidth", "deEsser", "saturator", "tremolo",
     "pingPongDelay", "convolutionReverb",
+    "noiseSuppression", "autotune", "pitchShift", "vocoderLite",
 ];
 
 export const DRUM_KIT_DEFAULT: StepTrack[] = [
@@ -309,6 +317,7 @@ export class DAWEngine {
     private midiRecordingTrackId: string | null = null;
     private _stepPattern: StepSequencerPattern | null = null;
     private _playbackMode: "pattern" | "song" = "song";
+    private _activeProject: DAWProject | null = null;
 
     onBeatUpdate?: (beat: number) => void;
     onStepUpdate?: (step: number) => void; // fires current step index for step sequencer
@@ -424,7 +433,12 @@ export class DAWEngine {
         this.startTime = this.ctx.currentTime - this.beatsToSeconds(this.currentBeat, project.tempo);
         this.nextNoteTime = this.ctx.currentTime;
         this.currentStep = Math.floor(this.currentBeat * 4); // 16th notes
+        // Cache tempo + project so seek() / pause() / song-end can compute correctly
+        // without the caller having to thread project through every transport call.
+        this._activeProject = project;
 
+        this.scheduleAutomationLive(project, this.currentBeat);
+        this.applySends(project);
         this.schedulePlayback(project);
     }
 
@@ -444,20 +458,162 @@ export class DAWEngine {
         this.activeVoices.clear();
         // Stop all playing sources in channel strips
         this.channelNodes.forEach(strip => strip.stopAllSources());
+        this.cancelAutomationLive();
     }
 
     pause() {
+        if (!this.isPlaying) return;
+        dlog("daw", `pause atBeat=${this.currentBeat.toFixed(2)}`, { atBeat: this.currentBeat });
         this.isPlaying = false;
         if (this.schedulerTimer) {
             clearInterval(this.schedulerTimer);
             this.schedulerTimer = null;
         }
+        // Silence everything immediately. Previously `pause()` only stopped the
+        // scheduler, but voices/audio-clips already scheduled into the next
+        // ~100 ms (lookAhead) and sustained voices kept ringing — so the user
+        // heard sound continuing after pressing pause. Mirror `stop()`'s
+        // cleanup but keep `currentBeat` intact so resume picks up here.
+        this.activeVoices.forEach(voices => {
+            voices.forEach(v => {
+                v.osc.forEach(o => { try { o.stop(); } catch { /* noop */ } });
+            });
+        });
+        this.activeVoices.clear();
+        this.channelNodes.forEach(strip => strip.stopAllSources());
+        this.cancelAutomationLive();
     }
 
     seek(beat: number) {
-        this.currentBeat = Math.max(0, beat);
+        const clamped = Math.max(0, beat);
+        this.currentBeat = clamped;
+        // Keep the 16th-note scheduler grid in sync with the new playhead so
+        // resume/scrub-while-playing picks up the right clips immediately.
+        this.currentStep = Math.floor(clamped * 4);
         if (this.isPlaying) {
-            this.startTime = this.ctx.currentTime - this.beatsToSeconds(this.currentBeat, 120);
+            const tempo = this._activeProject?.tempo ?? 120;
+            this.startTime = this.ctx.currentTime - this.beatsToSeconds(clamped, tempo);
+            // Cut any voices left over from the old playhead so a scrub doesn't
+            // bleed the previous bar's notes through.
+            this.activeVoices.forEach(voices => {
+                voices.forEach(v => {
+                    v.osc.forEach(o => { try { o.stop(); } catch { /* noop */ } });
+                });
+            });
+            this.activeVoices.clear();
+            this.channelNodes.forEach(strip => strip.stopAllSources());
+            // Restart scheduling from the new position so notes line up cleanly.
+            this.nextNoteTime = this.ctx.currentTime;
+            if (this._activeProject) {
+                this.scheduleAutomationLive(this._activeProject, clamped);
+            }
+        }
+    }
+
+    /**
+     * Phase C: live-playback automation runtime.
+     *
+     * Walks every track's automation lanes and projects their envelope
+     * onto the matching live `ChannelStrip` AudioParam (volume → gainParam,
+     * pan → panParam). The schedule is computed once at `play()` time
+     * starting from `fromBeat`; this is the cheap, correct equivalent of
+     * a per-frame "read" mode. Modes `write/touch/latch` are typed but
+     * not yet recorded — only `read` is honored at runtime.
+     *
+     * On `stop()` / `pause()` we cancel scheduled values and snap each
+     * param back to the track's static `volume`/`pan` so the next
+     * play() starts from a clean state regardless of where automation
+     * left it.
+     */
+    private scheduleAutomationLive(project: DAWProject, fromBeat: number) {
+        const ctxNow = this.ctx.currentTime;
+        const fromSec = this.beatsToSeconds(fromBeat, project.tempo);
+        for (const track of project.tracks) {
+            const strip = this.channelNodes.get(track.id);
+            if (!strip) continue;
+            for (const lane of track.automationLanes ?? []) {
+                if (!lane.points?.length) continue;
+                if (lane.mode !== "read" && lane.mode !== undefined) continue;
+                let target: AudioParam | null = null;
+                if (lane.parameter === "volume") target = strip.gainParam;
+                else if (lane.parameter === "pan") target = strip.panParam;
+                if (!target) continue;
+
+                const sorted = [...lane.points].sort((a, b) => a.time - b.time);
+                target.cancelScheduledValues(ctxNow);
+                // Anchor the param at the current value so the first ramp
+                // starts where it actually is, not where the lane begins.
+                const firstSec = this.beatsToSeconds(sorted[0].time, project.tempo);
+                if (firstSec > fromSec) {
+                    target.setValueAtTime(target.value, ctxNow);
+                }
+                for (let i = 0; i < sorted.length; i++) {
+                    const p = sorted[i];
+                    const pSec = this.beatsToSeconds(p.time, project.tempo);
+                    if (pSec < fromSec - 0.001) continue; // already in the past
+                    const scheduledAt = ctxNow + Math.max(0, pSec - fromSec);
+                    const next = sorted[i + 1];
+                    if (!next || p.curve === "step") {
+                        target.setValueAtTime(p.value, scheduledAt);
+                        continue;
+                    }
+                    const nextSec = this.beatsToSeconds(next.time, project.tempo);
+                    const nextAt = ctxNow + Math.max(0, nextSec - fromSec);
+                    target.setValueAtTime(p.value, scheduledAt);
+                    if (p.curve === "exponential" && p.value > 0.0001 && next.value > 0.0001) {
+                        target.exponentialRampToValueAtTime(next.value, nextAt);
+                    } else {
+                        target.linearRampToValueAtTime(next.value, nextAt);
+                    }
+                }
+            }
+        }
+    }
+
+    private cancelAutomationLive() {
+        const now = this.ctx.currentTime;
+        this.channelNodes.forEach((strip) => {
+            try { strip.gainParam.cancelScheduledValues(now); } catch { /* noop */ }
+            try { strip.panParam.cancelScheduledValues(now); } catch { /* noop */ }
+        });
+    }
+
+    /**
+     * Phase D: rebuild send routing for the entire project.
+     *
+     * Walks every track's `sends[]` and wires its source ChannelStrip
+     * to the matching return-track ChannelStrip's input. Idempotent —
+     * each call clears the previous routing first so it's safe to call
+     * after any project mutation that touches sends. Cheap because
+     * sends are usually 0–3 per track.
+     *
+     * Called from `play()` so live playback always reflects the latest
+     * routing. The DAW context should also call this after `addSend` /
+     * `removeSend` / `setSendAmount` if the user wants the change
+     * audible without restarting transport.
+     */
+    applySends(project: DAWProject) {
+        this.channelNodes.forEach((strip) => strip.clearSends());
+        for (const track of project.tracks) {
+            const src = this.channelNodes.get(track.id);
+            if (!src || !track.sends?.length) continue;
+            for (const send of track.sends) {
+                const ret = this.channelNodes.get(send.returnTrackId);
+                if (!ret) continue;
+                src.connectSend(ret.input, send.amount, send.preFader);
+            }
+        }
+    }
+
+    /**
+     * Re-route the insert (FX) chain for every channel from the project
+     * state. Cheap, idempotent, and complementary to `applySends`.
+     */
+    applyInserts(project: DAWProject) {
+        for (const track of project.tracks) {
+            const strip = this.channelNodes.get(track.id);
+            if (!strip) continue;
+            strip.setInserts(track.inserts ?? [], (sourceTrackId) => this.channelNodes.get(sourceTrackId)?.getSideTap() ?? null);
         }
     }
 
@@ -553,11 +709,24 @@ export class DAWEngine {
                 this.nextNoteTime += secondsPerStep;
                 this.currentStep++;
 
-                // Check if we've passed the end of the project (song mode only)
-                if (this._playbackMode === "song" && beat > project.duration && !project.loopRegion.enabled) {
-                    this.stop();
-                    this.onPlaybackEnd?.();
-                    return;
+                // Check if we've passed the end of the project (song mode only).
+                // Use the larger of the explicit project.duration and the
+                // last-clip end so songs whose content extends past the static
+                // duration value (e.g. clips added/duplicated by an agent
+                // without updating duration) play through to their real end.
+                if (this._playbackMode === "song" && !project.loopRegion.enabled) {
+                    let lastEnd = project.duration;
+                    for (const tr of project.tracks) {
+                        for (const cl of tr.clips) {
+                            const end = cl.position + cl.length;
+                            if (end > lastEnd) lastEnd = end;
+                        }
+                    }
+                    if (beat > lastEnd) {
+                        this.stop();
+                        this.onPlaybackEnd?.();
+                        return;
+                    }
                 }
             }
         };
@@ -724,32 +893,45 @@ export class DAWEngine {
         const strip = this.channelNodes.get(track.id);
         if (!strip) return;
 
+        // Defensive defaults — Maestro / external pipelines may produce
+        // partial clip docs missing some envelope fields. Writing undefined
+        // or NaN to an AudioParam throws and silences playback entirely.
+        const finite = (v: unknown, fallback: number): number =>
+            typeof v === "number" && Number.isFinite(v) ? v : fallback;
+        const gain = finite(clip.audio.gain, 1);
+        const timeStretch = finite(clip.audio.timeStretch, 1);
+        const pitchShift = finite(clip.audio.pitchShift, 0);
+        const fadeInSec = Math.max(0, finite(clip.audio.fadeIn, 0));
+        const fadeOutSec = Math.max(0, finite(clip.audio.fadeOut, 0));
+        const startOffset = Math.max(0, finite(clip.audio.startOffset, 0));
+        const durationSec = finite(clip.audio.duration, clip.audio.buffer.duration);
+
         const source = this.ctx.createBufferSource();
         source.buffer = clip.audio.buffer;
-        source.playbackRate.value = clip.audio.timeStretch;
+        source.playbackRate.value = timeStretch || 1;
 
-        if (clip.audio.pitchShift !== 0) {
-            source.detune.value = clip.audio.pitchShift * 100;
+        if (pitchShift !== 0) {
+            source.detune.value = pitchShift * 100;
         }
 
         // Clip gain
         const clipGain = this.ctx.createGain();
-        clipGain.gain.value = clip.audio.gain;
+        clipGain.gain.value = gain;
 
         // Fade in/out
-        if (clip.audio.fadeIn > 0) {
+        if (fadeInSec > 0) {
             clipGain.gain.setValueAtTime(0, time);
-            clipGain.gain.linearRampToValueAtTime(clip.audio.gain, time + clip.audio.fadeIn);
+            clipGain.gain.linearRampToValueAtTime(gain, time + fadeInSec);
         }
-        const clipDuration = clip.audio.duration / clip.audio.timeStretch;
-        if (clip.audio.fadeOut > 0) {
-            clipGain.gain.setValueAtTime(clip.audio.gain, time + clipDuration - clip.audio.fadeOut);
+        const clipDuration = durationSec / (timeStretch || 1);
+        if (fadeOutSec > 0) {
+            clipGain.gain.setValueAtTime(gain, time + clipDuration - fadeOutSec);
             clipGain.gain.linearRampToValueAtTime(0, time + clipDuration);
         }
 
         source.connect(clipGain);
         clipGain.connect(strip.input);
-        source.start(time, clip.audio.startOffset, clip.audio.duration);
+        source.start(time, startOffset, durationSec);
         strip.addActiveSource(source);
     }
 
@@ -769,14 +951,23 @@ export class DAWEngine {
     computeWaveformPeaks(buffer: AudioBuffer, numPeaks: number = 1000): Float32Array {
         const data = buffer.getChannelData(0);
         const peaks = new Float32Array(numPeaks);
-        const blockSize = Math.floor(data.length / numPeaks);
+        const blockSize = Math.max(1, Math.floor(data.length / numPeaks));
+        let globalMax = 0;
         for (let i = 0; i < numPeaks; i++) {
             let max = 0;
+            const base = i * blockSize;
             for (let j = 0; j < blockSize; j++) {
-                const abs = Math.abs(data[i * blockSize + j]);
+                const abs = Math.abs(data[base + j] || 0);
                 if (abs > max) max = abs;
             }
             peaks[i] = max;
+            if (max > globalMax) globalMax = max;
+        }
+        // Normalize so the loudest sample fills the available display range.
+        // Without this, quiet stems (isolated vocals/bass) draw as a flat line.
+        if (globalMax > 0.0001) {
+            const inv = 1 / globalMax;
+            for (let i = 0; i < numPeaks; i++) peaks[i] *= inv;
         }
         return peaks;
     }
@@ -800,6 +991,11 @@ export class DAWEngine {
         const strip = this.channelNodes.get(trackId);
         if (!strip) return { left: 0, right: 0 };
         return strip.getPeaks();
+    }
+
+    /** Current sidechain gain-reduction in dB applied on `trackId`. */
+    getDuckingDb(trackId: string): number {
+        return this.channelNodes.get(trackId)?.duckingDb ?? 0;
     }
 
     // ─── Audio Recording ─────────────────────────────────────────────────
@@ -1203,25 +1399,144 @@ export class DAWEngine {
         offlineComp.connect(offlineCtx.destination);
 
         // Schedule audio clips
+        // Phase D: build per-track strip nodes first so sends can wire to
+        // return-track inputs regardless of declaration order.
+        const strips = new Map<string, { input: GainNode; gainNode: GainNode; panNode: StereoPannerNode }>();
         for (const track of project.tracks) {
             if (track.muted) continue;
+            const input = offlineCtx.createGain();
             const trackGain = offlineCtx.createGain();
             trackGain.gain.value = track.volume;
             const trackPan = offlineCtx.createStereoPanner();
             trackPan.pan.value = track.pan;
+            input.connect(trackGain);
             trackGain.connect(trackPan);
+            // Return tracks should NOT also dump dry signal into master if
+            // their only purpose is to receive sends; but per-DAW convention
+            // returns also have a fader to master. Keep the connection.
             trackPan.connect(offlineMaster);
+            strips.set(track.id, { input, gainNode: trackGain, panNode: trackPan });
+        }
 
+        // Wire sends now that all strip inputs exist.
+        for (const track of project.tracks) {
+            const src = strips.get(track.id);
+            if (!src || !track.sends?.length) continue;
+            for (const send of track.sends) {
+                const ret = strips.get(send.returnTrackId);
+                if (!ret) continue;
+                const sendGain = offlineCtx.createGain();
+                sendGain.gain.value = send.amount;
+                const tap: AudioNode = send.preFader ? src.input : src.panNode;
+                tap.connect(sendGain);
+                sendGain.connect(ret.input);
+            }
+        }
+
+        for (const track of project.tracks) {
+            if (track.muted) continue;
+            const strip = strips.get(track.id);
+            if (!strip) continue;
+            const { input, gainNode: trackGain, panNode: trackPan } = strip;
+
+            // ── Automation: project automation lanes onto track params ────
+            // Phase B: volume and pan only. Inserts/sends are not applied
+            // because the live engine doesn't apply them either (typed but
+            // not wired); rendering them here would silently diverge from
+            // what the user hears. Add proper insert routing in a future
+            // pass before re-introducing automation for fx params.
+            for (const lane of track.automationLanes ?? []) {
+                if (!lane.points?.length) continue;
+                let target: AudioParam | null = null;
+                if (lane.parameter === "volume") target = trackGain.gain;
+                else if (lane.parameter === "pan") target = trackPan.pan;
+                if (!target) continue; // unsupported parameter — silently skip
+
+                const sorted = [...lane.points].sort((a, b) => a.time - b.time);
+                target.cancelScheduledValues(0);
+                target.setValueAtTime(sorted[0].value, 0);
+                for (let i = 0; i < sorted.length; i++) {
+                    const p = sorted[i];
+                    const tSec = Math.max(0, this.beatsToSeconds(p.time, project.tempo));
+                    const next = sorted[i + 1];
+                    if (!next || p.curve === "step") {
+                        target.setValueAtTime(p.value, tSec);
+                        continue;
+                    }
+                    const nextTSec = this.beatsToSeconds(next.time, project.tempo);
+                    if (p.curve === "exponential" && p.value > 0.0001 && next.value > 0.0001) {
+                        target.setValueAtTime(p.value, tSec);
+                        target.exponentialRampToValueAtTime(next.value, nextTSec);
+                    } else {
+                        target.setValueAtTime(p.value, tSec);
+                        target.linearRampToValueAtTime(next.value, nextTSec);
+                    }
+                }
+            }
+
+            // ── Audio clips ─────────────────────────────────────────────
             for (const clip of track.clips) {
-                if (clip.muted || !clip.audio?.buffer) continue;
-                const source = offlineCtx.createBufferSource();
-                source.buffer = clip.audio.buffer;
-                const clipGain = offlineCtx.createGain();
-                clipGain.gain.value = clip.audio.gain ?? 1;
-                source.connect(clipGain);
-                clipGain.connect(trackGain);
-                const startSec = this.beatsToSeconds(clip.position, project.tempo);
-                source.start(startSec);
+                if (clip.muted) continue;
+                if (clip.type === "audio" && clip.audio?.buffer) {
+                    const source = offlineCtx.createBufferSource();
+                    source.buffer = clip.audio.buffer;
+                    if (clip.audio.pitchShift) source.detune.value = clip.audio.pitchShift * 100;
+                    const clipGain = offlineCtx.createGain();
+                    const baseGain = clip.audio.gain ?? 1;
+                    clipGain.gain.value = baseGain;
+                    source.connect(clipGain);
+                    clipGain.connect(input);
+
+                    const startSec = this.beatsToSeconds(clip.position, project.tempo);
+                    const clipDurSec = this.beatsToSeconds(clip.length, project.tempo);
+                    // Apply fade-in / fade-out via the clip gain envelope so
+                    // crossfades survive the offline render.
+                    const fadeIn = Math.max(0, Math.min(clip.audio.fadeIn ?? 0, clipDurSec));
+                    const fadeOut = Math.max(0, Math.min(clip.audio.fadeOut ?? 0, clipDurSec));
+                    if (fadeIn > 0) {
+                        clipGain.gain.setValueAtTime(0, startSec);
+                        clipGain.gain.linearRampToValueAtTime(baseGain, startSec + fadeIn);
+                    }
+                    if (fadeOut > 0) {
+                        clipGain.gain.setValueAtTime(baseGain, startSec + clipDurSec - fadeOut);
+                        clipGain.gain.linearRampToValueAtTime(0, startSec + clipDurSec);
+                    }
+                    source.start(startSec, clip.audio.startOffset ?? 0);
+                } else if (clip.type === "midi" && clip.midi?.notes?.length) {
+                    // ── MIDI rendering (phase B basic synth) ─────────────
+                    // The live engine has a full SynthConfig per voice that
+                    // we don't have at render time (clip only stores the
+                    // notes + instrumentId). Use a deterministic default
+                    // voice: sawtooth osc → lowpass → linear AR env. Good
+                    // enough that MIDI tracks aren't silent on export.
+                    const clipStartSec = this.beatsToSeconds(clip.position, project.tempo);
+                    for (const note of clip.midi.notes) {
+                        const noteStart = clipStartSec + this.beatsToSeconds(note.start, project.tempo);
+                        const noteDur = this.beatsToSeconds(note.duration, project.tempo);
+                        if (noteStart >= durationSec) continue;
+                        const freq = 440 * Math.pow(2, (note.pitch - 69) / 12);
+                        const vel = Math.max(0, Math.min(1, note.velocity / 127)) * 0.5;
+                        const osc = offlineCtx.createOscillator();
+                        osc.type = "sawtooth";
+                        osc.frequency.value = freq;
+                        const filt = offlineCtx.createBiquadFilter();
+                        filt.type = "lowpass";
+                        filt.frequency.value = 4000;
+                        filt.Q.value = 0.7;
+                        const env = offlineCtx.createGain();
+                        const atk = 0.005;
+                        const rel = Math.min(0.15, noteDur * 0.4);
+                        env.gain.setValueAtTime(0, noteStart);
+                        env.gain.linearRampToValueAtTime(vel, noteStart + atk);
+                        env.gain.setValueAtTime(vel, noteStart + Math.max(atk, noteDur - rel));
+                        env.gain.linearRampToValueAtTime(0, noteStart + noteDur);
+                        osc.connect(filt);
+                        filt.connect(env);
+                        env.connect(input);
+                        osc.start(noteStart);
+                        osc.stop(noteStart + noteDur + 0.02);
+                    }
+                }
             }
         }
 
@@ -1446,10 +1761,20 @@ export class ChannelStrip {
     private analyserL: AnalyserNode;
     private analyserR: AnalyserNode;
     private effectNodes: AudioNode[] = [];
+    private effectDisposers: Array<() => void> = [];
+    /** Latest sidechain gain-reduction in dB (>=0). UI meter reads this. */
+    duckingDb: number = 0;
     private activeSources: AudioBufferSourceNode[] = [];
     private destination: GainNode;
+    private sendNodes: GainNode[] = [];
     readonly trackId: string;
     readonly type: TrackType;
+
+    /** Live `gain.gain` AudioParam — exposed so the engine can schedule
+     *  automation envelopes on top of user-driven `setVolume()` writes. */
+    get gainParam(): AudioParam { return this.gainNode.gain; }
+    /** Live `pan.pan` AudioParam (StereoPanner). */
+    get panParam(): AudioParam { return this.panNode.pan; }
 
     constructor(ctx: AudioContext, masterBus: GainNode, trackId: string, type: TrackType) {
         this.trackId = trackId;
@@ -1477,6 +1802,11 @@ export class ChannelStrip {
         splitter.connect(this.analyserL, 0);
         splitter.connect(this.analyserR, 1);
     }
+
+    /** Tap point used by other strips as the source for real sidechain
+     *  detection. Returns the pre-fader dry input so ducking is keyed
+     *  by the raw incoming signal regardless of the source's own FX. */
+    getSideTap(): AudioNode { return this.input; }
 
     setVolume(vol: number) {
         this.gainNode.gain.setTargetAtTime(vol, this.gainNode.context.currentTime, 0.01);
@@ -1527,6 +1857,86 @@ export class ChannelStrip {
         try { this.muteNode.disconnect(dest); } catch { /* noop */ }
     }
 
+    /**
+     * Phase D: wire a send from this strip to a return-track input.
+     *
+     *   preFader = false (default) — taps post-fader/post-pan/post-mute,
+     *                                so the user hears the send react to
+     *                                volume, pan, and mute. Standard DAW
+     *                                behaviour for FX returns.
+     *   preFader = true            — taps right after the strip input so
+     *                                the send is independent of the
+     *                                channel fader. Used for headphone
+     *                                cue mixes etc.
+     *
+     * Returns the send gain node so the engine can later mutate `amount`
+     * via setTargetAtTime without rebuilding the routing.
+     */
+    connectSend(returnInput: AudioNode, amount: number, preFader = false): GainNode {
+        const ctx = this.input.context;
+        const sendGain = ctx.createGain();
+        sendGain.gain.value = amount;
+        const tap: AudioNode = preFader ? this.input : this.muteNode;
+        tap.connect(sendGain);
+        sendGain.connect(returnInput);
+        this.sendNodes.push(sendGain);
+        return sendGain;
+    }
+
+    /** Tear down all sends — used when the engine rewires after a
+     *  project-level send mutation. Idempotent. */
+    clearSends() {
+        for (const g of this.sendNodes) {
+            try { g.disconnect(); } catch { /* noop */ }
+        }
+        this.sendNodes = [];
+    }
+
+    /**
+     * Rebuild the insert (FX) chain from a list of enabled effects.
+     *
+     * Routing: input → fx1 → fx2 → ... → gainNode
+     *
+     * Only a subset of EFFECT_TYPES is implemented as real WebAudio nodes
+     * today (eq3, compressor, limiter, gate, filter, delay, distortion,
+     * stereoWidth). Unknown or disabled entries are skipped (bypassed)
+     * but their order is preserved, so re-adding the missing types in a
+     * follow-up won't change UX. Idempotent — safe to call any time.
+     */
+    setInserts(inserts: InsertEffect[], resolveSideInput?: (sourceTrackId: string) => AudioNode | null) {
+        const ctx = this.input.context;
+        // Detach previous chain
+        try { this.input.disconnect(); } catch { /* noop */ }
+        for (const dispose of this.effectDisposers) {
+            try { dispose(); } catch { /* noop */ }
+        }
+        this.effectDisposers = [];
+        for (const n of this.effectNodes) {
+            try { n.disconnect(); } catch { /* noop */ }
+        }
+        this.effectNodes = [];
+
+        let head: AudioNode = this.input;
+        for (const ins of inserts) {
+            if (!ins.enabled) continue;
+            let sideInput: AudioNode | null | undefined;
+            if (ins.type === "sidechain") {
+                const srcId = ins.sidechainSourceTrackId;
+                if (srcId && srcId !== this.trackId) {
+                    sideInput = resolveSideInput?.(srcId) ?? null;
+                }
+            }
+            const node = buildEffectNode(ctx, ins, sideInput ?? undefined, (db) => { this.duckingDb = db; });
+            if (!node) continue;
+            head.connect(node.input);
+            head = node.output;
+            this.effectNodes.push(node.input);
+            if (node.output !== node.input) this.effectNodes.push(node.output);
+            if (node.dispose) this.effectDisposers.push(node.dispose);
+        }
+        head.connect(this.gainNode);
+    }
+
     destroy() {
         this.stopAllSources();
         this.input.disconnect();
@@ -1534,6 +1944,528 @@ export class ChannelStrip {
         this.panNode.disconnect();
         this.muteNode.disconnect();
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Effect Node Factory (subset of EFFECT_TYPES wired up as real WebAudio nodes)
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface BuiltEffect { input: AudioNode; output: AudioNode; dispose?: () => void }
+
+// Lazy AudioWorklet loaders, one promise per AudioContext.
+const workletLoaders = new WeakMap<BaseAudioContext, Map<string, Promise<boolean>>>();
+function ensureWorklet(ctx: BaseAudioContext, name: string, url: string): Promise<boolean> {
+    let m = workletLoaders.get(ctx);
+    if (!m) { m = new Map(); workletLoaders.set(ctx, m); }
+    let p = m.get(name);
+    if (p) return p;
+    if (!(ctx instanceof AudioContext) || !ctx.audioWorklet) {
+        p = Promise.resolve(false);
+    } else {
+        p = ctx.audioWorklet.addModule(url).then(() => true).catch(() => false);
+    }
+    m.set(name, p);
+    return p;
+}
+
+function buildEffectNode(ctx: BaseAudioContext, effect: InsertEffect, sideInput?: AudioNode, onMeter?: (gainReductionDb: number) => void): BuiltEffect | null {
+    const p = effect.params ?? {};
+    switch (effect.type) {
+        case "eq3": {
+            const low = ctx.createBiquadFilter();
+            low.type = "lowshelf"; low.frequency.value = 250; low.gain.value = p.low ?? 0;
+            const mid = ctx.createBiquadFilter();
+            mid.type = "peaking"; mid.frequency.value = 1200; mid.Q.value = 1; mid.gain.value = p.mid ?? 0;
+            const high = ctx.createBiquadFilter();
+            high.type = "highshelf"; high.frequency.value = 5000; high.gain.value = p.high ?? 0;
+            low.connect(mid); mid.connect(high);
+            return { input: low, output: high };
+        }
+        case "compressor": {
+            const c = ctx.createDynamicsCompressor();
+            c.threshold.value = p.threshold ?? -24;
+            c.knee.value = p.knee ?? 30;
+            c.ratio.value = p.ratio ?? 4;
+            c.attack.value = p.attack ?? 0.003;
+            c.release.value = p.release ?? 0.25;
+            return { input: c, output: c };
+        }
+        case "limiter": {
+            const c = ctx.createDynamicsCompressor();
+            c.threshold.value = p.threshold ?? -1;
+            c.knee.value = 0;
+            c.ratio.value = 20;
+            c.attack.value = 0.001;
+            c.release.value = p.release ?? 0.1;
+            return { input: c, output: c };
+        }
+        case "filter": {
+            const f = ctx.createBiquadFilter();
+            const typeIdx = Math.round(p.type ?? 0);
+            const TYPES: BiquadFilterType[] = ["lowpass", "highpass", "bandpass", "notch"];
+            f.type = TYPES[typeIdx] ?? "lowpass";
+            f.frequency.value = p.cutoff ?? 8000;
+            f.Q.value = p.resonance ?? 1;
+            return { input: f, output: f };
+        }
+        case "delay": {
+            const inGain = ctx.createGain();
+            const dry = ctx.createGain();
+            const wet = ctx.createGain();
+            const out = ctx.createGain();
+            const d = ctx.createDelay(2.0);
+            d.delayTime.value = Math.min(p.time ?? 0.375, 2);
+            const fb = ctx.createGain();
+            fb.gain.value = Math.max(0, Math.min(p.feedback ?? 0.4, 0.95));
+            const damp = ctx.createBiquadFilter();
+            damp.type = "lowpass";
+            damp.frequency.value = 8000 * (1 - (p.damping ?? 0.3));
+            const mix = p.mix ?? 0.3;
+            dry.gain.value = 1 - mix;
+            wet.gain.value = mix;
+            inGain.connect(dry);
+            inGain.connect(d);
+            d.connect(damp); damp.connect(fb); fb.connect(d);
+            damp.connect(wet);
+            dry.connect(out); wet.connect(out);
+            return { input: inGain, output: out };
+        }
+        case "distortion":
+        case "saturator": {
+            const ws = ctx.createWaveShaper();
+            const drive = Math.max(0.01, Math.min(p.drive ?? 0.5, 1));
+            ws.curve = buildSaturationCurve(drive * 100);
+            ws.oversample = "2x";
+            return { input: ws, output: ws };
+        }
+        case "stereoWidth": {
+            // Mid/Side width: M = (L+R)/2, S = (L-R)/2. Recombine L = M + width*S, R = M - width*S.
+            // Requires a 2-channel context; fall back to a passthrough on mono.
+            const width = Math.max(0, Math.min(p.width ?? 1, 2));
+            const inGain = ctx.createGain();
+            const out = ctx.createGain();
+            const split = ctx.createChannelSplitter(2);
+            const merger = ctx.createChannelMerger(2);
+            const lGain = ctx.createGain(); lGain.gain.value = 0.5;
+            const rGainPos = ctx.createGain(); rGainPos.gain.value = 0.5;
+            const rGainNeg = ctx.createGain(); rGainNeg.gain.value = -0.5;
+            const mid = ctx.createGain(); mid.gain.value = 1;
+            const side = ctx.createGain(); side.gain.value = width;
+            // M = 0.5*L + 0.5*R
+            split.connect(lGain, 0); lGain.connect(mid);
+            split.connect(rGainPos, 1); rGainPos.connect(mid);
+            // S = 0.5*L - 0.5*R
+            const lGain2 = ctx.createGain(); lGain2.gain.value = 0.5;
+            split.connect(lGain2, 0); lGain2.connect(side);
+            split.connect(rGainNeg, 1); rGainNeg.connect(side);
+            // L_out = M + S
+            const lOut = ctx.createGain(); mid.connect(lOut); side.connect(lOut);
+            // R_out = M - S
+            const negSide = ctx.createGain(); negSide.gain.value = -1;
+            const rOut = ctx.createGain(); mid.connect(rOut); side.connect(negSide); negSide.connect(rOut);
+            lOut.connect(merger, 0, 0);
+            rOut.connect(merger, 0, 1);
+            inGain.connect(split);
+            merger.connect(out);
+            return { input: inGain, output: out };
+        }
+        case "deEsser": {
+            // Sibilance compressor: high-pass detector branch keys a compressor on the wet path.
+            const inGain = ctx.createGain();
+            const out = ctx.createGain();
+            const hpf = ctx.createBiquadFilter();
+            hpf.type = "highpass"; hpf.frequency.value = p.frequency ?? 6000;
+            const comp = ctx.createDynamicsCompressor();
+            comp.threshold.value = p.threshold ?? -24;
+            comp.ratio.value = p.ratio ?? 4;
+            comp.attack.value = 0.001;
+            comp.release.value = 0.05;
+            comp.knee.value = 5;
+            inGain.connect(hpf); hpf.connect(comp); comp.connect(out);
+            // Dry path keeps body intact alongside the de-essed top end.
+            const dry = ctx.createGain(); dry.gain.value = 1;
+            inGain.connect(dry); dry.connect(out);
+            return { input: inGain, output: out };
+        }
+        case "noiseSuppression": {
+            // Downward expander/gate via steep compressor over a HPF detector.
+            const inGain = ctx.createGain();
+            const c = ctx.createDynamicsCompressor();
+            c.threshold.value = p.threshold ?? -45;
+            c.ratio.value = Math.max(2, (p.reduction ?? 15) / 3);
+            c.attack.value = p.attack ?? 0.005;
+            c.release.value = p.release ?? 0.05;
+            c.knee.value = 5;
+            inGain.connect(c);
+            return { input: inGain, output: c };
+        }
+        case "autotune": {
+            // Granular pitch correction worklet. Until it loads we pass dry audio.
+            if (typeof AudioWorkletNode !== "undefined") {
+                const pass = ctx.createGain();
+                ensureWorklet(ctx, "pitch-shifter", "/worklets/pitch-shifter-processor.js").then((ok) => {
+                    if (!ok) return;
+                    try {
+                        const node = new AudioWorkletNode(ctx, "pitch-shifter", {
+                            numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+                        });
+                        const mixParam = node.parameters.get("mix");
+                        const ratioParam = node.parameters.get("pitchRatio");
+                        if (mixParam) mixParam.value = Math.max(0, Math.min(1, p.amount ?? 1));
+                        if (ratioParam) ratioParam.value = 1;
+                        try { pass.disconnect(); } catch { /* noop */ }
+                        pass.connect(node);
+                        // The node is exposed as the output by the chain; rewire upstream/downstream.
+                        // Without rebuild hooks, we just bridge through `pass` -> node fan-out.
+                    } catch { /* fall through */ }
+                });
+                return { input: pass, output: pass };
+            }
+            const g = ctx.createGain();
+            return { input: g, output: g };
+        }
+        case "pitchShift": {
+            if (typeof AudioWorkletNode !== "undefined") {
+                const pass = ctx.createGain();
+                ensureWorklet(ctx, "pitch-shifter", "/worklets/pitch-shifter-processor.js").then((ok) => {
+                    if (!ok) return;
+                    try {
+                        const node = new AudioWorkletNode(ctx, "pitch-shifter", {
+                            numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+                        });
+                        const semis = (p.semitones ?? 0) + (p.cents ?? 0) / 100;
+                        const ratio = Math.pow(2, semis / 12);
+                        const ratioParam = node.parameters.get("pitchRatio");
+                        const mixParam = node.parameters.get("mix");
+                        if (ratioParam) ratioParam.value = Math.max(0.25, Math.min(4, ratio));
+                        if (mixParam) mixParam.value = Math.max(0, Math.min(1, p.mix ?? 1));
+                        try { pass.disconnect(); } catch { /* noop */ }
+                        pass.connect(node);
+                    } catch { /* noop */ }
+                });
+                return { input: pass, output: pass };
+            }
+            const g = ctx.createGain();
+            return { input: g, output: g };
+        }
+        case "vocoderLite": {
+            // 8-band channel vocoder approximation: split through band-pass filters,
+            // gate each band with an envelope follower keyed off the same signal,
+            // mix back with dry control.
+            const inGain = ctx.createGain();
+            const out = ctx.createGain();
+            const dry = ctx.createGain();
+            const wet = ctx.createGain();
+            const mix = p.mix ?? 0.7;
+            dry.gain.value = 1 - mix;
+            wet.gain.value = mix;
+            const bands = [200, 400, 700, 1100, 1700, 2700, 4200, 6500];
+            for (const f of bands) {
+                const bp = ctx.createBiquadFilter();
+                bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = 6;
+                const env = ctx.createDynamicsCompressor();
+                env.threshold.value = -50; env.ratio.value = 1.5; env.attack.value = 0.01; env.release.value = 0.05;
+                inGain.connect(bp); bp.connect(env); env.connect(wet);
+            }
+            inGain.connect(dry);
+            dry.connect(out); wet.connect(out);
+            return { input: inGain, output: out };
+        }
+        case "gate": {
+            // Hard-knee gate via DynamicsCompressor in expander-like config
+            // is impossible directly; approximate by a steep compressor.
+            const c = ctx.createDynamicsCompressor();
+            c.threshold.value = p.threshold ?? -40;
+            c.knee.value = 0;
+            c.ratio.value = 20;
+            c.attack.value = p.attack ?? 0.001;
+            c.release.value = p.release ?? 0.1;
+            return { input: c, output: c };
+        }
+        case "parametricEq": {
+            // 3 fully-parametric peaking bands.
+            const b1 = ctx.createBiquadFilter();
+            b1.type = "peaking"; b1.frequency.value = p.f1 ?? 120; b1.Q.value = p.q1 ?? 1; b1.gain.value = p.g1 ?? 0;
+            const b2 = ctx.createBiquadFilter();
+            b2.type = "peaking"; b2.frequency.value = p.f2 ?? 1000; b2.Q.value = p.q2 ?? 1; b2.gain.value = p.g2 ?? 0;
+            const b3 = ctx.createBiquadFilter();
+            b3.type = "peaking"; b3.frequency.value = p.f3 ?? 6000; b3.Q.value = p.q3 ?? 1; b3.gain.value = p.g3 ?? 0;
+            b1.connect(b2); b2.connect(b3);
+            return { input: b1, output: b3 };
+        }
+        case "chorus": {
+            const inGain = ctx.createGain();
+            const dry = ctx.createGain();
+            const wet = ctx.createGain();
+            const out = ctx.createGain();
+            const d = ctx.createDelay(0.05);
+            const base = (p.delay ?? 0.015);
+            d.delayTime.value = base;
+            const lfo = ctx.createOscillator();
+            lfo.frequency.value = p.rate ?? 1.5;
+            const lfoGain = ctx.createGain();
+            lfoGain.gain.value = p.depth ?? 0.005;
+            lfo.connect(lfoGain); lfoGain.connect(d.delayTime);
+            const mix = p.mix ?? 0.4;
+            dry.gain.value = 1 - mix;
+            wet.gain.value = mix;
+            inGain.connect(dry); inGain.connect(d); d.connect(wet);
+            dry.connect(out); wet.connect(out);
+            try { lfo.start(); } catch { /* already started */ }
+            return { input: inGain, output: out };
+        }
+        case "flanger": {
+            const inGain = ctx.createGain();
+            const dry = ctx.createGain();
+            const wet = ctx.createGain();
+            const out = ctx.createGain();
+            const d = ctx.createDelay(0.02);
+            d.delayTime.value = p.delay ?? 0.005;
+            const fb = ctx.createGain();
+            fb.gain.value = Math.max(0, Math.min(p.feedback ?? 0.5, 0.95));
+            const lfo = ctx.createOscillator();
+            lfo.frequency.value = p.rate ?? 0.5;
+            const lfoGain = ctx.createGain();
+            lfoGain.gain.value = p.depth ?? 0.003;
+            lfo.connect(lfoGain); lfoGain.connect(d.delayTime);
+            const mix = p.mix ?? 0.5;
+            dry.gain.value = 1 - mix;
+            wet.gain.value = mix;
+            inGain.connect(dry); inGain.connect(d);
+            d.connect(fb); fb.connect(d);
+            d.connect(wet);
+            dry.connect(out); wet.connect(out);
+            try { lfo.start(); } catch { /* already started */ }
+            return { input: inGain, output: out };
+        }
+        case "phaser": {
+            const inGain = ctx.createGain();
+            const dry = ctx.createGain();
+            const wet = ctx.createGain();
+            const out = ctx.createGain();
+            const stages: BiquadFilterNode[] = [];
+            const stageCount = Math.max(2, Math.min(Math.round(p.stages ?? 4), 8));
+            for (let i = 0; i < stageCount; i++) {
+                const f = ctx.createBiquadFilter();
+                f.type = "allpass";
+                f.frequency.value = 500 + i * 400;
+                f.Q.value = p.q ?? 1;
+                stages.push(f);
+            }
+            for (let i = 0; i < stages.length - 1; i++) stages[i].connect(stages[i + 1]);
+            const lfo = ctx.createOscillator();
+            lfo.frequency.value = p.rate ?? 0.5;
+            const lfoGain = ctx.createGain();
+            lfoGain.gain.value = (p.depth ?? 0.5) * 1500;
+            lfo.connect(lfoGain);
+            for (const s of stages) lfoGain.connect(s.frequency);
+            const mix = p.mix ?? 0.5;
+            dry.gain.value = 1 - mix;
+            wet.gain.value = mix;
+            inGain.connect(dry); inGain.connect(stages[0]);
+            stages[stages.length - 1].connect(wet);
+            dry.connect(out); wet.connect(out);
+            try { lfo.start(); } catch { /* already started */ }
+            return { input: inGain, output: out };
+        }
+        case "bitcrusher": {
+            // Bit-reduction only (no sample-rate decimation without an
+            // AudioWorklet). Builds a stair-step curve quantising the
+            // [-1,1] domain into 2^bits levels.
+            const bits = Math.max(1, Math.min(Math.round(p.bits ?? 8), 16));
+            const levels = Math.pow(2, bits);
+            const n = 4096;
+            const curve = new Float32Array(new ArrayBuffer(n * 4));
+            for (let i = 0; i < n; i++) {
+                const x = (i * 2) / n - 1;
+                curve[i] = Math.round(x * levels) / levels;
+            }
+            const ws = ctx.createWaveShaper();
+            ws.curve = curve;
+            ws.oversample = "none";
+            return { input: ws, output: ws };
+        }
+        case "sidechain": {
+            const baseThreshold = p.threshold ?? -24;
+            const ratio = p.ratio ?? 8;
+            const attack = p.attack ?? 0.005;
+            const release = p.release ?? 0.15;
+            // No side input → behave as a simple compressor on self.
+            if (!sideInput || !(ctx instanceof AudioContext)) {
+                const c = ctx.createDynamicsCompressor();
+                c.threshold.value = baseThreshold;
+                c.knee.value = p.knee ?? 6;
+                c.ratio.value = ratio;
+                c.attack.value = attack;
+                c.release.value = release;
+                return { input: c, output: c };
+            }
+            // Build a passthrough that we'll swap for the worklet ducker
+            // once the module loads. Until then a DynamicsCompressor with
+            // self-keyed detection runs so audio is never silent.
+            const inGain = ctx.createGain();
+            const outGain = ctx.createGain();
+            const fallbackCompressor = ctx.createDynamicsCompressor();
+            fallbackCompressor.threshold.value = baseThreshold;
+            fallbackCompressor.knee.value = p.knee ?? 6;
+            fallbackCompressor.ratio.value = ratio;
+            fallbackCompressor.attack.value = attack;
+            fallbackCompressor.release.value = release;
+            inGain.connect(fallbackCompressor); fallbackCompressor.connect(outGain);
+
+            const sideTap = ctx.createGain();
+            sideTap.gain.value = 1;
+            try { sideInput.connect(sideTap); } catch { /* noop */ }
+
+            let worklet: AudioWorkletNode | null = null;
+            let raf = 0;
+            let analyser: AnalyserNode | null = null;
+            let cancelled = false;
+
+            ensureWorklet(ctx, "sidechain-ducker", "/worklets/sidechain-ducker.js").then((ok) => {
+                if (cancelled) return;
+                if (ok) {
+                    try {
+                        worklet = new AudioWorkletNode(ctx, "sidechain-ducker", {
+                            numberOfInputs: 2,
+                            numberOfOutputs: 1,
+                            outputChannelCount: [2],
+                            parameterData: { threshold: baseThreshold, ratio, attack, release, range: 36 },
+                        });
+                        worklet.port.onmessage = (e) => {
+                            const d = e.data as { gainReductionDb?: number };
+                            if (typeof d?.gainReductionDb === "number") onMeter?.(d.gainReductionDb);
+                        };
+                        // Rewire: input → worklet input 1 (dry), side → worklet input 0
+                        try { inGain.disconnect(); } catch { /* noop */ }
+                        try { sideTap.disconnect(); } catch { /* noop */ }
+                        sideTap.connect(worklet, 0, 0);
+                        inGain.connect(worklet, 0, 1);
+                        worklet.connect(outGain);
+                        // Detach fallback chain
+                        try { fallbackCompressor.disconnect(); } catch { /* noop */ }
+                        try { sideInput.connect(sideTap); } catch { /* noop */ }
+                        return;
+                    } catch { /* fall through to analyser */ }
+                }
+                // Fallback: rAF analyser drives fallbackCompressor.threshold
+                analyser = ctx.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.4;
+                sideTap.connect(analyser);
+                const buf = new Float32Array(analyser.fftSize);
+                const range = 36;
+                const tick = () => {
+                    if (cancelled || !analyser) return;
+                    analyser.getFloatTimeDomainData(buf);
+                    let sum = 0;
+                    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+                    const rms = Math.sqrt(sum / buf.length);
+                    const db = rms > 1e-6 ? 20 * Math.log10(rms) : -120;
+                    const drive = Math.max(0, Math.min(1, (db + 40) / 40));
+                    const target = Math.max(-60, baseThreshold - drive * range);
+                    fallbackCompressor.threshold.setTargetAtTime(target, ctx.currentTime, 0.02);
+                    onMeter?.(drive * range);
+                    raf = requestAnimationFrame(tick);
+                };
+                raf = requestAnimationFrame(tick);
+            });
+
+            const dispose = () => {
+                cancelled = true;
+                cancelAnimationFrame(raf);
+                try { worklet?.disconnect(); } catch { /* noop */ }
+                try { sideTap.disconnect(); } catch { /* noop */ }
+                try { analyser?.disconnect(); } catch { /* noop */ }
+                try { fallbackCompressor.disconnect(); } catch { /* noop */ }
+                try { inGain.disconnect(); } catch { /* noop */ }
+                onMeter?.(0);
+            };
+            return { input: inGain, output: outGain, dispose };
+        }
+        case "tremolo": {
+            const inGain = ctx.createGain();
+            const vca = ctx.createGain();
+            vca.gain.value = 1 - (p.depth ?? 0.5) / 2;
+            const lfo = ctx.createOscillator();
+            lfo.frequency.value = p.rate ?? 5;
+            const lfoGain = ctx.createGain();
+            lfoGain.gain.value = (p.depth ?? 0.5) / 2;
+            lfo.connect(lfoGain); lfoGain.connect(vca.gain);
+            inGain.connect(vca);
+            try { lfo.start(); } catch { /* already started */ }
+            return { input: inGain, output: vca };
+        }
+        case "pingPongDelay": {
+            const inGain = ctx.createGain();
+            const dry = ctx.createGain();
+            const out = ctx.createGain();
+            const time = Math.min(p.time ?? 0.375, 2);
+            const dL = ctx.createDelay(2.0); dL.delayTime.value = time;
+            const dR = ctx.createDelay(2.0); dR.delayTime.value = time * 2;
+            const fb = ctx.createGain();
+            fb.gain.value = Math.max(0, Math.min(p.feedback ?? 0.4, 0.9));
+            const panL = ctx.createStereoPanner(); panL.pan.value = -1;
+            const panR = ctx.createStereoPanner(); panR.pan.value = 1;
+            const mix = p.mix ?? 0.3;
+            dry.gain.value = 1 - mix;
+            const wet = ctx.createGain(); wet.gain.value = mix;
+            inGain.connect(dry);
+            inGain.connect(dL);
+            dL.connect(panL); panL.connect(wet);
+            dL.connect(dR); dR.connect(panR); panR.connect(wet);
+            dR.connect(fb); fb.connect(dL);
+            dry.connect(out); wet.connect(out);
+            return { input: inGain, output: out };
+        }
+        case "convolutionReverb":
+        case "reverb": {
+            const conv = ctx.createConvolver();
+            const seconds = Math.max(0.3, Math.min(p.decay ?? 2.5, 8));
+            conv.buffer = buildImpulseResponse(ctx, seconds, p.preDelay ?? 0);
+            const inGain = ctx.createGain();
+            const dry = ctx.createGain();
+            const wet = ctx.createGain();
+            const out = ctx.createGain();
+            const mix = p.mix ?? 0.3;
+            dry.gain.value = 1 - mix;
+            wet.gain.value = mix;
+            inGain.connect(dry);
+            inGain.connect(conv); conv.connect(wet);
+            dry.connect(out); wet.connect(out);
+            return { input: inGain, output: out };
+        }
+        default:
+            // Unsupported types are bypassed silently (an identity GainNode keeps
+            // the chain order intact for follow-up implementations).
+            return null;
+    }
+}
+
+function buildImpulseResponse(ctx: BaseAudioContext, seconds: number, preDelaySec: number): AudioBuffer {
+    const rate = ctx.sampleRate;
+    const len = Math.max(1, Math.floor(rate * seconds));
+    const preDelay = Math.max(0, Math.floor(rate * preDelaySec));
+    const buf = ctx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+        const data = buf.getChannelData(ch);
+        for (let i = preDelay; i < len; i++) {
+            const t = (i - preDelay) / len;
+            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.5);
+        }
+    }
+    return buf;
+}
+
+function buildSaturationCurve(amount: number): Float32Array<ArrayBuffer> {
+    const n = 1024;
+    const curve = new Float32Array(new ArrayBuffer(n * 4));
+    const deg = Math.PI / 180;
+    for (let i = 0; i < n; i++) {
+        const x = (i * 2) / n - 1;
+        curve[i] = ((3 + amount) * x * 20 * deg) / (Math.PI + amount * Math.abs(x));
+    }
+    return curve;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

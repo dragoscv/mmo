@@ -1,0 +1,6 @@
+flask>=3.0
+gunicorn>=22.0
+google-cloud-storage>=2.18
+demucs>=4.0.1
+soundfile>=0.12
+numpy>=1.26

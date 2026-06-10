@@ -1216,6 +1216,52 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         res.json({ logs: analyzer.getLogs(since, limit) });
     });
 
+    // ── Track audio serving ──────────────────────────────────────────
+    //
+    // GET /tracks/:id/audio — streams the raw source file for the
+    // track. Ownership-scoped. Supports HTTP range so the web client
+    // can use it both as <audio src=…> and as a sequential read for
+    // training-dataset materialization (web app pulls each file and
+    // re-uploads to GCS).
+    router.get("/tracks/:id(\\d+)/audio", (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const id = parseInt(req.params.id, 10);
+        const db = getLibraryDb();
+        const row = db.select({ filepath: tracks.filepath, format: tracks.format })
+            .from(tracks)
+            .where(and(eq(tracks.id, id), eq(tracks.userId, userId)))
+            .get();
+        if (!row) { res.status(404).json({ error: "Not found" }); return; }
+        if (!row.filepath || !existsSync(row.filepath)) {
+            res.status(404).json({ error: "File missing on disk" });
+            return;
+        }
+        const stat = statSync(row.filepath);
+        const ext = (row.format ?? path.extname(row.filepath).slice(1) ?? "mp3").toLowerCase();
+        const mime = ext === "wav" ? "audio/wav"
+            : ext === "flac" ? "audio/flac"
+            : ext === "m4a" || ext === "aac" ? "audio/aac"
+            : ext === "ogg" ? "audio/ogg"
+            : "audio/mpeg";
+        res.setHeader("Content-Type", mime);
+        res.setHeader("Accept-Ranges", "bytes");
+        const range = req.headers.range;
+        if (range) {
+            const m = /^bytes=(\d+)-(\d*)$/.exec(range);
+            if (m) {
+                const start = parseInt(m[1], 10);
+                const end = m[2] ? parseInt(m[2], 10) : stat.size - 1;
+                res.status(206);
+                res.setHeader("Content-Range", `bytes ${start}-${end}/${stat.size}`);
+                res.setHeader("Content-Length", String(end - start + 1));
+                createReadStream(row.filepath, { start, end }).pipe(res);
+                return;
+            }
+        }
+        res.setHeader("Content-Length", String(stat.size));
+        createReadStream(row.filepath).pipe(res);
+    });
+
     // ── Stems serving ────────────────────────────────────────────────
     //
     // GET /stems/:trackId/:stem — serves the cached stem WAV produced

@@ -11,10 +11,25 @@
  */
 
 import "server-only";
+import { cookies } from "next/headers";
+import { cache } from "react";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
-const DEFAULT_LANG = process.env.TMDB_DEFAULT_LANG ?? "ro-RO";
 const FALLBACK_LANG = "en-US";
+
+/** Read the user's preferred locale (mmo-locale cookie) and map to a TMDB language code. */
+const getTmdbLang = cache(async (): Promise<string> => {
+    const envOverride = process.env.TMDB_DEFAULT_LANG;
+    if (envOverride) return envOverride;
+    try {
+        const c = await cookies();
+        const loc = c.get("mmo-locale")?.value;
+        if (loc === "en") return "en-US";
+        return "ro-RO";
+    } catch {
+        return "ro-RO";
+    }
+});
 
 export interface TmdbMovie {
     id: number;
@@ -88,6 +103,9 @@ export interface TmdbSearchHit {
     release_date?: string;
     first_air_date?: string;
     vote_average?: number;
+    vote_count?: number;
+    popularity?: number;
+    genre_ids?: number[];
     overview?: string | null;
 }
 
@@ -112,13 +130,13 @@ async function tmdb<T>(p: string, params: Record<string, string | number | undef
 
 export async function tmdbSearch(query: string, kind?: "movie" | "tv" | "multi"): Promise<TmdbSearchHit[]> {
     const path = kind === "movie" ? "/search/movie" : kind === "tv" ? "/search/tv" : "/search/multi";
-    const data = await tmdb<{ results: TmdbSearchHit[] }>(path, { query, language: DEFAULT_LANG, include_adult: "false" });
+    const data = await tmdb<{ results: TmdbSearchHit[] }>(path, { query, language: await getTmdbLang(), include_adult: "false" });
     if (!data) return [];
     return (data.results ?? []).map((r) => kind === "movie" ? { ...r, media_type: "movie" as const } : kind === "tv" ? { ...r, media_type: "tv" as const } : r);
 }
 
 export async function tmdbMovie(id: number): Promise<TmdbMovie | null> {
-    const ro = await tmdb<TmdbMovie>(`/movie/${id}`, { language: DEFAULT_LANG, append_to_response: "external_ids" });
+    const ro = await tmdb<TmdbMovie>(`/movie/${id}`, { language: await getTmdbLang(), append_to_response: "external_ids" });
     if (ro && ro.overview) return ro;
     const en = await tmdb<TmdbMovie>(`/movie/${id}`, { language: FALLBACK_LANG, append_to_response: "external_ids" });
     if (ro && en) return { ...ro, overview: ro.overview ?? en.overview, tagline: ro.tagline ?? en.tagline };
@@ -126,7 +144,7 @@ export async function tmdbMovie(id: number): Promise<TmdbMovie | null> {
 }
 
 export async function tmdbTv(id: number): Promise<TmdbTv | null> {
-    const ro = await tmdb<TmdbTv>(`/tv/${id}`, { language: DEFAULT_LANG, append_to_response: "external_ids" });
+    const ro = await tmdb<TmdbTv>(`/tv/${id}`, { language: await getTmdbLang(), append_to_response: "external_ids" });
     if (ro && ro.overview) return ro;
     const en = await tmdb<TmdbTv>(`/tv/${id}`, { language: FALLBACK_LANG, append_to_response: "external_ids" });
     if (ro && en) return { ...ro, overview: ro.overview ?? en.overview };
@@ -134,15 +152,15 @@ export async function tmdbTv(id: number): Promise<TmdbTv | null> {
 }
 
 export async function tmdbMovieCredits(id: number): Promise<TmdbCredits | null> {
-    return tmdb<TmdbCredits>(`/movie/${id}/credits`, { language: DEFAULT_LANG });
+    return tmdb<TmdbCredits>(`/movie/${id}/credits`, { language: await getTmdbLang() });
 }
 
 export async function tmdbTvCredits(id: number): Promise<TmdbCredits | null> {
-    return tmdb<TmdbCredits>(`/tv/${id}/credits`, { language: DEFAULT_LANG });
+    return tmdb<TmdbCredits>(`/tv/${id}/credits`, { language: await getTmdbLang() });
 }
 
 export async function tmdbMovieVideos(id: number): Promise<TmdbVideo[]> {
-    const data = await tmdb<{ results: TmdbVideo[] }>(`/movie/${id}/videos`, { language: DEFAULT_LANG });
+    const data = await tmdb<{ results: TmdbVideo[] }>(`/movie/${id}/videos`, { language: await getTmdbLang() });
     let arr = data?.results ?? [];
     if (arr.length === 0) {
         const en = await tmdb<{ results: TmdbVideo[] }>(`/movie/${id}/videos`, { language: FALLBACK_LANG });
@@ -152,7 +170,7 @@ export async function tmdbMovieVideos(id: number): Promise<TmdbVideo[]> {
 }
 
 export async function tmdbTvVideos(id: number): Promise<TmdbVideo[]> {
-    const data = await tmdb<{ results: TmdbVideo[] }>(`/tv/${id}/videos`, { language: DEFAULT_LANG });
+    const data = await tmdb<{ results: TmdbVideo[] }>(`/tv/${id}/videos`, { language: await getTmdbLang() });
     let arr = data?.results ?? [];
     if (arr.length === 0) {
         const en = await tmdb<{ results: TmdbVideo[] }>(`/tv/${id}/videos`, { language: FALLBACK_LANG });
@@ -162,18 +180,72 @@ export async function tmdbTvVideos(id: number): Promise<TmdbVideo[]> {
 }
 
 export async function tmdbMovieRecommendations(id: number): Promise<TmdbSearchHit[]> {
-    const data = await tmdb<{ results: TmdbSearchHit[] }>(`/movie/${id}/recommendations`, { language: DEFAULT_LANG });
+    const data = await tmdb<{ results: TmdbSearchHit[] }>(`/movie/${id}/recommendations`, { language: await getTmdbLang() });
     return (data?.results ?? []).map((r) => ({ ...r, media_type: "movie" as const }));
 }
 
 export async function tmdbTvRecommendations(id: number): Promise<TmdbSearchHit[]> {
-    const data = await tmdb<{ results: TmdbSearchHit[] }>(`/tv/${id}/recommendations`, { language: DEFAULT_LANG });
+    const data = await tmdb<{ results: TmdbSearchHit[] }>(`/tv/${id}/recommendations`, { language: await getTmdbLang() });
+    return (data?.results ?? []).map((r) => ({ ...r, media_type: "tv" as const }));
+}
+
+export async function tmdbMovieSimilar(id: number): Promise<TmdbSearchHit[]> {
+    const data = await tmdb<{ results: TmdbSearchHit[] }>(`/movie/${id}/similar`, { language: await getTmdbLang() });
+    return (data?.results ?? []).map((r) => ({ ...r, media_type: "movie" as const }));
+}
+
+export async function tmdbTvSimilar(id: number): Promise<TmdbSearchHit[]> {
+    const data = await tmdb<{ results: TmdbSearchHit[] }>(`/tv/${id}/similar`, { language: await getTmdbLang() });
     return (data?.results ?? []).map((r) => ({ ...r, media_type: "tv" as const }));
 }
 
 export async function tmdbWatchProviders(kind: "movie" | "tv", id: number, country = "RO"): Promise<TmdbWatchProviders | null> {
     const data = await tmdb<{ results: Record<string, TmdbWatchProviders> }>(`/${kind}/${id}/watch/providers`);
     return data?.results?.[country] ?? null;
+}
+
+/** Fetch watch providers for multiple regions and merge by provider id.
+ *  Returns one merged result with a `regions` array per provider, so the UI
+ *  can show e.g. "Netflix (US, RO)". The first region in `countries` wins
+ *  for the `link` field. */
+export async function tmdbWatchProvidersMulti(
+    kind: "movie" | "tv",
+    id: number,
+    countries: string[],
+): Promise<{
+    link: string | null;
+    flatrate: Array<TmdbWatchProvider & { regions: string[] }>;
+    rent: Array<TmdbWatchProvider & { regions: string[] }>;
+    buy: Array<TmdbWatchProvider & { regions: string[] }>;
+    free: Array<TmdbWatchProvider & { regions: string[] }>;
+} | null> {
+    const data = await tmdb<{ results: Record<string, TmdbWatchProviders> }>(`/${kind}/${id}/watch/providers`);
+    if (!data?.results) return null;
+    let link: string | null = null;
+    const merge = (bucket: "flatrate" | "rent" | "buy" | "free") => {
+        const map = new Map<number, TmdbWatchProvider & { regions: string[] }>();
+        for (const country of countries) {
+            const r = data.results[country];
+            if (!r) continue;
+            if (!link && r.link) link = r.link;
+            for (const p of r[bucket] ?? []) {
+                const ex = map.get(p.provider_id);
+                if (ex) {
+                    if (!ex.regions.includes(country)) ex.regions.push(country);
+                } else {
+                    map.set(p.provider_id, { ...p, regions: [country] });
+                }
+            }
+        }
+        return Array.from(map.values()).sort((a, b) => a.display_priority - b.display_priority);
+    };
+    return {
+        link,
+        flatrate: merge("flatrate"),
+        rent: merge("rent"),
+        buy: merge("buy"),
+        free: merge("free"),
+    };
 }
 
 export async function tmdbTvSeason(showId: number, season: number): Promise<{
@@ -183,12 +255,25 @@ export async function tmdbTvSeason(showId: number, season: number): Promise<{
         still_path: string | null; runtime: number | null; vote_average: number;
     }>;
 } | null> {
-    return tmdb(`/tv/${showId}/season/${season}`, { language: DEFAULT_LANG });
+    return tmdb(`/tv/${showId}/season/${season}`, { language: await getTmdbLang() });
 }
 
 export async function tmdbTrending(kind: "movie" | "tv", window: "day" | "week" = "week"): Promise<TmdbSearchHit[]> {
-    const data = await tmdb<{ results: TmdbSearchHit[] }>(`/trending/${kind}/${window}`, { language: DEFAULT_LANG });
+    const data = await tmdb<{ results: TmdbSearchHit[] }>(`/trending/${kind}/${window}`, { language: await getTmdbLang() });
     return (data?.results ?? []).map((r) => ({ ...r, media_type: kind }));
+}
+
+/** Combined movie + TV credits for an actor/crew member, sorted by popularity desc. */
+export async function tmdbPersonCredits(personId: number): Promise<TmdbSearchHit[]> {
+    const data = await tmdb<{ cast: TmdbSearchHit[]; crew: TmdbSearchHit[] }>(
+        `/person/${personId}/combined_credits`,
+        { language: await getTmdbLang() },
+    );
+    const cast = data?.cast ?? [];
+    // Drop unreleased / very low-vote entries
+    return cast
+        .filter((c) => (c.vote_count ?? 0) >= 50 && (c.vote_average ?? 0) >= 6)
+        .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
 }
 
 /** Build a TMDB poster URL. Use `tmdbImageProxyUrl()` to route through

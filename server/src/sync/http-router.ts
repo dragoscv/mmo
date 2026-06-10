@@ -43,6 +43,12 @@ const VALID_ENTITIES = new Set([
     "visualization_presets",
     "project_snapshots",
     "project_assets",
+    "daw_tracks",
+    "daw_clips",
+    "editor_regions",
+    "live_cues",
+    "mixer_channels",
+    "viz_layers",
 ]);
 
 const VALID_OPS = new Set(["upsert", "delete"]);

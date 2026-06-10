@@ -1,0 +1,19 @@
+name = "mmo-yjs-relay"
+main = "worker.ts"
+compatibility_date = "2025-01-15"
+
+# One Durable Object per room.
+[[durable_objects.bindings]]
+name = "YJS_ROOM"
+class_name = "YjsRoom"
+
+# Persistent snapshots — create the bucket once with:
+#   wrangler r2 bucket create mmo-yjs-snapshots
+[[r2_buckets]]
+binding = "YJS_BUCKET"
+bucket_name = "mmo-yjs-snapshots"
+
+# Required for stateful Durable Objects.
+[[migrations]]
+tag = "v1"
+new_classes = ["YjsRoom"]

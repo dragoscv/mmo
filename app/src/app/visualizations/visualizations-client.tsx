@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { usePlayer } from "@/components/player-context";
 import { VisualizationCanvas } from "@/components/visualization-canvas";
 import { VisualizationControls } from "@/components/visualization-controls";
 import { cn } from "@/lib/utils";
 import { useRenderCount } from "@/lib/dev-debugger";
+import { useProjectAutosave } from "@/hooks/use-project-autosave";
 import {
     getAllVisualizations,
     getCategories,
@@ -205,6 +206,27 @@ export function VisualizationsClient() {
             </div>
         );
     }
+
+    // Stable preset id for cloud persistence (favorites + playlists).
+    const [presetId, setPresetId] = useState<string | null>(null);
+    useEffect(() => {
+        try {
+            const KEY = "mmo:viz:preset-id";
+            let id = localStorage.getItem(KEY);
+            if (!id) {
+                id = (crypto.randomUUID?.() ?? `viz-${Date.now()}`);
+                localStorage.setItem(KEY, id);
+            }
+            setPresetId(id);
+        } catch { /* ignore */ }
+    }, []);
+    useProjectAutosave({
+        kind: "visualization",
+        externalId: presetId,
+        name: "Visualization Preset",
+        document: settings as unknown as Record<string, unknown>,
+        enabled: Boolean(presetId),
+    });
 
     // Browse Mode
     return (

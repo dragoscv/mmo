@@ -1,192 +1,641 @@
 /* Cinematic theme for /watch routes.
- * Applied via a class on the layout to scope styles. */
+ *
+ * Scoped via `.watch-shell` (set by app/watch/layout.tsx). Each theme
+ * overrides the CSS variable bag inside its `[data-watch-theme="…"]`
+ * block; everything else (hero, rows, posters, etc.) consumes those
+ * vars so a single attribute swap re-skins the entire surface.
+ */
 
+/* ─── Base / default (mmo) ────────────────────────────────────────────── */
 .watch-shell {
-    --watch-bg: #06070d;
-    --watch-bg-2: #0a0c14;
-    --watch-fg: #e8eaf0;
-    --watch-fg-dim: #8a8fa0;
-    --watch-accent: #ff3366;
-    --watch-radius: 12px;
+    --watch-bg: oklch(0.13 0.04 285);
+    --watch-bg-2: oklch(0.17 0.05 285);
+    --watch-surface: oklch(0.20 0.04 285);
+    --watch-surface-hi: oklch(0.24 0.05 285);
+    --watch-border: oklch(0.30 0.03 285 / 0.4);
+    --watch-fg: oklch(0.96 0.01 80);
+    --watch-fg-dim: oklch(0.70 0.02 285);
+    --watch-fg-muted: oklch(0.55 0.02 285);
+    --watch-accent: oklch(0.72 0.18 18);
+    --watch-accent-2: oklch(0.80 0.16 50);
+    --watch-accent-glow: oklch(0.72 0.18 18 / 0.35);
+    --watch-radius: 14px;
+    --watch-radius-lg: 24px;
+    --watch-hover-scale: 1.08;
+    --watch-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --watch-row-gap: 0.875rem;
+    --watch-poster-w: 180px;
+    --watch-font-display: "Inter", "SF Pro Display", system-ui, sans-serif;
 
     background:
-        radial-gradient(ellipse at top, rgba(255, 51, 102, 0.08), transparent 50%),
+        radial-gradient(ellipse at top, color-mix(in oklch, var(--watch-accent) 14%, transparent), transparent 55%),
+        radial-gradient(ellipse at bottom right, color-mix(in oklch, var(--watch-accent-2) 8%, transparent), transparent 60%),
         var(--watch-bg);
     color: var(--watch-fg);
-    min-height: 100vh;
-    font-feature-settings: "ss01", "ss02";
+    font-family: var(--watch-font-display);
+    font-feature-settings: "ss01", "ss02", "cv11";
+    /* Owns its own vertical scrollbar so the parent flex-1 container
+     * with overflow-hidden doesn't trap content. */
+    height: 100%;
+    min-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .watch-shell ::selection {
     background: var(--watch-accent);
-    color: #fff;
+    color: white;
 }
 
+/* ─── Theme: Netflix ──────────────────────────────────────────────────── */
+[data-watch-theme="netflix"].watch-shell {
+    --watch-bg: oklch(0.04 0 0);
+    --watch-bg-2: oklch(0.10 0 0);
+    --watch-surface: oklch(0.14 0 0);
+    --watch-surface-hi: oklch(0.20 0 0);
+    --watch-border: oklch(0.30 0 0 / 0.5);
+    --watch-fg: oklch(0.96 0 0);
+    --watch-fg-dim: oklch(0.70 0 0);
+    --watch-fg-muted: oklch(0.50 0 0);
+    --watch-accent: oklch(0.55 0.22 27);
+    --watch-accent-2: oklch(0.62 0.21 27);
+    --watch-accent-glow: oklch(0.55 0.22 27 / 0.45);
+    --watch-radius: 6px;
+    --watch-radius-lg: 8px;
+    --watch-hover-scale: 1.10;
+    --watch-row-gap: 0.5rem;
+    background: var(--watch-bg);
+}
+
+/* ─── Theme: Plex ─────────────────────────────────────────────────────── */
+[data-watch-theme="plex"].watch-shell {
+    --watch-bg: oklch(0.21 0.01 250);
+    --watch-bg-2: oklch(0.25 0.01 250);
+    --watch-surface: oklch(0.28 0.01 250);
+    --watch-surface-hi: oklch(0.33 0.01 250);
+    --watch-border: oklch(0.40 0.01 250 / 0.5);
+    --watch-fg: oklch(0.95 0.01 90);
+    --watch-fg-dim: oklch(0.72 0.01 90);
+    --watch-fg-muted: oklch(0.55 0.01 90);
+    --watch-accent: oklch(0.78 0.16 75);
+    --watch-accent-2: oklch(0.82 0.13 90);
+    --watch-accent-glow: oklch(0.78 0.16 75 / 0.30);
+    --watch-radius: 4px;
+    --watch-radius-lg: 6px;
+    --watch-hover-scale: 1.04;
+    --watch-row-gap: 0.625rem;
+    background: var(--watch-bg);
+}
+
+/* ─── Theme: Disney+ ──────────────────────────────────────────────────── */
+[data-watch-theme="disney"].watch-shell {
+    --watch-bg: oklch(0.10 0.05 260);
+    --watch-bg-2: oklch(0.15 0.07 260);
+    --watch-surface: oklch(0.19 0.06 260);
+    --watch-surface-hi: oklch(0.24 0.07 260);
+    --watch-border: oklch(0.55 0.15 235 / 0.35);
+    --watch-fg: oklch(0.97 0.01 235);
+    --watch-fg-dim: oklch(0.75 0.04 235);
+    --watch-fg-muted: oklch(0.55 0.04 235);
+    --watch-accent: oklch(0.62 0.18 235);
+    --watch-accent-2: oklch(0.78 0.16 225);
+    --watch-accent-glow: oklch(0.62 0.18 235 / 0.45);
+    --watch-radius: 12px;
+    --watch-radius-lg: 20px;
+    --watch-hover-scale: 1.06;
+    --watch-row-gap: 0.875rem;
+    background:
+        radial-gradient(ellipse at top, color-mix(in oklch, var(--watch-accent) 22%, transparent), transparent 65%),
+        var(--watch-bg);
+}
+
+/* ─── Theme: HBO Max ──────────────────────────────────────────────────── */
+[data-watch-theme="hbo"].watch-shell {
+    --watch-bg: oklch(0.10 0.03 295);
+    --watch-bg-2: oklch(0.15 0.04 295);
+    --watch-surface: oklch(0.19 0.04 295);
+    --watch-surface-hi: oklch(0.24 0.05 295);
+    --watch-border: oklch(0.40 0.06 295 / 0.45);
+    --watch-fg: oklch(0.96 0.01 80);
+    --watch-fg-dim: oklch(0.72 0.02 295);
+    --watch-fg-muted: oklch(0.55 0.02 295);
+    --watch-accent: oklch(0.70 0.18 295);
+    --watch-accent-2: oklch(0.78 0.16 320);
+    --watch-accent-glow: oklch(0.70 0.18 295 / 0.40);
+    --watch-radius: 10px;
+    --watch-radius-lg: 16px;
+    --watch-hover-scale: 1.07;
+    --watch-row-gap: 0.875rem;
+    background:
+        radial-gradient(ellipse at top right, color-mix(in oklch, var(--watch-accent) 18%, transparent), transparent 60%),
+        var(--watch-bg);
+}
+
+/* ─── Top bar / header ────────────────────────────────────────────────── */
+.watch-topbar h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    background: linear-gradient(135deg, var(--watch-accent), var(--watch-accent-2));
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+}
+
+/* ─── Hero billboard ──────────────────────────────────────────────────── */
 .watch-hero {
     position: relative;
     width: 100%;
-    aspect-ratio: 21 / 9;
-    max-height: 75vh;
+    min-height: clamp(520px, 70vh, 780px);
+    display: flex;
+    align-items: flex-end;
     overflow: hidden;
-    border-radius: var(--watch-radius);
+    isolation: isolate;
 }
 
 .watch-hero-bg {
     position: absolute;
     inset: 0;
+    z-index: 0;
     background-size: cover;
-    background-position: center;
-    transform: translateZ(0);
-    will-change: transform;
+    background-position: center 25%;
+    transform: scale(1.04);
+    animation: heroKenBurns 24s var(--watch-ease) infinite alternate;
 }
 
-.watch-hero-grain {
+/* Netflix-style hero trailer: muted YouTube embed layered above the
+   static backdrop. Slightly scaled up + bottom-cropped so the title
+   safe-area at the bottom still reads against the gradient. */
+.watch-hero-trailer {
     position: absolute;
     inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    /* Wrapper itself doesn't capture clicks; the iframe inside does. */
     pointer-events: none;
-    opacity: 0.08;
-    mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    animation: heroTrailerIn 600ms var(--watch-ease) both;
+}
+
+.watch-hero-trailer iframe {
+    position: absolute;
+    /* Gentle 1.08× zoom: crops the YouTube watermark in the top-right
+       corner but keeps the bottom control bar reachable. */
+    top: 50%;
+    left: 50%;
+    width: 108%;
+    height: 108%;
+    transform: translate(-50%, -50%);
+    border: 0;
+    pointer-events: auto;
+}
+
+/* Custom controls layered above the hero overlays.
+   The iframe itself keeps pointer-events: auto for hover affordance,
+   but native YouTube chrome is disabled (controls=0) — these are the
+   only interactive controls on the hero trailer. Sits above
+   .watch-hero-content (z-index 3) so it's never covered by the
+   title/CTA column. */
+.watch-hero-controls {
+    position: absolute;
+    bottom: clamp(1rem, 3vw, 2rem);
+    right: clamp(1rem, 3vw, 2rem);
+    z-index: 4;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.watch-hero-iconbtn {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: background 140ms ease, transform 140ms ease, border-color 140ms ease;
+}
+
+.watch-hero-iconbtn:hover {
+    background: rgba(0, 0, 0, 0.75);
+    border-color: rgba(255, 255, 255, 0.35);
+    transform: scale(1.06);
+}
+
+.watch-hero-iconbtn:focus-visible {
+    outline: 2px solid var(--watch-accent, #fff);
+    outline-offset: 2px;
+}
+
+@keyframes heroTrailerIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes heroKenBurns {
+    from {
+        transform: scale(1.04) translateX(0);
+    }
+
+    to {
+        transform: scale(1.10) translateX(-1.5%);
+    }
 }
 
 .watch-hero-fade {
     position: absolute;
     inset: 0;
+    z-index: 1;
+    pointer-events: none;
     background:
-        linear-gradient(180deg, transparent 30%, var(--watch-bg) 100%),
-        linear-gradient(90deg, var(--watch-bg) 0%, transparent 50%);
+        linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.35) 55%, color-mix(in oklch, var(--watch-bg) 92%, transparent) 85%, var(--watch-bg) 100%),
+        linear-gradient(90deg, color-mix(in oklch, var(--watch-bg) 94%, transparent) 0%, color-mix(in oklch, var(--watch-bg) 50%, transparent) 45%, transparent 70%);
+}
+
+.watch-hero-grain {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0.06;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
 .watch-hero-content {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 3rem 2rem;
-    z-index: 2;
+    position: relative;
+    z-index: 3;
+    width: 100%;
+    padding: clamp(4rem, 8vw, 7rem) clamp(1.5rem, 4vw, 3.5rem) clamp(2.5rem, 5vw, 4rem);
+    max-width: min(760px, 65%);
+    animation: heroContentIn 700ms var(--watch-ease) both;
+}
+
+@media (max-width: 900px) {
+    .watch-hero-content {
+        max-width: 100%;
+    }
+}
+
+@keyframes heroContentIn {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.watch-hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--watch-accent);
+    margin-bottom: 0.6rem;
 }
 
 .watch-hero-title {
-    font-size: clamp(2rem, 4vw, 4rem);
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 0.95;
-    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
+    font-size: clamp(1.75rem, 4.2vw, 3.8rem);
+    font-weight: 900;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+    text-shadow: 0 2px 28px rgba(0, 0, 0, 0.6);
+    text-wrap: balance;
+    margin: 0;
 }
 
-.watch-hero-tagline {
-    margin-top: 0.5rem;
+.watch-hero-meta {
+    margin-top: 0.9rem;
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
     color: var(--watch-fg-dim);
-    font-size: 1rem;
 }
 
-.watch-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 1rem;
-    padding: 1rem;
+.watch-hero-meta-chip {
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--watch-border);
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--watch-surface) 40%, transparent);
 }
 
+.watch-hero-overview {
+    margin-top: 1rem;
+    font-size: clamp(0.92rem, 1.05vw, 1.05rem);
+    color: var(--watch-fg-dim);
+    line-height: 1.55;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.watch-hero-actions {
+    margin-top: 1.6rem;
+    display: flex;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+}
+
+.watch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.3rem;
+    border-radius: var(--watch-radius);
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.005em;
+    transition: transform 180ms var(--watch-ease), background 180ms ease, box-shadow 180ms ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.watch-btn-primary {
+    background: var(--watch-fg);
+    color: var(--watch-bg);
+    box-shadow: 0 8px 30px -10px color-mix(in oklch, var(--watch-fg) 50%, transparent);
+}
+
+.watch-btn-primary:hover {
+    transform: translateY(-1px);
+    background: color-mix(in oklch, var(--watch-fg) 92%, var(--watch-accent) 8%);
+}
+
+.watch-btn-ghost {
+    background: color-mix(in oklch, var(--watch-surface) 55%, transparent);
+    color: var(--watch-fg);
+    border-color: var(--watch-border);
+    backdrop-filter: blur(6px);
+}
+
+.watch-btn-ghost:hover {
+    background: color-mix(in oklch, var(--watch-surface-hi) 70%, transparent);
+    transform: translateY(-1px);
+}
+
+.watch-btn-accent {
+    background: linear-gradient(135deg, var(--watch-accent), var(--watch-accent-2));
+    color: white;
+    box-shadow: 0 10px 30px -10px var(--watch-accent-glow);
+}
+
+.watch-btn-accent:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 40px -8px var(--watch-accent-glow);
+}
+
+/* ─── Rows ────────────────────────────────────────────────────────────── */
 .watch-row {
-    padding: 1rem 1rem 0.5rem;
+    position: relative;
+    padding: 1.4rem clamp(1rem, 3vw, 2.5rem) 0.4rem;
+}
+
+.watch-row-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+    gap: 1rem;
 }
 
 .watch-row-title {
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     font-weight: 700;
     letter-spacing: -0.01em;
-    margin-bottom: 0.75rem;
     color: var(--watch-fg);
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.watch-row-title::before {
+    content: "";
+    display: inline-block;
+    width: 4px;
+    height: 1.05rem;
+    border-radius: 2px;
+    background: linear-gradient(180deg, var(--watch-accent), var(--watch-accent-2));
+    box-shadow: 0 0 12px var(--watch-accent-glow);
+}
+
+.watch-row-link {
+    font-size: 0.78rem;
+    color: var(--watch-fg-muted);
+    text-decoration: none;
+    transition: color 150ms;
+}
+
+.watch-row-link:hover {
+    color: var(--watch-fg);
+}
+
+.watch-row-viewport {
+    position: relative;
 }
 
 .watch-row-scroll {
     display: flex;
-    gap: 0.75rem;
+    gap: var(--watch-row-gap);
     overflow-x: auto;
-    padding-bottom: 0.5rem;
-    scroll-snap-type: x proximity;
-    scrollbar-width: thin;
+    overflow-y: hidden;
+    /* browsers ignore overflow-y:visible when overflow-x is set; reserve vertical room via padding instead. */
+    /* Reserve room for the hover scale (~8% larger + 4px translate) so the
+     * expanded card isn't vertically clipped by the scroll container. The
+     * negative margin keeps the visual layout tight. */
+    padding: 2.4rem 0 2.4rem;
+    margin: -1.6rem 0 -1.6rem;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    /* Hide native scrollbars — arrow buttons replace them. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 .watch-row-scroll::-webkit-scrollbar {
-    height: 8px;
+    display: none;
 }
 
-.watch-row-scroll::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-}
-
-.poster-card {
-    position: relative;
-    flex: 0 0 auto;
-    width: 180px;
-    aspect-ratio: 2 / 3;
-    border-radius: var(--watch-radius);
-    overflow: hidden;
-    background: var(--watch-bg-2);
-    cursor: pointer;
-    scroll-snap-align: start;
-    transition: transform 240ms cubic-bezier(0.2, 0, 0.2, 1), box-shadow 240ms;
-    will-change: transform;
-    view-transition-name: var(--vt-name, none);
-}
-
-.poster-card:hover {
-    transform: translateY(-4px) scale(1.04);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5),
-                0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-
-.poster-card:focus-visible {
-    outline: 2px solid var(--watch-accent);
-    outline-offset: 4px;
-}
-
-.poster-card-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-.poster-card-placeholder {
+.watch-row-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 64px;
+    z-index: 4;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    height: 100%;
-    color: var(--watch-fg-dim);
-    font-size: 0.75rem;
-    text-align: center;
-    padding: 0.5rem;
+    border-radius: var(--watch-radius);
+    background: color-mix(in oklch, var(--watch-bg) 75%, transparent);
+    border: 1px solid var(--watch-border);
+    color: var(--watch-fg);
+    backdrop-filter: blur(8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease, transform 220ms var(--watch-ease), background 200ms;
+    cursor: pointer;
 }
 
-.poster-card-overlay {
+.watch-row-viewport:hover .watch-row-arrow {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.watch-row-arrow:hover {
+    background: var(--watch-surface-hi);
+    transform: translateY(-50%) scale(1.06);
+}
+
+.watch-row-arrow.is-prev {
+    left: 4px;
+}
+
+.watch-row-arrow.is-next {
+    right: 4px;
+}
+
+.watch-row-arrow[data-disabled="true"] {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Optional row backdrop ambient glow. Pick one poster's
+ * accent color via inline --row-glow custom property in JSX. */
+.watch-row[data-glow="true"]::before {
+    content: "";
+    position: absolute;
+    inset: -10% -10% -10% 0;
+    z-index: -1;
+    background: radial-gradient(ellipse at 0% 50%, var(--row-glow, transparent) 0%, transparent 60%);
+    opacity: 0.4;
+    pointer-events: none;
+    filter: blur(40px);
+}
+
+/* ─── Poster card ─────────────────────────────────────────────────────── */
+.poster-card {
+    position: relative;
+    flex: 0 0 var(--watch-poster-w);
+    width: var(--watch-poster-w);
+    aspect-ratio: 2/3;
+    border-radius: var(--watch-radius);
+    overflow: hidden;
+    background: var(--watch-surface);
+    text-decoration: none;
+    color: inherit;
+    scroll-snap-align: start;
+    transition: transform 260ms var(--watch-ease), box-shadow 260ms ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1;
+    isolation: isolate;
+}
+
+.poster-card:hover {
+    transform: translateY(-3px);
+    z-index: 2;
+    box-shadow:
+        0 18px 40px -10px rgba(0, 0, 0, 0.7),
+        0 0 0 1px color-mix(in oklch, var(--watch-accent) 60%, transparent);
+}
+
+.poster-card:focus-visible {
+    outline: none;
+    transform: translateY(-3px);
+    z-index: 2;
+    box-shadow: 0 0 0 2px var(--watch-accent), 0 14px 40px -10px rgba(0, 0, 0, 0.7);
+}
+
+.poster-card-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: filter 220ms ease, transform 320ms var(--watch-ease);
+}
+
+.poster-card:hover .poster-card-img {
+    transform: scale(1.04);
+    filter: brightness(0.85);
+}
+
+.poster-card-placeholder {
     position: absolute;
     inset: 0;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: center;
     padding: 0.75rem;
-    background: linear-gradient(0deg, rgba(0, 0, 0, 0.85) 0%, transparent 60%);
-    opacity: 0;
-    transition: opacity 200ms;
-}
-
-.poster-card:hover .poster-card-overlay {
-    opacity: 1;
-}
-
-.poster-card-title {
+    gap: 0.5rem;
+    text-align: center;
     font-size: 0.85rem;
     font-weight: 600;
-    line-height: 1.2;
+    color: var(--watch-fg-dim);
+    background:
+        radial-gradient(ellipse at top, color-mix(in oklch, var(--watch-accent) 12%, transparent), transparent 70%),
+        var(--watch-surface);
 }
 
-.poster-card-year {
+.poster-card-placeholder svg {
+    width: 28px;
+    height: 28px;
+    opacity: 0.45;
+}
+
+/* Always-visible caption strip at the bottom of the poster (title + meta). */
+.poster-card-caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 1.4rem 0.7rem 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.85) 70%);
+    pointer-events: none;
+}
+
+.poster-card-caption-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.poster-card-caption-meta {
     font-size: 0.7rem;
-    color: var(--watch-fg-dim);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.poster-card-rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.1rem 0.4rem;
+    background: color-mix(in oklch, var(--watch-accent) 30%, transparent);
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.68rem;
+    color: var(--watch-fg);
 }
 
 .poster-card-progress {
@@ -194,53 +643,1606 @@
     bottom: 0;
     left: 0;
     height: 3px;
-    background: var(--watch-accent);
-    box-shadow: 0 0 8px var(--watch-accent);
+    background: linear-gradient(90deg, var(--watch-accent), var(--watch-accent-2));
+    box-shadow: 0 0 10px var(--watch-accent-glow);
+    transition: width 300ms ease;
+    z-index: 3;
 }
 
-.watch-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4em;
-    padding: 0.25rem 0.65rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    font-size: 0.75rem;
-    color: var(--watch-fg-dim);
+/* ─── Netflix-style hover popover (portal'd to <body>) ────────────────── */
+.poster-preview {
+    border-radius: 8px;
+    overflow: hidden;
+    background: #141414;
+    box-shadow:
+        0 30px 80px -10px rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-family: inherit;
 }
 
-.watch-cta {
+.poster-preview-media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: hidden;
+}
+
+.poster-preview-trailer,
+.poster-preview-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    object-fit: cover;
+}
+
+.poster-preview-placeholder {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.poster-preview-shade {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 60%;
+    background: linear-gradient(180deg, transparent, #141414 95%);
+    pointer-events: none;
+}
+
+.poster-preview-body {
+    padding: 0.6rem 0.95rem 0.95rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.poster-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.poster-preview-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.5);
+    background: rgba(40, 40, 40, 0.6);
+    color: #fff;
     display: inline-flex;
     align-items: center;
-    gap: 0.5em;
-    padding: 0.65rem 1.2rem;
-    border-radius: 999px;
-    background: var(--watch-fg);
-    color: var(--watch-bg);
-    font-weight: 600;
-    font-size: 0.9rem;
-    transition: transform 120ms, box-shadow 200ms;
-    border: none;
+    justify-content: center;
     cursor: pointer;
+    padding: 0;
+    transition: background 160ms, border-color 160ms, transform 180ms var(--watch-ease);
 }
 
-.watch-cta:hover {
-    transform: scale(1.04);
-    box-shadow: 0 8px 24px rgba(255, 255, 255, 0.2);
+.poster-preview-btn:hover {
+    background: rgba(80, 80, 80, 0.9);
+    border-color: #fff;
+    transform: scale(1.08);
 }
 
-.watch-cta--accent {
-    background: var(--watch-accent);
+.poster-preview-btn[aria-pressed="true"] {
+    background: #fff;
+    color: #000;
+    border-color: #fff;
+}
+
+.poster-preview-btn--primary {
+    background: #fff;
+    color: #000;
+    border-color: #fff;
+    width: 36px;
+    height: 36px;
+}
+
+.poster-preview-btn--primary:hover {
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.poster-preview-btn--more {
+    width: 34px;
+    height: 34px;
+}
+
+.poster-preview-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+}
+
+.poster-preview-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.7);
+    align-items: center;
+}
+
+.poster-preview-rating {
+    color: #46d369;
+    font-weight: 700;
+}
+
+.poster-preview-badge {
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.poster-preview-genres {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.poster-preview-overview {
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ─── Tech badges (resolution / HDR / audio / codecs) ─────────────────── */
+.tech-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.15rem;
+}
+
+.tech-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.12rem 0.45rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.92);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 4px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.tech-badge--res {
+    color: #ffffff;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.45), rgba(168, 85, 247, 0.35));
+    border-color: rgba(168, 85, 247, 0.55);
+}
+
+.tech-badge--hdr {
+    color: #fff7d6;
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.55), rgba(249, 115, 22, 0.55));
+    border-color: rgba(249, 115, 22, 0.7);
+    text-shadow: 0 0 8px rgba(249, 115, 22, 0.6);
+}
+
+.tech-badge--audio {
+    color: #e0f2fe;
+    background: rgba(14, 165, 233, 0.22);
+    border-color: rgba(14, 165, 233, 0.45);
+}
+
+.tech-badge--lang {
+    color: #d1fae5;
+    background: rgba(16, 185, 129, 0.18);
+    border-color: rgba(16, 185, 129, 0.4);
+}
+
+.tech-badge--sub {
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.poster-modal-tech {
+    margin-top: 0.6rem;
+}
+
+.poster-modal-tech .poster-modal-label {
+    margin-bottom: 0.45rem;
+}
+
+/* Tech badges on the card cover (bottom-left overlay). */
+.poster-card-tech {
+    position: absolute;
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    z-index: 4;
+    pointer-events: none;
+    display: flex;
+    justify-content: flex-start;
+    /* Hide on very small cards via container query fallback: fine to show. */
+}
+
+.poster-card-tech .tech-badges {
+    margin: 0;
+    gap: 0.25rem;
+    max-width: 100%;
+    /* Show at most ~3 badges in one row; clip the rest. */
+    overflow: hidden;
+    max-height: 1.4rem;
+}
+
+.poster-card-tech .tech-badge {
+    padding: 0.1rem 0.35rem;
+    font-size: 0.58rem;
+    border-radius: 3px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    background-color: rgba(0, 0, 0, 0.55);
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.poster-card-tech .tech-badge--res {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.75), rgba(168, 85, 247, 0.7));
+    border-color: rgba(168, 85, 247, 0.85);
+}
+
+.poster-card-tech .tech-badge--hdr {
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.85), rgba(249, 115, 22, 0.85));
+    border-color: rgba(249, 115, 22, 0.9);
+}
+
+.poster-card-tech .tech-badge--audio {
+    background: rgba(14, 165, 233, 0.55);
+    border-color: rgba(14, 165, 233, 0.75);
+}
+
+/* Lift the caption slightly so it doesn't clash with the tech overlay. */
+.poster-card:has(.poster-card-tech) .poster-card-caption {
+    padding-bottom: 2.1rem;
+}
+
+/* ─── Inline trailer modal (TrailerButton) ──────────────────────────── */
+.trailer-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: grid;
+    place-items: center;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0px);
+    transition: background 200ms ease, backdrop-filter 200ms ease;
+}
+
+.trailer-modal-backdrop[data-mounted="1"] {
+    background: rgba(0, 0, 0, 0.88);
+    backdrop-filter: blur(10px);
+}
+
+.trailer-modal {
+    position: relative;
+    width: min(1100px, 100%);
+    opacity: 0;
+    transform: scale(0.94);
+    transition: opacity 220ms ease, transform 260ms cubic-bezier(.2, .9, .3, 1.2);
+}
+
+.trailer-modal[data-mounted="1"] {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.trailer-modal-frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px -10px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.trailer-modal-frame iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.trailer-modal-close {
+    position: absolute;
+    top: -2.6rem;
+    right: 0;
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 120ms ease, transform 120ms ease;
+}
+
+.trailer-modal-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+/* ─── Details modal (portal'd to <body>) ──────────────────────────────── */
+.poster-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(0, 0, 0, 0.0);
+    backdrop-filter: blur(0px);
+    transition: background 240ms ease, backdrop-filter 240ms ease;
+    display: grid;
+    place-items: center;
+    padding: 4rem 1rem;
+    overflow-y: auto;
+}
+
+.poster-modal-backdrop[data-mounted="1"] {
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(8px);
+}
+
+.poster-modal {
+    position: relative;
+    width: 100%;
+    max-width: 1080px;
+    background: #141414;
+    border-radius: 12px;
+    color: #fff;
+    overflow: hidden;
+    box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    transform: scale(0.94);
+    opacity: 0;
+    transition: transform 320ms cubic-bezier(.2, .9, .3, 1.1), opacity 240ms ease;
+    margin: auto;
+}
+
+.poster-modal[data-mounted="1"] {
+    transform: scale(1);
+    opacity: 1;
+}
+
+.poster-modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 5;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 0;
+    background: rgba(20, 20, 20, 0.85);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    transition: background 160ms;
+}
+
+.poster-modal-close:hover {
+    background: rgba(60, 60, 60, 0.95);
+}
+
+.poster-modal-hero {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: hidden;
+}
+
+.poster-modal-trailer,
+.poster-modal-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    object-fit: cover;
+}
+
+.poster-modal-fade {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 50%;
+    background: linear-gradient(180deg, transparent, #141414 95%);
+    pointer-events: none;
+}
+
+.poster-modal-hero-info {
+    position: absolute;
+    inset: auto 0 0 0;
+    padding: 2rem clamp(1.2rem, 3vw, 2.5rem);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.poster-modal-title {
+    margin: 0;
+    font-size: clamp(1.6rem, 3.5vw, 2.6rem);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+}
+
+.poster-modal-actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.poster-modal-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.4rem;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    background: rgba(80, 80, 80, 0.6);
+    color: #fff;
+    border: 0;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 160ms;
+}
+
+.poster-modal-btn:hover {
+    background: rgba(120, 120, 120, 0.8);
+}
+
+.poster-modal-btn--play {
+    background: #fff;
+    color: #000;
+}
+
+.poster-modal-btn--play:hover {
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.poster-modal-btn--info {
+    background: rgba(40, 40, 40, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.poster-modal-body {
+    padding: 1.5rem clamp(1.2rem, 3vw, 2.5rem) 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.poster-modal-meta {
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    font-size: 0.88rem;
+    color: rgba(255, 255, 255, 0.75);
+    align-items: center;
+}
+
+.poster-modal-rating {
+    color: #46d369;
+    font-weight: 700;
+}
+
+.poster-modal-pill {
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    padding: 0.1rem 0.45rem;
+    border-radius: 3px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.poster-modal-overview {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.55;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.poster-modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 2rem;
+}
+
+@media (max-width: 720px) {
+    .poster-modal-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.poster-modal-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 0.5rem;
+}
+
+.poster-modal-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.poster-modal-tag {
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 0.8rem;
+}
+
+.poster-modal-cast {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.88rem;
+}
+
+.poster-modal-cast-item {
+    display: flex;
+    gap: 0.6rem;
+    align-items: baseline;
+}
+
+.poster-modal-cast-item strong {
+    font-weight: 700;
     color: #fff;
 }
 
+.poster-modal-cast-item em {
+    font-style: normal;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.82rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
-    .poster-card,
-    .watch-cta {
-        transition: none;
-    }
-    .poster-card:hover {
-        transform: none;
+
+    .poster-preview,
+    .poster-modal,
+    .poster-modal-backdrop {
+        transition: none !important;
     }
 }
+
+/* ─── Grid (for /watch/movies, /watch/shows) ──────────────────────────── */
+.watch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1.1rem;
+    padding: 1.5rem clamp(1rem, 3vw, 2.5rem);
+}
+
+.watch-grid .poster-card {
+    flex: unset;
+    width: 100%;
+}
+
+/* ─── Settings page ───────────────────────────────────────────────────── */
+.watch-settings {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2rem clamp(1rem, 3vw, 2.5rem) 4rem;
+}
+
+.watch-settings h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 2rem 0 0.5rem;
+}
+
+.watch-settings h2:first-child {
+    margin-top: 0;
+}
+
+.watch-settings-blurb {
+    color: var(--watch-fg-dim);
+    font-size: 0.92rem;
+    margin-bottom: 1.4rem;
+}
+
+.theme-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.theme-card {
+    position: relative;
+    padding: 1rem;
+    border-radius: var(--watch-radius-lg);
+    background: var(--watch-surface);
+    border: 1.5px solid var(--watch-border);
+    cursor: pointer;
+    transition: transform 220ms var(--watch-ease), border-color 200ms, box-shadow 200ms;
+    text-align: left;
+    color: var(--watch-fg);
+    font-family: inherit;
+    overflow: hidden;
+}
+
+.theme-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklch, var(--watch-accent) 50%, var(--watch-border));
+    box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.4);
+}
+
+.theme-card.is-active {
+    border-color: var(--watch-accent);
+    box-shadow: 0 0 0 1px var(--watch-accent), 0 12px 40px -12px var(--watch-accent-glow);
+}
+
+.theme-card-swatch {
+    display: flex;
+    gap: 4px;
+    height: 38px;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 0.7rem;
+}
+
+.theme-card-swatch span {
+    flex: 1;
+}
+
+.theme-card-name {
+    font-weight: 700;
+    font-size: 0.98rem;
+}
+
+.theme-card-blurb {
+    font-size: 0.78rem;
+    color: var(--watch-fg-dim);
+    margin-top: 0.25rem;
+    line-height: 1.4;
+}
+
+.theme-card-check {
+    position: absolute;
+    top: 0.7rem;
+    right: 0.7rem;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--watch-accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 200ms, transform 220ms var(--watch-ease);
+}
+
+.theme-card.is-active .theme-card-check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* ─── Modal (reusable settings dialog) ────────────────────────────────── */
+.watch-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    animation: backdropIn 220ms ease both;
+}
+
+@keyframes backdropIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.watch-modal {
+    position: fixed;
+    z-index: 61;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(720px, 92vw);
+    max-height: 86vh;
+    overflow-y: auto;
+    background: var(--watch-bg-2);
+    border: 1px solid var(--watch-border);
+    border-radius: var(--watch-radius-lg);
+    padding: 1.4rem 1.6rem 1.8rem;
+    box-shadow: 0 30px 80px -10px rgba(0, 0, 0, 0.5);
+    animation: modalIn 280ms var(--watch-ease) both;
+    color: var(--watch-fg);
+}
+
+@keyframes modalIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, calc(-50% + 8px)) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.watch-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.watch-modal-title {
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: -0.01em;
+}
+
+.watch-modal-close {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--watch-fg-dim);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 150ms, color 150ms, border-color 150ms;
+}
+
+.watch-modal-close:hover {
+    background: var(--watch-surface);
+    color: var(--watch-fg);
+    border-color: var(--watch-border);
+}
+
+/* Portal wrapper: a .watch-shell sibling rendered to <body> so theme
+   variables resolve. Must not lay out itself — children are fixed. */
+.watch-modal-portal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    /* re-establish a stacking context but no layout */
+    display: contents;
+}
+.watch-modal-portal .watch-modal-backdrop,
+.watch-modal-portal .watch-modal { pointer-events: auto; }
+
+.watch-modal-section + .watch-modal-section {
+    margin-top: 1.6rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--watch-border);
+}
+.watch-modal-section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0 0 0.4rem;
+    color: var(--watch-fg);
+}
+
+/* ─── Discover detail (TMDB-only preview page) ────────────────────────── */
+.watch-detail { min-height: 100vh; }
+.watch-detail-hero {
+    position: relative;
+    height: min(72vh, 720px);
+    overflow: hidden;
+}
+.watch-detail-hero-img { object-fit: cover; }
+.watch-detail-hero-fade {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.6) 70%, var(--watch-bg) 100%),
+                linear-gradient(90deg, var(--watch-bg) 0%, rgba(0,0,0,0.35) 50%, transparent 100%);
+}
+.watch-detail-hero-content {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 2rem clamp(1rem, 4vw, 3rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    max-width: 880px;
+}
+.watch-detail-eyebrow {
+    display: inline-block;
+    align-self: flex-start;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--watch-accent);
+    padding: 0.25rem 0.55rem;
+    border: 1px solid color-mix(in oklch, var(--watch-accent) 40%, transparent);
+    border-radius: 6px;
+    background: color-mix(in oklch, var(--watch-accent) 12%, transparent);
+}
+.watch-detail-title {
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: var(--watch-fg);
+    text-shadow: 0 2px 24px rgba(0,0,0,0.5);
+}
+.watch-detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.9rem;
+    color: var(--watch-fg);
+    font-size: 0.92rem;
+    align-items: center;
+}
+.watch-detail-pill {
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.16);
+    font-size: 0.78rem;
+}
+.watch-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.4rem;
+}
+.watch-detail-body {
+    max-width: 880px;
+    padding: 2rem clamp(1rem, 4vw, 3rem) 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+.watch-detail-tagline {
+    color: var(--watch-fg-dim);
+    font-style: italic;
+    margin: 0;
+}
+.watch-detail-overview {
+    color: var(--watch-fg);
+    line-height: 1.65;
+    max-width: 65ch;
+    margin: 0;
+}
+.watch-detail-section h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 0.8rem;
+}
+.watch-detail-cast {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.5rem 1rem;
+}
+.watch-detail-cast-item {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.85rem;
+}
+.watch-detail-cast-item strong { color: var(--watch-fg); }
+.watch-detail-cast-item em {
+    font-style: normal;
+    color: var(--watch-fg-dim);
+    font-size: 0.78rem;
+}
+
+/* ─── Empty state ─────────────────────────────────────────────────────── */
+.watch-empty {
+    margin: 4rem auto;
+    text-align: center;
+    max-width: 520px;
+    padding: 2rem;
+    color: var(--watch-fg-dim);
+}
+
+.watch-empty h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--watch-fg);
+    margin-bottom: 0.4rem;
+}
+
+/* ─── Backfill toast / progress chip ──────────────────────────────────── */
+.watch-backfill-chip {
+    position: fixed;
+    bottom: 5.5rem;
+    right: 1.5rem;
+    z-index: 50;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.6rem 0.95rem;
+    background: var(--watch-bg-2);
+    border: 1px solid var(--watch-border);
+    color: var(--watch-fg);
+    font-size: 0.82rem;
+    border-radius: 999px;
+    box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    animation: chipIn 320ms var(--watch-ease) both;
+}
+
+@keyframes chipIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.watch-backfill-chip .spinner {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid color-mix(in oklch, var(--watch-fg) 30%, transparent);
+    border-top-color: var(--watch-accent);
+    animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ─── Reduced motion ──────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .watch-hero-bg {
+        animation: none !important;
+        transform: none !important;
+    }
+
+    .poster-card,
+    .poster-card:hover,
+    .poster-card-overlay,
+    .watch-row-arrow,
+    .theme-card {
+        transition: none !important;
+        transform: none !important;
+    }
+
+    .poster-card:hover {
+        transform: scale(1.02) !important;
+    }
+}
+
+/* ─── Floating controls (local-only + settings, top-right) ───────────── */
+.watch-topbar {
+    position: fixed;
+    top: 1rem;
+    right: 1.25rem;
+    z-index: 40;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--watch-bg) 65%, transparent);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid color-mix(in oklch, var(--watch-fg) 12%, transparent);
+    box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.55);
+}
+
+.watch-topbar-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.35rem 0.15rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklch, var(--watch-fg) 14%, transparent);
+    background: color-mix(in oklch, var(--watch-bg) 45%, transparent);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    color: var(--watch-fg);
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 180ms, border-color 180ms, color 180ms;
+}
+
+.watch-topbar-toggle:hover { color: var(--watch-fg); background: color-mix(in oklch, var(--watch-fg) 8%, transparent); }
+.watch-topbar-toggle.is-on {
+    background: color-mix(in oklch, var(--watch-accent) 35%, transparent);
+    color: #fff;
+}
+
+.watch-topbar-switch {
+    width: 22px;
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    position: relative;
+    transition: background 200ms;
+}
+.watch-topbar-toggle.is-on .watch-topbar-switch { background: var(--watch-accent); }
+
+.watch-topbar-switch-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 200ms var(--watch-ease);
+}
+.watch-topbar-toggle.is-on .watch-topbar-switch-knob { transform: translateX(10px); }
+
+/* Standalone switch variant (used inside settings panels). */
+.watch-topbar-switch.is-on { background: var(--watch-accent); }
+.watch-topbar-switch.is-on .watch-topbar-switch-knob { transform: translateX(16px); }
+
+/* ─── Settings panels (tabs body) ─────────────────────────────────────── */
+.watch-prefs-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.watch-prefs-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.65rem 0.85rem;
+    background: color-mix(in oklch, var(--watch-bg) 60%, transparent);
+    border: 1px solid var(--watch-border);
+    border-radius: 10px;
+}
+
+.watch-prefs-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--watch-fg);
+}
+
+.watch-prefs-hint {
+    font-size: 0.72rem;
+    color: var(--watch-fg-dim);
+    margin-top: 0.15rem;
+    max-width: 28rem;
+}
+
+.watch-pill {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-radius: 999px;
+    border: 1px solid var(--watch-border);
+    background: transparent;
+    color: var(--watch-fg-dim);
+    cursor: pointer;
+    transition: background 160ms, color 160ms, border-color 160ms;
+}
+.watch-pill:hover { color: var(--watch-fg); border-color: var(--watch-accent); }
+.watch-pill.is-active {
+    background: var(--watch-accent);
+    color: #fff;
+    border-color: var(--watch-accent);
+}
+
+/* Secondary CTA link/button used next to PlayHere, AddToQueue, etc. */
+.watch-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.85rem;
+    border-radius: 8px;
+    border: 1px solid var(--watch-border);
+    background: color-mix(in oklch, var(--watch-bg) 55%, transparent);
+    backdrop-filter: blur(8px);
+    color: var(--watch-fg);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 160ms, border-color 160ms, color 160ms, transform 160ms;
+    white-space: nowrap;
+}
+.watch-cta:hover {
+    border-color: var(--watch-accent);
+    background: color-mix(in oklch, var(--watch-accent) 18%, transparent);
+    color: #fff;
+}
+
+/* ─── Tab strip (Watch settings modal) ────────────────────────────────── */
+.watch-tabs {
+    display: flex;
+    gap: 0.15rem;
+    border-bottom: 1px solid var(--watch-border);
+    margin-bottom: 1.25rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.watch-tabs::-webkit-scrollbar { display: none; }
+
+.watch-tab {
+    flex: 0 0 auto;
+    padding: 0.55rem 0.85rem;
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--watch-fg-dim);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 160ms, border-color 160ms;
+    white-space: nowrap;
+}
+.watch-tab:hover { color: var(--watch-fg); }
+.watch-tab.is-active {
+    color: var(--watch-fg);
+    border-bottom-color: var(--watch-accent);
+}
+
+.watch-topbar-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid color-mix(in oklch, var(--watch-fg) 14%, transparent);
+    background: color-mix(in oklch, var(--watch-bg) 45%, transparent);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    color: var(--watch-fg);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 220ms var(--watch-ease), border-color 200ms, background 200ms;
+}
+.watch-topbar-btn:hover {
+    background: color-mix(in oklch, var(--watch-fg) 10%, transparent);
+    transform: rotate(35deg);
+}
+
+/* ─── Floating settings FAB (legacy, kept for non-watch surfaces) ─────── */
+.watch-settings-fab {
+    position: fixed;
+    top: 1.1rem;
+    right: 1.5rem;
+    z-index: 40;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in oklch, var(--watch-bg) 65%, transparent);
+    border: 1px solid var(--watch-border);
+    color: var(--watch-fg);
+    cursor: pointer;
+    backdrop-filter: blur(14px) saturate(140%);
+    transition: transform 220ms var(--watch-ease), background 200ms, border-color 200ms;
+    box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+}
+
+.watch-settings-fab:hover {
+    background: var(--watch-surface-hi);
+    border-color: var(--watch-accent);
+    transform: rotate(35deg) scale(1.05);
+}
+
+.watch-settings-fab:focus-visible {
+    outline: 2px solid var(--watch-accent);
+    outline-offset: 2px;
+}
+
+/* ─── Inline back button (detail pages) ───────────────────────────────── */
+.watch-hero-back-wrap {
+    position: absolute;
+    top: 1rem;
+    left: 1.2rem;
+    z-index: 6;
+}
+
+.watch-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.85rem 0.45rem 0.6rem;
+    background: color-mix(in oklch, var(--watch-bg) 60%, transparent);
+    border: 1px solid var(--watch-border);
+    border-radius: 999px;
+    color: var(--watch-fg);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: background 180ms, transform 200ms var(--watch-ease), border-color 200ms;
+}
+
+.watch-back-btn:hover {
+    background: var(--watch-surface-hi);
+    transform: translateX(-2px);
+    border-color: var(--watch-accent);
+}
+
+.watch-back-btn:focus-visible {
+    outline: 2px solid var(--watch-accent);
+    outline-offset: 2px;
+}
+
+/* ─── Floating action cluster (right side of /watch) ──────────────────── */
+.watch-floating-actions {
+    position: absolute;
+    top: 1.1rem;
+    right: 4.6rem;
+    /* leave room for the FAB */
+    z-index: 35;
+    display: inline-flex;
+    gap: 0.5rem;
+}
+
+/* ─── Backfill banner (visible nudge, replaces silent chip) ───────────── */
+.watch-backfill-banner {
+    margin: 0.4rem 1.5rem 1.4rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.7rem 0.85rem 0.7rem 1rem;
+    background: linear-gradient(90deg,
+            color-mix(in oklch, var(--watch-accent) 14%, var(--watch-bg-2)) 0%,
+            var(--watch-bg-2) 60%);
+    border: 1px solid color-mix(in oklch, var(--watch-accent) 30%, var(--watch-border));
+    color: var(--watch-fg);
+    font-size: 0.88rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px -15px var(--watch-accent-glow);
+    animation: chipIn 380ms var(--watch-ease) both;
+}
+
+.watch-backfill-cta {
+    margin-left: auto;
+    background: var(--watch-accent);
+    color: #fff;
+    border: none;
+    padding: 0.4rem 0.85rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: filter 180ms, transform 200ms var(--watch-ease);
+}
+
+.watch-backfill-cta:hover:not(:disabled) {
+    filter: brightness(1.1);
+    transform: scale(1.04);
+}
+
+.watch-backfill-cta:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+.watch-backfill-close {
+    background: transparent;
+    border: none;
+    color: var(--watch-fg-dim);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 180ms, color 180ms;
+}
+
+.watch-backfill-close:hover {
+    background: color-mix(in oklch, var(--watch-fg) 10%, transparent);
+    color: var(--watch-fg);
+}
+
+/* ─── View Transitions (poster ↔ detail hero morph) ───────────────────── */
+/* Next.js 16 wraps client navigations in document.startViewTransition()
+ * when `experimental.viewTransition: true`. Paired elements morph when
+ * they share a `view-transition-name`. We tune the curve + duration so
+ * the poster image glides into the detail hero instead of cross-fading. */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 320ms;
+    animation-timing-function: var(--watch-ease);
+}
+
+::view-transition-group(*) {
+    animation-duration: 480ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-image-pair(*) {
+    isolation: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    ::view-transition-old(*),
+    ::view-transition-new(*),
+    ::view-transition-group(*) {
+        animation-duration: 1ms !important;
+    }
+}
+
+/* ─── Tile badges + progress ──────────────────────────────────────────── */
+.poster-card-badges {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    z-index: 4;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.4rem;
+    pointer-events: none;
+}
+
+.poster-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.18rem 0.5rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    border-radius: 999px;
+    background: color-mix(in oklch, #000 65%, transparent);
+    color: #fff;
+    backdrop-filter: blur(6px);
+    letter-spacing: 0.02em;
+}
+
+.poster-badge--rating {
+    color: #ffd166;
+}
+
+.poster-badge--watched {
+    background: color-mix(in oklch, var(--watch-accent) 80%, transparent);
+    color: #fff;
+}
+
+.poster-badge--liked {
+    color: #ff4d6d;
+    background: color-mix(in oklch, #000 60%, transparent);
+}
+
+.poster-badge--local {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    color: #fff;
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    box-shadow: 0 1px 4px rgba(34, 197, 94, 0.45);
+}
+
+.poster-badge--progress {
+    background: color-mix(in oklch, #000 55%, transparent);
+    color: var(--watch-fg);
+}
+
+/* ─── Filter bar (Movies / TV Shows index) ────────────────────────────── */
+.watch-filter-bar {
+    padding: 0.4rem 1.5rem 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: linear-gradient(180deg, var(--watch-bg) 0%, color-mix(in oklch, var(--watch-bg) 92%, transparent) 100%);
+    backdrop-filter: blur(8px);
+}
+
+.watch-filter-row {
+    display: flex;
+    gap: 0.55rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.watch-filter-search {
+    flex: 1 1 220px;
+    min-width: 180px;
+    padding: 0.55rem 0.85rem;
+    background: var(--watch-surface);
+    border: 1px solid var(--watch-border);
+    border-radius: 10px;
+    color: var(--watch-fg);
+    font-size: 0.88rem;
+    outline: none;
+    transition: border-color 160ms, background 160ms;
+}
+
+.watch-filter-search:focus {
+    border-color: var(--watch-accent);
+    background: var(--watch-surface-hi);
+}
+
+.watch-filter-select {
+    padding: 0.5rem 0.7rem;
+    background: var(--watch-surface);
+    border: 1px solid var(--watch-border);
+    border-radius: 10px;
+    color: var(--watch-fg);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: border-color 160ms, background 160ms;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--watch-fg-dim) 50%), linear-gradient(135deg, var(--watch-fg-dim) 50%, transparent 50%);
+    background-position: calc(100% - 14px) 50%, calc(100% - 10px) 50%;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+    padding-right: 2rem;
+}
+
+.watch-filter-select:focus,
+.watch-filter-select:hover {
+    border-color: var(--watch-accent);
+    background-color: var(--watch-surface-hi);
+}
+
+.watch-filter-clear {
+    padding: 0.5rem 0.85rem;
+    background: transparent;
+    border: 1px solid var(--watch-border);
+    border-radius: 10px;
+    color: var(--watch-fg-dim);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: color 160ms, border-color 160ms;
+}
+
+.watch-filter-clear:hover {
+    color: var(--watch-fg);
+    border-color: var(--watch-accent);
+}
+
+.watch-filter-count {
+    margin-left: auto;
+    font-size: 0.78rem;
+    color: var(--watch-fg-dim);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ─── External ratings panel ──────────────────────────────────────────── */
+.external-ratings {
+    padding: 1.5rem;
+}
+
+.external-ratings-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+}
+
+.external-ratings-head .watch-row-title {
+    margin: 0;
+}
+
+.external-ratings-refresh {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    background: var(--watch-surface);
+    border: 1px solid var(--watch-border);
+    border-radius: 999px;
+    color: var(--watch-fg);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 160ms, border-color 160ms;
+}
+
+.external-ratings-refresh:hover:not(:disabled) {
+    background: var(--watch-surface-hi);
+    border-color: var(--watch-accent);
+}
+
+.external-ratings-refresh:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.external-ratings-refresh .spin {
+    animation: spin 800ms linear infinite;
+}
+
+.external-ratings-error {
+    color: #ff6b6b;
+    font-size: 0.8rem;
+}
+
+.external-ratings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.6rem;
+    margin-top: 0.4rem;
+}
+
+.rating-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.7rem 0.85rem;
+    background: color-mix(in oklch, var(--chip-color, var(--watch-accent)) 12%, var(--watch-surface));
+    border: 1px solid color-mix(in oklch, var(--chip-color, var(--watch-accent)) 35%, var(--watch-border));
+    border-radius: 12px;
+    transition: transform 200ms var(--watch-ease), border-color 200ms;
+}
+
+a:hover .rating-chip {
+    transform: translateY(-2px);
+    border-color: var(--chip-color, var(--watch-accent));
+}
+
+.rating-chip-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--watch-fg-dim);
+    font-weight: 700;
+}
+
+.rating-chip-score {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--chip-color, var(--watch-fg));
+    font-variant-numeric: tabular-nums;
+}
+
+.external-ratings-stale {
+    margin-top: 0.5rem;
+    font-size: 0.72rem;
+    color: var(--watch-fg-muted);
+}
+/* ─── Movie details panel ────────────────────────────────────────────── */
+.movie-details { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.movie-details-grid { display: grid; grid-template-columns: minmax(280px, 1fr) 1.4fr; gap: 2rem; align-items: start; }
+@media (max-width: 880px) { .movie-details-grid { grid-template-columns: 1fr; } }
+.movie-details-dl { display: grid; grid-template-columns: max-content 1fr; column-gap: 1rem; row-gap: 0.55rem; margin: 0; font-size: 0.9rem; }
+.movie-details-dl dt { color: var(--watch-fg-dim); font-weight: 500; }
+.movie-details-dl dd { margin: 0; color: var(--watch-fg); }
+.movie-details-dl dd a { color: var(--watch-accent); text-decoration: none; }
+.movie-details-dl dd a:hover { text-decoration: underline; }
+.movie-details-dl--compact { font-size: 0.82rem; row-gap: 0.35rem; }
+.movie-details-synopsis { display: flex; flex-direction: column; gap: 0.85rem; line-height: 1.6; }
+.movie-details-tagline { font-style: italic; color: var(--watch-fg-dim); margin: 0; font-size: 1rem; }
+.movie-details-overview { color: var(--watch-fg); margin: 0; max-width: 70ch; }
+.movie-details-files { display: flex; flex-direction: column; gap: 0.75rem; }
+.movie-details-subhead { font-size: 0.95rem; font-weight: 700; color: var(--watch-fg-dim); text-transform: uppercase; letter-spacing: 0.06em; margin: 0; }
+.movie-details-file { padding: 1rem 1.2rem; background: var(--watch-surface); border: 1px solid var(--watch-border); border-radius: var(--watch-radius); display: flex; flex-direction: column; gap: 0.6rem; }
+.movie-details-file-path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; color: var(--watch-fg-dim); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

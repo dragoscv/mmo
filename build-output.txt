@@ -1,0 +1,201 @@
+ΓÇëWARNΓÇë Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v26.1.0","pnpm":"10.0.0"})
+
+> music-organizer@0.3.17 prebuild E:\gh\mmo\app
+> pnpm run build:css && pnpm run sync:learn && pnpm run sync:jassub
+
+ΓÇëWARNΓÇë Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v26.1.0","pnpm":"10.0.0"})
+
+> music-organizer@0.3.17 build:css E:\gh\mmo\app
+> tailwindcss -i src/app/globals.src.css -o public/globals.css --minify
+
+(node:4900) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Γëê tailwindcss v4.0.17
+
+Done in 408ms
+ΓÇëWARNΓÇë Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v26.1.0","pnpm":"10.0.0"})
+
+> music-organizer@0.3.17 sync:learn E:\gh\mmo\app
+> node scripts/sync-learn-content.mjs
+
+[sync-learn-content] copied 6/6 sections into E:\gh\mmo\app\learn-content
+ΓÇëWARNΓÇë Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v26.1.0","pnpm":"10.0.0"})
+
+> music-organizer@0.3.17 sync:jassub E:\gh\mmo\app
+> node scripts/sync-jassub.mjs
+
+
+> music-organizer@0.3.17 build E:\gh\mmo\app
+> next build --webpack
+
+Γû▓ Next.js 16.2.3 (webpack)
+- Environments: .env.local
+- Experiments (use with caution):
+  ┬╖ serverActions
+  Γ£ô viewTransition
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 11.9s
+  Running TypeScript ...
+  Finished TypeScript in 19.4s ...
+  Collecting page data using 31 workers ...
+  Generating static pages using 31 workers (0/147) ...
+(node:16332) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:56992) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4836) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31920) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:39672) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ΓÜá metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+  Generating static pages using 31 workers (36/147) 
+  Generating static pages using 31 workers (73/147) 
+  Generating static pages using 31 workers (110/147) 
+Γ£ô Generating static pages using 31 workers (147/147) in 1106ms
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)                                  Revalidate  Expire
+Γöî ╞Æ /
+Γö£ ╞Æ /_not-found
+Γö£ Γùï /.well-known/apple-app-site-association          1h      1y
+Γö£ Γùï /.well-known/assetlinks.json                     1h      1y
+Γö£ ╞Æ /analysis
+Γö£ ╞Æ /api/analysis/apply
+Γö£ ╞Æ /api/analysis/changes
+Γö£ ╞Æ /api/analysis/control
+Γö£ ╞Æ /api/analysis/start
+Γö£ ╞Æ /api/analysis/status
+Γö£ ╞Æ /api/analysis/stream
+Γö£ ╞Æ /api/audio/[id]
+Γö£ ╞Æ /api/audio/device/[id]
+Γö£ ╞Æ /api/auth/[...nextauth]
+Γö£ ╞Æ /api/auth/desktop-bootstrap
+Γö£ ╞Æ /api/billing/checkout
+Γö£ ╞Æ /api/billing/portal
+Γö£ ╞Æ /api/billing/webhook
+Γö£ ╞Æ /api/companion-auth
+Γö£ ╞Æ /api/companion/download
+Γö£ ╞Æ /api/cron/training-reconcile
+Γö£ ╞Æ /api/devices/announce
+Γö£ ╞Æ /api/devices/auto-register
+Γö£ ╞Æ /api/devices/heartbeat
+Γö£ ╞Æ /api/devices/peers
+Γö£ ╞Æ /api/devices/validate
+Γö£ ╞Æ /api/download/add-to-library
+Γö£ ╞Æ /api/download/browse-folder
+Γö£ ╞Æ /api/download/check-duplicates
+Γö£ ╞Æ /api/download/history
+Γö£ ╞Æ /api/download/info
+Γö£ ╞Æ /api/download/search
+Γö£ ╞Æ /api/download/search-duplicates
+Γö£ ╞Æ /api/download/settings
+Γö£ ╞Æ /api/download/start
+Γö£ ╞Æ /api/downloads/manifest
+Γö£ ╞Æ /api/export/rekordbox
+Γö£ ╞Æ /api/generated/[id]
+Γö£ ╞Æ /api/generated/upload
+Γö£ ╞Æ /api/health
+Γö£ ╞Æ /api/lan-url
+Γö£ ╞Æ /api/maestro/chat
+Γö£ ╞Æ /api/maestro/feedback
+Γö£ ╞Æ /api/mcp
+Γö£ ╞Æ /api/push/subscribe
+Γö£ ╞Æ /api/recommendations/similar
+Γö£ ╞Æ /api/recordings/[id]/audio
+Γö£ ╞Æ /api/recordings/save
+Γö£ ╞Æ /api/remote/events
+Γö£ ╞Æ /api/remote/send
+Γö£ ╞Æ /api/sync
+Γö£ ╞Æ /api/system-stats
+Γö£ ╞Æ /api/training/control/[jobId]
+Γö£ ╞Æ /api/training/events/[jobId]
+Γö£ ╞Æ /api/training/reconcile
+Γö£ ╞Æ /api/training/webhook
+Γö£ ╞Æ /api/trakt/callback
+Γö£ ╞Æ /api/turn-credentials
+Γö£ ╞Æ /api/usb-copy
+Γö£ ╞Æ /api/voice-render
+Γö£ ╞Æ /api/waveform-rgb/[id]
+Γö£ ╞Æ /api/waveform/[id]
+Γö£ ╞Æ /daw
+Γö£ ╞Æ /devices
+Γö£ ╞Æ /download
+Γö£ ╞Æ /downloads
+Γö£ ╞Æ /drives
+Γö£ ╞Æ /editor
+Γö£ ╞Æ /generate
+Γö£ Γùï /learn
+Γö£ ΓùÅ /learn/[section]
+Γöé Γö£ /learn/concept
+Γöé Γö£ /learn/docs
+Γöé Γö£ /learn/organizare
+Γöé Γöö [+3 more paths]
+Γö£ ΓùÅ /learn/[section]/[slug]
+Γöé Γö£ /learn/concept/README
+Γöé Γö£ /learn/concept/arhitectura
+Γöé Γö£ /learn/concept/drive-manager
+Γöé Γöö [+89 more paths]
+Γö£ ╞Æ /library
+Γö£ ╞Æ /library/duplicates
+Γö£ ╞Æ /library/hidden
+Γö£ ╞Æ /library/import
+Γö£ ╞Æ /live
+Γö£ ╞Æ /login
+Γö£ ╞Æ /lora/validate
+Γö£ ╞Æ /maestro
+Γö£ ╞Æ /mixer
+Γö£ ╞Æ /music
+Γö£ Γùï /offline
+Γö£ ╞Æ /playlists
+Γö£ ╞Æ /plugins
+Γö£ ╞Æ /profile
+Γö£ ╞Æ /profiles
+Γö£ ╞Æ /recordings
+Γö£ ╞Æ /remote
+Γö£ ╞Æ /scanner
+Γö£ ╞Æ /settings
+Γö£ ╞Æ /settings/account
+Γö£ ╞Æ /settings/advanced
+Γö£ ╞Æ /settings/appearance
+Γö£ ╞Æ /settings/companions
+Γö£ ╞Æ /settings/copilot
+Γö£ ╞Æ /settings/daw
+Γö£ ╞Æ /settings/devices
+Γö£ ╞Æ /settings/github
+Γö£ ╞Æ /settings/library
+Γö£ ╞Æ /settings/live
+Γö£ ╞Æ /settings/mixer
+Γö£ ╞Æ /settings/music
+Γö£ ╞Æ /settings/notifications
+Γö£ ╞Æ /settings/profiles
+Γö£ ╞Æ /settings/security
+Γö£ ╞Æ /settings/sound-editor
+Γö£ ╞Æ /settings/video
+Γö£ ╞Æ /status
+Γö£ ╞Æ /training
+Γö£ ╞Æ /visualizations
+Γö£ ╞Æ /voice-wizard
+Γö£ ╞Æ /watch
+Γö£ ╞Æ /watch/collections
+Γö£ ╞Æ /watch/continue
+Γö£ ╞Æ /watch/discover/movie/[id]
+Γö£ ╞Æ /watch/discover/tv/[id]
+Γö£ ╞Æ /watch/movies
+Γö£ ╞Æ /watch/movies/[id]
+Γö£ ╞Æ /watch/play/[fileId]
+Γö£ ╞Æ /watch/settings
+Γö£ ╞Æ /watch/shows
+Γö£ ╞Æ /watch/shows/[id]
+Γöö ╞Æ /watch/stats
+
+
+╞Æ Proxy (Middleware)
+
+Γùï  (Static)   prerendered as static content
+ΓùÅ  (SSG)      prerendered as static HTML (uses generateStaticParams)
+╞Æ  (Dynamic)  server-rendered on demand
+

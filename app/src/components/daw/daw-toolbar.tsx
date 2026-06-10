@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useDAW } from "./daw-context";
 import {
-    MousePointer2, Pencil, Eraser, Scissors, VolumeX, TrendingUp,
+    MousePointer2, Pencil, Eraser, Scissors, VolumeX, TrendingUp, Hand,
     FolderOpen, Save, FilePlus, Settings, Undo2, Redo2, Download,
     LayoutGrid, Piano, Drum, Plug, Waves, Maximize, Minimize,
     PanelLeft, AudioWaveform, RotateCcw,
@@ -15,9 +15,11 @@ import type { ToolMode, SnapValue } from "@/lib/daw-engine";
 import { canUndo as histCanUndo, canRedo as histCanRedo } from "@/lib/history-engine";
 import { useScrollAdjust } from "./daw-ui-utils";
 import { DAWPanelManager } from "./daw-panel-manager";
+import { ProjectChrome } from "@/components/projects/project-chrome";
 
 const TOOLS: { mode: ToolMode; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
     { mode: "select", icon: MousePointer2, label: "Select", shortcut: "V" },
+    { mode: "pan", icon: Hand, label: "Hand (pan timeline)", shortcut: "H" },
     { mode: "draw", icon: Pencil, label: "Draw", shortcut: "D" },
     { mode: "erase", icon: Eraser, label: "Erase", shortcut: "E" },
     { mode: "slice", icon: Scissors, label: "Slice", shortcut: "C" },
@@ -145,6 +147,12 @@ export function DAWToolbar() {
                 <ToolBtn icon={RotateCcw} label="Reset Layout" onClick={resetDockviewLayout} />
                 <DAWPanelManager />
                 <ToolBtn icon={Settings} label="Settings" onClick={() => daw.setSettingsModal(true)} />
+
+                <ProjectChrome
+                    kind="daw"
+                    externalId={daw.project.id || null}
+                    getCurrentDocument={() => daw.project as unknown as Record<string, unknown>}
+                />
 
                 {/* Project name — hidden on small viewports to keep the bar uncluttered */}
                 <div className="hidden md:flex items-center">

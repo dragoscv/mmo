@@ -4,8 +4,7 @@
     "version": "0.1.0",
     "identifier": "ro.muzicai.app",
     "build": {
-        "frontendDist": "../",
-        "devUrl": "https://muzicai.ro/",
+        "frontendDist": "../web",
         "beforeDevCommand": "",
         "beforeBuildCommand": ""
     },
@@ -14,7 +13,6 @@
             {
                 "label": "main",
                 "title": "MMO",
-                "url": "https://muzicai.ro/",
                 "width": 1400,
                 "height": 900,
                 "minWidth": 900,

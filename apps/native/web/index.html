@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <title>MMO</title>
+        <style>
+            html,
+            body {
+                margin: 0;
+                padding: 0;
+                background: #0a0a0a;
+                color: #f5f5f5;
+                font-family:
+                    system-ui,
+                    -apple-system,
+                    "Segoe UI",
+                    sans-serif;
+                height: 100%;
+                overflow: hidden;
+            }
+            .stage {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                padding: 24px;
+                text-align: center;
+            }
+            h1 {
+                margin: 0;
+                font-size: 22px;
+                font-weight: 700;
+            }
+            p {
+                margin: 0;
+                opacity: 0.7;
+                font-size: 13px;
+                max-width: 320px;
+                line-height: 1.5;
+            }
+            .dot {
+                width: 12px;
+                height: 12px;
+                background: #a855f7;
+                border-radius: 50%;
+                animation: pulse 1.4s infinite ease-in-out;
+            }
+            @keyframes pulse {
+                0%,
+                100% {
+                    transform: scale(0.6);
+                    opacity: 0.4;
+                }
+                50% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+            }
+            button {
+                margin-top: 6px;
+                background: #a855f7;
+                color: #fff;
+                border: 0;
+                padding: 10px 22px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+            }
+            button.secondary {
+                background: #262626;
+                color: #fafafa;
+            }
+            button:disabled {
+                opacity: 0.5;
+                cursor: progress;
+            }
+            .row {
+                display: flex;
+                gap: 8px;
+            }
+            .err {
+                color: #ef4444;
+                font-size: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="stage" id="stage">
+            <div class="dot"></div>
+            <h1>MMO</h1>
+            <p id="status">Loading…</p>
+        </div>
+        <script type="module">
+            // Resolved at runtime via the Tauri `get_web_app_url` command
+            // so dev hits localhost:13789 and release hits muzicai.ro.
+            let WEB_APP_URL = "https://muzicai.ro";
+
+            const stage = document.getElementById("stage");
+            const status = document.getElementById("status");
+
+            function render(html) {
+                stage.innerHTML = html;
+            }
+
+            function goToApp(extraPath) {
+                window.location.replace(`${WEB_APP_URL}${extraPath || "/"}`);
+            }
+
+            // Tauri 2 exposes invoke at window.__TAURI__.core.invoke
+            const tauri = window.__TAURI__;
+            const invoke = tauri?.core?.invoke;
+            const isTauri = typeof invoke === "function";
+
+            async function runSignIn() {
+                render(`
+          <div class="dot"></div>
+          <h1>Sign in</h1>
+          <p>Opening your browser so you can sign in with Google.</p>
+          <p style="font-size:11px;opacity:0.5">After signing in, this app will reload automatically.</p>
+          <div class="row">
+            <button id="cancelBtn" class="secondary">Cancel</button>
+          </div>
+          <p id="errMsg" class="err"></p>
+        `);
+                document.getElementById("cancelBtn")?.addEventListener("click", async () => {
+                    try {
+                        await invoke("desktop_auth_cancel");
+                    } catch {
+                        /* ignore */
+                    }
+                    render(`
+            <h1>Sign-in cancelled</h1>
+            <p>Press the button to try again.</p>
+            <button id="retryBtn">Try again</button>
+          `);
+                    document.getElementById("retryBtn")?.addEventListener("click", boot);
+                });
+
+                try {
+                    const result = await invoke("desktop_auth", { webAppUrl: WEB_APP_URL });
+                    if (!result || !result.token) throw new Error("No token returned");
+                    // Hand the token off to the web app, which mints a real
+                    // NextAuth session cookie for the WebView, then
+                    // redirects to "/".
+                    const u = new URL("/api/auth/desktop-bootstrap", WEB_APP_URL);
+                    u.searchParams.set("token", result.token);
+                    u.searchParams.set("redirect", "/");
+                    window.location.replace(u.toString());
+                } catch (e) {
+                    const msg = (e && (e.message || String(e))) || "Unknown error";
+                    render(`
+            <h1>Sign-in failed</h1>
+            <p class="err">${escapeHtml(msg)}</p>
+            <button id="retryBtn">Try again</button>
+          `);
+                    document.getElementById("retryBtn")?.addEventListener("click", boot);
+                }
+            }
+
+            function escapeHtml(s) {
+                return String(s).replace(/[&<>"']/g, (c) => ({
+                    "&": "&amp;",
+                    "<": "&lt;",
+                    ">": "&gt;",
+                    '"': "&quot;",
+                    "'": "&#39;",
+                })[c]);
+            }
+
+            async function boot() {
+                render(`
+          <div class="dot"></div>
+          <h1>MMO</h1>
+          <p>Loading…</p>
+        `);
+
+                // Outside of Tauri (eg. opened directly in a browser): just
+                // forward to the live app and let the user sign in there.
+                if (!isTauri) {
+                    goToApp("/");
+                    return;
+                }
+
+                // Pull the dev/prod base URL from Rust so we don't ship a
+                // hardcoded muzicai.ro when running under `tauri dev`.
+                try {
+                    const resolved = await invoke("get_web_app_url");
+                    if (typeof resolved === "string" && resolved.length > 0) {
+                        WEB_APP_URL = resolved;
+                    }
+                } catch {
+                    /* fall back to the muzicai.ro default */
+                }
+
+                // We can't probe muzicai.ro/api/auth/session from this
+                // local origin without CORS. Offer two paths instead:
+                //   - "Open MMO" if the WebView already has a session cookie
+                //     from a previous launch (the web app will route fine).
+                //   - "Sign in with Google" to start the browser flow.
+                render(`
+          <h1>Welcome to MMO</h1>
+          <p>Sign in with your Google account to continue. We'll open your default browser so you can use your existing session.</p>
+          <button id="signInBtn">Sign in with Google</button>
+          <button id="openBtn" class="secondary">Continue (already signed in)</button>
+        `);
+                document.getElementById("signInBtn")?.addEventListener("click", runSignIn);
+                document.getElementById("openBtn")?.addEventListener("click", () => goToApp("/"));
+            }
+
+            boot();
+        </script>
+    </body>
+</html>

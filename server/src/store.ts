@@ -66,6 +66,16 @@ export interface CompanionSettings {
      *  error to Sentry. Default `false` — the companion is self-hosted
      *  and telemetry must be explicit. */
     telemetryEnabled: boolean;
+    /** When true, every video discovered by `/video/scan` is queued for
+     *  background pre-remux to a sidecar `.mmo.mp4` file. The sidecar
+     *  has fragment-friendly codecs (video copied, audio re-encoded to
+     *  AAC stereo, +faststart) so subsequent playback can remux in
+     *  realtime with near-zero CPU. Default off — the user must opt in
+     *  because pre-remux writes new files into their library folders
+     *  and can take a long time on big libraries. Manual single-file
+     *  triggers (`POST /video/preremux/:fileId`) always work
+     *  regardless of this flag. */
+    preRemuxAutoOnScan: boolean;
 }
 
 const DEFAULTS: CompanionSettings = {
@@ -87,6 +97,7 @@ const DEFAULTS: CompanionSettings = {
     ],
     authorizedAudioDevices: [],
     telemetryEnabled: false,
+    preRemuxAutoOnScan: false,
 };
 
 export const store = new Store({
@@ -175,6 +186,12 @@ function healServerPort(stored: unknown): number {
 }
 
 export function getSettings(): CompanionSettings {
+    // Dev override: when MMO_WEB_APP_URL is set (e.g. a cloudflared quick
+    // tunnel pointing at a local `pnpm dev` web server) we ignore the
+    // stored value so the cloud-sync / announce / OAuth loops all target
+    // local code without persisting a "localhost"-ish URL that would
+    // break the next normal launch.
+    const envOverride = process.env.MMO_WEB_APP_URL?.trim();
     return {
         startAtLogin: store.get("startAtLogin") as boolean,
         closeToTray: store.get("closeToTray") as boolean,
@@ -184,10 +201,11 @@ export function getSettings(): CompanionSettings {
         // Respect the value the OAuth flow persisted (or that the user typed in
         // settings). Heals legacy `localhost:3000` values left over from
         // pairings made before the web app moved to port 13789.
-        webAppUrl: healWebAppUrl(store.get("webAppUrl") as string | undefined),
+        webAppUrl: envOverride || healWebAppUrl(store.get("webAppUrl") as string | undefined),
         audioOriginAllowlist: mergeAllowlistWithDefaults(store.get("audioOriginAllowlist") as string[] | undefined),
         authorizedAudioDevices: (store.get("authorizedAudioDevices") as AuthorizedAudioDevice[] | undefined) ?? [],
         telemetryEnabled: (store.get("telemetryEnabled") as boolean | undefined) ?? DEFAULTS.telemetryEnabled,
+        preRemuxAutoOnScan: (store.get("preRemuxAutoOnScan") as boolean | undefined) ?? DEFAULTS.preRemuxAutoOnScan,
     };
 }
 

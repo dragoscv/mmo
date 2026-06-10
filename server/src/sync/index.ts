@@ -51,7 +51,7 @@ export function startCloudSync(logger?: (msg: string, err?: unknown) => void): b
         return false;
     }
     ensureBootstrapped();
-    _storage = new SqliteSyncStorage(getLibrarySqlite(), { seed, logger });
+    _storage = new SqliteSyncStorage(getLibrarySqlite(), { seed, getSeed: readSeed, logger });
     _client = new CloudSyncClient(_storage);
     if (_onApplied) _client.onApplied = _onApplied;
     _client.start();

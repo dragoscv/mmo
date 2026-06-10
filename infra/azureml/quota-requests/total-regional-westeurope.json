@@ -1,0 +1,13 @@
+{
+  "properties": {
+    "limit": {
+      "value": 32,
+      "limitObjectType": "LimitValue",
+      "limitType": "Independent"
+    },
+    "name": {
+      "value": "cores"
+    },
+    "resourceType": "regionalQuota"
+  }
+}

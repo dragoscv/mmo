@@ -151,6 +151,77 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
     /** Per-folder scan progress, keyed by folder path. Lives across
      *  refreshes because we re-fetch from the companion on mount. */
     const [scanProgress, setScanProgress] = useState<Record<string, CompanionScanJob>>({});
+    /** Last ingest result per folder path — persistent feedback that
+     *  survives the ephemeral toast so the user always sees what landed
+     *  in the cloud DB after a scan. */
+    const [ingestSummary, setIngestSummary] = useState<Record<string, {
+        ok: boolean;
+        text: string;
+        at: number;
+    }>>({});
+    /** Job IDs we've already kicked an ingest for. Prevents a double
+     *  ingest when both the WS "complete" frame and the 750 ms poll
+     *  observe the same transition. */
+    const ingestedJobIds = useRef<Set<string>>(new Set());
+
+    /** Pull a completed scan job's payload into the cloud DB and surface
+     *  the result on the folder card + as a toast. Idempotent per jobId. */
+    const runIngest = useCallback(async (
+        deviceId: string,
+        folderPath: string,
+        job: CompanionScanJob,
+    ) => {
+        if (ingestedJobIds.current.has(job.id)) return;
+        ingestedJobIds.current.add(job.id);
+        if (job.kind === "video") {
+            const ingest = await ingestCompanionVideoScanJob(deviceId, job.id);
+            if ("error" in ingest) {
+                toast.error(`Ingest failed: ${ingest.error}`, { duration: 12_000 });
+                setIngestSummary((p) => ({ ...p, [folderPath]: { ok: false, text: `Ingest failed: ${ingest.error}`, at: Date.now() } }));
+            } else {
+                const parts: string[] = [];
+                if (ingest.movies) parts.push(`${ingest.movies} movies`);
+                if (ingest.shows) parts.push(`${ingest.shows} shows`);
+                if (ingest.episodes) parts.push(`${ingest.episodes} episodes`);
+                parts.push(`${ingest.files} files`);
+                if (ingest.skipped) parts.push(`${ingest.skipped} skipped`);
+                const text = parts.join(", ");
+                toast.success(`Scan complete: ${text}`, { duration: 8_000 });
+                setIngestSummary((p) => ({ ...p, [folderPath]: { ok: true, text, at: Date.now() } }));
+            }
+        } else {
+            const ingest = await ingestCompanionScanJob(deviceId, job.id);
+            if ("error" in ingest) {
+                toast.error(`Ingest failed: ${ingest.error}`, { duration: 12_000 });
+                setIngestSummary((p) => ({ ...p, [folderPath]: { ok: false, text: `Ingest failed: ${ingest.error}`, at: Date.now() } }));
+            } else {
+                const text = `${ingest.inserted} new, ${ingest.skipped} skipped (of ${ingest.total})`;
+                toast.success(`Scan complete: ${text}`, { duration: 8_000 });
+                setIngestSummary((p) => ({ ...p, [folderPath]: { ok: true, text, at: Date.now() } }));
+                const c = await getDeviceTrackCount(deviceId);
+                setTrackCounts((p) => ({ ...p, [deviceId]: c }));
+            }
+        }
+        // Clear the progress bar a moment later so the user sees "100% done"
+        // before the row collapses back to its idle state.
+        setTimeout(() => {
+            setScanProgress((p) => { const next = { ...p }; delete next[folderPath]; return next; });
+        }, 2_500);
+    }, []);
+
+    /** Reactive ingest trigger. Runs every time scanProgress changes —
+     *  whether the new state came from the 750 ms poll OR from the WS
+     *  push frame. The `ingestedJobIds` ref dedupes so each job runs
+     *  ingest exactly once across the two channels. */
+    useEffect(() => {
+        for (const [folderPath, job] of Object.entries(scanProgress)) {
+            if (job.status !== "complete" || job.id === "pending") continue;
+            if (ingestedJobIds.current.has(job.id)) continue;
+            const owner = devices.find((d) => (folders[d.id] ?? []).some((f) => f.path === folderPath));
+            if (!owner) continue;
+            void runIngest(owner.id, folderPath, job);
+        }
+    }, [scanProgress, devices, folders, runIngest]);
     /** Per-device highest watcher event id we've ingested so far. */
     const watchHighWatermark = useRef<Record<string, number>>({});
     const [togglingWatch, setTogglingWatch] = useState<string | null>(null);
@@ -550,6 +621,10 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
                     : `${r.picked} was already in the library`,
             );
             setPickerDialogDevice(null);
+            // Fire an initial scan so the new folder's existing content
+            // shows up in /library or /watch. Watch only catches NEW
+            // files \u2014 the user expects current content too.
+            if (r.added) handleScanFolder(deviceId, r.picked, pendingPickKind);
         } finally {
             setBrowserAdding(false);
         }
@@ -578,7 +653,7 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
         });
     }
 
-    function handleScanFolder(deviceId: string, folderPath: string) {
+    function handleScanFolder(deviceId: string, folderPath: string, kind?: FolderKind) {
         // Optimistic placeholder so the UI shows a bar immediately.
         setScanProgress((p) => ({
             ...p,
@@ -590,7 +665,7 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
             },
         }));
         startTransition(async () => {
-            const r = await startCompanionScan(deviceId, folderPath);
+            const r = await startCompanionScan(deviceId, folderPath, kind);
             if ("error" in r) {
                 setScanProgress((p) => {
                     const next = { ...p }; delete next[folderPath]; return next;
@@ -602,10 +677,10 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
         });
     }
 
-    /** Poll any active scan jobs every ~750 ms until they complete. On
-     *  completion, drain the tracks payload and ingest into the library.
-     *  Survives refreshes because we hydrate from listCompanionScanJobs
-     *  on mount (see effect below). */
+    /** Poll any active scan jobs every ~750 ms until they complete.
+     *  Ingest is handled by a separate effect that reacts to any
+     *  transition into the "complete" state — whether the update came
+     *  from this poll or from the WS push frame. */
     useEffect(() => {
         const active = Object.entries(scanProgress).filter(
             ([, job]) => job.status !== "complete" && job.status !== "error" && job.status !== "canceled",
@@ -615,54 +690,16 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
         const tick = async () => {
             for (const [folderPath, job] of active) {
                 if (job.id === "pending") continue; // optimistic placeholder, wait for real id
-                // Find which device owns this folder. (Folder paths are
-                // companion-unique, but we still need the device for the IPC.)
                 const owner = devices.find((d) => (folders[d.id] ?? []).some((f) => f.path === folderPath));
                 if (!owner) continue;
                 const r = await getCompanionScanJob(owner.id, job.id);
                 if (stopped) return;
                 if ("error" in r) continue;
                 setScanProgress((p) => ({ ...p, [folderPath]: { ...r.job, folder: folderPath } }));
-                if (r.job.status === "complete") {
-                    // Pull tracks/videos + ingest, then clear progress after a
-                    // short celebratory pause so the user sees the “100% done”
-                    // state. Branch by kind — audio jobs feed the music library,
-                    // video jobs feed movies/tvShows/episodes/videoFiles.
-                    if (r.job.kind === "video") {
-                        const ingest = await ingestCompanionVideoScanJob(owner.id, job.id);
-                        if ("error" in ingest) {
-                            toast.error(`Ingest failed: ${ingest.error}`);
-                        } else {
-                            const parts: string[] = [];
-                            if (ingest.movies) parts.push(`${ingest.movies} movies`);
-                            if (ingest.shows) parts.push(`${ingest.shows} shows`);
-                            if (ingest.episodes) parts.push(`${ingest.episodes} episodes`);
-                            parts.push(`${ingest.files} files`);
-                            if (ingest.skipped) parts.push(`${ingest.skipped} skipped`);
-                            toast.success(`Scan complete: ${parts.join(", ")}`);
-                        }
-                    } else {
-                        const ingest = await ingestCompanionScanJob(owner.id, job.id);
-                        if ("error" in ingest) {
-                            toast.error(`Ingest failed: ${ingest.error}`);
-                        } else {
-                            toast.success(`Scan complete: ${ingest.inserted} new, ${ingest.skipped} skipped`);
-                            // Refresh the device's track count.
-                            const c = await getDeviceTrackCount(owner.id);
-                            setTrackCounts((p) => ({ ...p, [owner.id]: c }));
-                        }
-                    }
-                    setTimeout(() => {
-                        setScanProgress((p) => {
-                            const next = { ...p }; delete next[folderPath]; return next;
-                        });
-                    }, 2_500);
-                } else if (r.job.status === "error") {
+                if (r.job.status === "error") {
                     toast.error(`Scan failed: ${r.job.error ?? "unknown"}`);
                     setTimeout(() => {
-                        setScanProgress((p) => {
-                            const next = { ...p }; delete next[folderPath]; return next;
-                        });
+                        setScanProgress((p) => { const next = { ...p }; delete next[folderPath]; return next; });
                     }, 5_000);
                 }
             }
@@ -911,12 +948,16 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
                                                 isOnline={isOnline}
                                                 isPicking={false}
                                                 scanProgress={scanProgress}
+                                                ingestSummary={ingestSummary}
                                                 togglingWatch={togglingWatch}
                                                 onPick={() => openPickerDialog(device.id)}
-                                                onScan={(p) => handleScanFolder(device.id, p)}
+                                                onScan={(p) => {
+                                                    const f = (folders[device.id] ?? []).find((x) => x.path === p);
+                                                    handleScanFolder(device.id, p, f?.kind);
+                                                }}
                                                 onRemove={(p) => handleRemoveFolder(device.id, p)}
                                                 onScanAll={() => {
-                                                    for (const f of dFolders) handleScanFolder(device.id, f.path);
+                                                    for (const f of dFolders) handleScanFolder(device.id, f.path, f.kind);
                                                 }}
                                                 onToggleWatch={(p, w) => handleToggleWatch(device.id, p, w)}
                                             />
@@ -1341,6 +1382,7 @@ interface FolderSectionProps {
     isOnline: boolean;
     isPicking: boolean;
     scanProgress: Record<string, CompanionScanJob>;
+    ingestSummary: Record<string, { ok: boolean; text: string; at: number }>;
     togglingWatch: string | null;
     onPick: () => void;
     onScan: (path: string) => void;
@@ -1350,7 +1392,7 @@ interface FolderSectionProps {
 }
 
 function FolderSection({
-    folders, isOnline, isPicking, scanProgress, togglingWatch,
+    folders, isOnline, isPicking, scanProgress, ingestSummary, togglingWatch,
     onPick, onScan, onRemove, onScanAll, onToggleWatch,
 }: FolderSectionProps) {
     const anyScanning = Object.values(scanProgress).some(
@@ -1389,6 +1431,7 @@ function FolderSection({
                                 isOnline={isOnline}
                                 togglingWatch={togglingWatch === folder.path}
                                 progress={scanProgress[folder.path]}
+                                ingest={ingestSummary[folder.path]}
                                 onScan={() => onScan(folder.path)}
                                 onRemove={() => onRemove(folder.path)}
                                 onToggleWatch={(w) => onToggleWatch(folder.path, w)}
@@ -1426,13 +1469,14 @@ interface FolderRowProps {
     isOnline: boolean;
     togglingWatch: boolean;
     progress: CompanionScanJob | undefined;
+    ingest?: { ok: boolean; text: string; at: number };
     onScan: () => void;
     onRemove: () => void;
     onToggleWatch: (watch: boolean) => void;
 }
 
 function FolderRow({
-    folder, isOnline, togglingWatch, progress, onScan, onRemove, onToggleWatch,
+    folder, isOnline, togglingWatch, progress, ingest, onScan, onRemove, onToggleWatch,
 }: FolderRowProps) {
     const isScanning = progress
         && progress.status !== "complete"
@@ -1620,6 +1664,21 @@ function FolderRow({
                     {folder.watchError && (
                         <span className="ml-auto text-amber-400">{folder.watchError}</span>
                     )}
+                </div>
+            )}
+
+            {/* Last ingest result \u2014 persistent so the user always sees what
+                actually landed in the cloud DB after a scan finishes. */}
+            {ingest && !isScanning && (
+                <div className={cn(
+                    "flex items-center gap-1.5 border-t border-border/60 px-3 py-1.5 text-[10px]",
+                    ingest.ok ? "bg-green-500/5 text-green-300" : "bg-red-500/5 text-red-300",
+                )}>
+                    {ingest.ok ? <Sparkles className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
+                    <span className="truncate">{ingest.text}</span>
+                    <span className="ml-auto font-mono text-muted-foreground">
+                        {new Date(ingest.at).toLocaleTimeString()}
+                    </span>
                 </div>
             )}
         </motion.li>

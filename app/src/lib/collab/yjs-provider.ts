@@ -3,40 +3,30 @@
 /**
  * Yjs-backed multi-cursor collaboration provider for project docs.
  *
- * STATUS: scaffold. Not wired up.
+ * One Y.Doc per (kind, externalId), persisted locally via IndexedDB
+ * and fanned out via WebSocket. Room name is `mmo:{kind}:{externalId}`.
  *
- * Design:
- *   - One Y.Doc per (projectKind, externalId). Stored locally with
- *     `y-indexeddb` for instant load and offline edits.
- *   - Real-time fanout via `y-websocket` pointed at the companion's
- *     existing `/ws` channel (new subprotocol "yjs"), OR a cloud relay
- *     deployed as a separate WebSocket service (Vercel Edge Functions
- *     don't yet support long-lived WS — would need Cloudflare Workers
- *     with Durable Objects, Fly.io, or a small Node service on GCP).
- *   - Cloud Postgres still holds the authoritative `document` JSONB
- *     (snapshot of the Y.Doc state taken every N seconds or on idle).
- *     `yjs_state` BYTEA columns on each project table store the binary
- *     Y.Doc state for cold loads on devices that don't have IndexedDB
- *     yet (or fresh installs).
+ * Default WebSocket target order:
+ *   1. opts.wsUrl (caller override)
+ *   2. NEXT_PUBLIC_YJS_RELAY_URL  (cloud relay)
+ *   3. ws://<host>:5174/ws        (local companion)
  *
- * TODO:
- *   1. `pnpm add yjs y-indexeddb y-websocket y-protocols`
- *   2. Decide WebSocket relay target (companion vs cloud) — see
- *      askQuestions follow-up.
- *   3. Wrap the DAW project state object as a shared Y.Map so granular
- *      edits propagate without re-serializing the whole document.
- *   4. Add awareness (cursor positions, selections) per user.
+ * The cloud relay is a tiny Cloudflare Worker + Durable Object — see
+ * `infra/yjs-relay/`. The companion ws server speaks the y-websocket
+ * protocol on the "yjs" subprotocol (see `server/src/collab/yjs-ws.ts`).
  */
 
+import * as Y from "yjs";
+import { IndexeddbPersistence } from "y-indexeddb";
+import { WebsocketProvider } from "y-websocket";
 import type { ProjectKind } from "@/db/schema-projects";
 
 export interface YjsProviderHandle {
-    /** Disconnect and tear down the provider. */
+    doc: Y.Doc;
+    awareness: WebsocketProvider["awareness"];
+    persistence: IndexeddbPersistence;
+    provider: WebsocketProvider;
     destroy(): void;
-    /** Y.Doc instance — caller binds it to shared types. */
-    doc: unknown;
-    /** Awareness instance for presence + cursors. */
-    awareness: unknown;
 }
 
 export interface YjsProviderOptions {
@@ -44,10 +34,53 @@ export interface YjsProviderOptions {
     externalId: string;
     userId: string;
     displayName: string;
-    /** Override the default WebSocket URL (e.g. ws://localhost:5174/ws). */
+    color?: string;
     wsUrl?: string;
 }
 
-export function createYjsProvider(_opts: YjsProviderOptions): YjsProviderHandle {
-    throw new Error("createYjsProvider: not implemented (scaffold)");
+function defaultWsUrl(): string | null {
+    const envUrl = process.env.NEXT_PUBLIC_YJS_RELAY_URL;
+    if (envUrl) return envUrl;
+    // Local companion fallback is opt-in to avoid console spam when it isn't running.
+    if (process.env.NEXT_PUBLIC_YJS_RELAY_LOCAL === "1" && typeof window !== "undefined") {
+        const scheme = window.location.protocol === "https:" ? "wss:" : "ws:";
+        return `${scheme}//${window.location.hostname}:5174/ws`;
+    }
+    return null;
+}
+
+const HEX_COLORS = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
+function hashColor(s: string): string {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return HEX_COLORS[Math.abs(h) % HEX_COLORS.length];
+}
+
+export function createYjsProvider(opts: YjsProviderOptions): YjsProviderHandle {
+    const room = `mmo:${opts.kind}:${opts.externalId}`;
+    const doc = new Y.Doc();
+    const persistence = new IndexeddbPersistence(room, doc);
+    const wsUrl = opts.wsUrl ?? defaultWsUrl();
+    const provider = new WebsocketProvider(wsUrl ?? "ws://disabled.invalid", room, doc, {
+        connect: wsUrl !== null,
+        // The companion / cloud relay both accept the "yjs" subprotocol.
+        params: { kind: opts.kind, externalId: opts.externalId },
+    });
+    provider.awareness.setLocalStateField("user", {
+        id: opts.userId,
+        name: opts.displayName,
+        color: opts.color ?? hashColor(opts.userId),
+    });
+    return {
+        doc,
+        awareness: provider.awareness,
+        persistence,
+        provider,
+        destroy() {
+            try { provider.disconnect(); } catch { /* ignore */ }
+            try { provider.destroy(); } catch { /* ignore */ }
+            try { persistence.destroy(); } catch { /* ignore */ }
+            doc.destroy();
+        },
+    };
 }

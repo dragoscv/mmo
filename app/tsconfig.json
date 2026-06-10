@@ -28,6 +28,24 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@mmo/ai": [
+        "../packages/ai/src/index.ts"
+      ],
+      "@mmo/ai/*": [
+        "../packages/ai/src/*"
+      ],
+      "@mmo/audio-gen": [
+        "../packages/audio-gen/src/index.ts"
+      ],
+      "@mmo/audio-gen/*": [
+        "../packages/audio-gen/src/*"
+      ],
+      "@mmo/ai-mcp": [
+        "../packages/ai-mcp/src/index.ts"
+      ],
+      "@mmo/sdk": [
+        "../packages/sdk/src/index.ts"
       ]
     }
   },

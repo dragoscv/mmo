@@ -1,5 +1,29 @@
 {
     "appName": "MMO",
+    "watch": {
+        "rows": {
+            "continue": "Continue watching",
+            "recentMovies": "Recently added movies",
+            "recentShows": "Recently added shows",
+            "trending": "Trending on TMDB",
+            "forYouMovies": "For you — movies",
+            "forYouShows": "For you — shows",
+            "seeAll": "See all"
+        },
+        "moviesPage": {
+            "title": "Your movies",
+            "noResults": "No movies match the current filters.",
+            "empty": "No movies yet.",
+            "runScan": "Run a scan."
+        },
+        "showsPage": {
+            "title": "Your shows"
+        },
+        "continuePage": {
+            "title": "Continue watching",
+            "lead": "Pick up exactly where you left off on any screen tied to your profile."
+        }
+    },
     "tagline": "Multi Media Organizer for DJs and producers",
     "empty": {
         "features": {
@@ -36,6 +60,7 @@
         "drives": "Drives",
         "playlists": "Playlists",
         "recordings": "Recordings",
+        "voice-wizard": "Voice Wizard",
         "devices": "Devices",
         "settings": "Settings",
         "plugins": "Plugins",
@@ -43,6 +68,13 @@
         "profiles": "Profiles",
         "watch": "Watch",
         "watch-browse": "Browse",
+        "watch-movies": "Movies",
+        "watch-shows": "TV Shows",
+        "watch-continue": "Continue Watching",
+        "watch-stats": "Stats",
+        "watch-collections": "Collections",
+        "watch-profiles": "Profiles",
+        "watch-settings": "Settings",
         "collections": "Collections",
         "duplicates": "Duplicates",
         "learn": "Learn",

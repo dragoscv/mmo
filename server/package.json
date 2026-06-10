@@ -14,10 +14,11 @@
     "url": "https://github.com/dragoscv/mmo.git"
   },
   "scripts": {
-    "dev": "tsc && electron dist/main.js",
-    "dev:inspect": "tsc && electron --inspect=0.0.0.0:9229 --remote-debugging-port=9222 dist/main.js",
+    "dev": "tsc-watch --onFirstSuccess \"electronmon .\"",
+    "dev:once": "tsc && electron .",
+    "dev:inspect": "tsc-watch --onFirstSuccess \"electronmon --inspect=0.0.0.0:9229 --remote-debugging-port=9222 .\"",
     "build": "tsc",
-    "start": "electron dist/main.js",
+    "start": "electron .",
     "dist": "tsc && electron-builder --win --x64",
     "dist:win": "tsc && electron-builder --win --x64",
     "dist:mac": "tsc && electron-builder --mac",
@@ -245,6 +246,7 @@
     "electron": "^34.3.0",
     "electron-builder": "^26.0.0",
     "electronmon": "^2.0.3",
+    "tsc-watch": "^7.2.0",
     "typescript": "^5.8.3",
     "vitest": "^2.1.9"
   },
@@ -254,7 +256,12 @@
       "ui/**/*",
       "preload.js",
       "!**/node_modules/**",
-      "!**/release/**"
+      "!**/release/**",
+      "!**/*.m4s",
+      "!**/*.m3u8",
+      "!**/init.mp4",
+      "!**/seg_*.m4s",
+      "!**/mmo-hls-*/**"
     ],
     "logLevel": "quiet"
   },

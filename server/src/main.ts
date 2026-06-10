@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, nativeTheme, dialog, ipcMain, shell, powerSaveBlocker } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, nativeTheme, dialog, ipcMain, screen, shell, powerSaveBlocker } from "electron";
 import { autoUpdater } from "electron-updater";
 import path from "node:path";
 import os from "node:os";
@@ -359,12 +359,88 @@ function getThemeBackground(): string {
     return nativeTheme.shouldUseDarkColors ? "#0a0a0a" : "#0f1117";
 }
 
+// ─── Window bounds persistence ───────────────────────────────────────────────
+// Save the user's last position, size, and maximized state so the window
+// reopens where they left it — including on the correct monitor in a
+// multi-display setup. Bounds are discarded if the saved rectangle no
+// longer intersects any currently connected display (e.g. external
+// monitor unplugged) so the window can't be stranded off-screen.
+
+interface StoredWindowBounds {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    isMaximized?: boolean;
+}
+
+const WINDOW_BOUNDS_KEY = "windowBounds";
+const DEFAULT_WINDOW_SIZE = { width: 480, height: 720 };
+const MIN_WINDOW_SIZE = { width: 400, height: 500 };
+
+function loadWindowBounds(): StoredWindowBounds | null {
+    const raw = store.get(WINDOW_BOUNDS_KEY) as Partial<StoredWindowBounds> | undefined;
+    if (!raw || typeof raw !== "object") return null;
+    const { x, y, width, height } = raw;
+    if (
+        typeof x !== "number" || typeof y !== "number" ||
+        typeof width !== "number" || typeof height !== "number" ||
+        width < MIN_WINDOW_SIZE.width || height < MIN_WINDOW_SIZE.height
+    ) return null;
+
+    // Require at least a small visible portion to overlap a connected
+    // display; otherwise the window would land off-screen (e.g. saved
+    // on an external monitor that's no longer attached).
+    const displays = screen.getAllDisplays();
+    const visible = displays.some((d) => {
+        const wa = d.workArea;
+        const overlapX = Math.max(0, Math.min(x + width, wa.x + wa.width) - Math.max(x, wa.x));
+        const overlapY = Math.max(0, Math.min(y + height, wa.y + wa.height) - Math.max(y, wa.y));
+        return overlapX >= 64 && overlapY >= 64;
+    });
+    if (!visible) return null;
+
+    return {
+        x, y, width, height,
+        isMaximized: raw.isMaximized === true,
+    };
+}
+
+let saveBoundsTimer: NodeJS.Timeout | null = null;
+function scheduleSaveWindowBounds() {
+    if (saveBoundsTimer) clearTimeout(saveBoundsTimer);
+    saveBoundsTimer = setTimeout(saveWindowBoundsNow, 400);
+}
+function saveWindowBoundsNow() {
+    saveBoundsTimer = null;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    try {
+        // getNormalBounds() returns the un-maximized rect so restoring
+        // from a maximized state still places the window correctly when
+        // the user un-maximizes.
+        const bounds = mainWindow.getNormalBounds();
+        const payload: StoredWindowBounds = {
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
+            isMaximized: mainWindow.isMaximized(),
+        };
+        store.set(WINDOW_BOUNDS_KEY, payload);
+    } catch (err) {
+        logLine("warn", "saveWindowBounds failed:", err as Error);
+    }
+}
+
 function createWindow() {
+    const restored = loadWindowBounds();
     mainWindow = new BrowserWindow({
-        width: 480,
-        height: 720,
-        minWidth: 400,
-        minHeight: 500,
+        width: restored?.width ?? DEFAULT_WINDOW_SIZE.width,
+        height: restored?.height ?? DEFAULT_WINDOW_SIZE.height,
+        x: restored?.x,
+        y: restored?.y,
+        minWidth: MIN_WINDOW_SIZE.width,
+        minHeight: MIN_WINDOW_SIZE.height,
         resizable: true,
         // The default Windows menu (File / Edit / View / Window / Help) eats
         // ~22px of vertical space and isn't useful for this app — hide it
@@ -404,8 +480,20 @@ function createWindow() {
         // fires reliably (the default behaviour skips paints for hidden
         // windows on some platforms).
         paintWhenInitiallyHidden: true,
-        center: true,
+        center: restored == null,
     });
+
+    if (restored?.isMaximized) {
+        mainWindow.maximize();
+    }
+
+    // Persist position/size on every change. Debounced so a drag
+    // doesn't spam disk writes.
+    const onBoundsChange = () => scheduleSaveWindowBounds();
+    mainWindow.on("move", onBoundsChange);
+    mainWindow.on("resize", onBoundsChange);
+    mainWindow.on("maximize", onBoundsChange);
+    mainWindow.on("unmaximize", onBoundsChange);
 
     const indexPath = path.join(__dirname, "../ui/index.html");
     mainWindow.loadFile(indexPath).catch((err) => {
@@ -490,6 +578,10 @@ function createWindow() {
     setTimeout(() => showOnce("safety-timeout"), 1500);
 
     mainWindow.on("close", (event) => {
+        // Flush bounds synchronously so the last position is saved even
+        // if the debounce timer hasn't fired yet (e.g. quick quit after
+        // a move).
+        saveWindowBoundsNow();
         const settings = getSettings();
         if (!isQuitting && settings.closeToTray) {
             event.preventDefault();
@@ -611,18 +703,25 @@ function setupIPC() {
         return getSettings();
     });
 
-    ipcMain.handle("get-status", () => ({
-        port: serverModule?.getServerPort() ?? 0,
-        serverError: serverError?.message ?? null,
-        appVersion: app.getVersion(),
-        serverVersion: serverModule?.getServerVersion() ?? null,
-        authenticated: !!store.get("deviceToken"),
-        deviceId: store.get("deviceId") || null,
-        deviceName: store.get("deviceName") || null,
-        userName: store.get("userName") || null,
-        userEmail: store.get("userEmail") || null,
-        userImage: store.get("userImage") || null,
-    }));
+    ipcMain.handle("get-status", () => {
+        // Single disk read per call. Calling `store.get(key)` 7× forces
+        // `electron-store` to re-open + re-parse `config.json` 7 times,
+        // which under polling pressure (UI refreshes every 3s) exhausts
+        // Windows file-descriptor handles and surfaces as EMFILE.
+        const s = store.store as Record<string, unknown>;
+        return {
+            port: serverModule?.getServerPort() ?? 0,
+            serverError: serverError?.message ?? null,
+            appVersion: app.getVersion(),
+            serverVersion: serverModule?.getServerVersion() ?? null,
+            authenticated: !!s.deviceToken,
+            deviceId: (s.deviceId as string | undefined) || null,
+            deviceName: (s.deviceName as string | undefined) || null,
+            userName: (s.userName as string | undefined) || null,
+            userEmail: (s.userEmail as string | undefined) || null,
+            userImage: (s.userImage as string | undefined) || null,
+        };
+    });
 
     ipcMain.handle("authenticate", async (_event, data: {
         webAppUrl: string;

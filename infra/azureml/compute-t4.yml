@@ -1,0 +1,8 @@
+# Cheap fallback compute for testing the pipeline before A100 quota lands.
+# T4 quota is usually approved by default.
+name: gpu-t4
+size: Standard_NC4as_T4_v3
+min_instances: 0
+max_instances: 1
+idle_time_before_scale_down: 900
+tier: Dedicated

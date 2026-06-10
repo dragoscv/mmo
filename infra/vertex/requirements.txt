@@ -1,0 +1,7 @@
+# Dependencies for `submit-training.py` and any other submission-side helpers
+# under infra/vertex/. Trainer-container deps live in train-acestep/requirements.txt
+# and train-conductor/requirements.txt respectively.
+#
+# Bootstrap once per machine:
+#     pip install -r infra/vertex/requirements.txt
+google-cloud-aiplatform>=1.70.0

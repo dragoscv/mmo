@@ -80,6 +80,16 @@ export function companionDirectUrl(apiUrl: string, fileId: string, token: string
     return u.toString();
 }
 
+/** WebVTT URL for an embedded subtitle stream. `trackIndex` is the
+ *  0-based position within the file's subtitle streams (not the absolute
+ *  ffmpeg stream index) — matches the companion's `-map 0:s:N` mapping. */
+export function companionEmbeddedSubUrl(apiUrl: string, fileId: string, trackIndex: number, token: string, userId: string): string {
+    const u = new URL(`${apiUrl}/video/subs/${fileId}/${trackIndex}`);
+    u.searchParams.set("t", token);
+    u.searchParams.set("u", userId);
+    return u.toString();
+}
+
 /** Build the HLS playlist URL. */
 export function companionHlsUrl(apiUrl: string, fileId: string, quality: string, token: string, userId: string, startSec = 0): string {
     const u = new URL(`${apiUrl}/video/stream/${fileId}`);
@@ -94,4 +104,21 @@ export async function getPlaybackHandle(): Promise<{ apiUrl: string; token: stri
     const link = await getCompanionLink();
     if (!link) return null;
     return { apiUrl: link.apiUrl, token: link.token, userId: link.userId };
+}
+
+/** True when the browser's <video> element can play the source as-is (no transcode/remux).
+ *  Pass nullish values when codec metadata is unknown — returns false in that case. */
+export function canBrowserDirectPlay(
+    container: string | null | undefined,
+    videoCodec: string | null | undefined,
+    audioCodec: string | null | undefined,
+): boolean {
+    if (!container || !videoCodec) return false;
+    const c = container.toLowerCase();
+    const v = videoCodec.toLowerCase();
+    const a = (audioCodec ?? "").toLowerCase();
+    const okContainer = c.includes("mp4") || c.includes("m4v") || c.includes("webm");
+    const okVideo = v === "h264" || v === "avc" || v === "avc1" || v === "vp9" || v === "av1" || v === "av01";
+    const okAudio = a === "" || ["aac", "mp4a", "mp3", "opus", "vorbis"].includes(a);
+    return okContainer && okVideo && okAudio;
 }

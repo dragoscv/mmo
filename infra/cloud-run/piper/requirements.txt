@@ -1,0 +1,4 @@
+flask>=3.0
+gunicorn>=22.0
+google-cloud-storage>=2.18
+piper-tts>=1.2.0

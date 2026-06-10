@@ -37,6 +37,7 @@ import {
     projectAssets,
     type ProjectKind,
 } from "@/db/schema-projects";
+import { SUB_TABLES, type SubEntity } from "@/db/schema-projects-normalized";
 import { and, eq, sql } from "drizzle-orm";
 
 export type SyncEntity =
@@ -52,7 +53,8 @@ export type SyncEntity =
     | "mixer_setups"
     | "visualization_presets"
     | "project_snapshots"
-    | "project_assets";
+    | "project_assets"
+    | SubEntity;
 
 export interface SyncChange {
     entity: SyncEntity | string;
@@ -451,6 +453,13 @@ export async function applyChange(
             return applyProjectSnapshotUpsert(userId, change);
         case "project_assets":
             return applyProjectAssetUpsert(userId, change);
+        case "daw_tracks":
+        case "daw_clips":
+        case "editor_regions":
+        case "live_cues":
+        case "mixer_channels":
+        case "viz_layers":
+            return applySubEntityUpsert(change.entity, userId, change);
         default:
             return { changed: false, error: `Unknown entity: ${change.entity}` };
     }
@@ -652,3 +661,80 @@ export async function applyProjectAssetUpsert(
 }
 
 export { PROJECT_SYNC_ENTITY };
+
+/**
+ * Generic per-row LWW for normalized project sub-entities. All 6
+ * sub-tables share the (userId, externalId) sync key, `parentExternalId`
+ * link, and per-field `field_versions`. Their column sets differ but
+ * Drizzle's pgTable lets us drive everything through column names.
+ */
+export async function applySubEntityUpsert(
+    entity: SubEntity,
+    userId: string,
+    change: SyncChange,
+): Promise<ApplyResult> {
+    const table = SUB_TABLES[entity];
+    const externalId = change.entityId;
+    if (!externalId) return { changed: false, error: "Missing externalId" };
+
+    const existing = await db
+        .select({ id: table.id, fv: table.fieldVersions, deletedAt: table.deletedAt })
+        .from(table)
+        .where(and(eq(table.userId, userId), eq(table.externalId, externalId)))
+        .limit(1);
+
+    if (change.op === "delete") {
+        if (existing.length === 0) return { changed: false, skipped: true };
+        await db
+            .update(table)
+            .set({
+                deletedAt: new Date(change.updatedAt),
+                updatedAt: new Date(change.updatedAt),
+            } as never)
+            .where(eq(table.id, existing[0].id));
+        return { changed: true, rowId: existing[0].id };
+    }
+
+    const payload = (change.payload ?? {}) as Record<string, unknown>;
+    const stored = (existing[0]?.fv ?? {}) as Record<string, string>;
+    const accepted: Record<string, unknown> = {};
+    const nextFv: Record<string, string> = { ...stored };
+    for (const [key, value] of Object.entries(payload)) {
+        if (FORBIDDEN_PROJECT_FIELDS.has(key)) continue;
+        const storedTs = stored[key];
+        if (storedTs && storedTs >= change.updatedAt) continue;
+        accepted[key] = value;
+        nextFv[key] = change.updatedAt;
+    }
+
+    if (existing.length === 0) {
+        // parentExternalId is mandatory on insert.
+        if (!payload.parentExternalId) {
+            return { changed: false, error: "Missing parentExternalId on first insert" };
+        }
+        const inserted = await db
+            .insert(table)
+            .values({
+                userId,
+                externalId,
+                parentExternalId: String(payload.parentExternalId),
+                ...accepted,
+                fieldVersions: nextFv,
+                updatedAt: new Date(change.updatedAt),
+            } as never)
+            .returning({ id: table.id });
+        return { changed: true, rowId: inserted[0]?.id };
+    }
+    if (Object.keys(accepted).length === 0) {
+        return { changed: false, skipped: true, rowId: existing[0].id };
+    }
+    await db
+        .update(table)
+        .set({
+            ...accepted,
+            fieldVersions: nextFv,
+            updatedAt: new Date(change.updatedAt),
+        } as never)
+        .where(eq(table.id, existing[0].id));
+    return { changed: true, rowId: existing[0].id };
+}

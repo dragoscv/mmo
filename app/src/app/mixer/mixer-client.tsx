@@ -6,6 +6,8 @@ import { usePersonalization, getMixerBackgroundStyle } from "@/hooks/use-persona
 import { useMixerActions } from "@/components/mixer-context";
 import { RemoteHostBridge } from "@/components/remote/remote-host-bridge";
 import { MixerRemoteBridge } from "@/components/remote/mixer-remote-bridge";
+import { ProjectChrome } from "@/components/projects/project-chrome";
+import { useMixerState } from "@/components/mixer-context";
 import { cn } from "@/lib/utils";
 
 const MixerView = dynamic(
@@ -24,10 +26,19 @@ const MixerCinematicBackground = dynamic(
 export default function MixerClient() {
     const personalization = usePersonalization();
     const actions = useMixerActions();
+    const mixerState = useMixerState();
     const [mounted, setMounted] = useState(false);
     const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+    const [setupId, setSetupId] = useState<string | null>(null);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only mount detection for SSR safety
     useEffect(() => setMounted(true), []);
+    useEffect(() => {
+        try {
+            const KEY = "mmo:mixer:setup-id";
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror MixerAutosave id derivation
+            setSetupId(localStorage.getItem(KEY));
+        } catch { /* ignore */ }
+    }, []);
     // Pull the master analyser once mounted; safe to no-op if engine
     // isn't ready yet (the cinematic scene falls back to drift-only).
     useEffect(() => {
@@ -61,6 +72,17 @@ export default function MixerClient() {
                 >
                     <MixerView />
                 </div>
+
+                {/* Floating project chrome — snapshots + presence */}
+                {mounted && setupId && (
+                    <div className="absolute top-2 right-2 z-30">
+                        <ProjectChrome
+                            kind="mixer"
+                            externalId={setupId}
+                            getCurrentDocument={() => mixerState as unknown as Record<string, unknown>}
+                        />
+                    </div>
+                )}
             </div>
         </RemoteHostBridge>
     );

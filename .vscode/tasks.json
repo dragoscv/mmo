@@ -2,6 +2,111 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Dev: Prod-like (Web + Tunnel + Companion)",
+      "detail": "Local Next.js dev + cloudflared quick tunnel + local companion talking through the tunnel — same loop as production, but on local code.",
+      "dependsOn": [
+        "Dev: Web (local 13789)",
+        "Dev: Tunnel (cloudflared quick)",
+        "Dev: Companion (against tunnel)"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev: Prod-like + Native (Web + Tunnel + Companion + Tauri + Mobile)",
+      "detail": "Everything from the Prod-like loop, plus the Tauri desktop shell and the Capacitor Android shell (opens Android Studio so you can pick an emulator / device).",
+      "dependsOn": [
+        "Dev: Web (local 13789)",
+        "Dev: Tunnel (cloudflared quick)",
+        "Dev: Companion (against tunnel)",
+        "Dev: Native Tauri (desktop)",
+        "Dev: Native Mobile (Android)"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev: Native Tauri (desktop)",
+      "detail": "Waits for the cloudflared quick tunnel URL, exports it as MMO_WEB_APP_URL, then runs `pnpm tauri:dev`. The Tauri WebView loads the local Next.js dev server via the tunnel — same path the production app takes.",
+      "type": "shell",
+      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-native-tauri.ps1",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev-prod-like",
+        "clear": true
+      }
+    },
+    {
+      "label": "Dev: Native Mobile (Android)",
+      "detail": "Bootstraps the Capacitor Android platform on first run, points the WebView at the cloudflared tunnel (CAP_SERVER_URL), syncs the web assets, and runs the app on the first available emulator/device.",
+      "type": "shell",
+      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-native-mobile.ps1 -UseTunnel",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev-prod-like",
+        "clear": true
+      }
+    },
+    {
+      "label": "Dev: Web (local 13789)",
+      "type": "shell",
+      "command": "pnpm dev",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/app"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev-prod-like",
+        "clear": true
+      }
+    },
+    {
+      "label": "Dev: Tunnel (cloudflared quick)",
+      "type": "shell",
+      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-tunnel.ps1",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev-prod-like",
+        "clear": true
+      }
+    },
+    {
+      "label": "Dev: Companion (against tunnel)",
+      "type": "shell",
+      "command": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-companion.ps1",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev-prod-like",
+        "clear": true
+      }
+    },
+    {
       "label": "Dev Server",
       "type": "shell",
       "command": "pnpm dev",
