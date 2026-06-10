@@ -2,6 +2,33 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "MIXAI: Dev Prod-like (Companion + Tauri)",
+      "detail": "Starts the Companion server (music library + /mixai-profile cloud sync on :17899) and the MIXAI Tauri desktop shell together. The Tauri shell loads the native Rust audio core and proxies the companion + muzicai.ro cloud — the same path the shipped app takes.",
+      "dependsOn": [
+        "Companion: Dev",
+        "MIXAI: Dev (Tauri desktop)"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "MIXAI: Dev (Tauri desktop)",
+      "detail": "Runs `pnpm tauri:dev` for apps/mixai: builds the Rust audio core, starts Vite on :14420, and opens the native MIXAI window with the companion proxy + cloud profile sync wired up.",
+      "type": "shell",
+      "command": "pnpm tauri:dev",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/apps/mixai"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "mixai-prod-like",
+        "clear": true
+      }
+    },
+    {
       "label": "Dev: Prod-like (Web + Tunnel + Companion)",
       "detail": "Local Next.js dev + cloudflared quick tunnel + local companion talking through the tunnel — same loop as production, but on local code.",
       "dependsOn": [
