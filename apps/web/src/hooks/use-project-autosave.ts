@@ -82,13 +82,16 @@ export function useProjectAutosave(opts: UseProjectAutosaveOptions): AutosaveSta
             const q = await listQueue();
             for (const entry of q) {
                 try {
-                    await saveProject({
+                    const res = await saveProject({
                         kind: entry.kind,
                         externalId: entry.externalId,
                         name: entry.name,
                         document: entry.document,
                         extras: entry.extras,
                     });
+                    // Still signed out — keep the entry and stop draining; a
+                    // later online/auth tick retries.
+                    if (res?.deferred) break;
                     await removeFromQueue(entry.id);
                 } catch {
                     await bumpAttempt(entry.id);
@@ -116,8 +119,16 @@ export function useProjectAutosave(opts: UseProjectAutosaveOptions): AutosaveSta
             await cacheProject(kind, externalId, name, document);
             // Try direct save first (online happy path)
             try {
-                await saveProject({ kind, externalId, name, document, extras });
+                const res = await saveProject({ kind, externalId, name, document, extras });
                 if (!isMountedRef.current) return;
+                // No session yet (e.g. signed out / expired): keep the change
+                // queued locally and retry later instead of dropping it.
+                if (res?.deferred) {
+                    await enqueueSave({ kind, externalId, name, document, extras });
+                    setStatus("queued");
+                    await refreshQueueCount();
+                    return;
+                }
                 setStatus("saved");
                 setSavedAt(Date.now());
                 await drainQueue();

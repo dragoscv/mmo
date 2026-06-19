@@ -79,7 +79,10 @@ export async function listSessions(): Promise<SessionDto[]> {
  * auto-restore after a page refresh). null when the user has never chatted.
  */
 export async function getLastSession(): Promise<SessionDto | null> {
-    const userId = await uid();
+    // Read path: no session → no last session (don't 500 on signed-out callers).
+    const s = await auth();
+    const userId = s?.user?.id;
+    if (!userId) return null;
     const [row] = await db
         .select({
             id: aiAgentSessions.id,

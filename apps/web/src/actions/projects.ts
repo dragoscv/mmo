@@ -121,8 +121,23 @@ export interface SaveProjectInput {
     extras?: Record<string, unknown>;
 }
 
-export async function saveProject(input: SaveProjectInput): Promise<{ externalId: string; updatedAt: string }> {
-    const userId = await requireUserId();
+export interface SaveProjectResult {
+    externalId: string;
+    updatedAt: string | null;
+    /** True when the write was skipped because there's no signed-in session.
+     *  Callers (autosave) should keep the change in their local queue and
+     *  retry after re-authentication rather than treat it as a hard error. */
+    deferred?: boolean;
+}
+
+export async function saveProject(input: SaveProjectInput): Promise<SaveProjectResult> {
+    // Soft auth: autosave fires from globally-mounted providers (e.g. the
+    // mixer) on pages where the user may be signed out or the session has
+    // expired. Returning a "deferred" result instead of throwing avoids
+    // noisy 500s; the client autosave queue retries the write later.
+    const session = await auth();
+    const userId = session?.user?.id;
+    if (!userId) return { externalId: input.externalId, updatedAt: null, deferred: true };
     const table = PROJECT_TABLES[input.kind];
     const ts = nowIso();
 
