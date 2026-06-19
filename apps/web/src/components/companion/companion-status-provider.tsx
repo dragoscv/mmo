@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { discoverCompanion, probeCompanion } from "@/lib/native-companion";
+import { useSession } from "next-auth/react";
 
 export type CompanionStatus = "unknown" | "discovering" | "online" | "offline";
 
@@ -36,6 +37,11 @@ const REPROBE_ONLINE_MS = 90_000;
  * used to fire 4–5 redundant probes on every page load.
  */
 export function CompanionStatusProvider({ children }: { children: React.ReactNode }) {
+    // Companion discovery hits cloud endpoints (/api/devices/peers) that
+    // require auth. Gate all discovery on an authenticated session so a
+    // signed-out tab doesn't poll them every 30 s and spam 401s.
+    const { status: authStatus } = useSession();
+    const isAuthed = authStatus === "authenticated";
     const [value, setValue] = useState<CompanionStatusValue>(() => ({
         status: "unknown",
         apiUrl: null,
@@ -95,9 +101,10 @@ export function CompanionStatusProvider({ children }: { children: React.ReactNod
     }, [doDiscover]);
 
     useEffect(() => {
+        if (!isAuthed) return;
         void doDiscover();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [isAuthed]);
 
     // Expose status on window for debugging — surfaces in dev tools as
     // `__mmoCompanion` without pulling in React DevTools.
@@ -107,15 +114,17 @@ export function CompanionStatusProvider({ children }: { children: React.ReactNod
     }, [value]);
 
     useEffect(() => {
+        if (!isAuthed) return;
         const interval = value.status === "online" ? REPROBE_ONLINE_MS : REPROBE_OFFLINE_MS;
         const t = setInterval(() => { void doDiscover(); }, interval);
         return () => clearInterval(t);
-    }, [value.status, doDiscover]);
+    }, [isAuthed, value.status, doDiscover]);
 
     // When the tab regains focus, re-probe immediately so the user
     // doesn't wait for the next interval after un-pausing their laptop.
     useEffect(() => {
         const onVisibility = () => {
+            if (!isAuthed) return;
             if (document.visibilityState === "visible") void doDiscover();
         };
         document.addEventListener("visibilitychange", onVisibility);
@@ -124,7 +133,7 @@ export function CompanionStatusProvider({ children }: { children: React.ReactNod
             document.removeEventListener("visibilitychange", onVisibility);
             window.removeEventListener("focus", onVisibility);
         };
-    }, [doDiscover]);
+    }, [isAuthed, doDiscover]);
 
     return <CTX.Provider value={value}>{children}</CTX.Provider>;
 }
