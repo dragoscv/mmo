@@ -18,6 +18,7 @@ import {
     type CompanionTrack, type AnalyzeOptions, type AnalyzerHealth, type AnalyzerStatus,
     type AnalyzerLogEntry, type GpuInfo,
 } from "@/lib/companion-library";
+import { getAnalysisScopeFromCloud, getTracksFromCloud, applyTrackFieldsToCloud } from "@/lib/cloud-library";
 
 export interface AnalysisChange {
     trackId: number;
@@ -70,22 +71,14 @@ const EMPTY_SCOPE: AnalysisScope = {
 };
 
 export async function getAnalysisScope(): Promise<AnalysisScope> {
-    const link = await getCompanionLink();
-    if (!link) return EMPTY_SCOPE;
-
+    // Cloud Postgres is the source of truth for the library, so derive the
+    // scope (incl. lyrics/year/label/recentlyAnalyzed which /stats never
+    // exposed) directly from it — works even when no companion is reachable.
     try {
-        const stats = await companionLibrary.getStats(link);
-        return {
-            total: stats.total,
-            missingArtwork: stats.health.missingArtwork,
-            missingLyrics: 0, // not exposed by /stats yet
-            missingGenre: stats.health.missingGenre,
-            missingBpm: stats.health.missingBpm,
-            missingYear: 0, // not exposed by /stats yet
-            missingLabel: 0, // not exposed by /stats yet
-            recentlyAnalyzed: 0, // not exposed by /stats yet
-        };
-    } catch { return EMPTY_SCOPE; }
+        return await getAnalysisScopeFromCloud();
+    } catch {
+        return EMPTY_SCOPE;
+    }
 }
 
 // Caps to keep this server action surface from amplifying load against
@@ -95,6 +88,30 @@ export async function getAnalysisScope(): Promise<AnalysisScope> {
 const MAX_BATCH_SIZE = 100;
 const MAX_CHANGES_PER_APPLY = 5000;
 const MAX_DSP_TRACKS = 5000;
+
+/**
+ * True when the track is still missing at least one field the selected
+ * options would populate. Lets the batch loop skip the expensive external
+ * lookup (≈1.1s each) for already-complete rows in quick mode.
+ */
+function trackNeedsAnalysis(
+    track: CompanionTrack,
+    options: { metadata: boolean; artwork: boolean; lyrics: boolean; bpmKey: boolean },
+): boolean {
+    const blank = (v: unknown) =>
+        v == null || v === "" || v === 0 || v === "0" || v === "null";
+    if (options.artwork && blank(track.artworkUrl)) return true;
+    if (options.bpmKey && blank(track.bpm)) return true;
+    if (options.lyrics && blank(track.lyrics) && blank(track.syncedLyrics)) return true;
+    if (options.metadata) {
+        if (blank(track.genre)) return true;
+        if (blank(track.album)) return true;
+        if (blank(track.year)) return true;
+        if (blank(track.label)) return true;
+        if (blank(track.isrc)) return true;
+    }
+    return false;
+}
 
 export async function analyzeTrackBatch(
     offset: number,
@@ -107,23 +124,20 @@ export async function analyzeTrackBatch(
         bpmKey: boolean;
     },
 ): Promise<AnalysisBatchResult> {
-    const link = await getCompanionLink();
-    if (!link) {
-        return { changes: [], processed: 0, total: 0, currentTrack: "", errors: ["Companion not connected"] };
-    }
-
     const safeOffset = Number.isInteger(offset) && offset >= 0 ? offset : 0;
     const safeBatchSize = Number.isInteger(batchSize) && batchSize > 0
         ? Math.min(batchSize, MAX_BATCH_SIZE) : 25;
 
-    // Page math: companion uses 1-based pages.
+    // Page math: 1-based pages.
     const page = Math.floor(safeOffset / safeBatchSize) + 1;
 
+    // Read tracks from cloud Postgres (source of truth). Works even when no
+    // companion is reachable from the server, and reflects the full synced
+    // library. Oldest-analyzed first so re-runs hit the staler rows.
     let pageData;
     try {
-        pageData = await companionLibrary.getTracks(link, {
+        pageData = await getTracksFromCloud({
             page, pageSize: safeBatchSize,
-            // Oldest-analyzed first so re-runs hit the staler rows.
             sort: "analyzedAt", order: "asc",
         });
     } catch {
@@ -137,16 +151,33 @@ export async function analyzeTrackBatch(
     const errors: string[] = [];
     let currentTrack = "";
 
-    for (const track of batchTracks) {
+    // Per-track processor. Returns the changes it found (or an error). The
+    // MusicBrainz client enforces a global 1.1s throttle internally, so
+    // running these concurrently is safe — it overlaps the independent
+    // iTunes / Deezer / LRCLIB / CoverArtArchive waits and lets skipped
+    // tracks fly through, which is the main speed win.
+    const processTrack = async (track: CompanionTrack): Promise<{ changes: AnalysisChange[]; error?: string }> => {
         const artist = track.artist || "Unknown";
         const title = track.title || track.filename;
-        currentTrack = `${artist} — ${title}`;
+        const label = `${artist} — ${title}`;
+        currentTrack = label;
 
-        if (!track.artist || !track.title) continue;
+        if (!track.artist || !track.title) return { changes: [] };
 
+        // Fast path: skip tracks that already have everything the selected
+        // options would fill (no external call → no throttle wait).
+        if (mode === "quick" && !trackNeedsAnalysis(track, options)) {
+            return { changes: [] };
+        }
+
+        const local: AnalysisChange[] = [];
         try {
             const metadata = await fetchAllMetadata(
-                track.artist, track.title, track.album, track.duration, options,
+                track.artist, track.title, track.album, track.duration,
+                // In quick mode, let the fast parallel providers (iTunes/Deezer)
+                // satisfy the common fields and skip MusicBrainz's 1.1s throttle
+                // when they do. Full mode always consults MusicBrainz.
+                { ...options, fastSkipMusicBrainz: mode === "quick" },
             );
 
             const compareField = (
@@ -161,7 +192,7 @@ export async function analyzeTrackBatch(
                 const isEmpty =
                     oldStr == null || oldStr === "" || oldStr === "0" || oldStr === "null";
                 if (isEmpty || (oldStr !== newStr && mode === "full")) {
-                    changes.push({
+                    local.push({
                         trackId: track.id,
                         trackArtist: artist, trackTitle: title,
                         field, fieldLabel: FIELD_LABELS[field] || field,
@@ -181,7 +212,7 @@ export async function analyzeTrackBatch(
             if (metadata.artworkUrl && metadata.sources.artworkUrl) compareField("artworkUrl", metadata.artworkUrl, metadata.sources.artworkUrl);
 
             if (metadata.lyrics && metadata.sources.lyrics) {
-                changes.push({
+                local.push({
                     trackId: track.id, trackArtist: artist, trackTitle: title,
                     field: "lyrics", fieldLabel: "Lyrics",
                     oldValue: track.lyrics ? `${track.lyrics.split("\n").length} lines` : null,
@@ -190,7 +221,7 @@ export async function analyzeTrackBatch(
                 });
             }
             if (metadata.syncedLyrics && metadata.sources.syncedLyrics) {
-                changes.push({
+                local.push({
                     trackId: track.id, trackArtist: artist, trackTitle: title,
                     field: "syncedLyrics", fieldLabel: "Synced Lyrics",
                     oldValue: track.syncedLyrics ? `${track.syncedLyrics.split("\n").length} lines` : null,
@@ -200,8 +231,20 @@ export async function analyzeTrackBatch(
             }
             if (metadata.musicbrainzId && metadata.sources.musicbrainzId) compareField("musicbrainzId", metadata.musicbrainzId, metadata.sources.musicbrainzId);
             if (metadata.releaseMbid && metadata.sources.releaseMbid) compareField("releaseMbid", metadata.releaseMbid, metadata.sources.releaseMbid);
+            return { changes: local };
         } catch (err) {
-            errors.push(`${currentTrack}: ${err instanceof Error ? err.message : "Unknown error"}`);
+            return { changes: [], error: `${label}: ${err instanceof Error ? err.message : "Unknown error"}` };
+        }
+    };
+
+    // Bounded concurrency: process up to CONCURRENCY tracks at once.
+    const CONCURRENCY = 8;
+    for (let i = 0; i < batchTracks.length; i += CONCURRENCY) {
+        const slice = batchTracks.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(slice.map(processTrack));
+        for (const r of results) {
+            changes.push(...r.changes);
+            if (r.error) errors.push(r.error);
         }
     }
 
@@ -223,9 +266,6 @@ interface ChangeToApply {
 export async function applyAnalysisChanges(
     changesToApply: ChangeToApply[],
 ): Promise<{ applied: number; errors: number }> {
-    const link = await getCompanionLink();
-    if (!link) return { applied: 0, errors: changesToApply?.length ?? 0 };
-
     if (!Array.isArray(changesToApply)) return { applied: 0, errors: 0 };
     // Cap so a runaway client can't loop us through 100k companion PATCHes.
     // Real "apply all" UI flows are O(few hundred); 5000 is a generous bound.
@@ -244,21 +284,15 @@ export async function applyAnalysisChanges(
         grouped.set(change.trackId, existing);
     }
 
+    // Write directly to cloud Postgres (source of truth). The `trackId` is the
+    // UI id (companionTrackId when set, else the cloud serial id), so match on
+    // either. The companion picks these up on its next sync pull. This works
+    // regardless of whether a companion is reachable server-side.
     for (const [trackId, trackChanges] of grouped) {
         try {
-            const updateObj: Partial<CompanionTrack> = {};
-            for (const change of trackChanges) {
-                if (change.field === "bpm") {
-                    (updateObj as Record<string, unknown>).bpm = parseFloat(change.newValue);
-                } else if (change.field === "year") {
-                    (updateObj as Record<string, unknown>).year = parseInt(change.newValue, 10);
-                } else {
-                    (updateObj as Record<string, unknown>)[change.field] = change.newValue;
-                }
-            }
-            (updateObj as Record<string, unknown>).analyzedAt = new Date().toISOString();
-            await companionLibrary.updateTrack(link, trackId, updateObj);
-            applied += trackChanges.length;
+            const ok = await applyTrackFieldsToCloud(trackId, trackChanges);
+            if (ok) applied += trackChanges.length;
+            else errorCount += trackChanges.length;
         } catch {
             errorCount += trackChanges.length;
         }

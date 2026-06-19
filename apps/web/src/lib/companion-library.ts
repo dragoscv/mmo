@@ -209,6 +209,10 @@ export interface CompanionTrack {
     dspAnalyzedAt?: string | null;
     /** SHA-256 of the source file's content; primary dedupe key. */
     sha256?: string | null;
+    /** Cloud availability: "connected" when a source device is online,
+     *  "disconnected" otherwise. Set by cloud-library reads; the client
+     *  overlays "offline" when the track is pinned in IndexedDB. */
+    availabilityState?: "connected" | "disconnected" | null;
 }
 
 export interface PaginatedTracks {
@@ -740,7 +744,7 @@ export async function* copyTracksToUsb(
     let buffer = "";
 
     try {
-        for (;;) {
+        for (; ;) {
             const { value, done } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });

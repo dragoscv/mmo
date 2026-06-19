@@ -38,7 +38,7 @@ export function Deck({ deckId }: { deckId: DeckId }) {
     };
 
     return (
-        <div className="panel" style={{ padding: 14, display: "grid", gap: 10, alignContent: "start" }}>
+        <div className="panel" style={{ padding: 12, display: "grid", gap: 8, alignContent: "start" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span
@@ -57,7 +57,7 @@ export function Deck({ deckId }: { deckId: DeckId }) {
                 </span>
             </div>
 
-            <div style={{ minHeight: 36 }}>
+            <div style={{ minHeight: 30 }}>
                 <div style={{ fontWeight: 600 }}>{deck.title ?? "No track loaded"}</div>
                 <div style={{ fontSize: 12, color: "var(--fg-dim)" }}>{deck.artist ?? "—"}</div>
             </div>

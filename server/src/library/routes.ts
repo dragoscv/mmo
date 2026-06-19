@@ -49,7 +49,11 @@ function pushTrackChange(
             entity: "tracks",
             entityId,
             op,
-            payload: { sha256: sha || undefined, ...row, ...extraPayload },
+            // `companionTrackId` lets the cloud round-trip the companion's
+            // local row id, so the web app's write actions (rating, tags…)
+            // can target the right companion track even when reads now come
+            // from cloud Postgres.
+            payload: { sha256: sha || undefined, ...row, companionTrackId: row.id, ...extraPayload },
             updatedAt: new Date().toISOString(),
         });
     } catch {

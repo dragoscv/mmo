@@ -31,13 +31,24 @@ import {
 export type { TrackFilters, PaginatedTracks, DashboardStats } from "@/lib/companion-library";
 export type Track = CompanionTrack;
 
+import {
+    getTracksFromCloud,
+    getTrackByIdFromCloud,
+    getGenresFromCloud,
+    getKeysFromCloud,
+    getAllTagsFromCloud,
+    getStatsFromCloud,
+} from "@/lib/cloud-library";
+
 // ─── Reads ──────────────────────────────────────────────────────────────────
 
+// Reads are CLOUD-FIRST: cloud Postgres is the source of truth for library
+// metadata, so the library shows up on any device even when no companion is
+// reachable. Writes still go through the companion (see below).
+
 export async function getTracks(filters?: TrackFilters): Promise<PaginatedTracks> {
-    const link = await getCompanionLink();
-    if (!link) return EMPTY_PAGINATED_TRACKS;
     try {
-        return await companionLibrary.getTracks(link, filters);
+        return await getTracksFromCloud(filters);
     } catch (err) {
         log.warn("tracks.getTracks failed", undefined, err);
         return EMPTY_PAGINATED_TRACKS;
@@ -45,10 +56,8 @@ export async function getTracks(filters?: TrackFilters): Promise<PaginatedTracks
 }
 
 export async function getTrackById(id: number): Promise<CompanionTrack | null> {
-    const link = await getCompanionLink();
-    if (!link) return null;
     try {
-        return await companionLibrary.getTrackById(link, id);
+        return await getTrackByIdFromCloud(id);
     } catch (err) {
         log.warn("tracks.getTrackById failed", undefined, err);
         return null;
@@ -56,30 +65,22 @@ export async function getTrackById(id: number): Promise<CompanionTrack | null> {
 }
 
 export async function getGenres(): Promise<string[]> {
-    const link = await getCompanionLink();
-    if (!link) return [];
-    try { return await companionLibrary.getGenres(link); }
+    try { return await getGenresFromCloud(); }
     catch { return []; }
 }
 
 export async function getKeys(): Promise<string[]> {
-    const link = await getCompanionLink();
-    if (!link) return [];
-    try { return await companionLibrary.getKeys(link); }
+    try { return await getKeysFromCloud(); }
     catch { return []; }
 }
 
 export async function getAllTags(): Promise<string[]> {
-    const link = await getCompanionLink();
-    if (!link) return [];
-    try { return await companionLibrary.getTags(link); }
+    try { return await getAllTagsFromCloud(); }
     catch { return []; }
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-    const link = await getCompanionLink();
-    if (!link) return EMPTY_STATS;
-    try { return await companionLibrary.getStats(link); }
+    try { return await getStatsFromCloud(); }
     catch (err) {
         log.warn("tracks.getDashboardStats failed", undefined, err);
         return EMPTY_STATS;
@@ -108,10 +109,8 @@ export async function getTrackStats(): Promise<{
 export async function getHiddenTracks(
     filters?: Pick<TrackFilters, "page" | "pageSize" | "search" | "sort" | "order">,
 ): Promise<PaginatedTracks> {
-    const link = await getCompanionLink();
-    if (!link) return EMPTY_PAGINATED_TRACKS;
     try {
-        return await companionLibrary.getTracks(link, { ...filters, isHidden: true });
+        return await getTracksFromCloud({ ...filters, isHidden: true });
     } catch {
         return EMPTY_PAGINATED_TRACKS;
     }

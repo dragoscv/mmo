@@ -18,6 +18,7 @@ import { useShortcuts } from "./lib/use-shortcuts";
 import { PluginDock, PluginToasts, PluginHotkeys, PluginAutomation } from "./plugins/host";
 import { useHidStore } from "./state/hid-store";
 import { pushHidFeedback } from "./lib/hid-feedback";
+import { startCloudAutoSync } from "./lib/cloud-sync";
 
 export function App() {
     const hydrate = useMixerStore((s) => s.hydrate);
@@ -56,6 +57,11 @@ export function App() {
         return () => unlisten?.();
     }, []);
 
+    // Automatic account sync: pull the cloud profile on launch (when signed
+    // in) and debounce-push any local change so the setup follows the user to
+    // every device.
+    useEffect(() => startCloudAutoSync(), []);
+
     const leftDecks = deckCount === 4 ? (["c", "a"] as const) : (["a"] as const);
     const rightDecks = deckCount === 4 ? (["b", "d"] as const) : (["b"] as const);
 
@@ -64,9 +70,13 @@ export function App() {
             style={{
                 height: "100%",
                 display: "grid",
-                gridTemplateRows: "auto 1fr auto",
+                // Top bar (auto) + main deck/mixer area + bottom library/utility
+                // band. Both flexible rows get `minmax(0, …)` so they can shrink
+                // and scroll *internally* instead of overflowing the window.
+                gridTemplateRows: "auto minmax(0, 2.1fr) minmax(0, 1fr)",
                 gap: 12,
                 padding: 12,
+                overflow: "hidden",
             }}
         >
             <TopBar />
@@ -79,31 +89,63 @@ export function App() {
                     minHeight: 0,
                 }}
             >
-                <div style={{ display: "grid", gap: 12, gridAutoRows: "1fr" }}>
+                <div
+                    style={{
+                        display: "grid",
+                        gap: 12,
+                        gridAutoRows: "max-content",
+                        minHeight: 0,
+                        overflowY: "auto",
+                    }}
+                >
                     {leftDecks.map((id) => (
                         <Deck key={id} deckId={id} />
                     ))}
                 </div>
 
-                <MixerStrip decks={deckCount === 4 ? ["c", "a", "b", "d"] : ["a", "b"]} />
+                {/* Mixer + crossfader live together in the center column — the
+                    crossfader belongs directly under the channel faders. */}
+                <div style={{ display: "grid", gridTemplateRows: "1fr auto", gap: 12, minHeight: 0 }}>
+                    <MixerStrip decks={deckCount === 4 ? ["c", "a", "b", "d"] : ["a", "b"]} />
+                    <Crossfader />
+                </div>
 
-                <div style={{ display: "grid", gap: 12, gridAutoRows: "1fr" }}>
+                <div
+                    style={{
+                        display: "grid",
+                        gap: 12,
+                        gridAutoRows: "max-content",
+                        minHeight: 0,
+                        overflowY: "auto",
+                    }}
+                >
                     {rightDecks.map((id) => (
                         <Deck key={id} deckId={id} />
                     ))}
                 </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 12 }}>
+            {/* Bottom band: a single horizontal row so it stays short. Library
+                flexes; the utility panels are fixed-width and scroll internally.
+                Everything has `minHeight: 0` so it clips to the band height. */}
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) 260px 300px auto",
+                    gap: 12,
+                    minHeight: 0,
+                }}
+            >
                 <Library />
-                <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
-                    <div className="panel" style={{ padding: 12 }}>
-                        <AutoMixPanel />
-                    </div>
-                    <Crossfader />
-                    <div className="panel" style={{ padding: 12 }}>
-                        <SamplerPanel accent="var(--accent-deck-a)" />
-                    </div>
+                <div className="panel" style={{ padding: 12, minHeight: 0, overflowY: "auto" }}>
+                    <AutoMixPanel />
+                </div>
+                <div className="panel" style={{ padding: 12, minHeight: 0, overflowY: "auto" }}>
+                    <SamplerPanel accent="var(--accent-deck-a)" />
+                </div>
+                {/* Plugin dock: `auto` column collapses to 0 when no plugin
+                    panels are active, so it doesn't reserve dead space. */}
+                <div style={{ minHeight: 0, overflowY: "auto", display: "grid", gridAutoFlow: "column", gap: 12 }}>
                     <PluginDock accent="var(--accent)" />
                 </div>
             </div>

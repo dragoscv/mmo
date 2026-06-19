@@ -128,7 +128,7 @@ export async function POST(req: Request) {
             continue;
         }
         try {
-            const res = await applyChange(dev.userId, change);
+            const res = await applyChange(dev.userId, change, dev.id);
             if (res.error) {
                 errors.push({ entity: change.entity, entityId: change.entityId, error: res.error });
                 continue;

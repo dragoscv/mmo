@@ -115,7 +115,7 @@ export function Waveform({ deck, accent }: WaveformProps) {
             ref={canvasRef}
             style={{
                 width: "100%",
-                height: 72,
+                height: 60,
                 display: "block",
                 borderRadius: 10,
                 background: "var(--bg-elev)",

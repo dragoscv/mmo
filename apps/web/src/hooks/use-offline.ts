@@ -183,9 +183,11 @@ export function useOfflineMode() {
 
     // Download a single track for offline use
     const downloadTrack = useCallback(
-        async (trackId: number, filename: string, deviceId?: string) => {
+        async (trackId: number, filename: string, deviceId?: string, opts?: { force?: boolean }) => {
             const db = dbRef.current;
-            if (!db || !settings.enabled) return false;
+            // `force` lets an explicit user "pin" work even when the
+            // auto-download toggle is off.
+            if (!db || (!settings.enabled && !opts?.force)) return false;
 
             // Check storage limit
             const maxBytes = settings.maxStorageMB * 1024 * 1024;
@@ -198,12 +200,9 @@ export function useOfflineMode() {
             }
 
             try {
-                // Download via device proxy or local audio API
-                const url = deviceId
-                    ? `/api/audio/device/${trackId}`
-                    : `/api/audio/${trackId}`;
-
-                const resp = await fetch(url);
+                // A single playback URL streams from the owning device when
+                // local FS isn't configured, so /api/audio/[id] works for pins.
+                const resp = await fetch(`/api/audio/${trackId}`);
                 if (!resp.ok) return false;
 
                 const blob = await resp.blob();
@@ -221,6 +220,13 @@ export function useOfflineMode() {
             }
         },
         [settings, totalSize, cachedTracks]
+    );
+
+    // Explicit user "pin" — always downloads (ignores the auto toggle).
+    const pinTrack = useCallback(
+        (trackId: number, filename: string, deviceId?: string) =>
+            downloadTrack(trackId, filename, deviceId, { force: true }),
+        [downloadTrack],
     );
 
     // Batch download multiple tracks
@@ -279,6 +285,7 @@ export function useOfflineMode() {
         isTrackOffline,
         getOfflineUrl,
         downloadTrack,
+        pinTrack,
         downloadBatch,
         cancelDownload,
         removeTrack,

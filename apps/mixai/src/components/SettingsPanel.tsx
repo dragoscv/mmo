@@ -17,11 +17,9 @@ import {
     removeMapping,
 } from "@/lib/midi-preset";
 import { DEVICE_PRESETS } from "@/lib/device-presets";
-import { exportProfile, importProfile } from "@/lib/profile";
-import { PluginManager } from "@/plugins/host";
-import { usePluginStore } from "@/plugins/plugin-store";
+import { buildProfileJson, applyProfileJson } from "@/lib/cloud-sync";
 import { useHidStore } from "@/state/hid-store";
-import { useKeybindStore } from "@/state/keybind-store";
+import { PluginManager } from "@/plugins/host";
 import {
     ALL_HID_ACTIONS,
     hidActionLabel,
@@ -491,51 +489,15 @@ function ProfileSection() {
     const [importText, setImportText] = useState("");
     const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
     const [cloud, setCloud] = useState<"idle" | "saving" | "loading" | "saved" | "loaded" | "empty" | "error">("idle");
-    const restoreProfile = useUiStore((s) => s.restoreProfile);
-    const updateCompanion = useCompanionStore((s) => s.update);
     const cloudReady = useCompanionStore((s) => Boolean(s.deviceToken && s.userId));
 
-    const buildJson = async (): Promise<string> => {
-        const ui = useUiStore.getState();
-        const comp = useCompanionStore.getState();
-        const midiPreset = await engine.midiGetPreset();
-        return exportProfile({
-            theme: ui.theme,
-            deckCount: ui.deckCount,
-            customThemes: ui.customThemes,
-            companion: {
-                baseUrl: comp.baseUrl,
-                deviceToken: comp.deviceToken,
-                userId: comp.userId,
-            },
-            midiPreset: midiPreset ?? null,
-            hidPreset: useHidStore.getState().preset,
-            externalPlugins: usePluginStore.getState().externalSpecs,
-            keybinds: useKeybindStore.getState().overrides,
-        });
-    };
-
-    /** Apply a parsed profile patch to the live app. Shared by paste-restore
-     *  and cloud-load. */
-    const applyProfile = async (raw: string): Promise<boolean> => {
-        const parsed = importProfile(raw.trim());
-        if (!parsed) return false;
-        restoreProfile({
-            theme: parsed.theme as never,
-            deckCount: parsed.deckCount,
-            customThemes: parsed.customThemes,
-        });
-        if (parsed.companion) updateCompanion(parsed.companion);
-        if (parsed.midiPreset) await engine.midiSetPreset(parsed.midiPreset);
-        if (parsed.hidPreset) useHidStore.getState().setPreset(parsed.hidPreset);
-        if (parsed.externalPlugins) {
-            for (const spec of parsed.externalPlugins) {
-                usePluginStore.getState().installExternal(JSON.stringify(spec));
-            }
-        }
-        if (parsed.keybinds) useKeybindStore.getState().setOverrides(parsed.keybinds);
-        return true;
-    };
+    // Manual save/load + paste-restore all share the cloud-sync helpers so the
+    // serialize/apply logic lives in exactly one place. The paste-restore path
+    // (and "Load from cloud") DO restore the companion connection, unlike the
+    // background auto-sync.
+    const buildJson = buildProfileJson;
+    const applyProfile = (raw: string): Promise<boolean> =>
+        applyProfileJson(raw, { includeCompanion: true });
 
     const doExport = async () => {
         const json = await buildJson();

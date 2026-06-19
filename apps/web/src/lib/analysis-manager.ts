@@ -28,7 +28,7 @@
  */
 
 import { analyzeTrackBatch, applyAnalysisChanges, type AnalysisChange as RawChange } from "@/actions/analyze";
-import { getCompanionLink, companionLibrary } from "@/lib/companion-library";
+import { getTracksFromCloud } from "@/lib/cloud-library";
 
 export type JobStatus = "idle" | "running" | "paused" | "completed" | "stopped";
 
@@ -73,7 +73,11 @@ interface StartOptions {
 
 type Subscriber = (event: JobStatusSnapshot) => void;
 
-const BATCH_SIZE = 5; // small enough that the UI sees progress within ~5s even on cold MusicBrainz cache.
+// Tracks that already have everything are skipped cheaply inside
+// analyzeTrackBatch (no external call), so a bigger page means far fewer
+// companion round-trips when most of the library is already complete,
+// while real lookups still stream progress every batch.
+const BATCH_SIZE = 25;
 
 class AnalysisManager {
     private snapshot: JobStatusSnapshot = {
@@ -247,20 +251,16 @@ class AnalysisManager {
         mode: "quick" | "full",
         options: StartOptions,
     ): Promise<void> {
-        // Pre-flight: get the total track count immediately so the
-        // modal shows "0 of 8607" instead of "0 of 0" while the first
-        // batch (25-30s of MusicBrainz calls) is still in flight.
+        // Pre-flight: get the total track count immediately from cloud
+        // Postgres (source of truth) so the modal shows "0 of 8607" instead
+        // of "0 of 0" while the first batch (MusicBrainz calls) is in flight.
         try {
-            const link = await getCompanionLink();
-            if (link) {
-                const head = await companionLibrary.getTracks(link, { page: 1, pageSize: 1 });
-                this.snapshot = { ...this.snapshot, total: head.total };
-                this.emit();
-            }
+            const head = await getTracksFromCloud({ page: 1, pageSize: 1 });
+            this.snapshot = { ...this.snapshot, total: head.total };
+            this.emit();
         } catch {
             // Pre-flight failure is non-fatal — the first batch will
-            // populate `total` anyway. Just means the UI sits at
-            // "0 of 0" for ~30s longer.
+            // populate `total` anyway.
         }
 
         let offset = 0;

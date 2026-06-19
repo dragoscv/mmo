@@ -12,6 +12,48 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed — MIXAI viewport-locked layout + dark-green Neon Glass (`apps/mixai` `0.1.40`)
+
+- **No more overlapping panels or stray scrollbars.** The two-deck cockpit now
+  fits the window cleanly at every supported size and resizes responsively:
+  - Root grid switched to `minmax(0, …)` rows so the deck row and bottom band
+    each get a guaranteed share instead of the fixed-height decks overflowing
+    down over the panels below.
+  - Internal regions (mixer, decks, AutoMix/Sampler panels) scroll within
+    themselves only when genuinely needed (4-deck mode); the default two-deck
+    view fits with **zero scroll**.
+  - Crossfader moved directly under the mixer; the bottom band is now a single
+    horizontal row (Library · AutoMix · Sampler · plugins).
+  - Decks tightened (slimmer waveform + spacing) and a guaranteed-fit floor
+    enforced via raised window minimum (`1180×820`) and matching `#root` floor.
+- **Neon Glass theme recolored from purple to dark-green neon** — deep
+  near-black green background with `#00e08a` / `#19ffd5` accents.
+
+### Added — MIXAI automatic cloud profile sync (`apps/mixai` `0.1.39`)
+
+- **Your whole setup now follows you to every device, automatically.** Cloud
+  profile sync existed but was manual (Settings → "Save/Load to cloud"); it is
+  now also a background service, delivering on the "account · restored on any
+  device" product pillar:
+  - New `src/lib/cloud-sync.ts`: single source of truth for serializing
+    (`buildProfileJson`) and applying (`applyProfileJson`) the full profile
+    (theme + custom themes, deck layout, companion connection, MIDI + HID
+    mappings, keyboard shortcuts, installed plugins), plus a
+    `startCloudAutoSync()` controller.
+  - On launch, when signed in to the companion/account, MIXAI pulls the stored
+    profile and applies it (theme, layout, mappings, shortcuts, plugins).
+  - Thereafter any local change is debounce-pushed (4 s) back to the account —
+    last-write-wins on a single blob, best-effort when offline.
+  - Sign-in transitions trigger an initial pull-then-push. Pushes are
+    suppressed during/just-after applying a pulled profile so the snapshot
+    doesn't immediately bounce back.
+  - Auto-sync intentionally does NOT overwrite the local companion connection
+    (device token) from a snapshot; the manual "Load from cloud" / paste-restore
+    paths still do.
+  - `src/App.tsx` mounts `startCloudAutoSync()`; `SettingsPanel.tsx`
+    `ProfileSection` now reuses the shared helpers (removed duplicated
+    build/apply logic).
+
 ### Added — MIXAI trigger editor in the visual builder (`apps/mixai` `0.1.38`)
 
 - **The visual macro builder can now author automation triggers**, completing

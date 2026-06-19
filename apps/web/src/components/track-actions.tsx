@@ -57,10 +57,13 @@ import {
     RefreshCcw,
     Layers,
     Download,
+    CloudOff,
+    CloudDownload,
 } from "lucide-react";
 import { toggleFavorite, deleteTrack, hideTracks } from "@/actions/tracks";
 import { reanalyzeTracks } from "@/actions/stems";
 import { downloadTrackFile } from "@/hooks/use-session-downloads";
+import { useOffline } from "@/hooks/offline-context";
 import {
     removeTrackFromPlaylist,
     moveTrackInPlaylist,
@@ -87,6 +90,7 @@ function useTrackActionHandlers(config: TrackActionConfig) {
     const { track, playlistId, onMutate } = config;
     const player = usePlayer();
     const router = useRouter();
+    const offline = useOffline();
     const [isPending, startTransition] = useTransition();
     const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -96,6 +100,31 @@ function useTrackActionHandlers(config: TrackActionConfig) {
     const artist = track.artist || "Unknown";
     const title = track.title || track.filename;
     const trackLabel = `${artist} — ${title}`;
+
+    const isPinned = offline?.isTrackOffline(track.id) ?? false;
+
+    function handleToggleOffline() {
+        if (!offline) return;
+        const filename = track.filename || `${title}.mp3`;
+        if (isPinned) {
+            toast.promise(offline.removeTrack(track.id), {
+                loading: "Removing offline copy...",
+                success: "Removed from offline",
+                error: "Couldn't remove offline copy",
+            });
+        } else {
+            toast.promise(
+                offline.pinTrack(track.id, filename, track.deviceId ?? undefined).then((ok) => {
+                    if (!ok) throw new Error("download failed");
+                }),
+                {
+                    loading: `Saving "${title}" offline...`,
+                    success: "Available offline",
+                    error: "Couldn't save offline (device offline?)",
+                },
+            );
+        }
+    }
 
     function handlePlay() {
         player.play(track);
@@ -213,6 +242,9 @@ function useTrackActionHandlers(config: TrackActionConfig) {
         handleCopyInfo,
         handleDownloadFile,
         handleHideTrack,
+        handleToggleOffline,
+        isPinned,
+        offlineSupported: !!offline,
         router,
     };
 }
@@ -340,6 +372,21 @@ function TrackMenuItems({
                 <Download className="h-3.5 w-3.5 mr-2 text-sky-400" />
                 Download File
             </Item>
+            {handlers.offlineSupported && (
+                <Item onClick={handlers.handleToggleOffline}>
+                    {handlers.isPinned ? (
+                        <>
+                            <CloudOff className="h-3.5 w-3.5 mr-2 text-blue-400" />
+                            Remove Offline Copy
+                        </>
+                    ) : (
+                        <>
+                            <CloudDownload className="h-3.5 w-3.5 mr-2 text-blue-400" />
+                            Make Available Offline
+                        </>
+                    )}
+                </Item>
+            )}
 
             <Item onClick={onOpenDetail ?? (() => handlers.setDetailModalOpen(true))}>
                 <Info className="h-3.5 w-3.5 mr-2" />

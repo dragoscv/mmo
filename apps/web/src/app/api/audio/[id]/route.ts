@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { companionLibrary, getCompanionLink } from "@/lib/companion-library";
 import { requireRate } from "@/lib/api-guard";
+import { streamTrackFromDevice } from "@/lib/audio-stream";
 
 const MIME_TYPES: Record<string, string> = {
     ".mp3": "audio/mpeg",
@@ -66,20 +67,18 @@ export async function GET(
         return NextResponse.json({ error: "Invalid track ID" }, { status: 400 });
     }
 
-    const link = await getCompanionLink();
-    if (!link) {
-        return NextResponse.json({ error: "Companion not connected" }, { status: 503 });
+    // Local-FS streaming is opt-in (MMO_LOCAL_AUDIO_ROOTS). Hosted/tunnel
+    // deployments leave it unset, in which case we transparently stream from
+    // whichever of the user's devices holds the file (resolved via
+    // track_sources). Done inline (not an HTTP redirect) so Range requests and
+    // the devtunnel behave — a single playback URL works everywhere.
+    if (ALLOWED_ROOTS.length === 0) {
+        return streamTrackFromDevice(request, trackId);
     }
 
-    // Refuse to touch the local FS unless the operator opted in via
-    // MMO_LOCAL_AUDIO_ROOTS. Hosted/multi-tenant deployments leave this
-    // unset; clients must fall back to /api/audio/device/[id], which
-    // streams via the companion's HTTP API.
-    if (ALLOWED_ROOTS.length === 0) {
-        return NextResponse.json(
-            { error: "Local audio streaming not configured on this server" },
-            { status: 501 },
-        );
+    const link = await getCompanionLink();
+    if (!link) {
+        return streamTrackFromDevice(request, trackId);
     }
 
     const track = await companionLibrary.getTrackById(link, trackId);

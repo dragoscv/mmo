@@ -37,7 +37,14 @@ function ensureBootstrapped(): void {
 }
 
 function readSeed(): { apiUrl: string; deviceToken: string } | null {
-    const apiUrl = (store.get("webAppUrl") as string | undefined) ?? "https://muzicai.ro";
+    // Honor the MMO_WEB_APP_URL dev override (set by the "Dev: Companion
+    // (against tunnel)" task) so cloud sync targets the local Next.js dev
+    // server via the tunnel, exactly like announce/OAuth do through
+    // getSettings(). Falls back to the stored value, then production.
+    const apiUrl =
+        process.env.MMO_WEB_APP_URL?.trim() ||
+        (store.get("webAppUrl") as string | undefined) ||
+        "https://muzicai.ro";
     const deviceToken = (store.get("deviceToken") as string | undefined) ?? "";
     if (!deviceToken) return null;
     return { apiUrl, deviceToken };
@@ -56,6 +63,17 @@ export function startCloudSync(logger?: (msg: string, err?: unknown) => void): b
     if (_onApplied) _client.onApplied = _onApplied;
     _client.start();
     logger?.(`[cloud-sync] started — apiUrl=${seed.apiUrl}`);
+    // One-time push of the pre-existing local library into the cloud queue.
+    // Without this, a library scanned before sync was wired never reaches
+    // cloud Postgres and the web app shows nothing on other devices.
+    // Lazy import avoids a module-load cycle (backfill imports from here).
+    try {
+        const { backfillLibraryToCloud } = require("./backfill") as typeof import("./backfill");
+        const n = backfillLibraryToCloud();
+        if (n > 0) logger?.(`[cloud-sync] backfilled ${n} existing library rows`);
+    } catch (err) {
+        logger?.("[cloud-sync] backfill failed", err);
+    }
     return true;
 }
 

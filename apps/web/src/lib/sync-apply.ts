@@ -29,6 +29,7 @@ import {
     trackTags,
     cuepoints,
     syncLog,
+    trackSources,
 } from "@/db/schema";
 import {
     PROJECT_TABLES,
@@ -82,6 +83,13 @@ const FORBIDDEN_TRACK_FIELDS = new Set([
     "sha256", "fieldVersions", "field_versions",
     "syncVersion", "sync_version",
     "createdAt", "addedAt", "added_at",
+    // Local-only foreign keys: the companion's SQLite `device_id` and
+    // `related_track_id` reference rows that may not exist in cloud Postgres
+    // (different device registry / per-device track ids). Persisting them
+    // raw violates the cloud FK constraints and rejects the whole upsert.
+    // The cloud derives ownership separately (track_sources / token user).
+    "deviceId", "device_id",
+    "relatedTrackId", "related_track_id",
 ]);
 
 /**
@@ -91,6 +99,7 @@ const FORBIDDEN_TRACK_FIELDS = new Set([
 export async function applyTrackUpsert(
     userId: string,
     change: SyncChange,
+    deviceId: string | null = null,
 ): Promise<ApplyResult> {
     if (change.op === "delete") {
         // Soft-delete via isHidden: real delete would orphan playlistTracks,
@@ -139,12 +148,13 @@ export async function applyTrackUpsert(
         nextFv[key] = change.updatedAt;
     }
 
-    if (Object.keys(accepted).length === 0 && existing.length > 0) {
-        return { changed: false, skipped: true, rowId: existing[0].id };
-    }
+    // Resolve the cloud row id (create when new) so we can also record the
+    // per-device source. We record the source even on metadata no-ops, since
+    // file ownership should be tracked whenever a device reports the track.
+    let rowId: number | undefined;
+    let changed = false;
 
     if (existing.length === 0) {
-        // New row — accept everything we filtered above (no stored clock yet).
         const inserted = await db
             .insert(tracks)
             .values({
@@ -155,18 +165,57 @@ export async function applyTrackUpsert(
                 updatedAt: new Date(change.updatedAt),
             })
             .returning({ id: tracks.id });
-        return { changed: true, rowId: inserted[0]?.id };
+        rowId = inserted[0]?.id;
+        changed = true;
+    } else {
+        rowId = existing[0].id;
+        if (Object.keys(accepted).length > 0) {
+            await db
+                .update(tracks)
+                .set({
+                    ...accepted,
+                    fieldVersions: nextFv,
+                    updatedAt: new Date(change.updatedAt),
+                })
+                .where(eq(tracks.id, rowId));
+            changed = true;
+        }
     }
 
-    await db
-        .update(tracks)
-        .set({
-            ...accepted,
-            fieldVersions: nextFv,
-            updatedAt: new Date(change.updatedAt),
-        })
-        .where(eq(tracks.id, existing[0].id));
-    return { changed: true, rowId: existing[0].id };
+    if (rowId != null) {
+        await recordTrackSource(userId, rowId, sha256, deviceId, payload);
+    }
+
+    return { changed, skipped: !changed, rowId };
+}
+
+/**
+ * Upsert the per-device file-ownership row for a track. Best-effort: a
+ * failure here must never break the metadata sync. Keyed by (deviceId,
+ * trackId) so re-reports update in place.
+ */
+async function recordTrackSource(
+    userId: string,
+    trackId: number,
+    sha256: string,
+    deviceId: string | null,
+    payload: Record<string, unknown>,
+): Promise<void> {
+    if (!deviceId) return;
+    const filepath = typeof payload.filepath === "string" ? payload.filepath : null;
+    const companionTrackId =
+        typeof payload.companionTrackId === "number" ? payload.companionTrackId : null;
+    try {
+        await db
+            .insert(trackSources)
+            .values({ userId, trackId, sha256, deviceId, filepath, companionTrackId, lastSeenAt: new Date() })
+            .onConflictDoUpdate({
+                target: [trackSources.deviceId, trackSources.trackId],
+                set: { sha256, filepath, companionTrackId, lastSeenAt: new Date() },
+            });
+    } catch {
+        // Non-fatal — availability is a nice-to-have, metadata sync is not.
+    }
 }
 
 /** Playlists — row-level LWW by (userId, externalId). */
@@ -435,9 +484,10 @@ export async function appendSyncLog(
 export async function applyChange(
     userId: string,
     change: SyncChange,
+    deviceId: string | null = null,
 ): Promise<ApplyResult> {
     switch (change.entity) {
-        case "tracks": return applyTrackUpsert(userId, change);
+        case "tracks": return applyTrackUpsert(userId, change, deviceId);
         case "playlists": return applyPlaylistUpsert(userId, change);
         case "tags": return applyTagUpsert(userId, change);
         case "playlist_tracks": return applyPlaylistTrackUpsert(userId, change);

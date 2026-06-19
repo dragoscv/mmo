@@ -31,6 +31,33 @@ class AudioPreloadCache {
     private inflight = new Map<number, AbortController>();
     private totalBytes = 0;
     private listeners = new Set<PreloadListener>();
+    /** Optional resolver that returns an offline blob URL for a pinned track.
+     *  Registered by the OfflineProvider so the player prefers the local copy
+     *  (true no-device playback) before hitting the network. */
+    private offlineResolver: ((trackId: number) => Promise<string | null>) | null = null;
+
+    /** Register/replace the offline-blob resolver. Returns an unsubscribe. */
+    setOfflineResolver(fn: ((trackId: number) => Promise<string | null>) | null): () => void {
+        this.offlineResolver = fn;
+        return () => { if (this.offlineResolver === fn) this.offlineResolver = null; };
+    }
+
+    /** Resolve the best playback URL: in-memory preload → offline IDB blob →
+     *  network stream. Async because the offline lookup hits IndexedDB. */
+    async resolveUrl(trackId: number): Promise<string> {
+        const entry = this.cache.get(trackId);
+        if (entry) {
+            entry.lastAccess = Date.now();
+            return entry.blobUrl;
+        }
+        if (this.offlineResolver) {
+            try {
+                const offlineUrl = await this.offlineResolver(trackId);
+                if (offlineUrl) return offlineUrl;
+            } catch { /* fall through to network */ }
+        }
+        return `/api/audio/${trackId}`;
+    }
 
     /** Subscribe to preload status changes */
     subscribe(listener: PreloadListener): () => void {

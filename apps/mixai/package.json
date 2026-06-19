@@ -1,6 +1,6 @@
 {
     "name": "@mmo/mixai",
-    "version": "0.1.38",
+    "version": "0.1.40",
     "private": true,
     "description": "MIXAI — native DJ software (Tauri 2 + Rust audio core + React/TS UI). Part of the muzicai.ro suite.",
     "type": "module",

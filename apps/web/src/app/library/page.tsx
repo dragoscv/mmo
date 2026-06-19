@@ -2,8 +2,7 @@ import { getTracks, getGenres, getAllTags, getKeys } from "@/actions/tracks";
 import { listSavedSearches } from "@/actions/saved-searches";
 import { LibraryClient } from "./library-client";
 import { auth } from "@/auth";
-import { getCompanionLink } from "@/lib/companion-library";
-import { notSignedInFor, noCompanionFor } from "@/components/empty-state-server";
+import { notSignedInFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +13,11 @@ export default async function LibraryPage({
 }) {
     const params = await searchParams;
 
-    // Library is per-user and lives on the companion. Bail out early
-    // when we can't reach either, rather than rendering an empty grid.
+    // Library metadata is per-user and lives in cloud Postgres (the
+    // companion syncs it up). It renders on any device even with no
+    // companion reachable — only a sign-in is required.
     const session = await auth();
     if (!session?.user?.id) return notSignedInFor("library");
-    const link = await getCompanionLink();
-    if (!link) return noCompanionFor("library");
 
     const page = parseInt(params.page || "1");
     const pageSize = parseInt(params.pageSize || "50");

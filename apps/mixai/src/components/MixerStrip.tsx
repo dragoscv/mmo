@@ -74,7 +74,15 @@ export function MixerStrip({ decks }: { decks: DeckId[] }) {
     return (
         <div
             className="panel"
-            style={{ padding: 12, display: "flex", gap: 4, alignItems: "stretch" }}
+            style={{
+                padding: 12,
+                display: "flex",
+                gap: 4,
+                alignItems: "stretch",
+                justifyContent: "center",
+                minHeight: 0,
+                overflowY: "auto",
+            }}
         >
             {decks.map((id) => (
                 <ChannelStrip key={id} deckId={id} />

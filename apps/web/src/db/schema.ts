@@ -274,6 +274,47 @@ export const tracks = pgTable(
         fileSize: bigint("file_size", { mode: "number" }),
         addedAt: timestamp("added_at").defaultNow(),
         analyzedAt: timestamp("analyzed_at"),
+        // ── Columns mirrored from the companion SQLite library so cloud
+        //    Postgres can be the source of truth for the web library UI.
+        //    All nullable: partial sync payloads must never fail an insert.
+        /** Absolute path on the owning device (display + companion stream). */
+        filepath: text("filepath"),
+        /** Just the filename (display fallback when title is empty). */
+        filename: text("filename"),
+        /** Track length in SECONDS (companion's native unit; UI uses this). */
+        duration: integer("duration"),
+        /** Whether the companion has finished metadata processing. */
+        isProcessed: boolean("is_processed").default(false),
+        /** JSON-encoded string[] of user tags. */
+        tags: text("tags"),
+        musicbrainzId: text("musicbrainz_id"),
+        releaseMbid: text("release_mbid"),
+        isrc: text("isrc"),
+        lyrics: text("lyrics"),
+        syncedLyrics: text("synced_lyrics"),
+        relatedTrackId: integer("related_track_id"),
+        /** Mirror of companion flag; real offline state is per-browser (IDB). */
+        isOfflineAvailable: boolean("is_offline_available").default(false),
+        stemsStatus: text("stems_status"),
+        stemsVocalsPath: text("stems_vocals_path"),
+        stemsDrumsPath: text("stems_drums_path"),
+        stemsBassPath: text("stems_bass_path"),
+        stemsMelodyPath: text("stems_melody_path"),
+        stemsAnalyzedAt: text("stems_analyzed_at"),
+        stemsModel: text("stems_model"),
+        stemsError: text("stems_error"),
+        loudnessLufs: real("loudness_lufs"),
+        loudnessTruePeakDbfs: real("loudness_true_peak_dbfs"),
+        loudnessRangeLu: real("loudness_range_lu"),
+        acoustidFingerprint: text("acoustid_fingerprint"),
+        acoustidId: text("acoustid_id"),
+        bpmConfidence: real("bpm_confidence"),
+        keyConfidence: real("key_confidence"),
+        beats: text("beats"),
+        downbeats: text("downbeats"),
+        chordProgression: text("chord_progression"),
+        structureSegments: text("structure_segments"),
+        dspAnalyzedAt: text("dsp_analyzed_at"),
         /** AI-suggested BPM (awaiting user confirmation). Cleared when accepted into bpm. */
         aiBpm: real("ai_bpm"),
         /** AI-suggested Camelot key (e.g. "8A"). Cleared when accepted into keyCamelot. */
@@ -300,6 +341,42 @@ export const tracks = pgTable(
         index("tracks_sha_idx").on(t.sha256),
         index("tracks_sync_idx").on(t.userId, t.syncVersion),
         uniqueIndex("tracks_user_sha_uniq").on(t.userId, t.sha256),
+    ],
+);
+
+// ─── Track sources (per-device file ownership) ──────────────────────────────
+//
+// Which device(s) physically hold a given track's audio file. The library
+// metadata is cloud-first (one logical track per sha256), but the actual
+// file can live on several devices. A track is "connected" (streamable) when
+// at least one of its sources is on a device that's currently online; the
+// browser's IndexedDB pin layer adds the "offline" state on top. Companion
+// reports its files via POST /api/library/sources.
+export const trackSources = pgTable(
+    "track_sources",
+    {
+        id: serial("id").primaryKey(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        /** The cloud track this file backs (FK to tracks.id). */
+        trackId: integer("track_id").notNull().references(() => tracks.id, { onDelete: "cascade" }),
+        /** Content hash — stable across devices, mirrors tracks.sha256 (or the
+         *  `userId:companionTrackId` fallback for sha-less libraries). */
+        sha256: text("sha256"),
+        /** Device holding the file. */
+        deviceId: text("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+        /** Absolute path on that device (for companion streaming). */
+        filepath: text("filepath"),
+        /** Companion-local track id on that device (for stream/range requests). */
+        companionTrackId: integer("companion_track_id"),
+        lastSeenAt: timestamp("last_seen_at").defaultNow(),
+        createdAt: timestamp("created_at").defaultNow(),
+    },
+    (t) => [
+        index("track_sources_user_idx").on(t.userId),
+        index("track_sources_track_idx").on(t.trackId),
+        index("track_sources_device_idx").on(t.deviceId),
+        // One row per (device, track) — re-reports update in place.
+        uniqueIndex("track_sources_device_track_uniq").on(t.deviceId, t.trackId),
     ],
 );
 

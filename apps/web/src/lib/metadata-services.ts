@@ -348,6 +348,14 @@ interface FetchOptions {
     artwork: boolean;
     lyrics: boolean;
     bpmKey: boolean;
+    /**
+     * When true, skip the (rate-limited, serial) MusicBrainz lookup if the
+     * fast parallel providers (iTunes/Deezer) already filled genre + album +
+     * year + artwork. MusicBrainz still runs when those are missing or when
+     * the caller needs label/ISRC. This is the single biggest speedup on a
+     * first full pass since MB's 1.1s global throttle is the bottleneck.
+     */
+    fastSkipMusicBrainz?: boolean;
 }
 
 export async function fetchAllMetadata(
@@ -447,8 +455,17 @@ export async function fetchAllMetadata(
     // Wait for parallel requests
     await Promise.allSettled(promises);
 
-    // MusicBrainz (rate-limited, runs after parallel batch)
-    if (options.metadata) {
+    // MusicBrainz (rate-limited, runs after parallel batch). It's the
+    // throttle bottleneck (1.1s global), so when fastSkipMusicBrainz is on
+    // and the fast providers already covered the user-visible fields, skip
+    // it entirely — dramatically faster on large first passes.
+    const mbCoveredByFastPath =
+        options.fastSkipMusicBrainz === true &&
+        !!result.genre &&
+        !!result.album &&
+        !!result.year &&
+        (!options.artwork || !!result.artworkUrl);
+    if (options.metadata && !mbCoveredByFastPath) {
         const mb = await searchMusicBrainz(artist, title);
         if (mb) {
             result.musicbrainzId = mb.mbid;

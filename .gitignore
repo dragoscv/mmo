@@ -60,6 +60,10 @@ artifacts/
 .vscode/.dev-tunnel-url
 .vercel
 
+# Temp env dumps (e.g. `vercel env pull .env.prod.tmp`) — never commit secrets
+.env*.tmp
+.env.prod.tmp
+
 # Azure resource names (local-only, contains globally unique random suffixes)
 .azure-names.txt
 .venvs/

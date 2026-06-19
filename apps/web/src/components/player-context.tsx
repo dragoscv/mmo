@@ -582,15 +582,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const play = useCallback((track: Track, queue?: Track[]) => {
         const audio = audioRef.current;
         if (!audio) return;
-        // Use cached blob URL if available, start preloading if not
+        // Prefer a pinned offline blob (no device needed), else network stream.
+        // resolveUrl is async (IndexedDB lookup); set a sane src immediately so
+        // playback starts fast, then upgrade to the offline blob if one exists.
         audio.src = audioPreloadCache.getUrl(track.id);
-        audioPreloadCache.preload(track.id).then(url => {
-            // Upgrade to blob URL once cached (if not already playing from it)
-            if (audioRef.current && !audioPreloadCache.has(track.id)) return;
-            if (audioRef.current && audioRef.current.src !== url && !audioRef.current.paused) {
-                // Already playing from stream — blob is cached for next use
+        void audioPreloadCache.resolveUrl(track.id).then((url) => {
+            const a = audioRef.current;
+            // Swap to the offline blob only at the very start of playback so we
+            // never restart a stream the user is already hearing.
+            if (a && url.startsWith("blob:") && a.currentSrc !== url && a.currentTime < 0.5) {
+                const wasPlaying = !a.paused;
+                a.src = url;
+                if (wasPlaying) void safePlay(a);
             }
         }).catch(() => { });
+        audioPreloadCache.preload(track.id).catch(() => { });
         safePlay(audio);
         setState((s) => {
             const newQueue = queue || s.queue;

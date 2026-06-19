@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider } from "@/components/sidebar-context";
 import { PlayerProvider } from "@/components/player-context";
 import { AnalysisProvider } from "@/components/analysis-provider";
+import { OfflineProvider } from "@/hooks/offline-context";
 import { AudioPlayer } from "@/components/audio-player";
 import { NowPlaying } from "@/components/now-playing";
 import { StickyNowPlaying } from "@/components/sticky-now-playing";
@@ -109,6 +110,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                                             <MidiProvider>
                                                 <ControllerBridge />
                                                 <AnalysisProvider>
+                                                <OfflineProvider>
                                                 <FocusModeProvider>
                                                     <PlayerAwareLayout>
                                                         <FocusAwareSidebar>
@@ -133,6 +135,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                                                         <ConfirmLoadDialog />
                                                     </FocusAwareNowPlayingBar>
                                                 </FocusModeProvider>
+                                                </OfflineProvider>
                                             </AnalysisProvider>
                                             </MidiProvider>
                                         </MixerProvider>

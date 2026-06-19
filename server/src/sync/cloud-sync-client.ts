@@ -130,8 +130,30 @@ export class CloudSyncClient {
         }
     }
 
+    /**
+     * Drain the local change queue to the cloud. Loops within a single tick
+     * so a large first-time backfill (tens of thousands of rows) converges
+     * in minutes instead of one small batch per 30 s interval. Bounded by
+     * `maxBatches` so a tick can't run unbounded if the queue keeps growing.
+     */
     private async pushOnce(state: SyncState): Promise<number> {
-        const changes = await this.storage.drainDirty(500);
+        let total = 0;
+        const maxBatches = 200; // 200 × 100 = up to 20k rows per tick
+        for (let i = 0; i < maxBatches; i++) {
+            const n = await this.pushBatch(state);
+            if (n === 0) break;
+            total += n;
+        }
+        return total;
+    }
+
+    private async pushBatch(state: SyncState): Promise<number> {
+        // Batch size is deliberately small: track rows can carry large
+        // analysis blobs (beats, downbeats, chord/structure JSON), so 500
+        // rows produced multi-MB bodies that blew past the request timeout
+        // on first sync of a big library. 100 keeps each POST well under a
+        // megabyte and lets the queue drain steadily across ticks.
+        const changes = await this.storage.drainDirty(100);
         if (changes.length === 0) return 0;
         // Strip the internal queue ids before sending — the cloud doesn't
         // care about our local autoincrement.
@@ -143,7 +165,7 @@ export class CloudSyncClient {
                 authorization: `Bearer ${state.deviceToken}`,
             },
             body: JSON.stringify({ changes: wireChanges }),
-            signal: AbortSignal.timeout(15_000),
+            signal: AbortSignal.timeout(60_000),
         });
         if (!res.ok) {
             // 402 = paywall; surface so the UI can prompt upgrade. The queue

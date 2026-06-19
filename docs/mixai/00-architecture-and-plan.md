@@ -227,6 +227,8 @@ for offline; reconcile on login. Reuse `apps/web` auth/session + a `mixer_setups
 - [x] Plugin SDK + built-in plugins + external (declarative) plugins + visual
   builder + one-click catalog. (Code-bearing plugin sandbox still TODO.)
 - [x] Shareable themes/mappings + account sync (themes, MIDI, **HID**, **plugins**).
+  Manual save/load AND **automatic** background sync (pull on launch, debounced
+  push on change) — "restored on any device".
 - [x] AI assist: harmonic mix-assist (Camelot) + auto-mix/auto-queue "AI DJ".
 - [ ] Mobile (Android/iOS — `apps/native` has capacitor + tauri scaffolding).
 - [ ] Real marketplace backend (currently local + companion account blob).

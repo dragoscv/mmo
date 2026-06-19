@@ -1,0 +1,19 @@
+# DSP audio analyzer sidecar (server/python/analyze.py) dependencies.
+#
+# Install into a Python 3.10–3.12 interpreter (NOT 3.13+; some torch/onnx
+# wheels lag). On Windows the companion defaults MMO_PYTHON to
+# C:\Python312\python.exe (see scripts/dev-companion.ps1).
+#
+#   <python3.12> -m pip install -r server/python/requirements-analyzer.txt
+#
+# For NVIDIA GPU separation, replace audio-separator[cpu] with
+# audio-separator[gpu] (CUDA 12). librosa already pulls numpy/soundfile/audioread.
+
+librosa
+numpy
+soundfile
+pyloudnorm
+pyacoustid
+pedalboard
+audio-separator[cpu]
+# essentia            # optional: faster/extra key detection (Linux/macOS); librosa covers key otherwise

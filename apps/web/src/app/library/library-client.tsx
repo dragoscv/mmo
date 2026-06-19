@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSyncRefresh } from "@/hooks/use-sync-refresh";
+import { useAvailabilityRefresh } from "@/hooks/use-availability-refresh";
 import { useRouteMemorySave, clearRouteMemory } from "@/hooks/use-route-memory";
 import { useRenderCount } from "@/lib/dev-debugger";
 import {
@@ -24,6 +25,8 @@ import { TagBadges } from "@/components/tag-input";
 import { Artwork } from "@/components/artwork";
 import { TrackDetailModal } from "@/components/track-detail-modal";
 import { ColumnManager, useColumnConfig } from "@/components/column-manager";
+import { ReanalyzeButton } from "@/components/reanalyze-button";
+import { useOffline } from "@/hooks/offline-context";
 import { MetadataLink } from "@/components/metadata-link";
 import { usePlayer } from "@/components/player-context";
 import { useSelection } from "@/components/selection-provider";
@@ -63,7 +66,7 @@ import {
     Download,
 } from "lucide-react";
 import Link from "next/link";
-import type { Track } from "@/db/schema";
+import type { Track } from "@/actions/tracks";
 
 interface LibraryClientProps {
     tracks: Track[];
@@ -117,7 +120,9 @@ export function LibraryClient({
 }: LibraryClientProps) {
     useRenderCount("Page:/library");
     useSyncRefresh(["tracks", "playlist_tracks", "tags", "track_tags"]);
+    useAvailabilityRefresh();
     const router = useRouter();
+    const offline = useOffline();
     const searchParams = useSearchParams();
     const [searchInput, setSearchInput] = useState(currentFilters.search);
     const player = usePlayer();
@@ -390,7 +395,9 @@ export function LibraryClient({
                             </Button>
                         )}
 
-                        <span className="ml-auto text-xs text-[var(--muted-foreground)]">
+                        <ReanalyzeButton className="ml-auto" />
+
+                        <span className="text-xs text-[var(--muted-foreground)]">
                             {startIdx + 1}–{Math.min(startIdx + pageSize, total)} of{" "}
                             {formatNumber(total)}
                         </span>
@@ -716,9 +723,8 @@ export function LibraryClient({
                                                                         {track.title || track.filename}
                                                                     </span>
                                                                     <TrackAvailability
-                                                                        deviceId={track.deviceId}
-                                                                        isDeviceOnline={true}
-                                                                        isOfflineAvailable={track.isOfflineAvailable}
+                                                                        state={track.availabilityState}
+                                                                        isOfflineAvailable={offline?.isTrackOffline(track.id) ?? track.isOfflineAvailable}
                                                                         compact
                                                                     />
                                                                 </div>
