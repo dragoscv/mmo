@@ -14,7 +14,8 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Laptop, LogIn, Music } from "lucide-react";
+import { Laptop, Music } from "lucide-react";
+import { SignInButton } from "@/components/sign-in-button";
 
 interface CommonProps {
     /** Pre-translated feature label, e.g. "your dashboard" / "tabloul tău". */
@@ -44,9 +45,7 @@ export function NotSignedIn({
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Button asChild>
-                        <Link href="/login"><LogIn className="mr-2 h-4 w-4" /> {ctaLabel ?? "Sign in"}</Link>
-                    </Button>
+                    <SignInButton label={ctaLabel ?? "Sign in"} />
                 </CardContent>
             </Card>
         </div>
