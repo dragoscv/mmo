@@ -12,6 +12,31 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Rekordbox plug-and-play USB export + Drives manager (`apps/web` `0.5.4`, `server` `1.0.28`)
+
+- **True plug-and-play CDJ/XDJ USB export.** A native `rbexport` sidecar
+  writes `export.pdb` + `exportExt.pdb` (Device Library Plus) + `USBANLZ`
+  analysis (beatgrid, cues, full-res + color waveforms) plus the `Contents/`
+  audio tree, so a stick plays standalone on Pioneer hardware with no
+  rekordbox re-import. Exposed in the Playlists page ("Export USB…") and the
+  Drives manager, with scope (playlist / whole library), transcode policy,
+  and auto-crates (By Genre / BPM / Key). Streams progress over SSE.
+  - Fixed a DeviceSQL page-header bug (row-count must be a packed
+    `num_row_offsets`/`num_rows` bitfield) that made rekordbox report
+    "Device library is corrupted".
+- **Drives manager upgrades.** Each connected drive now shows its rekordbox
+  library status (track count, Classic / Device Library Plus / OneLibrary
+  badges), an "Export here" shortcut, a "Clean rekordbox library" action, and
+  live plug/unplug detection via an SSE drive-watch stream.
+- **Multi-source track availability.** The library now surfaces how many
+  devices hold each track and their names (online-first) in the availability
+  badge tooltip, on top of the existing connected / offline / disconnected
+  states.
+- **Companion link prefers loopback when co-located.** When the web app and
+  companion run on the same machine, the server reaches the companion over
+  `localhost` instead of a flaky self-announced LAN IP; hosted deployments
+  still use the LAN/tunnel URL.
+
 ### Changed — MIXAI viewport-locked layout + dark-green Neon Glass (`apps/mixai` `0.1.40`)
 
 - **No more overlapping panels or stray scrollbars.** The two-deck cockpit now

@@ -38,6 +38,7 @@ import { ColumnManager, useColumnConfig } from "@/components/column-manager";
 import { SmartPlaylistDialog } from "@/components/smart-playlist-dialog";
 import { UsbExportWizard } from "@/components/usb-export-wizard";
 import { UsbCopyDialog } from "@/components/usb-copy-dialog";
+import { RekordboxExportDialog } from "@/components/rekordbox-export-dialog";
 import { Select } from "@/components/ui/select";
 import { formatDuration, formatNumber, ENERGY_COLORS, GENRE_COLORS, cn } from "@/lib/utils";
 import {
@@ -58,6 +59,7 @@ import {
     ChevronsRight,
     ListPlus,
     Sparkles,
+    Usb,
 } from "lucide-react";
 import type { Track } from "@/db/schema";
 import {
@@ -124,6 +126,7 @@ export function PlaylistsClient({
     const [smartOpen, setSmartOpen] = useState(false);
     const [usbOpen, setUsbOpen] = useState(false);
     const [usbCopyOpen, setUsbCopyOpen] = useState(false);
+    const [rbExportOpen, setRbExportOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [newName, setNewName] = useState("");
@@ -343,6 +346,16 @@ export function PlaylistsClient({
                         >
                             <FileDown className="h-4 w-4" />
                             {t("copyAudio")}
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => setRbExportOpen(true)}
+                            title={t("rbExportTitle")}
+                        >
+                            <Usb className="h-4 w-4" />
+                            {t("rbExport")}
                         </Button>
                         <Button
                             size="sm"
@@ -949,6 +962,14 @@ export function PlaylistsClient({
             <UsbCopyDialog
                 open={usbCopyOpen}
                 onOpenChange={setUsbCopyOpen}
+                activePlaylistId={activePlaylist?.id}
+                activePlaylistName={activePlaylist?.name}
+            />
+
+            {/* Rekordbox plug-and-play USB export */}
+            <RekordboxExportDialog
+                open={rbExportOpen}
+                onOpenChange={setRbExportOpen}
                 activePlaylistId={activePlaylist?.id}
                 activePlaylistName={activePlaylist?.name}
             />

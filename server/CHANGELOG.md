@@ -2,6 +2,20 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.28 — rekordbox USB export + drive library management
+
+- **Rekordbox plug-and-play USB export.** New native `rbexport` sidecar
+	(bundled under `resources/bin`) writes a true CDJ/XDJ USB: `Contents/`
+	audio + `export.pdb` + `exportExt.pdb` (Device Library Plus) + `USBANLZ`
+	analysis (beatgrid, cues, full-res + color waveforms). Driven by
+	`POST /library/rekordbox/export` (SSE progress), with track resolution,
+	transcode policy and auto-crates. Fixed the DeviceSQL page-header
+	row-count bitfield so rekordbox no longer reports a corrupted library.
+- **Drive library management.** `GET /library/drives` now annotates each
+	drive with its rekordbox status; added `POST /library/drives/rekordbox/clean`
+	(remove DB/analysis, opt-in OneLibrary/Contents) and a
+	`GET /library/drives/watch` SSE stream for live plug/unplug detection.
+
 ## 1.0.18 — instant picker open
 
 - **Drive probe timeout 500 ms → 250 ms**: healthy local drives respond in <10 ms, so the previous 500 ms cap was over-conservative. With this change `/fs/drives` returns in <300 ms even if every drive letter is a stalled mount.

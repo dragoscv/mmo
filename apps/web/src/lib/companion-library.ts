@@ -18,15 +18,7 @@ import { db } from "@/db";
 import { devices } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { materializeDeviceToken } from "@/lib/device-token";
-
-const LOCAL_PREFIXES = ["http://localhost:", "http://127.0.0.1:", "https://localhost:", "https://127.0.0.1:"];
-
-/** True when `url` points at the same machine as the Next.js runtime —
- *  i.e. a loopback URL we should never `fetch()` from the server
- *  because we'd hit the Vercel container, not the user's laptop. */
-function isLoopbackUrl(url: string): boolean {
-    return LOCAL_PREFIXES.some((p) => url.startsWith(p));
-}
+import { isLoopbackUrl, pickCompanionUrl } from "@/lib/companion-url";
 
 export interface CompanionLink {
     apiUrl: string;
@@ -43,7 +35,14 @@ export interface CompanionLink {
  *    2. Any other device the user has paired with a non-empty api_url
  *       and token (LAN, Tailscale, 10.x, 192.168.x, public domain, …).
  *
- *  Returns null when there's no session or no paired device at all.
+ *  The chosen device's reachable base URL is then resolved by
+ *  `pickCompanionUrl`: when the Next runtime is co-located with the
+ *  companion (local `pnpm dev` / Tauri), the loopback URL is preferred
+ *  (fastest + immune to flaky LAN IPs); on hosted runtimes (Vercel /
+ *  Cloud Run) only the non-loopback LAN/tunnel URL is used.
+ *
+ *  Returns null when there's no session, no paired device, or no
+ *  reachable URL for the current runtime.
  *  Does NOT probe the companion — callers tolerate transient downtime
  *  via per-method try/catch. For paths that already know which device
  *  they want, prefer `getCompanionLinkForDevice(deviceId)`. */
@@ -56,19 +55,13 @@ export async function getCompanionLink(): Promise<CompanionLink | null> {
         .where(eq(devices.userId, userId));
     const usable = rows.filter((d) => d.apiUrl && d.tokenEncrypted);
     if (usable.length === 0) return null;
-    const local = usable.find((d) =>
-        LOCAL_PREFIXES.some((p) => d.apiUrl!.startsWith(p))
-    );
+    // Prefer a device with a loopback api_url (a true local companion).
+    const local = usable.find((d) => isLoopbackUrl(d.apiUrl!));
     const chosen = local ?? usable[0];
     const bearer = await materializeDeviceToken(chosen);
     if (!bearer) return null;
-    // Prefer the device's self-announced LAN URL when present. The
-    // companion writes this on every startup with whatever port it's
-    // actually bound to; the static `api_url` recorded at pairing time
-    // is often stale (different port after a reinstall, container
-    // restart, etc.). Falling back to apiUrl only when lanUrl is empty.
-    let chosenUrl = chosen.lanUrl ?? chosen.apiUrl!;
-    if (!chosenUrl) chosenUrl = chosen.apiUrl!;
+    const chosenUrl = pickCompanionUrl(chosen);
+    if (!chosenUrl) return null;
     return { apiUrl: chosenUrl.replace(/\/+$/, ""), token: bearer, deviceId: chosen.id, userId };
 }
 
@@ -91,7 +84,7 @@ export async function getCompanionLinkForDevice(
     if (!row || !row.apiUrl) return null;
     const bearer = await materializeDeviceToken(row);
     if (!bearer) return null;
-    const url = row.lanUrl ?? row.apiUrl;
+    const url = pickCompanionUrl(row) ?? row.apiUrl;
     return { apiUrl: url.replace(/\/+$/, ""), token: bearer, deviceId: row.id, userId };
 }
 
@@ -213,6 +206,10 @@ export interface CompanionTrack {
      *  "disconnected" otherwise. Set by cloud-library reads; the client
      *  overlays "offline" when the track is pinned in IndexedDB. */
     availabilityState?: "connected" | "disconnected" | null;
+    /** Number of distinct devices that hold this track's file. */
+    sourceCount?: number | null;
+    /** Display names of the source devices (online first), for tooltips. */
+    sourceDeviceNames?: string[] | null;
 }
 
 export interface PaginatedTracks {
@@ -353,6 +350,14 @@ export const companionLibrary = {
         const r = await call<{ drives: CompanionDrive[] }>(link, "GET", `/drives`);
         return r.drives || [];
     },
+    async cleanRekordboxDrive(
+        link: CompanionLink,
+        data: { drive: string; includeOneLibrary?: boolean; includeContents?: boolean },
+    ): Promise<{ removed: string[]; removedOneLibrary: boolean }> {
+        return call<{ removed: string[]; removedOneLibrary: boolean }>(
+            link, "POST", `/drives/rekordbox/clean`, data,
+        );
+    },
     async getSavedDrives(link: CompanionLink): Promise<CompanionSavedDrive[]> {
         const r = await call<{ drives: CompanionSavedDrive[] }>(link, "GET", `/drives/saved`);
         return r.drives || [];
@@ -373,11 +378,14 @@ export const companionLibrary = {
         return call<UsbCopyResult>(link, "POST", `/usb/copy`, { ...opts, stream: false });
     },
     async getScanLogs(link: CompanionLink, limit = 20): Promise<ScanLogEntry[]> {
-        const r = await call<{ logs: ScanLogEntry[] }>(link, "GET", `/scan-logs?limit=${limit}`);
+        // Short timeout: this runs during dashboard render. A stale/unreachable
+        // companion (e.g. cached LAN IP from another network) must fail fast
+        // instead of blocking the page for the full default timeout.
+        const r = await call<{ logs: ScanLogEntry[] }>(link, "GET", `/scan-logs?limit=${limit}`, undefined, 3_000);
         return r.logs || [];
     },
-    async getPlaylists(link: CompanionLink): Promise<PlaylistSummary[]> {
-        const r = await call<{ playlists: PlaylistSummary[] }>(link, "GET", `/playlists`);
+    async getPlaylists(link: CompanionLink, timeoutMs?: number): Promise<PlaylistSummary[]> {
+        const r = await call<{ playlists: PlaylistSummary[] }>(link, "GET", `/playlists`, undefined, timeoutMs);
         return r.playlists || [];
     },
     async createPlaylist(link: CompanionLink, name: string, description?: string): Promise<PlaylistSummary> {
@@ -574,6 +582,17 @@ export interface CompanionDrive {
     freeSpace: number;
     usedSpace: number;
     type: "fixed" | "removable" | "network" | "unknown";
+    /** Rekordbox library status (null when the drive can't be inspected). */
+    rekordbox?: RekordboxDriveStatus | null;
+}
+
+export interface RekordboxDriveStatus {
+    hasClassic: boolean;
+    hasDeviceLibraryPlus: boolean;
+    hasOneLibrary: boolean;
+    hasContents: boolean;
+    trackCount: number;
+    dbBytes: number;
 }
 
 export interface CompanionSavedDrive {
@@ -765,6 +784,94 @@ export async function* copyTracksToUsb(
                     yield { type: event, ...payload } as UsbCopyEvent;
                 } catch {
                     // Malformed payload — skip rather than abort the whole stream.
+                }
+            }
+        }
+    } finally {
+        try { reader.releaseLock(); } catch { /* ignore */ }
+    }
+}
+
+// ─── Rekordbox USB export (true plug-and-play CDJ/XDJ) ───────────────────────
+
+export type RekordboxAutoCrate = "genre" | "bpm" | "key";
+export type RekordboxTranscode = "none" | "incompatible" | "all";
+
+export interface RekordboxExportOptions {
+    /** Explicit track ids. Omit to export the whole library (or playlists). */
+    trackIds?: number[];
+    /** Playlist ids to export (their tracks are included + a crate created). */
+    playlistIds?: number[];
+    /** Absolute destination drive path. */
+    destination: string;
+    /** Auto-generate "By Genre / BPM / Key" crates. */
+    autoCrates?: RekordboxAutoCrate[];
+    /** Transcode policy for incompatible codecs (default "incompatible"). */
+    transcode?: RekordboxTranscode;
+    /** Write USBANLZ analysis files (beatgrid, cues, waveforms). Default true. */
+    writeAnlz?: boolean;
+}
+
+/** A progress event from the rekordbox export sidecar (via the companion). */
+export interface RekordboxExportEvent {
+    /** Event kind: "start" | "progress" | "stage" | "done" | "error" | "log". */
+    type: string;
+    [key: string]: unknown;
+}
+
+/**
+ * Stream rekordbox USB export progress from the companion. Yields a `start`
+ * event, any number of sidecar progress events, then a terminal `done` (or
+ * `error`). The caller may break early; pass an AbortSignal to cancel.
+ */
+export async function* rekordboxExport(
+    link: CompanionLink,
+    opts: RekordboxExportOptions,
+    signal?: AbortSignal,
+): AsyncGenerator<RekordboxExportEvent, void, void> {
+    const url = `${link.apiUrl}/library/rekordbox/export`;
+    const res = await fetch(url, {
+        method: "POST",
+        headers: {
+            "X-Device-Token": link.token,
+            "X-User-Id": link.userId,
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+        },
+        body: JSON.stringify(opts),
+        cache: "no-store",
+        signal,
+    });
+    if (!res.ok || !res.body) {
+        let detail = "";
+        try { detail = (await res.json()).error ?? ""; } catch { /* ignore */ }
+        throw new Error(`Rekordbox export failed (${res.status})${detail ? ": " + detail : ""}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+        for (; ;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            let idx: number;
+            while ((idx = buffer.indexOf("\n\n")) !== -1) {
+                const raw = buffer.slice(0, idx);
+                buffer = buffer.slice(idx + 2);
+                let event = "message";
+                let data = "";
+                for (const line of raw.split("\n")) {
+                    if (line.startsWith("event:")) event = line.slice(6).trim();
+                    else if (line.startsWith("data:")) data += line.slice(5).trim();
+                }
+                if (!data) continue;
+                try {
+                    const payload = JSON.parse(data) as Record<string, unknown>;
+                    yield { type: event, ...payload };
+                } catch {
+                    // Malformed payload — skip.
                 }
             }
         }

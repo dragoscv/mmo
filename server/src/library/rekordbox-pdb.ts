@@ -95,7 +95,10 @@ export function parseRekordboxPdbHeader(buf: Buffer): RekordboxPdbHeader {
     if (tableCount === 0 || tableCount > 256) {
         throw new Error(`pdb: implausible table count ${tableCount}`);
     }
-    const tableDescriptorStart = 0x18;
+    // Real layout (verified against a rekordbox-exported export.pdb):
+    //   0x00 gap, 0x04 len_page, 0x08 num_tables, 0x0c next_unused_page,
+    //   0x10 unknown, 0x14 sequence, 0x18 gap, 0x1c table descriptors.
+    const tableDescriptorStart = 0x1c;
     const requiredLen = tableDescriptorStart + tableCount * 16;
     if (buf.length < requiredLen) {
         throw new Error(
@@ -106,7 +109,7 @@ export function parseRekordboxPdbHeader(buf: Buffer): RekordboxPdbHeader {
         pageSize,
         tableCount,
         nextUnusedPage: buf.readUInt32LE(0x0c),
-        sequence: buf.readUInt32LE(0x10),
+        sequence: buf.readUInt32LE(0x14),
         tableDescriptorStart,
     };
 }
@@ -140,20 +143,22 @@ export function readRekordboxPdbTableDescriptors(
  */
 export function buildRekordboxPdbHeaderFixture(opts: {
     pageSize?: number;
+    sequence?: number;
     tables: { rawType: number; firstPage: number; lastPage: number }[];
 }): Buffer {
     const pageSize = opts.pageSize ?? REKORDBOX_PDB_DEFAULT_PAGE_SIZE;
     const tableCount = opts.tables.length;
     if (tableCount === 0) throw new Error("at least one table required");
-    const len = 0x18 + tableCount * 16;
+    const len = 0x1c + tableCount * 16;
     const buf = Buffer.alloc(len);
     buf.writeUInt32LE(0, 0x00); // magic / always zero
     buf.writeUInt32LE(pageSize, 0x04);
     buf.writeUInt32LE(tableCount, 0x08);
     buf.writeUInt32LE(1, 0x0c); // next unused page
-    buf.writeUInt32LE(0, 0x10); // sequence
-    buf.writeUInt32LE(0, 0x14); // reserved
-    let offset = 0x18;
+    buf.writeUInt32LE(0, 0x10); // unknown
+    buf.writeUInt32LE(opts.sequence ?? 0, 0x14); // sequence
+    buf.writeUInt32LE(0, 0x18); // gap
+    let offset = 0x1c;
     for (const t of opts.tables) {
         buf.writeUInt32LE(t.rawType, offset);
         buf.writeUInt32LE(0, offset + 4); // padding

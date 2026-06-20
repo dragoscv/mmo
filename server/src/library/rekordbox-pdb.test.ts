@@ -19,7 +19,7 @@ describe("rekordbox-pdb (reader-only spike)", () => {
         const header = parseRekordboxPdbHeader(buf);
         expect(header.pageSize).toBe(REKORDBOX_PDB_DEFAULT_PAGE_SIZE);
         expect(header.tableCount).toBe(4);
-        expect(header.tableDescriptorStart).toBe(0x18);
+        expect(header.tableDescriptorStart).toBe(0x1c);
 
         const tables = readRekordboxPdbTableDescriptors(buf, header);
         expect(tables).toHaveLength(4);

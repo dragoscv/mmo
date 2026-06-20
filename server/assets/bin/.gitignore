@@ -1,0 +1,5 @@
+# rbexport sidecar binary is built per-platform during dist packaging.
+# See scripts/prepare-rbexport.mjs.
+*
+!.gitkeep
+!.gitignore

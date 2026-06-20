@@ -1,0 +1,17 @@
+[package]
+name = "rbexport"
+version = "0.1.0"
+edition = "2021"
+description = "Rekordbox USB export writer (export.pdb + exportExt.pdb + USBANLZ) for the MMO companion."
+
+[[bin]]
+name = "rbexport"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 2
+strip = true

@@ -462,7 +462,9 @@ export async function getRecommendedPlaylists(): Promise<RecommendedCategory[]> 
     let existingNames = new Set<string>();
     if (link) {
         try {
-            const existing = await companionLibrary.getPlaylists(link);
+            // Short timeout: runs during dashboard render; a stale/unreachable
+            // companion must not block the page.
+            const existing = await companionLibrary.getPlaylists(link, 3_000);
             existingNames = new Set(existing.map((p) => p.name.toLowerCase()));
         } catch { /* keep empty set */ }
     }

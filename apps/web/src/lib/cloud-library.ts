@@ -216,7 +216,10 @@ export async function getTracksFromCloud(filters?: TrackFilters): Promise<Pagina
     // device heartbeat. Keyed by the cloud serial id.
     const avail = await getTrackAvailability(rows.map((r) => r.id));
     for (let i = 0; i < mapped.length; i++) {
-        mapped[i].availabilityState = avail.get(rows[i].id)?.state ?? "disconnected";
+        const a = avail.get(rows[i].id);
+        mapped[i].availabilityState = a?.state ?? "disconnected";
+        mapped[i].sourceCount = a?.sourceCount ?? 0;
+        mapped[i].sourceDeviceNames = a?.deviceNames ?? [];
     }
 
     return {
@@ -461,6 +464,11 @@ export interface TrackAvailability {
     onlineDeviceIds: string[];
     /** All device ids holding this track (online or not). */
     deviceIds: string[];
+    /** Display names of all source devices, online first, for the UI
+     *  tooltip (e.g. "On 2 devices: Studio PC, Laptop"). */
+    deviceNames: string[];
+    /** Count of distinct source devices (online or not). */
+    sourceCount: number;
 }
 
 /**
@@ -482,24 +490,45 @@ export async function getTrackAvailability(
         .select({
             trackId: trackSources.trackId,
             deviceId: trackSources.deviceId,
+            deviceName: devices.name,
             lastSeenAt: devices.lastSeenAt,
         })
         .from(trackSources)
         .innerJoin(devices, eq(devices.id, trackSources.deviceId))
         .where(and(eq(trackSources.userId, userId), inArray(trackSources.trackId, trackIds)));
 
+    // Collect online + offline device names separately so we can list
+    // online devices first in the UI tooltip.
+    const onlineNames = new Map<number, string[]>();
+    const offlineNames = new Map<number, string[]>();
+    const pushName = (map: Map<number, string[]>, trackId: number, name: string) => {
+        const list = map.get(trackId);
+        if (list) list.push(name);
+        else map.set(trackId, [name]);
+    };
     for (const r of rows) {
         let entry = out.get(r.trackId);
         if (!entry) {
-            entry = { state: "disconnected", onlineDeviceIds: [], deviceIds: [] };
+            entry = { state: "disconnected", onlineDeviceIds: [], deviceIds: [], deviceNames: [], sourceCount: 0 };
             out.set(r.trackId, entry);
         }
         entry.deviceIds.push(r.deviceId);
         const online = r.lastSeenAt != null && new Date(r.lastSeenAt) >= cutoff;
+        const name = r.deviceName?.trim() || "Unknown device";
         if (online) {
             entry.onlineDeviceIds.push(r.deviceId);
             entry.state = "connected";
+            pushName(onlineNames, r.trackId, name);
+        } else {
+            pushName(offlineNames, r.trackId, name);
         }
+    }
+
+    // Finalize: online device names first, then offline; dedupe; count.
+    for (const [trackId, entry] of out) {
+        const names = [...(onlineNames.get(trackId) ?? []), ...(offlineNames.get(trackId) ?? [])];
+        entry.deviceNames = [...new Set(names)];
+        entry.sourceCount = new Set(entry.deviceIds).size;
     }
 
     return out;

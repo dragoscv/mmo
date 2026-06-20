@@ -12,11 +12,14 @@
  */
 
 import { z } from "zod";
-import { getCompanionLink, companionLibrary } from "@/lib/companion-library";
+import { getCompanionLink, companionLibrary, type RekordboxDriveStatus } from "@/lib/companion-library";
 import { getConnectedDrives, type DriveInfo } from "@/lib/drives";
 import { log } from "@/lib/logger";
 
-export async function detectDrives(): Promise<DriveInfo[]> {
+/** A detected drive plus (when a companion is connected) its rekordbox status. */
+export type DetectedDrive = DriveInfo & { rekordbox?: RekordboxDriveStatus | null };
+
+export async function detectDrives(): Promise<DetectedDrive[]> {
     const link = await getCompanionLink();
     if (link) {
         try {
@@ -28,6 +31,7 @@ export async function detectDrives(): Promise<DriveInfo[]> {
                 totalSize: d.totalSize,
                 freeSpace: d.freeSpace,
                 usedSpace: d.usedSpace,
+                rekordbox: d.rekordbox ?? null,
             }));
         } catch (err) {
             log.warn("drives.detectDrives: companion request failed, falling back to host enumeration", {
@@ -37,6 +41,40 @@ export async function detectDrives(): Promise<DriveInfo[]> {
         }
     }
     return getConnectedDrives();
+}
+
+/**
+ * Remove the rekordbox database + analysis files from a connected drive so it
+ * can be re-exported cleanly. Audio under `Contents/` is preserved unless
+ * `includeContents` is set; the encrypted OneLibrary is preserved unless
+ * `includeOneLibrary` is set.
+ */
+const cleanInputSchema = z.object({
+    drive: z.string().min(1).max(4096).refine((p) => !/[\x00-\x1f]/.test(p), {
+        message: "drive must not contain control characters",
+    }),
+    includeOneLibrary: z.boolean().optional(),
+    includeContents: z.boolean().optional(),
+}).strict();
+
+export async function cleanRekordboxDrive(data: {
+    drive: string;
+    includeOneLibrary?: boolean;
+    includeContents?: boolean;
+}): Promise<{ success: boolean; removed?: number; error?: string }> {
+    const check = cleanInputSchema.safeParse(data);
+    if (!check.success) {
+        return { success: false, error: check.error.issues[0]?.message ?? "Invalid input" };
+    }
+    const link = await getCompanionLink();
+    if (!link) return { success: false, error: "Companion not connected" };
+    try {
+        const r = await companionLibrary.cleanRekordboxDrive(link, check.data);
+        return { success: true, removed: r.removed.length };
+    } catch (err) {
+        log.warn("drives.cleanRekordboxDrive failed", { error: err instanceof Error ? err.message : String(err) });
+        return { success: false, error: err instanceof Error ? err.message : "Failed to clean drive" };
+    }
 }
 
 export interface SavedDrive {

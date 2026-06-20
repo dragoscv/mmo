@@ -725,6 +725,8 @@ export function LibraryClient({
                                                                     <TrackAvailability
                                                                         state={track.availabilityState}
                                                                         isOfflineAvailable={offline?.isTrackOffline(track.id) ?? track.isOfflineAvailable}
+                                                                        sourceCount={track.sourceCount}
+                                                                        sourceDeviceNames={track.sourceDeviceNames}
                                                                         compact
                                                                     />
                                                                 </div>

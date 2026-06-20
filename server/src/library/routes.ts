@@ -20,7 +20,9 @@ import type { NewTrack } from "./schema";
 import { analyzer, type AnalyzeOptions } from "./analyzer";
 import { enqueueSyncChange } from "../sync";
 import { listConnectedDrives } from "./drives";
+import { inspectRekordboxDrive, cleanRekordboxDrive } from "./rekordbox-drive";
 import { validateCopyRequest, resolveTrackTarget } from "./usb-copy";
+import { runExport, type ManifestTrack, type ManifestPlaylist, type TranscodePolicy } from "./rekordbox-export";
 import { createReadStream, statSync, existsSync } from "node:fs";
 import { copyFile, mkdir, stat as statAsync } from "node:fs/promises";
 import path from "node:path";
@@ -225,6 +227,51 @@ function buildOrderBy(sort: string, order: "asc" | "desc") {
 }
 
 // ─── Router ──────────────────────────────────────────────────────────────────
+
+/**
+ * Group exportable tracks into auto-crates ("By Genre" / "By BPM" / "By Key")
+ * for the rekordbox export. Each requested dimension yields one playlist per
+ * distinct bucket value. BPM is bucketed into 10-wide ranges. Tracks with no
+ * value for a dimension are skipped for that crate only.
+ */
+function buildAutoCrates(
+    manifestTracks: ManifestTrack[],
+    rows: Array<{ id: number; bpm: number | null; genre: string | null; keyCamelot: string | null; keyMusical: string | null }>,
+    dims: Array<"genre" | "bpm" | "key">,
+): Array<{ name: string; trackIds: number[] }> {
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const order = manifestTracks.map((t) => t.id);
+    const out: Array<{ name: string; trackIds: number[] }> = [];
+
+    const collect = (label: (r: NonNullable<ReturnType<typeof byId.get>>) => string | null, prefix: string) => {
+        const buckets = new Map<string, number[]>();
+        for (const id of order) {
+            const r = byId.get(id);
+            if (!r) continue;
+            const key = label(r);
+            if (!key) continue;
+            const arr = buckets.get(key) ?? [];
+            arr.push(id);
+            buckets.set(key, arr);
+        }
+        for (const [name, trackIds] of [...buckets.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+            out.push({ name: `${prefix} ${name}`, trackIds });
+        }
+    };
+
+    for (const d of dims) {
+        if (d === "genre") collect((r) => r.genre?.trim() || null, "Genre:");
+        else if (d === "key") collect((r) => (r.keyCamelot || r.keyMusical)?.trim() || null, "Key:");
+        else if (d === "bpm") {
+            collect((r) => {
+                if (r.bpm == null) return null;
+                const lo = Math.floor(r.bpm / 10) * 10;
+                return `${lo}-${lo + 9}`;
+            }, "BPM:");
+        }
+    }
+    return out;
+}
 
 export function createLibraryRouter(authMiddleware: express.RequestHandler): express.Router {
     const router = express.Router();
@@ -578,10 +625,111 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     router.get("/drives", (_req, res) => {
         try {
             const drives = listConnectedDrives();
-            res.json({ drives });
+            // Annotate each drive with its rekordbox library status so the
+            // Drives manager can show track counts / variants without a
+            // second round-trip.
+            const annotated = drives.map((d) => {
+                try {
+                    return { ...d, rekordbox: inspectRekordboxDrive(d.path) };
+                } catch {
+                    return { ...d, rekordbox: null };
+                }
+            });
+            res.json({ drives: annotated });
         } catch (err) {
             res.status(500).json({
                 error: err instanceof Error ? err.message : "Failed to enumerate drives",
+            });
+        }
+    });
+
+    // GET /library/drives/watch  (SSE)
+    // Pushes the annotated drive list whenever the set of mounted drives
+    // changes (plug/unplug) or their rekordbox status changes. The companion
+    // polls enumeration internally on a short interval and only emits when
+    // the serialized snapshot differs, so the browser gets push-style updates
+    // without any native OS hooks. A `drives` event is sent immediately on
+    // connect, then on every change, plus a periodic `ping` to keep the
+    // connection alive through proxies.
+    router.get("/drives/watch", (_req, res) => {
+        res.status(200);
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache, no-store");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+
+        const snapshot = () => {
+            const drives = listConnectedDrives().map((d) => {
+                try {
+                    return { ...d, rekordbox: inspectRekordboxDrive(d.path) };
+                } catch {
+                    return { ...d, rekordbox: null };
+                }
+            });
+            return drives;
+        };
+
+        let lastJson = "";
+        const tick = () => {
+            let drives;
+            try {
+                drives = snapshot();
+            } catch {
+                return;
+            }
+            const json = JSON.stringify(drives);
+            if (json !== lastJson) {
+                lastJson = json;
+                res.write(`event: drives\ndata: ${json}\n\n`);
+            }
+        };
+
+        // Emit the initial snapshot, then poll for changes.
+        tick();
+        const poll = setInterval(tick, 3000);
+        const ping = setInterval(() => res.write(`event: ping\ndata: {}\n\n`), 25000);
+        const stop = () => {
+            clearInterval(poll);
+            clearInterval(ping);
+        };
+        res.on("close", stop);
+    });
+
+    // POST /library/drives/rekordbox/clean
+    // Body: { drive: string, includeOneLibrary?: boolean, includeContents?: boolean }
+    //
+    // Removes the rekordbox database + analysis files from a connected drive
+    // so it can be re-exported cleanly. Audio under `Contents/` is preserved
+    // unless `includeContents` is set. The encrypted OneLibrary is preserved
+    // unless `includeOneLibrary` is set.
+    //
+    // SECURITY: `drive` MUST be an absolute path; deletion is confined to
+    // `<drive>/PIONEER/rekordbox`, `<drive>/PIONEER/USBANLZ` and (opt-in)
+    // `<drive>/Contents`.
+    router.post("/drives/rekordbox/clean", (req, res) => {
+        const body = (req.body ?? {}) as {
+            drive?: unknown;
+            includeOneLibrary?: unknown;
+            includeContents?: unknown;
+        };
+        const drive = typeof body.drive === "string" ? body.drive.trim() : "";
+        if (!drive || !path.isAbsolute(drive)) {
+            res.status(400).json({ error: "drive: absolute path required" });
+            return;
+        }
+        if (!existsSync(drive)) {
+            res.status(400).json({ error: "drive does not exist" });
+            return;
+        }
+        try {
+            const result = cleanRekordboxDrive(drive, {
+                includeOneLibrary: body.includeOneLibrary === true,
+                includeContents: body.includeContents === true,
+            });
+            res.json({ success: true, ...result });
+        } catch (err) {
+            res.status(500).json({
+                error: err instanceof Error ? err.message : "Failed to clean drive",
             });
         }
     });
@@ -754,6 +902,174 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
             } catch { errors++; }
         }
         res.json({ copied, skipped, errors, total: rows.length });
+    });
+
+    // POST /library/rekordbox/export
+    // Body: { trackIds?: number[], playlistIds?: number[], destination: string,
+    //         autoCrates?: ("genre"|"bpm"|"key")[], transcode?: TranscodePolicy,
+    //         writeAnlz?: boolean }
+    //
+    // Writes a true plug-and-play CDJ/XDJ USB at `destination` via the native
+    // `rbexport` sidecar: Contents/ audio + export.pdb + exportExt.pdb +
+    // USBANLZ analysis (beatgrid, cues, color waveforms). Progress streams
+    // over SSE. Track rows are scoped to the authed user.
+    router.post("/rekordbox/export", async (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const body = (req.body ?? {}) as {
+            trackIds?: unknown;
+            playlistIds?: unknown;
+            destination?: unknown;
+            autoCrates?: unknown;
+            transcode?: unknown;
+            writeAnlz?: unknown;
+        };
+
+        const destination = typeof body.destination === "string" ? body.destination.trim() : "";
+        if (!destination || !path.isAbsolute(destination)) {
+            res.status(400).json({ error: "destination: absolute path required" });
+            return;
+        }
+        if (!existsSync(destination)) {
+            res.status(400).json({ error: "destination does not exist" });
+            return;
+        }
+
+        const explicitIds = Array.isArray(body.trackIds)
+            ? body.trackIds.filter((n): n is number => Number.isInteger(n) && n > 0)
+            : [];
+        const playlistIds = Array.isArray(body.playlistIds)
+            ? body.playlistIds.filter((n): n is number => Number.isInteger(n) && n > 0)
+            : [];
+        const transcode = (["none", "incompatible", "all"] as const).includes(body.transcode as TranscodePolicy)
+            ? (body.transcode as TranscodePolicy)
+            : "incompatible";
+        const autoCrates = Array.isArray(body.autoCrates)
+            ? body.autoCrates.filter((c): c is "genre" | "bpm" | "key" =>
+                c === "genre" || c === "bpm" || c === "key")
+            : [];
+
+        const db = getLibraryDb();
+
+        // Resolve the track id set: explicit ids ∪ all ids in the chosen
+        // playlists. Always scoped to the authed user.
+        const idSet = new Set<number>(explicitIds);
+        for (const pid of playlistIds) {
+            const owned = db.select({ id: playlists.id }).from(playlists)
+                .where(and(eq(playlists.id, pid), eq(playlists.userId, userId))).get();
+            if (!owned) continue;
+            const pts = db.select({ trackId: playlistTracks.trackId }).from(playlistTracks)
+                .where(eq(playlistTracks.playlistId, pid)).all();
+            for (const r of pts) idSet.add(r.trackId);
+        }
+        // No explicit selection → export the whole library.
+        let ids = [...idSet];
+        if (ids.length === 0 && playlistIds.length === 0) {
+            const all = db.select({ id: tracks.id }).from(tracks)
+                .where(eq(tracks.userId, userId)).all();
+            ids = all.map((r) => r.id);
+        }
+        if (ids.length === 0) {
+            res.status(400).json({ error: "no tracks to export" });
+            return;
+        }
+        if (ids.length > 20000) {
+            res.status(400).json({ error: "too many tracks (max 20000)" });
+            return;
+        }
+
+        const rows = db.select().from(tracks)
+            .where(and(eq(tracks.userId, userId), inArray(tracks.id, ids)))
+            .all();
+
+        const manifestTracks: ManifestTrack[] = rows
+            .filter((r) => r.filepath && existsSync(r.filepath))
+            .map((r) => ({
+                id: r.id,
+                source_path: r.filepath,
+                title: r.title ?? undefined,
+                artist: r.artist ?? undefined,
+                album: r.album ?? undefined,
+                genre: r.genre ?? undefined,
+                label: r.label ?? undefined,
+                key: r.keyMusical ?? r.keyCamelot ?? undefined,
+                bpm: r.bpm ?? undefined,
+                duration_sec: r.duration ?? undefined,
+            }));
+
+        if (manifestTracks.length === 0) {
+            res.status(400).json({ error: "no exportable tracks (sources missing on disk)" });
+            return;
+        }
+
+        // Build the playlist tree: explicit playlists first, then any
+        // requested auto-crates (By Genre / By BPM / By Key).
+        const manifestPlaylists: ManifestPlaylist[] = [];
+        const exportable = new Set(manifestTracks.map((t) => t.id));
+        let nextPlaylistId = 1_000_000; // synthetic ids for auto-crates
+        for (const pid of playlistIds) {
+            const pl = db.select({ id: playlists.id, name: playlists.name }).from(playlists)
+                .where(and(eq(playlists.id, pid), eq(playlists.userId, userId))).get();
+            if (!pl) continue;
+            const pts = db.select({ trackId: playlistTracks.trackId, position: playlistTracks.position })
+                .from(playlistTracks).where(eq(playlistTracks.playlistId, pid))
+                .orderBy(playlistTracks.position).all();
+            manifestPlaylists.push({
+                id: pl.id, name: pl.name, parent: 0, is_folder: false,
+                track_ids: pts.map((p) => p.trackId).filter((t) => exportable.has(t)),
+            });
+        }
+        if (autoCrates.length > 0) {
+            const buckets = buildAutoCrates(manifestTracks, rows, autoCrates);
+            for (const b of buckets) {
+                manifestPlaylists.push({
+                    id: nextPlaylistId++, name: b.name, parent: 0,
+                    is_folder: false, track_ids: b.trackIds,
+                });
+            }
+        }
+
+        res.status(200);
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+        const send = (event: string, data: unknown) => {
+            res.write(`event: ${event}\n`);
+            res.write(`data: ${JSON.stringify(data)}\n\n`);
+        };
+
+        const ac = new AbortController();
+        // Abort only when the *response* connection drops (client navigated
+        // away / closed the stream). NOT `req.on("close")` — for a buffered
+        // POST body that fires as soon as the body is received, which would
+        // kill the export immediately.
+        res.on("close", () => ac.abort());
+
+        send("start", {
+            tracks: manifestTracks.length,
+            playlists: manifestPlaylists.length,
+            destination,
+        });
+        try {
+            for await (const ev of runExport({
+                destination,
+                options: {
+                    write_pdb: true,
+                    write_ext: true,
+                    write_anlz: body.writeAnlz !== false,
+                    auto_cue: true,
+                    transcode,
+                },
+                tracks: manifestTracks,
+                playlists: manifestPlaylists,
+            }, { signal: ac.signal })) {
+                send(ev.kind, ev);
+            }
+        } catch (e) {
+            send("error", { error: e instanceof Error ? e.message : String(e) });
+        }
+        send("done", {});
+        res.end();
     });
 
     // Saved-drive metadata (user-given labels for "My CDJ USB" etc.).

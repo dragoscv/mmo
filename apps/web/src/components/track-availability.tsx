@@ -23,6 +23,11 @@ interface TrackAvailabilityProps {
     className?: string;
     compact?: boolean;
     deviceName?: string | null;
+    /** Number of distinct devices that hold this track's file. When >1 a
+     *  small count is shown next to the badge. */
+    sourceCount?: number | null;
+    /** Names of the source devices (online first), shown in the tooltip. */
+    sourceDeviceNames?: string[] | null;
     // ── Legacy props (still accepted for back-compat) ──
     deviceId?: string | null;
     isDeviceOnline?: boolean;
@@ -35,20 +40,36 @@ function resolveState(p: TrackAvailabilityProps): AvailabilityUiState {
     return "disconnected";
 }
 
+/** Build the human tooltip describing where a track lives. */
+export function sourcesSummary(names: string[] | null | undefined, count: number): string | null {
+    const list = (names ?? []).filter(Boolean);
+    if (list.length === 0) return null;
+    if (count <= 1) return list[0];
+    const shown = list.slice(0, 4).join(", ");
+    const extra = count - Math.min(list.length, 4);
+    return `On ${count} devices: ${shown}${extra > 0 ? `, +${extra} more` : ""}`;
+}
+
 export function TrackAvailability(props: TrackAvailabilityProps) {
-    const { className, compact = true, deviceName } = props;
+    const { className, compact = true, deviceName, sourceCount, sourceDeviceNames } = props;
     const state = resolveState(props);
+    const count = sourceCount ?? 0;
+    const multi = count > 1;
+    const summary = sourcesSummary(sourceDeviceNames, count);
 
     if (state === "connected") {
-        const title = `Available via ${deviceName || "device"}`;
+        const title = summary
+            ? `Available · ${summary}`
+            : `Available via ${deviceName || "device"}`;
         return compact ? (
             <span className={cn("inline-flex items-center gap-1", className)} title={title}>
                 <Monitor className="h-3 w-3 text-green-400" />
+                {multi && <span className="text-[10px] leading-none text-green-400">{count}</span>}
             </span>
         ) : (
             <span className={cn("inline-flex items-center gap-1 text-xs text-green-400", className)} title={title}>
                 <Wifi className="h-3 w-3" />
-                <span>{deviceName || "Online"}</span>
+                <span>{multi ? `${count} devices` : deviceName || "Online"}</span>
             </span>
         );
     }
@@ -66,10 +87,13 @@ export function TrackAvailability(props: TrackAvailabilityProps) {
         );
     }
 
-    const title = "Disconnected — no device online and not cached offline";
+    const title = summary
+        ? `Disconnected — last seen on ${summary}`
+        : "Disconnected — no device online and not cached offline";
     return compact ? (
         <span className={cn("inline-flex items-center gap-1", className)} title={title}>
             <WifiOff className="h-3 w-3 text-zinc-500" />
+            {multi && <span className="text-[10px] leading-none text-zinc-500">{count}</span>}
         </span>
     ) : (
         <span className={cn("inline-flex items-center gap-1 text-xs text-zinc-500", className)} title={title}>
