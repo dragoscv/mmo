@@ -55,5 +55,40 @@ describe("pickCompanionUrl", () => {
             expect(pickCompanionUrl({ apiUrl: loopback, lanUrl: loopback }, true)).toBeNull();
             expect(pickCompanionUrl({ apiUrl: loopback, lanUrl: null }, true)).toBeNull();
         });
+        it("prefers the tunnel hostname over LAN (cloud can't reach 192.168.x)", () => {
+            expect(
+                pickCompanionUrl(
+                    { apiUrl: loopback, lanUrl: lan, tunnelHostname: "device-abc.muzicai.ro" },
+                    true,
+                ),
+            ).toBe("https://device-abc.muzicai.ro");
+        });
+        it("normalizes a tunnel hostname that already has a scheme/slash", () => {
+            expect(
+                pickCompanionUrl(
+                    { apiUrl: null, lanUrl: null, tunnelHostname: "https://device-abc.muzicai.ro/" },
+                    true,
+                ),
+            ).toBe("https://device-abc.muzicai.ro");
+        });
+    });
+
+    describe("local runtime with tunnel", () => {
+        it("still prefers loopback over the tunnel when co-located", () => {
+            expect(
+                pickCompanionUrl(
+                    { apiUrl: loopback, lanUrl: lan, tunnelHostname: "device-abc.muzicai.ro" },
+                    false,
+                ),
+            ).toBe(loopback);
+        });
+        it("falls back to the tunnel when no api/lan url locally", () => {
+            expect(
+                pickCompanionUrl(
+                    { apiUrl: null, lanUrl: null, tunnelHostname: "device-abc.muzicai.ro" },
+                    false,
+                ),
+            ).toBe("https://device-abc.muzicai.ro");
+        });
     });
 });

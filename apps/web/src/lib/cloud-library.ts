@@ -19,6 +19,7 @@
 
 import { and, asc, desc, eq, ilike, inArray, or, sql, count } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
+import { unstable_cache } from "next/cache";
 import { db } from "@/db";
 import { tracks, playlists, trackSources, devices } from "@/db/schema";
 import { auth } from "@/auth";
@@ -244,38 +245,64 @@ export async function getTrackByIdFromCloud(id: number): Promise<CompanionTrack 
     return rows[0] ? rowToCompanionTrack(rows[0]) : null;
 }
 
+// Filter-option lists (genres / keys / tags) change only when the library is
+// re-synced, but were previously re-scanned on EVERY /library load
+// (full-table SELECT DISTINCT + a whole-column tags scan). They're cached
+// per-user and invalidated by `revalidateTag(libraryFacetsTag(userId))` from
+// the sync apply path. See `libraryFacetsTag`.
+export function libraryFacetsTag(userId: string): string {
+    return `library-facets:${userId}`;
+}
+
+function cachedFacet<T>(
+    userId: string,
+    name: string,
+    fn: () => Promise<T>,
+): Promise<T> {
+    return unstable_cache(fn, ["library-facet", name, userId], {
+        revalidate: 300,
+        tags: [libraryFacetsTag(userId)],
+    })();
+}
+
 export async function getGenresFromCloud(): Promise<string[]> {
     const userId = await getUserId();
     if (!userId) return [];
-    const rows = await db.selectDistinct({ genre: tracks.genre }).from(tracks)
-        .where(and(eq(tracks.userId, userId), sql`${tracks.genre} IS NOT NULL AND ${tracks.genre} <> ''`))
-        .orderBy(asc(tracks.genre));
-    return rows.map((r) => r.genre).filter((g): g is string => !!g);
+    return cachedFacet(userId, "genres", async () => {
+        const rows = await db.selectDistinct({ genre: tracks.genre }).from(tracks)
+            .where(and(eq(tracks.userId, userId), sql`${tracks.genre} IS NOT NULL AND ${tracks.genre} <> ''`))
+            .orderBy(asc(tracks.genre));
+        return rows.map((r) => r.genre).filter((g): g is string => !!g);
+    });
 }
 
 export async function getKeysFromCloud(): Promise<string[]> {
     const userId = await getUserId();
     if (!userId) return [];
-    const rows = await db.selectDistinct({ key: tracks.keyCamelot }).from(tracks)
-        .where(and(eq(tracks.userId, userId), sql`${tracks.keyCamelot} IS NOT NULL AND ${tracks.keyCamelot} <> ''`))
-        .orderBy(asc(tracks.keyCamelot));
-    return rows.map((r) => r.key).filter((k): k is string => !!k);
+    return cachedFacet(userId, "keys", async () => {
+        const rows = await db.selectDistinct({ key: tracks.keyCamelot }).from(tracks)
+            .where(and(eq(tracks.userId, userId), sql`${tracks.keyCamelot} IS NOT NULL AND ${tracks.keyCamelot} <> ''`))
+            .orderBy(asc(tracks.keyCamelot));
+        return rows.map((r) => r.key).filter((k): k is string => !!k);
+    });
 }
 
 export async function getAllTagsFromCloud(): Promise<string[]> {
     const userId = await getUserId();
     if (!userId) return [];
-    const rows = await db.select({ tags: tracks.tags }).from(tracks)
-        .where(and(eq(tracks.userId, userId), sql`${tracks.tags} IS NOT NULL AND ${tracks.tags} <> ''`));
-    const set = new Set<string>();
-    for (const r of rows) {
-        if (!r.tags) continue;
-        try {
-            const arr = JSON.parse(r.tags);
-            if (Array.isArray(arr)) for (const t of arr) if (typeof t === "string" && t) set.add(t);
-        } catch { /* ignore malformed tag json */ }
-    }
-    return [...set].sort((a, b) => a.localeCompare(b));
+    return cachedFacet(userId, "tags", async () => {
+        const rows = await db.select({ tags: tracks.tags }).from(tracks)
+            .where(and(eq(tracks.userId, userId), sql`${tracks.tags} IS NOT NULL AND ${tracks.tags} <> ''`));
+        const set = new Set<string>();
+        for (const r of rows) {
+            if (!r.tags) continue;
+            try {
+                const arr = JSON.parse(r.tags);
+                if (Array.isArray(arr)) for (const t of arr) if (typeof t === "string" && t) set.add(t);
+            } catch { /* ignore malformed tag json */ }
+        }
+        return [...set].sort((a, b) => a.localeCompare(b));
+    });
 }
 
 /**

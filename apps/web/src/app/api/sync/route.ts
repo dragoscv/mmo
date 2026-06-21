@@ -21,6 +21,8 @@ import { db } from "@/db";
 import { devices, syncLog } from "@/db/schema";
 import { getSubscription } from "@/lib/stripe";
 import { applyChange, appendSyncLog, type SyncChange } from "@/lib/sync-apply";
+import { libraryFacetsTag } from "@/lib/cloud-library";
+import { revalidateTag } from "next/cache";
 import { and, eq, gt, isNull, ne, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { requireRate } from "@/lib/api-guard";
@@ -116,6 +118,7 @@ export async function POST(req: Request) {
 
     let applied = 0;
     let skipped = 0;
+    let tracksTouched = false;
     const errors: Array<{ entity: string; entityId: string; error: string }> = [];
 
     for (const change of body.changes) {
@@ -135,6 +138,9 @@ export async function POST(req: Request) {
             }
             if (res.changed) {
                 applied++;
+                if (change.entity === "tracks" || change.entity === "track_tags") {
+                    tracksTouched = true;
+                }
                 await appendSyncLog(dev.userId, change, dev.id);
             } else if (res.skipped) {
                 skipped++;
@@ -152,6 +158,13 @@ export async function POST(req: Request) {
         .update(devices)
         .set({ lastSeenAt: new Date(), status: "syncing" })
         .where(eq(devices.id, dev.id));
+
+    // Filter-option lists (genres / keys / tags) are cached per-user; bust
+    // them once per batch when any track metadata changed so the /library
+    // facets reflect the new data without re-scanning on every page load.
+    if (tracksTouched) {
+        revalidateTag(libraryFacetsTag(dev.userId), "max");
+    }
 
     return NextResponse.json({ ok: errors.length === 0, applied, skipped, errors });
 }

@@ -12,6 +12,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — audio playback over the cloud + faster /library (`apps/web` `0.5.9`)
+
+- **Music now plays when the web app is hosted.** `/api/audio/[id]` returned
+  `503 Device unreachable: fetch failed` because the production server tried
+  to reach the companion over its LAN IP (`192.168.x`, unroutable from the
+  cloud). `pickCompanionUrl` now prefers the companion's public Cloudflare
+  Tunnel hostname on hosted runtimes, so audio streams through the tunnel.
+  Local/co-located runtimes still use loopback.
+- **Faster `/library` navigation.** The genre / key / tag filter lists were
+  re-scanned from the full tracks table on every page load (two
+  `SELECT DISTINCT` + a whole-column tags scan). They're now cached per-user
+  and invalidated when the library re-syncs, removing three full-table scans
+  from each `/library` render.
+
 ### Fixed — resilient Vercel install (`apps/web` `0.5.8`)
 
 - **Production install uses a fresh pnpm store.** Vercel's restored build

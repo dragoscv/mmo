@@ -37,26 +37,38 @@ export function isHostedRuntime(
  * Pick the best base URL to reach `device` from the current runtime.
  *
  *  Local runtime  → loopback `apiUrl` (if any) > `lanUrl` > `apiUrl`.
- *  Hosted runtime → non-loopback `lanUrl` > non-loopback `apiUrl`.
+ *  Hosted runtime → `tunnelHostname` (HTTPS) > non-loopback `lanUrl`
+ *                   > non-loopback `apiUrl`.
  *
  * The loopback preference when co-located fixes the case where the web
  * app and companion run on the same machine but the companion's
  * self-announced `lanUrl` (e.g. 192.168.x) is unreachable from the
  * server (flaky Wi-Fi, VPN, changed subnet).
  *
+ * On a hosted runtime (Vercel / Cloud Run) the server can only reach the
+ * companion over the public per-device Cloudflare Tunnel — a LAN IP like
+ * 192.168.x is unroutable from the cloud — so the tunnel hostname is
+ * preferred there.
+ *
  * Returns `null` when no usable URL exists for the runtime.
  */
 export function pickCompanionUrl(
-    device: { apiUrl: string | null; lanUrl: string | null },
+    device: { apiUrl: string | null; lanUrl: string | null; tunnelHostname?: string | null },
     hosted: boolean = isHostedRuntime(),
 ): string | null {
     const api = device.apiUrl ?? null;
     const lan = device.lanUrl ?? null;
+    const tunnel = device.tunnelHostname?.trim()
+        ? `https://${device.tunnelHostname.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "")}`
+        : null;
     if (!hosted) {
         if (api && isLoopbackUrl(api)) return api;
         if (lan) return lan;
-        return api;
+        if (api) return api;
+        return tunnel;
     }
+    // Hosted: the cloud can only reach the companion over its public tunnel.
+    if (tunnel) return tunnel;
     if (lan && !isLoopbackUrl(lan)) return lan;
     if (api && !isLoopbackUrl(api)) return api;
     return null;
