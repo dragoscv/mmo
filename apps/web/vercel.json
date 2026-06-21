@@ -2,7 +2,7 @@
     "$schema": "https://openapi.vercel.sh/vercel.json",
     "framework": "nextjs",
     "buildCommand": "pnpm build",
-    "installCommand": "pnpm install --frozen-lockfile || (rm -rf .pnpm-store node_modules/.pnpm && pnpm install --frozen-lockfile)",
+    "installCommand": "pnpm install --frozen-lockfile || (rm -rf /vercel/path0/.pnpm-store ../../.pnpm-store .pnpm-store node_modules/.pnpm ../../node_modules/.pnpm && pnpm store prune; pnpm install --frozen-lockfile)",
     "outputDirectory": ".next",
     "crons": [
         {

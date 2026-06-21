@@ -12,15 +12,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
-### Fixed — resilient Vercel install (`apps/web` `0.5.6`)
+### Fixed — resilient Vercel install (`apps/web` `0.5.7`)
 
 - **Self-healing production install.** Vercel's `installCommand` now discards
-  the restored pnpm store (`rm -rf .pnpm-store node_modules/.pnpm`) and
-  reinstalls when the first `pnpm install --frozen-lockfile` fails. A corrupt
-  build-cache store (missing index files, e.g. `webextension-polyfill` /
-  `undici-types`) previously failed the deploy with `ENOENT … exited 254`;
-  even `--force` couldn't recover because it still read the broken index, so
-  the store is now deleted before the retry. Lockfile integrity is still
+  the corrupt restored pnpm store at the **repo root**
+  (`/vercel/path0/.pnpm-store`, since the command runs from `apps/web`) plus
+  `node_modules/.pnpm`, runs `pnpm store prune`, then reinstalls when the
+  first `pnpm install --frozen-lockfile` fails. A corrupt build-cache store
+  (missing index files, e.g. `webextension-polyfill` / `undici-types`)
+  previously failed the deploy with `ENOENT … exited 254`; neither `--force`
+  nor deleting the wrong (workspace-relative) store path recovered, so the
+  root store is now removed before the retry. Lockfile integrity is still
   enforced on both passes.
 
 ### Added — Rekordbox plug-and-play USB export + Drives manager (`apps/web` `0.5.4`, `server` `1.0.28`)
