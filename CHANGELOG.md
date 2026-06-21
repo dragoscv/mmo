@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
-### Fixed — audio playback over the cloud + faster /library (`apps/web` `0.5.9`)
+### Fixed — audio playback over the cloud + faster /library (`apps/web` `0.5.10`)
 
 - **Music now plays when the web app is hosted.** `/api/audio/[id]` returned
   `503 Device unreachable: fetch failed` because the production server tried
@@ -25,6 +25,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   `SELECT DISTINCT` + a whole-column tags scan). They're now cached per-user
   and invalidated when the library re-syncs, removing three full-table scans
   from each `/library` render.
+- **Build cache disabled on Vercel.** The restored pnpm `node_modules`/store
+  from the build cache was corrupt (missing store index files), breaking every
+  install with `ENOENT … exited 254` even with a fresh `--store-dir`. Set
+  `VERCEL_FORCE_NO_BUILD_CACHE=1` and hardened the install retry to wipe a
+  stale `node_modules` before reinstalling.
 
 ### Fixed — resilient Vercel install (`apps/web` `0.5.8`)
 
