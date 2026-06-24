@@ -57,6 +57,13 @@ export interface CompanionSettings {
     serverPort: number;
     scanFolders: FolderConfig[];
     webAppUrl: string;
+    /** Base URL of the companion control-plane gateway (Hono on Cloud
+     *  Run). The device heartbeat + command channel (HTTP announce and
+     *  WebSocket) target this instead of the Vercel web app, keeping the
+     *  chatty control plane off the serverless hot path. Defaults to the
+     *  Cloud Run service URL; will move to https://api.muzicai.ro once the
+     *  custom domain is mapped. Falls back to `webAppUrl` only if cleared. */
+    gatewayUrl: string;
     /** Origins allowed to call the public /audio/native/* routes without
      *  a device token. Loopback origins are always allowed. Supports
      *  wildcards in the form "https://*.example.com". */
@@ -88,6 +95,7 @@ const DEFAULTS: CompanionSettings = {
     serverPort: 17899,
     scanFolders: [],
     webAppUrl: "https://muzicai.ro",
+    gatewayUrl: "https://muzicai-gateway-f2aflobeva-ez.a.run.app",
     audioOriginAllowlist: [
         "https://muzicai.ro",
         "https://*.muzicai.ro",
@@ -137,7 +145,7 @@ function migrateLegacyConfigOnce(): void {
         // folders — the exact rebrand breakage. We never overwrite a non-empty
         // value already present in the new config.
         const RESTORE_KEYS = [
-            "scanFolders", "webAppUrl", "audioOriginAllowlist", "authorizedAudioDevices",
+            "scanFolders", "webAppUrl", "gatewayUrl", "audioOriginAllowlist", "authorizedAudioDevices",
             "telemetryEnabled", "preRemuxAutoOnScan", "startAtLogin", "closeToTray",
             "startMinimized", "serverPort", "deviceToken", "deviceId", "userId",
             "userName", "userEmail", "userImage", "tunnelToken", "tunnelHostname", "deviceName",
@@ -236,6 +244,15 @@ function healWebAppUrl(stored: string | undefined): string {
     return stored;
 }
 
+// Resolve the control-plane gateway URL. Older pairings (pre-gateway) have
+// no stored value → default to the production gateway. An empty/blank stored
+// value also means "use default" so a user can't accidentally brick the
+// heartbeat by clearing the field.
+function resolveGatewayUrl(stored: string | undefined): string {
+    const v = (stored ?? "").trim();
+    return v.length > 0 ? v : DEFAULTS.gatewayUrl;
+}
+
 // Heal serverPort if it's missing, 0, or out of the valid range. A 0
 // value silently bound the HTTP server to a random OS-chosen port,
 // breaking every loopback probe (web app expects 17899) and turning the
@@ -257,6 +274,8 @@ export function getSettings(): CompanionSettings {
     // local code without persisting a "localhost"-ish URL that would
     // break the next normal launch.
     const envOverride = process.env.MMO_WEB_APP_URL?.trim();
+    // Dev override for the gateway, mirroring MMO_WEB_APP_URL.
+    const gatewayEnvOverride = process.env.MMO_GATEWAY_URL?.trim();
     return {
         startAtLogin: store.get("startAtLogin") as boolean,
         closeToTray: store.get("closeToTray") as boolean,
@@ -267,6 +286,7 @@ export function getSettings(): CompanionSettings {
         // settings). Heals legacy `localhost:3000` values left over from
         // pairings made before the web app moved to port 13789.
         webAppUrl: envOverride || healWebAppUrl(store.get("webAppUrl") as string | undefined),
+        gatewayUrl: gatewayEnvOverride || resolveGatewayUrl(store.get("gatewayUrl") as string | undefined),
         audioOriginAllowlist: mergeAllowlistWithDefaults(store.get("audioOriginAllowlist") as string[] | undefined),
         authorizedAudioDevices: (store.get("authorizedAudioDevices") as AuthorizedAudioDevice[] | undefined) ?? [],
         telemetryEnabled: (store.get("telemetryEnabled") as boolean | undefined) ?? DEFAULTS.telemetryEnabled,

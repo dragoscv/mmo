@@ -2,6 +2,18 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.34 — heartbeat moves to the new API gateway (off Vercel)
+
+- **The device heartbeat / command channel now targets the dedicated MuzicAI
+	gateway (Hono on Cloud Run) instead of posting directly to the Vercel web
+	app.** The chatty ~10s announce loop was hitting serverless cold starts,
+	causing `AbortError` timeouts and a stale "last seen" that made the web
+	app show "Reconnecting to companion…" even while the companion was up. A
+	new `gatewayUrl` setting (default the Cloud Run service URL; override via
+	`MMO_GATEWAY_URL`) points the control plane at the long-lived gateway.
+	Audio, sync and OAuth still use the web app — only the heartbeat moved.
+	Existing pairings pick up the new default automatically; no re-pair needed.
+
 ## 1.0.33 — restore settings lost in the rebrand (fixes 403 / "can't reach companion")
 
 - **Recovers your scan folders, pairing and tunnel settings after the rebrand.**

@@ -12,6 +12,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — MuzicAI Gateway (`apps/gateway`, Hono on Cloud Run)
+
+- **New dedicated control-plane service for the companion**, replacing direct
+  companion→Vercel heartbeat posts. The Electron companion's ~10s announce loop
+  was hitting Vercel serverless cold starts (`AbortError` timeouts, stale
+  `last_seen_at`), which surfaced as the analyzer modal stuck on "Reconnecting
+  to companion…". The gateway is a long-lived Hono service on GCP Cloud Run
+  (`mmo-mw-prod`, `europe-west4`) that owns:
+  - `POST /api/devices/announce` — heartbeat + command channel, wire-compatible
+    with the legacy web route;
+  - `WS /ws` — persistent heartbeat where a live socket = `online` and a
+    disconnect flips the device `offline` instantly;
+  - `GET /health` — liveness.
+  It reuses the same Postgres (`DATABASE_URL`) and `AUTH_SECRET` as the web app
+  and declares only the control-plane schema slice (`devices`,
+  `device_commands`); `apps/web` stays the single owner of migrations.
+- **Companion** (`server` `1.0.34`) now targets the gateway via a new
+  `gatewayUrl` setting (default = Cloud Run URL, `MMO_GATEWAY_URL` override).
+  Existing pairings adopt it automatically.
+- Phase 2 (separate PR) will migrate the `/api/sync` data plane to the gateway
+  behind a shared `packages/db`.
+
 ### Fixed — analyzer "Reconnecting…" with multiple paired devices (`apps/web` `0.6.1`)
 
 - **Fixed the Reanalyze/analyzer modal stuck on "Reconnecting to companion…"

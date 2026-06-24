@@ -99,7 +99,10 @@ export function buildLanUrl(port: number): string | null {
  */
 async function postAnnounce(lanUrl: string | null): Promise<void> {
     const settings = getSettings();
-    const webAppUrl = settings.webAppUrl || "https://muzicai.ro";
+    // Control plane targets the gateway (Cloud Run), not the Vercel web
+    // app. Falls back to webAppUrl only if a gatewayUrl somehow resolves
+    // empty, so an older/misconfigured client still heartbeats somewhere.
+    const webAppUrl = settings.gatewayUrl || settings.webAppUrl || "https://muzicai.ro";
     const token = store.get("deviceToken") as string | undefined;
     if (!token) return; // not paired yet
 
