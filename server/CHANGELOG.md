@@ -2,6 +2,17 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.29 — stable tunnel transport
+
+- **Cloudflare tunnel forced to HTTP/2 (TCP) instead of QUIC (UDP).** The
+	default QUIC transport degraded mid-session on UDP-throttling networks
+	(residential ISPs, VPNs, Wi-Fi) — `failed to run the datagram handler` /
+	`control stream encountered a failure` — leaving the tunnel origin
+	unreachable for up to ~1 minute and surfacing to the web app as HTTP 530
+	(e.g. "Companion analyzer offline", audio stream drops). The companion now
+	spawns cloudflared with `--protocol http2 --edge-ip-version 4`, which is far
+	steadier. Overridable via `MMO_TUNNEL_PROTOCOL` / `MMO_TUNNEL_EDGE_IP`.
+
 ## 1.0.28 — rekordbox USB export + drive library management
 
 - **Rekordbox plug-and-play USB export.** New native `rbexport` sidecar

@@ -1,7 +1,7 @@
 {
-  "name": "mmo-companion",
-  "version": "1.0.28",
-  "description": "MMO Companion Server — serves local music files to MMO web app",
+  "name": "muzicai-companion",
+  "version": "1.0.29",
+  "description": "MuzicAI Companion Server — serves local music files to the MuzicAI web app",
   "main": "dist/main.js",
   "author": {
     "name": "mwrty",
@@ -31,8 +31,8 @@
     "test:watch": "vitest"
   },
   "build": {
-    "appId": "com.mwrty.mmo-companion",
-    "productName": "MMO Companion",
+    "appId": "ro.muzicai.companion",
+    "productName": "MuzicAI Companion",
     "artifactName": "${productName}-Setup-${version}.${ext}",
     "afterPack": "scripts/mac-adhoc-sign.js",
     "publish": [
@@ -169,12 +169,12 @@
       "icon": "assets/icon.png",
       "category": "AudioVideo;Audio",
       "synopsis": "MMO Companion — local music server for the MMO web app",
-      "description": "Electron companion daemon that serves your local music library, recordings, and downloads to the MMO web app. Bundles the BlackHole / pactl virtual-audio adapter so you can route per-deck audio without third-party drivers.",
+      "description": "Electron companion daemon that serves your local music library, recordings, and downloads to the MuzicAI web app. Bundles the BlackHole / pactl virtual-audio adapter so you can route per-deck audio without third-party drivers.",
       "maintainer": "mwrty <vladulescu.catalin@gmail.com>",
       "vendor": "mwrty",
       "desktop": {
         "entry": {
-          "Name": "MMO Companion",
+          "Name": "MuzicAI Companion",
           "Comment": "Local music server for the MMO web app",
           "Categories": "AudioVideo;Audio;"
         }

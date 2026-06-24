@@ -12,6 +12,17 @@
  * weekly, handles every transport/QUIC/H2/H1 quirk, and recovers from
  * its own faults. Re-implementing any of that in Node is folly.
  *
+ * Transport: we force `--protocol http2` (TCP/7844) by default instead of
+ * the cloudflared default `auto` (QUIC/UDP). Residential ISPs, VPNs and
+ * Wi-Fi frequently throttle or drop sustained outbound UDP, which makes
+ * QUIC's control/datagram streams fail mid-session ("failed to run the
+ * datagram handler", "control stream encountered a failure"), leaving the
+ * tunnel origin unreachable for up to ~1 minute and surfacing as HTTP 530
+ * to the web app. http2 over TCP is far more stable on such networks. We
+ * also pin `--edge-ip-version 4` because the failing connections were to
+ * IPv6 edge IPs on dual-stack hosts with broken IPv6. Both are overridable
+ * via MMO_TUNNEL_PROTOCOL / MMO_TUNNEL_EDGE_IP for debugging.
+ *
  * Crash recovery: exponential backoff capped at 60s. We never expose
  * the token via process args list (`ps`) — we pass it via env var
  * `TUNNEL_TOKEN`, which cloudflared respects.
@@ -87,9 +98,22 @@ function spawnOnce(): void {
         pushDebugLog("warn", "[cloudflared] binary not found; tunnel disabled");
         return;
     }
-    pushDebugLog("info", `[cloudflared] spawning ${bin}`);
+    // Force a stable transport. QUIC (the cloudflared default) is unreliable
+    // on UDP-throttling networks and degrades mid-session; http2 over TCP is
+    // far steadier. Both knobs are overridable for debugging.
+    const protocol = process.env.MMO_TUNNEL_PROTOCOL || "http2";
+    const edgeIp = process.env.MMO_TUNNEL_EDGE_IP || "4";
+    const args = [
+        "tunnel",
+        "--no-autoupdate",
+        "--protocol", protocol,
+        "--edge-ip-version", edgeIp,
+        "--loglevel", "info",
+        "run",
+    ];
+    pushDebugLog("info", `[cloudflared] spawning ${bin} (protocol=${protocol}, edge-ip=${edgeIp})`);
     try {
-        child = spawn(bin, ["tunnel", "--no-autoupdate", "run"], {
+        child = spawn(bin, args, {
             env: { ...process.env, TUNNEL_TOKEN: activeToken ?? "" },
             stdio: ["ignore", "pipe", "pipe"],
             windowsHide: true,
