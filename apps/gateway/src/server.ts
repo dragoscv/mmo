@@ -16,6 +16,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { handleAnnounce } from "./routes/announce.js";
+import { handleSyncGet, handleSyncPost } from "./routes/sync.js";
 import { attachUpgradeHandler, createCompanionWss } from "./ws/hub.js";
 
 const app = new Hono();
@@ -32,6 +33,8 @@ app.get("/health", (c) => c.json({ ok: true, service: "muzicai-gateway", ts: Dat
 app.get("/", (c) => c.text("muzicai-gateway"));
 
 app.post("/api/devices/announce", handleAnnounce);
+app.get("/api/sync", handleSyncGet);
+app.post("/api/sync", handleSyncPost);
 
 const port = Number(process.env.PORT ?? 8080);
 

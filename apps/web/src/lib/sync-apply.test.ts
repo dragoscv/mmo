@@ -11,6 +11,7 @@
  *   3. Writes ignored by LWW report `{ skipped: true, changed: false }`.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { setDb, applyTrackUpsert, applyPlaylistUpsert, applyCuepointUpsert } from "@mmo/db";
 
 // ---- Stub the @/db module BEFORE importing the unit under test ------------
 
@@ -25,7 +26,7 @@ const state: {
     deleteCalls: number;
 } = { nextRow: [], nextRowQueue: null, insertCalls: [], updateCalls: [], deleteCalls: 0 };
 
-vi.mock("@/db", () => {
+function makeMockDb() {
     const select = () => ({
         from: () => ({
             where: () => ({
@@ -61,15 +62,13 @@ vi.mock("@/db", () => {
     });
 
     return {
-        db: {
-            select,
-            insert,
-            update,
-            delete: del,
-            query: { devices: { findFirst: async () => null } },
-        },
+        select,
+        insert,
+        update,
+        delete: del,
+        query: { devices: { findFirst: async () => null } },
     };
-});
+}
 
 // Drizzle's `eq` / `and` / `sql` are called for argument shape only — return
 // opaque markers; our stub `where()` doesn't care about their content.
@@ -79,10 +78,10 @@ vi.mock("drizzle-orm", () => ({
     sql: Object.assign(() => "SQL", { raw: (s: string) => s }),
 }));
 
-// `@/db/schema` is referenced by the unit only for column accessors; the
+// `./schema` is referenced by the unit only for column accessors; the
 // stubbed query builders never read those values, so a proxy that returns
 // itself for every property satisfies every chained access.
-vi.mock("@/db/schema", () => {
+vi.mock("@mmo/db/schema", () => {
     const proxy: unknown = new Proxy({}, { get: () => proxy });
     return {
         tracks: proxy,
@@ -94,11 +93,16 @@ vi.mock("@/db/schema", () => {
         syncLog: proxy,
         devices: proxy,
         users: proxy,
+        trackSources: proxy,
     };
 });
+vi.mock("@mmo/db/schema-projects", () => {
+    const proxy: unknown = new Proxy({}, { get: () => proxy });
+    return { PROJECT_TABLES: {}, PROJECT_SYNC_ENTITY: {}, projectSnapshots: proxy, projectAssets: proxy };
+});
+vi.mock("@mmo/db/schema-projects-normalized", () => ({ SUB_TABLES: {} }));
 
-// ---- Now import the unit under test ---------------------------------------
-import { applyTrackUpsert, applyPlaylistUpsert, applyCuepointUpsert } from "./sync-apply";
+// (functions imported from @mmo/db at top; mocks above are hoisted by vitest)
 
 const change = (over: Partial<{ payload: Record<string, unknown>; updatedAt: string; op: "upsert" | "delete" }> = {}) => ({
     entity: "tracks" as const,
@@ -115,6 +119,7 @@ beforeEach(() => {
     state.insertCalls = [];
     state.updateCalls = [];
     state.deleteCalls = 0;
+    setDb(makeMockDb());
 });
 
 describe("applyTrackUpsert (per-field LWW)", () => {

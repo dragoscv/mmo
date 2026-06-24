@@ -61,8 +61,8 @@ export interface CompanionSettings {
      *  Run). The device heartbeat + command channel (HTTP announce and
      *  WebSocket) target this instead of the Vercel web app, keeping the
      *  chatty control plane off the serverless hot path. Defaults to the
-     *  Cloud Run service URL; will move to https://api.muzicai.ro once the
-     *  custom domain is mapped. Falls back to `webAppUrl` only if cleared. */
+    *  https://api.muzicai.ro (Cloud Run custom domain). Falls back to
+    *  `webAppUrl` only if cleared. */
     gatewayUrl: string;
     /** Origins allowed to call the public /audio/native/* routes without
      *  a device token. Loopback origins are always allowed. Supports
@@ -95,7 +95,7 @@ const DEFAULTS: CompanionSettings = {
     serverPort: 17899,
     scanFolders: [],
     webAppUrl: "https://muzicai.ro",
-    gatewayUrl: "https://muzicai-gateway-f2aflobeva-ez.a.run.app",
+    gatewayUrl: "https://api.muzicai.ro",
     audioOriginAllowlist: [
         "https://muzicai.ro",
         "https://*.muzicai.ro",

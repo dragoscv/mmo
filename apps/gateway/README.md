@@ -19,6 +19,7 @@ home for a control plane.
 | --- | --- | --- |
 | HTTP | `GET /health` | Liveness (NOT `/healthz` — reserved by Google Frontend) |
 | HTTP | `POST /api/devices/announce` | Heartbeat + command channel (wire-compatible with the legacy web route) |
+| HTTP | `GET/POST /api/sync` | Cloud library sync (per-field LWW), shared logic from `@mmo/db` |
 | WS | `/ws` | Persistent heartbeat + command channel — a live socket means `online`; disconnect flips the device `offline` instantly |
 
 It reuses the **same Postgres** (`DATABASE_URL`) and **same `AUTH_SECRET`** as
@@ -56,15 +57,13 @@ pwsh deploy.ps1                 # Cloud Build + Cloud Run (project mmo-mw-prod, 
 pwsh deploy.ps1 -SkipBuild      # redeploy current image
 ```
 
-Live: `https://muzicai-gateway-f2aflobeva-ez.a.run.app`
-(custom domain `api.muzicai.ro` pending domain verification / Host-header rule).
+Live: `https://api.muzicai.ro` (Cloud Run custom domain) /
+`https://muzicai-gateway-f2aflobeva-ez.a.run.app` (origin).
 
 ## Roadmap
 
-- **Phase 2**: move the `/api/sync` data plane here, reusing a shared
-  `packages/db`. (Sync is ~1500 lines of LWW conflict logic on live user data —
-  migrated in its own verified pass.)
-- Companion WebSocket client (currently the companion uses the HTTP announce
-  path against the gateway; the WS endpoint is live and tested).
-- Map `api.muzicai.ro` once the zone is verified for the GCP account or a
-  Cloudflare Origin Rule (Host override) is permitted by the API token.
+- ✅ **Phase 2 done**: `/api/sync` runs here via shared `@mmo/db`.
+- ✅ Companion WebSocket heartbeat client (HTTP fallback retained).
+- ✅ `api.muzicai.ro` mapped (Cloud Run domain mapping + Cloudflare CNAME).
+- Next: move the remaining `device_commands` requester half + library reads
+   off Vercel; consider LISTEN/NOTIFY for fully event-driven WS command push.

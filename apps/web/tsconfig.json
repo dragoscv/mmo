@@ -46,6 +46,18 @@
       ],
       "@mmo/sdk": [
         "../../packages/sdk/src/index.ts"
+      ],
+      "@mmo/db": [
+        "../../packages/db/src/index.ts"
+      ],
+      "@mmo/db/*": [
+        "../../packages/db/src/*"
+      ],
+      "drizzle-orm": [
+        "./node_modules/drizzle-orm"
+      ],
+      "drizzle-orm/*": [
+        "./node_modules/drizzle-orm/*"
       ]
     }
   },

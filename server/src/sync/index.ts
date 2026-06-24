@@ -12,7 +12,7 @@
  * `startCloudSync()` are no-ops; calls afterwards land in the queue.
  */
 
-import { store } from "../store";
+import { getSettings, store } from "../store";
 import { getLibrarySqlite } from "../library/db";
 import { log } from "../lib/logger";
 import { CloudSyncClient, type SyncChange } from "./cloud-sync-client";
@@ -41,7 +41,14 @@ function readSeed(): { apiUrl: string; deviceToken: string } | null {
     // (against tunnel)" task) so cloud sync targets the local Next.js dev
     // server via the tunnel, exactly like announce/OAuth do through
     // getSettings(). Falls back to the stored value, then production.
+    // Sync is part of the control/data plane that now lives on the gateway
+    // (Cloud Run), not the Vercel web app. Prefer the gateway; the dev
+    // override and webAppUrl remain fallbacks. MMO_GATEWAY_URL mirrors the
+    // MMO_WEB_APP_URL dev override used by announce/OAuth.
+    // getSettings() resolves the gateway default + MMO_GATEWAY_URL override
+    // even for older pairings that never stored a gatewayUrl.
     const apiUrl =
+        getSettings().gatewayUrl ||
         process.env.MMO_WEB_APP_URL?.trim() ||
         (store.get("webAppUrl") as string | undefined) ||
         "https://muzicai.ro";

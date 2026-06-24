@@ -2,6 +2,14 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.36 — cloud sync moves to the gateway (api.muzicai.ro)
+
+- **Cloud library sync now runs against the gateway** (`api.muzicai.ro`) instead
+	of the Vercel web app, alongside the heartbeat. Same last-write-wins
+	behaviour, identical conflict resolution (shared code), just served by the
+	dedicated long-lived service. The control plane default is now the stable
+	`api.muzicai.ro` custom domain. Existing pairings switch automatically.
+
 ## 1.0.35 — persistent WebSocket heartbeat to the gateway
 
 - **The companion now keeps a persistent WebSocket open to the gateway** for

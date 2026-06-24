@@ -12,6 +12,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — Phase 2: shared `@mmo/db` + sync on the gateway; `api.muzicai.ro`
+
+- **New shared `packages/db`** is now the single source of truth for the
+  Drizzle schema, consumed by both `apps/web` and `apps/gateway`. The schema
+  files moved out of `apps/web/src/db`; thin re-export shims keep all existing
+  `@/db/schema*` imports working unchanged. The sync conflict logic
+  (`sync-apply.ts`, per-field LWW) also moved here and is now run identically by
+  the web route and the gateway (db client injected via `setDb`), so there is
+  no drift.
+- **Phase 2 sync on the gateway**: `GET/POST /api/sync` now served by
+  `apps/gateway`, reusing the shared `@mmo/db` logic. Free-tier device gate +
+  per-field LWW preserved. Track changes fire a best-effort cache-bust to the
+  web app's new `POST /api/internal/revalidate` hook so `/library` facets
+  refresh.
+- **`api.muzicai.ro`** mapped to the gateway (Cloud Run domain mapping +
+  Cloudflare DNS-only CNAME). Companion (`server` `1.0.36`) now defaults its
+  control plane + sync to `api.muzicai.ro`.
+- **Companion** (`server` `1.0.35`) gained a persistent gateway WebSocket
+  client for the heartbeat (instant online/offline) with HTTP fallback.
+
 ### Added — MuzicAI Gateway (`apps/gateway`, Hono on Cloud Run)
 
 - **New dedicated control-plane service for the companion**, replacing direct

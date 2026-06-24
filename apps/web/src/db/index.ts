@@ -52,3 +52,8 @@ if (process.env.NODE_ENV !== "production") {
 
 export const db = drizzle(sqlClient, { schema });
 export { sqlClient as sql };
+
+// Inject this client into the shared data-plane logic (sync-apply) so the
+// web sync route and the gateway run identical code over their own pools.
+import { setDb } from "@mmo/db";
+setDb(db);

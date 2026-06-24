@@ -20,7 +20,11 @@
  * during pull (see route GET).
  */
 
-import { db } from "@/db";
+import { getDb } from "./runtime-db";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type * as schemaCore from "./schema";
+import type * as schemaProjects from "./schema-projects";
+import type * as schemaNormalized from "./schema-projects-normalized";
 import {
     tracks,
     playlists,
@@ -30,16 +34,28 @@ import {
     cuepoints,
     syncLog,
     trackSources,
-} from "@/db/schema";
+} from "./schema";
 import {
     PROJECT_TABLES,
     PROJECT_SYNC_ENTITY,
     projectSnapshots,
     projectAssets,
     type ProjectKind,
-} from "@/db/schema-projects";
-import { SUB_TABLES, type SubEntity } from "@/db/schema-projects-normalized";
+} from "./schema-projects";
+import { SUB_TABLES, type SubEntity } from "./schema-projects-normalized";
 import { and, eq, sql } from "drizzle-orm";
+
+// Lazy proxy so the 42 `db.*` call sites below resolve the injected client
+// at call time (after setDb at startup) without reindenting the file. Typed
+// as the full schema-aware Drizzle client so call sites keep their types.
+type SyncDb = PostgresJsDatabase<
+    typeof schemaCore & typeof schemaProjects & typeof schemaNormalized
+>;
+const db: SyncDb = new Proxy({} as SyncDb, {
+    get(_t, prop) {
+        return (getDb() as Record<string | symbol, unknown>)[prop];
+    },
+});
 
 export type SyncEntity =
     | "tracks"

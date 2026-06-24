@@ -26,3 +26,8 @@ const client = postgres(connectionString, {
 export const db = drizzle(client, { schema });
 export { client };
 export * as schema from "./schema.js";
+
+// Inject this client into the shared data-plane logic (@mmo/db sync-apply)
+// so the gateway runs the identical conflict-resolution code as apps/web.
+import { setDb } from "@mmo/db";
+setDb(db);

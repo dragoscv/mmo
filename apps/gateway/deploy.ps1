@@ -20,6 +20,12 @@ $repoRoot = Resolve-Path (Join-Path $root "../..")
 $image = "europe-west4-docker.pkg.dev/${Project}/mmo/${Service}:latest"
 
 if (-not $SkipBuild) {
+    Write-Host "=== Building bundle locally (tsup) ===" -ForegroundColor Magenta
+    Push-Location $root
+    & pnpm build
+    $bc = $LASTEXITCODE
+    Pop-Location
+    if ($bc -ne 0) { throw "Local tsup build failed" }
     Write-Host "=== Building $image via Cloud Build ===" -ForegroundColor Magenta
     & gcloud builds submit $root --tag $image --project $Project
     if ($LASTEXITCODE -ne 0) { throw "Cloud Build failed" }
@@ -41,6 +47,11 @@ foreach ($k in $keys) {
     if ($envMap.ContainsKey($k) -and $envMap[$k]) { $pairs += "$k=$($envMap[$k])" }
 }
 $pairs += "CORS_ALLOW_ORIGINS=https://muzicai.ro"
+# Web facet-cache revalidation hook (Phase 2 sync). Optional.
+if ($envMap.ContainsKey("WEB_REVALIDATE_SECRET") -and $envMap["WEB_REVALIDATE_SECRET"]) {
+    $pairs += "WEB_REVALIDATE_SECRET=$($envMap['WEB_REVALIDATE_SECRET'])"
+    $pairs += "WEB_REVALIDATE_URL=https://muzicai.ro/api/internal/revalidate"
+}
 $envArg = ($pairs -join "`n")
 
 # Write env vars to a temp YAML to avoid comma-splitting issues with values

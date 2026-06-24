@@ -20,7 +20,7 @@
 import { db } from "@/db";
 import { devices, syncLog } from "@/db/schema";
 import { getSubscription } from "@/lib/stripe";
-import { applyChange, appendSyncLog, type SyncChange } from "@/lib/sync-apply";
+import { applyChange, appendSyncLog, type SyncChange } from "@mmo/db";
 import { libraryFacetsTag } from "@/lib/cloud-library";
 import { revalidateTag } from "next/cache";
 import { and, eq, gt, isNull, ne, or } from "drizzle-orm";

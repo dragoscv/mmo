@@ -23,6 +23,12 @@ export default defineConfig({
     resolve: {
         alias: {
             "@": path.resolve(__dirname, "src"),
+            // Shared schema/sync package (consumed via tsconfig path alias).
+            "@mmo/db/schema-projects-normalized": path.resolve(__dirname, "../../packages/db/src/schema-projects-normalized.ts"),
+            "@mmo/db/schema-projects": path.resolve(__dirname, "../../packages/db/src/schema-projects.ts"),
+            "@mmo/db/schema-ai": path.resolve(__dirname, "../../packages/db/src/schema-ai.ts"),
+            "@mmo/db/schema": path.resolve(__dirname, "../../packages/db/src/schema.ts"),
+            "@mmo/db": path.resolve(__dirname, "../../packages/db/src/index.ts"),
             // `server-only` is a Next.js sentinel package that throws if
             // imported into a client bundle. Vitest doesn't ship it; alias
             // to a no-op so server-side modules with `import "server-only"`
