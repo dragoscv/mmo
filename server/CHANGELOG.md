@@ -2,6 +2,16 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.32 — setup window stays open until you close it
+
+- **The analyzer setup window no longer auto-closes.** When provisioning
+	finishes it shows a green "All done" state with a **Close** button and waits
+	for you — it won't vanish on its own. On error it stays open too, with a
+	short explanation, so nothing disappears silently.
+- Note: if the analyzer still shows "offline" in the web app, the **companion
+	app simply isn't running** — launch it and the managed Python 3.12 env
+	(already provisioned with stems + GPU) is used automatically.
+
 ## 1.0.31 — fully automatic analyzer setup (managed Python + stems + GPU)
 
 - **Stems now work completely, automatically.** The companion provisions an

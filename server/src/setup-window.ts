@@ -29,6 +29,9 @@ export interface SetupUpdate {
     steps?: Array<{ id: string; label: string; state: "pending" | "active" | "done" | "error" }>;
     /** When true, the window switches to an error style and stops the spinner. */
     error?: boolean;
+  /** When true, setup is finished — reveal the Close button and stop the
+   *  spinner. The window then stays open until the user closes it. */
+  done?: boolean;
 }
 
 let win: BrowserWindow | null = null;
@@ -59,7 +62,11 @@ function html(dark: boolean): string {
   li.active { color:${fg}; } li.active .ico { border-color:${accent}; border-top-color:transparent; animation:spin .8s linear infinite; }
   li.error { color:#ff6b6b; } li.error .ico { border-color:#ff6b6b; color:#ff6b6b; }
   @keyframes spin { to { transform:rotate(360deg); } }
-  .foot { margin-top:auto; color:${sub}; font-size:10.5px; }
+  .foot { margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .foot .hint { color:${sub}; font-size:10.5px; }
+  #close { display:none; border:0; border-radius:8px; padding:8px 18px; font-size:12.5px; font-weight:600; color:#fff; background:${accent}; cursor:pointer; }
+  #close:hover { filter:brightness(1.08); }
+  #close:active { transform:translateY(1px); }
 </style></head><body>
 <div class="wrap">
   <div class="title"><span class="dot" id="dot"></span> Setting up MuzicAI analyzer</div>
@@ -67,7 +74,10 @@ function html(dark: boolean): string {
   <div class="bar"><div class="fill" id="fill"></div></div>
   <div class="msg" id="msg">Starting…</div>
   <ul class="steps" id="steps"></ul>
-  <div class="foot">You can keep using the app while this finishes.</div>
+  <div class="foot">
+    <span class="hint" id="hint">You can keep using the app while this finishes.</span>
+    <button id="close" onclick="window.close()">Close</button>
+  </div>
 </div>
 <script>
   window.__update = function(u){
@@ -75,6 +85,12 @@ function html(dark: boolean): string {
       document.getElementById('fill').style.width = Math.max(0,Math.min(100,Math.round((u.pct||0)*100))) + '%';
       if(u.msg) document.getElementById('msg').textContent = u.msg;
       if(u.error){ document.getElementById('dot').style.animation='none'; document.getElementById('dot').style.background='#ff6b6b'; }
+      if(u.done || u.error){
+        document.getElementById('dot').style.animation='none';
+        if(!u.error){ document.getElementById('dot').style.background='#3ddc84'; }
+        var btn=document.getElementById('close'); btn.style.display='inline-block';
+        document.getElementById('hint').textContent = u.error ? 'Setup finished with some issues — details above.' : 'All done — you can close this window.';
+      }
       if(Array.isArray(u.steps)){
         var ul=document.getElementById('steps'); ul.innerHTML='';
         u.steps.forEach(function(s){

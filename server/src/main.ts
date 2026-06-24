@@ -1311,12 +1311,22 @@ app.whenReady().then(async () => {
                 const { changed } = await analyzer.ensureDepsInstalled((u) => {
                     setup.updateSetupWindow(u);
                 });
-                // Hold the final state briefly, then close.
-                setup.closeSetupWindow(changed ? 2200 : 600);
+                // Leave the window open with a Close button — the user closes it
+                // when ready (explicit request). If nothing actually changed we
+                // never showed it anyway.
+                setup.updateSetupWindow({ pct: 1, msg: "Analyzer ready — stems, BPM, key, loudness & fingerprint are available.", done: true });
                 logLine("info", `analyzer provisioning done (changed=${changed})`);
             } catch (err) {
                 logLine("warn", "analyzer provisioning failed:", err as Error);
-                try { (await import("./setup-window")).closeSetupWindow(3000); } catch { /* ignore */ }
+                // Leave the window open (with Close button) showing the error so
+                // the user can see what happened rather than a vanished window.
+                try {
+                    (await import("./setup-window")).updateSetupWindow({
+                        pct: 1,
+                        msg: "Setup hit a problem — it will retry next launch. You can close this.",
+                        error: true,
+                    });
+                } catch { /* ignore */ }
             }
         })();
     });
