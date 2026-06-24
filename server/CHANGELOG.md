@@ -2,6 +2,17 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.35 — persistent WebSocket heartbeat to the gateway
+
+- **The companion now keeps a persistent WebSocket open to the gateway** for
+	its heartbeat + command channel instead of polling every few seconds.
+	Benefits: the web app flips your device online/offline instantly (no more
+	waiting for a stale "last seen" to expire), lower latency for folder
+	pickers / audio enumeration, and far less chatter. If the socket can't be
+	established it automatically falls back to the previous HTTP heartbeat, so
+	connectivity is never worse than before. Reconnects with backoff across
+	sleep / Wi-Fi roams.
+
 ## 1.0.34 — heartbeat moves to the new API gateway (off Vercel)
 
 - **The device heartbeat / command channel now targets the dedicated MuzicAI
