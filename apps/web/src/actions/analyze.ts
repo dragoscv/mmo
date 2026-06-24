@@ -313,11 +313,38 @@ export async function applyAnalysisChanges(
 // These actions are thin proxies — the actual queue + persistence lives
 // on the companion so jobs survive web-app refreshes.
 
+// Cloudflare/tunnel + transport hiccups that mean "couldn't reach the
+// companion right now" rather than "analyzer is offline / deps missing".
+// 530/520-526 are Cloudflare origin errors; 502/503/504 are gateway/timeouts.
+const TRANSIENT_STATUS = /\((5(?:3\d|2\d|0[234]))\)/; // 502,503,504,520-539
+function isTransientCompanionError(msg: string): boolean {
+    return TRANSIENT_STATUS.test(msg) || /timed out|timeout|fetch failed|ECONNRESET|ETIMEDOUT|network/i.test(msg);
+}
+
 export async function getAnalyzerHealth(): Promise<AnalyzerHealth> {
     const link = await getCompanionLink();
     if (!link) return { ok: false, reason: "Companion not connected" };
-    try { return await companionAnalyzer.health(link); }
-    catch (e) { return { ok: false, reason: e instanceof Error ? e.message : String(e) }; }
+    // The per-device Cloudflare tunnel occasionally drops/reconnects, which
+    // surfaces as a 530. Retry a couple of times before giving up so a blip
+    // doesn't masquerade as "analyzer offline — pip install …".
+    let lastErr = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            return await companionAnalyzer.health(link);
+        } catch (e) {
+            lastErr = e instanceof Error ? e.message : String(e);
+            if (!isTransientCompanionError(lastErr)) break;
+            if (attempt < 2) await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+        }
+    }
+    const transient = isTransientCompanionError(lastErr);
+    return {
+        ok: false,
+        transient,
+        reason: transient
+            ? "Couldn't reach the companion (connection dropped). It may be reconnecting — try again in a moment."
+            : lastErr,
+    };
 }
 
 export async function startDspAnalysis(

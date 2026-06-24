@@ -12,6 +12,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — analyzer health resilience + larger Reanalyze modal (`apps/web` `0.5.11`)
+
+- **No more false "Companion analyzer offline" on a tunnel blip.** The
+  Reanalyze Library modal showed *"Companion GET /library/analyze/health
+  failed (530) — pip install …"* when the per-device Cloudflare tunnel briefly
+  dropped (HTTP 530 is an origin-unreachable error, not missing deps).
+  `getAnalyzerHealth` now retries transient connectivity errors
+  (530/520-539/502/503/504/timeouts) up to 3× and, if still failing, reports a
+  clear "reconnecting — try again" state with a **Retry now** button instead
+  of the misleading pip-install hint.
+- **Larger Reanalyze Library modal.** Widened to 1400px (from 1100px) and
+  taller (94vh) so the options grid and companion status fit without cramping.
+
 ### Fixed — audio playback over the cloud + faster /library (`apps/web` `0.5.10`)
 
 - **Music now plays when the web app is hosted.** `/api/audio/[id]` returned

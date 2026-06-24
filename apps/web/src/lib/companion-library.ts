@@ -500,6 +500,11 @@ export interface AnalyzerHealth {
     available?: Record<string, boolean>;
     gpu?: GpuInfo;
     reason?: string;
+    /** True when the failure is a transient connectivity problem (tunnel
+     *  530/502/503/504 or timeout) rather than a real analyzer-offline /
+     *  missing-deps state. The UI shows "reconnecting / retry" instead of
+     *  the misleading pip-install hint. */
+    transient?: boolean;
 }
 
 export interface AnalyzerLogEntry {

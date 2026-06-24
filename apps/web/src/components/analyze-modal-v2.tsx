@@ -203,6 +203,15 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
         }
     }, [open]);
 
+    // Manual re-probe (used by the "Retry now" link on a transient/connection
+    // failure). Resets the miss counter so a recovered companion flips green
+    // immediately.
+    const refreshCompanionHealth = useCallback(async () => {
+        const h = await getAnalyzerHealth();
+        setCompanion(h);
+        setCompanionMisses(h.ok ? 0 : 2);
+    }, []);
+
     // Probe the companion when the config view is open. Re-probe every
     // 8 s in the background so users see the badge flip green as soon
     // as the companion comes online (handy when launching the app).
@@ -439,7 +448,7 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-5xl w-[min(92vw,1100px)] max-h-[92vh] flex flex-col gap-0 p-0 overflow-hidden">
+            <DialogContent className="max-w-[1400px] w-[min(96vw,1400px)] max-h-[94vh] flex flex-col gap-0 p-0 overflow-hidden">
                 {/* Header */}
                 <DialogHeader className="px-6 pt-6 pb-4 border-b border-[var(--border)] shrink-0">
                     <DialogTitle className="flex items-center gap-2">
@@ -506,6 +515,18 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                             >
                                                 Open the Analysis page →
                                             </a>
+                                        </span>
+                                    ) : companion?.transient ? (
+                                        <span>
+                                            <strong className="font-semibold">Reconnecting to companion…</strong>{" "}
+                                            {companion?.reason ?? "The connection dropped momentarily."}{" "}
+                                            <button
+                                                type="button"
+                                                onClick={() => { void refreshCompanionHealth(); }}
+                                                className="font-medium text-amber-300 underline-offset-2 hover:underline"
+                                            >
+                                                Retry now →
+                                            </button>
                                         </span>
                                     ) : (
                                         <span>
