@@ -55,9 +55,25 @@ export async function getCompanionLink(): Promise<CompanionLink | null> {
         .where(eq(devices.userId, userId));
     const usable = rows.filter((d) => d.apiUrl && d.tokenEncrypted);
     if (usable.length === 0) return null;
-    // Prefer a device with a loopback api_url (a true local companion).
-    const local = usable.find((d) => isLoopbackUrl(d.apiUrl!));
-    const chosen = local ?? usable[0];
+    // Choose the BEST device, not an arbitrary one. With multiple paired
+    // machines (e.g. desktop + laptop) the previous code picked whichever row
+    // the DB returned first, which could be a long-offline device whose tunnel
+    // is dead → every probe 530s ("Reconnecting…"). Rank by:
+    //   1. recently-seen (online within the heartbeat window) first,
+    //   2. then a true-local loopback api_url,
+    //   3. then most-recent last_seen_at.
+    const ONLINE_WINDOW_MS = 90_000;
+    const now = Date.now();
+    const seenMs = (d: typeof usable[number]) => (d.lastSeenAt ? new Date(d.lastSeenAt).getTime() : 0);
+    const isOnline = (d: typeof usable[number]) => now - seenMs(d) <= ONLINE_WINDOW_MS;
+    const ranked = [...usable].sort((a, b) => {
+        const ao = isOnline(a) ? 1 : 0, bo = isOnline(b) ? 1 : 0;
+        if (ao !== bo) return bo - ao;
+        const al = isLoopbackUrl(a.apiUrl!) ? 1 : 0, bl = isLoopbackUrl(b.apiUrl!) ? 1 : 0;
+        if (al !== bl) return bl - al;
+        return seenMs(b) - seenMs(a);
+    });
+    const chosen = ranked[0];
     const bearer = await materializeDeviceToken(chosen);
     if (!bearer) return null;
     const chosenUrl = pickCompanionUrl(chosen);

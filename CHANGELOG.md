@@ -12,6 +12,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — analyzer "Reconnecting…" with multiple paired devices (`apps/web` `0.6.1`)
+
+- **Fixed the Reanalyze/analyzer modal stuck on "Reconnecting to companion…"
+  when more than one device is paired.** `getCompanionLink()` picked an
+  arbitrary device row (DB order), so it could select a long-offline machine
+  whose Cloudflare tunnel is dead — every probe returned 530 even though the
+  active companion was online (audio playback worked because it resolves the
+  device per-track). It now ranks paired devices by **online (within the
+  heartbeat window) → true-local loopback → most-recent `last_seen_at`** and
+  picks the best one.
+
 ### Changed — complete rebrand to **MuzicAI** (`apps/web` `0.6.0`)
 
 - **New brand identity: MuzicAI (muzicai.ro).** Replaced the inconsistent
