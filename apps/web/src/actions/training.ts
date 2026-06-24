@@ -792,8 +792,8 @@ function describePatch(p: ControlPatch): string {
  *  apply them twice. Auth check is by the route (HMAC, not user). */
 // `consumeControlSignalForTrainer` + `ingestTrainerEvent` moved to the shared
 // @mmo/db package (trainer-facing M2M logic, run by both the web route and the
-// gateway). Re-exported below so existing imports keep working.
-export { consumeControlSignalForTrainer, ingestTrainerEvent } from "@mmo/db";
+// gateway). Consumers import them directly from "@mmo/db" — a "use server"
+// file may only export async functions, so we cannot re-export them here.
 
 // ─── Cancel ─────────────────────────────────────────────────────────────
 

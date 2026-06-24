@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { consumeControlSignalForTrainer, patchControlSignal } from "@/actions/training";
+import { consumeControlSignalForTrainer } from "@mmo/db";
+import { patchControlSignal } from "@/actions/training";
 import { auth } from "@/auth";
 import { timingSafeEqual } from "node:crypto";
 

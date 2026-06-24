@@ -27,7 +27,7 @@ import { db } from "@/db";
 import { trainingJobs, trainingEvents } from "@/db/schema-training";
 import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 
-import { ingestTrainerEvent } from "@/actions/training";
+import { ingestTrainerEvent } from "@mmo/db";
 
 const STALE_AFTER_MINUTES = 5;
 const SCRIPT_PATH = path.resolve(process.cwd(), "..", "infra", "vertex", "status-job.py");

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { ingestTrainerEvent } from "@/actions/training";
+import { ingestTrainerEvent } from "@mmo/db";
 import { timingSafeEqual } from "node:crypto";
 
 /**
