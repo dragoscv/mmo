@@ -20,7 +20,8 @@
       "@mmo/db": ["../../packages/db/src/index.ts"],
       "@mmo/db/*": ["../../packages/db/src/*"],
       "drizzle-orm": ["./node_modules/drizzle-orm"],
-      "drizzle-orm/*": ["./node_modules/drizzle-orm/*"]
+      "drizzle-orm/*": ["./node_modules/drizzle-orm/*"],
+      "zod": ["./node_modules/zod"]
     }
   },
   "include": ["src/**/*.ts"],

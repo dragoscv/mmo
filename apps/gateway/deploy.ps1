@@ -42,6 +42,9 @@ Get-Content $envFile | ForEach-Object {
     $envMap[$_.Substring(0, $i).Trim()] = $_.Substring($i + 1).Trim()
 }
 $keys = @("DATABASE_URL", "AUTH_SECRET", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_TUNNEL_ZONE_ID", "CLOUDFLARE_TUNNEL_BASE_HOSTNAME")
+# MMO_TRAINER_SECRET gates the trainer-facing M2M endpoints (webhook /
+# control / reconcile) moved off Vercel.
+if ($envMap.ContainsKey("MMO_TRAINER_SECRET")) { $keys += "MMO_TRAINER_SECRET" }
 $pairs = @()
 foreach ($k in $keys) {
     if ($envMap.ContainsKey($k) -and $envMap[$k]) { $pairs += "$k=$($envMap[$k])" }

@@ -12,6 +12,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed — training M2M endpoints moved off Vercel to the gateway (`apps/web` `0.6.3`)
+
+- **The trainer-facing machine-to-machine training endpoints now live on the
+  gateway** (`api.muzicai.ro`), completing the migration of non-browser traffic
+  off Vercel:
+  - `POST /api/training/webhook` (trainer progress events)
+  - `GET /api/training/control/:jobId` (trainer polls control signal)
+  - `POST /api/internal/reconcile` (Vertex job reconciler)
+  The shared logic (`ingestTrainerEvent`, `consumeControlSignalForTrainer`) moved
+  to `@mmo/db` so the web route and gateway run identical code; the web route
+  PATCH half (user-driven, NextAuth) stays on Vercel.
+- **Vertex reconciler rewritten for Cloud Run**: queries the Vertex AI REST API
+  with the instance metadata-server token (no `spawn(python)`); driven by **GCP
+  Cloud Scheduler** every 2 min instead of Vercel Cron (removed from
+  `vercel.json`).
+- Net result: everything the desktop companion AND the Python trainers call is
+  now on Google Cloud; Vercel serves only the browser-facing Next.js app + its
+  session/billing/cron-free routes.
+
 ### Added — Phase 2: shared `@mmo/db` + sync on the gateway; `api.muzicai.ro`
 
 - **New shared `packages/db`** is now the single source of truth for the

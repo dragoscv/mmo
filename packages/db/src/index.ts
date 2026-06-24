@@ -15,3 +15,4 @@ export * from "./schema";
 export * as schema from "./schema";
 export { setDb, getDb } from "./runtime-db";
 export * from "./sync-apply";
+export * from "./training-ingest";

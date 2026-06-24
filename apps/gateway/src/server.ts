@@ -17,6 +17,8 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { handleAnnounce } from "./routes/announce.js";
 import { handleSyncGet, handleSyncPost } from "./routes/sync.js";
+import { handleTrainingControlGet, handleTrainingWebhook } from "./routes/training.js";
+import { handleReconcile } from "./routes/reconcile.js";
 import { attachUpgradeHandler, createCompanionWss } from "./ws/hub.js";
 
 const app = new Hono();
@@ -35,6 +37,11 @@ app.get("/", (c) => c.text("muzicai-gateway"));
 app.post("/api/devices/announce", handleAnnounce);
 app.get("/api/sync", handleSyncGet);
 app.post("/api/sync", handleSyncPost);
+
+// Trainer-facing M2M (HMAC). PATCH control stays on the web app (NextAuth).
+app.post("/api/training/webhook", handleTrainingWebhook);
+app.get("/api/training/control/:jobId", handleTrainingControlGet);
+app.post("/api/internal/reconcile", handleReconcile);
 
 const port = Number(process.env.PORT ?? 8080);
 

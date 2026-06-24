@@ -17,6 +17,7 @@ export default defineConfig({
         options.alias = {
             ...(options.alias ?? {}),
             "@mmo/db/schema": resolve(here, "../../packages/db/src/schema.ts"),
+            "@mmo/db/schema-training": resolve(here, "../../packages/db/src/schema-training.ts"),
             "@mmo/db": resolve(here, "../../packages/db/src/index.ts"),
         };
     },

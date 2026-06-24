@@ -58,6 +58,9 @@
       ],
       "drizzle-orm/*": [
         "./node_modules/drizzle-orm/*"
+      ],
+      "zod": [
+        "./node_modules/zod"
       ]
     }
   },

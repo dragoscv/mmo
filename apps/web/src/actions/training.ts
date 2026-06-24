@@ -790,25 +790,10 @@ function describePatch(p: ControlPatch): string {
 /** Internal — called by the trainer-control API route. Returns the
  *  current signal AND clears one-shot fields so the trainer doesn't
  *  apply them twice. Auth check is by the route (HMAC, not user). */
-export async function consumeControlSignalForTrainer(jobId: string): Promise<ControlSignal | null> {
-    const [job] = await db
-        .select()
-        .from(trainingJobs)
-        .where(eq(trainingJobs.id, jobId))
-        .limit(1);
-    if (!job) return null;
-    const sig = (job.controlSignal ?? {}) as ControlSignal;
-    // Clear evalNow (one-shot) so the trainer doesn't render again next tick.
-    if (sig.evalNow) {
-        const cleared: ControlSignal = { ...sig, evalNow: false };
-        await db
-            .update(trainingJobs)
-            .set({ controlSignal: cleared, updatedAt: new Date() })
-            .where(eq(trainingJobs.id, jobId));
-        return cleared;
-    }
-    return sig;
-}
+// `consumeControlSignalForTrainer` + `ingestTrainerEvent` moved to the shared
+// @mmo/db package (trainer-facing M2M logic, run by both the web route and the
+// gateway). Re-exported below so existing imports keep working.
+export { consumeControlSignalForTrainer, ingestTrainerEvent } from "@mmo/db";
 
 // ─── Cancel ─────────────────────────────────────────────────────────────
 
@@ -887,137 +872,5 @@ async function cancelVertexJob(jobName: string): Promise<void> {
 
 // ─── Internal: trainer event ingestion ──────────────────────────────────
 
-const TrainerEventSchema = z.object({
-    kind: z.enum([
-        "started", "step", "sample", "checkpoint", "warning", "error",
-        "finished", "cancelled", "controlPatch",
-    ]),
-    step: z.number().int().min(0).optional(),
-    message: z.string().max(2000).optional(),
-    loss: z.number().optional(),
-    evalLoss: z.number().optional(),
-    learningRate: z.number().optional(),
-    sampleUri: z.string().optional(),
-    checkpointUri: z.string().optional(),
-    weightsUri: z.string().optional(),
-    previewUri: z.string().optional(),
-    outputUri: z.string().optional(),
-    actualCostUsd: z.number().optional(),
-    error: z.string().optional(),
-    data: z.record(z.string(), z.unknown()).optional(),
-});
-
-export type TrainerEventInput = z.infer<typeof TrainerEventSchema>;
-
-/** Called by the webhook route — never by user code. Updates cached
- *  progress fields and appends to the event log. */
-export async function ingestTrainerEvent(
-    jobId: string,
-    raw: unknown,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-    const parsed = TrainerEventSchema.safeParse(raw);
-    if (!parsed.success) return { ok: false, error: `invalid-event: ${parsed.error.message}` };
-    const ev = parsed.data;
-    const [job] = await db
-        .select()
-        .from(trainingJobs)
-        .where(eq(trainingJobs.id, jobId))
-        .limit(1);
-    if (!job) return { ok: false, error: "job-not-found" };
-
-    const update: Partial<typeof trainingJobs.$inferInsert> = { updatedAt: new Date() };
-    if (ev.kind === "started") {
-        update.status = "running";
-        update.startedAt = new Date();
-    }
-    if (ev.kind === "step" && typeof ev.step === "number") {
-        update.currentStep = ev.step;
-        if (typeof ev.loss === "number") update.lastLoss = ev.loss;
-        if (typeof ev.evalLoss === "number") update.lastEvalLoss = ev.evalLoss;
-        // Append to loss_history — capped at 500 entries to keep row small.
-        const history = ((job.lossHistory ?? []) as Array<{ step: number; loss: number }>).slice(-499);
-        if (typeof ev.loss === "number") {
-            history.push({ step: ev.step, loss: ev.loss });
-            update.lossHistory = history;
-        }
-    }
-    if (ev.kind === "sample" && ev.sampleUri) update.latestSampleUri = ev.sampleUri;
-    if (ev.kind === "checkpoint" && ev.checkpointUri) update.latestCheckpointUri = ev.checkpointUri;
-    if (ev.kind === "finished") {
-        update.status = "succeeded";
-        update.finishedAt = new Date();
-        if (typeof ev.actualCostUsd === "number") update.actualCostUsd = ev.actualCostUsd;
-    }
-    if (ev.kind === "cancelled") {
-        update.status = "cancelled";
-        update.finishedAt = new Date();
-    }
-    if (ev.kind === "error") {
-        update.status = "failed";
-        update.error = ev.error ?? ev.message ?? "trainer-error";
-        update.finishedAt = new Date();
-    }
-
-    await db.update(trainingJobs).set(update).where(eq(trainingJobs.id, jobId));
-    await db.insert(trainingEvents).values({
-        jobId,
-        kind: ev.kind,
-        step: ev.step ?? null,
-        message: ev.message ?? null,
-        source: "trainer",
-        data: ev as unknown as Record<string, unknown>,
-    });
-
-    // On successful finish, auto-register the LoRA so the inference router
-    // picks it up immediately. The trainer ships `weightsUri` + `previewUri`
-    // inside the data payload of the `finished` event.
-    if (ev.kind === "finished" && job.kind.endsWith("-lora")) {
-        const dataPayload = (ev.data ?? {}) as Record<string, unknown>;
-        const weightsUri = (ev.weightsUri
-            ?? dataPayload["weightsUri"]
-            ?? (raw as Record<string, unknown>)["weightsUri"]) as unknown;
-        const previewUri = (ev.previewUri
-            ?? dataPayload["previewUri"]
-            ?? (raw as Record<string, unknown>)["previewUri"]) as unknown;
-        if (typeof weightsUri === "string" && weightsUri.startsWith("gs://")) {
-            // Pull tagHistogram from the linked dataset so the LoRA gets
-            // genre/mood tags — that's what findLorasForPrompt scores on.
-            let tagsArr: string[] = [];
-            if (job.datasetId) {
-                const [ds] = await db
-                    .select({ tagHistogram: trainingDatasets.tagHistogram })
-                    .from(trainingDatasets)
-                    .where(eq(trainingDatasets.id, job.datasetId))
-                    .limit(1);
-                if (ds?.tagHistogram) {
-                    tagsArr = Object.entries(ds.tagHistogram)
-                        .sort(([, a], [, b]) => (b as number) - (a as number))
-                        .slice(0, 8)
-                        .map(([k]) => k.toLowerCase());
-                }
-            }
-            const slug = job.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
-            const triggerToken = slug ? `<${slug}>` : null;
-            await db
-                .insert(loraAssets)
-                .values({
-                    userId: job.userId,
-                    scope: job.kind === "style-lora" ? "shared" : "user",
-                    kind: job.kind === "style-lora" ? "style" : "user",
-                    jobId: job.id,
-                    name: job.name,
-                    description: job.description ?? null,
-                    triggerToken,
-                    baseModel: (job.config as TrainConfig).baseModel,
-                    rank: (job.config as TrainConfig).rank,
-                    weightsUri,
-                    previewUri: typeof previewUri === "string" ? previewUri : null,
-                    tags: tagsArr,
-                    evalLoss: job.lastEvalLoss,
-                })
-                .onConflictDoNothing();
-        }
-    }
-
-    return { ok: true };
-}
+// Trainer event ingestion moved to @mmo/db (re-exported near the top of this
+// module). The webhook route + reconciler import it from there.
