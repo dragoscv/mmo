@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
-### Fixed — analyzer health resilience + larger Reanalyze modal (`apps/web` `0.5.11`)
+### Fixed — analyzer health resilience + larger Reanalyze modal (`apps/web` `0.5.12`)
 
 - **No more false "Companion analyzer offline" on a tunnel blip.** The
   Reanalyze Library modal showed *"Companion GET /library/analyze/health
@@ -24,6 +24,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   of the misleading pip-install hint.
 - **Larger Reanalyze Library modal.** Widened to 1400px (from 1100px) and
   taller (94vh) so the options grid and companion status fit without cramping.
+  Also overrides the dialog's base `sm:max-w-md` cap, which was clamping the
+  modal to ~448px.
 
 ### Fixed — audio playback over the cloud + faster /library (`apps/web` `0.5.10`)
 

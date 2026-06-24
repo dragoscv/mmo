@@ -448,7 +448,7 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[1400px] w-[min(96vw,1400px)] max-h-[94vh] flex flex-col gap-0 p-0 overflow-hidden">
+            <DialogContent className="max-w-[1400px] sm:max-w-[1400px] w-[min(96vw,1400px)] max-h-[94vh] flex flex-col gap-0 p-0 overflow-hidden">
                 {/* Header */}
                 <DialogHeader className="px-6 pt-6 pb-4 border-b border-[var(--border)] shrink-0">
                     <DialogTitle className="flex items-center gap-2">
