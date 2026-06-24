@@ -1250,6 +1250,101 @@ class Analyzer extends EventEmitter {
         };
     }
 
+    /** Whether a silent core-deps auto-install has already run this session,
+     *  so we never spawn pip more than once per launch (and don't loop if it
+     *  keeps failing). */
+    private depsAutoInstallTried = false;
+    private depsInstalling: Promise<void> | null = null;
+
+    /** Pip-install the CORE analyzer deps (librosa / pyloudnorm / pyacoustid /
+     *  soundfile / numpy / audio-separator[cpu]) into the companion's Python
+     *  interpreter. Idempotent on the Python side. Restarts the sidecars so
+     *  the freshly-installed modules become importable. */
+    async installDeps(
+        packages?: string[],
+        onProgress?: (p: { stage: string; pct: number; msg: string }) => void,
+    ): Promise<{ installed: string[]; available: Record<string, boolean>; log: string }> {
+        const inFlight = CATEGORIES.filter((c) => this.workers[c].currentJob());
+        if (inFlight.length > 0) {
+            throw new Error(`Cannot install deps while lane(s) busy: ${inFlight.join(", ")}.`);
+        }
+        const result = await this.sendCommand<{
+            installed: string[]; restartRequired: boolean; available: Record<string, boolean>; log: string;
+        }>(
+            "deps_install",
+            packages ? { packages } : {},
+            (p) => {
+                this.pushLog("info", `[deps_install] ${Math.round(p.pct * 100)}% — ${p.msg}`);
+                onProgress?.(p);
+            },
+            30 * 60_000,
+        );
+        if (result.installed.length > 0) {
+            this.pushLog("info", `Analyzer deps installed (${result.installed.join(", ")}) — restarting sidecars…`);
+            await this.restartSidecar({ force: true });
+        }
+        const fresh = await this.health();
+        return {
+            installed: result.installed,
+            available: fresh.available ?? result.available,
+            log: result.log,
+        };
+    }
+
+    /** Fire-and-forget: on startup, if the core analyzer deps are missing,
+     *  silently pip-install them in the background. Runs at most once per
+     *  session and never throws into the caller — failures are logged and the
+     *  user simply keeps the "deps missing" state (with no terminal needed,
+     *  it'll retry next launch). Skipped when MMO_ANALYZER_AUTOINSTALL=0. */
+    async ensureDepsInstalled(): Promise<void> {
+        if (this.depsAutoInstallTried) return this.depsInstalling ?? undefined;
+        this.depsAutoInstallTried = true;
+        if (process.env.MMO_ANALYZER_AUTOINSTALL === "0") {
+            this.pushLog("info", "[deps] auto-install disabled via MMO_ANALYZER_AUTOINSTALL=0");
+            return;
+        }
+        this.depsInstalling = (async () => {
+            try {
+                const h = await this.health();
+                // No Python at all → nothing we can do silently; surface in health.
+                if (!h.ok || !h.available) return;
+                // Two tiers. CORE (DSP / loudness / fingerprint) is pure-wheel
+                // and reliable, so we install it as one group. Stems
+                // (audio-separator) drags in heavy, source-built deps that can
+                // fail on bleeding-edge Python — install it SEPARATELY and
+                // best-effort so a stems build failure never blocks the rest.
+                const CORE_FLAGS = ["numpy", "soundfile", "librosa", "pyloudnorm", "pyacoustid"];
+                const CORE_PKGS = ["numpy", "soundfile", "librosa", "pyloudnorm", "pyacoustid"];
+                const coreMissing = CORE_FLAGS.some((k) => !h.available![k]);
+                if (coreMissing) {
+                    this.pushLog("info", "[deps] core analyzer deps missing — installing silently in background…");
+                    try {
+                        const res = await this.installDeps(CORE_PKGS);
+                        this.pushLog("info", `[deps] core install done — installed: ${res.installed.join(", ") || "(none)"}`);
+                    } catch (e) {
+                        this.pushLog("warn", `[deps] core install failed (retry next launch): ${e instanceof Error ? e.message : String(e)}`);
+                    }
+                }
+                // Stems: best-effort, isolated. A build failure here is logged
+                // but leaves DSP/loudness/fingerprint fully working.
+                if (!h.available!["audio_separator"]) {
+                    this.pushLog("info", "[deps] stems engine (audio-separator) missing — attempting best-effort background install…");
+                    try {
+                        const res = await this.installDeps(["audio-separator[cpu]"]);
+                        this.pushLog("info", `[deps] stems install done — installed: ${res.installed.join(", ") || "(none)"}`);
+                    } catch (e) {
+                        this.pushLog("warn", `[deps] stems install failed (DSP/loudness/fingerprint still work): ${e instanceof Error ? e.message : String(e)}`);
+                    }
+                }
+            } catch (e) {
+                this.pushLog("warn", `[deps] background install failed (will retry next launch): ${e instanceof Error ? e.message : String(e)}`);
+            } finally {
+                this.depsInstalling = null;
+            }
+        })();
+        return this.depsInstalling;
+    }
+
     /** One-shot command on the control sidecar. Used by plugins/host.ts
      *  for `plugins.scan` / `plugins.describe` / `plugins.render`. */
     async sendCommand<T = unknown>(

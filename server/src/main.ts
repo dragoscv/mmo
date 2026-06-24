@@ -1279,6 +1279,21 @@ app.whenReady().then(async () => {
         });
     });
 
+    // Silently ensure the core analyzer Python deps are installed. Runs in the
+    // background after first paint so a fresh machine gets DSP / loudness /
+    // fingerprint / stems working without the user ever opening a terminal or
+    // clicking "install". No-ops when deps are already present; retries next
+    // launch on failure. Disable with MMO_ANALYZER_AUTOINSTALL=0.
+    runAfterPaint(() => {
+        void import("./library/analyzer").then((m) => {
+            m.analyzer.ensureDepsInstalled().catch((err) => {
+                logLine("warn", "analyzer deps auto-install failed:", err as Error);
+            });
+        }).catch((err) => {
+            logLine("warn", "analyzer module load (deps auto-install) failed:", err as Error);
+        });
+    });
+
     setupAutoUpdater();
 
     const settings = getSettings();

@@ -2,6 +2,21 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.30 — silent analyzer dependency auto-install
+
+- **Analyzer Python deps now install themselves, silently.** On startup the
+	companion checks the analyzer health and, if the core packages are missing,
+	pip-installs them in the background — no terminal, no button, no prompt. DSP
+	(BPM/key/beats), loudness (LUFS) and AcoustID fingerprinting work out of the
+	box on a fresh machine. Implemented as a new `deps_install` sidecar command
+	+ `analyzer.ensureDepsInstalled()` invoked after first paint.
+- **Two-tier, fault-isolated install.** The reliable pure-wheel core
+	(`numpy`, `soundfile`, `librosa`, `pyloudnorm`, `pyacoustid`) installs as one
+	group; the heavier stems engine (`audio-separator[cpu]`) installs separately
+	and best-effort, so a stems build failure (e.g. on a bleeding-edge Python)
+	never blocks DSP/loudness/fingerprint. Retries each launch; opt out with
+	`MMO_ANALYZER_AUTOINSTALL=0`.
+
 ## 1.0.29 — stable tunnel transport
 
 - **Cloudflare tunnel forced to HTTP/2 (TCP) instead of QUIC (UDP).** The

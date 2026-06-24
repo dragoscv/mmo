@@ -1194,6 +1194,83 @@ def handle_gpu_install(cmd: dict[str, Any]) -> None:
         _result_err(job_id, f"install failed: {type(e).__name__}: {e}")
 
 
+# Maps a missing `_AVAILABLE` flag → the pip requirement that provides it.
+# `audio-separator[cpu]` pulls onnxruntime + torch (CPU) so stems work without
+# a GPU; GPU acceleration is a separate opt-in via `gpu_install`.
+_DEP_PACKAGES = {
+    "numpy": "numpy",
+    "soundfile": "soundfile",
+    "librosa": "librosa",
+    "pyloudnorm": "pyloudnorm",
+    "pyacoustid": "pyacoustid",
+    "audio_separator": "audio-separator[cpu]",
+}
+
+
+def handle_deps_install(cmd: dict[str, Any]) -> None:
+    """Pip-install the CORE analyzer deps into the running interpreter.
+
+    Triggered automatically by the companion on startup when `health` reports
+    missing packages, so DSP / loudness / fingerprint / stems work without the
+    user touching a terminal. Idempotent: pip no-ops already-satisfied
+    requirements. `packages` may be passed to scope the install; otherwise we
+    install everything currently missing from `_AVAILABLE`.
+    """
+    job_id = cmd.get("id", "?")
+    try:
+        import subprocess
+        _try_import_baseline()
+        requested = cmd.get("packages")
+        if isinstance(requested, list) and requested:
+            pkgs = [p for p in requested if isinstance(p, str) and p]
+        else:
+            # Default: every known dep that's currently unavailable.
+            pkgs = [
+                pip_name
+                for flag, pip_name in _DEP_PACKAGES.items()
+                if not _AVAILABLE.get(flag, False)
+            ]
+        # De-dup while preserving order.
+        seen: set[str] = set()
+        pkgs = [p for p in pkgs if not (p in seen or seen.add(p))]
+        if not pkgs:
+            _result_ok(job_id, {"installed": [], "available": _AVAILABLE, "log": "all deps present"})
+            return
+
+        log_lines: list[str] = []
+        # One pip invocation for all packages — pip resolves the set together,
+        # which avoids conflicting transitive pins. `--upgrade` is intentionally
+        # NOT used: we only want to add what's missing, never churn versions.
+        step = [sys.executable, "-m", "pip", "install", *pkgs]
+        _progress(job_id, "deps_install", 0.1, f"installing: {' '.join(pkgs)}")
+        r = subprocess.run(step, capture_output=True, text=True)
+        log_lines.append(f"$ {' '.join(step)}")
+        if r.stdout:
+            log_lines.append(r.stdout[-4000:])
+        if r.returncode != 0:
+            if r.stderr:
+                log_lines.append("STDERR:\n" + r.stderr[-4000:])
+            _result_err(
+                job_id,
+                f"pip install failed (code {r.returncode}): "
+                + (r.stderr or r.stdout or "")[-500:],
+            )
+            return
+        _progress(job_id, "deps_install", 0.95, "verifying imports…")
+        # Re-probe so the result reflects what's now importable. Some modules
+        # (e.g. audio_separator) only become importable after a fresh process,
+        # so we still ask the companion to restart the sidecar.
+        _try_import_baseline()
+        _result_ok(job_id, {
+            "installed": pkgs,
+            "restartRequired": True,
+            "available": _AVAILABLE,
+            "log": "\n".join(log_lines)[-6000:],
+        })
+    except Exception as e:
+        _result_err(job_id, f"deps install failed: {type(e).__name__}: {e}")
+
+
 def handle_plugins(cmd: dict[str, Any]) -> None:
     """Dispatch `plugins.*` commands to the pedalboard module."""
     job_id = cmd.get("id", "?")
@@ -1318,6 +1395,8 @@ def main() -> int:
             return 0
         elif kind == "gpu_install":
             handle_gpu_install(cmd)
+        elif kind == "deps_install":
+            handle_deps_install(cmd)
         elif kind and kind.startswith("plugins."):
             handle_plugins(cmd)
         else:
