@@ -1279,19 +1279,46 @@ app.whenReady().then(async () => {
         });
     });
 
-    // Silently ensure the core analyzer Python deps are installed. Runs in the
-    // background after first paint so a fresh machine gets DSP / loudness /
-    // fingerprint / stems working without the user ever opening a terminal or
-    // clicking "install". No-ops when deps are already present; retries next
-    // launch on failure. Disable with MMO_ANALYZER_AUTOINSTALL=0.
+    // Provision the analyzer (managed Python 3.12 env + audio deps + stems +
+    // GPU) automatically after first paint, showing a friendly progress
+    // window. The main app keeps loading behind it; nothing here blocks
+    // startup, and only MISSING pieces are installed. Disable with
+    // MMO_ANALYZER_AUTOINSTALL=0.
     runAfterPaint(() => {
-        void import("./library/analyzer").then((m) => {
-            m.analyzer.ensureDepsInstalled().catch((err) => {
-                logLine("warn", "analyzer deps auto-install failed:", err as Error);
-            });
-        }).catch((err) => {
-            logLine("warn", "analyzer module load (deps auto-install) failed:", err as Error);
-        });
+        void (async () => {
+            try {
+                const [{ analyzer }, setup] = await Promise.all([
+                    import("./library/analyzer"),
+                    import("./setup-window"),
+                ]);
+                // Decide whether any work is needed BEFORE showing a window, so
+                // a fully-provisioned machine never sees a flash.
+                const h = await analyzer.health();
+                const envReady = (await import("./library/python-env")).venvReady();
+                const CORE = ["numpy", "soundfile", "librosa", "pyloudnorm", "pyacoustid"];
+                const needs = !envReady
+                    || !h.ok || !h.available
+                    || CORE.some((k) => !h.available?.[k])
+                    || !h.available?.["audio_separator"]
+                    || (!!h.gpu?.hasNvidia && !h.gpu?.onnxGpuActive && !!h.available?.["audio_separator"]);
+                if (!needs) {
+                    logLine("info", "analyzer already provisioned — skipping setup");
+                    return;
+                }
+                if (process.env.MMO_ANALYZER_AUTOINSTALL !== "0") {
+                    setup.showSetupWindow(mainWindow);
+                }
+                const { changed } = await analyzer.ensureDepsInstalled((u) => {
+                    setup.updateSetupWindow(u);
+                });
+                // Hold the final state briefly, then close.
+                setup.closeSetupWindow(changed ? 2200 : 600);
+                logLine("info", `analyzer provisioning done (changed=${changed})`);
+            } catch (err) {
+                logLine("warn", "analyzer provisioning failed:", err as Error);
+                try { (await import("./setup-window")).closeSetupWindow(3000); } catch { /* ignore */ }
+            }
+        })();
     });
 
     setupAutoUpdater();

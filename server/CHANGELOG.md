@@ -2,6 +2,29 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.31 — fully automatic analyzer setup (managed Python + stems + GPU)
+
+- **Stems now work completely, automatically.** The companion provisions an
+	isolated, managed **CPython 3.12** environment via `uv` (a dedicated venv
+	under the app data dir — never touches system Python) so the heavy stem
+	stack (`audio-separator`, `torch`, `onnxruntime`) installs from prebuilt
+	wheels. This fixes the case where a too-new system Python (e.g. 3.14) made
+	audio-separator's native deps fail to build.
+- **A friendly setup window — you do nothing.** A small always-on-top progress
+	window shows the one-time install (Python env → audio analysis → stems →
+	GPU) with a live checklist. The main app keeps loading behind it; the window
+	closes itself when done.
+- **Non-blocking startup.** Provisioning runs after first paint, so the app
+	opens immediately even on a brand-new machine (fixes the "app won't start
+	after update" feeling).
+- **Only installs what's missing.** A fully-provisioned machine shows no
+	window at all; otherwise only the missing pieces are fetched. Idempotent and
+	retried next launch on failure.
+- **Automatic GPU acceleration.** When an NVIDIA GPU + CUDA runtime is present,
+	`onnxruntime-gpu` is installed for faster stem separation (best-effort; CPU
+	stems still work if it fails). Opt out of all of this with
+	`MMO_ANALYZER_AUTOINSTALL=0`.
+
 ## 1.0.30 — silent analyzer dependency auto-install
 
 - **Analyzer Python deps now install themselves, silently.** On startup the

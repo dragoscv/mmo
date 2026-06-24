@@ -155,8 +155,17 @@ export interface LaneStatus {
 // ─── IO helpers ─────────────────────────────────────────────────────
 
 function resolvePython(): string {
-    return process.env.MMO_PYTHON
-        || (process.platform === "win32" ? "python" : "python3");
+    // Highest priority: explicit override. Then the managed venv (provisioned
+    // by python-env.ts — guaranteed 3.12 with all wheels). Fall back to system
+    // python only when the venv hasn't been created yet.
+    if (process.env.MMO_PYTHON) return process.env.MMO_PYTHON;
+    try {
+        // Lazy require to avoid a cycle at module load.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { venvPython, venvReady } = require("./python-env") as typeof import("./python-env");
+        if (venvReady()) return venvPython();
+    } catch { /* python-env unavailable (non-electron context) */ }
+    return process.platform === "win32" ? "python" : "python3";
 }
 
 function resolveScript(): string {
@@ -1291,58 +1300,120 @@ class Analyzer extends EventEmitter {
         };
     }
 
-    /** Fire-and-forget: on startup, if the core analyzer deps are missing,
-     *  silently pip-install them in the background. Runs at most once per
-     *  session and never throws into the caller — failures are logged and the
-     *  user simply keeps the "deps missing" state (with no terminal needed,
-     *  it'll retry next launch). Skipped when MMO_ANALYZER_AUTOINSTALL=0. */
-    async ensureDepsInstalled(): Promise<void> {
-        if (this.depsAutoInstallTried) return this.depsInstalling ?? undefined;
+    /**
+     * Provision the managed Python env (if needed) and install ONLY the
+     * missing analyzer dependencies, reporting progress via `onProgress`. Runs
+     * at most once per session and never throws into the caller. Skipped with
+     * MMO_ANALYZER_AUTOINSTALL=0.
+     *
+     * Stages: env (uv + CPython 3.12 venv) → core deps → stems → GPU (when a
+     * CUDA GPU is present). Each tier is fault-isolated: a failure in stems or
+     * GPU never prevents DSP/loudness/fingerprint from working.
+     */
+    async ensureDepsInstalled(
+        onProgress?: (u: { pct: number; msg: string; steps?: Array<{ id: string; label: string; state: "pending" | "active" | "done" | "error" }>; error?: boolean }) => void,
+    ): Promise<{ changed: boolean }> {
+        if (this.depsAutoInstallTried) { await this.depsInstalling; return { changed: false }; }
         this.depsAutoInstallTried = true;
         if (process.env.MMO_ANALYZER_AUTOINSTALL === "0") {
             this.pushLog("info", "[deps] auto-install disabled via MMO_ANALYZER_AUTOINSTALL=0");
-            return;
+            return { changed: false };
         }
+
+        let changed = false;
+        const steps: Array<{ id: string; label: string; state: "pending" | "active" | "done" | "error" }> = [
+            { id: "env", label: "Python environment", state: "pending" },
+            { id: "core", label: "Audio analysis (BPM, key, loudness, fingerprint)", state: "pending" },
+            { id: "stems", label: "Stem separation engine", state: "pending" },
+            { id: "gpu", label: "GPU acceleration", state: "pending" },
+        ];
+        const setStep = (id: string, state: "pending" | "active" | "done" | "error") => {
+            const s = steps.find((x) => x.id === id); if (s) s.state = state;
+        };
+        const emit = (pct: number, msg: string, error = false) => {
+            onProgress?.({ pct, msg, steps: steps.map((s) => ({ ...s })), error });
+        };
+
         this.depsInstalling = (async () => {
             try {
-                const h = await this.health();
-                // No Python at all → nothing we can do silently; surface in health.
-                if (!h.ok || !h.available) return;
-                // Two tiers. CORE (DSP / loudness / fingerprint) is pure-wheel
-                // and reliable, so we install it as one group. Stems
-                // (audio-separator) drags in heavy, source-built deps that can
-                // fail on bleeding-edge Python — install it SEPARATELY and
-                // best-effort so a stems build failure never blocks the rest.
+                // 1) Managed Python env (uv + CPython 3.12 venv). Idempotent.
+                setStep("env", "active"); emit(0.02, "Preparing Python environment…");
+                const { ensurePythonEnv, venvReady } = await import("./python-env");
+                const alreadyHadEnv = venvReady();
+                await ensurePythonEnv((p) => emit(0.02 + p.pct * 0.28, p.msg, p.stage === "error"));
+                if (!alreadyHadEnv) changed = true;
+                setStep("env", "done");
+
+                // The control sidecar may have been spawned earlier with the
+                // system python. Now that the venv exists, restart it so all
+                // subsequent health/install commands target the venv (where
+                // resolvePython() now points). force=true: fresh startup.
+                if (!alreadyHadEnv) {
+                    try { await this.restartSidecar({ force: true }); } catch { /* ignore */ }
+                }
+                // Re-probe now that the sidecar uses the venv interpreter.
+                let h = await this.health();
+                if (!h.ok || !h.available) {
+                    setStep("core", "error");
+                    emit(0.3, "Python unavailable — analysis disabled.", true);
+                    return;
+                }
+
+                // 2) Core deps (pure wheels → reliable).
                 const CORE_FLAGS = ["numpy", "soundfile", "librosa", "pyloudnorm", "pyacoustid"];
                 const CORE_PKGS = ["numpy", "soundfile", "librosa", "pyloudnorm", "pyacoustid"];
-                const coreMissing = CORE_FLAGS.some((k) => !h.available![k]);
-                if (coreMissing) {
-                    this.pushLog("info", "[deps] core analyzer deps missing — installing silently in background…");
+                if (CORE_FLAGS.some((k) => !h.available![k])) {
+                    setStep("core", "active"); emit(0.35, "Installing audio analysis packages…");
                     try {
-                        const res = await this.installDeps(CORE_PKGS);
-                        this.pushLog("info", `[deps] core install done — installed: ${res.installed.join(", ") || "(none)"}`);
+                        const res = await this.installDeps(CORE_PKGS, (p) => emit(0.35 + p.pct * 0.2, p.msg));
+                        if (res.installed.length) changed = true;
+                        setStep("core", "done");
                     } catch (e) {
-                        this.pushLog("warn", `[deps] core install failed (retry next launch): ${e instanceof Error ? e.message : String(e)}`);
+                        setStep("core", "error");
+                        this.pushLog("warn", `[deps] core install failed: ${e instanceof Error ? e.message : String(e)}`);
                     }
-                }
-                // Stems: best-effort, isolated. A build failure here is logged
-                // but leaves DSP/loudness/fingerprint fully working.
-                if (!h.available!["audio_separator"]) {
-                    this.pushLog("info", "[deps] stems engine (audio-separator) missing — attempting best-effort background install…");
+                } else { setStep("core", "done"); }
+
+                // 3) Stems engine (heavy). Best-effort, isolated.
+                h = await this.health();
+                if (!h.available?.["audio_separator"]) {
+                    setStep("stems", "active"); emit(0.58, "Installing stem-separation engine…");
                     try {
-                        const res = await this.installDeps(["audio-separator[cpu]"]);
-                        this.pushLog("info", `[deps] stems install done — installed: ${res.installed.join(", ") || "(none)"}`);
+                        const res = await this.installDeps(["audio-separator[cpu]"], (p) => emit(0.58 + p.pct * 0.22, p.msg));
+                        if (res.installed.length) changed = true;
+                        const after = await this.health();
+                        setStep("stems", after.available?.["audio_separator"] ? "done" : "error");
                     } catch (e) {
-                        this.pushLog("warn", `[deps] stems install failed (DSP/loudness/fingerprint still work): ${e instanceof Error ? e.message : String(e)}`);
+                        setStep("stems", "error");
+                        this.pushLog("warn", `[deps] stems install failed: ${e instanceof Error ? e.message : String(e)}`);
                     }
-                }
+                } else { setStep("stems", "done"); }
+
+                // 4) GPU acceleration (only if CUDA GPU present + stems usable).
+                h = await this.health();
+                const wantGpu = h.gpu?.hasNvidia && !h.gpu?.onnxGpuActive && h.available?.["audio_separator"];
+                if (wantGpu) {
+                    setStep("gpu", "active"); emit(0.82, "Installing GPU acceleration…");
+                    try {
+                        await this.installGpu("onnx", (p) => emit(0.82 + p.pct * 0.15, p.msg));
+                        changed = true;
+                        setStep("gpu", "done");
+                    } catch (e) {
+                        setStep("gpu", "error");
+                        this.pushLog("warn", `[deps] GPU install failed (CPU stems still work): ${e instanceof Error ? e.message : String(e)}`);
+                    }
+                } else { setStep("gpu", "done"); }
+
+                emit(1, "Analyzer ready.");
             } catch (e) {
-                this.pushLog("warn", `[deps] background install failed (will retry next launch): ${e instanceof Error ? e.message : String(e)}`);
+                this.pushLog("warn", `[deps] provisioning failed (will retry next launch): ${e instanceof Error ? e.message : String(e)}`);
+                emit(1, "Setup incomplete — will retry next launch.", true);
             } finally {
                 this.depsInstalling = null;
             }
         })();
-        return this.depsInstalling;
+        await this.depsInstalling;
+        return { changed };
     }
 
     /** One-shot command on the control sidecar. Used by plugins/host.ts
