@@ -1,6 +1,6 @@
 {
     "$schema": "https://schema.tauri.app/config/2",
-    "productName": "MMO",
+    "productName": "MuzicAI",
     "version": "0.1.0",
     "identifier": "ro.muzicai.app",
     "build": {
@@ -12,7 +12,7 @@
         "windows": [
             {
                 "label": "main",
-                "title": "MMO",
+                "title": "MuzicAI",
                 "width": 1400,
                 "height": 900,
                 "minWidth": 900,

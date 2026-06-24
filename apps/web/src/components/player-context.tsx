@@ -316,7 +316,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const lastTrackTitleRef = useRef<string | null>(null);
 
     const applyTitle = useCallback(() => {
-        const newTitle = lastTrackTitleRef.current || "MMO";
+        const newTitle = lastTrackTitleRef.current || "MuzicAI";
         document.title = newTitle;
         const titleEl = document.querySelector("title");
         if (titleEl && titleEl.textContent !== newTitle) {
@@ -329,7 +329,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (track) {
             const name = track.title || track.filename;
             const artist = track.artist || "Unknown Artist";
-            lastTrackTitleRef.current = `${name} — ${artist} | MMO`;
+            lastTrackTitleRef.current = `${name} — ${artist} | MuzicAI`;
         }
         applyTitle();
     }, [state.currentTrack?.id, state.currentTrack?.title, state.currentTrack?.artist, state.currentTrack?.filename, applyTitle]);

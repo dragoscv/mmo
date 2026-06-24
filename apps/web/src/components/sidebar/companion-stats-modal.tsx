@@ -321,7 +321,7 @@ export function CompanionStatsModal({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Server className="h-4 w-4 text-emerald-400" />
-                        MMO Companion
+                        MuzicAI Companion
                         <span className="text-[10px] font-mono text-white/40">v{version}</span>
                     </DialogTitle>
                     <DialogDescription className="text-[11px]">

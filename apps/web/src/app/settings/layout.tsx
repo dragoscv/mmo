@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-    title: { template: "%s · Settings · MMO", default: "Settings · MMO" },
+    title: { template: "%s · Settings · MuzicAI", default: "Settings · MuzicAI" },
 };
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {

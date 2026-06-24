@@ -29,7 +29,7 @@ export function stripe(): Stripe {
     }
     _stripe = new Stripe(stripeSecret, {
         apiVersion: "2026-04-22.dahlia",
-        appInfo: { name: "MMO", url: "https://muzicai.ro" },
+        appInfo: { name: "MuzicAI", url: "https://muzicai.ro" },
     });
     return _stripe;
 }
@@ -83,7 +83,7 @@ export async function getSubscription(userId: string): Promise<SubscriptionState
 /** Server-side gate. Throws a 402-style error usable in Server Actions. */
 export class PaywallError extends Error {
     constructor(public feature: string) {
-        super(`Feature "${feature}" requires an MMO Pro subscription.`);
+        super(`Feature "${feature}" requires a MuzicAI Pro subscription.`);
         this.name = "PaywallError";
     }
 }

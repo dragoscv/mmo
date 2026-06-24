@@ -1,16 +1,38 @@
 # Changelog
 
-All notable changes to **MMO — Multi Media Organizer** are documented here.
+All notable changes to **MuzicAI — AI Music Suite** are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 > Web app and companion are versioned independently:
 > - **Web app** (`apps/web/`): see [`apps/web/package.json`](apps/web/package.json) — currently `0.4.2`
-> - **MMO Companion** (`server/`): see [`server/package.json`](server/package.json) — currently `1.0.14`, releases at [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
+> - **MuzicAI Companion** (`server/`): see [`server/package.json`](server/package.json) — currently `1.0.14`, releases at [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
 
 ---
 
 ## [Unreleased]
+
+### Changed — complete rebrand to **MuzicAI** (`apps/web` `0.6.0`)
+
+- **New brand identity: MuzicAI (muzicai.ro).** Replaced the inconsistent
+  "MMO / Mwrty Music Organizer / Multi Media Organizer" naming everywhere with
+  a single brand: **MuzicAI — AI Music Suite**. Tagline: *"Your music library,
+  mixed by intelligence."*
+- **New logo & icon system** — waveform-pulse + AI-spark mark in the
+  "Neon Nocturne" palette (violet `#7C5CFF` → fuchsia `#E84FF0`, electric cyan
+  `#22D3EE` accent). Regenerated `logo.svg`, `wordmark.svg`,
+  `og-image`, `icon-192/512.png`, `apple-touch-icon.png`, `favicon.ico`.
+- **Design tokens** — wired real brand colors into the light/dark themes
+  (primary, accent, ring, charts, sidebar) plus `bg-brand` / `text-brand-accent`
+  Tailwind utilities. Added **Space Grotesk** as the heading font (`--font-heading`).
+- **SEO & PWA** — full metadata overhaul (`metadataBase` muzicai.ro, title
+  template, OpenGraph + Twitter cards, robots), manifest name/description/colors,
+  `theme-color` → `#7c5cff`.
+- **Cross-surface rebrand** — native Tauri shell, Capacitor app, companion
+  (electron-builder `productName` + `appId` → `ro.muzicai.companion`), browser
+  extension, READMEs, CHANGELOG and docs. Internal storage keys, mDNS service
+  types, and npm package identifiers were intentionally left unchanged to avoid
+  breaking persisted data and device discovery.
 
 ### Fixed — analyzer health resilience + larger Reanalyze modal (`apps/web` `0.5.12`)
 

@@ -2687,7 +2687,7 @@ export async function importProjectFile(file: File, options?: { rename?: boolean
         // Older raw export — accept it directly.
         project = data as DAWProject;
     } else {
-        throw new Error("Not a valid MMO DAW project file");
+        throw new Error("Not a valid MuzicAI DAW project file");
     }
     // Always assign a fresh id on import so we never overwrite an
     // existing project of the same name.

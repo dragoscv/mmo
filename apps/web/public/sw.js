@@ -209,12 +209,12 @@ self.addEventListener("push", (event) => {
         data = event.data?.json() ?? {};
     } catch {
         // Some senders push plain text; fall back to a generic notification.
-        data = { title: "MMO", body: event.data?.text() || "" };
+        data = { title: "MuzicAI", body: event.data?.text() || "" };
     }
 
     const title = typeof data.title === "string" && data.title.length > 0
         ? data.title.slice(0, 200)
-        : "MMO";
+        : "MuzicAI";
     const body = typeof data.body === "string" ? data.body.slice(0, 500) : "";
     const tag = typeof data.tag === "string" ? data.tag : undefined;
     const url = typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/";

@@ -34,17 +34,68 @@ import { getLocale, getMessages } from "next-intl/server";
 // We bypass Next.js' postcss pipeline because @tailwindcss/postcss on Linux
 // (Vercel) emits CSS its own re-parse step can't handle (relative-color
 // inside @supports). Source lives at `src/app/globals.src.css`.
-import { Inter } from "next/font/google";
+import { Inter, Space_Grotesk } from "next/font/google";
 import { cn } from "@/lib/utils";
 import Script from "next/script";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+const spaceGrotesk = Space_Grotesk({
+    subsets: ['latin'],
+    weight: ['500', '600', '700'],
+    variable: '--font-heading',
+});
 
 export const metadata: Metadata = {
-    title: "MMO",
+    metadataBase: new URL("https://muzicai.ro"),
+    title: {
+        default: "MuzicAI — AI Music Suite",
+        template: "%s · MuzicAI",
+    },
+    applicationName: "MuzicAI",
     description:
-        "Mwrty Music Organizer — scan, tag, organize, export",
+        "MuzicAI — your music library, mixed by intelligence. Scan, analyze, tag, organize, mix and perform with an AI-native music suite for DJs and producers.",
+    keywords: [
+        "MuzicAI",
+        "AI music suite",
+        "DJ software",
+        "music library manager",
+        "music organizer",
+        "BPM key analysis",
+        "music tagging",
+        "playlist manager",
+    ],
+    authors: [{ name: "MuzicAI", url: "https://muzicai.ro" }],
+    creator: "MuzicAI",
+    publisher: "MuzicAI",
     manifest: "/manifest.webmanifest",
+    openGraph: {
+        type: "website",
+        siteName: "MuzicAI",
+        title: "MuzicAI — AI Music Suite",
+        description:
+            "Your music library, mixed by intelligence. An AI-native music suite for DJs and producers.",
+        url: "https://muzicai.ro",
+        locale: "ro_RO",
+        images: [
+            {
+                url: "/og-image.png",
+                width: 1200,
+                height: 630,
+                alt: "MuzicAI — AI Music Suite",
+            },
+        ],
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "MuzicAI — AI Music Suite",
+        description:
+            "Your music library, mixed by intelligence. An AI-native music suite for DJs and producers.",
+        images: ["/og-image.png"],
+    },
+    robots: {
+        index: true,
+        follow: true,
+    },
     icons: {
         icon: [
             { url: "/favicon.ico", sizes: "32x32" },
@@ -56,7 +107,7 @@ export const metadata: Metadata = {
     appleWebApp: {
         capable: true,
         statusBarStyle: "black-translucent",
-        title: "MMO",
+        title: "MuzicAI",
     },
     other: {
         "mobile-web-app-capable": "yes",
@@ -84,9 +135,9 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
     const locale = await getLocale();
     const messages = await getMessages();
     return (
-        <html lang={locale} className={cn("dark font-sans", inter.variable)} suppressHydrationWarning>
+        <html lang={locale} className={cn("dark font-sans", inter.variable, spaceGrotesk.variable)} suppressHydrationWarning>
             <head>
-                <meta name="theme-color" content="#a855f7" />
+            <meta name="theme-color" content="#7c5cff" />
                 {/* Served as a static asset from public/, not as an
                     import, so Tailwind's CSS layers + the legacy globals
                     stay outside the route's RSC payload. */}

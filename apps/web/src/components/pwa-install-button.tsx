@@ -89,7 +89,7 @@ export function PwaInstallButton({ className }: { className?: string }) {
             className={className ??
                 "inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-zinc-200 hover:bg-white/10 transition-colors"
             }
-            aria-label="Install MMO as an app"
+            aria-label="Install MuzicAI as an app"
         >
             <Download className="h-3.5 w-3.5" aria-hidden />
             Install app

@@ -136,7 +136,7 @@ export function VoiceWizardClient({ snapshot }: { snapshot: VoiceWizardSnapshot 
             <div className="mx-auto max-w-3xl p-6">
                 <h1 className="text-3xl font-semibold tracking-tight">Voice Wizard</h1>
                 <p className="text-muted-foreground mt-2">
-                    Voice cloning runs entirely on your own computer through the MMO
+                    Voice cloning runs entirely on your own computer through the MuzicAI
                     Companion app. Pair this browser with a companion to continue.
                 </p>
                 <Card className="mt-6 p-6">

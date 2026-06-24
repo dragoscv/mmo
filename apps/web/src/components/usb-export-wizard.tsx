@@ -145,7 +145,7 @@ export function UsbExportWizard({
                 } else {
                     if (emitXml) {
                         const xml = await exportAllPlaylistsToXml();
-                        downloadBlob(new Blob([xml], { type: "application/xml" }), "MMO-library.xml");
+                        downloadBlob(new Blob([xml], { type: "application/xml" }), "MuzicAI-library.xml");
                     }
                     if (emitCrate) {
                         const r = await exportAllPlaylistsToCrates(musicSubdir);

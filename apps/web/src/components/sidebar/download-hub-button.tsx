@@ -2,12 +2,12 @@
 
 /**
  * Download Hub — single button in the sidebar that opens a modal showing
- * every way to get MMO on the user's machine / phone / browser:
+ * every way to get MuzicAI on the user's machine / phone / browser:
  *
- *   - MMO Companion (Win/Mac/Linux installers; local audio server)
- *   - MMO Native desktop (Win/Mac/Linux Tauri shell)
- *   - MMO Native mobile (iOS / Android Capacitor shell)
- *   - MMO Browser Extension (Chrome / Firefox / Edge)
+ *   - MuzicAI Companion (Win/Mac/Linux installers; local audio server)
+ *   - MuzicAI Native desktop (Win/Mac/Linux Tauri shell)
+ *   - MuzicAI Native mobile (iOS / Android Capacitor shell)
+ *   - MuzicAI Browser Extension (Chrome / Firefox / Edge)
  *
  * Detection layers (best-effort, fall back gracefully):
  *   - OS         → User-Agent + UA-Client-Hints when available.
@@ -218,7 +218,7 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
                     <button
                         type="button"
                         className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative"
-                        title="Download MMO apps & extensions"
+                        title="Download MuzicAI apps & extensions"
                     >
                         <Download className="h-4 w-4" />
                         {companionPresent === true && (
@@ -232,7 +232,7 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
                     >
                         <Download className="h-3.5 w-3.5" />
                         <span className="flex-1 truncate text-left">
-                            Get MMO apps
+                            Get MuzicAI apps
                         </span>
                         {(companionPresent === true ||
                             extensionPresent !== null) && (
@@ -244,7 +244,7 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
 
             <DialogContent className="max-w-3xl">
                 <DialogHeader>
-                    <DialogTitle>Get MMO everywhere</DialogTitle>
+                    <DialogTitle>Get MuzicAI everywhere</DialogTitle>
                     <DialogDescription>
                         Native apps, browser extension, and the local companion
                         server. Pick what fits your setup; everything works
@@ -585,7 +585,7 @@ function ExtensionSection({
             )}
             <p className="text-xs text-muted-foreground">
                 Lets you download audio from YouTube, SoundCloud, Bandcamp,
-                Mixcloud, and 10+ other platforms directly into your MMO
+                Mixcloud, and 10+ other platforms directly into your MuzicAI
                 library.
             </p>
             <ul className="space-y-1.5">

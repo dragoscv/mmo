@@ -44,25 +44,25 @@ interface Manifest {
 }
 
 export const metadata: Metadata = {
-    title: "Descarcă MMO — companion, aplicație nativă, extensie de browser",
+    title: "Descarcă MuzicAI — companion, aplicație nativă, extensie de browser",
     description:
-        "Descarcă MMO — Mwrty Music Organizer pentru Windows, macOS, Linux, Android și iOS. Aplicația companion, build-uri native și extensia pentru Chrome, Firefox și Edge.",
+        "Descarcă MuzicAI — suita muzicală AI pentru Windows, macOS, Linux, Android și iOS. Aplicația companion, build-uri native și extensia pentru Chrome, Firefox și Edge.",
     alternates: { canonical: "https://muzicai.ro/downloads" },
     openGraph: {
-        title: "Descarcă MMO",
+        title: "Descarcă MuzicAI",
         description:
             "Aplicații desktop, mobile și extensii browser pentru organizarea muzicii — gratuit, open source.",
         url: "https://muzicai.ro/downloads",
-        siteName: "MMO",
+        siteName: "MuzicAI",
         type: "website",
-        images: [{ url: "/icon-512.png", width: 512, height: 512, alt: "MMO" }],
+        images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "MuzicAI" }],
     },
     twitter: {
         card: "summary_large_image",
-        title: "Descarcă MMO",
+        title: "Descarcă MuzicAI",
         description:
             "Aplicații desktop, mobile și extensii browser pentru organizarea muzicii.",
-        images: ["/icon-512.png"],
+        images: ["/og-image.png"],
     },
 };
 
@@ -188,15 +188,15 @@ export default async function DownloadsPublicPage() {
                     >
                         <Image
                             src="/icon-192.png"
-                            alt="MMO"
+                            alt="MuzicAI"
                             width={48}
                             height={48}
                             className="rounded-xl shadow-[0_0_24px_rgba(139,92,246,0.35)]"
                         />
-                        <span className="text-2xl font-bold tracking-tight">MMO</span>
+                        <span className="font-heading text-2xl font-bold tracking-tight">Muzic<span className="text-brand-accent">AI</span></span>
                     </Link>
                     <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl">
-                        Descarcă MMO
+                        Descarcă MuzicAI
                     </h1>
                     <p className="mx-auto mt-3 max-w-2xl text-base text-white/60">
                         Aplicații desktop, mobile și extensii de browser pentru
@@ -238,7 +238,7 @@ export default async function DownloadsPublicPage() {
                         />
                         <ChannelSection
                             channel={manifest.channels.extension}
-                            blurb="Extensie pentru browser care leagă MMO de paginile de unde descarci muzică (YouTube, Bandcamp, SoundCloud)."
+                            blurb="Extensie pentru browser care leagă MuzicAI de paginile de unde descarci muzică (YouTube, Bandcamp, SoundCloud)."
                         />
 
                         <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5">

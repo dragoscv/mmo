@@ -1,6 +1,6 @@
-# 🎧 MMO — Multi Media Organizer
+# 🎧 MuzicAI — AI Music Suite
 
-> **Open-source suite for DJs, producers, and music enthusiasts.**
+> **Open-source AI suite for DJs, producers, and music enthusiasts.**
 > Web app · desktop companion · browser extension · live infrastructure.
 > Live domain: [muzicai.ro](https://muzicai.ro) · Source: [github.com/dragoscv/mmo](https://github.com/dragoscv/mmo)
 
@@ -12,9 +12,9 @@
 
 ---
 
-## ⚡ What is MMO?
+## ⚡ What is MuzicAI?
 
-MMO (**Multi Media Organizer**) is a complete suite for organizing, analyzing, mixing, and live-performing with music. It started as a personal rekordbox guide and grew into an ecosystem of components that work together:
+MuzicAI is a complete AI suite for organizing, analyzing, mixing, and live-performing with music. It started as a personal rekordbox guide and grew into an ecosystem of components that work together:
 
 | Component | Purpose | Path |
 |---|---|---|

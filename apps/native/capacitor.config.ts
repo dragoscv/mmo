@@ -23,7 +23,7 @@ try {
 
 const config: CapacitorConfig = {
     appId: "ro.muzicai.app",
-    appName: "MMO",
+    appName: "MuzicAI",
     // The "web assets" directory. Capacitor expects something to exist;
     // we point to a minimal index.html that immediately forwards to the
     // remote URL when online and serves the existing PWA shell offline

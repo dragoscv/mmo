@@ -1,5 +1,5 @@
 {
-    "appName": "MMO",
+    "appName": "MuzicAI",
     "watch": {
         "rows": {
             "continue": "Continue watching",
@@ -24,7 +24,7 @@
             "lead": "Pick up exactly where you left off on any screen tied to your profile."
         }
     },
-    "tagline": "Multi Media Organizer for DJs and producers",
+    "tagline": "AI music suite for DJs and producers",
     "empty": {
         "features": {
             "dashboard": "your dashboard",
@@ -145,9 +145,9 @@
         "termsNote": "By continuing you agree to our Terms and Privacy Policy."
     },
     "login": {
-        "welcomeTitle": "Welcome to MMO",
-        "welcomeSubtitle": "Mwrty Music Organizer",
-        "formTitle": "Sign in to MMO",
+        "welcomeTitle": "Welcome to MuzicAI",
+        "welcomeSubtitle": "MuzicAI — AI Music Suite",
+        "formTitle": "Sign in to MuzicAI",
         "formSubtitle": "Your settings and preferences will be synced across sessions",
         "formFooter": "By continuing, you agree to store your preferences securely in the app database.",
         "skipNoteLine1": "You can also use the app without signing in.",
@@ -279,14 +279,14 @@
     },
     "learn": {
         "eyebrow": "Learn",
-        "title": "MMO Knowledge base",
+        "title": "MuzicAI Knowledge base",
         "subtitle": "Concepts, architecture, equipment, genres, organisation tips and the full glossary — everything we know about running a DJ library, in one place.",
         "backToIndex": "All sections",
         "pageCount": "{count, plural, =1 {# page} other {# pages}}",
         "sections": {
             "concept": {
                 "title": "Concept",
-                "desc": "Vision, architecture decisions and product direction for MMO."
+                "desc": "Vision, architecture decisions and product direction for MuzicAI."
             },
             "docs": {
                 "title": "Documentation",
@@ -311,7 +311,7 @@
         }
     },
     "onboarding": {
-        "welcomeTitle": "Welcome to MMO",
+        "welcomeTitle": "Welcome to MuzicAI",
         "welcomeDesc": "Four quick steps and your DJ library is ready.",
         "skipForNow": "Skip for now",
         "reopenHint": "You can re-open this from <kbd>⌘K</kbd> → \"Onboarding\"",
@@ -330,11 +330,11 @@
         "companionTitle": "Install the companion",
         "companionDesc": "A small desktop app that scans your local files.",
         "companionLinked": "Companion linked.",
-        "companionInstall": "Download MMO Companion for your OS, run it once, and link it to this account.",
+        "companionInstall": "Download MuzicAI Companion for your OS, run it once, and link it to this account.",
         "companionOpenDownloads": "Open downloads",
         "companionLater": "I'll do it later",
         "scanTitle": "Run your first scan",
-        "scanDesc": "Point MMO at a folder of audio files. We'll handle the rest.",
+        "scanDesc": "Point MuzicAI at a folder of audio files. We'll handle the rest.",
         "scanLong": "Scanner reads ID3 tags, computes BPM + Camelot key, and indexes everything for instant search.",
         "scanOpenScanner": "Open Scanner"
     },

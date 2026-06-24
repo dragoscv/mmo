@@ -899,7 +899,7 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
                         <Server className="mb-4 h-12 w-12 text-muted-foreground/30" />
                         <h3 className="mb-1 font-semibold">No devices connected</h3>
                         <p className="max-w-md text-sm text-muted-foreground">
-                            Install the MMO Companion app on your computers and sign in with your Google account.
+                            Install the MuzicAI Companion app on your computers and sign in with your Google account.
                             Devices appear here automatically.
                         </p>
                     </CardContent>

@@ -7,7 +7,7 @@ import {
 import { DuplicatesClient } from "./duplicates-client";
 
 export const metadata = {
-    title: "Duplicates · MMO",
+    title: "Duplicates · MuzicAI",
 };
 
 export const dynamic = "force-dynamic";

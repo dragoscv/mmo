@@ -1,11 +1,12 @@
 {
-    "name": "Mwrty Music Organizer",
-    "short_name": "MMO",
-    "description": "Music organization tool — scan, tag, organize, export",
+    "name": "MuzicAI — AI Music Suite",
+    "short_name": "MuzicAI",
+    "description": "Your music library, mixed by intelligence. Scan, analyze, tag, organize, mix and perform with an AI-native music suite for DJs and producers.",
     "start_url": "/",
+    "id": "/",
     "display": "standalone",
-    "background_color": "#0a0a0b",
-    "theme_color": "#a855f7",
+    "background_color": "#0a0a0f",
+    "theme_color": "#7c5cff",
     "orientation": "any",
     "icons": [
         {

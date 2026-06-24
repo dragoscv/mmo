@@ -811,7 +811,7 @@ export class MidiEngine {
 
 export const PIONEER_DDJ_FLX4_PRESET: MidiPreset = {
     name: "Pioneer DDJ-FLX4",
-    author: "MMO",
+    author: "MuzicAI",
     description: "Full mapping for Pioneer DDJ-FLX4 based on Mixxx community mapping",
     deviceNameMatch: "DDJ.FLX4|DDJ-FLX4",
     mappings: [
@@ -1054,7 +1054,7 @@ export function importPreset(json: string): MidiPreset | null {
 
 export const PIONEER_DDJ_400_PRESET: MidiPreset = {
     name: "Pioneer DDJ-400",
-    author: "MMO",
+    author: "MuzicAI",
     description: "Full mapping for Pioneer DDJ-400 (2-channel rekordbox controller)",
     deviceNameMatch: "DDJ.400|DDJ-400",
     mappings: [
@@ -1133,7 +1133,7 @@ export const PIONEER_DDJ_400_PRESET: MidiPreset = {
 
 export const PIONEER_DDJ_1000_PRESET: MidiPreset = {
     name: "Pioneer DDJ-1000",
-    author: "MMO",
+    author: "MuzicAI",
     description: "Full mapping for Pioneer DDJ-1000 (4-channel pro rekordbox controller)",
     deviceNameMatch: "DDJ.1000|DDJ-1000",
     mappings: [

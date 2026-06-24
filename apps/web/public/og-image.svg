@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none" role="img" aria-label="MuzicAI — AI Music Suite">
+  <defs>
+    <linearGradient id="og-bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0A0A0F"/>
+      <stop offset="100%" stop-color="#15151E"/>
+    </linearGradient>
+    <radialGradient id="og-glow" cx="0.5" cy="0.2" r="0.8">
+      <stop offset="0%" stop-color="#7C5CFF" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#7C5CFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="og-mark" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7C5CFF"/>
+      <stop offset="100%" stop-color="#E84FF0"/>
+    </linearGradient>
+    <linearGradient id="og-wave" x1="0" y1="0" x2="120" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#22D3EE"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#og-bg)"/>
+  <rect width="1200" height="630" fill="url(#og-glow)"/>
+
+  <!-- Mark -->
+  <g transform="translate(110,150)">
+    <rect width="160" height="160" rx="44" fill="url(#og-mark)"/>
+    <g fill="url(#og-wave)" transform="translate(32,40)">
+      <rect x="0" y="36" width="10" height="20" rx="5"/>
+      <rect x="20" y="22" width="10" height="48" rx="5"/>
+      <rect x="40" y="6" width="10" height="80" rx="5"/>
+      <rect x="60" y="28" width="10" height="36" rx="5"/>
+      <rect x="80" y="6" width="10" height="80" rx="5"/>
+    </g>
+    <circle cx="126" cy="40" r="11" fill="#22D3EE"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="110" y="430" font-family="'Space Grotesk','Segoe UI',system-ui,sans-serif" font-size="120" font-weight="700" letter-spacing="-3">
+    <tspan fill="#FFFFFF">Muzic</tspan><tspan fill="#22D3EE">AI</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="114" y="500" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="38" font-weight="500" fill="#A1A1AA">
+    Your music library, mixed by intelligence.
+  </text>
+
+  <!-- Domain -->
+  <text x="114" y="560" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="28" font-weight="600" fill="#7C5CFF" letter-spacing="2">
+    muzicai.ro
+  </text>
+</svg>

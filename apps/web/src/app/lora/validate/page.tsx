@@ -1,7 +1,7 @@
 import { LoraValidateClient } from "./lora-validate-client";
 
 export const metadata = {
-    title: "Validate LoRA Corpus — MMO",
+    title: "Validate LoRA Corpus — MuzicAI",
 };
 
 export default function LoraValidatePage() {

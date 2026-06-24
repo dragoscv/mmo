@@ -22,9 +22,9 @@ import { cn } from "@/lib/utils";
 import { UserCard } from "./user-card";
 import { LegendModal } from "./legend-modal";
 import { GlobalSearch } from "./global-search";
+import { DownloadHubButton } from "./sidebar/download-hub-button";
 import { useRouteMemoryHrefs } from "@/hooks/use-route-memory";
 import { useSidebar } from "./sidebar-context";
-import { DownloadHubButton } from "./sidebar/download-hub-button";
 import {
     navTree,
     isLeafActive,
@@ -129,15 +129,15 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
             <div className="flex items-center gap-2.5 border-b border-sidebar-border px-4 py-4">
                 <Image
                     src="/logo.svg"
-                    alt="MMO"
+                    alt="MuzicAI"
                     width={32}
                     height={32}
-                    className="shrink-0 rounded-lg shadow-[0_0_12px_rgba(139,92,246,0.25)]"
+                    className="shrink-0 rounded-lg shadow-[0_0_12px_rgba(124,92,255,0.30)]"
                 />
                 {!collapsed && (
                     <div className="flex flex-col min-w-0 leading-tight">
-                        <span className="text-[15px] font-bold tracking-tight text-sidebar-foreground whitespace-nowrap overflow-hidden">
-                            MMO
+                        <span className="font-heading text-[15px] font-bold tracking-tight text-sidebar-foreground whitespace-nowrap overflow-hidden">
+                            Muzic<span className="text-brand-accent">AI</span>
                         </span>
                         <span className="text-[10px] text-sidebar-foreground/30 whitespace-nowrap">
                             v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}

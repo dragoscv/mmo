@@ -6,7 +6,7 @@ export default function OfflinePage() {
             <div className="max-w-sm space-y-4">
                 <h1 className="text-2xl font-bold">You&apos;re offline</h1>
                 <p className="text-muted-foreground">
-                    MMO works locally — the companion handles your library on this machine — but the
+                    MuzicAI works locally — the companion handles your library on this machine — but the
                     web shell needs network for sync, billing and remote.
                 </p>
                 <p className="text-sm text-muted-foreground">

@@ -1,6 +1,6 @@
 {
-    "appName": "MMO",
-    "tagline": "Multi Media Organizer pentru DJ-i și producători",
+    "appName": "MuzicAI",
+    "tagline": "Suită muzicală AI pentru DJ-i și producători",
     "watch": {
         "rows": {
             "continue": "Continuă vizionarea",
@@ -145,9 +145,9 @@
         "termsNote": "Continuând, accepți Termenii și Politica de confidențialitate."
     },
     "login": {
-        "welcomeTitle": "Bun venit la MMO",
-        "welcomeSubtitle": "Mwrty Music Organizer",
-        "formTitle": "Autentifică-te la MMO",
+        "welcomeTitle": "Bun venit la MuzicAI",
+        "welcomeSubtitle": "MuzicAI — Suită Muzicală AI",
+        "formTitle": "Autentifică-te la MuzicAI",
         "formSubtitle": "Setările și preferințele tale vor fi sincronizate între sesiuni",
         "formFooter": "Continuând, ești de acord să-ți stocăm preferințele în siguranță în baza de date a aplicației.",
         "skipNoteLine1": "Poți folosi aplicația și fără autentificare.",
@@ -279,14 +279,14 @@
     },
     "learn": {
         "eyebrow": "Învață",
-        "title": "Bază de cunoștințe MMO",
+        "title": "Bază de cunoștințe MuzicAI",
         "subtitle": "Concepte, arhitectură, echipament, genuri, sfaturi de organizare și glosarul complet — tot ce știm despre o bibliotecă DJ, într-un singur loc.",
         "backToIndex": "Toate secțiunile",
         "pageCount": "{count, plural, one {# pagină} few {# pagini} other {# de pagini}}",
         "sections": {
             "concept": {
                 "title": "Concept",
-                "desc": "Viziune, decizii de arhitectură și direcție de produs pentru MMO."
+                "desc": "Viziune, decizii de arhitectură și direcție de produs pentru MuzicAI."
             },
             "docs": {
                 "title": "Documentație",
@@ -311,7 +311,7 @@
         }
     },
     "onboarding": {
-        "welcomeTitle": "Bun venit în MMO",
+        "welcomeTitle": "Bun venit în MuzicAI",
         "welcomeDesc": "Patru pași rapizi și biblioteca ta DJ e gata.",
         "skipForNow": "Sari peste",
         "reopenHint": "Poți redeschide acest ghid din <kbd>⌘K</kbd> → „Onboarding”",
@@ -330,11 +330,11 @@
         "companionTitle": "Instalează companion-ul",
         "companionDesc": "O aplicație desktop mică care îți scanează fișierele locale.",
         "companionLinked": "Companion conectat.",
-        "companionInstall": "Descarcă MMO Companion pentru OS-ul tău, rulează-l o dată și conectează-l la acest cont.",
+        "companionInstall": "Descarcă MuzicAI Companion pentru OS-ul tău, rulează-l o dată și conectează-l la acest cont.",
         "companionOpenDownloads": "Deschide pagina de descărcări",
         "companionLater": "O fac mai târziu",
         "scanTitle": "Rulează prima scanare",
-        "scanDesc": "Indică MMO către un folder cu fișiere audio. Restul îl facem noi.",
+        "scanDesc": "Indică MuzicAI către un folder cu fișiere audio. Restul îl facem noi.",
         "scanLong": "Scanner-ul citește tagurile ID3, calculează BPM + tonalitate Camelot și indexează totul pentru căutare instantă.",
         "scanOpenScanner": "Deschide Scanner-ul"
     },

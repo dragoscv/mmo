@@ -195,7 +195,7 @@ export function CompanionDownloadButton({ collapsed = false }: { collapsed?: boo
                                 Or run this in Terminal:
                             </p>
                             <code className="block break-all rounded bg-black/30 p-1 text-[9px] text-amber-100">
-                                xattr -dr com.apple.quarantine &quot;/Applications/MMO Companion.app&quot;
+                                xattr -dr com.apple.quarantine &quot;/Applications/MuzicAI Companion.app&quot;
                             </code>
                         </div>
                     </details>

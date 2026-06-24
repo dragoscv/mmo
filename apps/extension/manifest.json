@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "MMO - Music Media Organizer Downloader",
-    "version": "1.2.0",
-    "description": "Detect audio/video on streaming platforms and download to your MMO library",
+    "name": "MuzicAI - Music Downloader",
+    "version": "1.3.0",
+    "description": "Detect audio/video on streaming platforms and download to your MuzicAI library",
     "browser_specific_settings": {
         "gecko": {
             "id": "mmo-downloader@muzicai.ro",

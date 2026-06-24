@@ -1,6 +1,7 @@
 {
   "name": "music-organizer",
-  "version": "0.5.12",
+  "version": "0.6.0",
+  "description": "MuzicAI — AI music suite for DJs and producers (muzicai.ro)",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "scripts": {

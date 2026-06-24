@@ -1318,7 +1318,7 @@ function VoicePanel() {
                             disabled={!nativeAvailable || !live.voiceActive}
                             title={
                                 !nativeAvailable
-                                    ? "MMO Companion not detected. Install + sign in on this device to enable native low-latency audio."
+                                    ? "MuzicAI Companion not detected. Install + sign in on this device to enable native low-latency audio."
                                     : !live.voiceActive
                                         ? "Turn the Voice Processor ON first to enable the native engine."
                                         : nativeMode

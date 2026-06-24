@@ -15,10 +15,10 @@ export function LoginPageClient() {
                 <div className="flex flex-col items-center gap-3">
                     <Image
                         src="/logo.svg"
-                        alt="MMO"
+                        alt="MuzicAI"
                         width={56}
                         height={56}
-                        className="rounded-2xl shadow-[0_0_24px_rgba(139,92,246,0.3)]"
+                        className="rounded-2xl shadow-[0_0_24px_rgba(124,92,255,0.35)]"
                     />
                     <div className="text-center">
                         <h1 className="text-2xl font-bold tracking-tight">

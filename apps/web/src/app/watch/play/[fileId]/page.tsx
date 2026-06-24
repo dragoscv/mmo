@@ -51,7 +51,7 @@ export default async function PlayPage({ params, searchParams }: {
         return (
             <main style={{ padding: "4rem 2rem", textAlign: "center" }}>
                 <h1>Companion offline</h1>
-                <p style={{ color: "var(--watch-fg-dim)" }}>Pornește aplicația MMO Companion pentru a reda fișierele locale.</p>
+                <p style={{ color: "var(--watch-fg-dim)" }}>Pornește aplicația MuzicAI Companion pentru a reda fișierele locale.</p>
             </main>
         );
     }

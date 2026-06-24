@@ -2,7 +2,7 @@
     "name": "@mmo/native",
     "version": "0.1.0",
     "private": true,
-    "description": "MMO native shell — Tauri 2 (desktop) + Capacitor (mobile). Wraps https://muzicai.ro and lets the existing PWA service worker handle offline.",
+    "description": "MuzicAI native shell — Tauri 2 (desktop) + Capacitor (mobile). Wraps https://muzicai.ro and lets the existing PWA service worker handle offline.",
     "type": "module",
     "scripts": {
         "tauri:dev": "tauri dev",

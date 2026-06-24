@@ -1,4 +1,4 @@
-# 🗺️ Navigare Completă — MMO Multi Media Organizer
+# 🗺️ Navigare Completă — MuzicAI (AI Music Suite)
 
 > **Hartă completă** a tuturor documentelor din acest repository.
 > Click pe orice link pentru a naviga direct.

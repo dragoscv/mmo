@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 120" fill="none" role="img" aria-label="MuzicAI">
+  <defs>
+    <linearGradient id="wm-mark" x1="0" y1="0" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7C5CFF"/>
+      <stop offset="100%" stop-color="#E84FF0"/>
+    </linearGradient>
+    <linearGradient id="wm-wave" x1="20" y1="60" x2="76" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#22D3EE"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Mark -->
+  <g transform="translate(12,12)">
+    <rect width="96" height="96" rx="26" fill="url(#wm-mark)"/>
+    <g fill="url(#wm-wave)">
+      <rect x="22" y="44" width="6" height="12" rx="3"/>
+      <rect x="33" y="34" width="6" height="32" rx="3"/>
+      <rect x="44" y="24" width="6" height="52" rx="3"/>
+      <rect x="55" y="38" width="6" height="24" rx="3"/>
+      <rect x="66" y="24" width="6" height="52" rx="3"/>
+    </g>
+    <circle cx="74" cy="28" r="6" fill="#22D3EE"/>
+  </g>
+
+  <!-- Wordmark: "Muzic" in foreground, "AI" in cyan -->
+  <text x="124" y="76" font-family="'Space Grotesk', 'Segoe UI', system-ui, sans-serif" font-size="58" font-weight="700" letter-spacing="-1">
+    <tspan fill="#0A0A0F">Muzic</tspan><tspan fill="#22D3EE">AI</tspan>
+  </text>
+</svg>
