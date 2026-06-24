@@ -1,4 +1,7 @@
 import Store from "electron-store";
+import { app } from "electron";
+import fs from "node:fs";
+import path from "node:path";
 
 /**
  * Stable identifier for an audio device that the user has explicitly
@@ -99,6 +102,68 @@ const DEFAULTS: CompanionSettings = {
     telemetryEnabled: false,
     preRemuxAutoOnScan: false,
 };
+
+/**
+ * One-time migration across the v1 rebrand (mmo-companion → muzicai-companion).
+ *
+ * Changing the Electron app/product name moved `userData` to a new directory,
+ * orphaning the previous `config.json` — users lost their scan folders, device
+ * pairing, tunnel token, etc., which broke audio streaming (403 "Path not in
+ * allowed folders") and analyzer pairing. If the NEW config is missing or has
+ * never been populated, copy the OLD one over before electron-store loads.
+ *
+ * Runs synchronously at import time, guarded so it only ever happens once
+ * (a present, non-empty new config short-circuits it).
+ */
+function migrateLegacyConfigOnce(): void {
+    try {
+        const newDir = app.getPath("userData");
+        const newCfg = path.join(newDir, "config.json");
+        // Find the legacy mmo-companion userData dir as a sibling of the new one.
+        const legacyCfg = path.join(path.dirname(newDir), "mmo-companion", "config.json");
+        if (!fs.existsSync(legacyCfg)) return;
+        const legacy = JSON.parse(fs.readFileSync(legacyCfg, "utf8"));
+        if (!legacy || typeof legacy !== "object") return;
+
+        // Read the current (new) config if any.
+        let current: Record<string, unknown> = {};
+        if (fs.existsSync(newCfg)) {
+            try { current = JSON.parse(fs.readFileSync(newCfg, "utf8")) ?? {}; } catch { current = {}; }
+        }
+
+        // Field-level restore: fill in anything the new config is MISSING from
+        // the legacy one. Critically this recovers `scanFolders` even when the
+        // new install already paired (has a deviceToken) but started with empty
+        // folders — the exact rebrand breakage. We never overwrite a non-empty
+        // value already present in the new config.
+        const RESTORE_KEYS = [
+            "scanFolders", "webAppUrl", "audioOriginAllowlist", "authorizedAudioDevices",
+            "telemetryEnabled", "preRemuxAutoOnScan", "startAtLogin", "closeToTray",
+            "startMinimized", "serverPort", "deviceToken", "deviceId", "userId",
+            "userName", "userEmail", "userImage", "tunnelToken", "tunnelHostname", "deviceName",
+        ] as const;
+        let changed = false;
+        for (const k of RESTORE_KEYS) {
+            const legacyVal = legacy[k];
+            const curVal = current[k];
+            const curEmpty = curVal === undefined || curVal === null || curVal === ""
+                || (Array.isArray(curVal) && curVal.length === 0);
+            const legacyHas = legacyVal !== undefined && legacyVal !== null && legacyVal !== ""
+                && !(Array.isArray(legacyVal) && legacyVal.length === 0);
+            if (curEmpty && legacyHas) { current[k] = legacyVal; changed = true; }
+        }
+        if (!changed) return;
+        fs.mkdirSync(newDir, { recursive: true });
+        fs.writeFileSync(newCfg, JSON.stringify(current, null, "\t"), "utf8");
+        // eslint-disable-next-line no-console
+        console.log(`[store] restored legacy settings (${legacyCfg}) into ${newCfg}`);
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("[store] legacy config migration failed:", e instanceof Error ? e.message : String(e));
+    }
+}
+
+migrateLegacyConfigOnce();
 
 export const store = new Store({
     defaults: {

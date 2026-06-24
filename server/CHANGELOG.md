@@ -2,6 +2,19 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.33 — restore settings lost in the rebrand (fixes 403 / "can't reach companion")
+
+- **Recovers your scan folders, pairing and tunnel settings after the rebrand.**
+	Renaming the app (mmo-companion → muzicai-companion) moved Electron's data
+	directory, orphaning the old `config.json`. Affected installs started with
+	**empty scan folders**, so the companion rejected every audio request with
+	`403 "Path not in allowed folders"` — the web app showed "can't reach the
+	companion" / no playback even though metadata was present. On startup the
+	companion now does a one-time, field-level restore from the legacy config:
+	any setting missing in the new config (scan folders, device token, tunnel
+	hostname, authorized audio devices, …) is copied over from the old one.
+	Existing non-empty values are never overwritten.
+
 ## 1.0.32 — setup window stays open until you close it
 
 - **The analyzer setup window no longer auto-closes.** When provisioning
