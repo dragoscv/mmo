@@ -1594,6 +1594,16 @@ export async function startServer(): Promise<void> {
             // 5 min so DHCP renewals / Wi-Fi roams self-heal.
             try { startLanAnnounce({ port: serverPort, version: SERVER_VERSION }); }
             catch (err) { console.warn("[lan-announce] start failed:", err); }
+            // Prefer the persistent gateway WebSocket for heartbeat +
+            // commands; it pauses the HTTP announce loop while connected
+            // and falls back to it automatically on failure.
+            try {
+                void import("./gateway-ws").then(async (gw) => {
+                    const la = await import("./lan-announce");
+                    gw.setOnWsActive((active) => la.setHttpAnnouncePaused(active));
+                    gw.startGatewayWs(serverPort);
+                });
+            } catch (err) { console.warn("[gateway-ws] start failed:", err); }
             // Restart cloudflared from the persisted token so the
             // per-device tunnel comes back online before the first
             // announce reply (saves ~3s on cold boot).
@@ -1620,6 +1630,7 @@ export async function stopServer(): Promise<void> {
     stopWatcherGc();
     await stopAllWatchers().catch(() => { /* ignore */ });
     stopLanAnnounce();
+    try { void import("./gateway-ws").then((gw) => gw.stopGatewayWs()); } catch { /* ignore */ }
 
     for (const client of wsClients) {
         client.close();

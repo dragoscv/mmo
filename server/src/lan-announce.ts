@@ -106,6 +106,10 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
     const token = store.get("deviceToken") as string | undefined;
     if (!token) return; // not paired yet
 
+    // WS is the active transport — skip the HTTP heartbeat. We still let
+    // explicit announceNow() calls through (paused only gates the loop).
+    if (httpAnnouncePaused) return;
+
     // Drain results from the previous tick. If the POST fails we re-queue.
     const sending = pendingResults;
     pendingResults = [];
@@ -143,37 +147,11 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
             return;
         }
 
-        const data = await res.json().catch(() => null) as {
-            name?: string;
-            commands?: InboundCommand[];
-            tunnelBootstrap?: { tunnelHostname: string; tunnelToken: string } | null;
-        } | null;
+        const data = await res.json().catch(() => null) as ControlPayload | null;
         if (!data) return;
 
-        if (data.name && onDeviceNameCb) {
-            try { onDeviceNameCb(data.name); } catch { /* ignore */ }
-        }
-
-        // Persist + start cloudflared when the server hands us a new
-        // bootstrap. Idempotent — startCloudflared no-ops if the same
-        // token is already running.
-        if (data.tunnelBootstrap?.tunnelHostname && data.tunnelBootstrap.tunnelToken) {
-            const b = data.tunnelBootstrap;
-            const prevHost = store.get("tunnelHostname") as string | undefined;
-            store.set("tunnelHostname", b.tunnelHostname);
-            store.set("tunnelToken", b.tunnelToken);
-            log("info", `[announce] tunnelBootstrap received host=${b.tunnelHostname} (prev=${prevHost ?? "none"})`);
-            try { startCloudflared(b.tunnelToken, b.tunnelHostname); }
-            catch (err) { log("warn", "[lan-announce] cloudflared start failed:", err); }
-        }
-
-        if (Array.isArray(data.commands) && data.commands.length > 0) {
-            burstUntil = Date.now() + BURST_DURATION_MS;
-            log("info", `[announce] received n=${data.commands.length} kinds=${data.commands.map((c) => c.kind).join(",")}`);
-            const t0 = Date.now();
-            // Execute sequentially so dialog-based commands don't race.
-            const results = await executeCommands(data.commands);
-            log("info", `[announce] executed n=${results.length} in ${Date.now() - t0}ms — posting back`);
+        const results = await handleControlPayload(data);
+        if (results.length > 0) {
             pendingResults.push(...results);
             // Trigger an immediate follow-up tick so results reach the
             // awaiting server action without waiting a full interval.
@@ -195,10 +173,77 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
 
 let onAuthInvalidatedCb: ((reason: string) => void) | null = null;
 
+// When the gateway WebSocket is the active transport, the HTTP announce
+// loop stands down (the WS carries heartbeat + commands). Set via
+// setHttpAnnouncePaused() from the WS client's active callback.
+let httpAnnouncePaused = false;
+export function setHttpAnnouncePaused(paused: boolean): void {
+    httpAnnouncePaused = paused;
+    log("info", `[announce] HTTP loop ${paused ? "paused (WS active)" : "resumed (WS inactive)"}`);
+}
+
+/** Shape of the control-plane response, shared by the HTTP announce route
+ *  and the WebSocket `commands`/`welcome`/`tunnelBootstrap` messages. */
+export interface ControlPayload {
+    name?: string;
+    commands?: InboundCommand[];
+    tunnelBootstrap?: { tunnelHostname: string; tunnelToken: string } | null;
+}
+
+/**
+ * Apply a control-plane payload from EITHER transport: persist the device
+ * name, bootstrap cloudflared, and execute any commands. Returns the
+ * command results to be sent back to the gateway. Kept transport-agnostic
+ * so the HTTP announce loop and the WS client never drift.
+ */
+export async function handleControlPayload(data: ControlPayload): Promise<OutboundResult[]> {
+    if (data.name && onDeviceNameCb) {
+        try { onDeviceNameCb(data.name); } catch { /* ignore */ }
+    }
+
+    // Persist + start cloudflared when the server hands us a new bootstrap.
+    // Idempotent — startCloudflared no-ops if the same token is running.
+    if (data.tunnelBootstrap?.tunnelHostname && data.tunnelBootstrap.tunnelToken) {
+        const b = data.tunnelBootstrap;
+        const prevHost = store.get("tunnelHostname") as string | undefined;
+        store.set("tunnelHostname", b.tunnelHostname);
+        store.set("tunnelToken", b.tunnelToken);
+        log("info", `[control] tunnelBootstrap received host=${b.tunnelHostname} (prev=${prevHost ?? "none"})`);
+        try { startCloudflared(b.tunnelToken, b.tunnelHostname); }
+        catch (err) { log("warn", "[control] cloudflared start failed:", err); }
+    }
+
+    if (Array.isArray(data.commands) && data.commands.length > 0) {
+        burstUntil = Date.now() + BURST_DURATION_MS;
+        log("info", `[control] received n=${data.commands.length} kinds=${data.commands.map((c) => c.kind).join(",")}`);
+        const t0 = Date.now();
+        // Execute sequentially so dialog-based commands don't race.
+        const results = await executeCommands(data.commands);
+        log("info", `[control] executed n=${results.length} in ${Date.now() - t0}ms`);
+        return results;
+    }
+    return [];
+}
+
 /** Register a callback invoked when /api/devices/announce returns 401.
  *  Set once at startup from main.ts to wire into invalidateLocalPairing. */
 export function setOnAuthInvalidated(cb: ((reason: string) => void) | null): void {
     onAuthInvalidatedCb = cb;
+}
+
+/** Accessors for the WebSocket client so it can share the same auth,
+ *  version and results queue as the HTTP announce loop. */
+export function getCurrentVersion(): string { return currentVersion; }
+export function getPendingResults(): OutboundResult[] {
+    const out = pendingResults;
+    pendingResults = [];
+    return out;
+}
+export function requeueResults(results: OutboundResult[]): void {
+    pendingResults = results.concat(pendingResults);
+}
+export function notifyAuthInvalidated(reason: string): void {
+    if (onAuthInvalidatedCb) { try { onAuthInvalidatedCb(reason); } catch { /* ignore */ } }
 }
 
 /** Register a callback invoked when the cloud reports our display name.
