@@ -2,6 +2,15 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.41 — resync analyzed tracks endpoint
+
+- **New `POST /analyze/resync`** — re-enqueues a cloud sync upsert for every
+	track that already has analysis results (any of `analyzed_at`/`dsp_analyzed_at`
+	/`stems_analyzed_at`/`bpm`/`acoustid_fingerprint`/`genre`/`artwork_url` set),
+	WITHOUT recomputing. Scoped to the calling user. Lets the web app push
+	previously analyzed results (that predate the 1.0.40 sync fix) up to the
+	cloud library. Returns `{ queued, total }`.
+
 ## 1.0.40 — fix: analysis results never synced to cloud library
 
 - **Analysis results (DSP/Stems/Fingerprint/Metadata) now round-trip to the

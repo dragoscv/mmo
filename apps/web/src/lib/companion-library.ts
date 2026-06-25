@@ -632,6 +632,9 @@ export const companionAnalyzer = {
     async batches(link: CompanionLink, limit = 50): Promise<{ batches: AnalyzerBatch[] }> {
         return call(link, "GET", `/analyze/batches?limit=${limit}`);
     },
+    async resync(link: CompanionLink): Promise<{ queued: number; total: number }> {
+        return call(link, "POST", `/analyze/resync`, {});
+    },
     async status(link: CompanionLink, sinceMs?: number): Promise<AnalyzerStatus> {
         const qs = sinceMs && sinceMs > 0 ? `?since=${sinceMs}` : "";
         return call<AnalyzerStatus>(link, "GET", `/analyze/status${qs}`);

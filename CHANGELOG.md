@@ -12,6 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — "Resync analyzed tracks" button (`apps/web` `0.7.5`, companion `1.0.41`)
+
+- **New button on `/analysis`** that re-uploads existing analysis results
+  (BPM, key, genre, artwork, lyrics…) to the cloud library without re-analyzing.
+  Useful after the 1.0.40 sync fix to push tracks analyzed before the fix.
+  Aggregates across all online companions via `POST /analyze/resync`.
+
 ### Fixed — companion shows "offline" despite running (`apps/web` `0.7.4`)
 
 - **Self-heal stale Cloudflare tunnel ingress port.** Companions whose

@@ -1419,6 +1419,38 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         res.json({ batches: analyzer.batches(Number.isFinite(limit) ? limit : 50) });
     });
 
+    // POST /analyze/resync — re-enqueue a cloud sync upsert for every track
+    // that already has analysis results, WITHOUT recomputing anything. Use
+    // after upgrading to a companion that fixes a sync gap so previously
+    // analyzed tracks (BPM/key/genre/artwork/lyrics…) finally reach the cloud
+    // library. Scoped to the calling user; best-effort per row.
+    router.post("/analyze/resync", (req, res) => {
+        const { userId } = req as AuthedRequest;
+        const db = getLibraryDb();
+        // "Has analysis results" = any analyzer stamp or computed field set.
+        const rows = db
+            .select()
+            .from(tracks)
+            .where(and(
+                eq(tracks.userId, userId),
+                sql`(
+                    ${tracks.analyzedAt} IS NOT NULL OR
+                    ${tracks.dspAnalyzedAt} IS NOT NULL OR
+                    ${tracks.stemsAnalyzedAt} IS NOT NULL OR
+                    ${tracks.bpm} IS NOT NULL OR
+                    ${tracks.acoustidFingerprint} IS NOT NULL OR
+                    ${tracks.genre} IS NOT NULL OR
+                    ${tracks.artworkUrl} IS NOT NULL
+                )`,
+            ))
+            .all() as Array<{ id: number; userId: string; sha256?: string | null } & Record<string, unknown>>;
+        let queued = 0;
+        for (const row of rows) {
+            try { pushTrackChange("upsert", row); queued++; } catch { /* best-effort */ }
+        }
+        res.json({ queued, total: rows.length });
+    });
+
     // GET /analyze/job/:id — single-job snapshot (for polling).
     router.get("/analyze/job/:id", (req, res) => {
         const job = analyzer.findJob(req.params.id);

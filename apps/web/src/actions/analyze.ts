@@ -411,6 +411,27 @@ export async function getAnalyzerBatches(limit = 50): Promise<{ batches: Analyze
     return { batches: all.slice(0, limit) };
 }
 
+/** Re-enqueue a cloud sync upsert for every already-analyzed track across all
+ *  online companions WITHOUT recomputing. Use after upgrading to a companion
+ *  that fixed a sync gap so previously analyzed results reach the library. */
+export async function resyncAnalyzedTracks(): Promise<{ queued: number; total: number; error?: string }> {
+    const links = await getAllCompanionLinks();
+    const targets = links.filter((l) => l.online);
+    if (targets.length === 0) {
+        const single = await getCompanionLink();
+        if (!single) return { queued: 0, total: 0, error: "Companion not connected" };
+        try { return await companionAnalyzer.resync(single); }
+        catch (e) { return { queued: 0, total: 0, error: e instanceof Error ? e.message : String(e) }; }
+    }
+    let queued = 0, total = 0;
+    const errs: string[] = [];
+    for (const link of targets) {
+        try { const r = await companionAnalyzer.resync(link); queued += r.queued; total += r.total; }
+        catch (e) { errs.push(e instanceof Error ? e.message : String(e)); }
+    }
+    return { queued, total, error: errs.length && queued === 0 ? errs.join("; ") : undefined };
+}
+
 export async function cancelAnalyzerJob(jobId: string): Promise<{ canceled: boolean; error?: string }> {
     const link = await getCompanionLink();
     if (!link) return { canceled: false, error: "Companion not connected" };

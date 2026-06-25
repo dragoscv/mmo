@@ -68,6 +68,7 @@ import {
     retryAnalyzerJob,
     retryFailedJobs,
     startBulkDspAnalysis,
+    resyncAnalyzedTracks,
 } from "@/actions/analyze";
 import type { AnalysisScope } from "@/actions/analyze";
 import type {
@@ -131,6 +132,7 @@ export function AnalysisClient() {
     const [forceReanalyze, setForceReanalyze] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [lastResult, setLastResult] = useState<string | null>(null);
+    const [resyncing, setResyncing] = useState(false);
 
     // Batch progress: tracks the current "wave" of work across the whole queue
     // so we can show overall %, ETA, and throughput — not just per-job progress.
@@ -273,6 +275,18 @@ export function AnalysisClient() {
             setSubmitting(false);
         }
     }, [opts, metaFields, filter, forceReanalyze]);
+
+    const resyncAnalyzed = useCallback(async () => {
+        setResyncing(true);
+        setLastResult(null);
+        try {
+            const r = await resyncAnalyzedTracks();
+            if (r.error && !r.queued) setLastResult(`Error: ${r.error}`);
+            else setLastResult(`Queued ${r.queued} of ${r.total} analyzed track(s) for cloud sync.`);
+        } finally {
+            setResyncing(false);
+        }
+    }, []);
 
     const cancelCurrent = useCallback(async () => {
         if (!status?.current) return;
@@ -578,6 +592,8 @@ export function AnalysisClient() {
                         submitting={submitting}
                         lastResult={lastResult}
                         onStart={startBulk}
+                        onResync={resyncAnalyzed}
+                        resyncing={resyncing}
                     />
                     <SystemCard health={health} healthMisses={healthMisses} />
                 </aside>
@@ -1349,6 +1365,8 @@ function ControlsCard({
     submitting,
     lastResult,
     onStart,
+    onResync,
+    resyncing,
 }: {
     health: AnalyzerHealth | null;
     scope: AnalysisScope | null;
@@ -1363,6 +1381,8 @@ function ControlsCard({
     submitting: boolean;
     lastResult: string | null;
     onStart: () => void;
+    onResync: () => void;
+    resyncing: boolean;
 }) {
     const noneSelected = !opts.dsp && !opts.stems && !opts.fingerprint && !opts.metadata;
     const disabled = submitting || !health?.ok || noneSelected;
@@ -1502,6 +1522,28 @@ function ControlsCard({
                         <Play className="h-4 w-4" />
                     )}
                     {submitting ? "Enqueuing…" : "Start analysis"}
+                </button>
+
+                {/* Resync already-analyzed tracks to the cloud library without
+                    recomputing. Useful after a companion upgrade that fixed a
+                    cloud-sync gap. */}
+                <button
+                    onClick={onResync}
+                    disabled={resyncing || !health?.ok}
+                    title="Re-upload existing analysis results (BPM, key, genre, artwork, lyrics…) to the cloud library without re-analyzing."
+                    className={cn(
+                        "inline-flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2 text-xs font-medium transition-all",
+                        resyncing || !health?.ok
+                            ? "cursor-not-allowed border-white/10 bg-white/5 text-white/30"
+                            : "cursor-pointer border-white/15 bg-white/5 text-white/80 hover:bg-white/10",
+                    )}
+                >
+                    {resyncing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                    {resyncing ? "Resyncing…" : "Resync analyzed tracks"}
                 </button>
                 {lastResult && (
                     <motion.div
