@@ -57,7 +57,7 @@ jobs:
       version: ${{ steps.read.outputs.version }}
       should_build: ${{ steps.check.outputs.should_build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Read server/package.json version
         id: read
         shell: bash
@@ -96,7 +96,7 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Assert tag matches server/package.json#version
         shell: bash
         run: |
@@ -125,6 +125,12 @@ jobs:
       )
     strategy:
       fail-fast: false
+      # Serialize the matrix so only ONE runner publishes at a time. All three
+      # runners publish to the SAME GitHub Release (named after the version);
+      # running them in parallel made the slowest lose a `POST /releases` race
+      # with HTTP 422 "already_exists" (historically macOS). With one at a
+      # time the first creates the release and the others attach their assets.
+      max-parallel: 1
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
@@ -134,7 +140,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Linux runners need a few system packages so electron-builder can
       # produce .deb / .rpm / .AppImage and so the bundled audio adapter
@@ -163,7 +169,7 @@ jobs:
           run_install: false
 
       - name: Setup Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: "pnpm"
@@ -287,7 +293,7 @@ jobs:
         run: pnpm exec electron-builder --linux --x64 --config.releaseInfo.releaseNotesFile=release/RELEASE_NOTES.md ${{ steps.pub.outputs.flag }}
       - name: Upload artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: companion-${{ matrix.os }}
           path: |

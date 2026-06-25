@@ -21,12 +21,12 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 3
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
               with:
                   # Need history so the check can diff vs origin/main.
                   fetch-depth: 0
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
                   node-version: 24
 
@@ -46,11 +46,11 @@ jobs:
             run:
                 working-directory: apps/extension
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
 
             - uses: pnpm/action-setup@v4
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
                   node-version: 24
                   cache: pnpm

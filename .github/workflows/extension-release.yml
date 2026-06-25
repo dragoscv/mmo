@@ -33,7 +33,7 @@ jobs:
         if: github.event_name == 'push'
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - name: Assert tag matches apps/extension/manifest.json#version
               shell: bash
               run: |
@@ -64,11 +64,11 @@ jobs:
             run:
                 working-directory: apps/extension
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
 
             - uses: pnpm/action-setup@v4
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
                   node-version: 24
                   cache: pnpm
@@ -107,7 +107,7 @@ jobs:
                   echo "zip_path=apps/extension/build/$name" >> $GITHUB_OUTPUT
 
             - name: Upload zip as workflow artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v5
               with:
                   name: extension-zip
                   path: apps/extension/build/*.zip
@@ -118,9 +118,9 @@ jobs:
         if: github.event_name == 'push'
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
 
-            - uses: actions/download-artifact@v4
+            - uses: actions/download-artifact@v6
               with:
                   name: extension-zip
                   path: ./out
@@ -149,7 +149,7 @@ jobs:
             (github.event_name == 'push' || github.event.inputs.publish_stores == 'true')
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/download-artifact@v4
+            - uses: actions/download-artifact@v6
               with:
                   name: extension-zip
                   path: ./out
@@ -186,8 +186,8 @@ jobs:
             (github.event_name == 'push' || github.event.inputs.publish_stores == 'true')
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/download-artifact@v4
+            - uses: actions/checkout@v5
+            - uses: actions/download-artifact@v6
               with:
                   name: extension-zip
                   path: ./out
@@ -204,7 +204,7 @@ jobs:
                     echo "::notice::Firefox AMO secrets not configured \u2014 skipping. Set FIREFOX_AMO_JWT_ISSUER + FIREFOX_AMO_JWT_SECRET to enable."
                   fi
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               if: steps.secrets.outputs.have == 'true'
               with:
                   node-version: 24
@@ -231,7 +231,7 @@ jobs:
             (github.event_name == 'push' || github.event.inputs.publish_stores == 'true')
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/download-artifact@v4
+            - uses: actions/download-artifact@v6
               with:
                   name: extension-zip
                   path: ./out
