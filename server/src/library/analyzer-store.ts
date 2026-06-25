@@ -75,6 +75,7 @@ export class AnalyzerStore {
         countByStateCategory: ReturnType<SqliteDatabase["prepare"]>;
         countFinishedSince: ReturnType<SqliteDatabase["prepare"]>;
         listBatches: ReturnType<SqliteDatabase["prepare"]>;
+        listBatchLanes: ReturnType<SqliteDatabase["prepare"]>;
     };
 
     constructor(db?: SqliteDatabase) {
@@ -310,6 +311,9 @@ export class AnalyzerStore {
                     batch_id   AS batchId,
                     MAX(batch_label) AS label,
                     COUNT(*)   AS total,
+                    COUNT(DISTINCT track_id) AS tracks,
+                    COUNT(DISTINCT CASE WHEN state IN ('done','error','canceled')
+                                        THEN track_id END) AS tracksFinished,
                     SUM(CASE WHEN state = 'queued'   THEN 1 ELSE 0 END) AS queued,
                     SUM(CASE WHEN state = 'running'  THEN 1 ELSE 0 END) AS running,
                     SUM(CASE WHEN state = 'done'     THEN 1 ELSE 0 END) AS done,
@@ -326,6 +330,25 @@ export class AnalyzerStore {
                 GROUP BY batch_id
                 ORDER BY MIN(enqueued_at) DESC
                 LIMIT ?
+            `),
+            // Per-(batch, category) breakdown so the UI can compute an accurate
+            // parallel ETA: lanes run concurrently at very different speeds
+            // (stems ~60s/track vs DSP ~9s), so batch ETA = MAX over lanes of
+            // (laneRemaining × laneAvgMs), not total × global avg.
+            listBatchLanes: this.db.prepare(`
+                SELECT
+                    batch_id AS batchId,
+                    category,
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN state IN ('done','error','canceled') THEN 1 ELSE 0 END) AS finished,
+                    SUM(CASE WHEN state = 'done' THEN 1 ELSE 0 END) AS done,
+                    SUM(CASE WHEN state = 'running' THEN 1 ELSE 0 END) AS running,
+                    SUM(CASE WHEN state = 'queued' THEN 1 ELSE 0 END) AS queued,
+                    MIN(started_at) AS startedAt,
+                    MAX(finished_at) AS lastFinishedAt
+                FROM analyzer_jobs
+                WHERE batch_id IS NOT NULL
+                GROUP BY batch_id, category
             `),
         };
     }
@@ -433,6 +456,8 @@ export class AnalyzerStore {
             batchId: string;
             label: string | null;
             total: number;
+            tracks: number;
+            tracksFinished: number;
             queued: number;
             running: number;
             done: number;
@@ -444,6 +469,23 @@ export class AnalyzerStore {
             categories: string | null;
             avgProgress: number | null;
         }>;
+        // Per-lane breakdown grouped by batch for parallel ETA + counts.
+        const laneRows = (this.stmts.listBatchLanes as unknown as { all(): unknown[] }).all() as Array<{
+            batchId: string; category: string; total: number; finished: number;
+            done: number; running: number; queued: number;
+            startedAt: number | null; lastFinishedAt: number | null;
+        }>;
+        const lanesByBatch = new Map<string, BatchLane[]>();
+        for (const lr of laneRows) {
+            const arr = lanesByBatch.get(lr.batchId) ?? [];
+            arr.push({
+                category: lr.category as Category,
+                total: lr.total, finished: lr.finished, done: lr.done,
+                running: lr.running, queued: lr.queued,
+                startedAt: lr.startedAt, lastFinishedAt: lr.lastFinishedAt,
+            });
+            lanesByBatch.set(lr.batchId, arr);
+        }
         return rows.map((r) => {
             const finishedCount = r.done + r.errored + r.canceled;
             const active = r.queued + r.running > 0;
@@ -451,6 +493,8 @@ export class AnalyzerStore {
                 batchId: r.batchId,
                 label: r.label ?? "Analysis",
                 total: r.total,
+                tracks: r.tracks,
+                tracksFinished: r.tracksFinished,
                 queued: r.queued,
                 running: r.running,
                 done: r.done,
@@ -465,15 +509,31 @@ export class AnalyzerStore {
                 enqueuedAt: r.enqueuedAt,
                 startedAt: r.startedAt,
                 finishedAt: active ? null : r.finishedAt,
+                lanes: lanesByBatch.get(r.batchId) ?? [],
             };
         });
     }
+}
+
+export interface BatchLane {
+    category: Category;
+    total: number;
+    finished: number;
+    done: number;
+    running: number;
+    queued: number;
+    startedAt: number | null;
+    lastFinishedAt: number | null;
 }
 
 export interface BatchSummary {
     batchId: string;
     label: string;
     total: number;
+    /** Distinct tracks in this run (not item sub-jobs). */
+    tracks: number;
+    /** Distinct tracks with all their sub-jobs finished. */
+    tracksFinished: number;
     queued: number;
     running: number;
     done: number;
@@ -486,6 +546,8 @@ export interface BatchSummary {
     enqueuedAt: number;
     startedAt: number | null;
     finishedAt: number | null;
+    /** Per-category breakdown for parallel ETA + lane counts. */
+    lanes: BatchLane[];
 }
 
 let _store: AnalyzerStore | null = null;

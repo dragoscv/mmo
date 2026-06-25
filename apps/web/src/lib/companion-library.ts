@@ -545,6 +545,10 @@ export interface AnalyzerBatch {
     batchId: string;
     label: string;
     total: number;
+    /** Distinct tracks in the run (not item sub-jobs). */
+    tracks: number;
+    /** Distinct tracks fully finished. */
+    tracksFinished: number;
     queued: number;
     running: number;
     done: number;
@@ -557,6 +561,18 @@ export interface AnalyzerBatch {
     enqueuedAt: number;
     startedAt: number | null;
     finishedAt: number | null;
+    lanes: BatchLane[];
+}
+
+export interface BatchLane {
+    category: Category;
+    total: number;
+    finished: number;
+    done: number;
+    running: number;
+    queued: number;
+    startedAt: number | null;
+    lastFinishedAt: number | null;
 }
 
 export interface LaneStatus {
@@ -634,6 +650,9 @@ export const companionAnalyzer = {
     },
     async resync(link: CompanionLink): Promise<{ queued: number; total: number }> {
         return call(link, "POST", `/analyze/resync`, {});
+    },
+    async cancelBatch(link: CompanionLink, batchId: string): Promise<{ canceled: number }> {
+        return call(link, "POST", `/analyze/batch/${encodeURIComponent(batchId)}/cancel`, {});
     },
     async status(link: CompanionLink, sinceMs?: number): Promise<AnalyzerStatus> {
         const qs = sinceMs && sinceMs > 0 ? `?since=${sinceMs}` : "";

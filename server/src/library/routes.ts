@@ -1466,6 +1466,13 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         res.json({ canceled: ok });
     });
 
+    // POST /analyze/batch/:batchId/cancel — cancel a whole run: drop all its
+    // queued sub-jobs across every lane + kill any in-flight sub-job of it.
+    router.post("/analyze/batch/:batchId/cancel", (req, res) => {
+        const n = analyzer.cancelBatch(req.params.batchId);
+        res.json({ canceled: n });
+    });
+
     // POST /analyze/retry/:id — re-enqueue a completed (or queued)
     // job using its original path + options. Useful for transient
     // failures like "python exited (SIGTERM)".

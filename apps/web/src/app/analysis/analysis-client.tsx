@@ -69,6 +69,7 @@ import {
     retryFailedJobs,
     startBulkDspAnalysis,
     resyncAnalyzedTracks,
+    cancelAnalyzerBatch,
 } from "@/actions/analyze";
 import type { AnalysisScope } from "@/actions/analyze";
 import type {
@@ -133,6 +134,7 @@ export function AnalysisClient() {
     const [submitting, setSubmitting] = useState(false);
     const [lastResult, setLastResult] = useState<string | null>(null);
     const [resyncing, setResyncing] = useState(false);
+    const [cancelingBatchId, setCancelingBatchId] = useState<string | null>(null);
 
     // Batch progress: tracks the current "wave" of work across the whole queue
     // so we can show overall %, ETA, and throughput — not just per-job progress.
@@ -288,6 +290,17 @@ export function AnalysisClient() {
         }
     }, []);
 
+    const cancelBatch = useCallback(async (batchId: string) => {
+        if (!window.confirm("Cancel this run? Queued sub-jobs are dropped and the in-flight one is stopped. Already-completed results are kept.")) return;
+        setCancelingBatchId(batchId);
+        try {
+            const r = await cancelAnalyzerBatch(batchId);
+            setLastResult(r.error ? `Error: ${r.error}` : `Cancelled ${r.canceled} sub-job(s).`);
+        } finally {
+            setCancelingBatchId(null);
+        }
+    }, []);
+
     const cancelCurrent = useCallback(async () => {
         if (!status?.current) return;
         await cancelAnalyzerJob(status.current.id);
@@ -411,6 +424,8 @@ export function AnalysisClient() {
     // status]` and conflicted with the inferred fine-grained deps.
     const batchStats = ((): {
         total: number;
+        tracks: number;
+        tracksFinished: number;
         doneCount: number;
         failedCount: number;
         remaining: number;
@@ -434,20 +449,38 @@ export function AnalysisClient() {
             const doneCount = liveBatch.done;
             const failedCount = liveBatch.errored;
             const remaining = Math.max(0, total - liveBatch.finished);
-            const lanes = status?.lanes;
-            const runningProgress = lanes
-                ? lanes.reduce((sum, l) => sum + (l.current?.progress ?? 0), 0)
-                : (status?.current?.progress ?? 0);
             const overall = Math.min(1, liveBatch.progress || 0);
             const startedAt = liveBatch.startedAt ?? liveBatch.enqueuedAt;
             const elapsed = (liveBatch.finishedAt ?? Date.now()) - startedAt;
-            const fractionalDone = liveBatch.finished + runningProgress;
-            const avgPerJobMs = fractionalDone > 0.05 ? elapsed / fractionalDone : null;
-            const etaMs = liveBatch.state === "running" && avgPerJobMs != null && remaining > 0
-                ? Math.max(0, avgPerJobMs * remaining)
-                : null;
+            // Parallel-aware ETA: lanes run concurrently at very different
+            // speeds (stems ~60s/track vs DSP ~9s), so the batch finishes when
+            // the SLOWEST lane finishes → ETA = MAX over lanes of
+            // (laneRemaining × laneAvgMs). Per-lane avg uses that lane's own
+            // elapsed/finished; falls back to the batch-wide avg when a lane
+            // has no completions yet.
+            const batchFractionalDone = liveBatch.finished;
+            const batchAvgMs = batchFractionalDone > 0 ? elapsed / batchFractionalDone : null;
+            let etaMs: number | null = null;
+            const runningLanes = liveBatch.lanes.filter((l) => l.queued + l.running > 0);
+            if (liveBatch.state === "running" && runningLanes.length > 0) {
+                let maxLaneEta = 0;
+                for (const l of runningLanes) {
+                    const laneRemaining = Math.max(0, l.total - l.finished);
+                    if (laneRemaining === 0) continue;
+                    const laneStart = l.startedAt ?? startedAt;
+                    const laneElapsed = (l.lastFinishedAt ?? Date.now()) - laneStart;
+                    const laneAvg = l.finished > 0 ? laneElapsed / l.finished : batchAvgMs;
+                    if (laneAvg == null) continue;
+                    maxLaneEta = Math.max(maxLaneEta, laneAvg * laneRemaining);
+                }
+                etaMs = maxLaneEta > 0 ? maxLaneEta : null;
+            }
+            const avgPerJobMs = batchAvgMs;
             return {
-                total, doneCount, failedCount, remaining, overall, elapsed,
+                total,
+                tracks: liveBatch.tracks,
+                tracksFinished: liveBatch.tracksFinished,
+                doneCount, failedCount, remaining, overall, elapsed,
                 avgPerJobMs, etaMs,
                 finished: liveBatch.state !== "running",
                 runningCount: liveBatch.running,
@@ -499,6 +532,8 @@ export function AnalysisClient() {
                 : null;
         return {
             total,
+            tracks: total,
+            tracksFinished: doneCount,
             doneCount,
             failedCount,
             remaining,
@@ -574,7 +609,7 @@ export function AnalysisClient() {
                 {/* Left column: live job + queue + completed */}
                 <section className="lg:col-span-8 space-y-4">
                     <BatchProgressCard stats={batchStats} />
-                    <JobsCard batches={batches} />
+                    <JobsCard batches={batches} onCancel={cancelBatch} cancelingId={cancelingBatchId} />
                     {status?.lanes && status.lanes.length > 0 ? (
                         <LanesPanel
                             lanes={status.lanes}
@@ -733,6 +768,8 @@ function StatTile({
 
 type BatchStats = {
     total: number;
+    tracks: number;
+    tracksFinished: number;
     doneCount: number;
     failedCount: number;
     remaining: number;
@@ -921,7 +958,11 @@ function LanesPanel({
 /** Jobs list — one row per "Start analysis" run (a batch). Each batch is a
  *  single logical job containing many item sub-jobs; the row shows aggregate
  *  progress and per-item done/error counts. */
-function JobsCard({ batches }: { batches: AnalyzerBatch[] }) {
+function JobsCard({ batches, onCancel, cancelingId }: {
+    batches: AnalyzerBatch[];
+    onCancel: (batchId: string) => void;
+    cancelingId: string | null;
+}) {
     return (
         <Card
             title={`Jobs (${batches.length})`}
@@ -960,6 +1001,19 @@ function JobsCard({ batches }: { batches: AnalyzerBatch[] }) {
                                     <span className={`shrink-0 text-[10px] font-medium uppercase tracking-wide ${stateColor}`}>
                                         {b.state === "running" ? `${pct}%` : b.state}
                                     </span>
+                                    {b.state === "running" && (
+                                        <button
+                                            onClick={() => onCancel(b.batchId)}
+                                            disabled={cancelingId === b.batchId}
+                                            title="Cancel this run (drops queued + stops in-flight sub-jobs)"
+                                            className="shrink-0 inline-flex items-center gap-1 rounded border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] text-rose-200 hover:bg-rose-500/20 disabled:opacity-50"
+                                        >
+                                            {cancelingId === b.batchId
+                                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                : <Square className="h-3 w-3" />}
+                                            Cancel
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/10">
                                     <div
@@ -968,7 +1022,8 @@ function JobsCard({ batches }: { batches: AnalyzerBatch[] }) {
                                     />
                                 </div>
                                 <div className="mt-1 flex items-center gap-3 text-[10px] text-white/40">
-                                    <span>{b.finished}/{b.total} items</span>
+                                    <span className="text-white/60">{b.tracksFinished.toLocaleString()}/{b.tracks.toLocaleString()} tracks</span>
+                                    <span>{b.finished.toLocaleString()}/{b.total.toLocaleString()} sub-jobs</span>
                                     {b.running > 0 && <span className="text-sky-300/80">{b.running} running</span>}
                                     {b.queued > 0 && <span>{b.queued} queued</span>}
                                     {b.errored > 0 && <span className="text-rose-300/80">{b.errored} failed</span>}
@@ -1021,6 +1076,10 @@ function BatchProgressCard({ stats }: { stats: BatchStats | null }) {
                                         {stats.failedCount} failed
                                     </span>
                                 )}
+                            </div>
+                            <div className="mt-0.5 text-[11px] text-white/50">
+                                {stats.tracksFinished.toLocaleString()} / {stats.tracks.toLocaleString()} tracks
+                                <span className="text-white/30"> · sub-jobs across {Math.max(1, Math.round(stats.total / Math.max(1, stats.tracks)))} categor{Math.max(1, Math.round(stats.total / Math.max(1, stats.tracks))) === 1 ? "y" : "ies"}</span>
                             </div>
                         </div>
                         <div className="text-right">

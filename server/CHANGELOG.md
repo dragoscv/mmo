@@ -2,6 +2,15 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.42 — cancel a run + accurate batch counts
+
+- **New `POST /analyze/batch/:batchId/cancel`** — cancels a whole run: drops all
+	its queued sub-jobs across every lane and kills any in-flight sub-job of it.
+- **Batch summaries now expose distinct-track counts** (`tracks`,
+	`tracksFinished`) and a **per-category lane breakdown** (`lanes[]`) so the web
+	app can show "X / Y tracks" (not just item sub-jobs) and compute an accurate
+	parallel ETA (lanes run concurrently at different speeds).
+
 ## 1.0.41 — resync analyzed tracks endpoint
 
 - **New `POST /analyze/resync`** — re-enqueues a cloud sync upsert for every

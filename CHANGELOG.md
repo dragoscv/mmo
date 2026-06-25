@@ -12,6 +12,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added / Fixed — cancel runs + accurate batch progress (`apps/web` `0.7.7`, companion `1.0.42`)
+
+- **Cancel button on each running job** in the `/analysis` Jobs card — cancels a
+  whole run (drops queued sub-jobs + stops the in-flight one across all lanes);
+  already-completed results are kept.
+- **Distinct-track counts** — the batch card + Jobs list now show "X / Y tracks"
+  alongside the item sub-job count, so a ~7,000-song library no longer looks
+  like ">10,000" (that number was track × category sub-jobs).
+- **Accurate parallel ETA** — lanes run concurrently at very different speeds
+  (stems ~60s/track vs DSP ~9s); ETA is now `MAX` over lanes of
+  `laneRemaining × laneAvgMs` instead of a single global average.
+
 ### Fixed — batch progress no longer resets on refresh (`apps/web` `0.7.6`)
 
 - **The "Current batch" progress card kept restarting (clock + baseline) on

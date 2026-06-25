@@ -375,6 +375,36 @@ class Worker extends EventEmitter {
         return n;
     }
 
+    /** Cancel every job belonging to a batch in this lane: drops its queued
+     *  jobs and kills the in-flight one if it belongs to the batch. */
+    cancelBatch(batchId: string): number {
+        let n = 0;
+        const keep: AnalyzeJob[] = [];
+        for (const j of this.queueMem) {
+            if (j.batchId === batchId) {
+                this.store.finish(j.id, "canceled", {
+                    stage: "canceled", message: "Batch cancelled",
+                    error: "batch cancel",
+                });
+                n++;
+            } else {
+                keep.push(j);
+            }
+        }
+        this.queueMem.length = 0;
+        this.queueMem.push(...keep);
+        if (this.current?.batchId === batchId && this.proc) {
+            this.killReason = `batch cancel (track ${this.current.trackId})`;
+            try { this.proc.kill(); } catch { /* ignore */ }
+            n++;
+        }
+        if (n > 0) {
+            this.parent.pushLog("warn",
+                `[${this.category}] Batch cancelled (${n} job${n === 1 ? "" : "s"})`);
+        }
+        return n;
+    }
+
     /** Forcibly kill the lane's sidecar (used by Analyzer.shutdown
      *  and Analyzer.restartSidecar). */
     kill(reason: string) {
@@ -1193,6 +1223,15 @@ class Analyzer extends EventEmitter {
             if (this.workers[cat].cancel(id)) return true;
         }
         return false;
+    }
+
+    /** Cancel an entire batch (run): drops all its queued sub-jobs across every
+     *  lane and kills any in-flight sub-job belonging to it. */
+    cancelBatch(batchId: string): number {
+        let n = 0;
+        for (const cat of CATEGORIES) n += this.workers[cat].cancelBatch(batchId);
+        this.pushLog("warn", `Batch ${batchId} cancelled (${n} job${n === 1 ? "" : "s"})`);
+        return n;
     }
 
     /** Pause one lane or all lanes. */

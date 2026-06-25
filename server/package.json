@@ -1,6 +1,6 @@
 {
   "name": "muzicai-companion",
-  "version": "1.0.41",
+  "version": "1.0.42",
   "description": "MuzicAI Companion Server — serves local music files to the MuzicAI web app",
   "main": "dist/main.js",
   "author": {

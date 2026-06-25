@@ -411,6 +411,23 @@ export async function getAnalyzerBatches(limit = 50): Promise<{ batches: Analyze
     return { batches: all.slice(0, limit) };
 }
 
+/** Cancel a whole run (batch) across whichever online companion owns it. */
+export async function cancelAnalyzerBatch(batchId: string): Promise<{ canceled: number; error?: string }> {
+    const links = await getAllCompanionLinks();
+    const targets = links.filter((l) => l.online);
+    if (targets.length === 0) {
+        const single = await getCompanionLink();
+        if (!single) return { canceled: 0, error: "Companion not connected" };
+        targets.push({ ...single, name: "companion", online: true, lastSeenAt: new Date() });
+    }
+    let canceled = 0;
+    for (const link of targets) {
+        try { canceled += (await companionAnalyzer.cancelBatch(link, batchId)).canceled; }
+        catch { /* batch may live on another companion */ }
+    }
+    return { canceled };
+}
+
 /** Re-enqueue a cloud sync upsert for every already-analyzed track across all
  *  online companions WITHOUT recomputing. Use after upgrading to a companion
  *  that fixed a sync gap so previously analyzed results reach the library. */
