@@ -2,6 +2,15 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.39 — fix: "no such column: batch_id" on upgrade
+
+- **Fixed a startup crash ("audio engine unavailable" / `no such column:
+	batch_id`) when upgrading an existing library DB to 1.0.38.** The bootstrap
+	`CREATE INDEX idx_analyzer_batch ON analyzer_jobs(batch_id)` ran before the
+	`ALTER TABLE … ADD COLUMN batch_id` migration; on an existing DB the
+	`CREATE TABLE IF NOT EXISTS` is a no-op, so the index hit a missing column.
+	The batch index is now created by `migrate()` after the column is added.
+
 ## 1.0.38 — analysis runs grouped into one job (batches)
 
 - **A "Start analysis" run is now one logical job containing many item

@@ -111,8 +111,6 @@ export class AnalyzerStore {
                 ON analyzer_jobs(request_id);
             CREATE INDEX IF NOT EXISTS idx_analyzer_track
                 ON analyzer_jobs(track_id, category);
-            CREATE INDEX IF NOT EXISTS idx_analyzer_batch
-                ON analyzer_jobs(batch_id);
         `);
         this.migrate();
     }
