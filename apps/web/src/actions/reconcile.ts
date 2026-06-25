@@ -33,28 +33,36 @@ export interface ReconcileResult {
     skipped?: string;
 }
 
+export interface ReconcileSummary {
+    results: ReconcileResult[];
+    totalPruned: number;
+    backfilled: number;
+    error?: string;
+}
+
 const PRUNE_HARD_CAP = 50_000; // never delete more than this in one run
 
 /**
  * Reconcile every online companion: prune cloud tracks whose file no longer
  * exists on the owning companion. Returns a per-device summary.
  */
-export async function reconcileCloudWithCompanions(): Promise<{
-    results: ReconcileResult[];
-    totalPruned: number;
-    error?: string;
-}> {
+export async function reconcileCloudWithCompanions(): Promise<ReconcileSummary> {
     const session = await auth();
-    if (!session?.user?.id) return { results: [], totalPruned: 0, error: "Not signed in" };
+    if (!session?.user?.id) return { results: [], totalPruned: 0, backfilled: 0, error: "Not signed in" };
     const userId = session.user.id;
 
     const links = (await getAllCompanionLinks()).filter((l) => l.online);
     if (links.length === 0) {
-        return { results: [], totalPruned: 0, error: "No online companion to reconcile against" };
+        return { results: [], totalPruned: 0, backfilled: 0, error: "No online companion to reconcile against" };
     }
 
     const results: ReconcileResult[] = [];
     let totalPruned = 0;
+    let backfilled = 0;
+
+    // filepath → owning deviceId, unioned across all online companions. Used
+    // both to prune (absent ⇒ orphan) and to backfill NULL deviceId rows.
+    const ownerByPath = new Map<string, string>();
 
     for (const link of links) {
         // 1. Collect the companion's current filepath set (paged).
@@ -62,13 +70,12 @@ export async function reconcileCloudWithCompanions(): Promise<{
         let page = 1;
         const PAGE = 500;
         let companionTotal = 0;
-        let safe = true;
         try {
             while (true) {
                 const res = await companionLibrary.getTracks(link, { page, pageSize: PAGE });
                 companionTotal = res.total ?? companionTotal;
                 for (const t of res.tracks) {
-                    if (t.filepath) have.add(t.filepath);
+                    if (t.filepath) { have.add(t.filepath); ownerByPath.set(t.filepath, link.deviceId); }
                 }
                 if (res.tracks.length < PAGE) break;
                 page++;
@@ -94,44 +101,75 @@ export async function reconcileCloudWithCompanions(): Promise<{
             });
             continue;
         }
-
-        // 2. Read cloud tracks for this device.
-        const cloudRows = await db
-            .select({ id: tracks.id, filepath: tracks.filepath })
-            .from(tracks)
-            .where(and(eq(tracks.userId, userId), eq(tracks.deviceId, link.deviceId)));
-
-        // 3. Prune cloud rows whose filepath is absent on the companion.
-        const orphanIds = cloudRows
-            .filter((r) => !r.filepath || !have.has(r.filepath))
-            .map((r) => r.id);
-
-        let pruned = 0;
-        if (orphanIds.length > 0) {
-            const toDelete = orphanIds.slice(0, PRUNE_HARD_CAP);
-            // Delete in chunks to keep parameter counts sane.
-            for (let i = 0; i < toDelete.length; i += 500) {
-                const chunk = toDelete.slice(i, i + 500);
-                const res = await db
-                    .delete(tracks)
-                    .where(and(eq(tracks.userId, userId), inArray(tracks.id, chunk)));
-                pruned += res.count ?? chunk.length;
-            }
-        }
-
-        totalPruned += pruned;
         results.push({
             deviceId: link.deviceId,
             name: link.name,
             companionTrackCount: companionTotal || have.size,
-            cloudTrackCount: cloudRows.length,
-            pruned,
+            cloudTrackCount: 0, // filled in the global pass below
+            pruned: 0,
         });
+    }
+
+    // If NO online companion produced a usable filepath set, bail without
+    // touching cloud data (avoids mass-delete on a transient empty read).
+    if (ownerByPath.size === 0) {
+        return { results, totalPruned: 0, backfilled: 0, error: "No companion filepaths read — nothing reconciled" };
+    }
+
+    // ── Global pass over ALL the user's cloud tracks ────────────────────
+    // Includes NULL-deviceId rows (historical syncs never stamped a device).
+    // A row is an orphan when its filepath is absent from EVERY online
+    // companion. Rows that match get their deviceId backfilled.
+    const cloudRows = await db
+        .select({ id: tracks.id, filepath: tracks.filepath, deviceId: tracks.deviceId })
+        .from(tracks)
+        .where(eq(tracks.userId, userId));
+
+    const orphanIds: number[] = [];
+    const backfillByDevice = new Map<string, number[]>();
+    for (const r of cloudRows) {
+        const owner = r.filepath ? ownerByPath.get(r.filepath) : undefined;
+        if (!owner) {
+            // Absent on every online companion → orphan.
+            if (r.filepath) orphanIds.push(r.id);
+            continue;
+        }
+        if (r.deviceId !== owner) {
+            const arr = backfillByDevice.get(owner) ?? [];
+            arr.push(r.id);
+            backfillByDevice.set(owner, arr);
+        }
+    }
+
+    // Backfill deviceId so future reconciles + per-device counts are correct.
+    for (const [deviceId, ids] of backfillByDevice) {
+        for (let i = 0; i < ids.length; i += 500) {
+            const chunk = ids.slice(i, i + 500);
+            const res = await db.update(tracks)
+                .set({ deviceId })
+                .where(and(eq(tracks.userId, userId), inArray(tracks.id, chunk)));
+            backfilled += res.count ?? chunk.length;
+        }
+    }
+
+    // Prune orphans.
+    const toDelete = orphanIds.slice(0, PRUNE_HARD_CAP);
+    for (let i = 0; i < toDelete.length; i += 500) {
+        const chunk = toDelete.slice(i, i + 500);
+        const res = await db.delete(tracks)
+            .where(and(eq(tracks.userId, userId), inArray(tracks.id, chunk)));
+        totalPruned += res.count ?? chunk.length;
+    }
+    // Reflect totals in the per-device summary.
+    for (const r of results) {
+        if (r.skipped) continue;
+        r.cloudTrackCount = cloudRows.length;
+        r.pruned = totalPruned;
     }
 
     if (totalPruned > 0) {
         revalidatePath("/library");
         revalidatePath("/");
     }
-    return { results, totalPruned };
+    return { results, totalPruned, backfilled };
 }
