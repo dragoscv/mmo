@@ -55,6 +55,7 @@ import {
 import { getLibraryDb, getLibrarySqlite } from "./db";
 import { tracks } from "./schema";
 import { fetchAllMetadata } from "./metadata-services";
+import { enqueueSyncChange } from "../sync";
 
 export type { Category };
 
@@ -904,6 +905,31 @@ class Analyzer extends EventEmitter {
         if (metaTouched) parts.push("metadata");
         this.pushLog("info",
             `Persisted track ${job.trackId} → ${parts.join("+")}`, job.id);
+
+        // Round-trip the new fields to cloud Postgres. Without this the
+        // analysis results only ever land in the companion's local SQLite and
+        // never reach the web library (which reads from cloud) — the user sees
+        // no updated songs. Best-effort: a sync failure must not break the
+        // analyzer (local DB is authoritative).
+        try {
+            // Push the FULL updated row (cloud does an LWW upsert). Mirrors
+            // routes.ts pushTrackChange so payload shape stays identical.
+            const row = db
+                .select()
+                .from(tracks)
+                .where(eq(tracks.id, job.trackId))
+                .get() as ({ id: number; userId: string; sha256: string | null } & Record<string, unknown>) | undefined;
+            if (row?.userId) {
+                const sha = (row.sha256 ?? "") as string;
+                enqueueSyncChange({
+                    entity: "tracks",
+                    entityId: sha || `${row.userId}:${row.id}`,
+                    op: "upsert",
+                    payload: { ...row, sha256: sha || undefined, companionTrackId: row.id },
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+        } catch { /* sync best-effort; local write already succeeded */ }
 
         // Lazy sha256 backfill — fires on any analysis pass for tracks
         // that don't have one yet. Cheap (streaming hash, no load into

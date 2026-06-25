@@ -2,6 +2,17 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.40 — fix: analysis results never synced to cloud library
+
+- **Analysis results (DSP/Stems/Fingerprint/Metadata) now round-trip to the
+	cloud library.** `persistResult()` wrote the new fields into the companion's
+	local SQLite `tracks` table but never enqueued a cloud sync change, so the web
+	library (which reads from cloud Postgres) never showed updated songs —
+	metadata, BPM, key, artwork, lyrics, etc. all stayed invisible online. It now
+	enqueues a `tracks` upsert (LWW, keyed by sha256) after every successful
+	persist, mirroring `routes.ts` `pushTrackChange`. Best-effort: a sync failure
+	never breaks the analyzer.
+
 ## 1.0.39 — fix: "no such column: batch_id" on upgrade
 
 - **Fixed a startup crash ("audio engine unavailable" / `no such column:
