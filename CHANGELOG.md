@@ -12,6 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — companion shows "offline" despite running (`apps/web` `0.7.4`)
+
+- **Self-heal stale Cloudflare tunnel ingress port.** Companions whose
+  per-device tunnel was provisioned under the old default port (`9876`) kept
+  showing "offline" with a 504 even though the local server runs on `17899` —
+  cloudflared proxied to a closed port (`dial tcp [::1]:9876 refused`). The
+  `/api/devices/announce` bootstrap now always reconciles the ingress to a
+  concrete port (`port ?? 17899`) instead of only when the heartbeat carries a
+  `lanUrl`, so the tunnel repairs itself on the next heartbeat.
+
 ### Changed — analysis runs are now one logical job per run (`apps/web` `0.7.3`, companion `1.0.38`)
 
 - **A single "Start analysis" run is now ONE job that contains many item
