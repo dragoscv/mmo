@@ -303,6 +303,10 @@ class Worker extends EventEmitter {
         if (this.queueMem.length > 0) {
             this.parent.pushLog("info",
                 `[${this.category}] Rehydrated ${this.queueMem.length} job(s) from disk`);
+            // Kick the processing loop — without this, rehydrated jobs sit in
+            // the queue forever after a restart/update (queue depth > 0 but
+            // "currently 0"), because only enqueue()/resume() pumped before.
+            if (!this.paused) Promise.resolve().then(() => this.pump());
         }
     }
 

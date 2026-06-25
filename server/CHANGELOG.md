@@ -2,6 +2,14 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.44 — fix: jobs don't resume after restart/update
+
+- **Rehydrated jobs now actually start processing after a restart/update.** The
+	worker's `rehydrate()` loaded the persisted queue but never kicked the
+	processing loop (only `enqueue()`/`resume()` did), so after an update the
+	queue showed depth > 0 but "currently 0" forever. It now `pump()`s each lane
+	after rehydration (unless the lane is paused).
+
 ## 1.0.43 — auto-updater diagnostics
 
 - **Auto-updater logs now go to `main.log`** (previously `autoUpdater.logger =
