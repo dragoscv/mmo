@@ -12,6 +12,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed/Added — real-time metadata analysis + cloud prune (`apps/web` `0.7.1`)
+
+- **Metadata analysis ("What to Fetch": Metadata/Artwork/Lyrics/BPM) now saves
+  in real time.** Previously changes accumulated in memory and were only written
+  at the end after a manual review — so a serverless recycle or closing the tab
+  **lost all progress**. Each batch is now applied to the DB immediately
+  (auto-apply), with a live "Saved" counter; no review step required.
+- **Resumable + crash-safe.** Every processed track is stamped `analyzedAt`
+  (even no-change ones), and the analyzer always reads the stalest-analyzed page
+  — so an interrupted run resumes exactly where it stopped instead of redoing
+  work or skipping tracks. Transient batch errors retry the same page (no skips)
+  instead of aborting.
+- **Cloud-prune reconciliation** (`reconcileCloudWithCompanions` + Scanner
+  "Reconcile library" button): removes cloud tracks whose file no longer exists
+  on an **online** companion. Offline devices and empty libraries are never
+  pruned (guards against false mass-deletes).
+
 ### Fixed/Changed — multi-companion scanner, analysis & counts (`apps/web` `0.7.0`)
 
 - **Scanner rebuilt on the companion-side scan flow.** The old Scanner walked

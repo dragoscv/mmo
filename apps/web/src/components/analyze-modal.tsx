@@ -40,6 +40,7 @@ import {
     getAnalysisScope,
     analyzeTrackBatch,
     applyAnalysisChanges,
+    markBatchAnalyzed,
 } from "@/actions/analyze";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -103,6 +104,8 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
     const [total, setTotal] = useState(0);
     const [currentTrack, setCurrentTrack] = useState("");
     const [errors, setErrors] = useState<string[]>([]);
+    /** Changes already saved to the DB during this run (real-time). */
+    const [appliedCount, setAppliedCount] = useState(0);
     const abortRef = useRef(false);
 
     // Review state
@@ -135,48 +138,84 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
         setState("analyzing");
         setChanges([]);
         setProgress(0);
+        setAppliedCount(0);
         setErrors([]);
         abortRef.current = false;
 
-        let offset = 0;
-        let finished = false;
+        // Real-time, resumable run:
+        //  • Each batch is SAVED to the DB immediately (no end-of-run review).
+        //  • We always read the stalest-analyzed page (offset 0) and stamp
+        //    every processed track as analyzed, so processed rows fall to the
+        //    back and the next read returns the next slice. This makes the run
+        //    resume correctly if it's interrupted (close tab, network drop) —
+        //    just start again and it continues with what's left.
+        let done = 0;
+        let total = 0;
+        let guard = 0;
+        const MAX_ITERS = 100_000;
 
-        while (!finished && !abortRef.current) {
+        while (!abortRef.current) {
+            if (++guard > MAX_ITERS) break;
             try {
                 const result: AnalysisBatchResult = await analyzeTrackBatch(
-                    offset,
+                    0, // always the stalest page
                     BATCH_SIZE,
                     mode,
-                    options
+                    options,
                 );
 
-                setChanges((prev) => [...prev, ...result.changes]);
-                setProgress(result.processed);
-                setTotal(result.total);
+                const batchIds = result.processedTrackIds ?? [];
+                if (batchIds.length === 0) break; // nothing left
+
+                // Persist this batch NOW (auto-apply every safe fill).
+                const toApply = result.changes
+                    .filter((c) => c.checked)
+                    .map((c) => ({ trackId: c.trackId, field: c.field, newValue: c.newValue }));
+                if (toApply.length > 0) {
+                    try {
+                        const res = await applyAnalysisChanges(toApply);
+                        setAppliedCount((n) => n + res.applied);
+                    } catch (err) {
+                        setErrors((prev) => [...prev, `Save failed: ${err instanceof Error ? err.message : "Unknown"}`]);
+                    }
+                }
+                // Mark EVERY processed track analyzed (incl. no-change) so the
+                // run advances and resumes cleanly.
+                try { await markBatchAnalyzed(batchIds); }
+                catch { /* non-fatal; worst case re-processed next run */ }
+
+                setChanges((prev) => [...prev, ...result.changes].slice(-500));
+                total = result.total || total;
+                done += batchIds.length;
+                setProgress(Math.min(done, total));
+                setTotal(total);
                 setCurrentTrack(result.currentTrack);
                 if (result.errors.length > 0) {
-                    setErrors((prev) => [...prev, ...result.errors]);
+                    setErrors((prev) => [...prev, ...result.errors].slice(-50));
                 }
 
-                offset += BATCH_SIZE;
-                finished = result.processed >= result.total;
+                if (batchIds.length < BATCH_SIZE) break; // reached the tail
             } catch (err) {
+                // Transient batch failure: surface and retry the SAME stalest
+                // page (we didn't advance offset, so nothing is skipped).
                 setErrors((prev) => [
                     ...prev,
-                    `Batch error at offset ${offset}: ${err instanceof Error ? err.message : "Unknown"}`,
+                    `Batch error: ${err instanceof Error ? err.message : "Unknown"} (retrying)`,
                 ]);
-                offset += BATCH_SIZE; // Skip failed batch
+                await new Promise((r) => setTimeout(r, 2000));
             }
         }
 
         if (!abortRef.current) {
-            setState("review");
+            setState("done");
         }
     }, [mode, options]);
 
     const stopAnalysis = useCallback(() => {
         abortRef.current = true;
-        setState("review");
+        // Everything analyzed so far is already saved, so jump straight to the
+        // summary instead of a review step.
+        setState("done");
     }, []);
 
     // ─── Review Logic ────────────────────────────────────────────────────────
@@ -521,10 +560,10 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                             <div className="grid grid-cols-3 gap-3 text-center">
                                 <div className="rounded-lg border border-[var(--border)] p-3">
                                     <div className="text-2xl font-bold text-green-400 tabular-nums">
-                                        {changes.length}
+                                        {formatNumber(appliedCount)}
                                     </div>
                                     <div className="text-[10px] text-[var(--muted-foreground)]">
-                                        Updates Found
+                                        Saved (live)
                                     </div>
                                 </div>
                                 <div className="rounded-lg border border-[var(--border)] p-3">
@@ -561,6 +600,11 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                                     )
                                 )}
                             </div>
+
+                            <p className="text-center text-[11px] text-[var(--muted-foreground)]">
+                                Changes are saved automatically as each batch completes — you can
+                                close this dialog any time and resume later without losing progress.
+                            </p>
                         </div>
                     )}
 
@@ -820,28 +864,29 @@ export function AnalyzeModal({ open, onOpenChange }: AnalyzeModalProps) {
                     )}
 
                     {/* ─── Done ─── */}
-                    {state === "done" && applyResult && (
+                    {state === "done" && (
                         <div className="py-8 text-center space-y-4">
                             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20 mx-auto">
                                 <CheckCheck className="h-8 w-8 text-green-400" />
                             </div>
                             <div>
-                                <p className="text-lg font-semibold">Changes Applied!</p>
+                                <p className="text-lg font-semibold">Analysis complete</p>
                                 <p className="text-sm text-[var(--muted-foreground)] mt-1">
-                                    Successfully updated{" "}
+                                    Saved{" "}
                                     <span className="text-green-400 font-medium">
-                                        {applyResult.applied}
+                                        {formatNumber(applyResult ? applyResult.applied : appliedCount)}
                                     </span>{" "}
-                                    fields
-                                    {applyResult.errors > 0 && (
+                                    field updates across{" "}
+                                    <span className="text-purple-400 font-medium">{formatNumber(progress)}</span>{" "}
+                                    tracks
+                                    {errors.length > 0 && (
                                         <>
-                                            {" "}
-                                            ·{" "}
-                                            <span className="text-rose-400">
-                                                {applyResult.errors} errors
-                                            </span>
+                                            {" "}· <span className="text-rose-400">{errors.length} errors</span>
                                         </>
                                     )}
+                                </p>
+                                <p className="text-xs text-[var(--muted-foreground)] mt-2">
+                                    Everything was saved automatically as the analysis ran.
                                 </p>
                             </div>
                         </div>

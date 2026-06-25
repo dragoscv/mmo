@@ -679,3 +679,33 @@ export async function applyTrackFieldsToCloud(
     await db.update(tracks).set(set).where(eq(tracks.id, row.id));
     return true;
 }
+
+/**
+ * Stamp `analyzedAt = now` for a set of tracks WITHOUT changing any other
+ * field. Called by the metadata analyzer after each batch so that EVERY
+ * processed track — including those that yielded no changes — is marked
+ * done. This is what makes the run resumable: the analyzer always reads the
+ * stalest-analyzed page, so stamping pushes processed rows to the back and a
+ * re-run picks up exactly where it left off (and terminates instead of
+ * re-scanning no-change tracks forever).
+ *
+ * `analyzedAt` is intentionally NOT synced as a field-version conflict (it's
+ * a local processing marker), but we still bump syncVersion so the row
+ * propagates. Matches on companionTrackId OR id like applyTrackFieldsToCloud.
+ */
+export async function markTracksAnalyzed(trackIds: number[]): Promise<number> {
+    const userId = await getUserId();
+    if (!userId || trackIds.length === 0) return 0;
+    const now = new Date();
+    const res = await db
+        .update(tracks)
+        .set({ analyzedAt: now, updatedAt: now, syncVersion: sql`${tracks.syncVersion} + 1` })
+        .where(and(
+            eq(tracks.userId, userId),
+            or(
+                inArray(tracks.companionTrackId, trackIds),
+                inArray(tracks.id, trackIds),
+            )!,
+        ));
+    return res.count ?? 0;
+}

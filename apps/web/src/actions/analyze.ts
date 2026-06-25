@@ -19,6 +19,7 @@ import {
     type AnalyzerLogEntry, type GpuInfo,
 } from "@/lib/companion-library";
 import { getAnalysisScopeFromCloud, getTracksFromCloud, applyTrackFieldsToCloud } from "@/lib/cloud-library";
+import { markTracksAnalyzed } from "@/lib/cloud-library";
 
 export interface AnalysisChange {
     trackId: number;
@@ -38,6 +39,8 @@ export interface AnalysisBatchResult {
     total: number;
     currentTrack: string;
     errors: string[];
+    /** IDs of every track read in this batch (for marking analyzed). */
+    processedTrackIds?: number[];
 }
 
 export interface AnalysisScope {
@@ -254,6 +257,7 @@ export async function analyzeTrackBatch(
         total: totalCount,
         currentTrack,
         errors,
+        processedTrackIds: batchTracks.map((t) => t.id),
     };
 }
 
@@ -261,6 +265,17 @@ interface ChangeToApply {
     trackId: number;
     field: string;
     newValue: string;
+}
+
+/** Mark a set of tracks as analyzed (stamp analyzedAt) without changing any
+ *  fields. Lets the metadata analyzer record "I processed these" so a re-run
+ *  resumes from the unprocessed tail — used for tracks that yielded no
+ *  changes. Returns how many rows were stamped. */
+export async function markBatchAnalyzed(trackIds: number[]): Promise<{ marked: number }> {
+    if (!Array.isArray(trackIds) || trackIds.length === 0) return { marked: 0 };
+    const safe = trackIds.filter((n) => Number.isInteger(n)).slice(0, MAX_CHANGES_PER_APPLY);
+    const marked = await markTracksAnalyzed(safe);
+    return { marked };
 }
 
 export async function applyAnalysisChanges(

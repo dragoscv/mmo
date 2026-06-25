@@ -28,7 +28,7 @@
  */
 
 import { analyzeTrackBatch, applyAnalysisChanges, type AnalysisChange as RawChange } from "@/actions/analyze";
-import { getTracksFromCloud } from "@/lib/cloud-library";
+import { getTracksFromCloud, markTracksAnalyzed } from "@/lib/cloud-library";
 
 export type JobStatus = "idle" | "running" | "paused" | "completed" | "stopped";
 
@@ -51,6 +51,8 @@ export interface JobStatusSnapshot {
     total: number;
     currentTrack: string | null;
     changesCount: number;
+    /** Changes already persisted to the DB during this run (real-time). */
+    appliedCount: number;
     errorsCount: number;
     errors: string[];
 }
@@ -88,6 +90,7 @@ class AnalysisManager {
         total: 0,
         currentTrack: null,
         changesCount: 0,
+        appliedCount: 0,
         errorsCount: 0,
         errors: [],
     };
@@ -147,6 +150,7 @@ class AnalysisManager {
             total: 0,
             currentTrack: null,
             changesCount: 0,
+            appliedCount: 0,
             errorsCount: 0,
             errors: [],
         };
@@ -206,6 +210,7 @@ class AnalysisManager {
             total: 0,
             currentTrack: null,
             changesCount: 0,
+            appliedCount: 0,
             errorsCount: 0,
             errors: [],
         };
@@ -263,11 +268,20 @@ class AnalysisManager {
             // populate `total` anyway.
         }
 
-        let offset = 0;
+        // Resumable paging: because we stamp `analyzedAt` on EVERY processed
+        // track after each batch, the "stalest-analyzed first" read always
+        // returns the next unprocessed slice when we read from offset 0. So
+        // we keep offset pinned at 0 and count progress with `done`. This is
+        // immune to the sliding-window skip that advancing offset would cause
+        // (processed rows move to the back of the sort) and it makes a re-run
+        // after a crash resume exactly where it stopped.
         let total = this.snapshot.total || Number.MAX_SAFE_INTEGER;
-        let lastProcessed = -1;
+        let done = 0;
+        let guard = 0;
+        const maxIters = 100_000; // hard safety bound
 
-        while (offset < total) {
+        while (done < total) {
+            if (++guard > maxIters) break;
             await this.waitWhilePaused();
             if (this.stopRequested) break;
 
@@ -278,11 +292,13 @@ class AnalysisManager {
             this.snapshot = {
                 ...this.snapshot,
                 currentTrack: this.snapshot.currentTrack ||
-                    `Scanning tracks ${offset + 1}–${Math.min(offset + BATCH_SIZE, total)}…`,
+                    `Analyzing tracks ${done + 1}–${Math.min(done + BATCH_SIZE, total)}…`,
             };
             this.emit();
 
-            const result = await analyzeTrackBatch(offset, BATCH_SIZE, mode, {
+            // Always read the stalest page (offset 0); processed rows get
+            // pushed to the back by the analyzedAt stamp below.
+            const result = await analyzeTrackBatch(0, BATCH_SIZE, mode, {
                 metadata: options.metadata,
                 artwork: options.artwork,
                 lyrics: options.lyrics,
@@ -315,14 +331,54 @@ class AnalysisManager {
                 });
             }
 
-            // Defensive: page failed to advance. Bail rather than loop.
-            if (result.processed === lastProcessed) break;
-            lastProcessed = result.processed;
-            offset = result.processed;
+            // ── Persist this batch IMMEDIATELY ───────────────────────────
+            // Write every "safe" change (filling an empty field, `checked`)
+            // to cloud Postgres as soon as the batch completes — not at the
+            // end. This makes progress durable: if the serverless function
+            // is recycled mid-run, or the user closes the tab, everything
+            // analyzed so far is already saved (and `analyzedAt` is bumped,
+            // so a re-run resumes from where it left off rather than redoing
+            // work). Conflicting overwrites (full-mode, unchecked) are left
+            // for manual review.
+            const autoApply = result.changes
+                .filter((c) => c.checked)
+                .map((c) => ({ trackId: c.trackId, field: c.field, newValue: c.newValue }));
+            if (autoApply.length > 0) {
+                try {
+                    const res = await applyAnalysisChanges(autoApply);
+                    this.snapshot = {
+                        ...this.snapshot,
+                        appliedCount: this.snapshot.appliedCount + res.applied,
+                    };
+                } catch (err) {
+                    this.snapshot.errors.push(
+                        `Failed to persist batch: ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                }
+            }
+
+            // Mark EVERY track in this batch as analyzed (even no-change
+            // ones) so it falls to the back of the stalest-first ordering.
+            // This is what guarantees forward progress + clean resume.
+            const batchIds = result.processedTrackIds ?? [];
+            const batchCount = batchIds.length;
+            if (batchCount > 0) {
+                try { await markTracksAnalyzed(batchIds); }
+                catch (err) {
+                    this.snapshot.errors.push(
+                        `Failed to mark batch analyzed: ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                }
+            }
+
+            // Empty batch → nothing left to analyze; we're done.
+            if (batchCount === 0) break;
+            total = result.total || total;
+            done += batchCount;
 
             this.snapshot = {
                 ...this.snapshot,
-                progress: offset,
+                progress: Math.min(done, total),
                 total,
                 currentTrack: result.currentTrack || this.snapshot.currentTrack,
                 changesCount: this.changes.length,
@@ -334,7 +390,8 @@ class AnalysisManager {
             };
             this.emit();
 
-            if (result.processed >= total) break;
+            // A short batch (fewer than requested) means we reached the tail.
+            if (batchCount < BATCH_SIZE) break;
         }
 
         // Honor explicit stop (don't flip to "completed").

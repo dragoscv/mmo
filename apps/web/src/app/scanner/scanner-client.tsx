@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { beginScan, getScanProgress } from "@/actions/scan-orchestrator";
 import { ingestCompanionScanJob } from "@/actions/devices";
+import { reconcileCloudWithCompanions } from "@/actions/reconcile";
 import type { ScannerCompanion, FolderKind } from "@/lib/companion-types";
 import {
     ScanSearch,
@@ -17,6 +18,7 @@ import {
     WifiOff,
     Music,
     Sparkles,
+    Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -78,6 +80,28 @@ export function ScannerClient({ companions }: ScannerClientProps) {
     }, []);
 
     const busy = isPending || active !== null;
+
+    const [reconciling, setReconciling] = useState(false);
+    const runReconcile = useCallback(() => {
+        setReconciling(true);
+        startTransition(async () => {
+            try {
+                const r = await reconcileCloudWithCompanions();
+                if (r.error) { toast.error(r.error); return; }
+                const skipped = r.results.filter((x) => x.skipped);
+                toast.success(`Reconcile complete: pruned ${r.totalPruned} orphaned track(s)`, {
+                    description: r.results
+                        .map((x) => x.skipped ? `${x.name}: ${x.skipped}` : `${x.name}: −${x.pruned}`)
+                        .join(" · "),
+                });
+                if (skipped.length === r.results.length && r.totalPruned === 0) {
+                    toast.message("Nothing pruned", { description: "All online companions were skipped or already in sync." });
+                }
+            } finally {
+                setReconciling(false);
+            }
+        });
+    }, []);
 
     return (
         <div className="space-y-6">
@@ -171,6 +195,24 @@ export function ScannerClient({ companions }: ScannerClientProps) {
                             Scan
                         </Button>
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Trash2 className="h-5 w-5" /> Library maintenance
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-[var(--muted-foreground)]">
+                        Prune cloud tracks whose files no longer exist on an online
+                        companion. Offline companions and empty libraries are never pruned.
+                    </p>
+                    <Button variant="outline" onClick={runReconcile} disabled={reconciling || busy}>
+                        {reconciling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                        {reconciling ? "Reconciling…" : "Reconcile library"}
+                    </Button>
                 </CardContent>
             </Card>
 
