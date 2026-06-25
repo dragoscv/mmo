@@ -76,7 +76,11 @@ async function markOffline(deviceId: string) {
 async function tunnelBootstrap(deviceId: string, ack: string | null | undefined, lanUrl: string | null) {
     let port: number | undefined;
     if (lanUrl) { try { port = Number(new URL(lanUrl).port) || undefined; } catch { /* ignore */ } }
-    const t = await ensureDeviceTunnel(deviceId, port ? { port } : {});
+    // Always reconcile to a concrete port (fall back to the standard 17899 when
+    // the heartbeat omits lanUrl). This self-heals tunnels created under the old
+    // 9876 default whose remote ingress still points at the wrong port → without
+    // it cloudflared proxies to a closed port and the device shows offline (504).
+    const t = await ensureDeviceTunnel(deviceId, { port: port ?? 17899 });
     if (!t || ack === t.tunnelHostname) return null;
     return t;
 }

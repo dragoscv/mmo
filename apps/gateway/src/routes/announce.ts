@@ -41,7 +41,9 @@ async function maybeTunnelBootstrap(
     if (lanUrl) {
         try { port = Number(new URL(lanUrl).port) || undefined; } catch { /* ignore */ }
     }
-    const t = await ensureDeviceTunnel(deviceId, port ? { port } : {});
+    // Always reconcile to a concrete port (fall back to 17899 on portless
+    // heartbeats) so tunnels created under the old 9876 default self-heal.
+    const t = await ensureDeviceTunnel(deviceId, { port: port ?? 17899 });
     if (!t) return null;
     if (ack === t.tunnelHostname) return null;
     return t;
