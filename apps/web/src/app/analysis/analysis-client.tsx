@@ -993,7 +993,7 @@ function JobsCard({ batches, onCancel, cancelingId }: {
                             >
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="flex items-center gap-1.5 min-w-0">
-                                        {b.categories.map((c) => (
+                                        {(b.categories ?? []).map((c) => (
                                             <CategoryBadge key={c} category={c} />
                                         ))}
                                         <span className="truncate text-xs text-white/80">
