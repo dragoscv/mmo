@@ -2,6 +2,16 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.43 — auto-updater diagnostics
+
+- **Auto-updater logs now go to `main.log`** (previously `autoUpdater.logger =
+	null`, so every update problem was invisible — the app would silently stay on
+	the old version with no trace). All updater phases (checking / available /
+	downloading / downloaded / up-to-date / error) are now logged, making stuck
+	updates diagnosable. Note: the app installs a downloaded update on full quit
+	(`autoInstallOnAppQuit`); since it runs in the tray, closing the window isn't
+	a quit — use the "Install update & restart" button or quit from the tray.
+
 ## 1.0.42 — cancel a run + accurate batch counts
 
 - **New `POST /analyze/batch/:batchId/cancel`** — cancels a whole run: drops all

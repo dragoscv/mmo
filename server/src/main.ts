@@ -1037,15 +1037,24 @@ let lastUpdateError: string | null = null;
 function setupAutoUpdater() {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
-    // Quieter electron-updater logs in production — we route to mainWindow.
-    autoUpdater.logger = null;
+    // Route electron-updater's own logs to our file logger so update failures
+    // are diagnosable from main.log. Previously logger=null made every update
+    // problem invisible — the app would silently stay on the old version.
+    autoUpdater.logger = {
+        info: (m: unknown) => logLine("info", "[updater]", m),
+        warn: (m: unknown) => logLine("warn", "[updater]", m),
+        error: (m: unknown) => logLine("error", "[updater]", m),
+        debug: (m: unknown) => logLine("info", "[updater:debug]", m),
+    } as unknown as typeof autoUpdater.logger;
 
     autoUpdater.on("checking-for-update", () => {
         lastUpdateCheckTs = Date.now();
+        logLine("info", "[updater] checking for update\u2026");
         mainWindow?.webContents.send("update-status", { status: "checking" });
     });
 
     autoUpdater.on("update-not-available", (info) => {
+        logLine("info", `[updater] up to date (${info.version})`);
         mainWindow?.webContents.send("update-status", {
             status: "current",
             version: info.version,
@@ -1054,6 +1063,7 @@ function setupAutoUpdater() {
 
     autoUpdater.on("update-available", (info) => {
         lastUpdateError = null;
+        logLine("info", `[updater] update available: ${info.version} — downloading…`);
         mainWindow?.webContents.send("update-status", {
             status: "available",
             version: info.version,
@@ -1071,6 +1081,7 @@ function setupAutoUpdater() {
     });
 
     autoUpdater.on("update-downloaded", (info) => {
+        logLine("info", `[updater] update downloaded: ${info.version} — prompting restart`);
         mainWindow?.webContents.send("update-status", {
             status: "ready",
             version: info.version,
@@ -1102,7 +1113,7 @@ function setupAutoUpdater() {
 
     autoUpdater.on("error", (err) => {
         lastUpdateError = err.message;
-        console.error("Auto-updater error:", err.message);
+        logLine("error", "[updater] error:", err);
         mainWindow?.webContents.send("update-status", {
             status: "error",
             error: err.message,
