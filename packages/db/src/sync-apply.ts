@@ -108,6 +108,27 @@ const FORBIDDEN_TRACK_FIELDS = new Set([
     "relatedTrackId", "related_track_id",
 ]);
 
+// Cloud `tracks` columns declared as Postgres `timestamp` (mode: date). The
+// companion sends these as ISO strings (its SQLite stores text), so we must
+// coerce to a `Date` before handing them to Drizzle/pg — otherwise the upsert
+// throws or silently drops the field (e.g. analyzed_at never landing in cloud
+// even though genre/bpm did). Other analyzer stamps (dsp/stems_analyzed_at)
+// are `text` in cloud and pass through unchanged.
+const TRACK_TIMESTAMP_FIELDS = new Set([
+    "analyzedAt", "analyzed_at",
+    "aiAnalyzedAt", "ai_analyzed_at",
+]);
+
+/** Coerce an ISO-string timestamp payload value to a Date; pass through
+ *  Dates/null and drop unparseable values so a bad string can't reject the
+ *  whole upsert. */
+function coerceTrackValue(key: string, value: unknown): unknown {
+    if (!TRACK_TIMESTAMP_FIELDS.has(key)) return value;
+    if (value == null || value instanceof Date) return value;
+    const d = new Date(value as string);
+    return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
 /**
  * Tracks — per-field LWW, keyed by `(userId, sha256)`.
  * Pure helper around the DB so the route stays thin and testable.
@@ -160,7 +181,9 @@ export async function applyTrackUpsert(
         if (FORBIDDEN_TRACK_FIELDS.has(key)) continue;
         const storedTs = stored[key];
         if (storedTs && storedTs >= change.updatedAt) continue; // LWW loser
-        accepted[key] = value;
+        const coerced = coerceTrackValue(key, value);
+        if (coerced === undefined) continue; // unparseable timestamp — skip
+        accepted[key] = coerced;
         nextFv[key] = change.updatedAt;
     }
 
