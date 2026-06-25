@@ -12,6 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — /analysis crash on older batch payloads (`apps/web` `0.7.8`)
+
+- **`TypeError: Cannot read properties of undefined (reading 'filter')`** on the
+  analysis page. The new parallel-ETA code called `liveBatch.lanes.filter(...)`,
+  but `lanes`/`tracks`/`tracksFinished` only exist on companion ≥1.0.42 — older
+  payloads crashed the page. These fields are now guarded with fallbacks.
+
 ### Fixed — cloud track duplication (2× rows) on re-hash
 
 - **Sync upsert no longer inserts a duplicate row when a file's `sha256`

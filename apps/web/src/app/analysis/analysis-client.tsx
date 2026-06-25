@@ -461,7 +461,9 @@ export function AnalysisClient() {
             const batchFractionalDone = liveBatch.finished;
             const batchAvgMs = batchFractionalDone > 0 ? elapsed / batchFractionalDone : null;
             let etaMs: number | null = null;
-            const runningLanes = liveBatch.lanes.filter((l) => l.queued + l.running > 0);
+            // `lanes` is only present on companions ≥1.0.42; guard for older
+            // payloads (otherwise `.filter` on undefined crashes the page).
+            const runningLanes = (liveBatch.lanes ?? []).filter((l) => l.queued + l.running > 0);
             if (liveBatch.state === "running" && runningLanes.length > 0) {
                 let maxLaneEta = 0;
                 for (const l of runningLanes) {
@@ -478,8 +480,8 @@ export function AnalysisClient() {
             const avgPerJobMs = batchAvgMs;
             return {
                 total,
-                tracks: liveBatch.tracks,
-                tracksFinished: liveBatch.tracksFinished,
+                tracks: liveBatch.tracks ?? total,
+                tracksFinished: liveBatch.tracksFinished ?? liveBatch.finished,
                 doneCount, failedCount, remaining, overall, elapsed,
                 avgPerJobMs, etaMs,
                 finished: liveBatch.state !== "running",
@@ -1022,7 +1024,7 @@ function JobsCard({ batches, onCancel, cancelingId }: {
                                     />
                                 </div>
                                 <div className="mt-1 flex items-center gap-3 text-[10px] text-white/40">
-                                    <span className="text-white/60">{b.tracksFinished.toLocaleString()}/{b.tracks.toLocaleString()} tracks</span>
+                                    <span className="text-white/60">{(b.tracksFinished ?? b.finished).toLocaleString()}/{(b.tracks ?? b.total).toLocaleString()} tracks</span>
                                     <span>{b.finished.toLocaleString()}/{b.total.toLocaleString()} sub-jobs</span>
                                     {b.running > 0 && <span className="text-sky-300/80">{b.running} running</span>}
                                     {b.queued > 0 && <span>{b.queued} queued</span>}
