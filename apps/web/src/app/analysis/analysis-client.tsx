@@ -421,6 +421,39 @@ export function AnalysisClient() {
         finished: boolean;
         runningCount: number;
     } | null => {
+        // ── Durable path (survives refresh) ──────────────────────────
+        // Prefer the companion's SQLite-backed batches[] as the source of
+        // truth. Local `batch` state resets to Date.now()/initialPending on
+        // every page load, which made the progress bar restart on refresh.
+        // The durable batch carries stable enqueuedAt + total + finished
+        // counts, so progress is consistent across reloads.
+        const liveBatch = batches.find((b) => b.state === "running")
+            ?? (batches.length > 0 ? batches[0] : undefined);
+        if (liveBatch) {
+            const total = liveBatch.total;
+            const doneCount = liveBatch.done;
+            const failedCount = liveBatch.errored;
+            const remaining = Math.max(0, total - liveBatch.finished);
+            const lanes = status?.lanes;
+            const runningProgress = lanes
+                ? lanes.reduce((sum, l) => sum + (l.current?.progress ?? 0), 0)
+                : (status?.current?.progress ?? 0);
+            const overall = Math.min(1, liveBatch.progress || 0);
+            const startedAt = liveBatch.startedAt ?? liveBatch.enqueuedAt;
+            const elapsed = (liveBatch.finishedAt ?? Date.now()) - startedAt;
+            const fractionalDone = liveBatch.finished + runningProgress;
+            const avgPerJobMs = fractionalDone > 0.05 ? elapsed / fractionalDone : null;
+            const etaMs = liveBatch.state === "running" && avgPerJobMs != null && remaining > 0
+                ? Math.max(0, avgPerJobMs * remaining)
+                : null;
+            return {
+                total, doneCount, failedCount, remaining, overall, elapsed,
+                avgPerJobMs, etaMs,
+                finished: liveBatch.state !== "running",
+                runningCount: liveBatch.running,
+            };
+        }
+        // ── Legacy fallback (older companions w/o batches) ───────────
         if (!batch) return null;
         const total = batch.initialPending + batch.addedSince;
         // Prefer the authoritative sqlite-backed count from the

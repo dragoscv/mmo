@@ -12,6 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — batch progress no longer resets on refresh (`apps/web` `0.7.6`)
+
+- **The "Current batch" progress card kept restarting (clock + baseline) on
+  every page refresh.** It derived from ephemeral local state seeded with
+  `Date.now()`/`initialPending` at page load. It now derives from the
+  companion's durable SQLite-backed `batches[]` (stable `enqueuedAt`/`startedAt`
+  + finished counts), so progress, elapsed and ETA stay consistent across
+  reloads. Falls back to the legacy local estimate only for companions without
+  the batches API.
+
 ### Added — "Resync analyzed tracks" button (`apps/web` `0.7.5`, companion `1.0.41`)
 
 - **New button on `/analysis`** that re-uploads existing analysis results
