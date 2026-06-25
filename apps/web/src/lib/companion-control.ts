@@ -45,6 +45,7 @@ export {
     type CompanionAudioDevice,
     type CompanionAudioBackendGroup,
     type CompanionAudioInventory,
+    type ScannerCompanion,
 } from "./companion-types";
 
 interface DeviceRow {

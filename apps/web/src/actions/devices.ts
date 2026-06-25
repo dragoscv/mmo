@@ -22,6 +22,7 @@ import {
     type CompanionAudioInventory,
     type CompanionScanJob,
     type FolderKind,
+    type ScannerCompanion,
 } from "@/lib/companion-control";
 import { issueDeviceToken, materializeDeviceToken, encryptDeviceToken, decryptDeviceToken } from "@/lib/device-token";
 import { enqueueDeviceCommand } from "@/lib/device-commands";
@@ -377,15 +378,13 @@ export async function pingDevice(deviceId: string): Promise<{ online: boolean; i
 // ─── Get track count per device ─────────────────────────────────────────────
 
 export async function getDeviceTrackCount(deviceId: string): Promise<number> {
-    // Track counts now live on the companion. We approximate by paging
-    // /library/tracks (companion has no per-device count endpoint yet).
+    // Track count for a device comes from its companion's /library/stats
+    // (authoritative `total`), not a paged sample.
     const link = await getCompanionLinkForDevice(deviceId);
     if (!link) return 0;
     try {
-        // Use a small page just to read `total`, then JS-filter by deviceId
-        // from a wider sample. Acceptable for the device list UI.
-        const r = await companionLibrary.getTracks(link, { page: 1, pageSize: 500 });
-        return r.tracks.filter((t) => t.deviceId === deviceId).length;
+        const stats = await companionLibrary.getStats(link);
+        return stats.total ?? 0;
     } catch { return 0; }
 }
 
@@ -503,6 +502,61 @@ export async function getCompanionFolders(deviceId: string): Promise<CompanionFo
     return getCachedCompanionFolders(deviceId);
 }
 
+// ─── Multi-companion scanner overview ───────────────────────────────────────
+/**
+ * Build the Scanner page model across ALL of the user's companions: each
+ * device with its watched folders (so the user sees WHICH companion owns
+ * each folder) plus its track / analyzed counts. Online devices are probed
+ * live; offline devices fall back to the cached folder mirror with zero
+ * counts so they still appear (clearly marked offline).
+ */
+export async function getScannerOverview(): Promise<ScannerCompanion[]> {
+    const session = await auth();
+    if (!session?.user?.id) return [];
+    const rows = await db
+        .select()
+        .from(devices)
+        .where(eq(devices.userId, session.user.id));
+    const now = Date.now();
+    const ONLINE_MS = 90_000;
+
+    return Promise.all(rows.map(async (d): Promise<ScannerCompanion> => {
+        const lastSeen = d.lastSeenAt ? new Date(d.lastSeenAt) : null;
+        const online = lastSeen ? now - lastSeen.getTime() <= ONLINE_MS : false;
+        const base: ScannerCompanion = {
+            deviceId: d.id,
+            name: d.name,
+            online,
+            lastSeenAt: lastSeen ? lastSeen.toISOString() : null,
+            folders: [],
+            trackCount: 0,
+            analyzedCount: 0,
+        };
+        if (!online) {
+            base.folders = await getCachedCompanionFolders(d.id).catch(() => []);
+            return base;
+        }
+        try {
+            const [folders, link] = await Promise.all([
+                getCompanionFolders(d.id),
+                getCompanionLinkForDevice(d.id),
+            ]);
+            base.folders = folders;
+            if (link) {
+                try {
+                    const stats = await companionLibrary.getStats(link);
+                    base.trackCount = stats.total ?? 0;
+                    base.analyzedCount = stats.analyzed ?? 0;
+                } catch { /* counts best-effort */ }
+            }
+        } catch (e) {
+            base.error = e instanceof Error ? e.message : String(e);
+            base.folders = await getCachedCompanionFolders(d.id).catch(() => []);
+        }
+        return base;
+    }));
+}
+
 /** Legacy: triggers the companion's native OS folder picker. Kept for
  *  backwards compat but the UI now uses the in-web browser (listCompanionDrives
  *  / listCompanionDirectory / addCompanionFolder) so the user never has to
@@ -574,7 +628,30 @@ export async function addCompanionFolder(
     );
     if (!r.ok) return { error: r.error ?? "Failed to add folder" };
     void mirrorCompanionFolders(deviceId, r.result!.folders);
+    // Auto-populate: kick a one-time full scan of the newly added folder so
+    // EXISTING files are ingested immediately. The chokidar watcher only
+    // reports files added AFTER it starts (ignoreInitial), so without this an
+    // added folder would stay empty until the user manually scanned. Fire and
+    // forget — the scan+ingest runs server-side.
+    const picked = r.result!.picked;
+    void autoScanAndIngest(deviceId, picked, kind).catch(() => { /* best-effort */ });
     return r.result!;
+}
+
+/** Internal: scan a folder on a companion to completion and ingest the
+ *  results. Used by auto-scan on folder-add. Polls server-side. */
+async function autoScanAndIngest(deviceId: string, folderPath: string, kind: FolderKind): Promise<void> {
+    const started = await startCompanionScan(deviceId, folderPath, kind);
+    if ("error" in started) return;
+    const jobId = started.job.id;
+    for (let i = 0; i < 1200; i++) {
+        await new Promise((res) => setTimeout(res, 1500));
+        let job: CompanionScanJob;
+        try { job = await companionControl.getScanJob(deviceId, jobId); }
+        catch { return; }
+        if (job.status === "error") return;
+        if (job.status === "complete") { await ingestCompanionScanJob(deviceId, jobId); return; }
+    }
 }
 
 export async function removeCompanionFolder(
@@ -940,267 +1017,267 @@ export async function ingestCompanionVideoScanJob(
     files: number;
     skipped: number;
 } | { error: string }> {
-  try {
-    console.log(`[ingest-video] start device=${deviceId} job=${jobId}`);
-    const session = await auth();
-    if (!session?.user?.id) return { error: "Not authenticated" };
-    const ownership = await assertDeviceOwnership(deviceId);
-    if (ownership) return { error: ownership };
+    try {
+        console.log(`[ingest-video] start device=${deviceId} job=${jobId}`);
+        const session = await auth();
+        if (!session?.user?.id) return { error: "Not authenticated" };
+        const ownership = await assertDeviceOwnership(deviceId);
+        if (ownership) return { error: ownership };
 
-    const [device] = await db
-        .select({ id: devices.id, hostname: devices.hostname, os: devices.os })
-        .from(devices)
-        .where(eq(devices.id, deviceId))
-        .limit(1);
-    if (!device) return { error: "Device not found" };
+        const [device] = await db
+            .select({ id: devices.id, hostname: devices.hostname, os: devices.os })
+            .from(devices)
+            .where(eq(devices.id, deviceId))
+            .limit(1);
+        if (!device) return { error: "Device not found" };
 
-    const job = await companionControl.getScanJob(deviceId, jobId).catch((e) => {
-        console.warn(`[ingest-video] getScanJob threw: ${e instanceof Error ? e.message : String(e)}`);
-        return null;
-    });
-    if (!job) return { error: "Scan job not found on companion" };
-    console.log(`[ingest-video] job folder="${job.folder}" kind=${job.kind} status=${job.status} videos=${job.videos?.length ?? 0}`);
-    if (job.status !== "complete") return { error: `Scan job is ${job.status}` };
-    if (job.kind !== "video" || !job.videos) return { error: "Not a video scan job" };
+        const job = await companionControl.getScanJob(deviceId, jobId).catch((e) => {
+            console.warn(`[ingest-video] getScanJob threw: ${e instanceof Error ? e.message : String(e)}`);
+            return null;
+        });
+        if (!job) return { error: "Scan job not found on companion" };
+        console.log(`[ingest-video] job folder="${job.folder}" kind=${job.kind} status=${job.status} videos=${job.videos?.length ?? 0}`);
+        if (job.status !== "complete") return { error: `Scan job is ${job.status}` };
+        if (job.kind !== "video" || !job.videos) return { error: "Not a video scan job" };
 
-    // Source of truth for kind is the cloud's deviceFolders row — the
-    // companion's local config may be empty when the folder was added
-    // from the web UI rather than from the desktop app.
-    const [folderRow] = await db
-        .select({ kind: deviceFolders.kind })
-        .from(deviceFolders)
-        .where(and(eq(deviceFolders.deviceId, deviceId), eq(deviceFolders.path, job.folder)))
-        .limit(1);
-    let folderKind: FolderKind | undefined = folderRow?.kind as FolderKind | undefined;
-    if (folderKind !== "movies" && folderKind !== "tv-shows") {
-        // Fallback to the companion's local config (older desktop-added folders).
-        const folders = await companionControl.listFolders(deviceId).catch(() => [] as CompanionFolder[]);
-        folderKind = folders.find((f) => f.path === job.folder)?.kind;
-    }
-    if (folderKind !== "movies" && folderKind !== "tv-shows") {
-        return { error: `Folder kind ${folderKind ?? "unknown"} is not a video kind` };
-    }
-
-    // Reconcile the `companionDevices` row (bigint id) the video schema's
-    // FKs point at. Two device tables exist for historical reasons — we
-    // key the bigint table by `machineId = devices.id` for a stable 1:1
-    // mapping.
-    const userId = session.user.id;
-    let [cdRow] = await db
-        .select({ id: companionDevices.id })
-        .from(companionDevices)
-        .where(and(eq(companionDevices.userId, userId), eq(companionDevices.machineId, device.id)))
-        .limit(1);
-    if (!cdRow) {
-        const inserted = await db
-            .insert(companionDevices)
-            .values({
-                userId,
-                machineId: device.id,
-                hostname: device.hostname ?? device.id,
-                platform: device.os ?? "unknown",
-            })
-            .returning({ id: companionDevices.id });
-        cdRow = inserted[0];
-    }
-    const companionDeviceId = cdRow.id;
-
-    const now = new Date();
-    let movieCount = 0;
-    let showCount = 0;
-    let seasonCount = 0;
-    let episodeCount = 0;
-    let fileCount = 0;
-    let skipped = 0;
-
-    if (folderKind === "movies") {
-        const groups = new Map<string, { title: string; year: number | null; files: typeof job.videos }>();
-        for (const v of job.videos) {
-            const title = (v.parsedTitle || v.filename).trim();
-            const key = `${title.toLowerCase()}::${v.parsedYear ?? ""}`;
-            const existing = groups.get(key);
-            if (existing) existing.files.push(v);
-            else groups.set(key, { title, year: v.parsedYear, files: [v] });
+        // Source of truth for kind is the cloud's deviceFolders row — the
+        // companion's local config may be empty when the folder was added
+        // from the web UI rather than from the desktop app.
+        const [folderRow] = await db
+            .select({ kind: deviceFolders.kind })
+            .from(deviceFolders)
+            .where(and(eq(deviceFolders.deviceId, deviceId), eq(deviceFolders.path, job.folder)))
+            .limit(1);
+        let folderKind: FolderKind | undefined = folderRow?.kind as FolderKind | undefined;
+        if (folderKind !== "movies" && folderKind !== "tv-shows") {
+            // Fallback to the companion's local config (older desktop-added folders).
+            const folders = await companionControl.listFolders(deviceId).catch(() => [] as CompanionFolder[]);
+            folderKind = folders.find((f) => f.path === job.folder)?.kind;
+        }
+        if (folderKind !== "movies" && folderKind !== "tv-shows") {
+            return { error: `Folder kind ${folderKind ?? "unknown"} is not a video kind` };
         }
 
-        for (const g of groups.values()) {
-            const [existing] = await db
-                .select({ id: movies.id })
-                .from(movies)
-                .where(and(
-                    eq(movies.userId, userId),
-                    eq(movies.title, g.title),
-                    g.year != null ? eq(movies.year, g.year) : sql`${movies.year} is null`,
-                ))
-                .limit(1);
-            let movieId: number;
-            if (existing) {
-                movieId = existing.id;
-            } else {
-                const [created] = await db
-                    .insert(movies)
-                    .values({ userId, title: g.title, year: g.year ?? null })
-                    .returning({ id: movies.id });
-                movieId = created.id;
-                movieCount++;
-            }
-
-            for (const v of g.files) {
-                const fileValues = {
+        // Reconcile the `companionDevices` row (bigint id) the video schema's
+        // FKs point at. Two device tables exist for historical reasons — we
+        // key the bigint table by `machineId = devices.id` for a stable 1:1
+        // mapping.
+        const userId = session.user.id;
+        let [cdRow] = await db
+            .select({ id: companionDevices.id })
+            .from(companionDevices)
+            .where(and(eq(companionDevices.userId, userId), eq(companionDevices.machineId, device.id)))
+            .limit(1);
+        if (!cdRow) {
+            const inserted = await db
+                .insert(companionDevices)
+                .values({
                     userId,
-                    deviceId: companionDeviceId,
-                    path: v.filepath,
-                    kind: "movie" as const,
-                    movieId,
-                    episodeId: null,
-                    sizeBytes: v.fileSize,
-                    durationSec: v.durationSec ?? null,
-                    container: v.container ?? null,
-                    videoCodec: v.videoCodec ?? null,
-                    audioCodec: v.audioCodec ?? null,
-                    width: v.width ?? null,
-                    height: v.height ?? null,
-                    bitrateKbps: v.bitrateKbps ?? null,
-                    hdr: v.hdr ?? null,
-                    audioTracks: v.audioTracks,
-                    subtitleTracks: v.subtitleTracks,
-                    mtime: new Date(v.mtime),
-                    scannedAt: now,
-                };
-                await db
-                    .insert(videoFiles)
-                    .values(fileValues)
-                    .onConflictDoUpdate({
-                        target: [videoFiles.deviceId, videoFiles.path],
-                        set: fileValues,
-                    });
-                fileCount++;
-            }
+                    machineId: device.id,
+                    hostname: device.hostname ?? device.id,
+                    platform: device.os ?? "unknown",
+                })
+                .returning({ id: companionDevices.id });
+            cdRow = inserted[0];
         }
-    } else {
-        const showGroups = new Map<string, typeof job.videos>();
-        for (const v of job.videos) {
-            if (v.parsedSeason == null || v.parsedEpisode == null) { skipped++; continue; }
-            const showName = (v.showHint || v.parsedTitle || v.filename).trim();
-            const key = showName.toLowerCase();
-            const arr = showGroups.get(key);
-            if (arr) arr.push(v);
-            else showGroups.set(key, [v]);
-        }
+        const companionDeviceId = cdRow.id;
 
-        for (const files of showGroups.values()) {
-            const showName = (files[0].showHint || files[0].parsedTitle || files[0].filename).trim();
-            const [existingShow] = await db
-                .select({ id: tvShows.id })
-                .from(tvShows)
-                .where(and(eq(tvShows.userId, userId), eq(tvShows.title, showName)))
-                .limit(1);
-            let showId: number;
-            if (existingShow) {
-                showId = existingShow.id;
-            } else {
-                const [created] = await db
-                    .insert(tvShows)
-                    .values({ userId, title: showName })
-                    .returning({ id: tvShows.id });
-                showId = created.id;
-                showCount++;
+        const now = new Date();
+        let movieCount = 0;
+        let showCount = 0;
+        let seasonCount = 0;
+        let episodeCount = 0;
+        let fileCount = 0;
+        let skipped = 0;
+
+        if (folderKind === "movies") {
+            const groups = new Map<string, { title: string; year: number | null; files: typeof job.videos }>();
+            for (const v of job.videos) {
+                const title = (v.parsedTitle || v.filename).trim();
+                const key = `${title.toLowerCase()}::${v.parsedYear ?? ""}`;
+                const existing = groups.get(key);
+                if (existing) existing.files.push(v);
+                else groups.set(key, { title, year: v.parsedYear, files: [v] });
             }
 
-            const bySeason = new Map<number, typeof job.videos>();
-            for (const v of files) {
-                const s = v.parsedSeason as number;
-                const arr = bySeason.get(s);
-                if (arr) arr.push(v);
-                else bySeason.set(s, [v]);
-            }
-
-            for (const [seasonNum, sFiles] of bySeason) {
-                await db
-                    .insert(tvSeasons)
-                    .values({ showId, seasonNumber: seasonNum })
-                    .onConflictDoNothing({ target: [tvSeasons.showId, tvSeasons.seasonNumber] });
-                seasonCount++;
-
-                const byEpisode = new Map<number, typeof job.videos>();
-                for (const v of sFiles) {
-                    const e = v.parsedEpisode as number;
-                    const arr = byEpisode.get(e);
-                    if (arr) arr.push(v);
-                    else byEpisode.set(e, [v]);
+            for (const g of groups.values()) {
+                const [existing] = await db
+                    .select({ id: movies.id })
+                    .from(movies)
+                    .where(and(
+                        eq(movies.userId, userId),
+                        eq(movies.title, g.title),
+                        g.year != null ? eq(movies.year, g.year) : sql`${movies.year} is null`,
+                    ))
+                    .limit(1);
+                let movieId: number;
+                if (existing) {
+                    movieId = existing.id;
+                } else {
+                    const [created] = await db
+                        .insert(movies)
+                        .values({ userId, title: g.title, year: g.year ?? null })
+                        .returning({ id: movies.id });
+                    movieId = created.id;
+                    movieCount++;
                 }
 
-                for (const [episodeNum, eFiles] of byEpisode) {
-                    const [insertedEp] = await db
-                        .insert(tvEpisodes)
-                        .values({
-                            showId,
-                            seasonNumber: seasonNum,
-                            episodeNumber: episodeNum,
-                            title: eFiles[0].parsedTitle || null,
-                        })
+                for (const v of g.files) {
+                    const fileValues = {
+                        userId,
+                        deviceId: companionDeviceId,
+                        path: v.filepath,
+                        kind: "movie" as const,
+                        movieId,
+                        episodeId: null,
+                        sizeBytes: v.fileSize,
+                        durationSec: v.durationSec ?? null,
+                        container: v.container ?? null,
+                        videoCodec: v.videoCodec ?? null,
+                        audioCodec: v.audioCodec ?? null,
+                        width: v.width ?? null,
+                        height: v.height ?? null,
+                        bitrateKbps: v.bitrateKbps ?? null,
+                        hdr: v.hdr ?? null,
+                        audioTracks: v.audioTracks,
+                        subtitleTracks: v.subtitleTracks,
+                        mtime: new Date(v.mtime),
+                        scannedAt: now,
+                    };
+                    await db
+                        .insert(videoFiles)
+                        .values(fileValues)
                         .onConflictDoUpdate({
-                            target: [tvEpisodes.showId, tvEpisodes.seasonNumber, tvEpisodes.episodeNumber],
-                            set: { seasonNumber: seasonNum },
-                        })
-                        .returning({ id: tvEpisodes.id });
-                    const episodeId = insertedEp.id;
-                    episodeCount++;
+                            target: [videoFiles.deviceId, videoFiles.path],
+                            set: fileValues,
+                        });
+                    fileCount++;
+                }
+            }
+        } else {
+            const showGroups = new Map<string, typeof job.videos>();
+            for (const v of job.videos) {
+                if (v.parsedSeason == null || v.parsedEpisode == null) { skipped++; continue; }
+                const showName = (v.showHint || v.parsedTitle || v.filename).trim();
+                const key = showName.toLowerCase();
+                const arr = showGroups.get(key);
+                if (arr) arr.push(v);
+                else showGroups.set(key, [v]);
+            }
 
-                    for (const v of eFiles) {
-                        const fileValues = {
-                            userId,
-                            deviceId: companionDeviceId,
-                            path: v.filepath,
-                            kind: "episode" as const,
-                            movieId: null,
-                            episodeId,
-                            sizeBytes: v.fileSize,
-                            durationSec: v.durationSec ?? null,
-                            container: v.container ?? null,
-                            videoCodec: v.videoCodec ?? null,
-                            audioCodec: v.audioCodec ?? null,
-                            width: v.width ?? null,
-                            height: v.height ?? null,
-                            bitrateKbps: v.bitrateKbps ?? null,
-                            hdr: v.hdr ?? null,
-                            audioTracks: v.audioTracks,
-                            subtitleTracks: v.subtitleTracks,
-                            mtime: new Date(v.mtime),
-                            scannedAt: now,
-                        };
-                        await db
-                            .insert(videoFiles)
-                            .values(fileValues)
+            for (const files of showGroups.values()) {
+                const showName = (files[0].showHint || files[0].parsedTitle || files[0].filename).trim();
+                const [existingShow] = await db
+                    .select({ id: tvShows.id })
+                    .from(tvShows)
+                    .where(and(eq(tvShows.userId, userId), eq(tvShows.title, showName)))
+                    .limit(1);
+                let showId: number;
+                if (existingShow) {
+                    showId = existingShow.id;
+                } else {
+                    const [created] = await db
+                        .insert(tvShows)
+                        .values({ userId, title: showName })
+                        .returning({ id: tvShows.id });
+                    showId = created.id;
+                    showCount++;
+                }
+
+                const bySeason = new Map<number, typeof job.videos>();
+                for (const v of files) {
+                    const s = v.parsedSeason as number;
+                    const arr = bySeason.get(s);
+                    if (arr) arr.push(v);
+                    else bySeason.set(s, [v]);
+                }
+
+                for (const [seasonNum, sFiles] of bySeason) {
+                    await db
+                        .insert(tvSeasons)
+                        .values({ showId, seasonNumber: seasonNum })
+                        .onConflictDoNothing({ target: [tvSeasons.showId, tvSeasons.seasonNumber] });
+                    seasonCount++;
+
+                    const byEpisode = new Map<number, typeof job.videos>();
+                    for (const v of sFiles) {
+                        const e = v.parsedEpisode as number;
+                        const arr = byEpisode.get(e);
+                        if (arr) arr.push(v);
+                        else byEpisode.set(e, [v]);
+                    }
+
+                    for (const [episodeNum, eFiles] of byEpisode) {
+                        const [insertedEp] = await db
+                            .insert(tvEpisodes)
+                            .values({
+                                showId,
+                                seasonNumber: seasonNum,
+                                episodeNumber: episodeNum,
+                                title: eFiles[0].parsedTitle || null,
+                            })
                             .onConflictDoUpdate({
-                                target: [videoFiles.deviceId, videoFiles.path],
-                                set: fileValues,
-                            });
-                        fileCount++;
+                                target: [tvEpisodes.showId, tvEpisodes.seasonNumber, tvEpisodes.episodeNumber],
+                                set: { seasonNumber: seasonNum },
+                            })
+                            .returning({ id: tvEpisodes.id });
+                        const episodeId = insertedEp.id;
+                        episodeCount++;
+
+                        for (const v of eFiles) {
+                            const fileValues = {
+                                userId,
+                                deviceId: companionDeviceId,
+                                path: v.filepath,
+                                kind: "episode" as const,
+                                movieId: null,
+                                episodeId,
+                                sizeBytes: v.fileSize,
+                                durationSec: v.durationSec ?? null,
+                                container: v.container ?? null,
+                                videoCodec: v.videoCodec ?? null,
+                                audioCodec: v.audioCodec ?? null,
+                                width: v.width ?? null,
+                                height: v.height ?? null,
+                                bitrateKbps: v.bitrateKbps ?? null,
+                                hdr: v.hdr ?? null,
+                                audioTracks: v.audioTracks,
+                                subtitleTracks: v.subtitleTracks,
+                                mtime: new Date(v.mtime),
+                                scannedAt: now,
+                            };
+                            await db
+                                .insert(videoFiles)
+                                .values(fileValues)
+                                .onConflictDoUpdate({
+                                    target: [videoFiles.deviceId, videoFiles.path],
+                                    set: fileValues,
+                                });
+                            fileCount++;
+                        }
                     }
                 }
             }
         }
+
+        await companionControl.ackScanJob(deviceId, jobId).catch(() => null);
+        revalidatePath("/devices");
+        revalidatePath("/watch");
+
+        console.log(`[ingest-video] done kind=${folderKind} movies=${movieCount} shows=${showCount} seasons=${seasonCount} episodes=${episodeCount} files=${fileCount} skipped=${skipped}`);
+        return {
+            success: true,
+            movies: movieCount,
+            shows: showCount,
+            seasons: seasonCount,
+            episodes: episodeCount,
+            files: fileCount,
+            skipped,
+        };
+    } catch (e) {
+        const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
+        console.error(`[ingest-video] crashed device=${deviceId} job=${jobId}: ${msg}`);
+        return { error: e instanceof Error ? e.message : String(e) };
     }
-
-    await companionControl.ackScanJob(deviceId, jobId).catch(() => null);
-    revalidatePath("/devices");
-    revalidatePath("/watch");
-
-    console.log(`[ingest-video] done kind=${folderKind} movies=${movieCount} shows=${showCount} seasons=${seasonCount} episodes=${episodeCount} files=${fileCount} skipped=${skipped}`);
-    return {
-        success: true,
-        movies: movieCount,
-        shows: showCount,
-        seasons: seasonCount,
-        episodes: episodeCount,
-        files: fileCount,
-        skipped,
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
-    console.error(`[ingest-video] crashed device=${deviceId} job=${jobId}: ${msg}`);
-    return { error: e instanceof Error ? e.message : String(e) };
-  }
 }
 

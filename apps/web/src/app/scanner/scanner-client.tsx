@@ -1,220 +1,183 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { scanFolderAction } from "@/actions/scan";
-import { useRenderCount, dlog } from "@/lib/dev-debugger";
+import { beginScan, getScanProgress } from "@/actions/scan-orchestrator";
+import { ingestCompanionScanJob } from "@/actions/devices";
+import type { ScannerCompanion, FolderKind } from "@/lib/companion-types";
 import {
     ScanSearch,
     FolderOpen,
     CheckCircle,
-    AlertCircle,
     Loader2,
+    Monitor,
+    Wifi,
+    WifiOff,
+    Music,
+    Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
-interface ScanResult {
-    totalFiles: number;
-    audioFiles: number;
-    inserted: number;
-    skipped: number;
-    errors: string[];
-}
-
 interface ScannerClientProps {
-    watchFolders: string[];
-    musicRoot: string;
+    companions: ScannerCompanion[];
 }
 
-export function ScannerClient({
-    watchFolders,
-    musicRoot,
-}: ScannerClientProps) {
-    useRenderCount("Page:/scanner");
-    const [customPath, setCustomPath] = useState("");
-    const [scanResult, setScanResult] = useState<ScanResult | null>(null);
-    const [isPending, startTransition] = useTransition();
+interface ActiveScan {
+    deviceId: string;
+    folder: string;
+    jobId: string;
+    status: string;
+    discovered: number;
+    scanned: number;
+}
 
-    function handleScan(folderPath: string) {
-        setScanResult(null);
+function relativeSeen(iso: string | null): string {
+    if (!iso) return "never";
+    const ms = Date.now() - new Date(iso).getTime();
+    if (ms < 60_000) return "just now";
+    if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
+    if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
+    return `${Math.floor(ms / 86_400_000)}d ago`;
+}
+
+export function ScannerClient({ companions }: ScannerClientProps) {
+    const [customPath, setCustomPath] = useState("");
+    const [customDevice, setCustomDevice] = useState(
+        companions.find((c) => c.online)?.deviceId ?? companions[0]?.deviceId ?? "",
+    );
+    const [active, setActive] = useState<ActiveScan | null>(null);
+    const [isPending, startTransition] = useTransition();
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const runScan = useCallback((deviceId: string, folder: string, kind?: FolderKind) => {
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
         startTransition(async () => {
-            try {
-                const result = await scanFolderAction(folderPath);
-                setScanResult(result);
-                if (result.inserted > 0) {
-                    toast.success(
-                        `${result.inserted} track-uri noi adăugate!`,
-                        {
-                            description: `${result.skipped} deja existente, ${result.errors.length} erori`,
-                        }
-                    );
-                } else if (result.skipped > 0) {
-                    toast.info("Niciun track nou — toate sunt deja în bibliotecă.");
-                } else {
-                    toast.warning("Niciun fișier audio găsit în folder.");
+            const begun = await beginScan(deviceId, folder, kind);
+            if ("error" in begun) { toast.error(`Scan failed: ${begun.error}`); return; }
+            const jobId = begun.jobId;
+            setActive({ deviceId, folder, jobId, status: "discovering", discovered: 0, scanned: 0 });
+            pollRef.current = setInterval(async () => {
+                const p = await getScanProgress(deviceId, jobId);
+                if ("error" in p) return;
+                setActive({ deviceId, folder, jobId, status: p.status, discovered: p.discovered, scanned: p.scanned });
+                if (p.status === "complete") {
+                    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+                    const ing = await ingestCompanionScanJob(deviceId, jobId);
+                    if ("error" in ing) { toast.error(`Ingest failed: ${ing.error}`); setActive(null); return; }
+                    toast.success(`Scan complete: ${ing.inserted} new, ${ing.skipped} existing`, { description: folder });
+                    setActive(null);
+                } else if (p.status === "error") {
+                    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+                    toast.error("Scan failed on companion");
+                    setActive(null);
                 }
-            } catch {
-                toast.error("Eroare la scanare");
-            }
+            }, 1500);
         });
-    }
+    }, []);
+
+    const busy = isPending || active !== null;
 
     return (
         <div className="space-y-6">
-            {/* Quick Scan Buttons */}
+            {companions.map((c) => (
+                <Card key={c.deviceId}>
+                    <CardHeader>
+                        <CardTitle className="flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-2 min-w-0">
+                                <Monitor className="h-5 w-5 shrink-0" />
+                                <span className="truncate">{c.name}</span>
+                                {c.online ? (
+                                    <span className="flex items-center gap-1 text-xs text-green-500"><Wifi className="h-3.5 w-3.5" /> online</span>
+                                ) : (
+                                    <span className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]"><WifiOff className="h-3.5 w-3.5" /> offline · {relativeSeen(c.lastSeenAt)}</span>
+                                )}
+                            </span>
+                            <span className="flex items-center gap-3 text-xs text-[var(--muted-foreground)] shrink-0">
+                                <span className="flex items-center gap-1"><Music className="h-3.5 w-3.5" /> {c.trackCount.toLocaleString()}</span>
+                                <span className="flex items-center gap-1"><Sparkles className="h-3.5 w-3.5" /> {c.analyzedCount.toLocaleString()} analyzed</span>
+                            </span>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {c.error && (
+                            <p className="text-sm text-amber-500">Could not reach companion: {c.error} (showing cached folders)</p>
+                        )}
+                        {c.folders.length > 0 ? (
+                            c.folders.map((f) => {
+                                const isActive = active?.deviceId === c.deviceId && active?.folder === f.path;
+                                return (
+                                    <div key={f.path} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-4 py-3">
+                                        <div className="min-w-0 flex-1">
+                                            <span className="text-sm font-mono truncate block">{f.path}</span>
+                                            {isActive && (
+                                                <span className="text-xs text-[var(--muted-foreground)]">
+                                                    {active!.status} · {active!.discovered} found · {active!.scanned} scanned
+                                                </span>
+                                            )}
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => runScan(c.deviceId, f.path, f.kind)}
+                                            disabled={busy || !c.online}
+                                            title={!c.online ? "Companion offline" : undefined}
+                                        >
+                                            {isActive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScanSearch className="mr-2 h-4 w-4" />}
+                                            {isActive ? "Scanning…" : "Scan"}
+                                        </Button>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <p className="text-sm text-[var(--muted-foreground)]">
+                                No folders configured on this companion. Add one from the Devices page.
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
+            ))}
+
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <FolderOpen className="h-5 w-5" />
-                        Watch Folders
+                        <FolderOpen className="h-5 w-5" /> Custom folder
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                    {watchFolders.length > 0 ? (
-                        watchFolders.map((folder: string) => (
-                            <div
-                                key={folder}
-                                className="flex items-center justify-between rounded-lg border border-[var(--border)] px-4 py-3"
-                            >
-                                <span className="text-sm font-mono truncate min-w-0 flex-1">{folder}</span>
-                                <Button
-                                    size="sm"
-                                    onClick={() => handleScan(folder)}
-                                    disabled={isPending}
-                                >
-                                    {isPending ? (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <ScanSearch className="mr-2 h-4 w-4" />
-                                    )}
-                                    Scan
-                                </Button>
-                            </div>
-                        ))
-                    ) : (
-                        <p className="text-sm text-[var(--muted-foreground)]">
-                            Niciun watch folder configurat. Adaugă din Settings.
-                        </p>
-                    )}
-
-                    {/* Scan music root */}
-                    <div className="flex items-center justify-between rounded-lg border border-dashed border-[var(--border)] px-4 py-3">
-                        <span className="text-sm font-mono truncate min-w-0 flex-1">
-                            {musicRoot} (root complet)
-                        </span>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleScan(musicRoot)}
-                            disabled={isPending}
-                        >
-                            {isPending ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <ScanSearch className="mr-2 h-4 w-4" />
-                            )}
-                            Scan All
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Custom Path Scan */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Custom Folder</CardTitle>
-                </CardHeader>
                 <CardContent>
-                    <div className="flex gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                        <select
+                            value={customDevice}
+                            onChange={(e) => setCustomDevice(e.target.value)}
+                            className="h-9 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 text-sm"
+                        >
+                            {companions.map((c) => (
+                                <option key={c.deviceId} value={c.deviceId} disabled={!c.online}>
+                                    {c.name}{c.online ? "" : " (offline)"}
+                                </option>
+                            ))}
+                        </select>
                         <Input
-                            placeholder="C:\Users\vladu\Downloads\music"
+                            placeholder="C:\\Users\\you\\Music"
                             value={customPath}
                             onChange={(e) => setCustomPath(e.target.value)}
                             className="flex-1"
                         />
                         <Button
-                            onClick={() => {
-                                if (customPath.trim()) handleScan(customPath.trim());
-                            }}
-                            disabled={isPending || !customPath.trim()}
+                            onClick={() => { if (customPath.trim() && customDevice) runScan(customDevice, customPath.trim()); }}
+                            disabled={busy || !customPath.trim() || !customDevice}
                         >
-                            {isPending ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <ScanSearch className="mr-2 h-4 w-4" />
-                            )}
+                            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScanSearch className="mr-2 h-4 w-4" />}
                             Scan
                         </Button>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Scan Results */}
-            {scanResult && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                            Scan Results
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                            <div className="rounded-lg bg-[var(--secondary)] p-3 text-center">
-                                <p className="text-2xl font-bold">{scanResult.audioFiles}</p>
-                                <p className="text-xs text-[var(--muted-foreground)]">
-                                    Audio Files Found
-                                </p>
-                            </div>
-                            <div className="rounded-lg bg-green-500/10 p-3 text-center">
-                                <p className="text-2xl font-bold text-green-500">
-                                    {scanResult.inserted}
-                                </p>
-                                <p className="text-xs text-[var(--muted-foreground)]">
-                                    New Added
-                                </p>
-                            </div>
-                            <div className="rounded-lg bg-blue-500/10 p-3 text-center">
-                                <p className="text-2xl font-bold text-blue-500">
-                                    {scanResult.skipped}
-                                </p>
-                                <p className="text-xs text-[var(--muted-foreground)]">
-                                    Already in DB
-                                </p>
-                            </div>
-                            <div className="rounded-lg bg-red-500/10 p-3 text-center">
-                                <p className="text-2xl font-bold text-red-500">
-                                    {scanResult.errors.length}
-                                </p>
-                                <p className="text-xs text-[var(--muted-foreground)]">Errors</p>
-                            </div>
-                        </div>
-
-                        {scanResult.errors.length > 0 && (
-                            <div className="mt-4 space-y-1">
-                                <p className="flex items-center gap-1 text-sm font-medium text-red-500">
-                                    <AlertCircle className="h-4 w-4" />
-                                    Errors:
-                                </p>
-                                {scanResult.errors.slice(0, 10).map((err, i) => (
-                                    <p
-                                        key={i}
-                                        className="truncate text-xs text-[var(--muted-foreground)]"
-                                    >
-                                        {err}
-                                    </p>
-                                ))}
-                                {scanResult.errors.length > 10 && (
-                                    <p className="text-xs text-[var(--muted-foreground)]">
-                                        ... and {scanResult.errors.length - 10} more
-                                    </p>
-                                )}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+            {!active && !isPending && (
+                <p className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+                    <CheckCircle className="h-3.5 w-3.5" /> Scans run on the companion machine; files are read locally and ingested into your library.
+                </p>
             )}
         </div>
     );

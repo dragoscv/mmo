@@ -34,6 +34,19 @@ export interface CompanionFolder {
     watchError?: string | null;
 }
 
+/** A companion device + its watched folders and counts, for the multi-
+ *  companion Scanner overview. */
+export interface ScannerCompanion {
+    deviceId: string;
+    name: string;
+    online: boolean;
+    lastSeenAt: string | null;
+    folders: CompanionFolder[];
+    trackCount: number;
+    analyzedCount: number;
+    error?: string;
+}
+
 export interface CompanionScannedTrack {
     filepath: string;
     filename: string;

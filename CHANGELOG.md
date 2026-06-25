@@ -12,6 +12,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed/Changed — multi-companion scanner, analysis & counts (`apps/web` `0.7.0`)
+
+- **Scanner rebuilt on the companion-side scan flow.** The old Scanner walked
+  the WEB-APP HOST's filesystem (`scanFolderAction` → `fs.readdir`), which on
+  Vercel produced **"Folder not found: H:\\Music"** because the host has no such
+  drive. Scans now run ON the companion (`POST /scan` → poll → ingest → ack) via
+  a new `scan-orchestrator` action with live progress.
+- **Multi-companion everywhere.** New `getAllCompanionLinks` / `aggregateAcrossCompanions`
+  resolvers. The Scanner now lists every companion with **which device owns each
+  watched folder**, online/offline status, and per-device track/analyzed counts.
+  A device selector targets the right companion for custom-folder scans.
+- **Analysis enqueues across ALL online companions** (was: a single auto-picked
+  device, which silently "Enqueued 0" when that device's library was empty).
+- **Auto initial scan on folder-add**: adding a watched folder now kicks a
+  one-time full scan so EXISTING files are ingested immediately (the chokidar
+  watcher uses `ignoreInitial` and only sees files added later).
+- Dashboard/Analysis gates now accept ANY paired companion (aggregate), not just
+  the auto-picked one. Per-device track counts use the companion's
+  `/library/stats.total` instead of a 500-row paged sample.
+
 ### Changed — training M2M endpoints moved off Vercel to the gateway (`apps/web` `0.6.3`)
 
 - **The trainer-facing machine-to-machine training endpoints now live on the

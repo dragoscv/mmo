@@ -14,7 +14,7 @@
 
 import { fetchAllMetadata } from "@/lib/metadata-services";
 import {
-    companionLibrary, companionAnalyzer, getCompanionLink,
+    companionLibrary, companionAnalyzer, getCompanionLink, getAllCompanionLinks,
     type CompanionTrack, type AnalyzeOptions, type AnalyzerHealth, type AnalyzerStatus,
     type AnalyzerLogEntry, type GpuInfo,
 } from "@/lib/companion-library";
@@ -504,15 +504,24 @@ export async function startBulkDspAnalysis(
     filter: "all" | "missing-dsp" | "missing-stems" = "missing-dsp",
     forceReanalyze = false,
 ): Promise<{ enqueued: number; skipped: number; tracksTouched: number; error?: string }> {
-    const link = await getCompanionLink();
-    if (!link) return { enqueued: 0, skipped: 0, tracksTouched: 0, error: "Companion not connected" };
+    // Multi-companion: enqueue across EVERY online companion so a user with
+    // several machines analyzes all their libraries, not just the auto-picked
+    // one. Falls back to the single best link if the aggregate is empty.
+    const links = await getAllCompanionLinks();
+    const targets = links.filter((l) => l.online);
+    if (targets.length === 0) {
+        const single = await getCompanionLink();
+        if (!single) return { enqueued: 0, skipped: 0, tracksTouched: 0, error: "Companion not connected" };
+        targets.push({ ...single, name: "companion", online: true, lastSeenAt: new Date() });
+    }
 
     let enqueued = 0;
     let skipped = 0;
     let tracksTouched = 0;
     const PAGE = 200;
-    let page = 1;
     try {
+      for (const link of targets) {
+        let page = 1;
         while (true) {
             const res = await companionLibrary.getTracks(link, { page, pageSize: PAGE });
             if (!res.tracks.length) break;
@@ -562,8 +571,9 @@ export async function startBulkDspAnalysis(
 
             if (res.tracks.length < PAGE) break;
             page++;
-            if (page > 200) break; // 40k safety cap
+            if (page > 200) break; // 40k safety cap per device
         }
+      }
         return { enqueued, skipped, tracksTouched };
     } catch (e) {
         return { enqueued, skipped, tracksTouched, error: e instanceof Error ? e.message : String(e) };

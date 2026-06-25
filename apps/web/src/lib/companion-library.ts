@@ -104,6 +104,70 @@ export async function getCompanionLinkForDevice(
     return { apiUrl: url.replace(/\/+$/, ""), token: bearer, deviceId: row.id, userId };
 }
 
+/** Online window shared across companion resolvers (heartbeat freshness). */
+export const COMPANION_ONLINE_WINDOW_MS = 90_000;
+
+export interface CompanionLinkInfo extends CompanionLink {
+    name: string;
+    online: boolean;
+    lastSeenAt: Date | null;
+}
+
+/** Resolve CompanionLinks for ALL of the signed-in user's paired devices
+ *  that have a usable api_url + token and a reachable URL for the current
+ *  runtime. Used by the aggregate (multi-companion) reads so Library /
+ *  Dashboard / Analysis show data across every companion rather than a
+ *  single auto-picked one. Ordered online-first, then most-recent. */
+export async function getAllCompanionLinks(): Promise<CompanionLinkInfo[]> {
+    const session = await auth();
+    const userId = session?.user?.id;
+    if (!userId) return [];
+    const rows = await db.select().from(devices).where(eq(devices.userId, userId));
+    const now = Date.now();
+    const out: CompanionLinkInfo[] = [];
+    for (const d of rows) {
+        if (!d.apiUrl || !d.tokenEncrypted) continue;
+        const url = pickCompanionUrl(d);
+        if (!url) continue;
+        const bearer = await materializeDeviceToken(d);
+        if (!bearer) continue;
+        const lastSeenAt = d.lastSeenAt ? new Date(d.lastSeenAt) : null;
+        out.push({
+            apiUrl: url.replace(/\/+$/, ""),
+            token: bearer,
+            deviceId: d.id,
+            userId,
+            name: d.name,
+            lastSeenAt,
+            online: lastSeenAt ? now - lastSeenAt.getTime() <= COMPANION_ONLINE_WINDOW_MS : false,
+        });
+    }
+    out.sort((a, b) => {
+        if (a.online !== b.online) return a.online ? -1 : 1;
+        return (b.lastSeenAt?.getTime() ?? 0) - (a.lastSeenAt?.getTime() ?? 0);
+    });
+    return out;
+}
+
+/** Run a read against every online companion and merge the results.
+ *  Offline companions are skipped (their cached data, when present, is the
+ *  caller's responsibility). Errors from one companion never fail the whole
+ *  aggregate — they're collected and returned alongside the data. */
+export async function aggregateAcrossCompanions<T>(
+    fn: (link: CompanionLinkInfo) => Promise<T>,
+    opts: { onlineOnly?: boolean } = {},
+): Promise<{ results: Array<{ link: CompanionLinkInfo; value: T }>; errors: Array<{ deviceId: string; name: string; error: string }> }> {
+    const links = await getAllCompanionLinks();
+    const targets = opts.onlineOnly === false ? links : links.filter((l) => l.online);
+    const results: Array<{ link: CompanionLinkInfo; value: T }> = [];
+    const errors: Array<{ deviceId: string; name: string; error: string }> = [];
+    await Promise.all(targets.map(async (link) => {
+        try { results.push({ link, value: await fn(link) }); }
+        catch (e) { errors.push({ deviceId: link.deviceId, name: link.name, error: e instanceof Error ? e.message : String(e) }); }
+    }));
+    return { results, errors };
+}
+
 // ─── Low-level fetch helper ─────────────────────────────────────────────────
 
 async function call<T>(
