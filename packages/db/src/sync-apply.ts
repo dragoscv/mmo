@@ -173,8 +173,38 @@ export async function applyTrackUpsert(
         .where(and(eq(tracks.userId, userId), eq(tracks.sha256, sha256)))
         .limit(1);
 
-    // Filter incoming fields against the per-field clock.
-    const stored = (existing[0]?.fv ?? {}) as Record<string, string>;
+    // Fallback identity match: when the sha256 isn't found, the SAME physical
+    // file may already exist under a DIFFERENT sha256 (re-encode / tag edit /
+    // path move re-hashes the file). Matching on (userId, companionTrackId) or
+    // (userId, filepath) lets us UPDATE that row (and adopt the new sha256)
+    // instead of inserting a duplicate — the root cause of the 2× row bloat.
+    let identityRow: { id: number; fv: unknown } | undefined;
+    if (existing.length === 0) {
+        const cidRaw = (payload as Record<string, unknown>).companionTrackId;
+        const cid = typeof cidRaw === "number" ? cidRaw : undefined;
+        const fp = (payload as Record<string, unknown>).filepath;
+        if (cid != null) {
+            const m = await db
+                .select({ id: tracks.id, fv: tracks.fieldVersions })
+                .from(tracks)
+                .where(and(eq(tracks.userId, userId), eq(tracks.companionTrackId, cid)))
+                .limit(1);
+            identityRow = m[0];
+        }
+        if (!identityRow && typeof fp === "string" && fp.length > 0) {
+            const m = await db
+                .select({ id: tracks.id, fv: tracks.fieldVersions })
+                .from(tracks)
+                .where(and(eq(tracks.userId, userId), eq(tracks.filepath, fp)))
+                .limit(1);
+            identityRow = m[0];
+        }
+    }
+
+    // Filter incoming fields against the per-field clock. When matching an
+    // existing row by identity (not sha256), use that row's field versions.
+    const matchRow = existing[0] ?? identityRow;
+    const stored = (matchRow?.fv ?? {}) as Record<string, string>;
     const accepted: Record<string, unknown> = {};
     const nextFv: Record<string, string> = { ...stored };
     for (const [key, value] of Object.entries(payload)) {
@@ -193,7 +223,7 @@ export async function applyTrackUpsert(
     let rowId: number | undefined;
     let changed = false;
 
-    if (existing.length === 0) {
+    if (existing.length === 0 && !identityRow) {
         const inserted = await db
             .insert(tracks)
             .values({
@@ -207,15 +237,26 @@ export async function applyTrackUpsert(
         rowId = inserted[0]?.id;
         changed = true;
     } else {
-        rowId = existing[0].id;
+        rowId = (existing[0] ?? identityRow)!.id;
+        // Adopt the new sha256 when we matched by identity, so the row converges
+        // to the file's current hash and future syncs hit the fast sha256 path.
+        const adoptSha = existing.length === 0 && identityRow ? { sha256 } : {};
         if (Object.keys(accepted).length > 0) {
             await db
                 .update(tracks)
                 .set({
                     ...accepted,
+                    ...adoptSha,
                     fieldVersions: nextFv,
                     updatedAt: new Date(change.updatedAt),
                 })
+                .where(eq(tracks.id, rowId));
+            changed = true;
+        } else if (Object.keys(adoptSha).length > 0) {
+            // No field changes but sha256 needs adopting (dedup convergence).
+            await db
+                .update(tracks)
+                .set({ ...adoptSha, updatedAt: new Date(change.updatedAt) })
                 .where(eq(tracks.id, rowId));
             changed = true;
         }

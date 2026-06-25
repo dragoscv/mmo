@@ -12,6 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — cloud track duplication (2× rows) on re-hash
+
+- **Sync upsert no longer inserts a duplicate row when a file's `sha256`
+  changes** (re-encode / tag edit / path move re-hashes the file). When the
+  incoming `sha256` isn't found, `applyTrackUpsert` now falls back to matching
+  the existing row by `(userId, companionTrackId)` then `(userId, filepath)` and
+  **updates it (adopting the new sha256)** instead of orphaning the old row.
+- One-time cleanup soft-hid **8,605 duplicate rows** (17,233 → 8,628 visible),
+  keeping the most-complete row per `(userId, filepath)`.
+
 ### Added / Fixed — cancel runs + accurate batch progress (`apps/web` `0.7.7`, companion `1.0.42`)
 
 - **Cancel button on each running job** in the `/analysis` Jobs card — cancels a
