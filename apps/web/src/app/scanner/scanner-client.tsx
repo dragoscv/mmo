@@ -89,7 +89,7 @@ export function ScannerClient({ companions }: ScannerClientProps) {
                 const r = await reconcileCloudWithCompanions();
                 if (r.error) { toast.error(r.error); return; }
                 const skipped = r.results.filter((x) => x.skipped);
-                toast.success(`Reconcile complete: pruned ${r.totalPruned}, linked ${r.backfilled}`, {
+                toast.success(`Reconcile: pruned ${r.totalPruned}, deduped ${r.deduped}, linked ${r.backfilled}`, {
                     description: r.results
                         .map((x) => x.skipped ? `${x.name}: ${x.skipped}` : `${x.name}: ${x.companionTrackCount} on device`)
                         .join(" · "),

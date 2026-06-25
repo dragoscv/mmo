@@ -37,6 +37,7 @@ export interface ReconcileSummary {
     results: ReconcileResult[];
     totalPruned: number;
     backfilled: number;
+    deduped: number;
     error?: string;
 }
 
@@ -48,17 +49,18 @@ const PRUNE_HARD_CAP = 50_000; // never delete more than this in one run
  */
 export async function reconcileCloudWithCompanions(): Promise<ReconcileSummary> {
     const session = await auth();
-    if (!session?.user?.id) return { results: [], totalPruned: 0, backfilled: 0, error: "Not signed in" };
+    if (!session?.user?.id) return { results: [], totalPruned: 0, backfilled: 0, deduped: 0, error: "Not signed in" };
     const userId = session.user.id;
 
     const links = (await getAllCompanionLinks()).filter((l) => l.online);
     if (links.length === 0) {
-        return { results: [], totalPruned: 0, backfilled: 0, error: "No online companion to reconcile against" };
+        return { results: [], totalPruned: 0, backfilled: 0, deduped: 0, error: "No online companion to reconcile against" };
     }
 
     const results: ReconcileResult[] = [];
     let totalPruned = 0;
     let backfilled = 0;
+    let deduped = 0;
 
     // filepath → owning deviceId, unioned across all online companions. Used
     // both to prune (absent ⇒ orphan) and to backfill NULL deviceId rows.
@@ -113,7 +115,7 @@ export async function reconcileCloudWithCompanions(): Promise<ReconcileSummary> 
     // If NO online companion produced a usable filepath set, bail without
     // touching cloud data (avoids mass-delete on a transient empty read).
     if (ownerByPath.size === 0) {
-        return { results, totalPruned: 0, backfilled: 0, error: "No companion filepaths read — nothing reconciled" };
+        return { results, totalPruned: 0, backfilled: 0, deduped: 0, error: "No companion filepaths read — nothing reconciled" };
     }
 
     // ── Global pass over ALL the user's cloud tracks ────────────────────
@@ -121,13 +123,29 @@ export async function reconcileCloudWithCompanions(): Promise<ReconcileSummary> 
     // A row is an orphan when its filepath is absent from EVERY online
     // companion. Rows that match get their deviceId backfilled.
     const cloudRows = await db
-        .select({ id: tracks.id, filepath: tracks.filepath, deviceId: tracks.deviceId })
+        .select({ id: tracks.id, filepath: tracks.filepath, deviceId: tracks.deviceId, analyzedAt: tracks.analyzedAt })
         .from(tracks)
         .where(eq(tracks.userId, userId));
 
     const orphanIds: number[] = [];
     const backfillByDevice = new Map<string, number[]>();
+    // Dedupe: keep ONE row per filepath (prefer analyzed, else lowest id);
+    // collect the rest for deletion.
+    const bestByPath = new Map<string, { id: number; analyzed: boolean }>();
+    const dupeIds: number[] = [];
     for (const r of cloudRows) {
+        if (!r.filepath) continue;
+        const analyzed = r.analyzedAt != null;
+        const cur = bestByPath.get(r.filepath);
+        if (!cur) { bestByPath.set(r.filepath, { id: r.id, analyzed }); continue; }
+        // Decide winner: analyzed beats non-analyzed; otherwise lower id wins.
+        const challengerWins = (analyzed && !cur.analyzed) || (analyzed === cur.analyzed && r.id < cur.id);
+        if (challengerWins) { dupeIds.push(cur.id); bestByPath.set(r.filepath, { id: r.id, analyzed }); }
+        else { dupeIds.push(r.id); }
+    }
+    const dupeSet = new Set(dupeIds);
+    for (const r of cloudRows) {
+        if (dupeSet.has(r.id)) continue; // handled by dedupe delete below
         const owner = r.filepath ? ownerByPath.get(r.filepath) : undefined;
         if (!owner) {
             // Absent on every online companion → orphan.
@@ -139,6 +157,14 @@ export async function reconcileCloudWithCompanions(): Promise<ReconcileSummary> 
             arr.push(r.id);
             backfillByDevice.set(owner, arr);
         }
+    }
+
+    // Delete duplicate rows first (keeps the chosen winner per filepath).
+    for (let i = 0; i < dupeIds.length; i += 500) {
+        const chunk = dupeIds.slice(i, i + 500);
+        const res = await db.delete(tracks)
+            .where(and(eq(tracks.userId, userId), inArray(tracks.id, chunk)));
+        deduped += res.count ?? chunk.length;
     }
 
     // Backfill deviceId so future reconciles + per-device counts are correct.
@@ -171,5 +197,9 @@ export async function reconcileCloudWithCompanions(): Promise<ReconcileSummary> 
         revalidatePath("/library");
         revalidatePath("/");
     }
-    return { results, totalPruned, backfilled };
+    if (deduped > 0 || totalPruned > 0) {
+        revalidatePath("/library");
+        revalidatePath("/");
+    }
+    return { results, totalPruned, backfilled, deduped };
 }
