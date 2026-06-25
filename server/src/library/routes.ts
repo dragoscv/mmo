@@ -26,6 +26,7 @@ import { runExport, type ManifestTrack, type ManifestPlaylist, type TranscodePol
 import { createReadStream, statSync, existsSync } from "node:fs";
 import { copyFile, mkdir, stat as statAsync } from "node:fs/promises";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 
 // ─── Sync helpers ───────────────────────────────────────────────────────────
 //
@@ -1355,8 +1356,9 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     //   wiring at the bottom of this function).
     router.post("/analyze", async (req, res) => {
         const { userId } = req as AuthedRequest;
-        const { trackIds, options } = req.body as {
+        const { trackIds, options, batchId, batchLabel } = req.body as {
             trackIds?: number[]; options?: AnalyzeOptions;
+            batchId?: string; batchLabel?: string;
         };
         if (!Array.isArray(trackIds) || trackIds.length === 0) {
             res.status(400).json({ error: "trackIds required" });
@@ -1370,6 +1372,12 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
             metadata: options?.metadata ?? false,
             metaFields: options?.metaFields,
         };
+        // One logical batch per /analyze call so the UI groups a whole run
+        // into a single job. Callers may pass a shared batchId across paged
+        // calls to keep a large run in one batch.
+        const batch = (batchId && typeof batchId === "string")
+            ? { id: batchId, label: typeof batchLabel === "string" ? batchLabel : "Analysis" }
+            : { id: randomUUID(), label: typeof batchLabel === "string" ? batchLabel : "Analysis" };
         const db = getLibraryDb();
         // Resolve absolute file paths (filtered by ownership).
         const rows = db.select({ id: tracks.id, filepath: tracks.filepath })
@@ -1384,10 +1392,10 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
                 db.update(tracks).set({ stemsStatus: "queued" })
                     .where(eq(tracks.id, row.id)).run();
             }
-            const job = analyzer.enqueue(row.id, row.filepath, opts);
+            const job = analyzer.enqueue(row.id, row.filepath, opts, batch);
             enqueued.push({ id: job.id, trackId: row.id });
         }
-        res.json({ jobs: enqueued });
+        res.json({ jobs: enqueued, batchId: batch.id });
     });
 
     // GET /analyze/status?since=<ms> — current + queued + recently
@@ -1400,6 +1408,15 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         const sinceRaw = req.query.since;
         const since = typeof sinceRaw === "string" ? Number.parseInt(sinceRaw, 10) : undefined;
         res.json(analyzer.status(Number.isFinite(since) ? since : undefined));
+    });
+
+    // GET /analyze/batches — one row per "Start analysis" run (a logical job
+    // containing many item sub-jobs) with live aggregate progress. This is the
+    // canonical jobs list for the /analysis page.
+    router.get("/analyze/batches", (req, res) => {
+        const limitRaw = req.query.limit;
+        const limit = typeof limitRaw === "string" ? Number.parseInt(limitRaw, 10) : 50;
+        res.json({ batches: analyzer.batches(Number.isFinite(limit) ? limit : 50) });
     });
 
     // GET /analyze/job/:id — single-job snapshot (for polling).

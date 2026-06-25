@@ -2,6 +2,20 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.38 — analysis runs grouped into one job (batches)
+
+- **A "Start analysis" run is now one logical job containing many item
+	sub-jobs.** `analyzer_jobs` rows carry `batch_id`/`batch_label`, `enqueue()`
+	accepts a `batch`, and the new `GET /analyze/batches` endpoint returns one
+	`BatchSummary` per run with live aggregate counts (queued/running/done/
+	errored/progress/state). Surfaced via `Analyzer.batches()`.
+
+## 1.0.37 — metadata analysis lane
+
+- **Metadata/Artwork/Lyrics/BPM-from-web fetching is now a 4th in-process
+	analyzer lane ("metadata")** instead of a client-side modal loop, so a run
+	persists across page refreshes and survives serverless restarts.
+
 ## 1.0.36 — cloud sync moves to the gateway (api.muzicai.ro)
 
 - **Cloud library sync now runs against the gateway** (`api.muzicai.ro`) instead

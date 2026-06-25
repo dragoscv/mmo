@@ -12,6 +12,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed — analysis runs are now one logical job per run (`apps/web` `0.7.3`, companion `1.0.38`)
+
+- **A single "Start analysis" run is now ONE job that contains many item
+  sub-jobs**, instead of one job row per `track × category`. Each run gets a
+  shared `batchId`/label that is threaded across every page and every targeted
+  companion, so the `/analysis` page groups the whole run into a single row with
+  aggregate progress and per-item done/running/queued/failed counts.
+- Companion: `analyzer_jobs` carries `batch_id`/`batch_label`; new
+  `GET /analyze/batches` returns one `BatchSummary` per run with live aggregate
+  state. `Analyzer.batches()` surfaces it; `enqueue()` accepts a `batch`.
+- Web: `POST /analyze` accepts `batchId`/`batchLabel`; `startBulkDspAnalysis`
+  mints one batch per run; new `getAnalyzerBatches` aggregates batches across
+  online companions; `/analysis` shows a new **Jobs** card (one row per run).
+
 ### Changed — metadata analysis moved to the companion (`apps/web` `0.7.2`, companion `1.0.37`)
 
 - **The "What to Fetch" metadata analysis (Metadata/Artwork/Lyrics/BPM-web) is

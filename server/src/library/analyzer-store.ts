@@ -49,6 +49,13 @@ export interface PersistedJob {
     finishedAt: number | null;
     /** JSON-serialised AnalyzeResult. */
     data: string | null;
+    /**
+     * Groups every sub-job of a single "Start analysis" run into one logical
+     * job. Null for legacy rows. See {@link AnalyzerStore.listBatches}.
+     */
+    batchId: string | null;
+    /** Human label for the batch (e.g. "Metadata · 8,607 tracks"). */
+    batchLabel: string | null;
 }
 
 export class AnalyzerStore {
@@ -67,6 +74,7 @@ export class AnalyzerStore {
         rehydrate: ReturnType<SqliteDatabase["prepare"]>;
         countByStateCategory: ReturnType<SqliteDatabase["prepare"]>;
         countFinishedSince: ReturnType<SqliteDatabase["prepare"]>;
+        listBatches: ReturnType<SqliteDatabase["prepare"]>;
     };
 
     constructor(db?: SqliteDatabase) {
@@ -80,7 +88,7 @@ export class AnalyzerStore {
             CREATE TABLE IF NOT EXISTS analyzer_jobs (
                 id            TEXT PRIMARY KEY,
                 request_id    TEXT NOT NULL,
-                category      TEXT NOT NULL CHECK(category IN ('dsp','stems','fingerprint')),
+                category      TEXT NOT NULL CHECK(category IN ('dsp','stems','fingerprint','metadata')),
                 track_id      INTEGER NOT NULL,
                 path          TEXT NOT NULL,
                 options       TEXT NOT NULL,
@@ -93,7 +101,9 @@ export class AnalyzerStore {
                 enqueued_at   INTEGER NOT NULL,
                 started_at    INTEGER,
                 finished_at   INTEGER,
-                data          TEXT
+                data          TEXT,
+                batch_id      TEXT,
+                batch_label   TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_analyzer_state_cat
                 ON analyzer_jobs(state, category, enqueued_at);
@@ -101,7 +111,94 @@ export class AnalyzerStore {
                 ON analyzer_jobs(request_id);
             CREATE INDEX IF NOT EXISTS idx_analyzer_track
                 ON analyzer_jobs(track_id, category);
+            CREATE INDEX IF NOT EXISTS idx_analyzer_batch
+                ON analyzer_jobs(batch_id);
         `);
+        this.migrate();
+    }
+
+    /**
+     * Forward-only migrations for DBs created by older companion versions.
+     *
+     * Two breaking changes need patching on existing installs:
+     *  1. The original CHECK(category IN (...)) omitted 'metadata', so every
+     *     metadata job insert threw "CHECK constraint failed" — the regression
+     *     that made the new metadata analyzer lane crash.
+     *  2. The batch columns (batch_id / batch_label) group all sub-jobs of a
+     *     single "Start analysis" run into one logical job.
+     *
+     * SQLite can't ALTER a CHECK constraint, so when the stored DDL is stale we
+     * rebuild the table; missing columns are added with ADD COLUMN.
+     */
+    private migrate() {
+        const row = this.db
+            .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='analyzer_jobs'`)
+            .get() as { sql?: string } | undefined;
+        const ddl = row?.sql ?? "";
+
+        // Stale CHECK constraint (pre-metadata) → full rebuild preserving rows.
+        if (ddl && !ddl.includes("'metadata'")) {
+            this.db.exec(`
+                BEGIN;
+                ALTER TABLE analyzer_jobs RENAME TO analyzer_jobs_old;
+                CREATE TABLE analyzer_jobs (
+                    id            TEXT PRIMARY KEY,
+                    request_id    TEXT NOT NULL,
+                    category      TEXT NOT NULL CHECK(category IN ('dsp','stems','fingerprint','metadata')),
+                    track_id      INTEGER NOT NULL,
+                    path          TEXT NOT NULL,
+                    options       TEXT NOT NULL,
+                    state         TEXT NOT NULL CHECK(state IN ('queued','running','done','error','canceled')),
+                    progress      REAL NOT NULL DEFAULT 0,
+                    stage         TEXT NOT NULL DEFAULT 'queued',
+                    message       TEXT NOT NULL DEFAULT '',
+                    error         TEXT,
+                    stems_model   TEXT,
+                    enqueued_at   INTEGER NOT NULL,
+                    started_at    INTEGER,
+                    finished_at   INTEGER,
+                    data          TEXT,
+                    batch_id      TEXT,
+                    batch_label   TEXT
+                );
+                INSERT INTO analyzer_jobs (
+                    id, request_id, category, track_id, path, options,
+                    state, progress, stage, message, error, stems_model,
+                    enqueued_at, started_at, finished_at, data
+                )
+                SELECT
+                    id, request_id, category, track_id, path, options,
+                    state, progress, stage, message, error, stems_model,
+                    enqueued_at, started_at, finished_at, data
+                FROM analyzer_jobs_old;
+                DROP TABLE analyzer_jobs_old;
+                CREATE INDEX IF NOT EXISTS idx_analyzer_state_cat
+                    ON analyzer_jobs(state, category, enqueued_at);
+                CREATE INDEX IF NOT EXISTS idx_analyzer_request
+                    ON analyzer_jobs(request_id);
+                CREATE INDEX IF NOT EXISTS idx_analyzer_track
+                    ON analyzer_jobs(track_id, category);
+                CREATE INDEX IF NOT EXISTS idx_analyzer_batch
+                    ON analyzer_jobs(batch_id);
+                COMMIT;
+            `);
+            return;
+        }
+
+        // CHECK is fine but batch columns may be missing (added separately).
+        const cols = this.db
+            .prepare(`PRAGMA table_info(analyzer_jobs)`)
+            .all() as Array<{ name: string }>;
+        const have = new Set(cols.map((c) => c.name));
+        if (!have.has("batch_id")) {
+            this.db.exec(`ALTER TABLE analyzer_jobs ADD COLUMN batch_id TEXT`);
+        }
+        if (!have.has("batch_label")) {
+            this.db.exec(`ALTER TABLE analyzer_jobs ADD COLUMN batch_label TEXT`);
+        }
+        this.db.exec(
+            `CREATE INDEX IF NOT EXISTS idx_analyzer_batch ON analyzer_jobs(batch_id)`,
+        );
     }
 
     private prepare() {
@@ -110,11 +207,13 @@ export class AnalyzerStore {
                 INSERT INTO analyzer_jobs (
                     id, request_id, category, track_id, path, options,
                     state, progress, stage, message, error, stems_model,
-                    enqueued_at, started_at, finished_at, data
+                    enqueued_at, started_at, finished_at, data,
+                    batch_id, batch_label
                 ) VALUES (
                     @id, @requestId, @category, @trackId, @path, @options,
                     @state, @progress, @stage, @message, @error, @stemsModel,
-                    @enqueuedAt, @startedAt, @finishedAt, @data
+                    @enqueuedAt, @startedAt, @finishedAt, @data,
+                    @batchId, @batchLabel
                 )
             `),
             updateState: this.db.prepare(`
@@ -156,7 +255,8 @@ export class AnalyzerStore {
                        path, options, state, progress, stage, message, error,
                        stems_model AS stemsModel,
                        enqueued_at AS enqueuedAt, started_at AS startedAt,
-                       finished_at AS finishedAt, data
+                       finished_at AS finishedAt, data,
+                       batch_id AS batchId, batch_label AS batchLabel
                 FROM analyzer_jobs
                 WHERE state IN ('queued','running')
                   AND category = ?
@@ -167,7 +267,8 @@ export class AnalyzerStore {
                        path, options, state, progress, stage, message, error,
                        stems_model AS stemsModel,
                        enqueued_at AS enqueuedAt, started_at AS startedAt,
-                       finished_at AS finishedAt, data
+                       finished_at AS finishedAt, data,
+                       batch_id AS batchId, batch_label AS batchLabel
                 FROM analyzer_jobs
                 WHERE state IN ('done','error','canceled')
                 ORDER BY finished_at DESC, id DESC
@@ -178,7 +279,8 @@ export class AnalyzerStore {
                        path, options, state, progress, stage, message, error,
                        stems_model AS stemsModel,
                        enqueued_at AS enqueuedAt, started_at AS startedAt,
-                       finished_at AS finishedAt, data
+                       finished_at AS finishedAt, data,
+                       batch_id AS batchId, batch_label AS batchLabel
                 FROM analyzer_jobs
                 WHERE state IN ('queued','running')
                 ORDER BY enqueued_at ASC, id ASC
@@ -201,6 +303,31 @@ export class AnalyzerStore {
                 WHERE state IN ('done','error')
                   AND finished_at IS NOT NULL
                   AND finished_at >= ?
+            `),
+            // One row per batch with live aggregate counts. Drives the
+            // /analysis "jobs" list — one logical job per "Start analysis"
+            // run instead of one row per (track × category) sub-job.
+            listBatches: this.db.prepare(`
+                SELECT
+                    batch_id   AS batchId,
+                    MAX(batch_label) AS label,
+                    COUNT(*)   AS total,
+                    SUM(CASE WHEN state = 'queued'   THEN 1 ELSE 0 END) AS queued,
+                    SUM(CASE WHEN state = 'running'  THEN 1 ELSE 0 END) AS running,
+                    SUM(CASE WHEN state = 'done'     THEN 1 ELSE 0 END) AS done,
+                    SUM(CASE WHEN state = 'error'    THEN 1 ELSE 0 END) AS errored,
+                    SUM(CASE WHEN state = 'canceled' THEN 1 ELSE 0 END) AS canceled,
+                    MIN(enqueued_at) AS enqueuedAt,
+                    MIN(started_at)  AS startedAt,
+                    MAX(CASE WHEN state IN ('queued','running') THEN NULL
+                             ELSE finished_at END) AS finishedAt,
+                    GROUP_CONCAT(DISTINCT category) AS categories,
+                    AVG(progress) AS avgProgress
+                FROM analyzer_jobs
+                WHERE batch_id IS NOT NULL
+                GROUP BY batch_id
+                ORDER BY MIN(enqueued_at) DESC
+                LIMIT ?
             `),
         };
     }
@@ -297,6 +424,70 @@ export class AnalyzerStore {
             total: row?.total ?? 0,
         };
     }
+
+    /**
+     * One row per batch ("Start analysis" run) with live aggregate counts.
+     * This is the canonical "jobs" list for the /analysis page: a single run
+     * over the whole library is ONE job containing many item sub-jobs.
+     */
+    listBatches(limit = 50): BatchSummary[] {
+        const rows = this.stmts.listBatches.all(limit) as Array<{
+            batchId: string;
+            label: string | null;
+            total: number;
+            queued: number;
+            running: number;
+            done: number;
+            errored: number;
+            canceled: number;
+            enqueuedAt: number;
+            startedAt: number | null;
+            finishedAt: number | null;
+            categories: string | null;
+            avgProgress: number | null;
+        }>;
+        return rows.map((r) => {
+            const finishedCount = r.done + r.errored + r.canceled;
+            const active = r.queued + r.running > 0;
+            return {
+                batchId: r.batchId,
+                label: r.label ?? "Analysis",
+                total: r.total,
+                queued: r.queued,
+                running: r.running,
+                done: r.done,
+                errored: r.errored,
+                canceled: r.canceled,
+                finished: finishedCount,
+                progress: r.total > 0 ? finishedCount / r.total : 0,
+                state: active ? "running" : r.errored > 0 ? "error" : "done",
+                categories: (r.categories ?? "")
+                    .split(",")
+                    .filter(Boolean) as Category[],
+                enqueuedAt: r.enqueuedAt,
+                startedAt: r.startedAt,
+                finishedAt: active ? null : r.finishedAt,
+            };
+        });
+    }
+}
+
+export interface BatchSummary {
+    batchId: string;
+    label: string;
+    total: number;
+    queued: number;
+    running: number;
+    done: number;
+    errored: number;
+    canceled: number;
+    finished: number;
+    progress: number;
+    state: "running" | "done" | "error";
+    categories: Category[];
+    enqueuedAt: number;
+    startedAt: number | null;
+    finishedAt: number | null;
 }
 
 let _store: AnalyzerStore | null = null;

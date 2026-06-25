@@ -537,7 +537,27 @@ export interface AnalyzerJob {
 
 /** Companion 0.9+ splits analysis across three independent worker
  *  lanes that run truly concurrently (disjoint resources). */
-export type Category = "dsp" | "stems" | "fingerprint";
+export type Category = "dsp" | "stems" | "fingerprint" | "metadata";
+
+/** One "Start analysis" run = one logical job (batch) containing many item
+ *  sub-jobs. Mirrors the companion's BatchSummary. */
+export interface AnalyzerBatch {
+    batchId: string;
+    label: string;
+    total: number;
+    queued: number;
+    running: number;
+    done: number;
+    errored: number;
+    canceled: number;
+    finished: number;
+    progress: number;
+    state: "running" | "done" | "error";
+    categories: Category[];
+    enqueuedAt: number;
+    startedAt: number | null;
+    finishedAt: number | null;
+}
 
 export interface LaneStatus {
     category: Category;
@@ -606,8 +626,11 @@ export const companionAnalyzer = {
     async health(link: CompanionLink): Promise<AnalyzerHealth> {
         return call<AnalyzerHealth>(link, "GET", `/analyze/health`);
     },
-    async start(link: CompanionLink, trackIds: number[], options: AnalyzeOptions): Promise<{ jobs: Array<{ id: string; trackId: number }> }> {
-        return call(link, "POST", `/analyze`, { trackIds, options });
+    async start(link: CompanionLink, trackIds: number[], options: AnalyzeOptions, batch?: { id: string; label: string }): Promise<{ jobs: Array<{ id: string; trackId: number }>; batchId?: string }> {
+        return call(link, "POST", `/analyze`, { trackIds, options, batchId: batch?.id, batchLabel: batch?.label });
+    },
+    async batches(link: CompanionLink, limit = 50): Promise<{ batches: AnalyzerBatch[] }> {
+        return call(link, "GET", `/analyze/batches?limit=${limit}`);
     },
     async status(link: CompanionLink, sinceMs?: number): Promise<AnalyzerStatus> {
         const qs = sinceMs && sinceMs > 0 ? `?since=${sinceMs}` : "";

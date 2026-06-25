@@ -58,6 +58,7 @@ import {
     getAnalyzerHealth,
     getAnalyzerLogs,
     getAnalyzerStatus,
+    getAnalyzerBatches,
     getAnalysisScope,
     installGpuSupport,
     pauseAnalyzerLane,
@@ -72,6 +73,7 @@ import type { AnalysisScope } from "@/actions/analyze";
 import type {
     AnalyzerHealth,
     AnalyzerJob,
+    AnalyzerBatch,
     AnalyzerLogEntry,
     AnalyzerStatus,
     Category,
@@ -108,6 +110,11 @@ export function AnalysisClient() {
     // Status (queue + current + completed)
     const [status, setStatus] = useState<AnalyzerStatus | null>(null);
     const [scope, setScope] = useState<AnalysisScope | null>(null);
+
+    // Jobs list: one row per "Start analysis" run (a batch) with many item
+    // sub-jobs. This is the canonical jobs view; the lanes/queue below show the
+    // live worker detail.
+    const [batches, setBatches] = useState<AnalyzerBatch[]>([]);
 
     // Logs
     const [logs, setLogs] = useState<AnalyzerLogEntry[]>([]);
@@ -187,6 +194,9 @@ export function AnalysisClient() {
             } else {
                 setStatus(s);
             }
+            // Refresh the per-run jobs list alongside status (same cadence).
+            const b = await getAnalyzerBatches(50);
+            if (!cancelled && !("error" in b)) setBatches(b.batches);
             const cadence = !health?.ok
                 ? POLL_STATUS_OFFLINE_MS
                 : (s && !("error" in s) && (s.current || s.queue.length > 0))
@@ -517,6 +527,7 @@ export function AnalysisClient() {
                 {/* Left column: live job + queue + completed */}
                 <section className="lg:col-span-8 space-y-4">
                     <BatchProgressCard stats={batchStats} />
+                    <JobsCard batches={batches} />
                     {status?.lanes && status.lanes.length > 0 ? (
                         <LanesPanel
                             lanes={status.lanes}
@@ -707,6 +718,13 @@ const LANE_META: Record<Category, { label: string; description: string; color: s
         icon: ScanSearch,
         badge: "border-sky-500/40 bg-sky-500/10 text-sky-200",
     },
+    metadata: {
+        label: "Metadata",
+        description: "Tags · cover · lyrics",
+        color: "from-amber-500/20 to-amber-500/5 border-amber-500/30",
+        icon: Music2,
+        badge: "border-amber-500/40 bg-amber-500/10 text-amber-200",
+    },
 };
 
 /** Compact lane badge used in queue/completed lists so the user can tell
@@ -848,6 +866,70 @@ function LanesPanel({
                 })}
             </div>
         </div>
+    );
+}
+
+/** Jobs list — one row per "Start analysis" run (a batch). Each batch is a
+ *  single logical job containing many item sub-jobs; the row shows aggregate
+ *  progress and per-item done/error counts. */
+function JobsCard({ batches }: { batches: AnalyzerBatch[] }) {
+    return (
+        <Card
+            title={`Jobs (${batches.length})`}
+            icon={<Layers className="h-3.5 w-3.5 text-sky-300" />}
+        >
+            {batches.length === 0 ? (
+                <div className="py-6 text-center text-xs text-white/40">
+                    No analysis runs yet
+                </div>
+            ) : (
+                <ul className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                    {batches.map((b) => {
+                        const pct = Math.round((b.progress ?? 0) * 100);
+                        const stateColor =
+                            b.state === "error" ? "text-rose-300"
+                            : b.state === "done" ? "text-emerald-300"
+                            : "text-sky-300";
+                        const barColor =
+                            b.state === "error" ? "bg-rose-400/70"
+                            : b.state === "done" ? "bg-emerald-400/70"
+                            : "bg-sky-400/70";
+                        return (
+                            <li
+                                key={b.batchId}
+                                className="rounded-lg border border-white/5 bg-white/5 px-3 py-2"
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="flex items-center gap-1.5 min-w-0">
+                                        {b.categories.map((c) => (
+                                            <CategoryBadge key={c} category={c} />
+                                        ))}
+                                        <span className="truncate text-xs text-white/80">
+                                            {b.label}
+                                        </span>
+                                    </span>
+                                    <span className={`shrink-0 text-[10px] font-medium uppercase tracking-wide ${stateColor}`}>
+                                        {b.state === "running" ? `${pct}%` : b.state}
+                                    </span>
+                                </div>
+                                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/10">
+                                    <div
+                                        className={`h-full rounded-full transition-all ${barColor}`}
+                                        style={{ width: `${pct}%` }}
+                                    />
+                                </div>
+                                <div className="mt-1 flex items-center gap-3 text-[10px] text-white/40">
+                                    <span>{b.finished}/{b.total} items</span>
+                                    {b.running > 0 && <span className="text-sky-300/80">{b.running} running</span>}
+                                    {b.queued > 0 && <span>{b.queued} queued</span>}
+                                    {b.errored > 0 && <span className="text-rose-300/80">{b.errored} failed</span>}
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </Card>
     );
 }
 

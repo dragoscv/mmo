@@ -16,6 +16,8 @@ import { fetchAllMetadata } from "@/lib/metadata-services";
 import {
     companionLibrary, companionAnalyzer, getCompanionLink, getAllCompanionLinks,
     type CompanionTrack, type AnalyzeOptions, type AnalyzerHealth, type AnalyzerStatus,
+    type AnalyzerBatch,
+    type Category,
     type AnalyzerLogEntry, type GpuInfo,
 } from "@/lib/companion-library";
 import { getAnalysisScopeFromCloud, getTracksFromCloud, applyTrackFieldsToCloud } from "@/lib/cloud-library";
@@ -387,6 +389,28 @@ export async function getAnalyzerStatus(sinceMs?: number): Promise<AnalyzerStatu
     catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
 }
 
+/** Aggregate the per-run "jobs" (batches) across every online companion.
+ *  One "Start analysis" run is a single batch containing many item sub-jobs;
+ *  this is the canonical jobs list for the /analysis page. */
+export async function getAnalyzerBatches(limit = 50): Promise<{ batches: AnalyzerBatch[]; error?: string }> {
+    const links = await getAllCompanionLinks();
+    const targets = links.filter((l) => l.online);
+    if (targets.length === 0) {
+        const single = await getCompanionLink();
+        if (!single) return { batches: [], error: "Companion not connected" };
+        targets.push({ ...single, name: "companion", online: true, lastSeenAt: new Date() });
+    }
+    const all: AnalyzerBatch[] = [];
+    for (const link of targets) {
+        try {
+            const r = await companionAnalyzer.batches(link, limit);
+            all.push(...r.batches);
+        } catch { /* skip offline/erroring companion */ }
+    }
+    all.sort((a, b) => b.enqueuedAt - a.enqueuedAt);
+    return { batches: all.slice(0, limit) };
+}
+
 export async function cancelAnalyzerJob(jobId: string): Promise<{ canceled: boolean; error?: string }> {
     const link = await getCompanionLink();
     if (!link) return { canceled: false, error: "Companion not connected" };
@@ -404,7 +428,7 @@ export async function retryAnalyzerJob(jobId: string): Promise<{ jobId?: string;
     catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
 }
 
-export async function clearAnalyzerQueue(category: "dsp" | "stems" | "fingerprint" | "all" = "all"): Promise<{ removed: number; error?: string }> {
+export async function clearAnalyzerQueue(category: Category | "all" = "all"): Promise<{ removed: number; error?: string }> {
     const link = await getCompanionLink();
     if (!link) return { removed: 0, error: "Companion not connected" };
     try {
@@ -416,7 +440,7 @@ export async function clearAnalyzerQueue(category: "dsp" | "stems" | "fingerprin
 
 /** Pause one analyzer lane (or all). The currently-running sub-job
  *  in that lane finishes; new work is held until {@link resumeAnalyzerLane}. */
-export async function pauseAnalyzerLane(category: "dsp" | "stems" | "fingerprint" | "all" = "all"): Promise<{ paused: boolean; error?: string }> {
+export async function pauseAnalyzerLane(category: Category | "all" = "all"): Promise<{ paused: boolean; error?: string }> {
     const link = await getCompanionLink();
     if (!link) return { paused: false, error: "Companion not connected" };
     try {
@@ -426,7 +450,7 @@ export async function pauseAnalyzerLane(category: "dsp" | "stems" | "fingerprint
     catch (e) { return { paused: false, error: e instanceof Error ? e.message : String(e) }; }
 }
 
-export async function resumeAnalyzerLane(category: "dsp" | "stems" | "fingerprint" | "all" = "all"): Promise<{ paused: boolean; error?: string }> {
+export async function resumeAnalyzerLane(category: Category | "all" = "all"): Promise<{ paused: boolean; error?: string }> {
     const link = await getCompanionLink();
     if (!link) return { paused: true, error: "Companion not connected" };
     try {
@@ -534,6 +558,18 @@ export async function startBulkDspAnalysis(
     let skipped = 0;
     let tracksTouched = 0;
     const PAGE = 200;
+    // One logical job per "Start analysis" run. The same batch id is shared
+    // across pages and across every targeted companion so the /analysis UI
+    // groups the whole run into a single job with many item sub-jobs.
+    const batchId = crypto.randomUUID();
+    const cats = [
+        options.dsp && "DSP",
+        options.stems && "Stems",
+        options.fingerprint && "Fingerprint",
+        options.metadata && "Metadata",
+    ].filter(Boolean).join(" · ") || "Analysis";
+    const batchLabel = forceReanalyze ? `${cats} · re-analyze` : cats;
+    const batch = { id: batchId, label: batchLabel };
     try {
       for (const link of targets) {
         let page = 1;
@@ -584,7 +620,7 @@ export async function startBulkDspAnalysis(
                     metadata: key.includes("m"),
                     metaFields: options.metaFields,
                 };
-                const r = await companionAnalyzer.start(link, ids, narrowed);
+                const r = await companionAnalyzer.start(link, ids, narrowed, batch);
                 enqueued += r.jobs.length;
             }
 

@@ -78,6 +78,15 @@ export interface AnalyzeJob {
     id: string;
     /** Groups sub-jobs from the same enqueue() call (track + multi-cat options). */
     requestId: string;
+    /**
+     * Groups every sub-job of a single "Start analysis" run (potentially
+     * thousands of tracks across multiple categories) into ONE logical job.
+     * Surfaced on the /analysis page as a single job row. Optional for
+     * single-track / legacy enqueues.
+     */
+    batchId?: string;
+    /** Human label for the batch (e.g. "Metadata · 8,607 tracks"). */
+    batchLabel?: string;
     /** Which lane owns this sub-job. */
     category: Category;
     trackId: number;
@@ -203,6 +212,8 @@ function persistedToJob(p: PersistedJob): AnalyzeJob {
     return {
         id: p.id,
         requestId: p.requestId,
+        batchId: p.batchId ?? undefined,
+        batchLabel: p.batchLabel ?? undefined,
         category: p.category,
         trackId: p.trackId,
         path: p.path,
@@ -283,6 +294,7 @@ class Worker extends EventEmitter {
                     stemsModel: j.options.stemsModel ?? null,
                     enqueuedAt: j.enqueuedAt,
                     startedAt: null, finishedAt: null, data: null,
+                    batchId: j.batchId ?? null, batchLabel: j.batchLabel ?? null,
                 });
             }
             this.queueMem.push(j);
@@ -1012,7 +1024,12 @@ class Analyzer extends EventEmitter {
      *  enqueue them. Returns the FIRST sub-job (for backwards compat
      *  with code that polls `.id`). To track all sub-jobs use
      *  `.requestId` and `findByRequest()`. */
-    enqueue(trackId: number, audioPath: string, options: AnalyzeOptions): AnalyzeJob {
+    enqueue(
+        trackId: number,
+        audioPath: string,
+        options: AnalyzeOptions,
+        batch?: { id: string; label: string },
+    ): AnalyzeJob {
         this.ensureRehydrated();
         const requestId = randomUUID();
         const now = Date.now();
@@ -1022,6 +1039,8 @@ class Analyzer extends EventEmitter {
             const j: AnalyzeJob = {
                 id: randomUUID(),
                 requestId, category,
+                batchId: batch?.id,
+                batchLabel: batch?.label,
                 trackId, path: audioPath,
                 options: narrowed,
                 enqueuedAt: now,
@@ -1036,6 +1055,7 @@ class Analyzer extends EventEmitter {
                 state: "queued", progress: 0, stage: "queued", message: "Queued",
                 error: null, stemsModel: narrowed.stemsModel ?? null,
                 enqueuedAt: now, startedAt: null, finishedAt: null, data: null,
+                batchId: batch?.id ?? null, batchLabel: batch?.label ?? null,
             });
             return j;
         };
@@ -1074,6 +1094,14 @@ class Analyzer extends EventEmitter {
                 queueDepth: w.queueDepth(),
             };
         });
+    }
+
+    /** One row per batch ("Start analysis" run) with live aggregate counts.
+     *  This is the canonical "jobs" list for the /analysis UI: one logical
+     *  job per run, containing many item sub-jobs. */
+    batches(limit = 50) {
+        this.ensureRehydrated();
+        return this.store.listBatches(limit);
     }
 
     /** Backwards-compatible status: aggregates across lanes so the
