@@ -54,6 +54,7 @@ import {
 } from "./analyzer-store";
 import { getLibraryDb, getLibrarySqlite } from "./db";
 import { tracks } from "./schema";
+import { fetchAllMetadata } from "./metadata-services";
 
 export type { Category };
 
@@ -65,6 +66,12 @@ export interface AnalyzeOptions {
     stems?: boolean;
     /** Override the default stems model (`htdemucs_ft`). */
     stemsModel?: string;
+    /** Web-metadata lane: fetch genre/album/year/label/ISRC/artwork/lyrics/
+     *  BPM from MusicBrainz/iTunes/Deezer/CoverArtArchive/LRCLIB (in-process,
+     *  no python). */
+    metadata?: boolean;
+    /** Sub-flags for the metadata lane (default: all true when metadata set). */
+    metaFields?: { tags?: boolean; artwork?: boolean; lyrics?: boolean; bpm?: boolean };
 }
 
 export interface AnalyzeJob {
@@ -110,6 +117,20 @@ export interface AnalyzeResult {
      *  Resolution: 2000 pairs per track (≈ 2px each at 4K width). */
     waveformPeaksHex?: string;
     waveformPeaksCount?: number;
+    // ── Web-metadata lane fields ────────────────────────────────────
+    genre?: string;
+    album?: string;
+    year?: number;
+    label?: string;
+    isrc?: string;
+    artworkUrl?: string;
+    lyrics?: string;
+    syncedLyrics?: string;
+    musicbrainzId?: string;
+    releaseMbid?: string;
+    /** Set when the metadata lane ran (even if it found nothing) so the
+     *  per-category completion stamp lands. */
+    metadataChecked?: boolean;
     [k: `_${string}_error`]: string | undefined;
 }
 
@@ -532,6 +553,12 @@ class Worker extends EventEmitter {
             `[${this.category}] Starting track ${next.trackId} — ${path.basename(next.path)}`,
             next.id);
         this.parent.emit("progress", next);
+        // ── In-process metadata lane (no python sidecar) ────────────
+        if (this.category === "metadata") {
+            this.runMetadataJob(next)
+                .catch((e) => this.failCurrent(`metadata failed: ${e instanceof Error ? e.message : String(e)}`));
+            return;
+        }
         const cmd = {
             id: next.id,
             kind: "analyze",
@@ -543,6 +570,86 @@ class Worker extends EventEmitter {
         this.ensureProcess()
             .then((proc) => proc.stdin.write(JSON.stringify(cmd) + "\n"))
             .catch((e) => this.failCurrent(`enqueue failed: ${e instanceof Error ? e.message : String(e)}`));
+    }
+
+    /**
+     * Metadata lane runner — fetches genre/album/year/label/ISRC/artwork/
+     * lyrics/BPM from the free web services (MusicBrainz/iTunes/Deezer/
+     * CoverArtArchive/LRCLIB) and finishes the job in-process. Mirrors the
+     * python lanes' progress/result lifecycle so all the store, persistence
+     * and status plumbing is reused unchanged. Only fills EMPTY fields
+     * (never overwrites existing tags); always stamps completion so the
+     * track is marked analyzed even when nothing was found.
+     */
+    private async runMetadataJob(job: AnalyzeJob): Promise<void> {
+        const emit = (pct: number, message: string) => {
+            if (this.current?.id !== job.id) return;
+            job.progress = pct;
+            job.stage = "metadata";
+            job.message = message;
+            this.lastProgressAt = Date.now();
+            this.store.updateProgress(job.id, pct, "metadata", message);
+            this.parent.emit("progress", job);
+        };
+        emit(0.05, "Reading track…");
+
+        // Look up the track row for artist/title/album + which fields are empty.
+        const db = getLibraryDb();
+        const [row] = await db.select().from(tracks).where(eq(tracks.id, job.trackId)).limit(1);
+        if (!row) { this.failCurrent("track not found"); return; }
+
+        const mf = job.options.metaFields ?? { tags: true, artwork: true, lyrics: true, bpm: true };
+        emit(0.15, "Querying MusicBrainz, iTunes, Deezer, LRCLIB…");
+
+        let meta: Awaited<ReturnType<typeof fetchAllMetadata>>;
+        try {
+            meta = await fetchAllMetadata(
+                row.artist ?? "", row.title ?? row.filename ?? "", row.album ?? null,
+                row.duration ?? null,
+                { metadata: !!mf.tags, artwork: !!mf.artwork, lyrics: !!mf.lyrics, bpmKey: !!mf.bpm },
+            );
+        } catch (e) {
+            this.failCurrent(`lookup failed: ${e instanceof Error ? e.message : String(e)}`);
+            return;
+        }
+
+        emit(0.85, "Saving…");
+        // Only fill EMPTY fields. Build an AnalyzeResult so persistResult writes it.
+        const data: AnalyzeResult = { metadataChecked: true };
+        const empty = (v: unknown) => v == null || v === "";
+        if (mf.tags) {
+            if (empty(row.genre) && meta.genre) data.genre = meta.genre;
+            if (empty(row.album) && meta.album) data.album = meta.album;
+            if (empty(row.year) && meta.year) data.year = meta.year;
+            if (empty(row.label) && meta.label) data.label = meta.label;
+            if (empty(row.isrc) && meta.isrc) data.isrc = meta.isrc;
+            if (empty(row.musicbrainzId) && meta.musicbrainzId) data.musicbrainzId = meta.musicbrainzId;
+            if (empty(row.releaseMbid) && meta.releaseMbid) data.releaseMbid = meta.releaseMbid;
+        }
+        if (mf.artwork && empty(row.artworkUrl) && meta.artworkUrl) data.artworkUrl = meta.artworkUrl;
+        if (mf.lyrics) {
+            if (empty(row.lyrics) && meta.lyrics) data.lyrics = meta.lyrics;
+            if (empty(row.syncedLyrics) && meta.syncedLyrics) data.syncedLyrics = meta.syncedLyrics;
+        }
+        if (mf.bpm && empty(row.bpm) && meta.bpm) data.bpm = meta.bpm;
+
+        job.finishedAt = Date.now();
+        job.data = data;
+        job.stage = "done";
+        job.progress = 1;
+        job.message = "Complete";
+        job.state = "done";
+        this.store.finish(job.id, "done", {
+            progress: 1, stage: "done", message: "Complete",
+            data, finishedAt: job.finishedAt,
+        });
+        const elapsed = job.startedAt ? ((job.finishedAt - job.startedAt) / 1000).toFixed(1) : "?";
+        this.parent.pushLog("info", `[metadata] Track ${job.trackId} done in ${elapsed}s`, job.id);
+        this.parent.recordCompleted(job);
+        this.parent.emit("complete", job);
+        this.current = null;
+        this.stopStallWatchdog();
+        this.pump();
     }
 
     private startStallWatchdog() {
@@ -604,6 +711,7 @@ class Analyzer extends EventEmitter {
             dsp: new Worker("dsp", this.store, this),
             stems: new Worker("stems", this.store, this),
             fingerprint: new Worker("fingerprint", this.store, this),
+            metadata: new Worker("metadata", this.store, this),
         };
         // CRITICAL: wire library-DB persistence BEFORE the rehydrate
         // microtask fires. Otherwise jobs that complete on a fresh
@@ -724,6 +832,26 @@ class Analyzer extends EventEmitter {
             stemsTouched = true;
         }
 
+        // ── Web-metadata fields (in-process metadata lane) ──────────
+        let metaTouched = false;
+        if (data.metadataChecked) {
+            if (data.genre) update.genre = data.genre;
+            if (data.album) update.album = data.album;
+            if (typeof data.year === "number") update.year = data.year;
+            if (data.label) update.label = data.label;
+            if (data.isrc) update.isrc = data.isrc;
+            if (data.artworkUrl) update.artworkUrl = data.artworkUrl;
+            if (data.lyrics) update.lyrics = data.lyrics;
+            if (data.syncedLyrics) update.syncedLyrics = data.syncedLyrics;
+            if (data.musicbrainzId) update.musicbrainzId = data.musicbrainzId;
+            if (data.releaseMbid) update.releaseMbid = data.releaseMbid;
+            if (typeof data.bpm === "number" && update.bpm == null) update.bpm = data.bpm;
+            // Always stamp metadata completion (even with no new fields) so the
+            // bulk skip-filter advances and re-runs resume on the rest.
+            update.analyzedAt = new Date().toISOString();
+            metaTouched = true;
+        }
+
         // Stamp DSP completion ONLY when DSP fields actually landed —
         // otherwise a fingerprint-only or stems-only run would falsely
         // mark DSP as done and the bulk-analyze skip filter would skip
@@ -761,6 +889,7 @@ class Analyzer extends EventEmitter {
         if (dspTouched) parts.push("dsp");
         if (stemsTouched) parts.push("stems");
         if (fpTouched) parts.push("fp");
+        if (metaTouched) parts.push("metadata");
         this.pushLog("info",
             `Persisted track ${job.trackId} → ${parts.join("+")}`, job.id);
 
@@ -838,7 +967,7 @@ class Analyzer extends EventEmitter {
             this.pushLog("info", "Analyzer ready — no pending jobs");
             return;
         }
-        const byCat: Record<Category, AnalyzeJob[]> = { dsp: [], stems: [], fingerprint: [] };
+        const byCat: Record<Category, AnalyzeJob[]> = { dsp: [], stems: [], fingerprint: [], metadata: [] };
         for (const r of rows) byCat[r.category].push(persistedToJob(r));
         for (const cat of CATEGORIES) {
             if (byCat[cat].length > 0) this.workers[cat].rehydrate(byCat[cat]);
@@ -914,6 +1043,7 @@ class Analyzer extends EventEmitter {
         if (options.dsp) subjobs.push(make("dsp", { dsp: true }));
         if (options.fingerprint) subjobs.push(make("fingerprint", { fingerprint: true }));
         if (options.stems) subjobs.push(make("stems", { stems: true, stemsModel: options.stemsModel }));
+        if (options.metadata) subjobs.push(make("metadata", { metadata: true, metaFields: options.metaFields }));
 
         if (subjobs.length === 0) {
             // Behave like the old API: enqueue a no-op DSP job that

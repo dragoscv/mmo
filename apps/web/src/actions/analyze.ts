@@ -516,7 +516,7 @@ export async function getAnalyzerLogs(
  *  CPU separation work. The caller should warn before invoking. */
 export async function startBulkDspAnalysis(
     options: AnalyzeOptions,
-    filter: "all" | "missing-dsp" | "missing-stems" = "missing-dsp",
+    filter: "all" | "missing-dsp" | "missing-stems" | "missing-metadata" = "missing-dsp",
     forceReanalyze = false,
 ): Promise<{ enqueued: number; skipped: number; tracksTouched: number; error?: string }> {
     // Multi-companion: enqueue across EVERY online companion so a user with
@@ -545,6 +545,7 @@ export async function startBulkDspAnalysis(
                 if (filter === "all") return true;
                 if (filter === "missing-dsp") return !t.dspAnalyzedAt;
                 if (filter === "missing-stems") return t.stemsStatus !== "ready";
+                if (filter === "missing-metadata") return !t.analyzedAt;
                 return true;
             });
 
@@ -559,14 +560,15 @@ export async function startBulkDspAnalysis(
                 const wantDsp = !!options.dsp && (forceReanalyze || !t.dspAnalyzedAt);
                 const wantStems = !!options.stems && (forceReanalyze || t.stemsStatus !== "ready");
                 const wantFp = !!options.fingerprint && (forceReanalyze || !t.acoustidFingerprint);
-                if (!wantDsp && !wantStems && !wantFp) {
+                const wantMeta = !!options.metadata && (forceReanalyze || !t.analyzedAt);
+                if (!wantDsp && !wantStems && !wantFp && !wantMeta) {
                     skipped++;
                     continue;
                 }
                 tracksTouched++;
                 // Bucket by options-shape so we make one bulk-start
                 // call per distinct narrowed-options combination.
-                const key = `${wantDsp ? "d" : ""}${wantStems ? "s" : ""}${wantFp ? "f" : ""}`;
+                const key = `${wantDsp ? "d" : ""}${wantStems ? "s" : ""}${wantFp ? "f" : ""}${wantMeta ? "m" : ""}`;
                 const arr = buckets.get(key);
                 if (arr) arr.push(t.id);
                 else buckets.set(key, [t.id]);
@@ -579,6 +581,8 @@ export async function startBulkDspAnalysis(
                     stems: key.includes("s"),
                     fingerprint: key.includes("f"),
                     stemsModel: options.stemsModel,
+                    metadata: key.includes("m"),
+                    metaFields: options.metaFields,
                 };
                 const r = await companionAnalyzer.start(link, ids, narrowed);
                 enqueued += r.jobs.length;

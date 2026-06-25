@@ -24,8 +24,8 @@
 import type { Database as SqliteDatabase } from "better-sqlite3";
 import { getLibrarySqlite } from "./db";
 
-export type Category = "dsp" | "stems" | "fingerprint";
-export const CATEGORIES: readonly Category[] = ["dsp", "stems", "fingerprint"] as const;
+export type Category = "dsp" | "stems" | "fingerprint" | "metadata";
+export const CATEGORIES: readonly Category[] = ["dsp", "stems", "fingerprint", "metadata"] as const;
 
 export type JobState = "queued" | "running" | "done" | "error" | "canceled";
 

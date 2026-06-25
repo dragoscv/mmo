@@ -14,9 +14,9 @@ import {
     AnalysisContext,
     type AnalysisContextValue,
 } from "@/hooks/analysis-context";
-import { AnalyzeModal } from "@/components/analyze-modal-v2";
 import { AnalysisFloatingStatus } from "@/components/analysis-floating-status";
 import { useRenderCount } from "@/lib/dev-debugger";
+import { useRouter } from "next/navigation";
 
 export { useAnalysisContext } from "@/hooks/analysis-context";
 
@@ -45,6 +45,7 @@ function saveModalOpen(open: boolean) {
 
 export function AnalysisProvider({ children }: { children: ReactNode }) {
     useRenderCount("AnalysisProvider");
+    const router = useRouter();
     const [modalOpen, setModalOpen] = useState(false);
 
     // SSE should be connected when analysis is active OR modal is open
@@ -88,7 +89,8 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
         });
     }, []);
 
-    const openModal = useCallback(() => handleModalChange(true), [handleModalChange]);
+    // The modal is gone — all analysis lives on /analysis. "Open" routes there.
+    const openModal = useCallback(() => router.push("/analysis"), [router]);
     const closeModal = useCallback(() => handleModalChange(false), [handleModalChange]);
 
     const value: AnalysisContextValue = {
@@ -105,13 +107,12 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
         applyChanges: analysis.applyChanges,
     };
 
-    // Show floating status when analysis is active but modal is closed
-    const showFloating = !modalOpen && (isActive || needsReview);
+    // Show floating status when analysis is active.
+    const showFloating = isActive || needsReview;
 
     return (
         <AnalysisContext.Provider value={value}>
             {children}
-            <AnalyzeModal open={modalOpen} onOpenChange={handleModalChange} />
             {showFloating && (
                 <AnalysisFloatingStatus
                     status={analysis.status}

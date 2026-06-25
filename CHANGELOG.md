@@ -12,6 +12,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed — metadata analysis moved to the companion (`apps/web` `0.7.2`, companion `1.0.37`)
+
+- **The "What to Fetch" metadata analysis (Metadata/Artwork/Lyrics/BPM-web) is
+  now a 4th companion analyzer lane ("metadata")** instead of a client-side
+  modal loop. This fixes the bug where, after a few items, the page refreshed
+  and the whole run was lost (the old loop held progress in browser/serverless
+  memory). It now runs fully in the background on the companion, survives
+  refresh, and **stores each track immediately** (no review step).
+- **The analyze modal is removed.** All analysis lives on the **/analysis page**:
+  config (DSP/Stems/Fingerprint/Web-metadata + sub-fields), the live job queue,
+  per-lane status & progress, and the log console. "Analyze"/"Reanalyze" buttons
+  and the floating widget now route to /analysis.
+- Companion: in-process metadata lane (MusicBrainz/iTunes/Deezer/CoverArtArchive/
+  LRCLIB via fetch — no python); only fills EMPTY fields; stamps `analyzedAt` so
+  re-runs resume on the remainder. Results sync to cloud like DSP/stems/fp.
+
 ### Fixed/Added — real-time metadata analysis + cloud prune (`apps/web` `0.7.1`)
 
 - **Metadata analysis ("What to Fetch": Metadata/Artwork/Lyrics/BPM) now saves

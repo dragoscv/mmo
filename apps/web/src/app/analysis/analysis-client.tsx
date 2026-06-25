@@ -93,6 +93,7 @@ const STAGE_META: Record<string, { label: string; color: string }> = {
     dsp: { label: "DSP", color: "text-blue-300" },
     fp: { label: "Fingerprint", color: "text-violet-300" },
     stems: { label: "Stems", color: "text-emerald-300" },
+    metadata: { label: "Metadata", color: "text-amber-300" },
     done: { label: "Done", color: "text-emerald-400" },
     error: { label: "Error", color: "text-rose-400" },
 };
@@ -116,8 +117,10 @@ export function AnalysisClient() {
     const logScrollRef = useRef<HTMLDivElement>(null);
 
     // Controls
-    const [opts, setOpts] = useState({ dsp: true, stems: false, fingerprint: false });
-    const [filter, setFilter] = useState<"all" | "missing-dsp" | "missing-stems">("missing-dsp");
+    const [opts, setOpts] = useState({ dsp: true, stems: false, fingerprint: false, metadata: false });
+    // Metadata sub-fields (the old modal's "What to Fetch").
+    const [metaFields, setMetaFields] = useState({ tags: true, artwork: true, lyrics: true, bpm: true });
+    const [filter, setFilter] = useState<"all" | "missing-dsp" | "missing-stems" | "missing-metadata">("missing-dsp");
     const [forceReanalyze, setForceReanalyze] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [lastResult, setLastResult] = useState<string | null>(null);
@@ -240,11 +243,15 @@ export function AnalysisClient() {
 
     // ─── Actions ────────────────────────────────────────────────────
     const startBulk = useCallback(async () => {
-        if (!opts.dsp && !opts.stems && !opts.fingerprint) return;
+        if (!opts.dsp && !opts.stems && !opts.fingerprint && !opts.metadata) return;
         setSubmitting(true);
         setLastResult(null);
         try {
-            const r = await startBulkDspAnalysis(opts, filter, forceReanalyze);
+            const r = await startBulkDspAnalysis(
+                { ...opts, metaFields },
+                filter,
+                forceReanalyze,
+            );
             if ("error" in r && r.error) setLastResult(`Error: ${r.error}`);
             else {
                 const parts = [`Enqueued ${r.enqueued} job(s)`];
@@ -255,7 +262,7 @@ export function AnalysisClient() {
         } finally {
             setSubmitting(false);
         }
-    }, [opts, filter, forceReanalyze]);
+    }, [opts, metaFields, filter, forceReanalyze]);
 
     const cancelCurrent = useCallback(async () => {
         if (!status?.current) return;
@@ -551,6 +558,8 @@ export function AnalysisClient() {
                         scope={scope}
                         opts={opts}
                         setOpts={setOpts}
+                        metaFields={metaFields}
+                        setMetaFields={setMetaFields}
                         filter={filter}
                         setFilter={setFilter}
                         forceReanalyze={forceReanalyze}
@@ -1249,6 +1258,8 @@ function ControlsCard({
     scope,
     opts,
     setOpts,
+    metaFields,
+    setMetaFields,
     filter,
     setFilter,
     forceReanalyze,
@@ -1259,17 +1270,19 @@ function ControlsCard({
 }: {
     health: AnalyzerHealth | null;
     scope: AnalysisScope | null;
-    opts: { dsp: boolean; stems: boolean; fingerprint: boolean };
-    setOpts: (o: { dsp: boolean; stems: boolean; fingerprint: boolean }) => void;
-    filter: "all" | "missing-dsp" | "missing-stems";
-    setFilter: (f: "all" | "missing-dsp" | "missing-stems") => void;
+    opts: { dsp: boolean; stems: boolean; fingerprint: boolean; metadata: boolean };
+    setOpts: (o: { dsp: boolean; stems: boolean; fingerprint: boolean; metadata: boolean }) => void;
+    metaFields: { tags: boolean; artwork: boolean; lyrics: boolean; bpm: boolean };
+    setMetaFields: (m: { tags: boolean; artwork: boolean; lyrics: boolean; bpm: boolean }) => void;
+    filter: "all" | "missing-dsp" | "missing-stems" | "missing-metadata";
+    setFilter: (f: "all" | "missing-dsp" | "missing-stems" | "missing-metadata") => void;
     forceReanalyze: boolean;
     setForceReanalyze: (v: boolean) => void;
     submitting: boolean;
     lastResult: string | null;
     onStart: () => void;
 }) {
-    const noneSelected = !opts.dsp && !opts.stems && !opts.fingerprint;
+    const noneSelected = !opts.dsp && !opts.stems && !opts.fingerprint && !opts.metadata;
     const disabled = submitting || !health?.ok || noneSelected;
 
     return (
@@ -1304,6 +1317,21 @@ function ControlsCard({
                         disabled={!health?.available?.pyacoustid}
                         onChange={(v) => setOpts({ ...opts, fingerprint: v })}
                     />
+                    <OptionToggle
+                        label="Web metadata"
+                        desc="Genre · Album · Year · Label · ISRC · Artwork · Lyrics · BPM"
+                        icon={<Sparkles className="h-3.5 w-3.5" />}
+                        checked={opts.metadata}
+                        onChange={(v) => setOpts({ ...opts, metadata: v })}
+                    />
+                    {opts.metadata && (
+                        <div className="ml-6 grid grid-cols-2 gap-1.5 rounded-lg border border-white/10 p-2">
+                            <SubToggle label="Metadata" checked={metaFields.tags} onChange={(v) => setMetaFields({ ...metaFields, tags: v })} />
+                            <SubToggle label="Artwork" checked={metaFields.artwork} onChange={(v) => setMetaFields({ ...metaFields, artwork: v })} />
+                            <SubToggle label="Lyrics" checked={metaFields.lyrics} onChange={(v) => setMetaFields({ ...metaFields, lyrics: v })} />
+                            <SubToggle label="BPM (web)" checked={metaFields.bpm} onChange={(v) => setMetaFields({ ...metaFields, bpm: v })} />
+                        </div>
+                    )}
                 </div>
 
                 {/* Scope */}
@@ -1311,11 +1339,12 @@ function ControlsCard({
                     <div className="text-[10px] uppercase tracking-wide text-white/50">
                         Scope
                     </div>
-                    <div className="grid grid-cols-3 gap-1 text-xs">
+                    <div className="grid grid-cols-2 gap-1 text-xs">
                         {(
                             [
                                 { v: "missing-dsp", l: "Missing DSP" },
                                 { v: "missing-stems", l: "Missing stems" },
+                                { v: "missing-metadata", l: "Missing metadata" },
                                 { v: "all", l: "Entire library" },
                             ] as const
                         ).map((o) => (
@@ -1875,6 +1904,29 @@ function OptionToggle({
                 </div>
                 <div className="text-[10px] text-white/50">{desc}</div>
             </div>
+        </button>
+    );
+}
+
+/** Compact checkbox for the metadata sub-fields (Metadata/Artwork/Lyrics/BPM). */
+function SubToggle({
+    label, checked, onChange,
+}: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+    return (
+        <button
+            onClick={() => onChange(!checked)}
+            className={cn(
+                "flex items-center gap-1.5 rounded px-2 py-1 text-left text-[11px] transition-colors",
+                checked ? "bg-amber-500/15 text-amber-200" : "bg-white/5 text-white/50 hover:bg-white/10",
+            )}
+        >
+            <span className={cn(
+                "flex h-3 w-3 shrink-0 items-center justify-center rounded-sm border",
+                checked ? "border-amber-400 bg-amber-400/80" : "border-white/20",
+            )}>
+                {checked && <CheckCircle2 className="h-2.5 w-2.5 text-black" />}
+            </span>
+            {label}
         </button>
     );
 }

@@ -510,7 +510,14 @@ export interface AnalyzeOptions {
      *  - `model_bs_roformer_ep_317_sdr_12.9755` (best vocals, 2-stem only)
      *  - `mel_band_roformer_kim_ft_unwa.ckpt`   (4-stem mel-band) */
     stemsModel?: string;
+    /** Web-metadata lane: genre/album/year/label/ISRC/artwork/lyrics/BPM
+     *  fetched in-process on the companion (MusicBrainz/iTunes/Deezer/
+     *  CoverArtArchive/LRCLIB). Survives refresh; stored immediately. */
+    metadata?: boolean;
+    /** Sub-flags for the metadata lane (default all on when `metadata`). */
+    metaFields?: { tags?: boolean; artwork?: boolean; lyrics?: boolean; bpm?: boolean };
 }
+
 
 export interface AnalyzerJob {
     id: string;

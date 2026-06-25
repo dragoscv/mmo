@@ -1367,6 +1367,8 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
             stems: options?.stems ?? false,
             fingerprint: options?.fingerprint ?? false,
             stemsModel: options?.stemsModel,
+            metadata: options?.metadata ?? false,
+            metaFields: options?.metaFields,
         };
         const db = getLibraryDb();
         // Resolve absolute file paths (filtered by ownership).
