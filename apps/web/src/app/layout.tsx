@@ -28,7 +28,6 @@ import { PreferencesSync } from "@/components/preferences-sync";
 import { CompanionStatusProvider } from "@/components/companion/companion-status-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { ScrollRestoration } from "@/components/scroll-restoration";
-import { KeepAlive } from "@/components/keep-alive";
 import { MaestroChatDock } from "@/components/maestro/chat-dock";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
@@ -179,7 +178,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                                                                 data-scroll-container
                                                                 className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
                                                             >
-                                                                <KeepAlive>{children}</KeepAlive>
+                                                                {children}
                                                             </main>
                                                             <Suspense>
                                                                 <ScrollRestoration />
