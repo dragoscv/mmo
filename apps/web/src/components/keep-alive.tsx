@@ -1,25 +1,22 @@
 "use client";
 
 /**
- * Layout-level keep-alive host for HEAVY routes only (LRU, last 5).
+ * Layout-level keep-alive for HEAVY routes using React 19.2 `<Activity>`.
  *
- * App Router unmounts a route's subtree on navigation, so heavy pages (library,
- * analysis, playlists, daw, mixer, editor, live, watch) lose their state +
- * scroll and feel slow to return to. This host keeps the rendered subtree of
- * recently-visited HEAVY routes mounted and just toggles visibility, so going
- * back is instant and in-page state (filters, selection, scroll, audio graphs)
- * is preserved.
+ * Why Activity (not manual hidden divs): Activity is the React primitive for
+ * "keep this mounted but inactive". In `hidden` mode it unmounts effects and
+ * DEFERS updates (so background routes don't cost main-thread work), then
+ * restores state + effects when it becomes `visible` again. Our earlier manual
+ * `hidden`/`display:none` host fought the reconciler and aborted App Router RSC
+ * navigations; Activity is designed to coexist with concurrent rendering.
  *
- * Scoped (whitelisted) on purpose: only heavy routes are cached. Every other
- * route renders normally (no behavior change), keeping this low-risk — modals,
- * portals, and one-off pages are unaffected.
- *
- * Keyed by the matched route prefix (not full path/query) so `/library?page=2`
- * reuses the single `/library` instance; the page reads the query from the URL
- * and its own state persists across pages.
+ * Scope: only whitelisted heavy routes are cached (LRU, last 5). Every other
+ * route renders normally via `children`, so modals/portals/one-off pages are
+ * unaffected. Keyed by route PREFIX so `/library?page=2` reuses the single
+ * `/library` instance.
  */
 
-import { useState, type ReactNode } from "react";
+import { Activity, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
 const MAX_ALIVE = 5;
@@ -74,20 +71,14 @@ export function KeepAlive({ children }: { children: ReactNode }) {
 
     return (
         <>
-            {entries.map((entry) => {
-                const active = entry.key === routeKey;
-                return (
-                    <div
-                        key={entry.key}
-                        data-keepalive-route={entry.key}
-                        hidden={!active}
-                        inert={!active}
-                        style={active ? { display: "contents" } : { display: "none" }}
-                    >
-                        {entry.node}
-                    </div>
-                );
-            })}
+            {entries.map((entry) => (
+                <Activity
+                    key={entry.key}
+                    mode={entry.key === routeKey ? "visible" : "hidden"}
+                >
+                    <div data-keepalive-route={entry.key}>{entry.node}</div>
+                </Activity>
+            ))}
 
             {/* Non-heavy routes render normally (not cached). */}
             {!routeKey && children}
