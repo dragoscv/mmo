@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — DSP hang on silent/dead-decode files (companion `1.0.47`)
+
+- **DSP analysis no longer hangs on files that decode to silence** (and then
+  gets killed by the 180s watchdog). librosa's beat tracker can hang on all-zero
+  audio; the companion now detects near-silence right after decoding and returns
+  early with no BPM/key instead of stalling — a ~4s clean skip vs a 183s kill.
+  Found via a real stuck DSP job (a 71MB WAV decoding to pure silence).
+
 ### Fixed — fingerprint fpcalc decode failures (companion `1.0.46`)
 
 - **"fingerprint: fpcalc exited with status 2/3" errors fixed.** fpcalc ships

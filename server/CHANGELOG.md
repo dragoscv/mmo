@@ -2,6 +2,15 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.47 — DSP: don't hang on silent/dead-decode files
+
+- **DSP no longer hangs (and trips the 180s watchdog) on files that decode to
+	silence.** Some files decode to all-zeros (genuinely silent, or a container
+	soundfile/librosa can't really read); librosa's beat tracker can hang forever
+	on that degenerate input. We now detect near-silence right after load and
+	return early (no BPM/key) instead of hanging — turns a 183s watchdog kill into
+	a clean ~4s skip.
+
 ## 1.0.46 — fingerprint: decode fallback for fpcalc failures
 
 - **Fingerprinting no longer fails on files fpcalc can't decode.** Chromaprint's

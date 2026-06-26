@@ -741,6 +741,23 @@ def _dsp_analyze(
         out["_load_error"] = str(e)
         return out
 
+    # ── Silence / dead-decode guard ──────────────────────────────────
+    # Some files decode to (near-)pure silence — a genuinely silent track,
+    # or a container/codec that soundfile+librosa can't actually read and
+    # return all zeros for. librosa's beat tracker can HANG indefinitely on
+    # such degenerate all-zero input (onset envelope is flat), which trips
+    # the sidecar watchdog after ~180s and fails the job. Detect it up front
+    # and return what we can (no BPM/key) instead of hanging.
+    try:
+        import numpy as _np
+        peak = float(_np.max(_np.abs(y))) if y.size else 0.0
+    except Exception:
+        peak = 1.0
+    if peak < 1e-4:
+        out["_silent"] = True
+        out["_dsp_note"] = "audio decoded to silence — skipped BPM/key/chords"
+        return out
+
     # ── Rhythm: BPM + beats + downbeats ──────────────────────────────
     _step(0.20, "Beat tracking…")
     try:
