@@ -12,6 +12,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — navigation performance & polish (`apps/web` `0.7.9`)
+
+- **Back/forward and revisited pages are instant.** Added Next.js
+  `experimental.staleTimes` (dynamic 30s, static 5m) so the client Router Cache
+  keeps recently-visited pages warm instead of refetching from the server every
+  time (the "waits a lot even though I was just there" symptom).
+- **Library pagination no longer blocks the UI.** Page/filter navigation is
+  wrapped in `useTransition` — the current list stays visible and interactive
+  (dimmed) while the next page loads, instead of a blank wait.
+- **Adjacent pages prefetch on hover** (prev / next / numbered pagination
+  buttons), so clicking feels instant.
+- **Smooth global page cross-fade** via the View Transitions API (220ms,
+  respects `prefers-reduced-motion`).
+- **All buttons now show `cursor: pointer`** (and `not-allowed` when disabled) —
+  pagination and everything else.
+
 ### Fixed — /analysis crash on older batch payloads (`apps/web` `0.7.8`)
 
 - **`TypeError: Cannot read properties of undefined (reading 'filter')`** on the

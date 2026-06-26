@@ -100,6 +100,15 @@ const nextConfig: NextConfig = {
         // elements (poster ↔ detail hero) morph cinematically. Pairing is
         // done with matching `view-transition-name` CSS on both ends.
         viewTransition: true,
+        // Client-side Router Cache retention. Default for dynamic pages is 0s,
+        // so navigating BACK to a page you just visited refetches it from the
+        // server (the "waits a lot even though I was just there" symptom).
+        // Keep dynamic entries warm for 30s and static (prefetched) ones for
+        // 5m so back/forward and tab-switching are instant.
+        staleTimes: {
+            dynamic: 30,
+            static: 300,
+        },
         // NOTE: `turbopackFileSystemCacheForDev` was enabled here for faster
         // cold restarts but caused `ChunkLoadError` / `chunk.reason.enqueueModel
         // is not a function` during client navigation in Next.js 16.2.x — the

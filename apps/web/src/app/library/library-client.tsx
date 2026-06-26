@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSyncRefresh } from "@/hooks/use-sync-refresh";
 import { useAvailabilityRefresh } from "@/hooks/use-availability-refresh";
@@ -124,6 +124,7 @@ export function LibraryClient({
     const router = useRouter();
     const offline = useOffline();
     const searchParams = useSearchParams();
+    const [isNavigating, startNavigation] = useTransition();
     const [searchInput, setSearchInput] = useState(currentFilters.search);
     const player = usePlayer();
     const selection = useSelection();
@@ -187,7 +188,12 @@ export function LibraryClient({
     );
 
     function navigate(updates: Record<string, string | undefined>) {
-        router.push(buildUrl(updates));
+        // Wrap in a transition so the current page stays interactive and
+        // visible (no blank flash / blocking) while the next one loads, and we
+        // can show a subtle pending state on the list.
+        startNavigation(() => {
+            router.push(buildUrl(updates));
+        });
     }
 
     function handleSort(column: string) {
@@ -211,6 +217,12 @@ export function LibraryClient({
 
     function handlePageChange(newPage: number) {
         navigate({ page: String(newPage) });
+    }
+
+    // Warm the client router cache for a page so the click feels instant.
+    function prefetchPage(targetPage: number) {
+        if (targetPage < 1 || targetPage > totalPages || targetPage === page) return;
+        router.prefetch(buildUrl({ page: String(targetPage) }));
     }
 
     function handlePlay(track: Track) {
@@ -520,7 +532,12 @@ export function LibraryClient({
                 {selection.count > 0 && (
                     <BulkActionsBar onDone={() => router.refresh()} />
                 )}
-                <div className="rounded-lg border border-[var(--border)] overflow-x-auto">
+                <div
+                    className={cn(
+                        "rounded-lg border border-[var(--border)] overflow-x-auto transition-opacity duration-200",
+                        isNavigating && "pointer-events-none opacity-60",
+                    )}
+                >
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-[var(--card)] hover:bg-[var(--card)]">
@@ -908,6 +925,7 @@ export function LibraryClient({
                                 className="h-8 w-8"
                                 disabled={page <= 1}
                                 onClick={() => handlePageChange(page - 1)}
+                                onMouseEnter={() => prefetchPage(page - 1)}
                             >
                                 <ChevronLeft className="h-4 w-4" />
                             </Button>
@@ -927,6 +945,7 @@ export function LibraryClient({
                                         size="icon"
                                         className="h-8 w-8 text-xs"
                                         onClick={() => handlePageChange(p as number)}
+                                        onMouseEnter={() => prefetchPage(p as number)}
                                     >
                                         {p}
                                     </Button>
@@ -939,6 +958,7 @@ export function LibraryClient({
                                 className="h-8 w-8"
                                 disabled={page >= totalPages}
                                 onClick={() => handlePageChange(page + 1)}
+                                onMouseEnter={() => prefetchPage(page + 1)}
                             >
                                 <ChevronRight className="h-4 w-4" />
                             </Button>
