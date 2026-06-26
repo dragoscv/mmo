@@ -12,6 +12,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — RSC-safe keep-alive via React 19.2 `<Activity>` (`apps/web` `0.8.1`)
+
+- **Heavy pages now truly stay mounted across navigation (LRU, last 5)** using
+  React 19.2's `<Activity>` primitive. The earlier manual hidden-div host
+  (0.8.0) aborted App Router RSC navigation and was reverted; `<Activity>` is
+  the supported primitive for "mounted but inactive" — `hidden` unmounts effects
+  + defers updates, `visible` restores state. Returning to `/library`,
+  `/analysis`, `/playlists`, `/daw`, `/mixer`, `/editor`, `/live`, `/watch` is
+  instant with scroll/selection/filters/audio-graph state preserved. Verified on
+  a Vercel preview: navigation completes and multiple routes stay mounted.
+
 ### Added — app-like instant navigation: keep-alive + TanStack Query (`apps/web` `0.8.0`)
 
 - **Heavy pages now stay mounted across navigation (LRU, last 5).** A new
