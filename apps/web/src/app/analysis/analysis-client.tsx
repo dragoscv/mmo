@@ -72,6 +72,13 @@ import {
     cancelAnalyzerBatch,
 } from "@/actions/analyze";
 import type { AnalysisScope } from "@/actions/analyze";
+import {
+    getAnalysisSnapshot,
+    setAnalysisHealth,
+    setAnalysisStatus,
+    setAnalysisBatches,
+    setAnalysisScope,
+} from "./analysis-cache";
 import type {
     AnalyzerHealth,
     AnalyzerJob,
@@ -105,18 +112,22 @@ const STAGE_META: Record<string, { label: string; color: string }> = {
 // ─── Component ──────────────────────────────────────────────────────
 
 export function AnalysisClient() {
+    // Seed from the module-level cache so returning to this page renders the
+    // last known state instantly (no blank "reload" wait) while polling
+    // refreshes in the background. See analysis-cache.ts.
+    const cached = getAnalysisSnapshot();
     // Health
-    const [health, setHealth] = useState<AnalyzerHealth | null>(null);
+    const [health, setHealth] = useState<AnalyzerHealth | null>(cached.health);
     const [healthMisses, setHealthMisses] = useState(0);
 
     // Status (queue + current + completed)
-    const [status, setStatus] = useState<AnalyzerStatus | null>(null);
-    const [scope, setScope] = useState<AnalysisScope | null>(null);
+    const [status, setStatus] = useState<AnalyzerStatus | null>(cached.status);
+    const [scope, setScope] = useState<AnalysisScope | null>(cached.scope);
 
     // Jobs list: one row per "Start analysis" run (a batch) with many item
     // sub-jobs. This is the canonical jobs view; the lanes/queue below show the
     // live worker detail.
-    const [batches, setBatches] = useState<AnalyzerBatch[]>([]);
+    const [batches, setBatches] = useState<AnalyzerBatch[]>(cached.batches);
 
     // Logs
     const [logs, setLogs] = useState<AnalyzerLogEntry[]>([]);
@@ -158,12 +169,14 @@ export function AnalysisClient() {
             if (cancelled) return;
             if (h.ok) {
                 setHealth(h);
+                setAnalysisHealth(h);
                 setHealthMisses(0);
             } else {
                 setHealthMisses((p) => {
                     const next = p + 1;
                     if (next < 2 && health?.ok) return next;
                     setHealth(h);
+                    setAnalysisHealth(h);
                     return next;
                 });
             }
@@ -195,12 +208,14 @@ export function AnalysisClient() {
             if (cancelled) return;
             if ("error" in s) {
                 setStatus(null);
+                setAnalysisStatus(null);
             } else {
                 setStatus(s);
+                setAnalysisStatus(s);
             }
             // Refresh the per-run jobs list alongside status (same cadence).
             const b = await getAnalyzerBatches(50);
-            if (!cancelled && !("error" in b)) setBatches(b.batches);
+            if (!cancelled && !("error" in b)) { setBatches(b.batches); setAnalysisBatches(b.batches); }
             const cadence = !health?.ok
                 ? POLL_STATUS_OFFLINE_MS
                 : (s && !("error" in s) && (s.current || s.queue.length > 0))
@@ -244,7 +259,7 @@ export function AnalysisClient() {
 
     // Initial scope
     useEffect(() => {
-        getAnalysisScope().then(setScope);
+        getAnalysisScope().then((s) => { setScope(s); setAnalysisScope(s); });
     }, []);
 
     // Auto-scroll logs container.

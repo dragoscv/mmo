@@ -12,6 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — /analysis no longer shows blank on return (`apps/web` `0.7.10`)
+
+- **The analysis page kept its last data across navigations.** Its polled state
+  (health / status / batches / scope) lived in component `useState`, which was
+  lost on unmount — so returning from another page showed an empty page until
+  the first poll completed. State is now seeded from a module-level snapshot
+  cache (`analysis-cache.ts`) that survives navigation, rendering the last known
+  data instantly while polling refreshes in the background. Pairs with the
+  `staleTimes` (30s) RSC cache from 0.7.9.
+
 ### Fixed — navigation performance & polish (`apps/web` `0.7.9`)
 
 - **Back/forward and revisited pages are instant.** Added Next.js
