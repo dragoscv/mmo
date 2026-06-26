@@ -21,6 +21,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   cache (`analysis-cache.ts`) that survives navigation, rendering the last known
   data instantly while polling refreshes in the background. Pairs with the
   `staleTimes` (30s) RSC cache from 0.7.9.
+- **Removed the blocking companion DB lookup from the page gate.** The route
+  only `auth()`-gates server-side now; the "no companion paired" / offline state
+  is handled client-side (it already polls health). This drops a ~multi-second
+  server round-trip (auth + device query + token decrypt) on every return, so
+  the cached client component paints immediately.
 
 ### Fixed — navigation performance & polish (`apps/web` `0.7.9`)
 
