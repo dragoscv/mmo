@@ -26,6 +26,8 @@ import { CinemaSettingsSync } from "@/components/cinema-settings-sync";
 import { AuthProvider } from "@/components/auth-provider";
 import { PreferencesSync } from "@/components/preferences-sync";
 import { CompanionStatusProvider } from "@/components/companion/companion-status-provider";
+import { QueryProvider } from "@/components/query-provider";
+import { ScrollRestoration } from "@/components/scroll-restoration";
 import { MaestroChatDock } from "@/components/maestro/chat-dock";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
@@ -151,6 +153,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                 <ThemeProvider>
                     <AuthProvider>
                         <PreferencesSync />
+                        <QueryProvider>
                         <CompanionStatusProvider>
                         <NextIntlClientProvider locale={locale} messages={messages}>
                         <SelectionProvider>
@@ -171,9 +174,15 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                                                             <FocusAwareMobileHeader>
                                                                 <MobileHeader />
                                                             </FocusAwareMobileHeader>
-                                                            <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+                                                            <main
+                                                                data-scroll-container
+                                                                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+                                                            >
                                                                 {children}
                                                             </main>
+                                                            <Suspense>
+                                                                <ScrollRestoration />
+                                                            </Suspense>
                                                         </div>
                                                     </PlayerAwareLayout>
                                                     <FocusAwareNowPlayingBar>
@@ -209,6 +218,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                         </SelectionProvider>
                         </NextIntlClientProvider>
                         </CompanionStatusProvider>
+                        </QueryProvider>
                     </AuthProvider>
                 </ThemeProvider>
             </body>
