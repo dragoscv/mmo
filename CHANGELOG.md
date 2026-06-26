@@ -12,6 +12,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added — app-like instant navigation: keep-alive + TanStack Query (`apps/web` `0.8.0`)
+
+- **Heavy pages now stay mounted across navigation (LRU, last 5).** A new
+  layout-level `KeepAlive` host keeps the rendered subtree of recently-visited
+  heavy routes (`/library`, `/analysis`, `/playlists`, `/daw`, `/mixer`,
+  `/editor`, `/live`, `/watch`) alive and just toggles visibility — so returning
+  is instant and in-page state (filters, selection, scroll, audio graphs,
+  expanded panels) is preserved. Other routes render normally (low risk).
+- **TanStack Query v5 with IndexedDB persistence** as the data layer
+  (`QueryProvider`): cache-first reads stay warm across navigation + reloads
+  (`staleTime` 30s, `gcTime` 24h), background refetch, offline-capable. Live
+  polling queries are excluded from persistence.
+- **Optimistic mutation hooks** (`use-tracks-queries`): rating, favorite, tags,
+  track edits patch the cache instantly and roll back on error.
+- **Per-route scroll restoration** on the main scroll container.
+- Builds on 0.7.9/0.7.10 (staleTimes router cache, useTransition pagination,
+  hover prefetch, View Transitions, pointer cursors, analysis snapshot cache).
+
 ### Fixed — /analysis no longer shows blank on return (`apps/web` `0.7.10`)
 
 - **The analysis page kept its last data across navigations.** Its polled state
