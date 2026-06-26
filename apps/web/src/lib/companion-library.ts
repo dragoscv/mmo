@@ -687,6 +687,9 @@ export const companionAnalyzer = {
     async retryFailed(link: CompanionLink): Promise<{ enqueued: number; jobs: Array<{ id: string; trackId: number }> }> {
         return call(link, "POST", `/analyze/retry-failed`);
     },
+    async retryAllFailed(link: CompanionLink): Promise<{ enqueued: number; skipped: number }> {
+        return call(link, "POST", `/analyze/retry-all-failed`);
+    },
     async logs(link: CompanionLink, since = 0, limit = 500): Promise<{ logs: AnalyzerLogEntry[] }> {
         return call(link, "GET", `/analyze/logs?since=${since}&limit=${limit}`);
     },

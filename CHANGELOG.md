@@ -12,6 +12,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — analysis failed-job retry + stems crash (`apps/web` `0.8.2`, companion `1.0.45`)
+
+- **"Retry failed" now retries ALL persisted failures**, not just the recent
+  in-memory buffer (which was often empty after cancel/restart churn, so failures
+  could never be retried from the UI). Backed by a new durable
+  `/analyze/retry-all-failed` endpoint; skips files whose source is gone.
+- **Stems no longer crash on a missing separated-stem file** — the output rename
+  tolerates a missing source and uses an atomic replace.
+- Diagnosed the reported "thousands failed" as mostly **canceled** jobs (from
+  earlier start/cancel churn); actual errors were ~44: fpcalc decode failures
+  (bad files), DSP watchdog stalls on large files, and the stems rename bug.
+
 ### Added — RSC-safe keep-alive via React 19.2 `<Activity>` (`apps/web` `0.8.1`)
 
 - **Heavy pages now truly stay mounted across navigation (LRU, last 5)** using

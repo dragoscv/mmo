@@ -71,6 +71,7 @@ export class AnalyzerStore {
         clearCompletedByFilter: ReturnType<SqliteDatabase["prepare"]>;
         listQueued: ReturnType<SqliteDatabase["prepare"]>;
         listCompleted: ReturnType<SqliteDatabase["prepare"]>;
+        listErrored: ReturnType<SqliteDatabase["prepare"]>;
         rehydrate: ReturnType<SqliteDatabase["prepare"]>;
         countByStateCategory: ReturnType<SqliteDatabase["prepare"]>;
         countFinishedSince: ReturnType<SqliteDatabase["prepare"]>;
@@ -284,6 +285,20 @@ export class AnalyzerStore {
                 WHERE state IN ('queued','running')
                 ORDER BY enqueued_at ASC, id ASC
             `),
+            // All persisted ERRORED jobs (not canceled) — used by bulk
+            // retry-failed so we re-enqueue every failure, not just the
+            // last 128 in the in-memory ring buffer.
+            listErrored: this.db.prepare(`
+                SELECT id, request_id AS requestId, category, track_id AS trackId,
+                       path, options, state, progress, stage, message, error,
+                       stems_model AS stemsModel,
+                       enqueued_at AS enqueuedAt, started_at AS startedAt,
+                       finished_at AS finishedAt, data,
+                       batch_id AS batchId, batch_label AS batchLabel
+                FROM analyzer_jobs
+                WHERE state = 'error'
+                ORDER BY finished_at ASC, id ASC
+            `),
             countByStateCategory: this.db.prepare(`
                 SELECT category, state, COUNT(*) AS n
                 FROM analyzer_jobs
@@ -416,6 +431,11 @@ export class AnalyzerStore {
 
     listCompleted(limit = 64): PersistedJob[] {
         return this.stmts.listCompleted.all(limit) as PersistedJob[];
+    }
+
+    /** All persisted ERRORED jobs (for bulk retry-failed). */
+    listErrored(): PersistedJob[] {
+        return (this.stmts.listErrored as unknown as { all(): unknown[] }).all() as PersistedJob[];
     }
 
     /** Cross-category rehydration on startup. */

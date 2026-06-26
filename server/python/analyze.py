@@ -597,10 +597,20 @@ def _separate_stems(path: str, out_dir: str, model_name: str, job_id: str | None
                 target = os.path.join(out_dir, canon)
                 # Avoid a self-rename failing if it already happens to
                 # be the canonical name.
-                if os.path.normcase(full) != os.path.normcase(target):
+                if os.path.normcase(full) == os.path.normcase(target):
+                    result[stem_key] = target
+                    break
+                # The source can be missing if a previous (interrupted) pass
+                # already moved it, or demucs reported a path it didn't write.
+                # Don't let one missing stem crash the whole job — prefer an
+                # already-canonical file if present, else skip this stem.
+                if not os.path.exists(full):
                     if os.path.exists(target):
-                        os.remove(target)
-                    os.rename(full, target)
+                        result[stem_key] = target
+                    break
+                if os.path.exists(target):
+                    os.remove(target)
+                os.replace(full, target)  # atomic; tolerates existing target
                 result[stem_key] = target
                 break
     return result

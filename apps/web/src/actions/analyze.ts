@@ -521,8 +521,16 @@ export async function retryFailedJobs(): Promise<{ enqueued: number; error?: str
     const link = await getCompanionLink();
     if (!link) return { enqueued: 0, error: "Companion not connected" };
     try {
-        const r = await companionAnalyzer.retryFailed(link);
-        return { enqueued: r.enqueued };
+        // Prefer the durable retry that re-enqueues EVERY persisted failure
+        // (not just the last ~128 in the in-memory buffer). Falls back to the
+        // buffer-only endpoint on older companions that lack it.
+        try {
+            const all = await companionAnalyzer.retryAllFailed(link);
+            return { enqueued: all.enqueued };
+        } catch {
+            const r = await companionAnalyzer.retryFailed(link);
+            return { enqueued: r.enqueued };
+        }
     }
     catch (e) { return { enqueued: 0, error: e instanceof Error ? e.message : String(e) }; }
 }

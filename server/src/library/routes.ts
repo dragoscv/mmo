@@ -1544,6 +1544,13 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         res.json({ enqueued: enqueued.length, jobs: enqueued });
     });
 
+    // POST /analyze/retry-all-failed — re-enqueue EVERY persisted errored job
+    // (from sqlite, not just the in-memory buffer). Skips missing-source files.
+    router.post("/analyze/retry-all-failed", (_req, res) => {
+        const r = analyzer.retryAllFailed();
+        res.json(r);
+    });
+
     // GET /analyze/health — Python availability + installed deps. Lets
     // the Reanalyze modal hide unavailable options instead of failing.
     router.get("/analyze/health", async (_req, res) => {

@@ -2,6 +2,17 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.45 — durable retry-failed + stems rename hardening
+
+- **New `POST /analyze/retry-all-failed`** re-enqueues EVERY persisted errored
+	job from sqlite (not just the last ~128 in the in-memory ring buffer), skipping
+	jobs whose source file no longer exists. The web "Retry failed" button now uses
+	this, so bulk failures actually get retried after restarts/cancel churn.
+- **Stems: don't crash a job when a separated stem file is missing.** The output
+	rename now tolerates a missing source (prefers an already-canonical file, else
+	skips that stem) and uses `os.replace` — fixes `FileNotFoundError` aborting the
+	whole stems job for some tracks.
+
 ## 1.0.44 — fix: jobs don't resume after restart/update
 
 - **Rehydrated jobs now actually start processing after a restart/update.** The

@@ -1302,6 +1302,33 @@ class Analyzer extends EventEmitter {
         return this.enqueue(original.trackId, original.path, opts);
     }
 
+    /** Re-enqueue EVERY persisted errored job (not just the in-memory ring
+     *  buffer). Skips jobs whose source file no longer exists. Returns the
+     *  count re-enqueued and skipped. */
+    retryAllFailed(): { enqueued: number; skipped: number } {
+        const errored = this.store.listErrored();
+        let enqueued = 0;
+        let skipped = 0;
+        for (const j of errored) {
+            if (!existsSync(j.path)) { skipped++; continue; }
+            const cat = j.category as Category;
+            const parsedOpts = typeof j.options === "string"
+                ? (JSON.parse(j.options || "{}") as AnalyzeOptions)
+                : ((j.options ?? {}) as AnalyzeOptions);
+            const opts: AnalyzeOptions = cat === "dsp" ? { dsp: true }
+                : cat === "stems" ? { stems: true, stemsModel: parsedOpts.stemsModel }
+                    : cat === "fingerprint" ? { fingerprint: true }
+                        : { metadata: true };
+            // Drop the old errored row so it doesn't linger as a duplicate.
+            this.store.deleteOne(j.id);
+            this.enqueue(j.trackId, j.path, opts);
+            enqueued++;
+        }
+        this.pushLog("info",
+            `Retry-all-failed: re-enqueued ${enqueued}, skipped ${skipped} (missing source)`);
+        return { enqueued, skipped };
+    }
+
     shutdown() {
         for (const cat of CATEGORIES) this.workers[cat].kill("shutdown");
         if (this.controlProc) {
