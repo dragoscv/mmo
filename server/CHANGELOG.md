@@ -2,6 +2,15 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 1.0.46 — fingerprint: decode fallback for fpcalc failures
+
+- **Fingerprinting no longer fails on files fpcalc can't decode.** Chromaprint's
+	bundled `fpcalc` has no FFmpeg, so it errored ("fpcalc exited with status
+	2/3") on some valid files. We now catch that, decode the audio ourselves
+	(soundfile → librosa fallback), write a temporary WAV (which fpcalc decodes
+	natively), and fingerprint that. Genuinely-unreadable files now fail with a
+	clear combined error message.
+
 ## 1.0.45 — durable retry-failed + stems rename hardening
 
 - **New `POST /analyze/retry-all-failed`** re-enqueues EVERY persisted errored

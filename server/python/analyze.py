@@ -1097,11 +1097,61 @@ def _fingerprint(path: str) -> dict[str, Any]:
             "pyacoustid not installed — `pip install pyacoustid` "
             "and ensure the `fpcalc` binary is on PATH "
             "(https://acoustid.org/chromaprint).")
-    duration, fingerprint = aid.fingerprint_file(path)
-    return {
-        "acoustidFingerprint": fingerprint.decode("ascii") if isinstance(fingerprint, bytes) else fingerprint,
-        "fingerprintDurationSec": float(duration),
-    }
+    try:
+        duration, fingerprint = aid.fingerprint_file(path)
+        return {
+            "acoustidFingerprint": fingerprint.decode("ascii") if isinstance(fingerprint, bytes) else fingerprint,
+            "fingerprintDurationSec": float(duration),
+        }
+    except Exception as fpcalc_err:
+        # fpcalc ships without FFmpeg, so it fails ("exited with status 2/3")
+        # on containers/codecs it can't decode itself — even though the file
+        # is perfectly valid (the DSP lane decodes it fine). Fall back to
+        # decoding the audio ourselves and fingerprinting the raw PCM via
+        # Chromaprint directly, which doesn't touch fpcalc's decoder.
+        try:
+            return _fingerprint_pcm_fallback(path, aid)
+        except Exception as fallback_err:
+            raise RuntimeError(
+                f"fingerprint: fpcalc failed ({fpcalc_err}); "
+                f"PCM fallback also failed ({fallback_err})") from fallback_err
+
+
+def _fingerprint_pcm_fallback(path: str, aid: Any) -> dict[str, Any]:
+    """fpcalc ships without FFmpeg, so it can't decode some codecs/containers
+    even when the file is valid. We decode the audio ourselves (soundfile, with
+    a librosa fallback), write a temporary WAV — which fpcalc decodes natively —
+    and fingerprint that. Keeps using the working fpcalc.exe, no libchromaprint
+    needed (the Python chromaprint binding isn't installed)."""
+    import os as _os
+    import tempfile
+    import numpy as np  # type: ignore
+
+    sr = None
+    data = None
+    try:
+        import soundfile as sf  # type: ignore
+        data, sr = sf.read(path, always_2d=True, dtype="float32")  # type: ignore
+    except Exception:
+        import librosa  # type: ignore
+        y, sr = librosa.load(path, sr=None, mono=False)  # type: ignore
+        data = y.reshape(-1, 1) if y.ndim == 1 else y.T
+
+    fd, tmp_wav = tempfile.mkstemp(suffix=".wav")
+    _os.close(fd)
+    try:
+        import soundfile as sf  # type: ignore
+        sf.write(tmp_wav, data, int(sr), subtype="PCM_16")  # type: ignore
+        duration, fingerprint = aid.fingerprint_file(tmp_wav)
+        return {
+            "acoustidFingerprint": fingerprint.decode("ascii") if isinstance(fingerprint, bytes) else fingerprint,
+            "fingerprintDurationSec": float(duration),
+        }
+    finally:
+        try:
+            _os.remove(tmp_wav)
+        except OSError:
+            pass
 
 
 # ─── Command dispatch ────────────────────────────────────────────────

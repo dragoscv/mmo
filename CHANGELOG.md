@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed — fingerprint fpcalc decode failures (companion `1.0.46`)
+
+- **"fingerprint: fpcalc exited with status 2/3" errors fixed.** fpcalc ships
+  without FFmpeg and couldn't decode some valid files. The companion now falls
+  back to decoding the audio itself and fingerprinting a temporary WAV, so those
+  tracks fingerprint successfully. (Use "Retry failed" after updating to retry
+  the previously-failed ones.)
+
 ### Fixed — analysis failed-job retry + stems crash (`apps/web` `0.8.2`, companion `1.0.45`)
 
 - **"Retry failed" now retries ALL persisted failures**, not just the recent
