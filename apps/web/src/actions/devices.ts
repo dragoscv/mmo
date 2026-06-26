@@ -896,12 +896,22 @@ export async function setCompanionAuthorizedAudioDevices(
 
 // Per-process memo of the last ingress port written per device, so the
 // announce-route hot path doesn't fire a CF API call on every 3s tick.
-const ingressPortByDevice = new Map<string, number>();
+// We also remember WHEN it was written and periodically re-assert the
+// ingress even if the port looks unchanged — this self-heals drift where
+// the CF config and our memory disagree (e.g. a device paired under an old
+// default port like 9876 whose ingress was never migrated, or a cold/warm
+// serverless instance with stale memory). Without this, "Companion offline"
+// can persist forever because cloudflared proxies to the wrong local port.
+const INGRESS_REASSERT_MS = 10 * 60_000; // re-assert at most every 10 min
+const ingressByDevice = new Map<string, { port: number; at: number }>();
 function shouldUpdateIngress(deviceId: string, port: number): boolean {
-    return ingressPortByDevice.get(deviceId) !== port;
+    const last = ingressByDevice.get(deviceId);
+    if (!last) return true;
+    if (last.port !== port) return true;
+    return Date.now() - last.at > INGRESS_REASSERT_MS;
 }
 function rememberIngressPort(deviceId: string, port: number): void {
-    ingressPortByDevice.set(deviceId, port);
+    ingressByDevice.set(deviceId, { port, at: Date.now() });
 }
 
 /**
@@ -937,14 +947,18 @@ export async function ensureDeviceTunnel(
                 tunnelHostname: row.tunnelHostname,
                 tunnelToken: decryptDeviceToken(row.tunnelTokenEncrypted),
             };
-            if (opts.port && shouldUpdateIngress(deviceId, opts.port)) {
+                // Default to the companion's standard port so the ingress is
+                // reconciled even when the announce doesn't carry an explicit port
+                // (otherwise a device stuck on an old port never self-heals).
+                const targetPort = opts.port ?? 17899;
+                if (shouldUpdateIngress(deviceId, targetPort)) {
                 try {
                     await updateDeviceTunnelIngress(cfg, {
                         tunnelId: row.tunnelId,
                         hostname: row.tunnelHostname,
-                        port: opts.port,
+                            port: targetPort,
                     });
-                    rememberIngressPort(deviceId, opts.port);
+                        rememberIngressPort(deviceId, targetPort);
                 } catch (err) {
                     console.warn("[devices] tunnel ingress update failed:", err instanceof Error ? err.message : err);
                 }
