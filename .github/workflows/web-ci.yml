@@ -1,0 +1,76 @@
+name: web-ci
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "apps/web/**"
+            - "packages/**"
+            - ".github/workflows/web-ci.yml"
+    pull_request:
+        paths:
+            - "apps/web/**"
+            - "packages/**"
+            - ".github/workflows/web-ci.yml"
+
+concurrency:
+    group: web-ci-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    packages:
+        name: packages (design-tokens, ui)
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        strategy:
+            matrix:
+                pkg: [design-tokens, ui]
+        defaults:
+            run:
+                working-directory: packages/${{ matrix.pkg }}
+        steps:
+            - uses: actions/checkout@v5
+            - uses: pnpm/action-setup@v6
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+                  cache: pnpm
+                  cache-dependency-path: packages/${{ matrix.pkg }}/pnpm-lock.yaml
+            - run: pnpm install --frozen-lockfile --ignore-workspace
+            - run: pnpm typecheck
+            - run: pnpm test
+            - name: Generated tokens are committed
+              if: matrix.pkg == 'design-tokens'
+              run: |
+                  pnpm build
+                  git diff --exit-code -- dist ../../apps || (echo "::error::Run pnpm -C packages/design-tokens build and commit the output" && exit 1)
+
+    web:
+        name: web (lint, typecheck, test, build)
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
+        defaults:
+            run:
+                working-directory: apps/web
+        env:
+            NEXT_TELEMETRY_DISABLED: 1
+            SKIP_ENV_VALIDATION: 1
+        steps:
+            - uses: actions/checkout@v5
+            - uses: pnpm/action-setup@v6
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+                  cache: pnpm
+                  cache-dependency-path: apps/web/pnpm-lock.yaml
+            - run: pnpm install --frozen-lockfile --ignore-workspace
+            - name: Lint (baseline-aware)
+              run: pnpm lint:check
+            - run: pnpm typecheck
+            - run: pnpm test
+            - name: Build
+              run: pnpm build
+            - name: Bundle size report
+              if: always()
+              run: |
+                  if [ -d .next ]; then du -sh .next/static 2>/dev/null || true; fi

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import {
     Disc3, Mic, Piano, Waves, Star, Trash2, Pencil, Download,
     Play, Pause, FolderOpen, Search, Filter, Music2, Clock, HardDrive,

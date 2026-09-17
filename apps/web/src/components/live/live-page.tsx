@@ -29,7 +29,7 @@ import {
     Save, RotateCcw, Sliders, KeyRound, Zap, Eye, BarChart3,
     ZoomIn, ZoomOut, Type, Music2, Plug,
 } from "lucide-react";
-import { Reorder, useDragControls, type DragControls } from "framer-motion";
+import { Reorder, useDragControls, type DragControls } from "motion/react";
 import { FX_DEFAULTS, FX_CATEGORIES, MUSICAL_SCALES, NOTE_NAMES, AudioFxEngine, type FxType, type FxPreset } from "@/lib/audio-fx-engine";
 import { formatLiveTime, formatRecordTime } from "@/lib/live-engine";
 import { QUALITY_PROFILES, type StreamQuality } from "@/lib/webrtc-audio-bridge";
@@ -1318,7 +1318,7 @@ function VoicePanel() {
                             disabled={!nativeAvailable || !live.voiceActive}
                             title={
                                 !nativeAvailable
-                                    ? "MuzicAI Companion not detected. Install + sign in on this device to enable native low-latency audio."
+                                    ? "MixAI Companion not detected. Install + sign in on this device to enable native low-latency audio."
                                     : !live.voiceActive
                                         ? "Turn the Voice Processor ON first to enable the native engine."
                                         : nativeMode

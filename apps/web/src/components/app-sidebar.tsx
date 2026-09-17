@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import {
     Menu,
     Search,
@@ -129,7 +129,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
             <div className="flex items-center gap-2.5 border-b border-sidebar-border px-4 py-4">
                 <Image
                     src="/logo.svg"
-                    alt="MuzicAI"
+                    alt="MixAI"
                     width={32}
                     height={32}
                     className="shrink-0 rounded-lg shadow-[0_0_12px_rgba(124,92,255,0.30)]"

@@ -96,10 +96,8 @@ const nextConfig: NextConfig = {
                 "*.devtunnels.ms",
             ],
         },
-        // Wrap client navigations in document.startViewTransition() so paired
-        // elements (poster ↔ detail hero) morph cinematically. Pairing is
-        // done with matching `view-transition-name` CSS on both ends.
-        viewTransition: true,
+        // NOTE: `viewTransition` graduated in Next 16.3 — React 19.3
+        // `<ViewTransition>` works in the App Router with no config.
         // Client-side Router Cache retention. Default for dynamic pages is 0s,
         // so navigating BACK to a page you just visited refetches it from the
         // server (the "waits a lot even though I was just there" symptom).
@@ -127,9 +125,11 @@ const nextConfig: NextConfig = {
         // dynamic-style attack surface in this app is tiny (no untrusted
         // content rendered into a `style` attribute).
         const isProd = process.env.NODE_ENV === "production";
+        // `www.gstatic.com` hosts the Google Cast Web Sender SDK
+        // (cast_sender.js + the framework it lazy-loads) — see lib/cast/google-cast.ts.
         const scriptSrc = isProd
-            ? "script-src 'self' 'unsafe-inline' https://js.stripe.com https://accounts.google.com"
-            : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://accounts.google.com";
+            ? "script-src 'self' 'unsafe-inline' https://js.stripe.com https://accounts.google.com https://www.gstatic.com"
+            : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://accounts.google.com https://www.gstatic.com";
         const csp = [
             "default-src 'self'",
             // `'unsafe-eval'` is needed for the Next.js dev runtime (HMR + RSC
@@ -151,7 +151,9 @@ const nextConfig: NextConfig = {
             "connect-src 'self' http: https: wss: ws:",
             // Stripe Elements + Auth.js Google one-tap iframes + YouTube
             // trailer embeds (HeroTrailer, PosterPopover, TrailerModal).
-            "frame-src 'self' https://js.stripe.com https://accounts.google.com https://hooks.stripe.com https://www.youtube-nocookie.com https://www.youtube.com",
+            // `www.gstatic.com` — the Cast SDK opens a hidden iframe for the
+            // device picker / session handshake.
+            "frame-src 'self' https://js.stripe.com https://accounts.google.com https://hooks.stripe.com https://www.youtube-nocookie.com https://www.youtube.com https://www.gstatic.com",
             "frame-ancestors 'self'",
             "object-src 'none'",
             "base-uri 'self'",

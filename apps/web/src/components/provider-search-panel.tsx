@@ -17,7 +17,7 @@ import {
     AlertCircle,
     X,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { SearchType } from "@/app/api/download/search/route";

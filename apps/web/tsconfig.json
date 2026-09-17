@@ -53,6 +53,15 @@
       "@mmo/db/*": [
         "../../packages/db/src/*"
       ],
+      "@mmo/ui": [
+        "../../packages/ui/src/index.ts"
+      ],
+      "@mmo/ui/*": [
+        "../../packages/ui/src/*"
+      ],
+      "@mmo/design-tokens": [
+        "../../packages/design-tokens/src/index.ts"
+      ],
       "drizzle-orm": [
         "./node_modules/drizzle-orm"
       ],

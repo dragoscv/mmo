@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import {
     Disc3, Piano, Waves, Plug, CircleDot, Mic, Music2,
     Clock, HardDrive, Star, Sparkles, ArrowRight, Activity,

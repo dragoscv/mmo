@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import {
     Copy,
     ExternalLink,
@@ -93,6 +93,7 @@ import { PROVIDER_IDS, type ProviderId } from "@mmo/ai/providers/types";
 const NON_COPILOT_PROVIDERS = PROVIDER_IDS.filter((p) => p !== "copilot");
 
 const PROVIDER_LABELS: Record<ProviderId, string> = {
+    codai: "codai",
     openai: "OpenAI",
     anthropic: "Anthropic",
     google: "Google",

@@ -64,7 +64,7 @@ import { useEQ } from "./eq-context";
 import { PerformanceInline, SessionRestoreIndicator } from "./performance-stats";
 import { TrackContextMenu } from "./track-actions";
 import { SortableUpNext } from "./sortable-up-next";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 
 // Dynamic imports for heavy components (code-split, no SSR)
 const VisualizationCanvas = dynamic(

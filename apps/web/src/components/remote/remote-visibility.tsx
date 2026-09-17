@@ -15,7 +15,7 @@
 import {
     createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { Layout, X, Check, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 

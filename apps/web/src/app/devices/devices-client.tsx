@@ -71,7 +71,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import type { Device } from "@/db/schema";
 import {
     removeDevice,
@@ -97,6 +97,7 @@ import {
 } from "@/actions/devices";
 import { directFetch } from "@/lib/companion-direct";
 import { connectDeviceWs, type DeviceWsClient, type DeviceLogEntry } from "@/lib/device-ws";
+import { PendingPairingsPanel } from "@/app/pair/pending-pairings-panel";
 import {
     FOLDER_KINDS,
     type CompanionFolder,
@@ -877,6 +878,8 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
                 </Button>
             </div>
 
+            <PendingPairingsPanel />
+
             {!isLocalhost && (
                 <Card className="border-amber-500/30 bg-amber-500/5">
                     <CardContent className="flex items-start gap-3 py-3">
@@ -899,7 +902,7 @@ export function DevicesClient({ initialDevices, initialFolders }: DevicesClientP
                         <Server className="mb-4 h-12 w-12 text-muted-foreground/30" />
                         <h3 className="mb-1 font-semibold">No devices connected</h3>
                         <p className="max-w-md text-sm text-muted-foreground">
-                            Install the MuzicAI Companion app on your computers and sign in with your Google account.
+                            Install the MixAI Companion app on your computers and sign in with your Google account.
                             Devices appear here automatically.
                         </p>
                     </CardContent>
