@@ -3,8 +3,8 @@
 import type * as React from "react";
 import { ContextMenu as BaseContextMenu } from "@base-ui/react/context-menu";
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
-import { cn } from "../lib/cn.ts";
-import { menuItemClass, menuItemDestructiveClass, menuPopupClass } from "./dropdown-menu.tsx";
+import { cn } from "../lib/cn";
+import { menuItemClass, menuItemDestructiveClass, menuPopupClass } from "./dropdown-menu";
 
 /** Context menu root. */
 export const ContextMenu = BaseContextMenu.Root;

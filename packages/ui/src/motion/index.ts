@@ -62,4 +62,4 @@ export const list: Variants = {
   animate: { transition: stagger() },
 };
 
-export * from "./page-transition.tsx";
+export * from "./page-transition";

@@ -4,7 +4,7 @@ import type * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { useRender } from "@base-ui/react/use-render";
 import { mergeProps } from "@base-ui/react/merge-props";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export const badgeVariants = cva(
   "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-full border border-transparent px-2 py-0.5 text-xs font-medium transition-[color,background-color,border-color] duration-(--dur-fast) focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none [&>svg]:pointer-events-none [&>svg]:size-3",

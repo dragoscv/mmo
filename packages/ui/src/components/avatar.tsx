@@ -2,7 +2,7 @@
 
 import { cva, type VariantProps } from "class-variance-authority";
 import { Avatar as BaseAvatar } from "@base-ui/react/avatar";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export const avatarVariants = cva("relative inline-flex shrink-0 select-none overflow-hidden rounded-full bg-muted align-middle", {
   variants: {

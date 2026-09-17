@@ -7,17 +7,25 @@ import { getActiveProfileId } from "@/lib/active-profile";
 import { PosterCard } from "@/components/video/poster-card";
 import { PosterRow } from "@/components/video/poster-row";
 import { buildMoviePosterProps, buildShowPosterProps } from "@/lib/poster-card-builder";
+import { notSignedInFor } from "@/components/empty-state-server";
+import { Button, EmptyState } from "@mmo/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function CollectionsPage() {
     const session = await auth();
     if (!session?.user?.id) {
-        return <div style={{ padding: "4rem 2rem" }}><p>Autentifică-te ca să-ți vezi colecțiile.</p></div>;
+        return notSignedInFor("collections");
     }
     const profileId = await getActiveProfileId();
     if (!profileId) {
-        return <div style={{ padding: "4rem 2rem" }}><p>Selectează un profil ca să vezi colecțiile.</p></div>;
+        return (
+            <EmptyState
+                title="Selectează un profil"
+                description="Alege un profil de vizionare ca să vezi colecțiile."
+                actions={<Button render={<Link href="/profiles" />}>Profiluri</Button>}
+            />
+        );
     }
 
     const rows = await db

@@ -2,8 +2,8 @@
 
 import { Toast as BaseToast } from "@base-ui/react/toast";
 import { AlertTriangleIcon, CheckCircle2Icon, InfoIcon, XCircleIcon, XIcon } from "lucide-react";
-import { cn } from "../lib/cn.ts";
-import { useUiT } from "../i18n/index.tsx";
+import { cn } from "../lib/cn";
+import { useUiT } from "../i18n/index";
 
 /** Wrap the app once; provides the toast manager to `useToast`. */
 export const ToastProvider = BaseToast.Provider;

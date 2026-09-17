@@ -3,11 +3,11 @@
 import * as React from "react";
 import { Command as Cmdk } from "cmdk";
 import { SearchIcon } from "lucide-react";
-import { cn } from "../lib/cn.ts";
-import { useUiT } from "../i18n/index.tsx";
-import { Dialog, DialogContent } from "./dialog.tsx";
-import { KbdCombo } from "./kbd.tsx";
-import { useRegisterShortcut } from "../lib/shortcuts-registry.ts";
+import { cn } from "../lib/cn";
+import { useUiT } from "../i18n/index";
+import { Dialog, DialogContent } from "./dialog";
+import { KbdCombo } from "./kbd";
+import { useRegisterShortcut } from "../lib/shortcuts-registry";
 
 // ─── Primitives ─────────────────────────────────────────────────────────────
 

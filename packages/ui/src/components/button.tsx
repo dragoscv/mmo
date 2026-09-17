@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { useRender } from "@base-ui/react/use-render";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { Loader2 } from "lucide-react";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export const buttonVariants = cva(
   "group/button relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap select-none outline-none transition-[background-color,border-color,color,box-shadow,translate,scale] duration-(--dur-fast) ease-(--ease-out) focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",

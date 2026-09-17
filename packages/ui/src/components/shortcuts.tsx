@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "../lib/cn.ts";
-import { useUiT } from "../i18n/index.tsx";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog.tsx";
-import { KbdCombo } from "./kbd.tsx";
-import { detectPlatform, useRegisterShortcut, useShortcuts, type Platform, type ShortcutDef } from "../lib/shortcuts-registry.ts";
+import { cn } from "../lib/cn";
+import { useUiT } from "../i18n/index";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
+import { KbdCombo } from "./kbd";
+import { detectPlatform, useRegisterShortcut, useShortcuts, type Platform, type ShortcutDef } from "../lib/shortcuts-registry";
 
 export interface ShortcutsOverlayProps {
   open: boolean;

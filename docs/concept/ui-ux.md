@@ -1,12 +1,17 @@
-# 🎨 UI/UX Design — Music Organizer
+# 🎨 UI/UX Design — MixAI
 
 [🏠 Home](../../README.md) · [📱 App](README.md)
 
 ---
 
+> **Sistemul de design canonic este [`docs/design-system.md`](../design-system.md)** (Neon Nocturne,
+> OKLCH, dimensiuni de temă mode/accent/surface/density/radius/motion, `@mmo/design-tokens` +
+> `@mmo/ui`). Tabelul de culori de mai jos este **istoric** (era "Music Organizer", hex fix,
+> doar dark) și nu mai reflectă codul; îl păstrăm pentru maparea energie→culoare și schițele de layout.
+
 ## 🎨 Design System
 
-### Culori (Dark Theme — DJ-friendly)
+### Culori — istoric (înlocuit de tokens OKLCH; vezi design-system.md §2–3)
 
 | Rol | Culoare | Hex | Utilizare |
 |-----|---------|-----|-----------|

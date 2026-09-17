@@ -2,7 +2,7 @@
 
 import { Accordion as BaseAccordion } from "@base-ui/react/accordion";
 import { ChevronDownIcon } from "lucide-react";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 /** Accordion root; `multiple` allows several open items. */
 export function Accordion({ className, ...props }: BaseAccordion.Root.Props) {

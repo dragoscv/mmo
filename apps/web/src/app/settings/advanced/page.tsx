@@ -2,12 +2,13 @@ import { auth } from "@/auth";
 import { listAiKeys } from "@/actions/ai-keys";
 import { getPreferredAiProvider } from "@/actions/ai-tag";
 import { AiKeysPanel } from "@/components/settings/ai-keys-panel";
+import { notSignedInFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdvancedSettingsPage() {
     const session = await auth();
-    if (!session?.user?.id) return <main className="p-6"><p>Autentifică-te.</p></main>;
+    if (!session?.user?.id) return notSignedInFor("settings");
     const [aiKeys, preferred] = await Promise.all([listAiKeys(), getPreferredAiProvider()]);
     return (
         <main className="p-4 sm:p-6 max-w-3xl space-y-6">

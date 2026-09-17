@@ -1,5 +1,74 @@
 {
-    "appName": "MuzicAI",
+    "appName": "MixAI",
+    "settings": {
+        "appearance": {
+            "title": "Appearance & language",
+            "description": "Mode, accent colour, surfaces, density, motion and language. Saved to your viewing profile and applied on every device."
+        }
+    },
+    "activate": {
+        "title": "Sign in {device} ({platform})?",
+        "titleNoDevice": "Connect a TV to your account",
+        "subtitle": "Enter the 8-character code shown on the TV screen.",
+        "codeLabel": "Activation code",
+        "continue": "Continue",
+        "approve": "Approve",
+        "deny": "Deny",
+        "successTitle": "Done",
+        "successBody": "{device} is now signed in to your account — you can put the phone down.",
+        "deniedTitle": "Denied",
+        "deniedBody": "{device} was not signed in. If this wasn't you, you're safe.",
+        "errors": {
+            "unauthenticated": "Please sign in first.",
+            "invalid": "The code is 8 letters and digits (no 0, O, 1, I).",
+            "not_found": "No pending request with this code. Check the code on the TV.",
+            "expired": "The code has expired. Ask the TV for a new one.",
+            "already_decided": "This code has already been used."
+        }
+    },
+    "pair": {
+        "title": "Approve MixAI TV on {server}?",
+        "titleNoServer": "Approve a TV or mobile device",
+        "subtitle": "Enter the 6-digit code shown on the screen you want to connect.",
+        "hostLabel": "Server address",
+        "codeLabel": "Pairing code",
+        "approve": "Approve",
+        "successTitle": "Connected",
+        "successBody": "{server} accepted the device — you can put the phone down.",
+        "errors": {
+            "not_found": "No pending request with this code. Check the code on the TV and try again.",
+            "unauthorized": "Your MMO Server rejected the request. Make sure it is paired to this account.",
+            "expired": "This code has expired. Ask the TV for a new one.",
+            "unreachable": "Could not reach your MMO Server. Is it online and on the same network?",
+            "failed": "Something went wrong. Try again.",
+            "unauthenticated": "You need to sign in first.",
+            "invalid": "The code must be exactly 6 digits."
+        },
+        "panelTitle": "Pending TV / mobile pairing requests",
+        "panelEmpty": "No devices are waiting. Open MixAI TV and it will appear here.",
+        "panelRow": "{requester} ({platform}) wants to connect to {server}",
+        "expiresAt": "expires {time}",
+        "approved": "{requester} connected to {server}"
+    },
+    "cast": {
+        "playOn": "Play on…",
+        "browserCast": "Chromecast (this browser)",
+        "noCastDevices": "no devices",
+        "searching": "Searching the network…",
+        "noDevices": "No renderers found. Make sure the TV / speaker is on the same network as your companion.",
+        "haNotConfigured": "Home Assistant is not configured (HA_URL / HA_TOKEN on the companion).",
+        "refresh": "Search again",
+        "playingOn": "Playing on {name}",
+        "castFailed": "Could not cast: {error}",
+        "pause": "Pause",
+        "resume": "Resume",
+        "stop": "Stop casting",
+        "kind": {
+            "google-cast-ha": "Google Cast (via Home Assistant)",
+            "dlna": "DLNA / UPnP",
+            "home-assistant": "Home Assistant"
+        }
+    },
     "watch": {
         "rows": {
             "continue": "Continue watching",
@@ -32,7 +101,19 @@
             "playlists": "your playlists",
             "scanner": "the scanner",
             "plugins": "plugins",
-            "analysis": "library analysis"
+            "analysis": "library analysis",
+            "watch": "your video library",
+            "movies": "your movies",
+            "shows": "your shows",
+            "collections": "your collections",
+            "continue": "your continue-watching list",
+            "stats": "your watch stats",
+            "profiles": "viewing profiles",
+            "settings": "settings",
+            "music": "your music workspace",
+            "recordings": "your recordings",
+            "devices": "your devices",
+            "download": "the downloader"
         },
         "notSignedIn": {
             "title": "Sign in to see {feature}",
@@ -109,6 +190,10 @@
         "searchPlaceholder": "Search…",
         "noResults": "No results",
         "error": "Something went wrong",
+        "errorDetail": "The page hit an unexpected error. Try again — if it keeps happening, the issue has been reported.",
+        "notFound": "Page not found",
+        "notFoundDetail": "The page you are looking for does not exist or was moved.",
+        "goHome": "Go to dashboard",
         "retry": "Retry",
         "close": "Close",
         "open": "Open",
@@ -145,9 +230,9 @@
         "termsNote": "By continuing you agree to our Terms and Privacy Policy."
     },
     "login": {
-        "welcomeTitle": "Welcome to MuzicAI",
-        "welcomeSubtitle": "MuzicAI — AI Music Suite",
-        "formTitle": "Sign in to MuzicAI",
+        "welcomeTitle": "Welcome to MixAI",
+        "welcomeSubtitle": "MixAI — AI Music Suite",
+        "formTitle": "Sign in to MixAI",
         "formSubtitle": "Your settings and preferences will be synced across sessions",
         "formFooter": "By continuing, you agree to store your preferences securely in the app database.",
         "skipNoteLine1": "You can also use the app without signing in.",
@@ -279,14 +364,14 @@
     },
     "learn": {
         "eyebrow": "Learn",
-        "title": "MuzicAI Knowledge base",
+        "title": "MixAI Knowledge base",
         "subtitle": "Concepts, architecture, equipment, genres, organisation tips and the full glossary — everything we know about running a DJ library, in one place.",
         "backToIndex": "All sections",
         "pageCount": "{count, plural, =1 {# page} other {# pages}}",
         "sections": {
             "concept": {
                 "title": "Concept",
-                "desc": "Vision, architecture decisions and product direction for MuzicAI."
+                "desc": "Vision, architecture decisions and product direction for MixAI."
             },
             "docs": {
                 "title": "Documentation",
@@ -311,7 +396,7 @@
         }
     },
     "onboarding": {
-        "welcomeTitle": "Welcome to MuzicAI",
+        "welcomeTitle": "Welcome to MixAI",
         "welcomeDesc": "Four quick steps and your DJ library is ready.",
         "skipForNow": "Skip for now",
         "reopenHint": "You can re-open this from <kbd>⌘K</kbd> → \"Onboarding\"",
@@ -330,11 +415,11 @@
         "companionTitle": "Install the companion",
         "companionDesc": "A small desktop app that scans your local files.",
         "companionLinked": "Companion linked.",
-        "companionInstall": "Download MuzicAI Companion for your OS, run it once, and link it to this account.",
+        "companionInstall": "Download MixAI Companion for your OS, run it once, and link it to this account.",
         "companionOpenDownloads": "Open downloads",
         "companionLater": "I'll do it later",
         "scanTitle": "Run your first scan",
-        "scanDesc": "Point MuzicAI at a folder of audio files. We'll handle the rest.",
+        "scanDesc": "Point MixAI at a folder of audio files. We'll handle the rest.",
         "scanLong": "Scanner reads ID3 tags, computes BPM + Camelot key, and indexes everything for instant search.",
         "scanOpenScanner": "Open Scanner"
     },

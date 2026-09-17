@@ -5,13 +5,14 @@ import { getActiveProfileId } from "@/lib/active-profile";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import Link from "next/link";
 import { WatchDailyChart } from "@/components/watch/stats-chart";
+import { notSignedInFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function WatchStatsPage() {
     const session = await auth();
     const userId = session?.user?.id;
-    if (!userId) return null;
+    if (!userId) return notSignedInFor("stats");
     const profileId = await getActiveProfileId().catch(() => null);
     if (!profileId) {
         return (

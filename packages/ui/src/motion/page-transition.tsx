@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion as m, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
-import { base, rise } from "./index.ts";
+import { base, rise } from "./index";
 
 export interface PageTransitionProps {
   /** Change this (e.g. pathname) to animate between pages. */

@@ -2,7 +2,7 @@
 
 import { RadioGroup as BaseRadioGroup } from "@base-ui/react/radio-group";
 import { Radio as BaseRadio } from "@base-ui/react/radio";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 /**
  * Radio group container. Supports `value`/`defaultValue`/`onValueChange`, `name`, `disabled`.

@@ -13,7 +13,19 @@ export type EmptyFeatureKey =
     | "playlists"
     | "scanner"
     | "plugins"
-    | "analysis";
+    | "analysis"
+    | "watch"
+    | "movies"
+    | "shows"
+    | "collections"
+    | "continue"
+    | "stats"
+    | "profiles"
+    | "settings"
+    | "music"
+    | "recordings"
+    | "devices"
+    | "download";
 
 export async function notSignedInFor(featureKey: EmptyFeatureKey) {
     const t = await getTranslations("empty");

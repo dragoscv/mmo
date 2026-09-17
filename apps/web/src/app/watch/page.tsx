@@ -18,6 +18,7 @@ import { getMovieRecommendations, getShowRecommendations } from "@/actions/video
 import { fileToTech, pickBestFile } from "@/lib/video-tech";
 import { buildMoviePosterProps, buildShowPosterProps, buildTmdbHitPosterProps } from "@/lib/poster-card-builder";
 import { getWatchPrefs } from "@/actions/watch-prefs";
+import { notSignedInFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
@@ -87,14 +88,7 @@ export default async function WatchHome() {
     const session = await auth();
     const userId = session?.user?.id;
     const t = await getTranslations("watch.rows");
-    if (!userId) {
-        return (
-            <div style={{ padding: "4rem 2rem" }}>
-                <h1>Watch</h1>
-                <p>Autentifică-te pentru a-ți vedea biblioteca.</p>
-            </div>
-        );
-    }
+    if (!userId) return notSignedInFor("watch");
 
     const hasLocalSeed = await safe(
         () => db.select({ id: videoFiles.id }).from(videoFiles).where(eq(videoFiles.userId, userId)).limit(1),

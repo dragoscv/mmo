@@ -3,13 +3,14 @@ import { Music } from "lucide-react";
 import { auth } from "@/auth";
 import { ProcessingModeSwitch } from "@/components/settings/processing-mode-switch";
 import { getProcessingMode } from "@/lib/processing-mode";
+import { notSignedInFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
     const session = await auth();
     if (!session?.user?.id) {
-        return <main className="p-6"><p>Autentifică-te.</p></main>;
+        return notSignedInFor("music");
     }
     const mode = await getProcessingMode(session.user.id);
     return (

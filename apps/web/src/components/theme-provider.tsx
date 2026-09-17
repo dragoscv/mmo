@@ -1,81 +1,39 @@
 "use client";
 
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useLayoutEffect,
-    useMemo,
-    useState,
-} from "react";
+/**
+ * Web binding for the shared @mmo/ui ThemeProvider.
+ *
+ * Preserves the legacy `useTheme()` shape ({ theme, setTheme, resolvedTheme })
+ * for existing call sites, and keeps profile sync working: every change is
+ * mirrored into the legacy `theme` localStorage key and dispatches
+ * "mmo-preference-changed" (both done inside @mmo/ui's prefs-store), and the
+ * new `mixai:` prefix is registered in lib/syncable-keys.ts.
+ *
+ * Pre-paint state is applied by /prehydrate.js (generated from
+ * packages/design-tokens) which the root layout loads in <head>.
+ */
+import { startTransition, type ReactNode } from "react";
+import { ThemeProvider as UiThemeProvider, useTheme, useThemePrefs, type ThemePrefs } from "@mmo/ui/theme";
+import { setLocaleAction } from "@/actions/locale";
+import type { AppLocale } from "@/i18n/locales";
 
-type Theme = "light" | "dark" | "system";
+export { useTheme, useThemePrefs };
+export type { ThemePrefs };
 
-interface ThemeContextValue {
-    theme: Theme;
-    setTheme: (theme: Theme) => void;
-    resolvedTheme: "light" | "dark";
-}
-
-const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
-
-const STORAGE_KEY = "theme";
-
-function getSystemTheme(): "light" | "dark" {
-    if (typeof window === "undefined") return "dark";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
-}
-
-function applyTheme(theme: Theme) {
-    const resolved = theme === "system" ? getSystemTheme() : theme;
-    const root = document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(resolved);
-    root.style.colorScheme = resolved;
-}
-
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-    const [theme, setThemeState] = useState<Theme>(() => {
-        if (typeof window === "undefined") return "dark";
-        return (localStorage.getItem(STORAGE_KEY) as Theme) || "dark";
-    });
-
-    const resolvedTheme = theme === "system" ? getSystemTheme() : theme;
-
-    const setTheme = useCallback((newTheme: Theme) => {
-        setThemeState(newTheme);
-        localStorage.setItem(STORAGE_KEY, newTheme);
-        applyTheme(newTheme);
-        window.dispatchEvent(new Event("mmo-preference-changed"));
-    }, []);
-
-    useLayoutEffect(() => {
-        applyTheme(theme);
-    }, [theme]);
-
-    useEffect(() => {
-        if (theme !== "system") return;
-        const mql = window.matchMedia("(prefers-color-scheme: dark)");
-        const handler = () => applyTheme("system");
-        mql.addEventListener("change", handler);
-        return () => mql.removeEventListener("change", handler);
-    }, [theme]);
-
-    const value = useMemo(
-        () => ({ theme, setTheme, resolvedTheme }),
-        [theme, setTheme, resolvedTheme]
-    );
-
+export function ThemeProvider({ children, initialLocale }: { children: ReactNode; initialLocale?: AppLocale }) {
     return (
-        <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+        <UiThemeProvider
+            initialPrefs={initialLocale ? { locale: initialLocale } : undefined}
+            onChange={(prefs) => {
+                // Locale lives in a cookie so the server can pick messages —
+                // keep it in step when the user changes it from any surface.
+                if (typeof document !== "undefined") {
+                    const m = document.cookie.match(/(?:^|; )mmo-locale=(ro|en)/);
+                    if (m?.[1] !== prefs.locale) startTransition(() => void setLocaleAction(prefs.locale));
+                }
+            }}
+        >
+            {children}
+        </UiThemeProvider>
     );
-}
-
-export function useTheme() {
-    const ctx = useContext(ThemeContext);
-    if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
-    return ctx;
 }

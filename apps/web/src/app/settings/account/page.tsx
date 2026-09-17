@@ -2,13 +2,14 @@ import { auth } from "@/auth";
 import { getSubscription } from "@/lib/stripe";
 import { BillingPanel } from "@/components/settings/billing-panel";
 import { AccountPanel } from "@/components/settings/account-panel";
+import { notSignedInFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountSettingsPage() {
     const session = await auth();
     if (!session?.user?.id) {
-        return <main className="p-6"><p>Autentifică-te.</p></main>;
+        return notSignedInFor("settings");
     }
     const sub = await getSubscription(session.user.id);
     return (

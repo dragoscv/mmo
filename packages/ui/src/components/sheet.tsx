@@ -3,8 +3,8 @@
 import type * as React from "react";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
-import { cn } from "../lib/cn.ts";
-import { useUiT } from "../i18n/index.tsx";
+import { cn } from "../lib/cn";
+import { useUiT } from "../i18n/index";
 
 /** Sheet root — a dialog that slides in from an edge. */
 export const Sheet = BaseDialog.Root;

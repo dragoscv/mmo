@@ -2,7 +2,7 @@
 
 import { Checkbox as BaseCheckbox } from "@base-ui/react/checkbox";
 import { CheckIcon, MinusIcon } from "lucide-react";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export type CheckboxProps = BaseCheckbox.Root.Props;
 

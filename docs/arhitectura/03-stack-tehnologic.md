@@ -31,16 +31,19 @@ Toate dependențele majore din MMO, grupate pe componentă, cu **motivația** al
 
 | Dependență | De ce |
 |---|---|
-| `tailwindcss` 4.1 | CSS-first config (`@theme`), PostCSS plugin |
-| `shadcn` 4.2 | Componente owned (Radix + CVA + tailwind-merge) |
-| `@radix-ui/*` | Primitive headless accesibile |
+| `@mmo/design-tokens` (packages/) | **Sursa unică de tokens** — paletă OKLCH, dimensiuni de temă (mode/accent/surface/density/radius/motion), generator CSS/JSON/Kotlin/prehydrate. Vezi [design-system.md](../design-system.md) |
+| `@mmo/ui` (packages/) | Componente partajate pe **Base UI** (`@base-ui/react` 1.8), ThemeProvider, motion presets, hooks, mesaje RO/EN |
+| `tailwindcss` 4.3 | CSS-first config (`@theme`), compilat cu `@tailwindcss/cli` în `public/globals.css` |
+| `@base-ui/react` 1.8 | Primitive headless accesibile (default shadcn din 2026-07; `render` prop în loc de `asChild`) |
+| `radix-ui` 1.6 | Primitive legacy în `apps/web/src/components/ui/*` până la migrarea completă pe `@mmo/ui` |
 | `class-variance-authority` 0.7 | Variants type-safe pentru componente |
-| `clsx` + `tailwind-merge` | Combinare clase Tailwind sigură |
-| `lucide-react` 1.8 | Iconuri SVG, tree-shakable |
-| `next-themes` 0.4 | Dark mode |
+| `clsx` + `tailwind-merge` 3.7 | Combinare clase Tailwind sigură |
+| `lucide-react` 1.47 | Iconuri SVG, tree-shakable |
 | `sonner` 2.0 | Toast notifications |
-| `cmdk` 1.1 | Command palette |
-| `framer-motion` 12.38 | Animații (DAW timeline, transitions) |
+| `cmdk` 1.1 | Command palette (`CommandDialog` din `@mmo/ui`) |
+| `motion` 13.4 | Animații (fost `framer-motion`; DAW timeline, transitions, `AnimateView` pe React 19.3 ViewTransition) |
+| `@tanstack/react-table` 9 | `DataTable` cu prioritate de coloane și mod card pe mobil |
+| `nuqs` 2.10 | Stare URL pentru filtre (library, playlists) |
 | `dockview` 5.2 | Layout cu panouri redimensionabile (DAW, mixer) |
 | `react-grid-layout` 2.2 | Grid drag-drop (live mode pads) |
 | `mobile-drag-drop` 3.0-rc | DnD touch pe mobile |

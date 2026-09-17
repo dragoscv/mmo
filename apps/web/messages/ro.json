@@ -1,6 +1,75 @@
 {
-    "appName": "MuzicAI",
+    "appName": "MixAI",
     "tagline": "Suită muzicală AI pentru DJ-i și producători",
+    "activate": {
+        "title": "Conectezi {device} ({platform})?",
+        "titleNoDevice": "Conectează un TV la contul tău",
+        "subtitle": "Introdu codul de 8 caractere afișat pe ecranul TV-ului.",
+        "codeLabel": "Cod de activare",
+        "continue": "Continuă",
+        "approve": "Aprobă",
+        "deny": "Refuză",
+        "successTitle": "Gata",
+        "successBody": "{device} este conectat la contul tău — poți lăsa telefonul.",
+        "deniedTitle": "Refuzat",
+        "deniedBody": "{device} nu a fost conectat. Dacă nu tu ai cerut asta, ești în siguranță.",
+        "errors": {
+            "unauthenticated": "Trebuie să te autentifici mai întâi.",
+            "invalid": "Codul are 8 litere și cifre (fără 0, O, 1, I).",
+            "not_found": "Nu există nicio cerere cu acest cod. Verifică codul de pe TV.",
+            "expired": "Codul a expirat. Cere TV-ului un cod nou.",
+            "already_decided": "Acest cod a fost deja folosit."
+        }
+    },
+            "settings": {
+                "appearance": {
+                    "title": "Aspect & limbă",
+                    "description": "Mod, culoare de accent, suprafețe, densitate, animații și limbă. Salvate în profilul tău și aplicate pe fiecare dispozitiv."
+                }
+            },
+    "pair": {
+        "title": "Aprobi MixAI TV pe {server}?",
+        "titleNoServer": "Aprobă un TV sau un dispozitiv mobil",
+        "subtitle": "Introdu codul de 6 cifre afișat pe ecranul pe care vrei să-l conectezi.",
+        "hostLabel": "Adresa serverului",
+        "codeLabel": "Cod de asociere",
+        "approve": "Aprobă",
+        "successTitle": "Conectat",
+        "successBody": "{server} a acceptat dispozitivul — poți lăsa telefonul jos.",
+        "errors": {
+            "not_found": "Nu există nicio cerere în așteptare cu acest cod. Verifică codul de pe TV și încearcă din nou.",
+            "unauthorized": "MMO Server a respins cererea. Asigură-te că este asociat cu acest cont.",
+            "expired": "Codul a expirat. Cere TV-ului un cod nou.",
+            "unreachable": "Nu am putut contacta MMO Server. Este pornit și în aceeași rețea?",
+            "failed": "Ceva nu a mers. Încearcă din nou.",
+            "unauthenticated": "Trebuie să te autentifici mai întâi.",
+            "invalid": "Codul trebuie să aibă exact 6 cifre."
+        },
+        "panelTitle": "Cereri de asociere TV / mobil în așteptare",
+        "panelEmpty": "Niciun dispozitiv nu așteaptă. Deschide MixAI TV și va apărea aici.",
+        "panelRow": "{requester} ({platform}) vrea să se conecteze la {server}",
+        "expiresAt": "expiră {time}",
+        "approved": "{requester} conectat la {server}"
+    },
+    "cast": {
+        "playOn": "Redă pe…",
+        "browserCast": "Chromecast (acest browser)",
+        "noCastDevices": "niciun dispozitiv",
+        "searching": "Caut în rețea…",
+        "noDevices": "Nu am găsit niciun dispozitiv. Verifică dacă TV-ul / boxa e în aceeași rețea cu companion-ul.",
+        "haNotConfigured": "Home Assistant nu e configurat (HA_URL / HA_TOKEN pe companion).",
+        "refresh": "Caută din nou",
+        "playingOn": "Redare pe {name}",
+        "castFailed": "Nu am putut trimite redarea: {error}",
+        "pause": "Pauză",
+        "resume": "Reia",
+        "stop": "Oprește redarea",
+        "kind": {
+            "google-cast-ha": "Google Cast (prin Home Assistant)",
+            "dlna": "DLNA / UPnP",
+            "home-assistant": "Home Assistant"
+        }
+    },
     "watch": {
         "rows": {
             "continue": "Continuă vizionarea",
@@ -32,7 +101,19 @@
             "playlists": "playlist-urile tale",
             "scanner": "scanerul",
             "plugins": "plugin-urile",
-            "analysis": "analiza bibliotecii"
+            "analysis": "analiza bibliotecii",
+            "watch": "videoteca ta",
+            "movies": "filmele tale",
+            "shows": "serialele tale",
+            "collections": "colecțiile tale",
+            "continue": "lista ta de continuare",
+            "stats": "statisticile tale de vizionare",
+            "profiles": "profilurile de vizionare",
+            "settings": "setările",
+            "music": "spațiul tău de lucru muzical",
+            "recordings": "înregistrările tale",
+            "devices": "dispozitivele tale",
+            "download": "descărcătorul"
         },
         "notSignedIn": {
             "title": "Autentifică-te pentru a vedea {feature}",
@@ -109,6 +190,10 @@
         "searchPlaceholder": "Caută…",
         "noResults": "Niciun rezultat",
         "error": "A apărut o eroare",
+        "errorDetail": "Pagina a întâmpinat o eroare neașteptată. Încearcă din nou — dacă persistă, problema a fost raportată.",
+        "notFound": "Pagina nu există",
+        "notFoundDetail": "Pagina căutată nu există sau a fost mutată.",
+        "goHome": "Mergi la panou",
         "retry": "Reîncearcă",
         "close": "Închide",
         "open": "Deschide",
@@ -145,9 +230,9 @@
         "termsNote": "Continuând, accepți Termenii și Politica de confidențialitate."
     },
     "login": {
-        "welcomeTitle": "Bun venit la MuzicAI",
-        "welcomeSubtitle": "MuzicAI — Suită Muzicală AI",
-        "formTitle": "Autentifică-te la MuzicAI",
+        "welcomeTitle": "Bun venit la MixAI",
+        "welcomeSubtitle": "MixAI — Suită Muzicală AI",
+        "formTitle": "Autentifică-te la MixAI",
         "formSubtitle": "Setările și preferințele tale vor fi sincronizate între sesiuni",
         "formFooter": "Continuând, ești de acord să-ți stocăm preferințele în siguranță în baza de date a aplicației.",
         "skipNoteLine1": "Poți folosi aplicația și fără autentificare.",
@@ -279,14 +364,14 @@
     },
     "learn": {
         "eyebrow": "Învață",
-        "title": "Bază de cunoștințe MuzicAI",
+        "title": "Bază de cunoștințe MixAI",
         "subtitle": "Concepte, arhitectură, echipament, genuri, sfaturi de organizare și glosarul complet — tot ce știm despre o bibliotecă DJ, într-un singur loc.",
         "backToIndex": "Toate secțiunile",
         "pageCount": "{count, plural, one {# pagină} few {# pagini} other {# de pagini}}",
         "sections": {
             "concept": {
                 "title": "Concept",
-                "desc": "Viziune, decizii de arhitectură și direcție de produs pentru MuzicAI."
+                "desc": "Viziune, decizii de arhitectură și direcție de produs pentru MixAI."
             },
             "docs": {
                 "title": "Documentație",
@@ -311,7 +396,7 @@
         }
     },
     "onboarding": {
-        "welcomeTitle": "Bun venit în MuzicAI",
+        "welcomeTitle": "Bun venit în MixAI",
         "welcomeDesc": "Patru pași rapizi și biblioteca ta DJ e gata.",
         "skipForNow": "Sari peste",
         "reopenHint": "Poți redeschide acest ghid din <kbd>⌘K</kbd> → „Onboarding”",
@@ -330,11 +415,11 @@
         "companionTitle": "Instalează companion-ul",
         "companionDesc": "O aplicație desktop mică care îți scanează fișierele locale.",
         "companionLinked": "Companion conectat.",
-        "companionInstall": "Descarcă MuzicAI Companion pentru OS-ul tău, rulează-l o dată și conectează-l la acest cont.",
+        "companionInstall": "Descarcă MixAI Companion pentru OS-ul tău, rulează-l o dată și conectează-l la acest cont.",
         "companionOpenDownloads": "Deschide pagina de descărcări",
         "companionLater": "O fac mai târziu",
         "scanTitle": "Rulează prima scanare",
-        "scanDesc": "Indică MuzicAI către un folder cu fișiere audio. Restul îl facem noi.",
+        "scanDesc": "Indică MixAI către un folder cu fișiere audio. Restul îl facem noi.",
         "scanLong": "Scanner-ul citește tagurile ID3, calculează BPM + tonalitate Camelot și indexează totul pentru căutare instantă.",
         "scanOpenScanner": "Deschide Scanner-ul"
     },

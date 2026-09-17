@@ -1,7 +1,7 @@
 "use client";
 
 import { Field as BaseField } from "@base-ui/react/field";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 /**
  * Form field container: label above control, description/error below.

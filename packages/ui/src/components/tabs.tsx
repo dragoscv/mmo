@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Tabs as BaseTabs } from "@base-ui/react/tabs";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 /** Tabs root; controls the active tab value. */
 export function Tabs({ className, ...props }: BaseTabs.Root.Props) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Switch as BaseSwitch } from "@base-ui/react/switch";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export interface SwitchProps extends BaseSwitch.Root.Props {
   size?: "sm" | "default";

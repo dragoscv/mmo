@@ -1,7 +1,7 @@
 "use client";
 
 import { Collapsible as BaseCollapsible } from "@base-ui/react/collapsible";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 /** Collapsible root; controls open state. */
 export const Collapsible = BaseCollapsible.Root;

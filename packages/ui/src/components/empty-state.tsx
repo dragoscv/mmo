@@ -2,8 +2,8 @@
 
 import type { ComponentProps, ReactNode } from "react";
 import { AlertTriangle, Inbox, Laptop, LockKeyhole, SearchX } from "lucide-react";
-import { cn } from "../lib/cn.ts";
-import { useUiT } from "../i18n/index.tsx";
+import { cn } from "../lib/cn";
+import { useUiT } from "../i18n/index";
 
 export interface EmptyStateProps extends Omit<ComponentProps<"div">, "title"> {
   icon?: ReactNode;

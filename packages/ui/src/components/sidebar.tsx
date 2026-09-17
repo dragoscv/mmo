@@ -5,9 +5,9 @@ import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { useRender } from "@base-ui/react/use-render";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { PanelLeftIcon } from "lucide-react";
-import { cn } from "../lib/cn.ts";
-import { useUiT } from "../i18n/index.tsx";
-import { useIsMobile } from "../hooks/index.ts";
+import { cn } from "../lib/cn";
+import { useUiT } from "../i18n/index";
+import { useIsMobile } from "../hooks/index";
 
 // ─── Persistence ────────────────────────────────────────────────────────────
 

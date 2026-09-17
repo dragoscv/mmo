@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Field as BaseField } from "@base-ui/react/field";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export interface TextareaProps extends Omit<BaseField.Control.Props, "render"> {
   /** Native textarea attributes not present on the generic control props. */

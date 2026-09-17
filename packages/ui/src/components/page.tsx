@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export type ContentWidth = "sm" | "md" | "lg" | "xl" | "full";
 

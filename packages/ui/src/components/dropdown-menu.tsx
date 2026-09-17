@@ -3,7 +3,7 @@
 import type * as React from "react";
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 /** Dropdown menu root. */
 export const DropdownMenu = BaseMenu.Root;

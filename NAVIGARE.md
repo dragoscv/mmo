@@ -1,9 +1,9 @@
-# 🗺️ Navigare Completă — MuzicAI (AI Music Suite)
+# 🗺️ Navigare Completă — MixAI (Multi Media Organizer)
 
 > **Hartă completă** a tuturor documentelor din acest repository.
 > Click pe orice link pentru a naviga direct.
 
-[🏠 Home](README.md) · [🇬🇧 EN](README.en.md)
+[🏠 Home](README.md) · [🇬🇧 EN](README.en.md) · [🗺️ Plan platformă media](docs/followups/mixai-media-platform-plan.md) · [📜 ADR-uri](docs/adr/)
 
 ---
 
@@ -133,7 +133,7 @@ mindmap
 
 ---
 
-## 🖥️ MMO Companion (desktop Electron)
+## 🖥️ MMO Server / MixAI Companion (desktop Electron)
 
 | Document | Descriere |
 |----------|-----------|
@@ -262,7 +262,9 @@ mindmap
 | [concept/README.md](docs/concept/README.md) | Brief produs MMO |
 | [concept/arhitectura.md](docs/concept/arhitectura.md) | Decizii arhitecturale & istorie |
 | [concept/functionalitati.md](docs/concept/functionalitati.md) | Roadmap & feature matrix |
-| [concept/ui-ux.md](docs/concept/ui-ux.md) | Sistem design UI |
+| [design-system.md](docs/design-system.md) | **Sistemul de design MixAI** — tokens OKLCH, dimensiuni de temă, `@mmo/ui`, reguli layout/motion/a11y |
+| [mixai-design-tracker.md](docs/mixai-design-tracker.md) | Plan + tracker canonic al overhaul-ului de design (decizii D1–D14, WP0–WP9; CSV în același folder) |
+| [concept/ui-ux.md](docs/concept/ui-ux.md) | UI/UX istoric (Music Organizer) — paletă veche, schițe layout |
 | [concept/drive-manager.md](docs/concept/drive-manager.md) | Concept Drive Manager |
 | [concept/scanner.md](docs/concept/scanner.md) | Concept Scanner |
 

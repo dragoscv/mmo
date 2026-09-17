@@ -1,8 +1,8 @@
 import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { PREFS_STORAGE_KEY } from "@mmo/design-tokens";
-import { ThemeProvider, useThemePrefs } from "./theme-provider.tsx";
-import { loadPrefs } from "./prefs-store.ts";
+import { ThemeProvider, useThemePrefs } from "./theme-provider";
+import { loadPrefs } from "./prefs-store";
 
 function Probe() {
   const { prefs, resolvedMode, setPrefs } = useThemePrefs();

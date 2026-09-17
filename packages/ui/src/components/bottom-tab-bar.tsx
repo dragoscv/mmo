@@ -6,9 +6,9 @@ import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { useRender } from "@base-ui/react/use-render";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { MoreHorizontalIcon } from "lucide-react";
-import { cn } from "../lib/cn.ts";
-import { useUiT } from "../i18n/index.tsx";
-import { useHaptics } from "../hooks/index.ts";
+import { cn } from "../lib/cn";
+import { useUiT } from "../i18n/index";
+import { useHaptics } from "../hooks/index";
 
 export interface BottomTabItem {
   id: string;

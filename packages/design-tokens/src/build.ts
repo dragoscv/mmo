@@ -1,6 +1,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+// Executed directly by `node --experimental-strip-types`, which needs explicit
+// extensions (unlike the bundler-resolved imports elsewhere in this package).
 import { kotlinTokens, plainCss, prehydrateScript, tailwindCss, tokensJson } from "./generate.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));

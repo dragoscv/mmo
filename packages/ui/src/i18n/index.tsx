@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, type ReactNode } from "react";
-import { useThemePrefs } from "../theme/theme-provider.tsx";
-import { uiMessages, type UiLocale, type UiMessageKey } from "./messages.ts";
+import { useThemePrefs } from "../theme/theme-provider";
+import { uiMessages, type UiLocale, type UiMessageKey } from "./messages";
 
 export { uiMessages, type UiLocale, type UiMessageKey };
 

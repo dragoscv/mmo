@@ -3,8 +3,8 @@
 import * as React from "react";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
-import { cn } from "../lib/cn.ts";
-import { useUiT } from "../i18n/index.tsx";
+import { cn } from "../lib/cn";
+import { useUiT } from "../i18n/index";
 
 export const Dialog = BaseDialog.Root;
 export const DialogTrigger = BaseDialog.Trigger;

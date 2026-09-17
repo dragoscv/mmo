@@ -20,7 +20,13 @@ const alias = {
 };
 
 export default defineConfig({
-    resolve: { alias },
+    resolve: {
+        alias,
+        // packages/ui is consumed via path alias, so its own node_modules would
+        // otherwise supply a second React copy ("Cannot read properties of null
+        // (reading 'useState')"). Force a single instance from apps/web.
+        dedupe: ["react", "react-dom", "motion", "@base-ui/react", "lucide-react"],
+    },
     test: {
         // Per-pattern environments (vitest 5 `projects` replaces the removed
         // `environmentMatchGlobs`): tsx component tests need jsdom for a real

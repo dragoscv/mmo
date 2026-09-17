@@ -5,13 +5,14 @@ import { asc, eq } from "drizzle-orm";
 import { CreateProfileForm } from "./_create-form";
 import { ProfileCard } from "@/components/profile-card";
 import { getActiveProfileId } from "@/lib/active-profile";
+import { notSignedInFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfilesPage() {
     const session = await auth();
     const userId = session?.user?.id;
-    if (!userId) return <main style={{ padding: "2rem" }}><p>Autentifică-te.</p></main>;
+    if (!userId) return notSignedInFor("profiles");
     const [rows, activeId] = await Promise.all([
         db.select().from(watchProfiles).where(eq(watchProfiles.userId, userId)).orderBy(asc(watchProfiles.sortOrder)),
         getActiveProfileId(),

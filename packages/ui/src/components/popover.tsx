@@ -2,7 +2,7 @@
 
 import type * as React from "react";
 import { Popover as BasePopover } from "@base-ui/react/popover";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 /** Popover root — controls open state. */
 export const Popover = BasePopover.Root;

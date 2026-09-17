@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export function Skeleton({ className, ...props }: ComponentProps<"div">) {
   return <div data-slot="skeleton" aria-hidden className={cn("skeleton", className)} {...props} />;

@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "../lib/cn.ts";
-import { SidebarProvider, type SidebarProviderProps } from "./sidebar.tsx";
+import { cn } from "../lib/cn";
+import { SidebarProvider, type SidebarProviderProps } from "./sidebar";
 
 export interface AppShellProps extends Omit<React.ComponentProps<"div">, "children"> {
   children: React.ReactNode;

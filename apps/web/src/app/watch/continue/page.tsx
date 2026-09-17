@@ -7,6 +7,7 @@ import { PosterCard } from "@/components/video/poster-card";
 import { getActiveProfileId } from "@/lib/active-profile";
 import { listCustomCollections } from "@/actions/video-context";
 import { buildMoviePosterProps } from "@/lib/poster-card-builder";
+import { notSignedInFor } from "@/components/empty-state-server";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Continuă vizionarea" };
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ContinueWatchingPage() {
     const session = await auth();
-    if (!session?.user?.id) return <div style={{ padding: "4rem" }}>Autentifică-te.</div>;
+    if (!session?.user?.id) return notSignedInFor("continue");
 
     const profileId = await getActiveProfileId().catch(() => null);
     if (!profileId) {

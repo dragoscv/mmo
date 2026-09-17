@@ -12,9 +12,8 @@
  * the component will fall back to the original English copy.
  */
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Laptop, Music } from "lucide-react";
+import { Laptop, LockKeyhole } from "lucide-react";
+import { Button, EmptyState } from "@mmo/ui";
 import { SignInButton } from "@/components/sign-in-button";
 
 interface CommonProps {
@@ -33,22 +32,12 @@ export function NotSignedIn({
     ctaLabel,
 }: CommonProps) {
     return (
-        <div className="flex h-full min-h-[60vh] w-full items-center justify-center p-6">
-            <Card className="max-w-md text-center">
-                <CardHeader>
-                    <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                        <Music className="h-6 w-6" />
-                    </div>
-                    <CardTitle>{title ?? `Sign in to see ${feature}`}</CardTitle>
-                    <CardDescription>
-                        {description ?? `Tracks, playlists, and scans are stored per user. Sign in to access ${feature}.`}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <SignInButton label={ctaLabel ?? "Sign in"} />
-                </CardContent>
-            </Card>
-        </div>
+        <EmptyState
+            icon={<LockKeyhole aria-hidden />}
+            title={title ?? `Sign in to see ${feature}`}
+            description={description ?? `Tracks, playlists, and scans are stored per user. Sign in to access ${feature}.`}
+            actions={<SignInButton label={ctaLabel ?? "Sign in"} />}
+        />
     );
 }
 
@@ -59,23 +48,15 @@ export function NoCompanion({
     ctaLabel,
 }: CommonProps) {
     return (
-        <div className="flex h-full min-h-[60vh] w-full items-center justify-center p-6">
-            <Card className="max-w-md text-center">
-                <CardHeader>
-                    <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                        <Laptop className="h-6 w-6" />
-                    </div>
-                    <CardTitle>{title ?? `Connect a companion to see ${feature}`}</CardTitle>
-                    <CardDescription>
-                        {description ?? `${feature} now lives on your local companion app. Install it and pair it with this account to get going.`}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-2">
-                    <Button asChild>
-                        <Link href="/devices"><Laptop className="mr-2 h-4 w-4" /> {ctaLabel ?? "Manage devices"}</Link>
-                    </Button>
-                </CardContent>
-            </Card>
-        </div>
+        <EmptyState
+            icon={<Laptop aria-hidden />}
+            title={title ?? `Connect a companion to see ${feature}`}
+            description={description ?? `${feature} now lives on your local companion app. Install it and pair it with this account to get going.`}
+            actions={
+                <Button render={<Link href="/devices" />}>
+                    <Laptop aria-hidden /> {ctaLabel ?? "Manage devices"}
+                </Button>
+            }
+        />
     );
 }

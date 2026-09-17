@@ -18,7 +18,7 @@ import {
   loadPrefs,
   resolveMode,
   savePrefs,
-} from "./prefs-store.ts";
+} from "./prefs-store";
 
 export interface ThemeContextValue {
   prefs: ThemePrefs;

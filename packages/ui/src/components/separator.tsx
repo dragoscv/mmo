@@ -1,7 +1,7 @@
 "use client";
 
 import { Separator as BaseSeparator } from "@base-ui/react/separator";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export interface SeparatorProps extends BaseSeparator.Props {
   /** When true (default) the separator is purely visual and hidden from AT. */

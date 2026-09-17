@@ -1,8 +1,8 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { ThemeProvider } from "../theme/theme-provider.tsx";
-import { EmptyState, ErrorState, NotSignedInState } from "./empty-state.tsx";
+import { ThemeProvider } from "../theme/theme-provider";
+import { EmptyState, ErrorState, NotSignedInState } from "./empty-state";
 
 const wrap = (ui: React.ReactNode) => render(<ThemeProvider>{ui}</ThemeProvider>);
 

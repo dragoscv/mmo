@@ -9,7 +9,9 @@
 
 /** Prefixes — any localStorage key starting with one of these is syncable. */
 export const SYNCABLE_KEY_PREFIXES = [
+    "mixai:",                // design-system prefs (mixai:prefs:v1, mixai:sidebar, …)
     "mmo-",                  // app-wide ("My Music Organizer") namespace
+    "mmo:",                  // colon-namespaced keys (watch theme, pickers) — previously NOT synced (drift fix)
     "music-organizer-",      // legacy app namespace (player, EQ, etc.)
     "daw_",                  // DAW dockview layout, etc.
     "daw-",                  // DAW clipboard, misc

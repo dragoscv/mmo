@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Slider as BaseSlider } from "@base-ui/react/slider";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export interface SliderProps<Value extends number | readonly number[] = number | readonly number[]> extends BaseSlider.Root.Props<Value> {
   /** Renders the formatted value(s) next to the control (no tooltip). */

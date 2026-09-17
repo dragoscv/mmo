@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { kotlinTokens, oklchToHex, plainCss, prehydrateScript, tailwindCss } from "./generate.ts";
-import { ACCENTS, DATA_ATTRS, PREFS_STORAGE_KEY, normalizePrefs, parseAccent } from "./tokens.ts";
+import { kotlinTokens, oklchToHex, plainCss, prehydrateScript, tailwindCss } from "./generate";
+import { ACCENTS, DATA_ATTRS, PREFS_STORAGE_KEY, normalizePrefs, parseAccent } from "./tokens";
 
 describe("tokens css", () => {
   const css = tailwindCss();

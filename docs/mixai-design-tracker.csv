@@ -13,9 +13,9 @@ D11,decision,all,Risky majors,done,user,"TS7, vitest5, electron44, ai7, express5
 D12,decision,all,Delivery order,done,user,"WP0→WP1→WP2→WP3-7 parallel→WP8"
 D13,decision,all,Extra recommendations,done,user,"all 7 in (WP9)"
 D14,decision,all,Versioning,done,user,"major bump everywhere"
-WP0-01,item,packages,design-tokens package + generator (CSS/JSON/Kotlin),todo,agent,
-WP0-02,item,packages,packages/ui scaffold + tsconfig paths,todo,agent,
-WP0-03,item,packages,ThemeProvider v2 + prefs store + prehydrate,todo,agent,
+WP0-01,item,packages,design-tokens package + generator (CSS/JSON/Kotlin),done,agent,4f9e671
+WP0-02,item,packages,packages/ui on Base UI (40+ primitives),done,agent,4f9e671
+WP0-03,item,packages,ThemeProvider v2 + prefs store + prehydrate,done,agent,4f9e671
 WP0-04,item,tooling,Root scripts + web CI workflow,todo,agent,
 WP0-05,item,docs,design-system.md; replace concept/ui-ux.md; NAVIGARE/README/stack,todo,agent,
 WP1-01,item,web,next 16.3.5 + react 19.3,todo,agent,

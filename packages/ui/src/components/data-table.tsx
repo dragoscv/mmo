@@ -18,12 +18,12 @@ import {
 } from "@tanstack/react-table";
 import { Popover } from "@base-ui/react/popover";
 import { ArrowDownIcon, ArrowUpIcon, ChevronLeftIcon, ChevronRightIcon, Columns3Icon } from "lucide-react";
-import { cn } from "../lib/cn.ts";
-import { useUiT } from "../i18n/index.tsx";
-import { useIsMobile } from "../hooks/index.ts";
-import { SkeletonTable } from "./skeleton.tsx";
-import { NoResultsState } from "./empty-state.tsx";
-import { Button } from "./button.tsx";
+import { cn } from "../lib/cn";
+import { useUiT } from "../i18n/index";
+import { useIsMobile } from "../hooks/index";
+import { SkeletonTable } from "./skeleton";
+import { NoResultsState } from "./empty-state";
+import { Button } from "./button";
 
 // ─── Classic table primitives (legacy call sites) ───────────────────────────
 

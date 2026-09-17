@@ -2,7 +2,7 @@
 
 import type * as React from "react";
 import { Progress as BaseProgress } from "@base-ui/react/progress";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export interface ProgressProps extends Omit<BaseProgress.Root.Props, "value"> {
   /** Current value; ignored when `indeterminate`. */

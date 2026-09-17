@@ -2,8 +2,8 @@
 
 import type * as React from "react";
 import { AlertDialog as BaseAlertDialog } from "@base-ui/react/alert-dialog";
-import { cn } from "../lib/cn.ts";
-import { Button, type ButtonProps } from "./button.tsx";
+import { cn } from "../lib/cn";
+import { Button, type ButtonProps } from "./button";
 
 /** Alert dialog root — a modal that requires an explicit response. */
 export const AlertDialog = BaseAlertDialog.Root;

@@ -1,7 +1,7 @@
 "use client";
 
 import { Input as BaseInput } from "@base-ui/react/input";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export interface InputProps extends Omit<BaseInput.Props, "size"> {
   /** Density size; maps to the `h-control*` tokens. */

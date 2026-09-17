@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
-import { cn } from "../lib/cn.ts";
-import { formatKeyParts, type Platform } from "../lib/shortcuts-registry.ts";
+import { cn } from "../lib/cn";
+import { formatKeyParts, type Platform } from "../lib/shortcuts-registry";
 
 export interface KbdProps extends ComponentProps<"kbd"> {
   size?: "sm" | "md";

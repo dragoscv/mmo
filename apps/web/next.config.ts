@@ -23,6 +23,30 @@ const nextConfig: NextConfig = {
     },
     serverExternalPackages: ["postgres", "music-metadata", "systeminformation"],
 
+    // packages/ui and packages/design-tokens are consumed through tsconfig
+    // `paths` (not workspace deps). Their own node_modules carry a second
+    // React/motion/Base UI copy for isolated tests; force a single instance
+    // here so hooks/context resolve against apps/web's copies.
+    turbopack: {
+        // Turbopack rejects absolute Windows paths here ("windows imports are
+        // not implemented yet") — use project-relative specifiers.
+        resolveAlias: Object.fromEntries(
+            ["react", "react-dom", "motion", "@base-ui/react", "lucide-react", "class-variance-authority", "clsx", "tailwind-merge", "cmdk", "@tanstack/react-table"].map(
+                (p) => [p, `./node_modules/${p}`],
+            ),
+        ),
+    },
+    webpack(config) {
+        config.resolve.alias = {
+            ...config.resolve.alias,
+            react: resolve(__dirname, "node_modules/react"),
+            "react-dom": resolve(__dirname, "node_modules/react-dom"),
+            motion: resolve(__dirname, "node_modules/motion"),
+            "@base-ui/react": resolve(__dirname, "node_modules/@base-ui/react"),
+        };
+        return config;
+    },
+
     images: {
         remotePatterns: [
             { protocol: "https", hostname: "image.tmdb.org" },

@@ -2,12 +2,13 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { devices, companionDevices } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { notSignedInFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function CompanionsSettingsPage() {
     const session = await auth();
-    if (!session?.user?.id) return <main className="p-6"><p>Autentifică-te.</p></main>;
+    if (!session?.user?.id) return notSignedInFor("settings");
     const userId = session.user.id;
 
     const [devRows, compRows] = await Promise.all([

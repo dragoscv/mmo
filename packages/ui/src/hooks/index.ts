@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { useThemePrefs } from "../theme/theme-provider.tsx";
+import { useThemePrefs } from "../theme/theme-provider";
 
 // ─── useMediaQuery ──────────────────────────────────────────────────────────
 

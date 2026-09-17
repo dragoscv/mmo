@@ -121,24 +121,24 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 ### WP0 — Foundation & tooling
 | ID | Item | Status |
 |---|---|---|
-| WP0-01 | `packages/design-tokens` with typed OKLCH tokens + generator (CSS/JSON/Kotlin) | todo |
-| WP0-02 | `packages/ui` scaffold (Tailwind v4, radix-ui, cva, motion 13, lucide), `cn`, tsconfig paths in consumers | todo |
-| WP0-03 | ThemeProvider v2: prefs store `mixai:prefs:v1`, migration from legacy keys, prehydrate script, `data-*` attrs | todo |
-| WP0-04 | Root scripts (`lint`, `typecheck`, `test`, `build` fan-out) + `.github/workflows/web-ci.yml` (lint/typecheck/test/build) | todo |
+| WP0-01 | `packages/design-tokens` with typed OKLCH tokens + generator (CSS/JSON/Kotlin) | done 4f9e671 |
+| WP0-02 | `packages/ui` on **Base UI** (D6) — 40+ primitives incl. DataTable (TanStack 9), Sidebar, BottomTabBar, AppShell, CommandDialog, shortcuts registry | done 4f9e671 |
+| WP0-03 | ThemeProvider v2: prefs store `mixai:prefs:v1`, migration from legacy keys, prehydrate script, `data-*` attrs, artwork accent | done 4f9e671 |
+| WP0-04 | Root scripts (`lint`, `typecheck`, `test`, `build` fan-out) + `.github/workflows/web-ci.yml` (lint/typecheck/test/build) | done e837d87 |
 | WP0-05 | Docs: `docs/design-system.md` (tokens, dimensions, usage), replace `docs/concept/ui-ux.md`, update NAVIGARE/README/stack doc | todo |
 
 ### WP1 — Dependency upgrades (one slice = one commit, verified)
 | ID | Item | Status |
 |---|---|---|
-| WP1-01 | web: next 16.3.5, react 19.3, eslint-config-next, @next/bundle-analyzer | todo |
-| WP1-02 | web: tailwindcss 4.3.3 (+cli), tw-animate-css, radix-ui 1.6.7, lucide-react 1.47, tailwind-merge | todo |
-| WP1-03 | web: framer-motion 12 → motion 13 (rename imports, `@emotion/is-prop-valid` note) | todo |
-| WP1-04 | web: vitest 2 → 5, @vitest/coverage-v8, jsdom, @testing-library/*, @playwright/test 1.63 | todo |
-| WP1-05 | web: ai 5 → 7 + @ai-sdk/* (with packages/ai peers) — verify Maestro/copilot | todo |
-| WP1-06 | web: @tanstack/react-query latest; add @tanstack/react-table 9 for DataTable | todo |
-| WP1-07 | web: typescript 5.8 → 7.0.2 (typecheck must stay clean; fallback 5.9 if tooling breaks) | todo |
-| WP1-08 | web: remove dead `next-themes`; misc minors (zod, drizzle, hls.js, recharts, sonner, next-intl 4.14) | todo |
-| WP1-09 | web: `next build` on Turbopack (drop `--webpack`), FS cache; verify worklets/jassub/hls | todo |
+| WP1-01 | web: next 16.3.5, react 19.3, eslint-config-next, @next/bundle-analyzer | done e837d87 |
+| WP1-02 | web: tailwindcss 4.3.3 (+cli), tw-animate-css, radix-ui 1.6.7, lucide-react 1.47, tailwind-merge | done e837d87 |
+| WP1-03 | web: framer-motion 12 → motion 13 (16 import sites) | done e837d87 |
+| WP1-04 | web: vitest 2 → 5 (+vite 8, `projects`), jsdom 29, @testing-library/*, @playwright/test 1.63 | done e837d87 |
+| WP1-05 | web: ai 5 → 7 + @ai-sdk/* v4 (packages/ai on LanguageModelV4) | done 206652f |
+| WP1-06 | web: @tanstack/react-query 5.103; @tanstack/react-table 9 (DataTable) | done e837d87 |
+| WP1-07 | web: typescript 7.0.2 | **blocked upstream** — typescript-eslint 8.70 has no TS 7 API (typescript-eslint#10940); web stays 5.9.3, packages/* on 7.0.2. Re-try when 8.71+ ships. ESLint stays 9.x: eslint-plugin-react 7.37 peer `^9.7` (no ESLint 10). |
+| WP1-08 | web: removed `next-themes`; zod 4.6, drizzle 0.45.2, hls.js, recharts, sonner, next-intl 4.14, nuqs added | done e837d87 |
+| WP1-09 | web: `next build` on Turbopack — VERIFIED BUILD OK 126.7 s, 65 routes, static 6.7 MB; `build:webpack` escape hatch kept | done e837d87 |
 | WP1-10 | mixai: vite 6 → 8, plugin-react 6, @tauri-apps/* 2.11.x, TS 7, drop unused framer-motion | todo |
 | WP1-11 | tv-tizen: vite 7 → 8, plugin-legacy 8, plugin-react 6, hls.js latest | todo |
 | WP1-12 | native: @capacitor/* 7 → 8, @tauri-apps/* 2.11.x | todo |
@@ -150,8 +150,8 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 ### WP2 — apps/web
 | ID | Item | Status |
 |---|---|---|
-| WP2-01 | Move tokens to `@mmo/design-tokens`; `globals.src.css` imports them; delete hardcoded purple/fuchsia (26 sites) | todo |
-| WP2-02 | Settings › Appearance: mode, accent, surface, density, radius, motion, locale — live preview | todo |
+| WP2-01 | `globals.src.css` now imports `@mmo/design-tokens` + `@mmo/ui/styles.css`; legacy :root/.dark/@theme removed; ThemeProvider swapped for `@mmo/ui` binding; prehydrate.js in `<head>` (no flash); dynamic theme-color | doing (hardcoded purple sweep pending) |
+| WP2-02 | Settings › Appearance on shared `ThemeSettings` + `ThemePreview` (mode/accent+custom hue+artwork/surface/density/radius/motion/feedback/locale); `settings.appearance` i18n ns; LocaleSwitcher deleted | done |
 | WP2-03 | App shell: `AppShell` from `@mmo/ui`, sidebar rail/expanded, mobile bottom tab bar, safe-area, `Page` container with ultra-wide rules | todo |
 | WP2-04 | `loading.tsx` skeletons for every route group + `not-found.tsx` + shared `ErrorState` | todo |
 | WP2-05 | Unify auth/empty states: one `NotSignedIn`/`NoCompanion`/`EmptyState` everywhere (16 pages) | todo |
@@ -161,7 +161,7 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 | WP2-09 | Route transitions with React 19.3 `<ViewTransition>`; reduced-motion guard | todo |
 | WP2-10 | Responsive tables → `DataTable` with column priority collapsing (library, hidden, playlists, render-jobs, mixer settings, lora) | todo |
 | WP2-11 | i18n: every hardcoded string through next-intl; nav-tree + global-search from one source; RO+EN complete | todo |
-| WP2-12 | Storage keys: `mmo:` → syncable; unify to `mixai:` with migration; fix `components.json` | todo |
+| WP2-12 | Storage keys: `mixai:` + `mmo:` prefixes now syncable (drift fix); prefs migrated from `theme`/`mmo-locale`/`mixai-ui`; `components.json` fix pending | doing |
 | WP2-13 | Nav discoverability: add `/voice-wizard`, `/library/import`, `/lora/validate`, `/pair`; rename `/downloads` → `/get`; metadata title format | todo |
 | WP2-14 | Fonts: single `font-sans` source, `next/font` for Inter + Space Grotesk; `theme-color` follows mode/accent | todo |
 | WP2-15 | Watch: replace inline-style auth fallbacks; watch skins become surface presets on shared tokens | todo |

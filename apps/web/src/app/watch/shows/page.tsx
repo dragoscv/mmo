@@ -9,6 +9,7 @@ import { getActiveProfileId, ensureDefaultWatchProfile } from "@/lib/active-prof
 import { listCustomCollections } from "@/actions/video-context";
 import { getWatchPrefs } from "@/actions/watch-prefs";
 import { buildShowPosterProps } from "@/lib/poster-card-builder";
+import { notSignedInFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ interface Search {
 export default async function ShowsPage({ searchParams }: { searchParams: Promise<Search> }) {
     const session = await auth();
     const userId = session?.user?.id;
-    if (!userId) return <main style={{ padding: "2rem" }}><p>Autentifică-te.</p></main>;
+    if (!userId) return notSignedInFor("shows");
     const sp = await searchParams;
 
     const profileId = (await getActiveProfileId()) ?? (await ensureDefaultWatchProfile());

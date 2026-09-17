@@ -1,7 +1,7 @@
 "use client";
 
 import { ScrollArea as BaseScrollArea } from "@base-ui/react/scroll-area";
-import { cn } from "../lib/cn.ts";
+import { cn } from "../lib/cn";
 
 export interface ScrollAreaProps extends BaseScrollArea.Root.Props {
   /** Which scrollbars to render. */
