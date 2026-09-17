@@ -1,0 +1,56 @@
+{
+  "name": "@mmo/ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MixAI shared UI — Base UI primitives styled with Tailwind v4 on @mmo/design-tokens, ThemeProvider (mode/accent/surface/density/radius/motion/locale), motion presets, hooks, shared RO/EN UI messages. Consumed by apps/web, apps/mixai, server/ui via tsconfig paths.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css",
+    "./theme": "./src/theme/index.ts",
+    "./motion": "./src/motion/index.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./i18n": "./src/i18n/index.ts",
+    "./components/*": "./src/components/*.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@tanstack/react-table": "^9.2.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "lucide-react": "^1.47.0",
+    "motion": "^13.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@tanstack/react-table": "^9.2.4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "jsdom": "^29.1.1",
+    "lucide-react": "^1.47.0",
+    "motion": "^13.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.7.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
