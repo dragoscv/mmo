@@ -81,7 +81,7 @@ export async function coachVoiceSample(raw: CoachVoiceSampleInput): Promise<Coac
         const { model, modelId } = await resolveModel({ userId, role: "chat" });
         const { text } = await generateText({
             model,
-            system: SYSTEM_PROMPT,
+            instructions: SYSTEM_PROMPT,
             messages: [{
                 role: "user",
                 content: JSON.stringify({

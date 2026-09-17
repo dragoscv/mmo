@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./providers": "./src/providers/index.ts",
+    "./providers/codai": "./src/providers/codai.ts",
     "./providers/copilot": "./src/providers/copilot.ts",
     "./models": "./src/models/index.ts",
     "./agent": "./src/agent/index.ts",
@@ -18,14 +19,19 @@
     "./settings": "./src/settings/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^1.0.0",
-    "@ai-sdk/provider": "^2.0.0"
+    "@ai-sdk/openai-compatible": "^3.0.51",
+    "@ai-sdk/provider": "^4.0.17"
   },
   "peerDependencies": {
-    "ai": "^5.0.0",
+    "ai": "^7.0.0",
     "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
   }
 }

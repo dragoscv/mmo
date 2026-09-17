@@ -19,10 +19,12 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { LanguageModel } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGoogle } from "@ai-sdk/google";
 import { createMistral } from "@ai-sdk/mistral";
 import { createGroq } from "@ai-sdk/groq";
 import { copilotAdapter } from "@mmo/ai/providers/copilot";
+import { CODAI_TIER_MODEL, codaiLanguageModel } from "@mmo/ai/providers/codai";
+import { getCodaiModel, isCodaiAvailable } from "@/lib/codai/client";
 
 interface CopilotSession {
     token: string;
@@ -141,12 +143,14 @@ async function buildLanguageModel(conn: ConnectionRow, modelId: string): Promise
     const apiKey = await decryptToken(conn.encApiKey);
 
     switch (provider) {
+        case "codai":
+            return codaiLanguageModel(modelId, { apiKey, sessionId: conn.userId }) as LanguageModel;
         case "openai":
             return createOpenAI({ apiKey })(modelId);
         case "anthropic":
             return createAnthropic({ apiKey })(modelId);
         case "google":
-            return createGoogleGenerativeAI({ apiKey })(modelId);
+            return createGoogle({ apiKey })(modelId);
         case "mistral":
             return createMistral({ apiKey })(modelId);
         case "groq":
@@ -184,6 +188,8 @@ async function buildLanguageModel(conn: ConnectionRow, modelId: string): Promise
  * authenticated user without forcing them through /settings/copilot first.
  *
  * Priority (cheapest, most-reliable first):
+ *   0. codai (ADR-0006)          — needs CODAI_API_KEY (server key); see
+ *      `resolveServerDefaultForUser` for per-user minted keys
  *   1. Google Gemini 2.5 Pro     — needs GOOGLE_GENERATIVE_AI_API_KEY
  *   2. Azure OpenAI gpt-4o-mini  — needs AZURE_OPENAI_ENDPOINT + KEY + DEPLOYMENT
  *   3. Anthropic Claude Sonnet   — needs ANTHROPIC_API_KEY
@@ -192,11 +198,23 @@ async function buildLanguageModel(conn: ConnectionRow, modelId: string): Promise
  * Returns null if no server-default credentials are present.
  */
 export function resolveServerDefault(): ResolvedModel | null {
+    const codaiKey = process.env.CODAI_API_KEY;
+    if (codaiKey) {
+        const modelId = CODAI_TIER_MODEL.default;
+        return {
+            model: codaiLanguageModel(modelId, { apiKey: codaiKey }) as LanguageModel,
+            provider: "codai" as ProviderId,
+            modelId,
+            connectionId: "__server_default__",
+            role: "agent" as ModelRole,
+        };
+    }
+
     const googleKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (googleKey) {
         const modelId = process.env.GEMINI_MODEL ?? "gemini-2.5-pro";
         return {
-            model: createGoogleGenerativeAI({ apiKey: googleKey })(modelId) as LanguageModel,
+            model: createGoogle({ apiKey: googleKey })(modelId) as LanguageModel,
             provider: "google" as ProviderId,
             modelId,
             connectionId: "__server_default__",
@@ -255,6 +273,31 @@ export function resolveServerDefault(): ResolvedModel | null {
     }
 
     return null;
+}
+
+/**
+ * User-aware server default: codai with the user's minted key (or the
+ * server key) pinned to `x-codai-session-id = userId`, then the same
+ * env-based chain as `resolveServerDefault`. A user's explicit
+ * `aiModelChoices` row always wins — call `resolveModel` first.
+ */
+export async function resolveServerDefaultForUser(userId: string): Promise<ResolvedModel | null> {
+    if (isCodaiAvailable()) {
+        try {
+            const modelId = CODAI_TIER_MODEL.default;
+            const model = await getCodaiModel(userId, "default");
+            return {
+                model,
+                provider: "codai" as ProviderId,
+                modelId,
+                connectionId: "__server_default__",
+                role: "agent" as ModelRole,
+            };
+        } catch (err) {
+            console.warn("[model-resolver] codai unavailable, falling back:", err instanceof Error ? err.message : err);
+        }
+    }
+    return resolveServerDefault();
 }
 
 function toProviderConnection(row: ConnectionRow, secrets: ProviderSecrets): ProviderConnection {

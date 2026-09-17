@@ -6,10 +6,17 @@ import {
     aiAgentSessions,
     aiAgentToolCalls,
 } from "@/db/schema-ai";
-import { resolveModel, resolveServerDefault } from "@/lib/maestro/model-resolver";
+import { resolveModel, resolveServerDefaultForUser } from "@/lib/maestro/model-resolver";
 import { buildTools, type ToolContext } from "@/lib/maestro/tools";
 import { getAiPrefs } from "@/actions/ai-prefs";
-import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
+import {
+    convertToModelMessages,
+    createUIMessageStreamResponse,
+    isStepCount,
+    streamText,
+    toUIMessageStream,
+    type UIMessage,
+} from "ai";
 import { eq } from "drizzle-orm";
 
 export const runtime = "nodejs";
@@ -152,8 +159,8 @@ export async function POST(req: NextRequest) {
         resolved = await resolveModel({ userId, role, override: body.override });
     } catch (err) {
         // User hasn't configured a provider — fall back to server-default
-        // (env-based: Gemini → Azure OpenAI → Anthropic → OpenAI).
-        const fallback = resolveServerDefault();
+        // (codai per-user/server key → Gemini → Azure OpenAI → Anthropic → OpenAI).
+        const fallback = await resolveServerDefaultForUser(userId);
         if (fallback) {
             resolved = fallback;
         } else {
@@ -179,19 +186,21 @@ export async function POST(req: NextRequest) {
 
     const result = streamText({
         model: resolved.model,
-        system: SYSTEM_PROMPT,
-        messages: convertToModelMessages(body.messages),
+        instructions: SYSTEM_PROMPT,
+        messages: await convertToModelMessages(body.messages),
         tools: buildTools(ctx),
-        stopWhen: stepCountIs(Math.max(1, prefs["ai.agent.maxSteps"])),
-        onFinish: async ({ text, toolCalls, toolResults, usage }) => {
+        stopWhen: isStepCount(Math.max(1, prefs["ai.agent.maxSteps"])),
+        onEnd: async ({ text, toolCalls, toolResults, usage }) => {
             try {
                 await persistAssistantMessage({
                     sessionId,
                     text,
                     modelId: resolved.modelId,
+                    // v7: `usage` is the total across all steps (was final-step only).
                     tokensIn: usage?.inputTokens,
                     tokensOut: usage?.outputTokens,
                 });
+                // v7: `toolCalls`/`toolResults` cover ALL steps (was final-step only).
                 await persistToolCalls(sessionId, toolCalls, toolResults);
                 await db
                     .update(aiAgentSessions)
@@ -203,7 +212,8 @@ export async function POST(req: NextRequest) {
         },
     });
 
-    return result.toUIMessageStreamResponse({
+    return createUIMessageStreamResponse({
+        stream: toUIMessageStream({ stream: result.stream }),
         headers: { "x-maestro-session-id": sessionId, "x-maestro-model": resolved.modelId },
     });
 }

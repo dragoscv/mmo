@@ -20,7 +20,7 @@
 
 import type { ModelCapabilities, ModelInfo, ProviderAdapter, ProviderConnection, ProviderSecrets } from "./types";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { LanguageModelV2 } from "@ai-sdk/provider";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 
 /**
  * Public client_id for the VS Code Copilot extension. Same id used by
@@ -276,7 +276,7 @@ export const copilotAdapter: ProviderAdapter = {
         const raw = await listCopilotModels(session);
         return raw.map(toModelInfo);
     },
-    languageModel(conn, modelId): LanguageModelV2 {
+    languageModel(conn, modelId): LanguageModelV4 {
         if (conn.secrets.kind !== "copilot") throw new Error("Wrong secret kind for copilot adapter");
         const secrets = conn.secrets;
         // We build the openai-compatible provider with a Bearer token that
