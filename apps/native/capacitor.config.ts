@@ -8,10 +8,10 @@ import type { CapacitorConfig } from "@capacitor/cli";
 //   CAP_SERVER_URL=http://10.0.2.2:13789
 // Physical devices on the same Wi-Fi can use the host's LAN IP, or any
 // public tunnel (cloudflared / ngrok).
-const SERVER_URL = process.env.CAP_SERVER_URL?.trim() || "https://muzicai.ro";
+const SERVER_URL = process.env.CAP_SERVER_URL?.trim() || "https://mixai.ro";
 const isHttp = SERVER_URL.startsWith("http://");
-let serverHostname = "muzicai.ro";
-let allowNavigation = ["muzicai.ro", "*.muzicai.ro"];
+let serverHostname = "mixai.ro";
+let allowNavigation = ["mixai.ro", "*.mixai.ro"];
 try {
     const parsed = new URL(SERVER_URL);
     serverHostname = parsed.hostname;
@@ -22,12 +22,12 @@ try {
 }
 
 const config: CapacitorConfig = {
-    appId: "ro.muzicai.app",
-    appName: "MuzicAI",
+    appId: "ro.mixai.app",
+    appName: "MixAI",
     // The "web assets" directory. Capacitor expects something to exist;
     // we point to a minimal index.html that immediately forwards to the
     // remote URL when online and serves the existing PWA shell offline
-    // (the muzicai.ro service worker registers itself on first visit).
+    // (the mixai.ro service worker registers itself on first visit).
     webDir: "dist",
     server: {
         url: SERVER_URL,
@@ -45,18 +45,19 @@ const config: CapacitorConfig = {
     },
     ios: {
         contentInset: "always",
-        backgroundColor: "#0a0a0a",
+        // Matches the dark `--background` token (oklch(0.13 0.02 285)).
+        backgroundColor: "#151320",
         // We let Capacitor handle status-bar styling; the web app reads
         // CSS env(safe-area-inset-*) for notches.
         limitsNavigationsToAppBoundDomains: true,
     },
     android: {
-        backgroundColor: "#0a0a0a",
+        backgroundColor: "#151320",
         allowMixedContent: false,
         captureInput: true,
         webContentsDebuggingEnabled: false,
-        // Android TV / Leanback compatibility — see ANDROID_TV.md for the
-        // AndroidManifest.xml additions needed after running `npx cap add android`.
+        // Android TV / Leanback compatibility is declared in
+        // android/app/src/main/AndroidManifest.xml (see ANDROID_TV.md).
         buildOptions: {
             // Block the soft keyboard from auto-showing on TV inputs.
             // The user navigates with a remote; on-screen keyboard would

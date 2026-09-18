@@ -1,15 +1,22 @@
 # Android TV / Leanback Support
 
+> **Status:** Applied in `android/app/src/main/AndroidManifest.xml` (leanback +
+> touchscreen `uses-feature`, `LEANBACK_LAUNCHER` intent filter,
+> `android:banner="@drawable/banner"` vector). The dedicated Compose TV app
+> lives in `apps/tv-android` (ADR-0004); this Capacitor shell only keeps TV
+> *compatibility* so the same APK installs on Google TV.
+
 The web app is TV-aware (see `app/src/components/video/tv-mode-probe.tsx`
 and `app/src/lib/focus-nav.ts`) — D-pad navigation, scaled fonts, and
 larger focus rings activate automatically when the WebView reports a
 TV-like user agent (`Android.*TV`, `BRAVIA`, `AFT…`, `GoogleTV`) or
 when the URL has `?tv` appended.
 
-## To ship as an Android TV app
+## What the manifest declares (reference)
 
-After running `npx cap add android` (from `apps/native/`), edit
-`apps/native/android/app/src/main/AndroidManifest.xml`:
+`apps/native/android/app/src/main/AndroidManifest.xml` is tracked in git and
+already contains everything below. Re-apply only if you regenerate the
+scaffold with `npx cap add android`.
 
 ### 1. Declare TV compatibility
 
@@ -41,7 +48,9 @@ Also add the banner attribute on the `<application>` element:
     android:isGame="false">
 ```
 
-Drop a `320×180` PNG into `apps/native/android/app/src/main/res/drawable-xhdpi/banner.png`.
+The banner is a vector drawable at `res/drawable/banner.xml` (320×180 dp,
+brand gradient). Replace with a `320×180` PNG in `res/drawable-xhdpi/banner.png`
+if Play Console rejects the vector.
 
 ### 3. Confirm the Play Console listing
 
@@ -54,9 +63,9 @@ not appear in the TV store even when the manifest is correct.
 ```powershell
 # From apps/native
 pnpm install
-pnpm build           # builds the web bundle into dist/
-npx cap sync android
-npx cap open android # opens Android Studio
+pnpm build:web         # copies web/ into dist/ (Capacitor webDir)
+pnpm cap:sync android  # runs build:web first
+pnpm cap:open:android  # opens Android Studio
 ```
 
 Use *Run → Run 'app'* with a connected Android TV device (developer

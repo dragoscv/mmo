@@ -1,6 +1,10 @@
-// MMO Extension - Options Script
+// MixAI Extension - Options Script
 
 document.addEventListener("DOMContentLoaded", () => {
+    applyI18n();
+    const title = t("optionsTitle");
+    if (title) document.title = title;
+
     const baseUrlInput = document.getElementById("baseUrl");
     const autoDownloadInput = document.getElementById("autoDownload");
     const audioOnlyInput = document.getElementById("audioOnly");
@@ -9,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Load saved settings
     browser.storage.sync.get(["baseUrl", "autoDownload", "audioOnly"]).then((data) => {
-        baseUrlInput.value = data.baseUrl || "https://muzicai.ro";
+        baseUrlInput.value = data.baseUrl || "https://mixai.ro";
         autoDownloadInput.checked = data.autoDownload || false;
         audioOnlyInput.checked = data.audioOnly !== false; // default true
     });
@@ -17,7 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Save settings
     saveBtn.addEventListener("click", () => {
         const settings = {
-            baseUrl: baseUrlInput.value.replace(/\/+$/, "") || "https://muzicai.ro",
+            baseUrl: baseUrlInput.value.replace(/\/+$/, "") || "https://mixai.ro",
             autoDownload: autoDownloadInput.checked,
             audioOnly: audioOnlyInput.checked,
         };

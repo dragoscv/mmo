@@ -1,12 +1,18 @@
-// MMO Extension - Content Script
+// MixAI Extension - Content Script
 // Injects download buttons on supported streaming platforms
 
 (function () {
     "use strict";
 
     // Prevent double injection
-    if (window.__mmoInjected) return;
-    window.__mmoInjected = true;
+    if (window.__mixaiInjected) return;
+    window.__mixaiInjected = true;
+
+    const BUTTON_ID = "mixai-download-btn";
+
+    // Generic SPA-friendly "is this a media page" helper: any playable
+    // <video>/<audio> element in the DOM counts.
+    const hasMediaElement = () => !!document.querySelector("video, audio");
 
     const PLATFORM_CONFIGS = {
         youtube: {
@@ -70,19 +76,91 @@
             waitFor: "article [role='group']",
             isMediaPage: () => location.pathname.includes("/status/"),
         },
+        mixcloud: {
+            match: () => location.hostname.includes("mixcloud.com"),
+            getMediaUrl: () => location.href,
+            getTitle: () => document.querySelector("h1")?.textContent?.trim() || document.title,
+            // Mixcloud's React class names are hashed; the show page always has an h1 in the header.
+            buttonTarget: () => document.querySelector("h1")?.parentElement || null,
+            waitFor: "h1",
+            isMediaPage: () => {
+                // Show pages: /user/show-slug/ (not /user/, /discover, /upload …)
+                const parts = location.pathname.split("/").filter(Boolean);
+                return parts.length >= 2 && !["discover", "upload", "settings", "select", "live", "search", "pro"].includes(parts[0]);
+            },
+            floating: true,
+        },
+        vimeo: {
+            match: () => location.hostname.includes("vimeo.com"),
+            getMediaUrl: () => location.href,
+            getTitle: () => document.querySelector("h1")?.textContent?.trim() || document.title,
+            buttonTarget: () => document.querySelector("[data-clip-actions], .clip_info-actions, main h1")?.parentElement || null,
+            waitFor: "main, h1",
+            isMediaPage: () => /^\/(\d+|channels\/[^/]+\/\d+|[^/]+\/[^/]+)$/.test(location.pathname.replace(/\/$/, "")) && hasMediaElement(),
+            floating: true,
+        },
+        instagram: {
+            match: () => location.hostname.includes("instagram.com"),
+            getMediaUrl: () => location.href,
+            getTitle: () => document.title,
+            buttonTarget: () => null,
+            waitFor: "main",
+            isMediaPage: () => /^\/(p|reel|reels|tv)\//.test(location.pathname),
+            floating: true,
+        },
+        facebook: {
+            match: () => location.hostname.includes("facebook.com"),
+            getMediaUrl: () => location.href,
+            getTitle: () => document.title,
+            buttonTarget: () => null,
+            waitFor: "[role='main']",
+            isMediaPage: () => /\/(watch|videos?|reel|share\/v)\b/.test(location.pathname + location.search) || location.pathname.startsWith("/watch"),
+            floating: true,
+        },
+        twitch: {
+            match: () => location.hostname.includes("twitch.tv"),
+            getMediaUrl: () => location.href,
+            getTitle: () => document.querySelector("[data-a-target='stream-title'], h2[title]")?.textContent?.trim() || document.title,
+            buttonTarget: () => document.querySelector(".channel-info-content, [data-a-target='player-controls']")?.parentElement || null,
+            waitFor: "video",
+            // VODs and clips are downloadable; live channel pages are not.
+            isMediaPage: () => location.pathname.startsWith("/videos/") || location.hostname.startsWith("clips.") || location.pathname.includes("/clip/"),
+            floating: true,
+        },
+        dailymotion: {
+            match: () => location.hostname.includes("dailymotion.com"),
+            getMediaUrl: () => location.href,
+            getTitle: () => document.querySelector("h1")?.textContent?.trim() || document.title,
+            buttonTarget: () => document.querySelector("h1")?.parentElement || null,
+            waitFor: "h1, video",
+            isMediaPage: () => location.pathname.startsWith("/video/"),
+            floating: true,
+        },
+        deezer: {
+            match: () => location.hostname.includes("deezer.com"),
+            getMediaUrl: () => location.href,
+            getTitle: () => document.querySelector("h1")?.textContent?.trim() || document.title,
+            buttonTarget: () => null,
+            waitFor: "h1, #page_content",
+            // Deezer is DRM'd; MixAI matches the track/album metadata elsewhere.
+            isMediaPage: () => /\/(track|album|playlist)\//.test(location.pathname),
+            floating: true,
+        },
         generic: {
             match: () => true,
             getMediaUrl: () => location.href,
             getTitle: () => document.title,
             buttonTarget: () => null,
             waitFor: null,
-            isMediaPage: () => false,
+            // Any host-permitted page that renders a <video>/<audio> gets a floating button.
+            isMediaPage: hasMediaElement,
+            floating: true,
         },
     };
 
     let currentPlatform = null;
     let injectedButton = null;
-    let settings = { baseUrl: "https://muzicai.ro", autoDownload: false, audioOnly: true };
+    let settings = { baseUrl: "https://mixai.ro", autoDownload: false, audioOnly: true };
 
     // Load settings
     function loadSettings() {
@@ -91,33 +169,35 @@
         }).catch(() => { /* SW asleep / extension reloaded — keep defaults */ });
     }
 
-    // Detect platform
+    // Detect platform (falls back to `generic` — we only run on host-permitted pages)
     function detectPlatform() {
         for (const [name, config] of Object.entries(PLATFORM_CONFIGS)) {
             if (name !== "generic" && config.match()) return { name, ...config };
         }
-        return null;
+        return { name: "generic", ...PLATFORM_CONFIGS.generic };
     }
 
     // Create the download button element
-    function createButton(platform) {
+    function createButton(platform, floating) {
         const btn = document.createElement("button");
-        btn.id = "mmo-download-btn";
-        btn.title = "Download to MMO Library";
-        btn.setAttribute("aria-label", "Download to MMO Library");
+        btn.id = BUTTON_ID;
+        btn.type = "button";
+        const title = msg("contentButtonTitle", "Download to MixAI Library");
+        btn.title = title;
+        btn.setAttribute("aria-label", title);
 
         // Style varies by platform
         const platformStyles = {
-            youtube: "mmo-btn-youtube",
-            youtubeMusic: "mmo-btn-ytmusic",
-            soundcloud: "mmo-btn-soundcloud",
-            spotify: "mmo-btn-spotify",
-            bandcamp: "mmo-btn-bandcamp",
-            tiktok: "mmo-btn-generic",
-            twitter: "mmo-btn-generic",
+            youtube: "mixai-btn-youtube",
+            youtubeMusic: "mixai-btn-ytmusic",
+            soundcloud: "mixai-btn-soundcloud",
+            spotify: "mixai-btn-spotify",
+            bandcamp: "mixai-btn-bandcamp",
         };
 
-        btn.className = `mmo-download-btn ${platformStyles[platform.name] || "mmo-btn-generic"}`;
+        btn.className = floating
+            ? "mixai-download-btn mixai-floating-btn"
+            : `mixai-download-btn ${platformStyles[platform.name] || "mixai-btn-generic"}`;
 
         btn.innerHTML = `
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -125,7 +205,7 @@
                 <polyline points="7 10 12 15 17 10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            <span class="mmo-btn-label">MMO</span>
+            <span class="mixai-btn-label">${escapeHtml(msg("contentButtonLabel", "MixAI"))}</span>
         `;
 
         btn.addEventListener("click", (e) => {
@@ -137,14 +217,27 @@
                 type: "open-download",
                 url: mediaUrl,
                 autoDownload: settings.autoDownload,
+                audioOnly: settings.audioOnly,
             }).catch(() => { /* SW asleep — user can retry */ });
 
             // Visual feedback
-            btn.classList.add("mmo-btn-clicked");
-            setTimeout(() => btn.classList.remove("mmo-btn-clicked"), 1000);
+            btn.classList.add("mixai-btn-clicked");
+            setTimeout(() => btn.classList.remove("mixai-btn-clicked"), 1000);
         });
 
         return btn;
+    }
+
+    function msg(key, fallback) {
+        try {
+            return browser.i18n.getMessage(key) || fallback;
+        } catch {
+            return fallback;
+        }
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
     }
 
     // Inject button into the page
@@ -154,6 +247,7 @@
             injectedButton.remove();
             injectedButton = null;
         }
+        document.getElementById(BUTTON_ID)?.remove();
 
         const platform = detectPlatform();
         if (!platform || !platform.isMediaPage()) return;
@@ -161,9 +255,17 @@
         currentPlatform = platform;
 
         const target = platform.buttonTarget();
-        if (!target) return;
+        if (!target) {
+            // No stable inline container on this platform → fixed-position
+            // floating button (bottom-right, above the safe area).
+            if (!platform.floating) return;
+            const floating = createButton(platform, true);
+            injectedButton = floating;
+            document.body.appendChild(floating);
+            return;
+        }
 
-        const btn = createButton(platform);
+        const btn = createButton(platform, false);
         injectedButton = btn;
 
         // Insert based on platform
@@ -217,6 +319,11 @@
             });
         } else {
             injectButton();
+        }
+
+        // Generic/floating pages: <video> may mount later than document_idle.
+        if (platform.name === "generic") {
+            waitForElement("video, audio", injectButton, 15000);
         }
 
         // Re-inject on SPA navigation (YouTube, SoundCloud, etc.)

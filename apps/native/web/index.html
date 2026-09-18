@@ -1,21 +1,53 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-accent="violet">
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <title>MMO</title>
+        <meta name="color-scheme" content="dark light" />
+        <title>MixAI</title>
+        <script>
+            // Pre-hydrate theme: read the shared MixAI prefs blob (same key the
+            // web app persists), fall back to the OS colour scheme. Runs before
+            // any stylesheet so there is no light/dark flash.
+            (function () {
+                var html = document.documentElement;
+                var mode = "system";
+                var accent = "violet";
+                var locale = "";
+                try {
+                    var raw = localStorage.getItem("mixai:prefs:v1");
+                    if (raw) {
+                        var prefs = JSON.parse(raw);
+                        if (prefs && typeof prefs === "object") {
+                            if (prefs.mode === "light" || prefs.mode === "dark") mode = prefs.mode;
+                            if (typeof prefs.accent === "string" && prefs.accent) accent = prefs.accent;
+                            if (prefs.locale === "ro" || prefs.locale === "en") locale = prefs.locale;
+                        }
+                    }
+                } catch (e) {
+                    /* storage unavailable — use system defaults */
+                }
+                if (mode === "system") {
+                    mode = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+                }
+                html.setAttribute("data-mode", mode);
+                html.classList.toggle("dark", mode === "dark");
+                html.setAttribute("data-accent", accent);
+                if (!locale) {
+                    locale = /^ro\b/i.test(navigator.language || "") ? "ro" : "en";
+                }
+                html.setAttribute("lang", locale);
+            })();
+        </script>
+        <link rel="stylesheet" href="./tokens.css" />
         <style>
             html,
             body {
                 margin: 0;
                 padding: 0;
-                background: #0a0a0a;
-                color: #f5f5f5;
-                font-family:
-                    system-ui,
-                    -apple-system,
-                    "Segoe UI",
-                    sans-serif;
+                background: var(--background);
+                color: var(--foreground);
+                font-family: var(--font-sans);
                 height: 100%;
                 overflow: hidden;
             }
@@ -26,27 +58,42 @@
                 align-items: center;
                 justify-content: center;
                 height: 100%;
-                padding: 24px;
+                box-sizing: border-box;
+                padding: calc(24px + var(--safe-top)) calc(24px + var(--safe-right)) calc(24px + var(--safe-bottom))
+                    calc(24px + var(--safe-left));
                 text-align: center;
             }
             h1 {
                 margin: 0;
+                font-family: var(--font-heading);
                 font-size: 22px;
                 font-weight: 700;
+                letter-spacing: -0.01em;
+            }
+            .wordmark span {
+                background: var(--brand-gradient);
+                -webkit-background-clip: text;
+                background-clip: text;
+                color: transparent;
             }
             p {
                 margin: 0;
-                opacity: 0.7;
+                color: var(--muted-foreground);
                 font-size: 13px;
                 max-width: 320px;
                 line-height: 1.5;
             }
+            p.hint {
+                font-size: 11px;
+                opacity: 0.7;
+            }
             .dot {
                 width: 12px;
                 height: 12px;
-                background: #a855f7;
+                background: var(--brand-gradient);
                 border-radius: 50%;
-                animation: pulse 1.4s infinite ease-in-out;
+                box-shadow: var(--surface-glow);
+                animation: pulse 1.4s infinite var(--ease-in-out);
             }
             @keyframes pulse {
                 0%,
@@ -59,20 +106,41 @@
                     opacity: 1;
                 }
             }
+            @media (prefers-reduced-motion: reduce) {
+                .dot {
+                    animation: none;
+                }
+            }
             button {
                 margin-top: 6px;
-                background: #a855f7;
-                color: #fff;
+                background: var(--primary);
+                color: var(--primary-foreground);
                 border: 0;
-                padding: 10px 22px;
-                border-radius: 8px;
+                min-height: var(--control-h);
+                padding: 0 22px;
+                border-radius: var(--radius);
+                font-family: inherit;
                 font-size: 14px;
                 font-weight: 600;
                 cursor: pointer;
+                transition:
+                    filter var(--dur-fast) var(--ease-out),
+                    transform var(--dur-fast) var(--ease-out);
+            }
+            button:hover {
+                filter: brightness(1.08);
+            }
+            button:active {
+                transform: scale(0.98);
+            }
+            button:focus-visible {
+                outline: 2px solid var(--ring);
+                outline-offset: 2px;
             }
             button.secondary {
-                background: #262626;
-                color: #fafafa;
+                background: var(--secondary);
+                color: var(--secondary-foreground);
+                border: 1px solid var(--border);
             }
             button:disabled {
                 opacity: 0.5;
@@ -83,7 +151,7 @@
                 gap: 8px;
             }
             .err {
-                color: #ef4444;
+                color: var(--destructive);
                 font-size: 12px;
             }
         </style>
@@ -91,16 +159,59 @@
     <body>
         <div class="stage" id="stage">
             <div class="dot"></div>
-            <h1>MMO</h1>
+            <h1 class="wordmark">Mix<span>AI</span></h1>
             <p id="status">Loading…</p>
         </div>
         <script type="module">
             // Resolved at runtime via the Tauri `get_web_app_url` command
-            // so dev hits localhost:13789 and release hits muzicai.ro.
-            let WEB_APP_URL = "https://muzicai.ro";
+            // so dev hits localhost:13789 and release hits mixai.ro.
+            let WEB_APP_URL = "https://mixai.ro";
+
+            const STRINGS = {
+                en: {
+                    loading: "Loading…",
+                    welcomeTitle: "Welcome to MixAI",
+                    welcomeBody:
+                        "Sign in with your Google account to continue. We'll open your default browser so you can use your existing session.",
+                    signIn: "Sign in with Google",
+                    continueSignedIn: "Continue (already signed in)",
+                    signingTitle: "Sign in",
+                    signingBody: "Opening your browser so you can sign in with Google.",
+                    signingHint: "After signing in, this app will reload automatically.",
+                    cancel: "Cancel",
+                    cancelledTitle: "Sign-in cancelled",
+                    cancelledBody: "Press the button to try again.",
+                    retry: "Try again",
+                    failedTitle: "Sign-in failed",
+                    unknownError: "Unknown error",
+                    noToken: "No token returned",
+                },
+                ro: {
+                    loading: "Se încarcă…",
+                    welcomeTitle: "Bine ai venit în MixAI",
+                    welcomeBody:
+                        "Autentifică-te cu contul Google pentru a continua. Deschidem browserul implicit ca să folosești sesiunea existentă.",
+                    signIn: "Autentificare cu Google",
+                    continueSignedIn: "Continuă (deja autentificat)",
+                    signingTitle: "Autentificare",
+                    signingBody: "Deschidem browserul ca să te autentifici cu Google.",
+                    signingHint: "După autentificare, aplicația se reîncarcă automat.",
+                    cancel: "Anulează",
+                    cancelledTitle: "Autentificare anulată",
+                    cancelledBody: "Apasă butonul pentru a încerca din nou.",
+                    retry: "Încearcă din nou",
+                    failedTitle: "Autentificarea a eșuat",
+                    unknownError: "Eroare necunoscută",
+                    noToken: "Nu s-a primit niciun token",
+                },
+            };
+            const lang = document.documentElement.getAttribute("lang") === "ro" ? "ro" : "en";
+            const t = (k) => STRINGS[lang][k] ?? STRINGS.en[k] ?? k;
+            const WORDMARK = `<h1 class="wordmark">Mix<span>AI</span></h1>`;
 
             const stage = document.getElementById("stage");
             const status = document.getElementById("status");
+            status.textContent = t("loading");
 
             function render(html) {
                 stage.innerHTML = html;
@@ -118,11 +229,11 @@
             async function runSignIn() {
                 render(`
           <div class="dot"></div>
-          <h1>Sign in</h1>
-          <p>Opening your browser so you can sign in with Google.</p>
-          <p style="font-size:11px;opacity:0.5">After signing in, this app will reload automatically.</p>
+                    <h1>${t("signingTitle")}</h1>
+                    <p>${t("signingBody")}</p>
+                    <p class="hint">${t("signingHint")}</p>
           <div class="row">
-            <button id="cancelBtn" class="secondary">Cancel</button>
+                        <button id="cancelBtn" class="secondary">${t("cancel")}</button>
           </div>
           <p id="errMsg" class="err"></p>
         `);
@@ -133,16 +244,16 @@
                         /* ignore */
                     }
                     render(`
-            <h1>Sign-in cancelled</h1>
-            <p>Press the button to try again.</p>
-            <button id="retryBtn">Try again</button>
+                        <h1>${t("cancelledTitle")}</h1>
+                        <p>${t("cancelledBody")}</p>
+                        <button id="retryBtn">${t("retry")}</button>
           `);
                     document.getElementById("retryBtn")?.addEventListener("click", boot);
                 });
 
                 try {
                     const result = await invoke("desktop_auth", { webAppUrl: WEB_APP_URL });
-                    if (!result || !result.token) throw new Error("No token returned");
+                                        if (!result || !result.token) throw new Error(t("noToken"));
                     // Hand the token off to the web app, which mints a real
                     // NextAuth session cookie for the WebView, then
                     // redirects to "/".
@@ -151,11 +262,11 @@
                     u.searchParams.set("redirect", "/");
                     window.location.replace(u.toString());
                 } catch (e) {
-                    const msg = (e && (e.message || String(e))) || "Unknown error";
+                                        const msg = (e && (e.message || String(e))) || t("unknownError");
                     render(`
-            <h1>Sign-in failed</h1>
+                        <h1>${t("failedTitle")}</h1>
             <p class="err">${escapeHtml(msg)}</p>
-            <button id="retryBtn">Try again</button>
+                        <button id="retryBtn">${t("retry")}</button>
           `);
                     document.getElementById("retryBtn")?.addEventListener("click", boot);
                 }
@@ -174,8 +285,8 @@
             async function boot() {
                 render(`
           <div class="dot"></div>
-          <h1>MMO</h1>
-          <p>Loading…</p>
+                    ${WORDMARK}
+                    <p>${t("loading")}</p>
         `);
 
                 // Outside of Tauri (eg. opened directly in a browser): just
@@ -186,26 +297,26 @@
                 }
 
                 // Pull the dev/prod base URL from Rust so we don't ship a
-                // hardcoded muzicai.ro when running under `tauri dev`.
+                // hardcoded mixai.ro when running under `tauri dev`.
                 try {
                     const resolved = await invoke("get_web_app_url");
                     if (typeof resolved === "string" && resolved.length > 0) {
                         WEB_APP_URL = resolved;
                     }
                 } catch {
-                    /* fall back to the muzicai.ro default */
+                    /* fall back to the mixai.ro default */
                 }
 
-                // We can't probe muzicai.ro/api/auth/session from this
+                // We can't probe mixai.ro/api/auth/session from this
                 // local origin without CORS. Offer two paths instead:
-                //   - "Open MMO" if the WebView already has a session cookie
+                    //   - "Continue" if the WebView already has a session cookie
                 //     from a previous launch (the web app will route fine).
                 //   - "Sign in with Google" to start the browser flow.
                 render(`
-          <h1>Welcome to MMO</h1>
-          <p>Sign in with your Google account to continue. We'll open your default browser so you can use your existing session.</p>
-          <button id="signInBtn">Sign in with Google</button>
-          <button id="openBtn" class="secondary">Continue (already signed in)</button>
+                <h1>${t("welcomeTitle")}</h1>
+                <p>${t("welcomeBody")}</p>
+                <button id="signInBtn">${t("signIn")}</button>
+                <button id="openBtn" class="secondary">${t("continueSignedIn")}</button>
         `);
                 document.getElementById("signInBtn")?.addEventListener("click", runSignIn);
                 document.getElementById("openBtn")?.addEventListener("click", () => goToApp("/"));

@@ -1,32 +1,34 @@
 {
     "name": "@mmo/native",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "private": true,
-    "description": "MuzicAI native shell — Tauri 2 (desktop) + Capacitor (mobile). Wraps https://muzicai.ro and lets the existing PWA service worker handle offline.",
+    "description": "MixAI native shell — Tauri 2 (desktop) + Capacitor (mobile). Wraps https://mixai.ro and lets the existing PWA service worker handle offline.",
     "type": "module",
     "scripts": {
+        "build": "node scripts/build-web.mjs",
+        "build:web": "node scripts/build-web.mjs",
         "tauri:dev": "tauri dev",
         "tauri:build": "tauri build",
         "tauri:icon": "tauri icon ../web/public/icon-512.png",
-        "cap:sync": "cap sync",
-        "cap:copy": "cap copy",
-        "cap:add:android": "cap add android",
-        "cap:add:ios": "cap add ios",
+        "cap:sync": "pnpm run build:web && cap sync",
+        "cap:copy": "pnpm run build:web && cap copy",
+        "cap:add:android": "pnpm run build:web && cap add android",
+        "cap:add:ios": "pnpm run build:web && cap add ios",
         "cap:open:android": "cap open android",
         "cap:open:ios": "cap open ios",
-        "android:build:debug": "cd android && ./gradlew assembleDebug",
-        "android:build:release": "cd android && ./gradlew assembleRelease bundleRelease",
+        "android:build:debug": "pnpm run cap:sync android && cd android && ./gradlew assembleDebug",
+        "android:build:release": "pnpm run cap:sync android && cd android && ./gradlew assembleRelease bundleRelease",
         "ios:build": "xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -archivePath ios/build/App.xcarchive archive"
     },
     "devDependencies": {
-        "@capacitor/android": "^7.0.0",
-        "@capacitor/cli": "^7.0.0",
-        "@capacitor/core": "^7.0.0",
-        "@capacitor/ios": "^7.0.0",
-        "@tauri-apps/cli": "^2.1.0",
-        "typescript": "^5.8.3"
+        "@capacitor/android": "^8.5.2",
+        "@capacitor/cli": "^8.5.2",
+        "@capacitor/core": "^8.5.2",
+        "@capacitor/ios": "^8.5.2",
+        "@tauri-apps/cli": "^2.11.4",
+        "typescript": "^5.9.3"
     },
     "dependencies": {
-        "@tauri-apps/api": "^2.1.0"
+        "@tauri-apps/api": "^2.11.1"
     }
 }

@@ -1,4 +1,4 @@
-// MMO Extension — presence beacon for muzicai.ro
+// MixAI Extension — presence beacon for mixai.ro
 // Injects a <meta name="mmo-extension" content="<version>"> tag so the
 // Download Hub in the web app can detect that the extension is installed.
 // Kept intentionally tiny: no listeners, no DOM observation, just a marker.

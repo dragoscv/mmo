@@ -1,8 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-accent="violet">
 
 <head>
     <meta charset="utf-8">
+    <meta name="color-scheme" content="dark light">
+    <script>
+        // Popup cannot read the site's localStorage; follow the OS scheme.
+        var m = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        document.documentElement.setAttribute("data-mode", m);
+        document.documentElement.classList.toggle("dark", m === "dark");
+    </script>
+    <link rel="stylesheet" href="tokens.css">
     <style>
         * {
             margin: 0;
@@ -12,9 +20,9 @@
 
         body {
             width: 320px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #1a1a2e;
-            color: #e0e0e0;
+            font-family: var(--font-sans);
+            background: var(--background);
+            color: var(--foreground);
             padding: 16px;
         }
 
@@ -24,14 +32,14 @@
             gap: 10px;
             margin-bottom: 16px;
             padding-bottom: 12px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom: 1px solid var(--border);
         }
 
         .header .logo {
             width: 28px;
             height: 28px;
-            background: linear-gradient(135deg, #9333ea, #6366f1);
-            border-radius: 8px;
+            background: var(--brand-gradient);
+            border-radius: var(--radius);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -39,6 +47,7 @@
         }
 
         .header h1 {
+            font-family: var(--font-heading);
             font-size: 14px;
             font-weight: 700;
             letter-spacing: -0.3px;
@@ -46,14 +55,15 @@
 
         .header .version {
             font-size: 10px;
-            color: rgba(255, 255, 255, 0.3);
+            color: var(--muted-foreground);
             margin-left: auto;
         }
 
         .current-page {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 10px;
+            background: var(--card);
+            color: var(--card-foreground);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             padding: 12px;
             margin-bottom: 12px;
         }
@@ -62,13 +72,12 @@
             font-size: 9px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: rgba(255, 255, 255, 0.3);
+            color: var(--muted-foreground);
             margin-bottom: 6px;
         }
 
         .current-page .title {
             font-size: 12px;
-            color: rgba(255, 255, 255, 0.7);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -76,8 +85,12 @@
 
         .current-page .platform {
             font-size: 10px;
-            color: #a855f7;
+            color: var(--muted-foreground);
             margin-top: 4px;
+        }
+
+        .current-page .platform.detected {
+            color: var(--success);
         }
 
         .btn {
@@ -86,35 +99,42 @@
             justify-content: center;
             gap: 8px;
             width: 100%;
-            padding: 10px;
+            min-height: var(--control-h);
+            padding: 0 12px;
             border: none;
-            border-radius: 10px;
+            border-radius: var(--radius);
+            font-family: inherit;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: filter var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
             margin-bottom: 8px;
         }
 
+        .btn:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
+        }
+
         .btn-primary {
-            background: linear-gradient(135deg, #9333ea, #7c3aed);
-            color: #fff;
+            background: var(--primary);
+            color: var(--primary-foreground);
         }
 
         .btn-primary:hover {
-            background: linear-gradient(135deg, #a855f7, #8b5cf6);
-            box-shadow: 0 2px 12px rgba(147, 51, 234, 0.3);
+            filter: brightness(1.08);
+            box-shadow: var(--surface-glow);
         }
 
         .btn-secondary {
-            background: rgba(255, 255, 255, 0.06);
-            color: rgba(255, 255, 255, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: var(--secondary);
+            color: var(--secondary-foreground);
+            border: 1px solid var(--border);
         }
 
         .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.8);
+            background: var(--accent);
+            color: var(--accent-foreground);
         }
 
         .btn svg {
@@ -125,12 +145,12 @@
         .status {
             text-align: center;
             font-size: 10px;
-            color: rgba(255, 255, 255, 0.25);
+            color: var(--muted-foreground);
             margin-top: 8px;
         }
 
         .status a {
-            color: #a855f7;
+            color: var(--primary);
             text-decoration: none;
         }
 
@@ -142,14 +162,14 @@
             display: block;
             text-align: center;
             font-size: 10px;
-            color: rgba(255, 255, 255, 0.25);
+            color: var(--muted-foreground);
             margin-top: 4px;
             cursor: pointer;
             text-decoration: none;
         }
 
         .settings-link:hover {
-            color: rgba(255, 255, 255, 0.5);
+            color: var(--foreground);
         }
     </style>
 </head>
@@ -157,13 +177,13 @@
 <body>
     <div class="header">
         <div class="logo">🎧</div>
-        <h1>MuzicAI Downloader</h1>
-        <span class="version">v1.0</span>
+        <h1 data-i18n="popupTitle">MixAI Downloader</h1>
+        <span class="version" id="version"></span>
     </div>
 
     <div class="current-page" id="current-page">
-        <div class="label">Current Page</div>
-        <div class="title" id="page-title">Loading...</div>
+        <div class="label" data-i18n="currentPage">Current page</div>
+        <div class="title" id="page-title" data-i18n="loading">Loading…</div>
         <div class="platform" id="page-platform"></div>
     </div>
 
@@ -174,7 +194,7 @@
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
-        Download Audio
+        <span id="btn-download-label" data-i18n="downloadAudio">Download audio</span>
     </button>
 
     <button class="btn btn-secondary" id="btn-open">
@@ -184,15 +204,16 @@
             <polyline points="15 3 21 3 21 9" />
             <line x1="10" y1="14" x2="21" y2="3" />
         </svg>
-        Open in MuzicAI
+        <span data-i18n="openInMixai">Open in MixAI</span>
     </button>
 
     <div class="status">
-        Connected to <a href="#" id="base-url-link">muzicai.ro</a>
+        <span data-i18n="connectedTo">Connected to</span> <a href="#" id="base-url-link">mixai.ro</a>
     </div>
-    <a class="settings-link" id="settings-link">⚙ Settings</a>
+    <a class="settings-link" id="settings-link" href="#" data-i18n="settings">⚙ Settings</a>
 
     <script src="vendor/browser-polyfill.min.js"></script>
+    <script src="i18n.js"></script>
     <script src="popup.js"></script>
 </body>
 

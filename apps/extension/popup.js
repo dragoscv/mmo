@@ -1,15 +1,24 @@
-// MMO Extension - Popup Script
+// MixAI Extension - Popup Script
 
 document.addEventListener("DOMContentLoaded", () => {
+    applyI18n();
+
     const btnDownload = document.getElementById("btn-download");
+    const btnDownloadLabel = document.getElementById("btn-download-label");
     const btnOpen = document.getElementById("btn-open");
     const pageTitle = document.getElementById("page-title");
     const pagePlatform = document.getElementById("page-platform");
     const baseUrlLink = document.getElementById("base-url-link");
     const settingsLink = document.getElementById("settings-link");
+    const versionEl = document.getElementById("version");
 
     let currentUrl = "";
-    let settings = { baseUrl: "https://muzicai.ro", autoDownload: false };
+    let settings = { baseUrl: "https://mixai.ro", autoDownload: false, audioOnly: true };
+
+    // Version comes from the manifest so it can never drift from the release.
+    try {
+        versionEl.textContent = `v${browser.runtime.getManifest().version}`;
+    } catch { /* ignore */ }
 
     // Supported platforms
     const PLATFORMS = {
@@ -41,43 +50,51 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Load settings
-    browser.storage.sync.get(["baseUrl", "autoDownload"]).then((data) => {
-        settings.baseUrl = data.baseUrl || "https://muzicai.ro";
+    browser.storage.sync.get(["baseUrl", "autoDownload", "audioOnly"]).then((data) => {
+        settings.baseUrl = data.baseUrl || "https://mixai.ro";
         settings.autoDownload = data.autoDownload || false;
+        settings.audioOnly = data.audioOnly !== false; // default true
         baseUrlLink.textContent = settings.baseUrl.replace(/^https?:\/\//, "");
         baseUrlLink.href = settings.baseUrl;
+        const label = t(settings.audioOnly ? "downloadAudio" : "downloadMedia");
+        if (label) btnDownloadLabel.textContent = label;
     });
 
     // Get current tab
     browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
         if (tabs[0]) {
             currentUrl = tabs[0].url || "";
-            pageTitle.textContent = tabs[0].title || "Unknown page";
+            pageTitle.textContent = tabs[0].title || t("unknownPage") || "Unknown page";
 
             const platform = detectPlatform(currentUrl);
             if (platform) {
-                pagePlatform.textContent = `✓ ${platform} detected`;
-                pagePlatform.style.color = "#22c55e";
+                pagePlatform.textContent = t("platformDetected", [platform]) || `✓ ${platform} detected`;
+                pagePlatform.classList.add("detected");
             } else {
-                pagePlatform.textContent = "Not a known streaming platform";
-                pagePlatform.style.color = "rgba(255,255,255,0.25)";
+                pagePlatform.textContent = t("notPlatform") || "Not a known streaming platform";
+                pagePlatform.classList.remove("detected");
             }
         }
     });
 
+    function buildDownloadUrl(auto) {
+        const params = new URLSearchParams({ url: currentUrl });
+        if (auto) params.set("auto", "1");
+        if (settings.audioOnly) params.set("audio", "1");
+        return `${settings.baseUrl}/download?${params.toString()}`;
+    }
+
     // Download button
     btnDownload.addEventListener("click", () => {
         if (!currentUrl) return;
-        const downloadUrl = `${settings.baseUrl}/download?url=${encodeURIComponent(currentUrl)}&auto=1`;
-        browser.tabs.create({ url: downloadUrl });
+        browser.tabs.create({ url: buildDownloadUrl(true) });
         window.close();
     });
 
-    // Open in MMO button
+    // Open in MixAI button
     btnOpen.addEventListener("click", () => {
         if (!currentUrl) return;
-        const downloadUrl = `${settings.baseUrl}/download?url=${encodeURIComponent(currentUrl)}`;
-        browser.tabs.create({ url: downloadUrl });
+        browser.tabs.create({ url: buildDownloadUrl(false) });
         window.close();
     });
 
