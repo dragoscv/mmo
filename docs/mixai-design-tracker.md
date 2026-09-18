@@ -317,8 +317,8 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 |---|---|---|
 | WP11-01 | Move dashboard to `/dashboard` (nav-tree, TAB_KEYS, i18n, tests, revalidate paths, palette) — `/` = `MediaHome` placeholder + `MediaHomeSkeleton`; `nav.home` first leaf, TAB_KEYS `home/library/watch/music` | done |
 | WP11-02 | `lib/media/aggregate.ts` fan-out + merge by tmdbId → `sources[]`, per-server status; DB migration `track_plays` + `media_sync_state` (expand-only) — `drizzle/0030_media_home.sql` (NOT yet applied to prod), `actions/track-plays.ts`, `lib/play-recorder.ts` wired into `player-context` (end / ≥90 % / switch, debounced) | done |
-| WP11-03 | `/` MediaHome RSC: `HeroBillboard` (backdrop + logo treatment, artwork accent), `MediaRow` (embla 8.6, keyboard, virtualised), server chips (nuqs), `loading.tsx`, empty/no-server states, ultrawide layout | todo |
-| WP11-04 | Title page `/media/[kind]/[tmdbId]`: local sources per server, provider buttons (deep link / search fallback, attribution), trailer, similar, watchlist, mark watched, hide; redirects from `/watch/discover/*` | todo |
+| WP11-03 | `/` MediaHome RSC: `HeroBillboard` (backdrop + logo treatment, artwork accent), `MediaRow` (embla 8.6, keyboard, capped at 40 + "See all" instead of a virtualiser), server chips (nuqs `?servers=`), `loading.tsx`, empty/no-server states, ultrawide layout (hero clamps 1600 px) | done 20cf5e8 |
+| WP11-04 | Title page `/media/[kind]/[tmdbId]`: local sources per server (`/watch/play/<cid>?server=&cid=`), provider buttons (deep link / search fallback, attribution), trailer, similar, watchlist, mark watched, hide; redirects from `/watch/discover/*` | done 20cf5e8 |
 | WP11-05 | Listen rows: `track_plays` recording, Continue listening, New albums (album grouping), Favourites, Playlists aggregated, `AlbumCard`; localStorage history migrated once | todo |
 | WP11-06 | Settings › Media: region, preferred providers, hide watched, curator toggle; Settings › Video merged | todo |
 | WP11-07 | Codai curator (env-gated): row titles + one-line "why", 24 h cache | todo |
