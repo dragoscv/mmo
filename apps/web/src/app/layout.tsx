@@ -8,7 +8,7 @@ import { OfflineProvider } from "@/hooks/offline-context";
 import { AudioPlayer } from "@/components/audio-player";
 import { NowPlaying } from "@/components/now-playing";
 import { StickyNowPlaying } from "@/components/sticky-now-playing";
-import { VideoPlayerHost } from "@/components/video/player-host";
+import { VideoPlayerHost, MaestroChatDock } from "@/components/layout-lazy";
 import { PlayerAwareLayout } from "@/components/player-aware-layout";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SelectionProvider } from "@/components/selection-provider";
@@ -23,9 +23,9 @@ import { ShortcutsOverlay } from "@/components/shortcuts-overlay";
 import { CinemaSettingsSync } from "@/components/cinema-settings-sync";
 import { AuthProvider } from "@/components/auth-provider";
 import { PreferencesSync } from "@/components/preferences-sync";
+import { PwaStandalone } from "@/components/pwa-standalone";
 import { CompanionStatusProvider } from "@/components/companion/companion-status-provider";
 import { QueryProvider } from "@/components/query-provider";
-import { MaestroChatDock } from "@/components/maestro/chat-dock";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
@@ -165,6 +165,8 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                     reloadOnOnline={false}
                 />
                 <ThemeProvider initialLocale={locale as "ro" | "en"}>
+                    {/* WP4-03: <html data-standalone> for installed PWA / Capacitor / Tauri. */}
+                    <PwaStandalone />
                     <AuthProvider>
                         <PreferencesSync />
                         <QueryProvider>

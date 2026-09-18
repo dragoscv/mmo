@@ -304,6 +304,36 @@ input[type="range"].volume-slider::-moz-range-thumb {
 
 /* ─── App-specific (web-only) styles below ─────────────────────────────── */
 
+/* WP4-03 standalone */
+/* Installed app (PWA standalone / iOS home screen / Capacitor / Tauri).
+ * `<html data-standalone="true">` is set by components/pwa-standalone.tsx;
+ * the media query covers first paint before React mounts. Tokens already
+ * define `--safe-*` and the `standalone` variant + `pb-safe` utility. */
+@media (display-mode: standalone) {
+    html {
+        /* No browser chrome → no rubber-band overscroll on the document. */
+        overscroll-behavior: none;
+    }
+}
+
+html[data-standalone="true"] {
+    overscroll-behavior: none;
+    /* Installed apps have their own window chrome; don't let text-select
+     * long-press feel like a web page on mobile shells. */
+    -webkit-touch-callout: none;
+}
+
+html[data-standalone="true"] [data-slot="mobile-header"] {
+    /* It already pads `--safe-top`; grow the box so the 56px tappable row
+     * stays intact under a notch/status bar. */
+    height: calc(3.5rem + var(--safe-top));
+}
+
+html[data-standalone="true"] [data-slot="sidebar"] {
+    padding-top: var(--safe-top);
+    padding-left: var(--safe-left);
+}
+
 /* ─── DAW Focus Mode ──────────────────────────────────────────────────── */
 body.daw-focus-mode [data-app-sidebar] {
     display: none !important;
