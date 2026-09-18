@@ -1,0 +1,5 @@
+# actionlint config (ci-lint.yml + local `actionlint`). Custom runner labels used by
+# our release workflows so actionlint does not flag them as unknown.
+self-hosted-runner:
+    labels:
+        - ubuntu-24.04-arm

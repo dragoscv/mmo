@@ -1,0 +1,57 @@
+name: docs-ci
+
+# Markdown hygiene (WP13-05): internal link check with lychee (offline — no network
+# flakiness) and the canonical tracker → CSV regeneration guard.
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "**/*.md"
+            - "docs/**"
+            - "lychee.toml"
+            - "scripts/tracker-regen-csv.mjs"
+            - ".github/workflows/docs-ci.yml"
+    pull_request:
+        paths:
+            - "**/*.md"
+            - "docs/**"
+            - "lychee.toml"
+            - "scripts/tracker-regen-csv.mjs"
+            - ".github/workflows/docs-ci.yml"
+
+concurrency:
+    group: docs-ci-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    links:
+        name: lychee (internal links, offline)
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - uses: actions/checkout@v5
+            - uses: lycheeverse/lychee-action@v2
+              with:
+                  # Config carries --offline semantics + excludes (localhost, LAN, staging).
+                  args: --config lychee.toml --offline --no-progress --root-dir "${{ github.workspace }}" './**/*.md'
+                  fail: true
+                  failIfEmpty: false
+
+    tracker:
+        name: tracker csv matches md
+        runs-on: ubuntu-latest
+        timeout-minutes: 3
+        steps:
+            - uses: actions/checkout@v5
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+            - name: Regenerate + diff
+              run: |
+                  node scripts/tracker-regen-csv.mjs
+                  git diff --exit-code -- docs/mixai-design-tracker.csv \
+                  || (echo "::error::docs/mixai-design-tracker.csv is stale — run node scripts/tracker-regen-csv.mjs and commit it" && exit 1)

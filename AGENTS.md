@@ -74,16 +74,25 @@ known blocks: web on TS 5.9 + ESLint 9 (typescript-eslint/eslint-plugin-react pe
 
 ## Gates (what runs where)
 
-| Gate | Local (husky pre-commit) | CI today | Planned (WP13-04/05) |
-|---|---|---|---|
-| web version bump | `apps/web/scripts/check-version.mjs --staged` | — | lint-staged |
-| extension version bump | `apps/extension/scripts/check-version.mjs --staged` | `extension-ci` (+manifest MV3, vendor polyfill drift) | commitlint |
-| migrations `.sql`+journal | `apps/web/scripts/check-migrations.mjs --staged` | — | — |
-| web lint/typecheck/test/build | manual | `web-ci` (`lint:check`, `typecheck`, `test`, `build`) | + bundle budget, LHCI, axe, knip |
-| tokens committed | manual `pnpm tokens:build` | `web-ci` packages job (`git diff --exit-code -- dist ../../apps`) | lint-staged |
-| OpenAPI drift | manual `pnpm -C server openapi:check` | — | `server-ci.yml`, lint-staged |
-| i18n parity, hex gate, tracker csv | — | — | `apps/web/scripts/i18n-parity.mjs`, `scripts/hex-gate.mjs` (WP13-03) |
-| server build/test | manual | only `mmo-server-docker` on tag | `server-ci.yml` |
+Full inventory + mutation-test status: `docs/arhitectura/gates.md`.
+
+| Gate | Local (husky) | CI |
+|---|---|---|
+| web version bump + migrations | `apps/web/scripts/check-version.mjs --staged`, `check-migrations.mjs --staged` | `web-ci` fast-gates (PR, `--base`) |
+| extension version bump | `apps/extension/scripts/check-version.mjs --staged` | `extension-ci` (+manifest MV3, vendor polyfill drift) |
+| server / packages version bump | lint-staged → `scripts/check-version-generic.mjs --staged` | `server-ci` (PR) |
+| commit message | `.husky/commit-msg` → commitlint (`commitlint.config.mjs`) | — |
+| i18n parity (web, extension) | lint-staged on `messages/*.json`, `_locales/**` | `web-ci` fast-gates |
+| hex / `Color(0x` gate | lint-staged → `scripts/hex-gate.mjs --staged` | `web-ci` fast-gates |
+| tokens mirrors committed | lint-staged → `scripts/tokens-drift.mjs` (fails, tells you what to `git add`) | `web-ci` packages job |
+| OpenAPI drift + generated Models.kt/SDK | lint-staged → `server/scripts/openapi-check.mjs` | `server-ci` (`openapi:check`, `openapi:lint`, regen + diff) |
+| tracker csv | lint-staged → `scripts/tracker-drift.mjs` | `docs-ci` |
+| web lint/typecheck/test/build/bundle | manual | `web-ci` web job (+ `bundle-budget.mjs --check .next`) |
+| LHCI, axe a11y, knip | `pnpm -C apps/web lhci` / `e2e` | `web-ci` runtime + knip jobs (knip report-only) |
+| server tsc/vitest/docker | manual | `server-ci` (+ amd64 docker `/health` smoke on main) |
+| docs links | — | `docs-ci` lychee `--offline` |
+| workflow lint | `actionlint` | `ci-lint` |
+| deps | — | `deps-weekly` rolling issue |
 
 ## Shared-clone etiquette
 

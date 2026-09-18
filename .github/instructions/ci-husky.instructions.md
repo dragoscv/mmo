@@ -13,11 +13,23 @@ description: "Gates: husky pre-commit checks, GitHub Actions workflows, repo scr
 3. `node apps/web/scripts/check-migrations.mjs --staged` — staged `apps/web/src/db/**` ⇒ new `drizzle/NNNN_*.sql`
    + `drizzle/meta/_journal.json` change.
 All three accept `--base=<ref>` for CI mode (diff vs `origin/main`).
+4. `pnpm exec lint-staged --no-stash` — path-scoped gates from root `package.json` `lint-staged` (added WP13-04):
+   web/extension i18n parity, `scripts/tokens-drift.mjs`, `server/scripts/openapi-check.mjs`, `scripts/hex-gate.mjs
+   --staged`, `scripts/tracker-drift.mjs`, `scripts/check-version-generic.mjs --staged` (server + packages/{ui,
+   design-tokens,sdk,ai}). Drift gates FAIL and print the `git add` to run; they never stage anything.
+
+**Husky `.husky/commit-msg`** (WP13-04): `pnpm exec commitlint --edit "$1"` → `commitlint.config.mjs` (conventional,
+header ≤ 120, scope-enum is a warning). Root `prepare` runs `scripts/prepare-husky.cjs` (no-op when `CI`/`HUSKY=0`).
+Root deps install with `pnpm install --ignore-workspace` at the repo root. Full inventory: `docs/arhitectura/gates.md`.
 
 **Workflows** (`.github/workflows/`):
 | File | Trigger | Does |
 |---|---|---|
-| `web-ci.yml` | push/PR on `apps/web/**`, `packages/**` | packages matrix (design-tokens, ui): install `--frozen-lockfile --ignore-workspace`, typecheck, test, tokens `pnpm build` + `git diff --exit-code -- dist ../../apps`; web: `lint:check`, `typecheck`, `test`, `build` (Node 22, `SKIP_ENV_VALIDATION=1`) |
+| `web-ci.yml` | push/PR on `apps/web/**`, `packages/**`, `scripts/**` | fast-gates (i18n parity, hex gate, PR version/migration guards); packages matrix (design-tokens, ui): typecheck, test, tokens `pnpm build` + `git diff --exit-code -- dist ../../apps ../../server/ui/public`; web: `lint:check`, `typecheck`, `test`, `build`, `bundle-budget.mjs --check .next`; runtime: LHCI + axe (`e2e/a11y.spec.ts` w390/w1440); knip (report only) — added WP13-05 |
+| `server-ci.yml` | `server/**`, `packages/sdk/**` | tsc, `ui:typecheck`, vitest, `openapi:check`, `openapi:lint`, regenerate Models.kt + SDK types and `git diff --exit-code`, PR version guard; sdk typecheck/test; docker amd64 smoke `/health` on main — added WP13-05 |
+| `docs-ci.yml` | `**/*.md`, `docs/**` | lychee `--offline` (`lychee.toml`), tracker csv regen + diff — added WP13-05 |
+| `deps-weekly.yml` | cron Mon 06:00 UTC, dispatch | `pnpm outdated` per lockfile → rolling issue "Weekly dependency report" — added WP13-05 |
+| `ci-lint.yml` | `.github/workflows/**` | `raven-actions/actionlint@v2` (`.github/actionlint.yaml` declares `ubuntu-24.04-arm`) — added WP13-05 |
 | `extension-ci.yml` | `apps/extension/**` | version-bump guard vs base, manifest MV3 check, `vendor:polyfill` drift |
 | `companion-release.yml` | tag `companion-v*`, dispatch | electron-builder installers |
 | `mmo-server-docker.yml` | tag `server-v*`, dispatch | buildx image, context `server/` |
@@ -26,16 +38,11 @@ All three accept `--base=<ref>` for CI mode (diff vs `origin/main`).
 | `tv-android-release.yml` | tag `tv-v*` | Gradle release APK |
 | `release.yml` | dispatch | Changesets version/publish |
 | `yjs-relay-deploy.yml` | `infra/yjs-relay/**` | relay deploy |
-Not covered today: server build/test, OpenAPI drift, i18n parity, hex gate, tracker CSV, docs links.
+Not covered anywhere yet: tv-android/tv-tizen/mixai/native builds on PR (release tags only).
 
-## Planned (tracker §11 WP13 — reference the paths, mark "added in WP13-0x")
-- WP13-03 scripts: `apps/web/scripts/i18n-parity.mjs`, `apps/web/scripts/bundle-budget.mjs`, `scripts/hex-gate.mjs`;
-  tokens mirror list += mixai/server `prehydrate.js`.
-- WP13-04 husky `prepare` + lint-staged path-scoped gates (i18n, tokens, OpenAPI, hex/`Color(0x`, tracker csv,
-  version bumps for server/packages) + commitlint (Conventional Commits).
-- WP13-05 CI: `server-ci.yml` (build:headless, test, openapi:check), web-ci += bundle budget / LHCI (`pnpm lhci`,
-  `lighthouserc.cjs` exists) / axe (`e2e/a11y.spec.ts`) / knip, `docs-ci.yml` (lychee), actionlint, `deps-weekly.yml`.
-- WP13-06 mutation-test every gate → `docs/arhitectura/gates.md`.
+## Planned (tracker §11 WP13)
+- WP13-06 mutation-test every gate → fill the "Mutation test" column in `docs/arhitectura/gates.md`
+  (done so far: commitlint, hex `--staged`, check-version-generic). Then drop `--no-exit-code` from knip.
 
 ## Rules for touching gates
 - A gate is "done" only after a mutation test: break the invariant → gate goes RED → restore → GREEN. Paste both

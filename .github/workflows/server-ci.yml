@@ -1,0 +1,122 @@
+name: server-ci
+
+# MMO Server (server/) + the SDK types generated from its OpenAPI spec (WP13-05).
+# Node 22 is mandatory: better-sqlite3 13 prebuilds + the Electron 44 ABI line.
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "server/**"
+            - "packages/sdk/**"
+            - ".github/workflows/server-ci.yml"
+    pull_request:
+        paths:
+            - "server/**"
+            - "packages/sdk/**"
+            - ".github/workflows/server-ci.yml"
+
+concurrency:
+    group: server-ci-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+env:
+    CI: 1
+    HUSKY: 0
+
+jobs:
+    server:
+        name: server (tsc, vitest, openapi drift, generated files)
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        defaults:
+            run:
+                working-directory: server
+        steps:
+            - uses: actions/checkout@v5
+            - uses: pnpm/action-setup@v6
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+                  cache: pnpm
+                  cache-dependency-path: server/pnpm-lock.yaml
+            - name: Install (server)
+              run: pnpm install --frozen-lockfile --ignore-workspace
+            - name: Typecheck headless core (tsc)
+              run: pnpm build:headless
+            - name: Typecheck renderer
+              run: pnpm ui:typecheck
+            - name: Unit tests (vitest)
+              run: pnpm test
+            - name: OpenAPI ↔ Express drift
+              run: pnpm openapi:check
+            - name: OpenAPI lint (redocly)
+              run: pnpm openapi:lint
+            - name: Regenerate Kotlin models + SDK types
+              run: |
+                  node scripts/openapi-kotlin.mjs
+                  pnpm exec openapi-typescript openapi.yaml -o ../packages/sdk/src/generated/mmo-server.d.ts
+            - name: Generated files are committed
+              working-directory: .
+              run: |
+                  git diff --exit-code --stat -- \
+                    apps/tv-android/app/src/main/java/ro/mixai/tv/data/generated/Models.kt \
+                    packages/sdk/src/generated \
+                  || (echo "::error::Run pnpm -C server openapi:gen and commit Models.kt + packages/sdk/src/generated" && exit 1)
+            - name: Version bump guard (server, packages)
+              if: github.event_name == 'pull_request'
+              working-directory: .
+              run: |
+                  git fetch origin "${{ github.base_ref }}" --depth=50
+                  node scripts/check-version-generic.mjs --base="origin/${{ github.base_ref }}"
+
+    sdk:
+        name: packages/sdk (typecheck, test)
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        defaults:
+            run:
+                working-directory: packages/sdk
+        steps:
+            - uses: actions/checkout@v5
+            - uses: pnpm/action-setup@v6
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+                  cache: pnpm
+                  cache-dependency-path: packages/sdk/pnpm-lock.yaml
+            - run: pnpm install --frozen-lockfile --ignore-workspace
+            - run: pnpm typecheck
+            - run: pnpm test
+
+    docker-smoke:
+        name: docker build smoke (amd64, no push)
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
+        needs: server
+        # Image build is expensive (ffmpeg download + native deps) — main only.
+        if: github.event_name == 'push'
+        steps:
+            - uses: actions/checkout@v5
+            - uses: docker/setup-buildx-action@v3
+            - uses: docker/build-push-action@v6
+              with:
+                  context: server
+                  file: server/Dockerfile
+                  platforms: linux/amd64
+                  push: false
+                  load: true
+                  tags: mmo-server:ci
+                  cache-from: type=gha,scope=mmo-server-amd64
+                  cache-to: type=gha,scope=mmo-server-amd64,mode=max
+            - name: Container answers /health
+              run: |
+                  docker run -d --name mmo -p 17899:17899 -e MMO_HEADLESS=1 mmo-server:ci
+                  for i in $(seq 1 30); do
+                    if curl -fsS http://127.0.0.1:17899/health; then echo; echo "OK"; exit 0; fi
+                    sleep 2
+                  done
+                  echo "::error::/health never answered"; docker logs mmo; exit 1

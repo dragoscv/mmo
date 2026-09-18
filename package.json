@@ -2,14 +2,21 @@
     "name": "mmo-monorepo",
     "private": true,
     "version": "0.0.0",
-    "description": "MixAI \u2014 Multi Media Organizer (self-hosted MMO Server + MixAI apps). Root hosts husky hooks + workspace declaration. Each sub-package keeps its own pnpm-lock.yaml so existing CI (web-app, companion) and Vercel continue to work unchanged.",
+    "description": "MixAI — Multi Media Organizer (self-hosted MMO Server + MixAI apps). Root hosts husky hooks + workspace declaration. Each sub-package keeps its own pnpm-lock.yaml so existing CI (web-app, companion) and Vercel continue to work unchanged.",
     "scripts": {
+        "prepare": "node ./scripts/prepare-husky.cjs",
         "dev:setup": "node ./scripts/prepare-husky.cjs",
         "check:extension-version": "node apps/extension/scripts/check-version.mjs",
+        "check:version-generic": "node scripts/check-version-generic.mjs",
         "tokens:build": "pnpm -C packages/design-tokens build",
+        "tokens:drift": "node scripts/tokens-drift.mjs",
         "hex:check": "node scripts/hex-gate.mjs",
         "i18n:check": "pnpm -C apps/web i18n:check && pnpm -C apps/extension i18n:check",
         "bundle:check": "pnpm -C apps/web bundle:check",
+        "tracker:csv": "node scripts/tracker-regen-csv.mjs",
+        "tracker:drift": "node scripts/tracker-drift.mjs",
+        "commitlint": "commitlint",
+        "lint-staged": "lint-staged --no-stash",
         "typecheck": "pnpm -r --if-present --no-bail run typecheck",
         "lint": "pnpm -r --if-present --no-bail run lint",
         "test": "pnpm -r --if-present --no-bail run test",
@@ -23,7 +30,20 @@
     },
     "devDependencies": {
         "@changesets/cli": "^2.27.10",
-        "husky": "^9.1.7"
+        "@commitlint/cli": "21.2.2",
+        "@commitlint/config-conventional": "21.2.2",
+        "husky": "^9.1.7",
+        "lint-staged": "17.5.1"
+    },
+    "lint-staged": {
+        "apps/web/messages/*.json": "node apps/web/scripts/i18n-parity.mjs",
+        "apps/extension/_locales/**/messages.json": "node scripts/i18n-parity-ext.mjs",
+        "packages/design-tokens/src/**": "node scripts/tokens-drift.mjs",
+        "{server/src/**/*.ts,server/openapi.yaml,server/package.json}": "node server/scripts/openapi-check.mjs",
+        "{packages/ui/src,apps/mixai/src,server/ui/src,apps/tv-tizen/src}/**/*.{ts,tsx,css}": "node scripts/hex-gate.mjs --staged",
+        "apps/tv-android/**/*.kt": "node scripts/hex-gate.mjs --staged",
+        "docs/mixai-design-tracker.md": "node scripts/tracker-drift.mjs",
+        "{server,packages/ui,packages/design-tokens,packages/sdk,packages/ai}/**": "node scripts/check-version-generic.mjs --staged"
     },
     "packageManager": "pnpm@10.0.0"
 }

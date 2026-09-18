@@ -1,0 +1,104 @@
+name: deps-weekly
+
+# Monday 06:00 UTC: `pnpm outdated` per surface (each has its own lockfile),
+# aggregated into ONE rolling issue "Weekly dependency report" (WP13-05).
+# Known blockers (tracker §8 / WP1-07) are listed so nobody re-tries them blindly.
+
+on:
+    schedule:
+        - cron: "0 6 * * 1"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    issues: write
+
+concurrency:
+    group: deps-weekly
+    cancel-in-progress: false
+
+jobs:
+    report:
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        steps:
+            - uses: actions/checkout@v5
+            - uses: pnpm/action-setup@v6
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+
+            - name: Collect pnpm outdated per surface
+              shell: bash
+              run: |
+                  set +e
+                  out=deps-report.md
+                  {
+                    echo "# Weekly dependency report"
+                    echo
+                    echo "_Generated $(date -u +%Y-%m-%dT%H:%MZ) by \`deps-weekly.yml\` (run ${{ github.run_id }})._"
+                    echo
+                    echo "## Known blockers (do not bump blindly — tracker §8 / WP1-07)"
+                    echo
+                    echo "| Package | Surface | Stuck at | Why |"
+                    echo "|---|---|---|---|"
+                    echo "| typescript | apps/web | 5.9.x | typescript-eslint 8.70 has no TS 7 API (typescript-eslint#10940); packages/* already on 7.x |"
+                    echo "| eslint | apps/web | 9.x | eslint-plugin-react 7.37 peer \`^9.7\` — no ESLint 10 |"
+                    echo "| @tauri-apps/* + tauri crates | apps/mixai, apps/native | 2.x | tauri 3 is alpha only |"
+                    echo "| cpal / symphonia | apps/mixai Rust | 0.15.3 / 0.5.5 | 0.16+/0.6 need source changes (SampleRate→u32, AudioBufferRef rework) |"
+                    echo "| pnpm (Dockerfile) | server | 10.0.0 | newer 10.x makes ERR_PNPM_IGNORED_BUILDS fatal |"
+                    echo
+                  } > "$out"
+
+                  for dir in apps/web apps/extension apps/mixai apps/native apps/tv-tizen apps/gateway server packages/ui packages/design-tokens packages/sdk packages/ai packages/db packages/ai-mcp packages/audio-gen .; do
+                    [ -f "$dir/package.json" ] || continue
+                    [ -f "$dir/pnpm-lock.yaml" ] || { echo "skip $dir (no lockfile)"; continue; }
+                    echo "== $dir"
+                    label="$dir"; [ "$dir" = "." ] && label="root (husky/commitlint)"
+                    json=$(cd "$dir" && pnpm outdated --format json --ignore-workspace 2>/dev/null)
+                    rc=$?
+                    {
+                      echo "## $label"
+                      echo
+                      if [ -z "$json" ] || [ "$json" = "{}" ]; then
+                        echo "_up to date_ (pnpm exit $rc)"
+                      else
+                        echo "| Package | Current | Latest | Type |"
+                        echo "|---|---|---|---|"
+                        echo "$json" | node -e '
+                          let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+                            let o={}; try{o=JSON.parse(s)}catch{ console.log("| _(unparseable pnpm output)_ | | | |"); return; }
+                            for (const [k,v] of Object.entries(o)) console.log(`| ${k} | ${v.current??""} | ${v.latest??""} | ${v.dependencyType??""} |`);
+                          });'
+                      fi
+                      echo
+                    } >> "$out"
+                  done
+                  echo "---" >> "$out"
+                  echo "_Per-app lockfiles: bump inside the app with \`pnpm add --ignore-workspace <pkg>@latest\`, then run that surface's CI._" >> "$out"
+                  wc -l "$out"
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: deps-report
+                  path: deps-report.md
+                  retention-days: 30
+
+            - name: Find the existing open report issue
+              id: find
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  n=$(gh issue list --repo "${{ github.repository }}" --state open --label automated --search 'in:title "Weekly dependency report"' --json number --jq '.[0].number // empty')
+                  echo "number=${n}" >> "$GITHUB_OUTPUT"
+                  echo "existing issue: ${n:-none}"
+
+            - name: Create or update the rolling issue
+              uses: peter-evans/create-issue-from-file@v5
+              with:
+                  title: Weekly dependency report
+                  content-filepath: deps-report.md
+                  labels: dependencies, automated
+                  # Empty issue-number ⇒ create; set ⇒ update the body of the rolling issue.
+                  issue-number: ${{ steps.find.outputs.number }}
+                  token: ${{ secrets.GITHUB_TOKEN }}

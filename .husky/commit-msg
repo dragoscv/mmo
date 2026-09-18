@@ -1,0 +1,2 @@
+# Conventional Commits (WP13-04). Config: commitlint.config.mjs at the repo root.
+pnpm exec commitlint --edit "$1"

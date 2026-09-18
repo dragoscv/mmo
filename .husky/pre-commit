@@ -6,3 +6,8 @@ node apps/web/scripts/check-version.mjs --staged
 
 # Fails if app/src/db schema changed without a matching new drizzle migration.
 node apps/web/scripts/check-migrations.mjs --staged
+
+# Path-scoped gates (WP13-04): i18n parity, tokens drift, OpenAPI drift, hex gate,
+# tracker csv, version bumps for server/packages. Config: root package.json "lint-staged".
+# --no-stash: never touch the working tree (shared clone) — gates only READ the index.
+pnpm exec lint-staged --no-stash

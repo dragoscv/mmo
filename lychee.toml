@@ -1,0 +1,45 @@
+# lychee link checker config (docs-ci.yml, WP13-05). Run locally:
+#   lychee --config lychee.toml --offline './**/*.md'
+# CI runs --offline: only file:// / relative links are verified, external URLs skipped.
+
+# Never follow into dependencies, build output or third-party checkouts.
+exclude_path = [
+  "node_modules",
+  ".next",
+  "dist",
+  "release",
+  "target",
+  "external",
+  ".copilot-tmp",
+  "apps/web/public",
+  "apps/tv-android/build",
+  "apps/native/android",
+]
+
+# URL patterns to ignore (regex). Dev hosts, LAN, staging and mail/tel links.
+exclude = [
+  "^https?://localhost",
+  "^https?://127\\.0\\.0\\.1",
+  "^https?://0\\.0\\.0\\.0",
+  "^https?://192\\.168\\.",
+  "^https?://10\\.",
+  "^https?://172\\.(1[6-9]|2[0-9]|3[01])\\.",
+  "^https?://(staging\\.)?mixai\\.ro",
+  "^https?://homepi",
+  "^mailto:",
+  "^tel:",
+  "^chrome://",
+  "^chrome-extension://",
+  "^tizen",
+]
+
+# Anchors inside markdown are checked; missing fragments are errors.
+include_fragments = true
+
+# Quiet, machine-friendly output.
+no_progress = true
+max_retries = 1
+timeout = 20
+accept = ["200..=299", "403", "429"]
+exclude_all_private = true
+require_https = false
