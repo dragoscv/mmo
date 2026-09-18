@@ -41,5 +41,20 @@ export default defineConfig({
         emptyOutDir: true,
         target: "chrome132", // Electron 34
         sourcemap: false,
+        rolldownOptions: {
+            output: {
+                // rolldown ≥1.x: `codeSplitting.groups` (advancedChunks is deprecated).
+                // One stable vendor chunk for the framework so app chunks stay small and cacheable.
+                codeSplitting: {
+                    groups: [
+                        {
+                            name: "vendor",
+                            test: /[\\/]node_modules[\\/](react|react-dom|scheduler|motion|framer-motion|@base-ui[\\/]react|lucide-react)[\\/]/,
+                            priority: 10,
+                        },
+                    ],
+                },
+            },
+        },
     },
 });

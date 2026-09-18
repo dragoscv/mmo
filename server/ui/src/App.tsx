@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@mmo/ui";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger } from "@mmo/ui";
 import { ArrowLeft, AudioLines } from "lucide-react";
 import { useT } from "./i18n";
 import { isMac } from "./lib/ipc";
@@ -7,8 +7,20 @@ import { hideSplash } from "./lib/splash";
 import { useStatus } from "./lib/use-status";
 import { AuthView } from "./views/AuthView";
 import { MainView } from "./views/MainView";
-import { VirtualAudioView } from "./views/VirtualAudioView";
 import { TitleBar } from "./components/TitleBar";
+
+// Audio Setup is never the first paint — split it (and its device widgets) into its own chunk.
+const VirtualAudioView = lazy(() => import("./views/VirtualAudioView").then((m) => ({ default: m.VirtualAudioView })));
+
+function ViewSkeleton() {
+    return (
+        <div className="mx-auto flex max-w-[var(--content-sm)] flex-col gap-4 p-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-40 w-full" />
+        </div>
+    );
+}
 
 type Route = "home" | "virtual-audio";
 
@@ -73,7 +85,9 @@ export function App() {
 
             <main className="min-h-0 flex-1 overflow-y-auto">
                 {route === "virtual-audio" ? (
-                    <VirtualAudioView />
+                    <Suspense fallback={<ViewSkeleton />}>
+                        <VirtualAudioView />
+                    </Suspense>
                 ) : authenticated && status ? (
                     <MainView status={status} onStatusRefresh={refresh} />
                 ) : (

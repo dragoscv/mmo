@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense } from "react";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -16,27 +16,32 @@ import {
     Button,
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
-    Label,
-    Separator,
     Skeleton,
-    Switch,
     Tabs,
     TabsContent,
     TabsList,
     TabsTrigger,
-    ThemeSettings,
-    useToast,
 } from "@mmo/ui";
 import { LogOut } from "lucide-react";
 import { useT } from "../i18n";
-import { errorMessage, ipc, type CompanionSettings, type CompanionStatus } from "../lib/ipc";
-import { DebugLogPanel } from "../components/DebugLogPanel";
+import { ipc, type CompanionStatus } from "../lib/ipc";
 import { UpdaterBar } from "../components/UpdaterBar";
 
-type ToggleKey = "startAtLogin" | "closeToTray" | "startMinimized";
+// Lazy tab bodies: only the Overview tab is visible at first paint.
+const SettingsTab = lazy(() => import("./SettingsTab"));
+const DebugLogPanel = lazy(() => import("../components/DebugLogPanel").then((m) => ({ default: m.DebugLogPanel })));
+
+function TabSkeleton() {
+    return (
+        <div className="space-y-3">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+        </div>
+    );
+}
 
 function initials(name: string | null): string {
     return (name || "?")
@@ -49,35 +54,6 @@ function initials(name: string | null): string {
 
 export function MainView({ status, onStatusRefresh }: { status: CompanionStatus; onStatusRefresh: () => Promise<unknown> }) {
     const t = useT();
-    const toast = useToast();
-    const [settings, setSettings] = useState<CompanionSettings | null>(null);
-
-    useEffect(() => {
-        let alive = true;
-        ipc()
-            .getSettings()
-            .then((s) => alive && setSettings(s))
-            .catch(() => {});
-        return () => {
-            alive = false;
-        };
-    }, []);
-
-    /** Legacy `toggleSetting`: re-read, flip, write, re-render from the returned settings. */
-    async function toggle(key: ToggleKey, next: boolean) {
-        setSettings((cur) => (cur ? { ...cur, [key]: next } : cur));
-        try {
-            const updated = await ipc().updateSettings({ [key]: next });
-            setSettings(updated);
-        } catch (err) {
-            toast.add({ type: "error", title: t("settings.saveFailed"), description: errorMessage(err) });
-            try {
-                setSettings(await ipc().getSettings());
-            } catch {
-                /* ignore */
-            }
-        }
-    }
 
     async function disconnect() {
         await ipc().logout();
@@ -86,12 +62,6 @@ export function MainView({ status, onStatusRefresh }: { status: CompanionStatus;
 
     const serverTone = status.serverError ? "destructive" : status.port ? "success" : "warning";
     const serverText = status.serverError ? t("profile.serverError") : status.port ? t("profile.serverRunning") : t("profile.serverStarting");
-
-    const toggles: Array<{ key: ToggleKey; label: string; desc: string }> = [
-        { key: "startAtLogin", label: t("settings.startAtLogin"), desc: t("settings.startAtLogin.desc") },
-        { key: "closeToTray", label: t("settings.closeToTray"), desc: t("settings.closeToTray.desc") },
-        { key: "startMinimized", label: t("settings.startMinimized"), desc: t("settings.startMinimized.desc") },
-    ];
 
     return (
         <div className="flex h-full flex-col">
@@ -170,45 +140,15 @@ export function MainView({ status, onStatusRefresh }: { status: CompanionStatus;
                         </TabsContent>
 
                         <TabsContent value="settings" className="mt-4 space-y-4">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("settings.title")}</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {settings ? (
-                                        toggles.map((row, i) => (
-                                            <div key={row.key}>
-                                                {i > 0 && <Separator className="my-2" />}
-                                                <div className="flex items-center justify-between gap-4 py-1">
-                                                    <div>
-                                                        <Label htmlFor={`toggle-${row.key}`} className="text-sm">
-                                                            {row.label}
-                                                        </Label>
-                                                        <CardDescription className="text-[11px]">{row.desc}</CardDescription>
-                                                    </div>
-                                                    <Switch id={`toggle-${row.key}`} checked={!!settings[row.key]} onCheckedChange={(v) => void toggle(row.key, v)} />
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="space-y-3">
-                                            <Skeleton className="h-9 w-full" />
-                                            <Skeleton className="h-9 w-full" />
-                                            <Skeleton className="h-9 w-full" />
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <ThemeSettings hide={["feedback"]} />
-                                </CardContent>
-                            </Card>
+                            <Suspense fallback={<TabSkeleton />}>
+                                <SettingsTab />
+                            </Suspense>
                         </TabsContent>
 
                         <TabsContent value="debug" className="mt-4">
-                            <DebugLogPanel />
+                            <Suspense fallback={<TabSkeleton />}>
+                                <DebugLogPanel />
+                            </Suspense>
                         </TabsContent>
                     </Tabs>
                 </div>
