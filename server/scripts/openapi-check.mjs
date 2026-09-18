@@ -17,7 +17,8 @@ import { parse } from "yaml";
 const here = dirname(fileURLToPath(import.meta.url));
 const serverRoot = resolve(here, "..");
 const srcRoot = join(serverRoot, "src");
-const specPath = join(serverRoot, "openapi.yaml");
+const specArg = process.argv.find((a) => a.startsWith("--spec="));
+const specPath = specArg ? resolve(specArg.slice("--spec=".length)) : join(serverRoot, "openapi.yaml");
 
 /** Mount prefix per router file (relative to server/src, forward slashes). */
 const MOUNTS = {

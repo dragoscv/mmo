@@ -4,6 +4,7 @@
 //   node scripts/bundle-budget.mjs --measure <buildlog|.next dir>            print {routes, shared} (kB)
 //   node scripts/bundle-budget.mjs --measure <src> --baseline                write .bundle-baseline.json
 //   node scripts/bundle-budget.mjs --check <buildlog|.next dir>              compare with the baseline, exit 1 on regression
+//   … --baseline-file <path>                                                 use another baseline (mutation tests)
 //
 // Source of sizes:
 //   * a `next build --webpack` log — the "Route (app) … First Load JS" table is parsed;
@@ -22,13 +23,13 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const BASELINE_PATH = join(here, "..", ".bundle-baseline.json");
 const ROUTE_PCT = 0.10;
 const ROUTE_ABS_KB = 25;
 const SHARED_ABS_KB = 20;
 
 const args = process.argv.slice(2);
 const arg = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
+const BASELINE_PATH = arg("--baseline-file") ? resolve(arg("--baseline-file")) : join(here, "..", ".bundle-baseline.json");
 const measureSrc = arg("--measure");
 const checkSrc = arg("--check");
 const writeBaseline = args.includes("--baseline");

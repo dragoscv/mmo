@@ -3,6 +3,7 @@
 //
 //   node scripts/i18n-parity.mjs            # missing keys on either side → exit 1
 //   node scripts/i18n-parity.mjs --strict   # also fail on identical (untranslated) values
+//   node scripts/i18n-parity.mjs --dir=<messages dir>   # check another directory (mutation tests)
 //
 // ICU plural/select variant differences (e.g. RO `few`, EN lacks it) are NOT
 // flagged: only leaf keys are compared, and plural variants live inside the
@@ -12,7 +13,8 @@ import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const dir = join(here, "..", "messages");
+const dirArg = process.argv.find((a) => a.startsWith("--dir="));
+const dir = dirArg ? dirArg.slice("--dir=".length) : join(here, "..", "messages");
 const STRICT = process.argv.includes("--strict");
 const BASE = "en";
 

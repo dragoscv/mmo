@@ -4,12 +4,14 @@
 //
 //   node scripts/i18n-parity-ext.mjs            # missing keys → exit 1
 //   node scripts/i18n-parity-ext.mjs --strict   # also fail on identical messages
+//   node scripts/i18n-parity-ext.mjs --dir=<_locales dir>   # check another directory (mutation tests)
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const dir = join(here, "..", "apps", "extension", "_locales");
+const dirArg = process.argv.find((a) => a.startsWith("--dir="));
+const dir = dirArg ? dirArg.slice("--dir=".length) : join(here, "..", "apps", "extension", "_locales");
 const STRICT = process.argv.includes("--strict");
 const BASE = "en";
 

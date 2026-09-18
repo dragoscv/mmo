@@ -340,7 +340,7 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 | WP13-03 | Scripts promoted: `scripts/tracker-regen-csv.mjs`, `apps/web/scripts/i18n-parity.mjs`, `apps/web/scripts/bundle-budget.mjs`, `scripts/hex-gate.mjs`; tokens mirror list += mixai/server prehydrate | todo |
 | WP13-04 | Husky `prepare` + lint-staged path-scoped gates (i18n, tokens, OpenAPI, hex/Color(0x), tracker csv, version bumps server/packages) + commitlint | done — root `lint-staged` config, `scripts/{check-version-generic,tokens-drift,tracker-drift}.mjs`, `commitlint.config.mjs`, `.husky/commit-msg` |
 | WP13-05 | CI: `server-ci.yml`, web-ci += bundle budget/LHCI/axe/knip, `docs-ci.yml` lychee, actionlint, `deps-weekly.yml` | done — actionlint clean locally; first CI run pending push |
-| WP13-06 | Mutation-test every gate (break → red → restore) → `docs/arhitectura/gates.md` | doing — commitlint, hex `--staged`, version-generic verified; rest pending in gates.md |
+| WP13-06 | Mutation-test every gate (break → red → restore) → `docs/arhitectura/gates.md` | done 2026-09-18 — all 11 hook gates + bundle budget + lint-baseline compare RED/GREEN in gates.md; scripts gained `--dir`/`--spec`/`--baseline-file`/`--results` overrides |
 
 ### WP14 — Closure
 | ID | Item | Status |

@@ -1,10 +1,13 @@
 // Regenerates docs/mixai-design-tracker.csv from the canonical .md (WP rows only; other CSV lines kept).
+// `--dir=<path>` points at another directory holding both files (mutation tests).
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const md = readFileSync(join(root, "docs/mixai-design-tracker.md"), "utf8");
-const csvP = join(root, "docs/mixai-design-tracker.csv");
+const dirArg = process.argv.find((a) => a.startsWith("--dir="));
+const docsDir = dirArg ? dirArg.slice("--dir=".length) : join(root, "docs");
+const md = readFileSync(join(docsDir, "mixai-design-tracker.md"), "utf8");
+const csvP = join(docsDir, "mixai-design-tracker.csv");
 const old = readFileSync(csvP, "utf8");
 // keep the non-WP sections of the old CSV (decisions, questions) — everything whose id isn't WPx-yy
 const q = (s) => `"${String(s).replace(/"/g, '""')}"`;

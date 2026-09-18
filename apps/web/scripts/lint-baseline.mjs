@@ -6,6 +6,8 @@
  * Usage:
  *   node scripts/lint-baseline.mjs snapshot   # write .eslint-baseline.json
  *   node scripts/lint-baseline.mjs check      # fail only on NEW errors
+ *   node scripts/lint-baseline.mjs check --results=<eslint json>   # compare a saved `eslint --format json` output
+ *   node scripts/lint-baseline.mjs check --baseline=<file>         # compare against another baseline
  *
  * The baseline records `{ <relativePath>: errorCount }` for the worst
  * lines as of the snapshot. `check` runs ESLint, computes the same map for
@@ -26,13 +28,18 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
-const BASELINE_PATH = path.join(REPO_ROOT, ".eslint-baseline.json");
+const argv = process.argv.slice(3);
+const optOf = (name) => argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+const BASELINE_PATH = optOf("baseline") ? path.resolve(optOf("baseline")) : path.join(REPO_ROOT, ".eslint-baseline.json");
+const RESULTS_PATH = optOf("results") ? path.resolve(optOf("results")) : null;
 
 function runEslintJson() {
     // ESLint exits non-zero when there are errors — we WANT the JSON either
     // way, so swallow the throw and read stdout.
     let stdout = "";
-    try {
+    if (RESULTS_PATH) {
+        stdout = fs.readFileSync(RESULTS_PATH, "utf8");
+    } else try {
         stdout = execFileSync("pnpm", ["exec", "eslint", ".", "--format", "json"], {
             cwd: REPO_ROOT,
             encoding: "utf8",
