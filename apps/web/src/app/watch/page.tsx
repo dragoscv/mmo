@@ -22,6 +22,7 @@ export default async function WatchHome() {
     const session = await auth();
     const userId = session?.user?.id;
     const t = await getTranslations("watch.rows");
+    const th = await getTranslations("watch.home");
     if (!userId) return notSignedInFor("watch");
 
     const hasLocalSeed = await safe(
@@ -47,11 +48,11 @@ export default async function WatchHome() {
                 <ContinueWatchingRow />
             </Suspense>
 
-            <Suspense fallback={<RowSkeleton title="Up Next" />}>
+            <Suspense fallback={<RowSkeleton title={th("upNext")} />}>
                 <UpNextRow />
             </Suspense>
 
-            <Suspense fallback={<RowSkeleton title="Watchlist" />}>
+            <Suspense fallback={<RowSkeleton title={th("watchlist")} />}>
                 <WatchlistRow />
             </Suspense>
 
@@ -83,9 +84,9 @@ export default async function WatchHome() {
 
             {!hasLocal && (
                 <div className="watch-empty">
-                    <p>Configurează un companion și rulează un scan pentru a-ți vedea filmele locale.</p>
+                    <p>{th("noLocal")}</p>
                     <p style={{ marginTop: "1rem" }}>
-                        <Link href="/settings" className="watch-btn watch-btn-ghost">Setări &rarr;</Link>
+                        <Link href="/settings" className="watch-btn watch-btn-ghost">{th("settings")}</Link>
                     </p>
                 </div>
             )}

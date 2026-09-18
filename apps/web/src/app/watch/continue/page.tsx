@@ -10,18 +10,23 @@ import { buildMoviePosterProps } from "@/lib/poster-card-builder";
 import { notSignedInFor } from "@/components/empty-state-server";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Continuă vizionarea" };
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("watch.continuePage");
+    return { title: t("title") };
+}
 
 export default async function ContinueWatchingPage() {
     const session = await auth();
     if (!session?.user?.id) return notSignedInFor("continue");
+    const t = await getTranslations("watch.continuePage");
 
     const profileId = await getActiveProfileId().catch(() => null);
     if (!profileId) {
         return (
             <div className="watch-empty">
-                <p>Nu există un profil de vizionare activ. Creează unul mai întâi.</p>
+                <p>{t("noProfile")}</p>
             </div>
         );
     }
@@ -67,8 +72,6 @@ export default async function ContinueWatchingPage() {
     const wishlistSet = new Set(wishlists.map((w) => w.movieId).filter((x): x is number => x != null));
     const customs = customCollections.filter((c) => c.kind === "custom").map((c) => ({ id: c.id, name: c.name }));
 
-    const t = await getTranslations("watch.continuePage");
-
     return (
         <main className="p-6">
             <header className="mb-6">
@@ -79,7 +82,7 @@ export default async function ContinueWatchingPage() {
             </header>
             {rows.length === 0 ? (
                 <div className="watch-empty">
-                    <p>Nu există nimic în desfășurare. Pornește un film sau un episod și va apărea aici.</p>
+                    <p>{t("empty")}</p>
                 </div>
             ) : (
                 <div className="watch-grid">

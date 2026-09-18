@@ -52,6 +52,22 @@ export function offerHref(offer: { link?: string | null; launch: { web: string; 
     return offer.link || offer.launch.web || offer.launch.search;
 }
 
+/** True when the offer's TMDB provider id is one of the user's `preferredProviders`. */
+export function isPreferredOffer(offer: { providerId: string }, preferred: ReadonlyArray<number>): boolean {
+    const n = Number(offer.providerId);
+    return Number.isInteger(n) && preferred.includes(n);
+}
+
+/**
+ * Stable partition: preferred offers first, in the user's ranking order,
+ * then the rest in server order. Pure; used by `ProviderOffers`.
+ */
+export function orderOffersByPreference<T extends { providerId: string }>(offers: T[], preferred: ReadonlyArray<number>): T[] {
+    if (preferred.length === 0) return offers;
+    const rank = (o: T) => { const i = preferred.indexOf(Number(o.providerId)); return i === -1 ? Number.MAX_SAFE_INTEGER : i; };
+    return offers.map((o, i) => ({ o, i, r: rank(o) })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.o);
+}
+
 /** Group sources by server so the title page renders one "Play on <server>" block per machine. */
 export function groupSourcesByServer(sources: TitleSource[]): Array<{ serverId: string; serverName: string; files: TitleSource[] }> {
     const map = new Map<string, { serverId: string; serverName: string; files: TitleSource[] }>();

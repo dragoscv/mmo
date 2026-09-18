@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { videoCollections, videoCollectionItems, movies, tvShows, watchProfiles, videoFiles } from "@/db/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { getActiveProfileId } from "@/lib/active-profile";
 import { PosterCard } from "@/components/video/poster-card";
 import { PosterRow } from "@/components/video/poster-row";
@@ -17,13 +18,14 @@ export default async function CollectionsPage() {
     if (!session?.user?.id) {
         return notSignedInFor("collections");
     }
+    const t = await getTranslations("watch.collectionsPage");
     const profileId = await getActiveProfileId();
     if (!profileId) {
         return (
             <EmptyState
-                title="Selectează un profil"
-                description="Alege un profil de vizionare ca să vezi colecțiile."
-                actions={<Button render={<Link href="/profiles" />}>Profiluri</Button>}
+                title={t("pickProfileTitle")}
+                description={t("pickProfileDescription")}
+                actions={<Button render={<Link href="/profiles" />}>{t("profiles")}</Button>}
             />
         );
     }
@@ -44,17 +46,16 @@ export default async function CollectionsPage() {
         <main className="px-6 pt-8 pb-24">
             <header className="mb-8 flex items-center justify-between">
                 <div>
-                    <h1 className="text-[2rem] font-extrabold tracking-tight">Colecții</h1>
+                    <h1 className="text-[2rem] font-extrabold tracking-tight">{t("title")}</h1>
                     <p style={{ color: "var(--watch-fg-dim)", marginTop: ".25rem" }}>
-                        Listele tale: wishlist, watch-later și colecții personalizate.
+                        {t("lead")}
                     </p>
                 </div>
             </header>
 
             {rows.length === 0 && (
                 <p style={{ color: "var(--watch-fg-dim)" }}>
-                    Nu ai încă nicio colecție. Apasă inima pe un film ca să-l adaugi în wishlist,
-                    sau folosește butonul „Adaugă în colecție" pe o pagină de detaliu.
+                    {t("empty")}
                 </p>
             )}
 

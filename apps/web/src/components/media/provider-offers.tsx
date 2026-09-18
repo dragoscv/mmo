@@ -4,16 +4,23 @@
  * (see `offerHref`). Attribution footer is mandatory (TMDB + JustWatch /
  * Movie of the Night depending on `attribution`). Server component.
  */
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Star } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { Badge } from "@mmo/ui";
 import { tmdbImg } from "@/lib/media/normalize";
-import { offerHref } from "@/lib/media/title";
+import { isPreferredOffer, offerHref, orderOffersByPreference } from "@/lib/media/title";
 import type { Availability } from "@/lib/media/types";
 
-export async function ProviderOffers({ availability }: { availability: Availability }) {
+export interface ProviderOffersProps {
+    availability: Availability;
+    /** `WatchPrefs.preferredProviders` (TMDB ids) — ranked first + "Preferred" badge. */
+    preferred?: ReadonlyArray<number>;
+}
+
+export async function ProviderOffers({ availability, preferred = [] }: ProviderOffersProps) {
     const t = await getTranslations("media.offers");
-    const { offers, attribution } = availability;
+    const { attribution } = availability;
+    const offers = orderOffersByPreference(availability.offers, preferred);
     return (
         <section className="media-title-section" aria-labelledby="media-offers-title">
             <h2 id="media-offers-title">{t("title")}</h2>
@@ -23,6 +30,7 @@ export async function ProviderOffers({ availability }: { availability: Availabil
                 <ul className="media-offers" role="list">
                     {offers.map((o) => {
                         const logo = tmdbImg(o.logo, "w92");
+                        const fav = isPreferredOffer(o, preferred);
                         return (
                             <li key={`${o.providerId}:${o.type}`}>
                                 <a
@@ -31,6 +39,7 @@ export async function ProviderOffers({ availability }: { availability: Availabil
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     data-deeplink={o.link ? "" : undefined}
+                                    data-preferred={fav ? "" : undefined}
                                 >
                                     {logo ? (
                                         // eslint-disable-next-line @next/next/no-img-element
@@ -39,6 +48,7 @@ export async function ProviderOffers({ availability }: { availability: Availabil
                                         <span className="media-offer-logo" aria-hidden />
                                     )}
                                     <span className="media-offer-name">{o.name}</span>
+                                    {fav ? <Badge><Star className="size-3" aria-hidden /> {t("preferred")}</Badge> : null}
                                     <Badge variant="secondary">{t(`type.${o.type}`)}</Badge>
                                     <ExternalLink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
                                 </a>

@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { getPlaybackHandle, companionHlsUrl, companionDirectUrl, canBrowserDirectPlay } from "@/lib/companion-video";
 import { getCompanionLinkForDevice } from "@/lib/companion-library";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { PlayerHost } from "./_player-host";
 import { getActiveProfileId } from "@/lib/active-profile";
 
@@ -88,11 +89,12 @@ export default async function PlayPage({ params, searchParams }: {
     }
 
     const handle = await getPlaybackHandle();
+    const t = await getTranslations("watch.play");
     if (!handle) {
         return (
             <main className="px-8 py-16 text-center">
-                <h1>Companion offline</h1>
-                <p style={{ color: "var(--watch-fg-dim)" }}>Pornește aplicația MixAI Companion pentru a reda fișierele locale.</p>
+                <h1>{t("companionOffline")}</h1>
+                <p style={{ color: "var(--watch-fg-dim)" }}>{t("companionOfflineHint")}</p>
             </main>
         );
     }
@@ -111,8 +113,8 @@ export default async function PlayPage({ params, searchParams }: {
     if (!fileIdResp || !fileIdResp.ok) {
         return (
             <main className="px-8 py-16 text-center">
-                <h1>Fișier negăsit în companion</h1>
-                <p style={{ color: "var(--watch-fg-dim)" }}>Rulează din nou un scan din /watch pentru a re-înregistra fișierele.</p>
+                <h1>{t("fileMissing")}</h1>
+                <p style={{ color: "var(--watch-fg-dim)" }}>{t("fileMissingHint")}</p>
                 <p style={{ color: "var(--watch-fg-dim)", fontFamily: "monospace", fontSize: ".8rem", marginTop: "1rem" }}>{dbFile.path}</p>
             </main>
         );

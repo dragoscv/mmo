@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
+import { useTranslations } from "next-intl";
 import { toggleWishlist } from "@/actions/video-collections";
 import { Heart } from "lucide-react";
 import { toast } from "sonner";
@@ -10,6 +11,7 @@ export function WishlistButton({ movieId, tvShowId, initial }: {
 }) {
     const [pending, start] = useTransition();
     const [on, setOn] = useState(initial);
+    const t = useTranslations("watch.actions");
     return (
         <button
             type="button"
@@ -19,12 +21,12 @@ export function WishlistButton({ movieId, tvShowId, initial }: {
                     const r = await toggleWishlist({ movieId, tvShowId });
                     if ("added" in r) {
                         setOn(r.added === true);
-                        toast.success(r.added ? "Added to wishlist" : "Removed from wishlist");
+                        toast.success(r.added ? t("addedWishlist") : t("removedWishlist"));
                     } else if ("error" in r) {
-                        toast.error("Acțiune eșuată");
+                        toast.error(t("failed"));
                     }
                 } catch {
-                    toast.error("Acțiune eșuată");
+                    toast.error(t("failed"));
                 }
             })}
             aria-pressed={on}

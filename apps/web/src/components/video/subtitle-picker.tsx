@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { getSubtitleSearchAuthorized } from "@/actions/subtitles";
 
 interface SubtitleResult {
@@ -27,6 +28,9 @@ export function SubtitlePicker({ query, onPick, autoSelectLangs, preferSdh }: {
     /** Prefer SDH/CC variants when auto-selecting. */
     preferSdh?: boolean;
 }) {
+    const t = useTranslations("watch.subtitles");
+    const tPlay = useTranslations("watch.play");
+    const tCommon = useTranslations("common");
     const [open, setOpen] = useState(false);
     const [lang, setLang] = useState("ro,en");
     const [loading, setLoading] = useState(false);
@@ -84,7 +88,7 @@ export function SubtitlePicker({ query, onPick, autoSelectLangs, preferSdh }: {
         (async () => {
             const handle = await getSubtitleSearchAuthorized({ ...query, lang });
             if (cancelled) return;
-            if (!handle) { setError("Companion neconectat"); setLoading(false); return; }
+            if (!handle) { setError(tPlay("companionOffline")); setLoading(false); return; }
             try {
                 const resp = await fetch(handle.searchUrl);
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -97,7 +101,7 @@ export function SubtitlePicker({ query, onPick, autoSelectLangs, preferSdh }: {
             }
         })();
         return () => { cancelled = true; };
-    }, [open, lang, query.title, query.tmdbId, query.imdbId, query.kind, query.season, query.episode, query]);
+    }, [open, lang, query.title, query.tmdbId, query.imdbId, query.kind, query.season, query.episode, query, tPlay]);
 
     const pick = async (r: SubtitleResult) => {
         const handle = await getSubtitleSearchAuthorized(query);
@@ -138,9 +142,9 @@ export function SubtitlePicker({ query, onPick, autoSelectLangs, preferSdh }: {
                         />
                         <button type="button" onClick={() => setOpen(false)} style={{ background: "transparent", border: "none", color: "#aaa", cursor: "pointer" }}>×</button>
                     </div>
-                    {loading && <div style={{ fontSize: ".8rem", opacity: .7 }}>Caut...</div>}
+                    {loading && <div style={{ fontSize: ".8rem", opacity: .7 }}>{tCommon("loading")}</div>}
                     {error && <div style={{ fontSize: ".8rem", color: "#ff7070" }}>{error}</div>}
-                    {!loading && !error && results.length === 0 && <div style={{ fontSize: ".8rem", opacity: .6 }}>Niciun rezultat. Verifică OPENSUBTITLES_API_KEY pe companion.</div>}
+                    {!loading && !error && results.length === 0 && <div style={{ fontSize: ".8rem", opacity: .6 }}>{t("noResults")}</div>}
                     {results.map((r) => (
                         <button
                             key={`${r.provider}-${r.id}`}

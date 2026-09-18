@@ -17,6 +17,29 @@ Every surface now renders from one token source. Decisions and rationale:
 [docs/design-system.md](docs/design-system.md); per-item status:
 [docs/mixai-design-tracker.md](docs/mixai-design-tracker.md).
 
+### Added — Media Home (web 2.1.0 → 2.2.0, tracker §10–11)
+
+- **`/` is Media Home**: hero billboard, Watch rows merged across every paired MMO Server
+  (dedupe by TMDB id, per-server chips, inline notices for offline/outdated servers), Listen rows
+  from `track_plays`, unified title page `/media/[kind]/[tmdbId]` with local sources and
+  streaming offers (TMDB + JustWatch / Movie of the Night attribution). Old dashboard → `/dashboard`.
+- **`POST /api/media/sync`** (device bearer token): MMO Servers push watch progress + track plays;
+  upserts `watch_history` (last-writer-wins), inserts `track_plays` (deduped), records
+  `media_sync_state`. **`GET /api/media/sync?since=`** returns web-side progress for servers/TVs
+  to pull. [WP11-07..09]
+- **Codai curator** (env-gated, opt-in per profile in Settings › Media): punchy RO/EN row titles
+  and a one-line "why" for the first picks, one `codai-fast` call per home revision cached 24 h;
+  any failure leaves the rows untouched.
+- **Preferred providers**: `/media/home?providers=` is sent from the profile prefs; "Where to
+  watch" ranks preferred offers first with a *Preferat/Preferred* badge.
+- **i18n sweep** of `/watch/**` and the video components — every hardcoded Romanian string now
+  lives in `messages/{en,ro}.json` under `watch.*` (RO+EN parity). `aria-live` region for server
+  notices; rows keep `role=list`; hero honours reduced motion.
+- Tests: sync mapping, curator (success/timeout/invalid JSON), preferred ordering (vitest);
+  Playwright `media-home.spec.ts` (anon landing; signed-in hero + rows at 390/1440/3440 light+dark
+  and axe on `/` + `/media/movie/550` when `E2E_SESSION_COOKIE` is set); `a11y.spec.ts` now scans
+  `/media/movie/550`.
+
 ### Removed — third-party embed sources (companion 3.1.0)
 
 - Third-party embed sources (vidsrc & co.) are gone from the companion (`/video/streams`, the

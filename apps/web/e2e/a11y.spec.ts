@@ -18,7 +18,9 @@ import AxeBuilder from "@axe-core/playwright";
  * intentionally empty: adding an id here needs a comment with the issue link.
  */
 
-const ROUTES = ["/", "/library", "/settings/appearance", "/get"] as const;
+// `/media/movie/550` (WP11-09) renders the NotSignedIn shell anonymously and the
+// full title page when a session cookie is present — both get scanned.
+const ROUTES = ["/", "/library", "/settings/appearance", "/get", "/media/movie/550"] as const;
 const MODES = ["light", "dark"] as const;
 const BLOCKING_IMPACTS: ReadonlyArray<string> = ["serious", "critical"];
 /** axe rule ids exempted from the gate. Keep empty; document any addition. */

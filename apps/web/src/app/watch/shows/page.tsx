@@ -8,6 +8,7 @@ import { WatchFilterBar } from "@/components/video/watch-filter-bar";
 import { getActiveProfileId, ensureDefaultWatchProfile } from "@/lib/active-profile";
 import { listCustomCollections } from "@/actions/video-context";
 import { getWatchPrefs } from "@/actions/watch-prefs";
+import { getTranslations } from "next-intl/server";
 import { buildShowPosterProps } from "@/lib/poster-card-builder";
 import { notSignedInFor } from "@/components/empty-state-server";
 
@@ -94,19 +95,20 @@ export default async function ShowsPage({ searchParams }: { searchParams: Promis
     const customCollections = collections
         .filter((c) => c.kind === "custom")
         .map((c) => ({ id: c.id, name: c.name }));
+    const t = await getTranslations("watch.showsPage");
 
     return (
         <main>
             <header className="px-6 pt-8">
-                <h1 className="text-[2rem] font-extrabold">Serialele tale</h1>
+                <h1 className="text-[2rem] font-extrabold">{t("title")}</h1>
             </header>
             <WatchFilterBar genres={facetGenres} years={facetYears} count={visible.length} />
             {visible.length === 0 ? (
                 <div className="px-8 py-16 text-[var(--watch-fg-dim)]">
                     {rows.length > 0 ? (
-                        <p>Niciun serial care să corespundă filtrelor.</p>
+                        <p>{t("noResults")}</p>
                     ) : (
-                        <p>Niciun serial încă. <Link href="/watch" style={{ color: "var(--watch-accent)" }}>Rulează un scan.</Link></p>
+                        <p>{t("empty")} <Link href="/watch" style={{ color: "var(--watch-accent)" }}>{t("runScan")}</Link></p>
                     )}
                 </div>
             ) : (

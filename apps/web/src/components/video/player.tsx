@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import type Hls from "hls.js";
+import { useTranslations } from "next-intl";
 import {
     Play,
     Pause,
@@ -87,6 +88,7 @@ function parseThumbsVtt(text: string, baseUrl: string): ThumbCue[] {
 }
 
 export function VideoPlayer(props: VideoPlayerProps) {
+    const t = useTranslations("watch.player");
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const hlsRef = useRef<Hls | null>(null);
     const [playing, setPlaying] = useState(false);
@@ -155,7 +157,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
             const HlsMod = (await import("hls.js")).default;
             if (cancelled) return;
             if (!HlsMod.isSupported()) {
-                setHlsError("Browserul nu suportă HLS.");
+                setHlsError(t("noHls"));
                 return;
             }
             const hls = new HlsMod({
@@ -221,7 +223,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
         // reloadKey forces re-run when the user seeks past the buffered
         // range — we kick a fresh transcode from the new offset.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [props.hlsUrl, props.directUrl, props.startSec, reloadKey]);
+    }, [props.hlsUrl, props.directUrl, props.startSec, reloadKey, t]);
 
     // Wire up media events + progress reporting
     useEffect(() => {

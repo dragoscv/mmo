@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ServerResult } from "./aggregate";
 import { normalizeCard, normalizeRows, pickTrailerKey, progressFraction, tmdbImg, type WireTitleResponse } from "./normalize";
-import { groupSourcesByServer, mergeTitleResponses, offerHref } from "./title";
+import { groupSourcesByServer, isPreferredOffer, mergeTitleResponses, offerHref, orderOffersByPreference } from "./title";
 import { buildServerChips, filterRowsByServers, pickHeroCandidates } from "./home";
 import type { HomeRow, MediaServer } from "./types";
 
@@ -110,5 +110,18 @@ describe("home helpers", () => {
     it("picks hero candidates with backdrops, logo first then rating, deduped", () => {
         const hero = pickHeroCandidates(rows, 5);
         expect(hero.map((h) => h.tmdbId)).toEqual([2, 3, 1]);
+    });
+});
+
+describe("preferred providers", () => {
+    const offers = [{ providerId: "337" }, { providerId: "8" }, { providerId: "119" }, { providerId: "abc" }];
+    it("flags preferred offers by numeric TMDB id", () => {
+        expect(isPreferredOffer({ providerId: "8" }, [119, 8])).toBe(true);
+        expect(isPreferredOffer({ providerId: "337" }, [119, 8])).toBe(false);
+        expect(isPreferredOffer({ providerId: "abc" }, [119, 8])).toBe(false);
+    });
+    it("orders preferred first in ranking order, rest stable", () => {
+        expect(orderOffersByPreference(offers, [119, 8]).map((o) => o.providerId)).toEqual(["119", "8", "337", "abc"]);
+        expect(orderOffersByPreference(offers, [])).toBe(offers);
     });
 });

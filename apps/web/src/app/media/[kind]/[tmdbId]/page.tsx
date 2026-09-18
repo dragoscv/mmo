@@ -124,7 +124,7 @@ export default async function MediaTitlePage({ params }: { params: Params }) {
 
                     <ServerNotices errors={errors} />
                     <TitleSources sources={sources} progress={progress} />
-                    <ProviderOffers availability={availability} />
+                    <ProviderOffers availability={availability} preferred={data.preferredProviders} />
 
                     {title.trailerKey ? (
                         <section className="media-title-section" aria-labelledby="media-trailer-title">

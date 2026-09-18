@@ -7,6 +7,7 @@ import { Button, EmptyState, Page, PageHeader, Skeleton } from "@mmo/ui";
 import { auth } from "@/auth";
 import { LandingPage } from "@/components/landing/landing-page";
 import { getMediaHome } from "@/actions/media";
+import { CuratorNote } from "@/components/media/curator-note";
 import { HeroBillboard } from "@/components/media/hero-billboard";
 import { ListenRows } from "@/components/media/listen-rows";
 import { ServerChips } from "@/components/media/server-chips";
@@ -80,6 +81,7 @@ async function WatchHalf() {
     return (
         <>
             {hero.length > 0 ? <HeroBillboard items={hero} /> : null}
+            <CuratorNote notes={home.curatorNotes} />
             <ServerChips chips={chips} now={home.now} />
             <ServerNotices errors={home.errors} />
             <WatchRows rows={home.rows} />

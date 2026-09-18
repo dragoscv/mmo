@@ -542,17 +542,126 @@
             "runScan": "Rulează un scan."
         },
         "showsPage": {
-            "title": "Serialele tale"
+            "title": "Serialele tale",
+            "noResults": "Niciun serial care să corespundă filtrelor.",
+            "empty": "Niciun serial încă.",
+            "runScan": "Rulează un scan."
         },
         "continuePage": {
             "title": "Continuă vizionarea",
-            "lead": "Reia exact de unde ai rămas pe orice ecran asociat profilului tău."
+            "lead": "Reia exact de unde ai rămas pe orice ecran asociat profilului tău.",
+            "noProfile": "Nu există un profil de vizionare activ. Creează unul mai întâi.",
+            "empty": "Nu există nimic în desfășurare. Pornește un film sau un episod și va apărea aici."
         },
         "error": {
             "title": "Watch s-a oprit din randare",
             "detail": "Ceva a eșuat pe server (probabil o interogare către baza de date sau un serviciu extern). Detaliile complete sunt în log-urile serverului pentru codul",
             "retry": "Reîncearcă",
             "backHome": "Înapoi la Vizionare"
+        },
+        "layout": {
+            "description": "Filme, seriale și alte clipuri din biblioteca ta locală."
+        },
+        "home": {
+            "upNext": "Urmează",
+            "watchlist": "Lista de vizionare",
+            "noLocal": "Configurează un companion și rulează un scan pentru a-ți vedea filmele locale.",
+            "settings": "Setări →"
+        },
+        "import": {
+            "scan": "Scanează biblioteca",
+            "scanning": "Se scanează…",
+            "error": "Eroare: {error}",
+            "done": "+{movies} filme, +{shows} seriale, {files} fișiere scanate"
+        },
+        "collectionsPage": {
+            "pickProfileTitle": "Selectează un profil",
+            "pickProfileDescription": "Alege un profil de vizionare ca să vezi colecțiile.",
+            "profiles": "Profiluri",
+            "title": "Colecții",
+            "lead": "Listele tale: wishlist, watch-later și colecții personalizate.",
+            "empty": "Nu ai încă nicio colecție. Apasă inima pe un film ca să-l adaugi în wishlist, sau folosește butonul „Adaugă în colecție” pe o pagină de detaliu."
+        },
+        "statsPage": {
+            "title": "Statistici vizionare",
+            "shortTitle": "Statistici",
+            "noProfile": "Niciun profil activ.",
+            "back": "Înapoi",
+            "totalTime": "Timp total",
+            "minutes": "{count} minute",
+            "thisWeek": "Săptămâna asta",
+            "thisMonth": "Luna asta",
+            "streak": "Serie",
+            "days": "{count, plural, one {# zi} other {# zile}}",
+            "consecutiveDays": "Zile consecutive",
+            "avgSession": "Sesiune medie",
+            "moviesDone": "Filme finalizate",
+            "episodesDone": "Episoade finalizate",
+            "last30": "Ultimele 30 de zile",
+            "nothingInPeriod": "Nimic vizionat în această perioadă.",
+            "topShows": "Top seriale",
+            "topMovies": "Top filme",
+            "topGenres": "Top genuri"
+        },
+        "play": {
+            "companionOffline": "Companion deconectat",
+            "companionOfflineHint": "Pornește aplicația MixAI Companion pentru a reda fișierele locale.",
+            "fileMissing": "Fișier negăsit în companion",
+            "fileMissingHint": "Rulează din nou un scan din /watch pentru a re-înregistra fișierele."
+        },
+        "actions": {
+            "failed": "Acțiune eșuată",
+            "open": "Deschide",
+            "markWatched": "Marchează vizionat",
+            "markUnwatched": "Marchează nevizionat",
+            "markedWatched": "Marcat ca vizionat",
+            "markedUnwatched": "Marcat ca nevizionat",
+            "watched": "Vizionat",
+            "addWishlist": "Adaugă la wishlist",
+            "removeWishlist": "Scoate din wishlist",
+            "addedWishlist": "Adăugat în wishlist",
+            "removedWishlist": "Scos din wishlist",
+            "rate": "Notează",
+            "rated": "Notat {rating}/10",
+            "ratingCleared": "Nota retrasă",
+            "clearRating": "Retrage nota",
+            "addToPlaylist": "Adaugă în playlist",
+            "addedToPlaylist": "Adăugat în playlist",
+            "noPlaylists": "Niciun playlist",
+            "managePlaylists": "Gestionează playlist-urile",
+            "refreshMetadata": "Reîmprospătează metadate",
+            "metadataRefreshed": "Metadate reîmprospătate",
+            "missingTmdb": "Lipsește TMDB id",
+            "hideFromRecs": "Ascunde din recomandări",
+            "hiddenFromRecs": "Ascuns din recomandări",
+            "copyImdb": "Copiază link IMDB",
+            "copyTmdb": "Copiază link TMDB",
+            "copied": "{what} copiat",
+            "copyFailed": "Copierea a eșuat",
+            "playNext": "Va fi redat în continuare",
+            "play": "Redă",
+            "fullPage": "Pagina completă",
+            "videoFile": "Fișier video",
+            "cast": "Distribuție"
+        },
+        "trailer": {
+            "play": "Redă trailer",
+            "pause": "Pauză trailer",
+            "unmute": "Activează sunetul",
+            "mute": "Dezactivează sunetul"
+        },
+        "subtitles": {
+            "noResults": "Niciun rezultat. Verifică OPENSUBTITLES_API_KEY pe companion."
+        },
+        "player": {
+            "noHls": "Browserul nu suportă HLS."
+        },
+        "backfill": {
+            "unexpected": "Eroare neașteptată",
+            "missingKey": "Cheia TMDB lipsește. Adaug-o în .env.local (TMDB_API_KEY).",
+            "failed": "Backfill eșuat: {error}",
+            "unknown": "necunoscut",
+            "updated": "{count, plural, one {Metadata actualizată pentru # titlu.} other {Metadata actualizată pentru # titluri.}}"
         }
     },
     "empty": {
@@ -770,6 +879,10 @@
             "offlineNotice": "{name} este offline — titlurile lui sunt ascunse până revine.",
             "outdated": "{name} rulează un MixAI Server mai vechi, fără Media Home — actualizează-l.",
             "noneForSelection": "Nimic de redat pe serverele selectate."
+        },
+        "curator": {
+            "label": "Alese pentru tine",
+            "by": "Curatorul MixAI — de ce acestea"
         },
         "empty": {
             "title": "Nimic de afișat încă",
@@ -1338,7 +1451,8 @@
         },
         "meta": {
             "runtime": "{min} min",
-            "seasons": "{count, plural, one {# sezon} few {# sezoane} other {# de sezoane}}"
+            "seasons": "{count, plural, one {# sezon} few {# sezoane} other {# de sezoane}}",
+            "episodes": "{count, plural, one {# episod} few {# episoade} other {# de episoade}}"
         },
         "trailer": "Trailer",
         "trailerFor": "Trailer — {title}",
@@ -1354,6 +1468,7 @@
         "offers": {
             "title": "Unde vezi",
             "none": "Nicio ofertă de streaming găsită pentru regiunea ta.",
+            "preferred": "Preferat",
             "type": {
                 "subscription": "Abonament",
                 "free": "Gratuit",

@@ -15,6 +15,7 @@
  */
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Sparkles, Loader2, X, Check, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { backfillMissingTmdbMetadata, countMissingTmdb } from "@/actions/video-backfill";
@@ -31,6 +32,7 @@ type State =
 
 export function AutoBackfill() {
     const router = useRouter();
+    const t = useTranslations("watch.backfill");
     const [state, setState] = useState<State>({ kind: "idle" });
     const [pending, startTransition] = useTransition();
 
@@ -48,13 +50,13 @@ export function AutoBackfill() {
     const run = useCallback(() => {
         startTransition(async () => {
             const result = await backfillMissingTmdbMetadata(50).catch((err) => ({
-                error: err instanceof Error ? err.message : "Eroare neașteptată",
+                error: err instanceof Error ? err.message : t("unexpected"),
                 moviesUpdated: 0, showsUpdated: 0, moviesSkipped: 0, showsSkipped: 0,
             }));
             if (!result || result.error) {
                 const msg = result?.error === "TMDB_API_KEY not configured"
-                    ? "Cheia TMDB lipsește. Adaug-o în .env.local (TMDB_API_KEY)."
-                    : `Backfill eșuat: ${result?.error ?? "necunoscut"}`;
+                    ? t("missingKey")
+                    : t("failed", { error: result?.error ?? t("unknown") });
                 toast.error(msg, { duration: 8000 });
                 setState({ kind: "error", message: msg });
                 return;
@@ -62,7 +64,7 @@ export function AutoBackfill() {
             const updated = result.moviesUpdated + result.showsUpdated;
             setState({ kind: "done", updated });
             if (updated > 0) {
-                toast.success(`Metadata actualizată pentru ${updated} ${updated === 1 ? "titlu" : "titluri"}.`);
+                toast.success(t("updated", { count: updated }));
                 router.refresh();
             }
             setTimeout(() => {
@@ -71,7 +73,7 @@ export function AutoBackfill() {
                 });
             }, 6000);
         });
-    }, [router, probe]);
+    }, [router, probe, t]);
 
     // First-mount probe + optional auto-run.
     useEffect(() => {

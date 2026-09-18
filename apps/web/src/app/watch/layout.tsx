@@ -2,6 +2,7 @@ import "./cinematic.css";
 import "./tv-mode.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { getTranslations } from "next-intl/server";
 import { LibraryEventsListener } from "@/components/video/library-events-listener";
 import { TvModeProbe } from "@/components/video/tv-mode-probe";
 import { WatchPrefsHydrator } from "@/components/video/watch-prefs-hydrator";
@@ -9,10 +10,13 @@ import { WatchThemeProvider } from "./_theme/watch-theme-provider";
 import { WatchTopBar } from "@/components/video/watch-top-bar";
 import { getWatchPrefs } from "@/actions/watch-prefs";
 
-export const metadata: Metadata = {
-    title: { template: "%s · Watch · MixAI", default: "Watch · MixAI" },
-    description: "Filme, seriale și alte clipuri din biblioteca ta locală.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("watch.layout");
+    return {
+        title: { template: "%s · Watch · MixAI", default: "Watch · MixAI" },
+        description: t("description"),
+    };
+}
 
 export default async function WatchLayout({ children }: { children: ReactNode }) {
     const prefs = await getWatchPrefs().catch(() => null);

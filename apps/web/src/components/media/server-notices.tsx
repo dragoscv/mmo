@@ -7,9 +7,9 @@ export async function ServerNotices({ errors }: { errors: ServerError[] }) {
     if (errors.length === 0) return null;
     const t = await getTranslations("home.servers");
     return (
-        <div className="flex flex-col gap-2" data-slot="server-notices">
+        <div className="flex flex-col gap-2" data-slot="server-notices" aria-live="polite">
             {errors.map((e) => (
-                <p key={e.serverId} className="media-notice" role="status">
+            <p key={e.serverId} className="media-notice">
                     <AlertTriangle className="size-4 shrink-0" aria-hidden />
                     <span>
                         {e.error === "outdated"

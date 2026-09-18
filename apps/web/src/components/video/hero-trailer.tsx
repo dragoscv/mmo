@@ -15,6 +15,7 @@
 
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { usePlayer } from "@/components/player-context";
 
 interface HeroTrailerProps {
@@ -31,6 +32,7 @@ export function HeroTrailer({
     title,
     mountDelayMs = 350,
 }: HeroTrailerProps) {
+    const t = useTranslations("watch.trailer");
     const backdrop = backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : null;
     const [showIframe, setShowIframe] = useState(false);
     const [startSeconds, setStartSeconds] = useState(0);
@@ -145,8 +147,8 @@ export function HeroTrailer({
                             className="watch-hero-iconbtn"
                             onClick={togglePlay}
                             aria-pressed={!playing}
-                            aria-label={playing ? "Pauză trailer" : "Redă trailer"}
-                            title={playing ? "Pauză trailer" : "Redă trailer"}
+                            aria-label={playing ? t("pause") : t("play")}
+                            title={playing ? t("pause") : t("play")}
                         >
                             {playing ? <Pause size={20} aria-hidden /> : <Play size={20} aria-hidden />}
                         </button>
@@ -155,8 +157,8 @@ export function HeroTrailer({
                             className="watch-hero-iconbtn"
                             onClick={toggleMute}
                             aria-pressed={!muted}
-                            aria-label={muted ? "Activează sunetul" : "Dezactivează sunetul"}
-                            title={muted ? "Activează sunetul" : "Dezactivează sunetul"}
+                            aria-label={muted ? t("unmute") : t("mute")}
+                            title={muted ? t("unmute") : t("mute")}
                         >
                             {muted ? <VolumeX size={20} aria-hidden /> : <Volume2 size={20} aria-hidden />}
                         </button>

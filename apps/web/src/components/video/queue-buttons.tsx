@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { ListPlus, ListVideo } from "lucide-react";
 import { usePlayer } from "@/components/player-context";
 import { resolveVideoForPlayback } from "@/actions/video-now-playing";
@@ -11,6 +12,7 @@ type Mode = "next" | "end";
 function Btn({ fileId, mode, label, icon }: { fileId: number; mode: Mode; label: string; icon: React.ReactNode }) {
     const player = usePlayer();
     const [pending, start] = useTransition();
+    const t = useTranslations("watch.actions");
     return (
         <button
             type="button"
@@ -20,7 +22,7 @@ function Btn({ fileId, mode, label, icon }: { fileId: number; mode: Mode; label:
                 if (!media) { toast.error("Companion offline or file unreachable."); return; }
                 if (mode === "next") {
                     player.playVideoNext(media);
-                    toast.success("Va fi redat în continuare");
+                    toast.success(t("playNext"));
                 } else {
                     player.addToVideoQueue(media);
                     toast.success("Added to queue");

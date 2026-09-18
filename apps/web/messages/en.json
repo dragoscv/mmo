@@ -541,17 +541,126 @@
             "runScan": "Run a scan."
         },
         "showsPage": {
-            "title": "Your shows"
+            "title": "Your shows",
+            "noResults": "No shows match the current filters.",
+            "empty": "No shows yet.",
+            "runScan": "Run a scan."
         },
         "continuePage": {
             "title": "Continue watching",
-            "lead": "Pick up exactly where you left off on any screen tied to your profile."
+            "lead": "Pick up exactly where you left off on any screen tied to your profile.",
+            "noProfile": "No active watch profile. Create one first.",
+            "empty": "Nothing in progress. Start a movie or an episode and it will show up here."
         },
         "error": {
             "title": "Watch stopped rendering",
             "detail": "Something failed on the server (probably a database or external service query). Full details are in the server logs under code",
             "retry": "Try again",
             "backHome": "Back to Watch"
+        },
+        "layout": {
+            "description": "Movies, shows and other clips from your local library."
+        },
+        "home": {
+            "upNext": "Up Next",
+            "watchlist": "Watchlist",
+            "noLocal": "Set up a companion and run a scan to see your local movies.",
+            "settings": "Settings →"
+        },
+        "import": {
+            "scan": "Scan library",
+            "scanning": "Scanning…",
+            "error": "Error: {error}",
+            "done": "+{movies} movies, +{shows} shows, {files} files scanned"
+        },
+        "collectionsPage": {
+            "pickProfileTitle": "Pick a profile",
+            "pickProfileDescription": "Choose a watch profile to see its collections.",
+            "profiles": "Profiles",
+            "title": "Collections",
+            "lead": "Your lists: wishlist, watch-later and custom collections.",
+            "empty": "No collections yet. Tap the heart on a movie to add it to the wishlist, or use \"Add to collection\" on a detail page."
+        },
+        "statsPage": {
+            "title": "Watch stats",
+            "shortTitle": "Stats",
+            "noProfile": "No active profile.",
+            "back": "Back",
+            "totalTime": "Total time",
+            "minutes": "{count} minutes",
+            "thisWeek": "This week",
+            "thisMonth": "This month",
+            "streak": "Streak",
+            "days": "{count, plural, one {# day} other {# days}}",
+            "consecutiveDays": "Consecutive days",
+            "avgSession": "Average session",
+            "moviesDone": "Movies finished",
+            "episodesDone": "Episodes finished",
+            "last30": "Last 30 days",
+            "nothingInPeriod": "Nothing watched in this period.",
+            "topShows": "Top shows",
+            "topMovies": "Top movies",
+            "topGenres": "Top genres"
+        },
+        "play": {
+            "companionOffline": "Companion offline",
+            "companionOfflineHint": "Start the MixAI Companion app to play local files.",
+            "fileMissing": "File not found on the companion",
+            "fileMissingHint": "Run a scan again from /watch to re-register the files."
+        },
+        "actions": {
+            "failed": "Action failed",
+            "open": "Open",
+            "markWatched": "Mark watched",
+            "markUnwatched": "Mark unwatched",
+            "markedWatched": "Marked as watched",
+            "markedUnwatched": "Marked as unwatched",
+            "watched": "Watched",
+            "addWishlist": "Add to wishlist",
+            "removeWishlist": "Remove from wishlist",
+            "addedWishlist": "Added to wishlist",
+            "removedWishlist": "Removed from wishlist",
+            "rate": "Rate",
+            "rated": "Rated {rating}/10",
+            "ratingCleared": "Rating cleared",
+            "clearRating": "Clear rating",
+            "addToPlaylist": "Add to playlist",
+            "addedToPlaylist": "Added to playlist",
+            "noPlaylists": "No playlists",
+            "managePlaylists": "Manage playlists",
+            "refreshMetadata": "Refresh metadata",
+            "metadataRefreshed": "Metadata refreshed",
+            "missingTmdb": "Missing TMDB id",
+            "hideFromRecs": "Hide from recommendations",
+            "hiddenFromRecs": "Hidden from recommendations",
+            "copyImdb": "Copy IMDB link",
+            "copyTmdb": "Copy TMDB link",
+            "copied": "{what} copied",
+            "copyFailed": "Copy failed",
+            "playNext": "Will play next",
+            "play": "Play",
+            "fullPage": "Full page",
+            "videoFile": "Video file",
+            "cast": "Cast"
+        },
+        "trailer": {
+            "play": "Play trailer",
+            "pause": "Pause trailer",
+            "unmute": "Unmute",
+            "mute": "Mute"
+        },
+        "subtitles": {
+            "noResults": "No results. Check OPENSUBTITLES_API_KEY on the companion."
+        },
+        "player": {
+            "noHls": "This browser does not support HLS."
+        },
+        "backfill": {
+            "unexpected": "Unexpected error",
+            "missingKey": "TMDB key missing. Add it to .env.local (TMDB_API_KEY).",
+            "failed": "Backfill failed: {error}",
+            "unknown": "unknown",
+            "updated": "{count, plural, one {Metadata updated for # title.} other {Metadata updated for # titles.}}"
         }
     },
     "tagline": "AI music suite for DJs and producers",
@@ -770,6 +879,10 @@
             "offlineNotice": "{name} is offline — its titles are hidden until it comes back.",
             "outdated": "{name} runs an older MixAI Server without Media Home — update it.",
             "noneForSelection": "Nothing to play on the selected servers."
+        },
+        "curator": {
+            "label": "Picked for you",
+            "by": "MixAI curator — why these"
         },
         "empty": {
             "title": "Nothing to show yet",
@@ -1338,7 +1451,8 @@
         },
         "meta": {
             "runtime": "{min} min",
-            "seasons": "{count, plural, one {# season} other {# seasons}}"
+            "seasons": "{count, plural, one {# season} other {# seasons}}",
+            "episodes": "{count, plural, one {# episode} other {# episodes}}"
         },
         "trailer": "Trailer",
         "trailerFor": "Trailer — {title}",
@@ -1354,6 +1468,7 @@
         "offers": {
             "title": "Where to watch",
             "none": "No streaming offers found for your region.",
+            "preferred": "Preferred",
             "type": {
                 "subscription": "Subscription",
                 "free": "Free",

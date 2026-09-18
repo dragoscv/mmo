@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
     Check, Plus, Star, Eye, EyeOff, RefreshCw, Copy, ListPlus,
@@ -37,8 +38,10 @@ export function PosterContextMenu({
     inWishlist, watched, customCollections = [],
 }: PosterContextMenuProps) {
     const [pending, start] = useTransition();
+    const t = useTranslations("watch.actions");
+    const failed = t("failed");
 
-    function withToast(promise: Promise<unknown>, ok: string, err = "Acțiune eșuată"): void {
+    function withToast(promise: Promise<unknown>, ok: string, err = failed): void {
         void promise.then((r) => {
             if (r && typeof r === "object" && "error" in r && r.error) {
                 toast.error(typeof r.error === "string" ? r.error : err);
@@ -49,40 +52,40 @@ export function PosterContextMenu({
     }
 
     function onMarkWatched() {
-        start(() => withToast(markWatched({ movieId }), "Marcat ca vizionat"));
+        start(() => withToast(markWatched({ movieId }), t("markedWatched")));
     }
     function onMarkUnwatched() {
-        start(() => withToast(markUnwatched({ movieId }), "Marcat ca nevizionat"));
+        start(() => withToast(markUnwatched({ movieId }), t("markedUnwatched")));
     }
     function onToggleWishlist() {
         start(() => withToast(
             toggleWishlist({ movieId, tvShowId: showId }),
-            inWishlist ? "Scos din wishlist" : "Adăugat în wishlist",
+            inWishlist ? t("removedWishlist") : t("addedWishlist"),
         ));
     }
     function onRate(rating: number | null) {
-        start(() => withToast(rateItem({ movieId, showId, rating }), rating ? `Notat ${rating}/10` : "Nota retrasă"));
+        start(() => withToast(rateItem({ movieId, showId, rating }), rating ? t("rated", { rating }) : t("ratingCleared")));
     }
     function onAddToCollection(collectionId: number) {
         start(() => withToast(
             addToCustomCollection({ collectionId, movieId, showId }),
-            "Adăugat în playlist",
+            t("addedToPlaylist"),
         ));
     }
     function onRefresh() {
-        start(() => withToast(refreshMetadata({ movieId, showId }), "Metadate reîmprospătate"));
+        start(() => withToast(refreshMetadata({ movieId, showId }), t("metadataRefreshed")));
     }
     function onHide() {
-        if (!tmdbId) { toast.error("Lipsește TMDB id"); return; }
+        if (!tmdbId) { toast.error(t("missingTmdb")); return; }
         start(() => withToast(
             toggleHidden(kind, tmdbId),
-            "Ascuns din recomandări",
+            t("hiddenFromRecs"),
         ));
     }
     function copy(text: string, label: string) {
         navigator.clipboard.writeText(text).then(
-            () => toast.success(`${label} copiat`),
-            () => toast.error("Copierea a eșuat"),
+            () => toast.success(t("copied", { what: label })),
+            () => toast.error(t("copyFailed")),
         );
     }
 
@@ -93,7 +96,7 @@ export function PosterContextMenu({
                 {href && (
                     <>
                         <ContextMenuItem onClick={() => { window.location.assign(href); }}>
-                            <PlayCircle className="mr-2 h-4 w-4" /> Deschide
+                            <PlayCircle className="mr-2 h-4 w-4" /> {t("open")}
                         </ContextMenuItem>
                         <ContextMenuSeparator />
                     </>
@@ -101,21 +104,21 @@ export function PosterContextMenu({
 
                 {watched ? (
                     <ContextMenuItem onClick={onMarkUnwatched} disabled={pending}>
-                        <EyeOff className="mr-2 h-4 w-4" /> Marchează nevizionat
+                        <EyeOff className="mr-2 h-4 w-4" /> {t("markUnwatched")}
                     </ContextMenuItem>
                 ) : (
                     <ContextMenuItem onClick={onMarkWatched} disabled={pending}>
-                        <Eye className="mr-2 h-4 w-4" /> Marchează vizionat
+                        <Eye className="mr-2 h-4 w-4" /> {t("markWatched")}
                     </ContextMenuItem>
                 )}
 
                 <ContextMenuItem onClick={onToggleWishlist} disabled={pending}>
-                    <Heart className="mr-2 h-4 w-4" /> {inWishlist ? "Scoate din wishlist" : "Adaugă la wishlist"}
+                    <Heart className="mr-2 h-4 w-4" /> {inWishlist ? t("removeWishlist") : t("addWishlist")}
                 </ContextMenuItem>
 
                 <ContextMenuSub>
                     <ContextMenuSubTrigger>
-                        <Star className="mr-2 h-4 w-4" /> Notează
+                        <Star className="mr-2 h-4 w-4" /> {t("rate")}
                     </ContextMenuSubTrigger>
                     <ContextMenuSubContent>
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((r) => (
@@ -124,17 +127,17 @@ export function PosterContextMenu({
                             </ContextMenuItem>
                         ))}
                         <ContextMenuSeparator />
-                        <ContextMenuItem onClick={() => onRate(null)}>Retrage nota</ContextMenuItem>
+                        <ContextMenuItem onClick={() => onRate(null)}>{t("clearRating")}</ContextMenuItem>
                     </ContextMenuSubContent>
                 </ContextMenuSub>
 
                 <ContextMenuSub>
                     <ContextMenuSubTrigger>
-                        <ListPlus className="mr-2 h-4 w-4" /> Adaugă în playlist
+                        <ListPlus className="mr-2 h-4 w-4" /> {t("addToPlaylist")}
                     </ContextMenuSubTrigger>
                     <ContextMenuSubContent>
                         {customCollections.length === 0 && (
-                            <ContextMenuItem disabled>Niciun playlist</ContextMenuItem>
+                            <ContextMenuItem disabled>{t("noPlaylists")}</ContextMenuItem>
                         )}
                         {customCollections.map((c) => (
                             <ContextMenuItem key={c.id} onClick={() => onAddToCollection(c.id)}>
@@ -143,7 +146,7 @@ export function PosterContextMenu({
                         ))}
                         <ContextMenuSeparator />
                         <ContextMenuItem onClick={() => window.location.assign("/watch/collections")}>
-                            <ListPlus className="mr-2 h-4 w-4" /> Gestionează playlist-urile
+                            <ListPlus className="mr-2 h-4 w-4" /> {t("managePlaylists")}
                         </ContextMenuItem>
                     </ContextMenuSubContent>
                 </ContextMenuSub>
@@ -151,24 +154,24 @@ export function PosterContextMenu({
                 <ContextMenuSeparator />
 
                 <ContextMenuItem onClick={onRefresh} disabled={pending}>
-                    <RefreshCw className="mr-2 h-4 w-4" /> Reîmprospătează metadate
+                    <RefreshCw className="mr-2 h-4 w-4" /> {t("refreshMetadata")}
                 </ContextMenuItem>
 
                 {imdbId && (
                     <ContextMenuItem onClick={() => copy(`https://www.imdb.com/title/${imdbId}/`, "Link IMDB")}>
-                        <Copy className="mr-2 h-4 w-4" /> Copiază link IMDB
+                        <Copy className="mr-2 h-4 w-4" /> {t("copyImdb")}
                     </ContextMenuItem>
                 )}
                 {tmdbId && (
                     <ContextMenuItem onClick={() => copy(`https://www.themoviedb.org/${kind}/${tmdbId}`, "Link TMDB")}>
-                        <ExternalLink className="mr-2 h-4 w-4" /> Copiază link TMDB
+                        <ExternalLink className="mr-2 h-4 w-4" /> {t("copyTmdb")}
                     </ContextMenuItem>
                 )}
 
                 <ContextMenuSeparator />
 
                 <ContextMenuItem onClick={onHide} disabled={pending || !tmdbId}>
-                    <Ban className="mr-2 h-4 w-4" /> Ascunde din recomandări
+                    <Ban className="mr-2 h-4 w-4" /> {t("hideFromRecs")}
                 </ContextMenuItem>
             </ContextMenuContent>
         </ContextMenu>

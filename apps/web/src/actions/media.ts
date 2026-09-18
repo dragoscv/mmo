@@ -25,6 +25,8 @@ import { markUnwatched } from "@/actions/video-context";
 import { mergeRows, type FanOutResult, type ServerError, type ServerResult } from "@/lib/media/aggregate";
 import { normalizeRows, type WireHome, type WireTitleResponse } from "@/lib/media/normalize";
 import { mergeTitleResponses } from "@/lib/media/title";
+import { CURATOR_TTL_SEC, curateRows, homeRevisionHash, type CuratorNoteItem } from "@/lib/media/curator";
+import { getCodaiModel, isCodaiAvailable } from "@/lib/codai/client";
 import type { HomeRow, MediaKind, MediaServer, MergedTitleDetails, TitleCard } from "@/lib/media/types";
 
 const HOME_TTL_SEC = 300;
@@ -59,15 +61,34 @@ async function fanOut<T>(links: LinkLite[], path: string): Promise<FanOutResult<
 
 // Tokens must not become part of the cache key; the key is user+profile+region
 // and the links are closed over per call (same inputs → same servers).
-function cachedHome(userId: string, profileId: string, region: string, links: LinkLite[]) {
+function cachedHome(userId: string, profileId: string, region: string, providers: number[], links: LinkLite[]) {
+    const q = new URLSearchParams({ profile: profileId, region });
+    if (providers.length) q.set("providers", providers.join(","));
     return unstable_cache(
         async () => {
-            const { results, errors } = await fanOut<WireHome>(links, `/media/home?profile=${encodeURIComponent(profileId)}&region=${region}`);
+            const { results, errors } = await fanOut<WireHome>(links, `/media/home?${q.toString()}`);
             const rows = mergeRows(results.map((r) => ({ ...r, data: normalizeRows(r.data) })));
             return { rows, errors, serverIds: results.map((r) => r.serverId) };
         },
-        ["media-home", userId, profileId, region, links.map((l) => l.deviceId).sort().join(",")],
+        ["media-home", userId, profileId, region, providers.join(","), links.map((l) => l.deviceId).sort().join(",")],
         { revalidate: HOME_TTL_SEC, tags: [`media-home:${userId}`] },
+    )();
+}
+
+/**
+ * Codai curator (WP11-07): one model call per (user, profile, region, rows
+ * hash), cached 24 h. The model closure runs inside the cache boundary; the
+ * key never contains tokens. Any failure → rows unchanged, no notes.
+ */
+function cachedCuration(userId: string, profileId: string, region: string, rows: HomeRow[]) {
+    const hash = homeRevisionHash(rows);
+    return unstable_cache(
+        async () => {
+            const model = await getCodaiModel(userId, "fast");
+            return curateRows(rows, { model });
+        },
+        ["media-curator", userId, profileId, region, hash],
+        { revalidate: CURATOR_TTL_SEC, tags: [`media-home:${userId}`] },
     )();
 }
 
@@ -92,6 +113,8 @@ async function context() {
         profileId: String(profileId ?? "default"),
         profileIdNum: profileId,
         region: (prefs.defaultRegion || "RO").toUpperCase().slice(0, 2),
+        preferredProviders: prefs.preferredProviders.filter((n) => Number.isInteger(n) && n > 0),
+        curator: prefs.curator,
         links,
         servers: links.map(toServer),
     };
@@ -102,6 +125,8 @@ export interface MediaHomeResult {
     rows: HomeRow[];
     errors: ServerError[];
     region: string;
+    /** Curator "why" notes for the first picks (empty unless WP11-07 ran). */
+    curatorNotes: CuratorNoteItem[];
     /** Epoch ms when the result was assembled — for relative "last seen" labels (no Date.now() in render). */
     now: number;
 }
@@ -132,7 +157,7 @@ export async function getMediaHome(): Promise<MediaHomeResult | null> {
     const offlineErrors: ServerError[] = ctx.links.filter((l) => !l.online)
         .map((l) => ({ serverId: l.deviceId, name: l.name, error: "offline" }));
     const [home, cont] = await Promise.all([
-        online.length ? cachedHome(ctx.userId, ctx.profileId, ctx.region, online) : Promise.resolve({ rows: [] as HomeRow[], errors: [] as ServerError[], serverIds: [] as string[] }),
+        online.length ? cachedHome(ctx.userId, ctx.profileId, ctx.region, ctx.preferredProviders, online) : Promise.resolve({ rows: [] as HomeRow[], errors: [] as ServerError[], serverIds: [] as string[] }),
         continueFromHistory(ctx.profileIdNum).catch(() => [] as TitleCard[]),
     ]);
     let rows = home.rows;
@@ -156,17 +181,22 @@ export async function getMediaHome(): Promise<MediaHomeResult | null> {
             }
         }
     }
-    return { servers: ctx.servers, rows, errors: [...home.errors, ...offlineErrors], region: ctx.region, now: Date.now() };
+    let curatorNotes: CuratorNoteItem[] = [];
+    if (ctx.curator && rows.length > 0 && isCodaiAvailable()) {
+        const curated = await cachedCuration(ctx.userId, ctx.profileId, ctx.region, rows).catch(() => null);
+        if (curated) { rows = curated.rows; curatorNotes = curated.notes; }
+    }
+    return { servers: ctx.servers, rows, errors: [...home.errors, ...offlineErrors], region: ctx.region, curatorNotes, now: Date.now() };
 }
 
-export async function getMediaTitle(kind: MediaKind, tmdbId: number): Promise<(MergedTitleDetails & { servers: MediaServer[] }) | null> {
+export async function getMediaTitle(kind: MediaKind, tmdbId: number): Promise<(MergedTitleDetails & { servers: MediaServer[]; preferredProviders: number[] }) | null> {
     const ctx = await context();
     if (!ctx) return null;
     const online = ctx.links.filter((l) => l.online);
     if (online.length === 0) return null;
     const { results, errors } = await cachedTitle(ctx.userId, ctx.profileId, ctx.region, kind, tmdbId, online);
     const merged = mergeTitleResponses(results, errors);
-    return merged ? { ...merged, servers: ctx.servers } : null;
+    return merged ? { ...merged, servers: ctx.servers, preferredProviders: ctx.preferredProviders } : null;
 }
 
 export interface MediaServerStatus extends MediaServer {

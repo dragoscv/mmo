@@ -15,6 +15,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { Play, Plus, ThumbsUp, Check, ChevronDown, X, Info, Film } from "lucide-react";
 import { toast } from "sonner";
 import { toggleWishlist } from "@/actions/video-collections";
@@ -83,6 +84,9 @@ export function PosterPopover({
     onOpenModal: () => void;
 }) {
     const router = useRouter();
+    const t = useTranslations("watch.actions");
+    const tm = useTranslations("media.meta");
+    const th = useTranslations("home.hero");
     const [, startTransition] = useTransition();
     const ref = useRef<HTMLDivElement>(null);
     const [mounted, setMounted] = useState(false);
@@ -141,25 +145,25 @@ export function PosterPopover({
         try {
             await toggleWishlist(data.kind === "movie"
                 ? { movieId: data.movieId! } : { tvShowId: data.showId! });
-            toast.success(data.inWishlist ? "Scos din wishlist" : "Adăugat în wishlist");
-        } catch { toast.error("Acțiune eșuată"); }
+            toast.success(data.inWishlist ? t("removedWishlist") : t("addedWishlist"));
+        } catch { toast.error(t("failed")); }
     });
     const onLike = () => startTransition(async () => {
         try {
             await rateItem({ movieId: data.movieId, showId: data.showId, rating: 9 });
-            toast.success("Apreciat");
-        } catch { toast.error("Acțiune eșuată"); }
+            toast.success(t("rated", { rating: 9 }));
+        } catch { toast.error(t("failed")); }
     });
     const onWatched = () => startTransition(async () => {
         try {
             if (data.watched) {
                 await markUnwatched({ movieId: data.movieId });
-                toast.success("Marcat ca nevăzut");
+                toast.success(t("markedUnwatched"));
             } else {
                 await markWatched({ movieId: data.movieId });
-                toast.success("Marcat vizionat");
+                toast.success(t("markedWatched"));
             }
-        } catch { toast.error("Acțiune eșuată"); }
+        } catch { toast.error(t("failed")); }
     });
 
     const style: CSSProperties = {
@@ -205,7 +209,7 @@ export function PosterPopover({
     }, [data.trailerId]);
 
     return (
-        <div ref={ref} role="dialog" aria-label={`Previzualizare ${data.title}`} className="poster-preview" style={style}>
+        <div ref={ref} role="dialog" aria-label={data.title} className="poster-preview" style={style}>
             <div className="poster-preview-media">
                 {mediaUrl ? (
                     <Image src={mediaUrl} alt={data.title} fill sizes="380px" className="poster-preview-img" />
@@ -220,22 +224,22 @@ export function PosterPopover({
             </div>
             <div className="poster-preview-body">
                 <div className="poster-preview-row">
-                    <button type="button" onClick={onPlay} className="poster-preview-btn poster-preview-btn--primary" title="Redă">
+                    <button type="button" onClick={onPlay} className="poster-preview-btn poster-preview-btn--primary" title={t("play")}>
                         <Play size={16} fill="currentColor" />
                     </button>
                     {(data.movieId || data.showId) ? (
                         <>
                             <button type="button" onClick={onWishlist} className="poster-preview-btn"
-                                title={data.inWishlist ? "Scoate din wishlist" : "Adaugă în wishlist"}
+                                title={data.inWishlist ? t("removeWishlist") : t("addWishlist")}
                                 aria-pressed={data.inWishlist}>
                                 {data.inWishlist ? <Check size={14} /> : <Plus size={14} />}
                             </button>
                             <button type="button" onClick={onLike} className="poster-preview-btn"
-                                title="Îmi place" aria-pressed={data.liked}>
+                                title={t("rate")} aria-pressed={data.liked}>
                                 <ThumbsUp size={14} />
                             </button>
                             <button type="button" onClick={onWatched} className="poster-preview-btn"
-                                title={data.watched ? "Marchează nevăzut" : "Marchează vizionat"}
+                                title={data.watched ? t("markUnwatched") : t("markWatched")}
                                 aria-pressed={data.watched}>
                                 <Check size={14} />
                             </button>
@@ -243,7 +247,7 @@ export function PosterPopover({
                     ) : null}
                     <button type="button" onClick={onOpenModal}
                         className="poster-preview-btn poster-preview-btn--more"
-                        title="Vezi detalii" style={{ marginLeft: "auto" }}>
+                        title={th("details")} style={{ marginLeft: "auto" }}>
                         <ChevronDown size={16} />
                     </button>
                 </div>
@@ -254,7 +258,7 @@ export function PosterPopover({
                     {data.runtime ? <span>{formatRuntime(data.runtime)}</span> : null}
                     {data.ageRating && <span className="poster-preview-badge">{data.ageRating}</span>}
                     {data.kind === "tv" && data.seasonCount ? (
-                        <span>{data.seasonCount} {data.seasonCount === 1 ? "sezon" : "sezoane"}</span>
+                        <span>{tm("seasons", { count: data.seasonCount })}</span>
                     ) : null}
                 </div>
                 {data.genres && data.genres.length > 0 && (
@@ -282,6 +286,9 @@ export function PosterDetailsModal({
     onClose: () => void;
 }) {
     const router = useRouter();
+    const t = useTranslations("watch.actions");
+    const tc = useTranslations("common");
+    const tm = useTranslations("media.meta");
     const [, startTransition] = useTransition();
     const [mounted, setMounted] = useState(false);
 
@@ -310,8 +317,8 @@ export function PosterDetailsModal({
         try {
             await toggleWishlist(data.kind === "movie"
                 ? { movieId: data.movieId! } : { tvShowId: data.showId! });
-            toast.success(data.inWishlist ? "Scos din wishlist" : "Adăugat în wishlist");
-        } catch { toast.error("Acțiune eșuată"); }
+            toast.success(data.inWishlist ? t("removedWishlist") : t("addedWishlist"));
+        } catch { toast.error(t("failed")); }
     });
 
     return (
@@ -319,7 +326,7 @@ export function PosterDetailsModal({
             <div className="poster-modal" data-mounted={mounted ? "1" : "0"}
                 role="dialog" aria-modal="true" aria-labelledby="poster-modal-title"
                 onClick={(e) => e.stopPropagation()}>
-                <button type="button" className="poster-modal-close" onClick={onClose} aria-label="Închide">
+                <button type="button" className="poster-modal-close" onClick={onClose} aria-label={tc("close")}>
                     <X size={20} />
                 </button>
                 <div className="poster-modal-hero">
@@ -335,7 +342,7 @@ export function PosterDetailsModal({
                         <h2 id="poster-modal-title" className="poster-modal-title">{data.title}</h2>
                         <div className="poster-modal-actions">
                             <button type="button" className="poster-modal-btn poster-modal-btn--play" onClick={onPlay}>
-                                <Play size={18} fill="currentColor" /> Redă
+                                <Play size={18} fill="currentColor" /> {t("play")}
                             </button>
                             {(data.movieId || data.showId) && (
                                 <button type="button" className="poster-modal-btn" onClick={onWishlist}
@@ -344,7 +351,7 @@ export function PosterDetailsModal({
                                 </button>
                             )}
                             <Link href={data.href} className="poster-modal-btn poster-modal-btn--info">
-                                <Info size={16} /> Pagina completă
+                                <Info size={16} /> {t("fullPage")}
                             </Link>
                         </div>
                     </div>
@@ -356,20 +363,20 @@ export function PosterDetailsModal({
                         {data.runtime ? <span>{formatRuntime(data.runtime)}</span> : null}
                         {data.ageRating && <span className="poster-modal-pill">{data.ageRating}</span>}
                         {data.kind === "tv" && data.seasonCount ? (
-                            <span>{data.seasonCount} {data.seasonCount === 1 ? "sezon" : "sezoane"}{data.episodeCount ? ` · ${data.episodeCount} episoade` : ""}</span>
+                            <span>{tm("seasons", { count: data.seasonCount })}{data.episodeCount ? ` · ${tm("episodes", { count: data.episodeCount })}` : ""}</span>
                         ) : null}
                     </div>
                     {data.overview && <p className="poster-modal-overview">{data.overview}</p>}
                     {data.tech && (
                         <div className="poster-modal-tech">
-                            <div className="poster-modal-label">Fișier video</div>
+                            <div className="poster-modal-label">{t("videoFile")}</div>
                             <TechBadges tech={data.tech} verbose />
                         </div>
                     )}
                     <div className="poster-modal-grid">
                         {data.genres && data.genres.length > 0 && (
                             <div>
-                                <div className="poster-modal-label">Genuri</div>
+                                <div className="poster-modal-label">{tc("genres")}</div>
                                 <div className="poster-modal-tags">
                                     {data.genres.map((g) => <span key={g} className="poster-modal-tag">{g}</span>)}
                                 </div>
@@ -377,7 +384,7 @@ export function PosterDetailsModal({
                         )}
                         {data.cast && data.cast.length > 0 && (
                             <div>
-                                <div className="poster-modal-label">Distribuție</div>
+                                <div className="poster-modal-label">{t("cast")}</div>
                                 <div className="poster-modal-cast">
                                     {data.cast.slice(0, 8).map((c) => (
                                         <span key={c.name} className="poster-modal-cast-item">

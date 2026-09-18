@@ -280,6 +280,39 @@
     font-size: 0.85rem;
 }
 
+/* ─── Curator notes (WP11-07) ─────────────────────────────────────────── */
+.media-curator {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-block: 0.5rem 1rem;
+    font-size: 0.8rem;
+    color: var(--muted-foreground);
+}
+
+.media-curator-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.media-curator-list { display: flex; flex-direction: column; gap: 0.125rem; }
+
+.media-curator-title {
+    color: var(--foreground);
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+}
+
+.media-curator-title:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
+.media-curator-why { text-wrap: pretty; }
+
 /* ─── Title page ──────────────────────────────────────────────────────── */
 .media-title-hero {
     position: relative;

@@ -4,6 +4,7 @@ import { watchHistory, movies, tvShows, tvEpisodes } from "@/db/schema";
 import { getActiveProfileId } from "@/lib/active-profile";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { WatchDailyChart } from "@/components/watch/stats-chart-lazy";
 import { notSignedInFor } from "@/components/empty-state-server";
 
@@ -13,13 +14,14 @@ export default async function WatchStatsPage() {
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) return notSignedInFor("stats");
+    const t = await getTranslations("watch.statsPage");
     const profileId = await getActiveProfileId().catch(() => null);
     if (!profileId) {
         return (
             <main className="p-8">
-                <h1 className="watch-row-title">Statistici</h1>
-                <p style={{ color: "var(--watch-fg-dim)" }}>Niciun profil activ.</p>
-                <Link className="watch-cta" href="/watch">Înapoi</Link>
+                <h1 className="watch-row-title">{t("shortTitle")}</h1>
+                <p style={{ color: "var(--watch-fg-dim)" }}>{t("noProfile")}</p>
+                <Link className="watch-cta" href="/watch">{t("back")}</Link>
             </main>
         );
     }
@@ -142,32 +144,32 @@ export default async function WatchStatsPage() {
 
     return (
         <main className="mx-auto max-w-[1200px] p-8">
-            <h1 className="watch-row-title">Statistici vizionare</h1>
+            <h1 className="watch-row-title">{t("title")}</h1>
 
             <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem", marginTop: "1.5rem" }}>
-                <StatCard label="Timp total" value={`${totalHours} h`} hint={`${totalMin} minute`} />
-                <StatCard label="Săptămâna asta" value={`${weekMin} min`} />
-                <StatCard label="Luna asta" value={`${(monthMin / 60).toFixed(1)} h`} hint={`${monthMin} min`} />
-                <StatCard label="Streak" value={`${streak} ${streak === 1 ? "zi" : "zile"}`} hint="Zile consecutive" />
-                <StatCard label="Sesiune medie" value={`${avgSession} min`} />
-                <StatCard label="Filme finalizate" value={String(moviesDone[0]?.c ?? 0)} />
-                <StatCard label="Episoade finalizate" value={String(episodesDone[0]?.c ?? 0)} />
+                <StatCard label={t("totalTime")} value={`${totalHours} h`} hint={t("minutes", { count: totalMin })} />
+                <StatCard label={t("thisWeek")} value={`${weekMin} min`} />
+                <StatCard label={t("thisMonth")} value={`${(monthMin / 60).toFixed(1)} h`} hint={`${monthMin} min`} />
+                <StatCard label={t("streak")} value={t("days", { count: streak })} hint={t("consecutiveDays")} />
+                <StatCard label={t("avgSession")} value={`${avgSession} min`} />
+                <StatCard label={t("moviesDone")} value={String(moviesDone[0]?.c ?? 0)} />
+                <StatCard label={t("episodesDone")} value={String(episodesDone[0]?.c ?? 0)} />
             </section>
 
             <section style={{ marginTop: "2rem" }}>
-                <h2 className="watch-row-title">Ultimele 30 de zile</h2>
+                <h2 className="watch-row-title">{t("last30")}</h2>
                 {daily.length > 0 ? (
                     <div className="rounded-xl bg-[var(--watch-bg-2)] p-4">
                         <WatchDailyChart data={daily} />
                     </div>
                 ) : (
-                    <p style={{ color: "var(--watch-fg-dim)" }}>Nimic vizionat în această perioadă.</p>
+                    <p style={{ color: "var(--watch-fg-dim)" }}>{t("nothingInPeriod")}</p>
                 )}
             </section>
 
             {topShows.length > 0 && (
                 <section style={{ marginTop: "2rem" }}>
-                    <h2 className="watch-row-title">Top seriale</h2>
+                    <h2 className="watch-row-title">{t("topShows")}</h2>
                     <ul className="grid list-none gap-2 p-0">
                         {topShows.map((s) => (
                             <li key={s.id}>
@@ -183,7 +185,7 @@ export default async function WatchStatsPage() {
 
             {topMovies.length > 0 && (
                 <section style={{ marginTop: "2rem" }}>
-                    <h2 className="watch-row-title">Top filme</h2>
+                    <h2 className="watch-row-title">{t("topMovies")}</h2>
                     <ul className="grid list-none gap-2 p-0">
                         {topMovies.map((m) => (
                             <li key={m.id}>
@@ -199,10 +201,10 @@ export default async function WatchStatsPage() {
 
             {topGenres.length > 0 && (
                 <section style={{ marginTop: "2rem" }}>
-                    <h2 className="watch-row-title">Top genuri</h2>
+                    <h2 className="watch-row-title">{t("topGenres")}</h2>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: ".5rem" }}>
                         {topGenres.map((g) => (
-                            <span key={g.name} className="watch-pill" title={`${g.minutes} minute`}>
+                            <span key={g.name} className="watch-pill" title={t("minutes", { count: g.minutes })}>
                                 {g.name} · {g.minutes}m
                             </span>
                         ))}
