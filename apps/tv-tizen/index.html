@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ro" data-tv data-mode="dark" data-accent="violet" data-surface="solid" data-motion="reduced">
+<head>
+    <meta charset="UTF-8" />
+    <!-- TV defaults for the shared theme prefs (only when the user has none), then the
+         shared prehydrate applies them to <html>. Classic scripts: file:// on Tizen. -->
+    <script>try{var K="mixai:prefs:v1";if(!localStorage.getItem(K))localStorage.setItem(K,JSON.stringify({mode:"dark",accent:"violet",surface:"solid",density:"comfortable",radius:"md",motion:"reduced",locale:"ro",feedback:false}))}catch(e){}</script>
+    <script src="./prehydrate.js"></script>
+    <meta name="viewport" content="width=1920, height=1080, user-scalable=no" />
+    <title>MixAI TV</title>
+    <script src="$WEBAPIS/webapis/webapis.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+</body>
+</html>

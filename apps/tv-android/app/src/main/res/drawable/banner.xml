@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Leanback banner, 320x180 dp. Vector is accepted on API 26+. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path android:fillColor="@color/bg" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="@color/accent" android:pathData="M0,0h320v180h-320z" android:fillAlpha="0.18" />
+    <!-- play triangle -->
+    <path android:fillColor="@color/accent2" android:pathData="M60,55 L60,125 L120,90 Z" />
+    <!-- M I X -->
+    <path android:fillColor="@color/foreground" android:pathData="M140,120 V60 h10 l14,28 14,-28 h10 v60 h-10 V80 l-14,28 -14,-28 v40z" />
+    <path android:fillColor="@color/foreground" android:pathData="M200,120 V60 h10 v60z" />
+    <path android:fillColor="@color/foreground" android:pathData="M220,60 h12 l10,17 10,-17 h12 l-16,29 17,31 h-12 l-11,-19 -11,19 h-12 l17,-31z" />
+    <!-- TV bar -->
+    <path android:fillColor="@color/accent2" android:pathData="M140,135 h132 v6 h-132z" />
+</vector>

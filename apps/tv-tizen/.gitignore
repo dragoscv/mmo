@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.pnpm-cache/
+*.wgt
+.sign/
+author-signature.xml
+signature1.xml

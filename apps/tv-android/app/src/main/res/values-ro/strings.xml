@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MixAI TV</string>
+
+    <!-- Common -->
+    <string name="action_back">Înapoi</string>
+    <string name="action_retry">Reîncearcă</string>
+    <string name="common_nothing_yet">nimic încă</string>
+    <string name="common_row_error">eroare: %1$s</string>
+    <string name="common_mmo_server">MMO Server</string>
+    <string name="common_saved_server">Server salvat</string>
+    <string name="common_your_code">Codul tău</string>
+    <string name="common_expires_in">Expiră în %1$d:%2$02d</string>
+
+    <!-- Welcome (first run) -->
+    <string name="welcome_title">Bun venit la MixAI TV</string>
+    <string name="welcome_subtitle">Cum vrei să te conectezi?</string>
+    <string name="welcome_signin_title">Conectare cu contul MixAI</string>
+    <string name="welcome_signin_desc">Un cod pe ecran, îl confirmi de pe telefon. Serverele tale apar automat.</string>
+    <string name="welcome_recommended">Recomandat</string>
+    <string name="welcome_local_title">Conectare la un server din această rețea</string>
+    <string name="welcome_local_desc">Caută MMO Server în rețeaua locală și împerechează cu un cod de 6 cifre.</string>
+
+    <!-- Sign in (device code) -->
+    <string name="signin_title">Conectare cu contul MixAI</string>
+    <string name="signin_open">Deschide %1$s/activate pe telefon și introdu codul</string>
+    <string name="signin_requesting">Se cere un cod de la %1$s…</string>
+    <string name="signin_your_code">Codul tău</string>
+    <string name="signin_scan">Sau scanează codul QR cu telefonul</string>
+    <string name="signin_waiting">Se așteaptă confirmarea…</string>
+    <string name="signin_expires_in">Expiră în %1$d:%2$02d</string>
+    <string name="signin_connecting">Bun venit, %1$s! Se caută serverele tale…</string>
+    <string name="signin_expired">Codul a expirat.</string>
+    <string name="signin_denied">Conectarea a fost refuzată de pe telefon.</string>
+    <string name="signin_new_code">Cod nou</string>
+    <string name="signin_err_network">Nu am putut contacta %1$s (rețea)</string>
+    <string name="signin_err_status">Nu am putut contacta %1$s (%2$d)</string>
+    <string name="signin_err_invalid">Răspuns invalid de la %1$s</string>
+
+    <!-- Discover (LAN) -->
+    <string name="discover_scanning">Se caută MMO Server în rețeaua locală…</string>
+    <string name="discover_pick">Alege serverul la care vrei să te conectezi</string>
+    <string name="discover_no_pairing">v%1$s · împerecherea nu e suportată</string>
+    <string name="discover_quick">v%1$s · Quick Connect</string>
+    <string name="discover_manual">Introdu adresa manual</string>
+
+    <!-- Pair (Quick Connect) -->
+    <string name="pair_title">Conectare la %1$s</string>
+    <string name="pair_requesting">Se cere un cod…</string>
+    <string name="pair_scan">Scanează cu telefonul sau deschide mixai.ro/pair\nși introdu codul</string>
+    <string name="pair_waiting">Se așteaptă aprobarea…</string>
+    <string name="pair_expired">Codul a expirat.</string>
+    <string name="pair_failed_hint">Serverul poate nu suportă încă Quick Connect — actualizează MMO Server sau introdu tokenul manual.</string>
+    <string name="pair_err_no_token">Serverul a aprobat fără token</string>
+
+    <!-- Connect (manual) -->
+    <string name="connect_subtitle">Conectează-te la MMO Server din rețeaua locală</string>
+    <string name="connect_host_label">Server (IP sau http://host:17899)</string>
+    <string name="connect_token_label">Device token (opțional — gol = împerechere cu cod)</string>
+    <string name="connect_submit">Conectare</string>
+    <string name="connect_checking">Se verifică /health…</string>
+    <string name="connect_ok">✓ Server OK — %1$s v%2$s</string>
+    <string name="connect_not_paired">Neîmperecheat încă.</string>
+    <string name="connect_token_rejected">Token invalid (401) — neîmperecheat.</string>
+    <string name="connect_quick">Împerechează cu cod</string>
+    <string name="connect_enter_token">Introdu device token-ul din config.json al serverului.</string>
+    <string name="connect_err_host">Introdu adresa serverului</string>
+    <string name="connect_fail">✗ %1$s</string>
+
+    <!-- Home -->
+    <string name="home_title">MixAI TV</string>
+    <string name="home_continue">Continuă vizionarea</string>
+    <string name="home_movies">Filme</string>
+    <string name="home_shows">Seriale</string>
+    <string name="home_albums">Albume</string>
+    <string name="home_settings">Setări</string>
+    <string name="home_change_server">Schimbă serverul</string>
+    <string name="home_sign_out">Deconectare din cont</string>
+    <string name="home_movies_empty">Niciun film</string>
+    <string name="home_movies_empty_hint">Adaugă un folder Movies în MMO Server → Settings.</string>
+    <string name="home_shows_empty">Niciun serial</string>
+    <string name="home_shows_empty_hint">Episoadele sunt detectate din nume de fișier de tip S01E02.</string>
+    <string name="home_albums_empty">Niciun album</string>
+    <string name="home_albums_empty_hint">Nicio piesă în bibliotecă.</string>
+    <string name="home_load_failed">Nu s-a putut încărca</string>
+    <string name="home_episodes">%1$d episoade</string>
+    <string name="home_seasons">%1$d sezoane</string>
+
+    <!-- Movie -->
+    <string name="movie_duration">%1$d h %2$02d min</string>
+    <string name="movie_subtitles">Subtitrare: %1$s</string>
+    <string name="movie_play_direct">▶  Redă (direct)</string>
+    <string name="movie_play_transcode">▶  Redă (transcodare)</string>
+    <string name="movie_play_hls">Redă prin HLS</string>
+    <string name="movie_resume">▶  Continuă de la %1$s</string>
+    <string name="movie_start_over">De la început</string>
+    <string name="subtitle_n">Subtitrare %1$d</string>
+
+    <!-- Show -->
+    <string name="show_episodes">%1$d episoade</string>
+    <string name="show_empty">Niciun episod.</string>
+    <string name="show_episode_fallback">Episodul %1$d</string>
+
+    <!-- Album -->
+    <string name="album_tracks">%1$d piese</string>
+    <string name="album_play_all">▶  Redă tot</string>
+    <string name="album_empty">Album gol.</string>
+    <string name="album_load_failed">Nu s-a putut încărca albumul</string>
+
+    <!-- Player -->
+    <string name="player_error">Eroare la redare</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Setări</string>
+    <string name="settings_server">Server</string>
+    <string name="settings_server_info">%1$s · v%2$s</string>
+    <string name="settings_server_checking">Se verifică…</string>
+    <string name="settings_server_unreachable">Nu răspunde</string>
+    <string name="settings_language">Limba</string>
+    <string name="settings_lang_system">Sistem</string>
+    <string name="settings_lang_ro">Română</string>
+    <string name="settings_lang_en">English</string>
+    <string name="settings_clear_progress">Șterge progresul</string>
+    <string name="settings_cleared">Progresul a fost șters.</string>
+    <string name="settings_app_version">Versiune aplicație %1$s</string>
+    <string name="settings_account">Cont</string>
+</resources>

@@ -1,0 +1,31 @@
+{
+    "name": "@mmo/tv-tizen",
+    "version": "1.0.0",
+    "private": true,
+    "description": "MixAI TV for Samsung Tizen — web application (.wgt) that plays movies + music from MMO Server on Smart Hub TVs/monitors.",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc --noEmit && vite build",
+        "preview": "vite preview",
+        "typecheck": "tsc --noEmit",
+        "package": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-wgt.ps1",
+        "setup:cert": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-tizen-cert.ps1"
+    },
+    "dependencies": {
+        "hls.js": "^1.7.3",
+        "qrcode": "^1.5.4",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0"
+    },
+    "devDependencies": {
+        "@types/qrcode": "^1.5.6",
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+        "@vitejs/plugin-legacy": "^8.2.3",
+        "@vitejs/plugin-react": "^6.1.1",
+        "terser": "^5.51.2",
+        "typescript": "^7.0.2",
+        "vite": "^8.3.0"
+    }
+}

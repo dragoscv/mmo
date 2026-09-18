@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MixAI TV</string>
+
+    <!-- Common -->
+    <string name="action_back">Back</string>
+    <string name="action_retry">Retry</string>
+    <string name="common_nothing_yet">nothing yet</string>
+    <string name="common_row_error">error: %1$s</string>
+    <string name="common_mmo_server">MMO Server</string>
+    <string name="common_saved_server">Saved server</string>
+    <string name="common_your_code">Your code</string>
+    <string name="common_expires_in">Expires in %1$d:%2$02d</string>
+
+    <!-- Welcome (first run) -->
+    <string name="welcome_title">Welcome to MixAI TV</string>
+    <string name="welcome_subtitle">How do you want to connect?</string>
+    <string name="welcome_signin_title">Sign in with MixAI account</string>
+    <string name="welcome_signin_desc">A code on this screen, confirm it on your phone. Your servers appear automatically.</string>
+    <string name="welcome_recommended">Recommended</string>
+    <string name="welcome_local_title">Connect to a server on this network</string>
+    <string name="welcome_local_desc">Find MMO Server on your LAN and pair with a 6-digit code.</string>
+
+    <!-- Sign in (device code) -->
+    <string name="signin_title">Sign in with MixAI account</string>
+    <string name="signin_open">Open %1$s/activate on your phone and enter the code</string>
+    <string name="signin_requesting">Requesting a code from %1$s…</string>
+    <string name="signin_your_code">Your code</string>
+    <string name="signin_scan">Or scan the QR code with your phone</string>
+    <string name="signin_waiting">Waiting for confirmation…</string>
+    <string name="signin_expires_in">Expires in %1$d:%2$02d</string>
+    <string name="signin_connecting">Welcome, %1$s! Looking for your servers…</string>
+    <string name="signin_expired">The code expired.</string>
+    <string name="signin_denied">Sign-in was declined on your phone.</string>
+    <string name="signin_new_code">New code</string>
+    <string name="signin_err_network">Could not reach %1$s (network)</string>
+    <string name="signin_err_status">Could not reach %1$s (%2$d)</string>
+    <string name="signin_err_invalid">Unexpected reply from %1$s</string>
+
+    <!-- Discover (LAN) -->
+    <string name="discover_scanning">Searching for MMO Servers on your network…</string>
+    <string name="discover_pick">Choose your MMO Server</string>
+    <string name="discover_no_pairing">v%1$s · pairing not supported</string>
+    <string name="discover_quick">v%1$s · Quick Connect</string>
+    <string name="discover_manual">Enter address manually</string>
+
+    <!-- Pair (Quick Connect) -->
+    <string name="pair_title">Pair with %1$s</string>
+    <string name="pair_requesting">Requesting a pairing code…</string>
+    <string name="pair_scan">Scan with your phone or open mixai.ro/pair\nand enter the code</string>
+    <string name="pair_waiting">Waiting for approval…</string>
+    <string name="pair_expired">The code expired.</string>
+    <string name="pair_failed_hint">This server may not support Quick Connect yet — update MMO Server or enter the token manually.</string>
+    <string name="pair_err_no_token">Server approved without a token</string>
+
+    <!-- Connect (manual) -->
+    <string name="connect_subtitle">Connect to your MMO Server manually</string>
+    <string name="connect_host_label">Server (host or http://host:17899)</string>
+    <string name="connect_token_label">Device token (optional — leave empty to pair with a code)</string>
+    <string name="connect_submit">Connect</string>
+    <string name="connect_checking">Checking /health…</string>
+    <string name="connect_ok">✓ Server OK — %1$s v%2$s</string>
+    <string name="connect_not_paired">Not paired yet.</string>
+    <string name="connect_token_rejected">Token rejected (401) — not paired.</string>
+    <string name="connect_quick">Quick Connect with a code</string>
+    <string name="connect_enter_token">Enter the device token from the server\'s config.json.</string>
+    <string name="connect_err_host">Enter the server address</string>
+    <string name="connect_fail">✗ %1$s</string>
+
+    <!-- Home -->
+    <string name="home_title">MixAI TV</string>
+    <string name="home_continue">Continue watching</string>
+    <string name="home_movies">Movies</string>
+    <string name="home_shows">TV shows</string>
+    <string name="home_albums">Albums</string>
+    <string name="home_settings">Settings</string>
+    <string name="home_change_server">Change server</string>
+    <string name="home_sign_out">Sign out</string>
+    <string name="home_movies_empty">No movies</string>
+    <string name="home_movies_empty_hint">Add a Movies folder in MMO Server → Settings.</string>
+    <string name="home_shows_empty">No TV shows</string>
+    <string name="home_shows_empty_hint">Episodes are detected from S01E02-style file names.</string>
+    <string name="home_albums_empty">No albums</string>
+    <string name="home_albums_empty_hint">No tracks in the library yet.</string>
+    <string name="home_load_failed">Could not load</string>
+    <string name="home_episodes">%1$d episodes</string>
+    <string name="home_seasons">%1$d seasons</string>
+
+    <!-- Movie -->
+    <string name="movie_duration">%1$d h %2$02d min</string>
+    <string name="movie_subtitles">Subtitles: %1$s</string>
+    <string name="movie_play_direct">▶  Play (direct)</string>
+    <string name="movie_play_transcode">▶  Play (transcode)</string>
+    <string name="movie_play_hls">Play via HLS</string>
+    <string name="movie_resume">▶  Resume from %1$s</string>
+    <string name="movie_start_over">Start over</string>
+    <string name="subtitle_n">Subtitle %1$d</string>
+
+    <!-- Show -->
+    <string name="show_episodes">%1$d episodes</string>
+    <string name="show_empty">No episodes.</string>
+    <string name="show_episode_fallback">Episode %1$d</string>
+
+    <!-- Album -->
+    <string name="album_tracks">%1$d tracks</string>
+    <string name="album_play_all">▶  Play all</string>
+    <string name="album_empty">No tracks</string>
+    <string name="album_load_failed">Could not load the album</string>
+
+    <!-- Player -->
+    <string name="player_error">Playback error</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_server">Server</string>
+    <string name="settings_server_info">%1$s · v%2$s</string>
+    <string name="settings_server_checking">Checking…</string>
+    <string name="settings_server_unreachable">Not reachable</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_lang_system">System</string>
+    <string name="settings_lang_ro">Română</string>
+    <string name="settings_lang_en">English</string>
+    <string name="settings_clear_progress">Clear resume data</string>
+    <string name="settings_cleared">Resume data cleared.</string>
+    <string name="settings_app_version">App version %1$s</string>
+    <string name="settings_account">Account</string>
+</resources>

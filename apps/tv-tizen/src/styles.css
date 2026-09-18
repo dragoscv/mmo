@@ -1,0 +1,225 @@
+@import "./tokens.css";
+
+/* Role colours + `font-size: 24px` (10-foot UI) come from tokens.css via
+   `:root[data-tv]` + `:root[data-mode="dark"]` — no local palette here. */
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: "Segoe UI", "SamsungOne", "Noto Sans", system-ui, sans-serif;
+    overflow: hidden;
+    cursor: none;
+}
+button { font: inherit; color: inherit; }
+a { color: inherit; }
+
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; padding: var(--overscan-y) var(--overscan-x); }
+.screen-title { font-size: 1.6rem; font-weight: 700; margin: 0 0 8px; letter-spacing: -0.01em; }
+.screen-sub { color: var(--muted-foreground); margin: 0 0 32px; }
+
+/* Focus ring — the only thing the user sees from the couch. */
+[data-focusable] { outline: none; transition: transform var(--dur-fast) var(--ease-out), outline-color var(--dur-fast) var(--ease-out); }
+[data-focusable]:focus {
+    outline: var(--focus-ring-w) solid var(--ring);
+    outline-offset: 2px;
+    transform: scale(var(--card-scale-focused));
+    z-index: var(--z-raised);
+}
+
+/* Connect */
+.connect { max-width: 900px; margin: auto; width: 100%; }
+.field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+.field label { color: var(--muted-foreground); font-size: 0.85rem; }
+.field input {
+    font: inherit; padding: 18px 22px; border-radius: var(--radius);
+    border: 2px solid var(--input); background: var(--card); color: var(--card-foreground);
+}
+.field input:focus { border-color: var(--primary); outline: var(--focus-ring-w) solid var(--ring); outline-offset: 2px; }
+.btn {
+    padding: 18px 32px; border-radius: var(--radius); border: 0;
+    background: var(--primary); color: var(--primary-foreground); font-weight: 600; cursor: none;
+}
+.btn.secondary { background: var(--secondary); color: var(--secondary-foreground); }
+.btn-row { display: flex; gap: 20px; align-items: center; }
+.status { margin-top: 16px; min-height: 1.5em; color: var(--muted-foreground); }
+.status.error { color: var(--destructive); }
+.status.ok { color: var(--success); }
+
+/* Discover (Quick Connect step 1) */
+.discover-grid { display: flex; flex-wrap: wrap; gap: 28px; padding: 12px 8px 24px; min-height: 260px; }
+.server-card {
+    width: 420px; padding: 28px 30px; border-radius: var(--radius); border: 2px solid var(--border);
+    background: var(--card); color: var(--card-foreground); text-align: left; display: flex; flex-direction: column; gap: 6px;
+}
+.server-card.preselected { border-color: var(--primary); }
+.server-card .server-icon { font-size: 2rem; margin-bottom: 8px; }
+.server-card .server-name { font-weight: 700; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.server-card .server-sub { color: var(--muted-foreground); font-size: 0.8rem; }
+.server-card .server-tag { margin-top: 10px; align-self: flex-start; font-size: 0.7rem; padding: 4px 12px; border-radius: 999px; background: var(--accent); color: var(--accent-foreground); }
+.server-card .server-tag.warn { background: var(--destructive); color: var(--destructive-foreground); }
+.discover-actions { display: flex; gap: 20px; margin-top: auto; }
+
+/* Welcome (first run) */
+.server-card.welcome-card { width: 560px; padding: 40px 36px; gap: 10px; }
+.server-card.welcome-card .server-name { white-space: normal; font-size: 1.35rem; }
+.server-card.welcome-card .server-sub { font-size: 0.9rem; line-height: 1.4; }
+
+/* Pair (Quick Connect step 2) */
+.pair { display: flex; gap: 80px; align-items: center; flex: 1; }
+.pair-left { flex: 1; }
+.pair-right { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.pair-label { color: var(--muted-foreground); font-size: 0.95rem; margin-bottom: 28px; }
+.pair-code { display: flex; gap: 16px; font-variant-numeric: tabular-nums; }
+.pair-code span {
+    width: 96px; height: 130px; display: flex; align-items: center; justify-content: center;
+    font-size: 3.4rem; font-weight: 800; background: var(--card); border: 2px solid var(--border); border-radius: var(--radius);
+}
+.pair-countdown { margin-top: 24px; color: var(--brand-accent); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.pair-code.user-code span { width: 76px; font-size: 2.8rem; }
+.pair-code.user-code span.dash { width: 40px; background: none; border: none; color: var(--muted-foreground); }
+.pair-hint { color: var(--muted-foreground); font-size: 0.8rem; margin-top: 10px; }
+/* The QR canvas itself is always black-on-white (scanner contrast); the frame is the card. */
+.pair-qr { width: 320px; height: 320px; border-radius: var(--radius); background: var(--card); padding: 12px; }
+
+/* Home */
+.home-header { display: flex; align-items: baseline; justify-content: space-between; }
+.home-header .server { color: var(--muted-foreground); font-size: 0.8rem; }
+.home-header-right { display: flex; gap: 20px; align-items: baseline; }
+.home-header .user { color: var(--foreground); font-size: 0.9rem; font-weight: 600; }
+.home-header .btn.small { padding: 10px 20px; font-size: 0.8rem; }
+.rows { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px 0 60px; scroll-behavior: smooth; }
+.row { margin-bottom: 36px; }
+.row-title { font-size: 1.1rem; font-weight: 600; margin: 0 0 14px; color: var(--foreground); }
+.row-track { display: flex; gap: 20px; overflow-x: auto; overflow-y: visible; padding: 12px 8px 20px; scrollbar-width: none; }
+.row-track::-webkit-scrollbar { display: none; }
+.card {
+    flex: 0 0 auto; width: 260px; border-radius: var(--radius); background: var(--card); color: var(--card-foreground);
+    border: 0; padding: 0; text-align: left; overflow: hidden; display: flex; flex-direction: column; position: relative;
+}
+.card.poster { width: 220px; }
+.card.wide { width: 320px; }
+.card .art { width: 100%; aspect-ratio: 1 / 1; background: var(--muted); object-fit: cover; display: block; }
+.card.poster .art { aspect-ratio: 2 / 3; }
+.card.wide .art { aspect-ratio: 16 / 9; }
+/* Scrubber sprite as a still: 12×12 grid, tile 14 = row 1, col 2 (≈10 % into the film).
+   background-position % maps col/(cols-1): 2/11 = 18.1818 %, row 1/11 = 9.0909 %. */
+.card .art.still {
+    background-size: 1200% 1200%;
+    background-position: 18.1818% 9.0909%;
+    background-repeat: no-repeat;
+    aspect-ratio: 16 / 9;
+}
+.card .art.placeholder { display: flex; align-items: center; justify-content: center; color: var(--muted-foreground); font-size: 2rem; }
+.card .meta { padding: 12px 14px 14px; }
+.card .title { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .sub { color: var(--muted-foreground); font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.empty { color: var(--muted-foreground); padding: 24px 8px; }
+
+/* Resume indicator — thin bar along the bottom of a card / inline in a list row. */
+.progress { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--muted); }
+.progress > div { height: 100%; background: var(--brand-accent); }
+.list-item .progress { position: static; flex: 0 0 120px; height: 6px; border-radius: 3px; overflow: hidden; }
+
+/* Skeletons. TV runs data-motion="reduced" (zeroed --dur-*), but the shimmer is
+   the only loading affordance on a 10-foot UI, so its duration is set
+   explicitly and deliberately NOT disabled under reduced motion — it is slow
+   and low-contrast. */
+.skeleton {
+    background: linear-gradient(90deg, var(--muted) 25%, var(--secondary) 50%, var(--muted) 75%);
+    background-size: 200% 100%;
+    animation: mixai-shimmer 1.4s linear infinite;
+    animation-duration: 1.4s;
+    border-radius: var(--radius);
+}
+@keyframes mixai-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.skeleton-card { flex: 0 0 auto; width: 220px; display: flex; flex-direction: column; gap: 10px; }
+.skeleton-card .skeleton-art { width: 100%; aspect-ratio: 2 / 3; }
+.skeleton-card.wide { width: 320px; }
+.skeleton-card.wide .skeleton-art { aspect-ratio: 16 / 9; }
+.skeleton-line { height: 0.9em; width: 100%; }
+.skeleton-card .skeleton-line { width: 80%; margin: 0 14px; }
+.skeleton-card .skeleton-line.short { width: 50%; }
+.list .skeleton-line { height: 3.2rem; margin: 0; flex: 0 0 auto; }
+
+/* Album / list */
+.list { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 8px; flex: 1; }
+.list-item {
+    display: flex; align-items: center; gap: 20px; padding: 14px 20px; border-radius: var(--radius);
+    background: var(--card); color: var(--card-foreground); border: 0; text-align: left; width: 100%;
+}
+.list-item .num { width: 2.2em; color: var(--muted-foreground); text-align: right; }
+.list-item .grow { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-item .dur { color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.album-head { display: flex; gap: 32px; align-items: flex-end; margin-bottom: 24px; }
+.album-head img { width: 220px; height: 220px; border-radius: var(--radius); object-fit: cover; background: var(--muted); }
+
+/* Search */
+.search-form { display: flex; gap: 20px; align-items: center; margin-bottom: 8px; }
+.search-form input {
+    flex: 1; font: inherit; padding: 18px 22px; border-radius: var(--radius);
+    border: 2px solid var(--input); background: var(--card); color: var(--card-foreground);
+}
+.search-form input:focus { border-color: var(--primary); outline: var(--focus-ring-w) solid var(--ring); outline-offset: 2px; }
+
+/* Player */
+.player { position: absolute; inset: 0; background: var(--background); }
+.player video, .player audio { width: 100%; height: 100%; background: var(--background); }
+.player .art-bg { position: absolute; inset: 0; background-size: cover; background-position: center; filter: blur(40px) brightness(0.35); transform: scale(1.1); }
+.player .now { position: absolute; left: var(--overscan-x); bottom: 200px; display: flex; gap: 32px; align-items: center; }
+.player .now img { width: 300px; height: 300px; border-radius: var(--radius); object-fit: cover; box-shadow: var(--surface-shadow); }
+.player .now .t { font-size: 1.6rem; font-weight: 700; }
+.player .now .s { color: var(--muted-foreground); font-size: 1rem; margin-top: 8px; }
+.osd {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 40px var(--overscan-x) 48px;
+    background: linear-gradient(to top, var(--background), transparent);
+    transition: opacity var(--dur-base) var(--ease-out);
+}
+.osd.hidden { opacity: 0; pointer-events: none; }
+.osd .title { font-size: 1.2rem; font-weight: 600; margin-bottom: 18px; }
+.osd .title .dim { color: var(--muted-foreground); font-weight: 400; }
+.osd .bar { height: 8px; background: var(--muted); border-radius: 4px; overflow: hidden; }
+.osd .bar > div { height: 100%; background: var(--brand-accent); }
+.osd .times { display: flex; justify-content: space-between; color: var(--muted-foreground); font-size: 0.8rem; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.osd .controls { display: flex; gap: 16px; margin-top: 20px; }
+.osd .controls .btn { padding: 14px 24px; font-size: 0.9rem; background: var(--secondary); color: var(--secondary-foreground); }
+.osd .controls .btn.active { background: var(--primary); color: var(--primary-foreground); }
+.osd .hint { color: var(--muted-foreground); font-size: 0.7rem; margin-top: 16px; }
+.toast {
+    position: absolute; top: 40px; right: var(--overscan-x); padding: 14px 22px; border-radius: var(--radius);
+    background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); font-size: 0.85rem; z-index: var(--z-toast);
+}
+.toast.error { border-color: var(--destructive); color: var(--destructive); }
+
+/* Subtitles: bigger, TV-safe */
+video::cue { font-size: 1.4rem; background: var(--background); color: var(--foreground); }
+
+.spinner { color: var(--muted-foreground); padding: 40px; }
+
+/* sRGB fallbacks = the generated dark/violet values from packages/design-tokens
+   dist/Tokens.kt (Tizen Chromium < 111 has no oklch()). Re-copy them when tokens change. */
+@supports not (color: oklch(0 0 0)) {
+    :root, :root[data-mode="dark"] {
+        --background: #07060F;
+        --foreground: #F5F1EA;
+        --card: #11101A;
+        --card-foreground: #F5F1EA;
+        --primary: #9588FF;
+        --primary-foreground: #080715;
+        --secondary: #20202B;
+        --secondary-foreground: #F5F1EA;
+        --muted: #20202B;
+        --muted-foreground: #9D9DAB;
+        --accent: #2B294B;
+        --accent-foreground: #D8D7FF;
+        --destructive: #FF6367;
+        --destructive-foreground: #140505;
+        --success: #4BCB71;
+        --warning: #F3BA25;
+        --info: #42A3FD;
+        --border: rgba(255,255,255,0.10);
+        --input: rgba(255,255,255,0.15);
+        --ring: #9588FF;
+    }
+}
