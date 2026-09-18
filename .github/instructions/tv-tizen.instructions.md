@@ -35,7 +35,7 @@ description: "MixAI TV for Samsung Tizen (Vite 8 + plugin-legacy, React 19, file
 1. TV Developer Mode on; port 26101 opens only after a FULL power-off/on. `http://<ip>:8001/api/v2/` shows
    developerMode + IP.
 2. `sdb connect 192.168.100.135; sdb devices` → serial.
-3. `tizen install -s <serial> -- dist/MixAITV.wgt` (use `-s`, not `-t`).
+3. `tizen install -s <serial> -n MixAITV.wgt -- <abs path to dist>` (`-s` not `-t`; `-n` file name + `--` directory, else `Option "-n (--name)" is required`).
 4. Launch `sdb shell 0 was_execute <appid>`; real install error text via
    `sdb push <wgt> /tmp/ && sdb shell 0 vd_appinstall <appid> /tmp/<wgt>`.
 

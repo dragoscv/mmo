@@ -33,7 +33,7 @@ shared terminal silently drops them.
 8. ```powershell
    $t = "$env:USERPROFILE\tizen-studio\tools"
    & "$t\sdb.exe" connect 192.168.100.135; & "$t\sdb.exe" devices          # note the serial
-   & "$t\ide\bin\tizen.bat" install -s <serial> -- E:\gh\mmo\apps\tv-tizen\dist\MixAITV.wgt   # -s, not -t
+   & "$t\ide\bin\tizen.bat" install -s <serial> -n MixAITV.wgt -- E:\gh\mmo\apps\tv-tizen\dist   # -s not -t; -n FILE + -- DIR (verified 2026-09-18)
    & "$t\sdb.exe" shell 0 was_execute mXa1TvApp0.MixAI
    ```
    Real error text when `tizen install` is vague: `sdb push dist\MixAITV.wgt /tmp/` then

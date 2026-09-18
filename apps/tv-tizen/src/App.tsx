@@ -5,8 +5,10 @@ import {
 } from "./lib/config";
 import type { Companion } from "./lib/device-auth";
 import { MmoClient, type ProbedVideo, type SubsonicAlbum, type SubsonicSong } from "./lib/api";
+import { MediaClient } from "./lib/media";
+import type { MediaKind, TitleCard } from "./lib/media-types";
 import { keyFromEvent, registerTvKeys, exitApp, type TvKey } from "./lib/tv-keys";
-import { moveFocus, currentFocus } from "./lib/focus";
+import { moveFocus, currentFocus, installRowMemory } from "./lib/focus";
 import type { DiscoveredServer } from "./lib/discovery";
 import type { Show } from "./lib/shows";
 import { useLocale } from "./i18n/useLocale";
@@ -19,6 +21,7 @@ import { HomeScreen } from "./screens/Home";
 import { AlbumScreen } from "./screens/Album";
 import { ShowScreen } from "./screens/Show";
 import { SearchScreen } from "./screens/Search";
+import { TitleScreen, type PlayRequest } from "./screens/Title";
 import { PlayerScreen, type PlayItem } from "./screens/Player";
 
 type Route =
@@ -31,6 +34,7 @@ type Route =
     | { name: "album"; album: SubsonicAlbum }
     | { name: "show"; show: Show }
     | { name: "search"; videos: ProbedVideo[] }
+    | { name: "title"; kind: MediaKind; tmdbId: number; seed?: TitleCard }
     | { name: "player"; item: PlayItem; queue?: PlayItem[]; index?: number };
 
 function toDiscovered(cfg: ServerConfig): DiscoveredServer {
@@ -50,6 +54,7 @@ function AppRoutes() {
     const [route, setRoute] = useState<Route>(() => (loadConfig() ? { name: "home" } : { name: "welcome" }));
     const stack = useRef<Route[]>([]);
     const client = useMemo(() => (cfg ? new MmoClient(cfg) : null), [cfg]);
+    const media = useMemo(() => (cfg && client ? new MediaClient(cfg, client) : null), [cfg, client]);
 
     // Saved server → Home directly; if it is not reachable, fall back to
     // discovery with the saved one preselected (mirrors tv-android).
@@ -73,7 +78,7 @@ function AppRoutes() {
         return true;
     }, []);
 
-    useEffect(() => { registerTvKeys(); }, []);
+    useEffect(() => { registerTvKeys(); installRowMemory(); }, []);
 
     // Global D-pad handling. The Player owns its keys and stops propagation.
     useEffect(() => {
@@ -149,6 +154,10 @@ function AppRoutes() {
     const playVideo = (v: ProbedVideo) => {
         push({ name: "player", item: { kind: "video", video: v } });
     };
+    const playFromTitle = (r: PlayRequest) => {
+        push({ name: "player", item: { kind: "video", video: r.video, ref: r.ref, resumeSec: r.resumeSec } });
+    };
+    const openTitle = (c: TitleCard) => push({ name: "title", kind: c.kind, tmdbId: c.tmdbId, seed: c });
 
     const playAlbum = (album: SubsonicAlbum, songs: SubsonicSong[], index: number) => {
         const queue: PlayItem[] = songs.map((s) => ({ kind: "audio", song: s, album }));
@@ -177,9 +186,11 @@ function AppRoutes() {
             return (
                 <HomeScreen
                     client={client}
+                    media={media!}
                     cfg={cfg!}
                     user={session?.user ?? null}
                     onPlayVideo={playVideo}
+                    onOpenTitle={openTitle}
                     onOpenShow={(show) => push({ name: "show", show })}
                     onOpenAlbum={(album) => push({ name: "album", album })}
                     onSearch={(videos) => push({ name: "search", videos })}
@@ -201,10 +212,24 @@ function AppRoutes() {
                     onOpenAlbum={(album) => push({ name: "album", album })}
                 />
             );
+        case "title":
+            return (
+                <TitleScreen
+                    key={`${route.kind}:${route.tmdbId}`}
+                    client={client!}
+                    media={media!}
+                    kind={route.kind}
+                    tmdbId={route.tmdbId}
+                    seed={route.seed}
+                    onPlay={playFromTitle}
+                    onOpenTitle={openTitle}
+                />
+            );
         case "player":
             return (
                 <PlayerScreen
                     client={client!}
+                    media={media}
                     item={route.item}
                     queue={route.queue}
                     index={route.index}

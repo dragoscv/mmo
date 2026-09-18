@@ -122,6 +122,18 @@ export class MmoClient {
         return `${this.cfg.baseUrl}/video/direct/${encodeURIComponent(fileId)}?${this.authQuery()}`;
     }
 
+    /** `/video/file/:id/info`; after a server restart the registry is empty (404) → `/video/lookup?path=` re-registers. */
+    async resolveVideo(fileId: string, path: string): Promise<ProbedVideo> {
+        const info = (id: string) => this.json<Omit<ProbedVideo, "fileId"> & { fileId?: string }>(`/video/file/${encodeURIComponent(id)}/info`);
+        try {
+            return { ...(await info(fileId)), fileId };
+        } catch (e) {
+            if (!(e instanceof ApiError) || e.status !== 404) throw e;
+            const r = await this.json<{ fileId: string }>(`/video/lookup?path=${encodeURIComponent(path)}`);
+            return { ...(await info(r.fileId)), fileId: r.fileId };
+        }
+    }
+
     /** HLS playlist. `caps` tells the server which codecs the TV decodes so it can remux instead of transcode. */
     hlsUrl(fileId: string, opts: { startSec?: number; caps?: string[]; quality?: "original" | "1080p" | "720p" | "480p" } = {}): string {
         const q = new URLSearchParams();
@@ -136,8 +148,13 @@ export class MmoClient {
     }
 
     posterUrl(posterPath: string): string {
-        const p = posterPath.replace(/^\//, "");
-        return `${this.cfg.baseUrl}/video/tmdb-image/w500/${p}?${this.authQuery()}`;
+        return this.tmdbImageUrl(posterPath, "w500");
+    }
+
+    /** Any TMDB image through the server proxy (`/video/tmdb-image/<size>/<path>`). */
+    tmdbImageUrl(imagePath: string, size: string): string {
+        const p = imagePath.replace(/^\//, "");
+        return `${this.cfg.baseUrl}/video/tmdb-image/${size}/${p}?${this.authQuery()}`;
     }
 
     /**

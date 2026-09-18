@@ -321,15 +321,15 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 | WP11-04 | Title page `/media/[kind]/[tmdbId]`: local sources per server (`/watch/play/<cid>?server=&cid=`), provider buttons (deep link / search fallback, attribution), trailer, similar, watchlist, mark watched, hide; redirects from `/watch/discover/*` | done 20cf5e8 |
 | WP11-05 | Listen rows: `track_plays` recording, Continue listening, New albums (album grouping), Favourites, Playlists aggregated, `AlbumCard`; localStorage history migrated once | todo |
 | WP11-06 | Settings › Media: region, preferred providers, hide watched, curator toggle; Settings › Video merged | todo |
-| WP11-07 | Codai curator (env-gated): row titles + one-line "why", 24 h cache | todo |
-| WP11-08 | i18n RO+EN for new strings + sweep hardcoded RO in watch pages; a11y (rows role=list, focus, reduced motion) | todo |
-| WP11-09 | Tests: aggregate merge, row builders, title page states; e2e home at 4 widths light/dark | todo |
+| WP11-07 | Codai curator (env-gated): `lib/media/curator.ts` (`generateObject` + zod, `codai-fast`, 6 s, 24 h `unstable_cache` per user/profile/region/rows hash), `CuratorNote` under the hero; `/media/home?providers=` from prefs + preferred-first offers with badge; `POST/GET /api/media/sync` (device bearer → `watch_history`/`track_plays`/`media_sync_state`) | done |
+| WP11-08 | i18n RO+EN for new strings + sweep hardcoded RO in `/watch/**` + `components/video/**` → `watch.*` keys (parity strict); a11y: rows `role=list` (verified), `aria-live` server notices, focus-visible on curator links, hero reduced motion (verified) | done |
+| WP11-09 | Tests: `sync-map`, `curator` (success/timeout/invalid JSON), preferred ordering (vitest); `e2e/media-home.spec.ts` (anon landing; signed-in hero+rows 390/1440/3440 light+dark + axe on `/` and `/media/movie/550` behind `E2E_SESSION_COOKIE`); `a11y.spec.ts` + `/media/movie/550` | done |
 
 ### WP12 — TV apps
 | ID | Item | Status |
 |---|---|---|
-| WP12-01 | tv-android: `MediaRepository` on `/media/*`, hero + rows, title screen with provider buttons, `ProviderLauncher` + `<queries>`, Watch Next, progress via server + local fallback; RO/EN | todo |
-| WP12-02 | tv-tizen: `/media/*` client, hero + rows, title screen, `launch.ts` (`launchAppControl`, `getAppInfo`, privilege), progress via server | todo |
+| WP12-01 | tv-android: `MediaRepository` on `/media/*`, hero + rows, title screen with provider buttons, `ProviderLauncher` + `<queries>`, Watch Next, progress via server + local fallback; RO/EN | done (1.1.0: `data/{MediaRepository,ProgressSync,ProviderLauncher,WatchNext}.kt`, `ui/{MediaRows,TitleScreen}.kt`, Home hero + server rows with `/video/scan` fallback, `tvprovider` 1.1.0 + `mixai://title/…` deep link, legacy progress migrated once; watchlist button omitted on TV — web only) |
+| WP12-02 | tv-tizen: `/media/*` client, hero + rows, title screen, `launch.ts` (`launchAppControl`, `getAppInfo`, privilege), progress via server | done (`lib/{media,media-types,launch,progress-sync}.ts`, `screens/{Title,media-cards}.tsx`, Home hero + `HomeRow`s with scan fallback, focus row memory, `application.launch/info` privileges, config.xml 1.1.0; mock e2e 22/22 incl. fake `window.tizen`; installed + launched on Odyssey G8, TV opened 5 TCP sessions to the local server `/media`) |
 | WP12-03 | Device verification: Google TV 192.168.100.31 + Odyssey 192.168.100.135 — open Netflix/YouTube from a title, progress round-trip web↔TV | todo |
 
 ### WP13 — Agent config & gates (D23)

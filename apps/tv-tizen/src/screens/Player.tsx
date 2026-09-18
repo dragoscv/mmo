@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MmoClient, ProbedVideo, SubsonicAlbum, SubsonicSong } from "../lib/api";
+import type { MediaClient } from "../lib/media";
+import { reportProgress, type TitleRef } from "../lib/progress-sync";
 import { keyFromEvent } from "../lib/tv-keys";
 import { canDirectPlayOnTizen, isHlsNative, TIZEN_CAPS } from "../lib/playback";
 import { fmtClock } from "../lib/format";
-import { getProgress, setProgress } from "../lib/progress";
+import { getProgress } from "../lib/progress";
 import { t } from "../i18n/messages";
 import type Hls from "hls.js";
 
 export type PlayItem =
-    | { kind: "video"; video: ProbedVideo }
+    | { kind: "video"; video: ProbedVideo; ref?: TitleRef; resumeSec?: number }
     | { kind: "audio"; song: SubsonicSong; album: SubsonicAlbum };
 
 interface Props {
     client: MmoClient;
+    media?: MediaClient | null;
     item: PlayItem;
     queue?: PlayItem[];
     index?: number;
@@ -22,7 +25,7 @@ interface Props {
 const SEEK_STEP = 10;
 const OSD_TIMEOUT = 4000;
 
-export function PlayerScreen({ client, item, queue, index, onExit }: Props) {
+export function PlayerScreen({ client, media = null, item, queue, index, onExit }: Props) {
     const mediaRef = useRef<HTMLVideoElement>(null);
     const hlsRef = useRef<Hls | null>(null);
     const [cur, setCur] = useState<PlayItem>(item);
@@ -45,6 +48,11 @@ export function PlayerScreen({ client, item, queue, index, onExit }: Props) {
     const video = cur.kind === "video" ? cur.video : null;
     const song = cur.kind === "audio" ? cur.song : null;
     const subs = video?.subtitleTracks ?? [];
+    const titleRef = cur.kind === "video" ? cur.ref ?? null : null;
+    const save = (el: HTMLMediaElement, force: boolean) => {
+        if (!video) return;
+        reportProgress(media, video.fileId, titleRef, el.currentTime, Number.isFinite(el.duration) ? el.duration : (video.durationSec ?? 0), force);
+    };
 
     // ─── Source setup ───────────────────────────────────────────────────
     useEffect(() => {
@@ -56,9 +64,9 @@ export function PlayerScreen({ client, item, queue, index, onExit }: Props) {
         setDuration(0);
         setSubIdx(subs.findIndex((s) => s.forced) >= 0 ? subs.findIndex((s) => s.forced) : -1);
 
-        // Resume: saved position (≥ 10 s) for videos. Direct + native HLS seek on
-        // loadedmetadata; hls.js gets `startPosition` in its config.
-        const resumeAt = cur.kind === "video" ? (getProgress(cur.video.fileId)?.pos ?? 0) : 0;
+        // Resume: server position when the Title screen passed one, else the local
+        // store (≥ 10 s). Direct + native HLS seek on loadedmetadata; hls.js gets `startPosition`.
+        const resumeAt = cur.kind === "video" ? (cur.resumeSec && cur.resumeSec > 10 ? cur.resumeSec : (getProgress(cur.video.fileId)?.pos ?? 0)) : 0;
         const onMeta = () => {
             if (resumeAt > 0 && Number.isFinite(el.duration) && resumeAt < el.duration - 5) el.currentTime = resumeAt;
         };
@@ -116,7 +124,7 @@ export function PlayerScreen({ client, item, queue, index, onExit }: Props) {
         return () => {
             cancelled = true;
             if (cur.kind === "video") {
-                setProgress(cur.video.fileId, el.currentTime, Number.isFinite(el.duration) ? el.duration : (cur.video.durationSec ?? 0), true);
+                save(el, true);
                 client.pauseStream(cur.video.fileId);
             }
             teardown();
@@ -130,13 +138,13 @@ export function PlayerScreen({ client, item, queue, index, onExit }: Props) {
         if (!el) return;
         const onTime = () => {
             setTime(el.currentTime);
-            if (video) setProgress(video.fileId, el.currentTime, Number.isFinite(el.duration) ? el.duration : (video.durationSec ?? 0));
+            save(el, false);
         };
         const onDur = () => setDuration(Number.isFinite(el.duration) ? el.duration : (video?.durationSec ?? 0));
         const onPlay = () => setPaused(false);
         const onPause = () => {
             setPaused(true);
-            if (video) setProgress(video.fileId, el.currentTime, Number.isFinite(el.duration) ? el.duration : (video.durationSec ?? 0), true);
+            save(el, true);
         };
         const onEnded = () => next();
         const onErr = () => {

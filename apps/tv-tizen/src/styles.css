@@ -197,6 +197,58 @@ video::cue { font-size: 1.4rem; background: var(--background); color: var(--fore
 
 .spinner { color: var(--muted-foreground); padding: 40px; }
 
+/* ─── Media Home (WP12-02) ───────────────────────────────────────────── */
+.hero { position: relative; height: 520px; margin: 4px 8px 32px; border-radius: var(--radius); overflow: hidden; background: var(--card); }
+.hero-bg { position: absolute; inset: 0; background-size: cover; background-position: center top; }
+.hero-fade {
+    position: absolute; inset: 0;
+    background: linear-gradient(to right, var(--background) 0%, rgba(0,0,0,0.55) 45%, transparent 75%),
+                linear-gradient(to top, var(--background) 0%, transparent 40%);
+}
+.hero-body { position: absolute; left: 56px; right: 56px; bottom: 48px; max-width: 900px; }
+.hero-title { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; text-shadow: 0 2px 12px rgba(0,0,0,0.6); }
+.hero-meta { color: var(--muted-foreground); margin: 12px 0 14px; font-size: 0.9rem; }
+.hero-overview {
+    margin: 0 0 24px; font-size: 0.95rem; line-height: 1.4; max-width: 760px;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.hero-dots { display: inline-flex; gap: 8px; align-items: center; margin-left: 12px; }
+.hero-dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--muted-foreground); opacity: 0.5; display: inline-block; }
+.hero-dots i.on { background: var(--primary); opacity: 1; }
+
+.media-card .badge {
+    position: absolute; top: 10px; left: 10px; padding: 4px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 700;
+    background: var(--primary); color: var(--primary-foreground);
+}
+
+/* Title screen */
+.title-screen { padding: 0; }
+.title-bg { position: absolute; inset: 0; background-size: cover; background-position: center top; }
+.title-fade {
+    position: absolute; inset: 0;
+    background: linear-gradient(to right, var(--background) 30%, rgba(0,0,0,0.7) 60%, rgba(0,0,0,0.35) 100%),
+                linear-gradient(to top, var(--background) 10%, transparent 60%);
+}
+.title-body { position: relative; padding: var(--overscan-y) var(--overscan-x) 60px; }
+.title-head { display: flex; gap: 48px; align-items: flex-start; margin-bottom: 36px; }
+.title-poster { flex: 0 0 300px; width: 300px; aspect-ratio: 2 / 3; border-radius: var(--radius); object-fit: cover; background: var(--muted); box-shadow: var(--surface-shadow); }
+.title-poster.placeholder { display: flex; align-items: center; justify-content: center; font-size: 3rem; color: var(--muted-foreground); }
+.title-info { flex: 1; min-width: 0; }
+.title-logo { max-width: 500px; max-height: 180px; object-fit: contain; display: block; margin-bottom: 8px; }
+.title-tagline { color: var(--muted-foreground); font-style: italic; margin-bottom: 8px; }
+.title-meta { color: var(--muted-foreground); font-size: 0.85rem; margin-bottom: 14px; }
+.title-overview { max-width: 900px; line-height: 1.45; font-size: 0.95rem; margin: 0 0 20px; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.title-section { margin-top: 20px; }
+.btn-row.wrap { flex-wrap: wrap; padding: 8px 6px; }
+.btn .btn-sub { display: block; font-weight: 400; font-size: 0.7rem; opacity: 0.8; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 520px; }
+.provider-btn { display: flex; align-items: center; gap: 14px; text-align: left; padding: 12px 22px 12px 14px; }
+.provider-btn .provider-logo { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: var(--muted); }
+.provider-btn .provider-name { font-weight: 700; }
+.provider-btn[data-installed="missing"] { opacity: 0.75; }
+.attribution { color: var(--muted-foreground); font-size: 0.65rem; margin-top: 10px; }
+.launch-qr { display: flex; gap: 24px; align-items: center; margin-top: 20px; }
+.launch-qr .status { max-width: 600px; }
+
 /* sRGB fallbacks = the generated dark/violet values from packages/design-tokens
    dist/Tokens.kt (Tizen Chromium < 111 has no oklch()). Re-copy them when tokens change. */
 @supports not (color: oklch(0 0 0)) {

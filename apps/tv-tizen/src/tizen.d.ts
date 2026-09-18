@@ -13,9 +13,37 @@ interface TizenTvInputDevice {
 
 interface TizenApplication { exit(): void; hide(): void }
 
+interface TizenWebAPIError { name: string; message: string; code?: number }
+interface TizenAppInfo { id: string; name: string; version?: string; installDate?: Date }
+interface TizenApplicationControlData { key: string; value: string[] }
+interface TizenApplicationControl {
+    operation: string;
+    uri: string | null;
+    mime: string | null;
+    category: string | null;
+    data: TizenApplicationControlData[];
+}
+interface TizenApplicationControlDataCtor { new (key: string, value: string[]): TizenApplicationControlData }
+interface TizenApplicationControlCtor {
+    new (operation: string, uri?: string | null, mime?: string | null, category?: string | null, data?: TizenApplicationControlData[] | null): TizenApplicationControl;
+}
+interface TizenApplicationManager {
+    getCurrentApplication(): TizenApplication;
+    getAppInfo(id?: string): TizenAppInfo;
+    launchAppControl(
+        control: TizenApplicationControl,
+        id?: string | null,
+        onSuccess?: () => void,
+        onError?: (e: TizenWebAPIError) => void,
+        replyCallback?: unknown,
+    ): void;
+}
+
 interface TizenNamespace {
     tvinputdevice?: TizenTvInputDevice;
-    application?: { getCurrentApplication(): TizenApplication };
+    application?: TizenApplicationManager;
+    ApplicationControl?: TizenApplicationControlCtor;
+    ApplicationControlData?: TizenApplicationControlDataCtor;
 }
 
 interface WebApisProductInfo { getModel(): string; getFirmware(): string; getVersion(): string }
