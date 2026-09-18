@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { AlertTriangle, Inbox, Laptop, LockKeyhole, SearchX } from "lucide-react";
 import { cn } from "../lib/cn";
 import { useUiT } from "../i18n/index";
+import { Skeleton } from "./skeleton";
 
 export interface EmptyStateProps extends Omit<ComponentProps<"div">, "title"> {
   icon?: ReactNode;
@@ -11,9 +12,35 @@ export interface EmptyStateProps extends Omit<ComponentProps<"div">, "title"> {
   description?: ReactNode;
   /** Primary + secondary actions. */
   actions?: ReactNode;
+  /**
+   * Decorative content rendered behind the card (e.g. `<GhostTable />`) so
+   * the empty page previews its purpose. Non-interactive and hidden from AT.
+   */
+  backdrop?: ReactNode;
   /** `page` centres in the viewport; `inline` fits inside a card/list. */
   variant?: "page" | "inline";
   tone?: "neutral" | "error" | "warning";
+}
+
+/**
+ * Skeleton rows shaped like a track list (cover, title/artist, duration pill).
+ * Meant as an `EmptyState` backdrop; always `aria-hidden`.
+ */
+export function GhostTable({ rows = 6, className }: { rows?: number; className?: string }) {
+  return (
+    <div data-slot="ghost-table" className={cn("flex w-full flex-col gap-1", className)} aria-hidden>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="grid h-row grid-cols-[2.25rem_minmax(0,1fr)_3.5rem] items-center gap-3 px-3">
+          <Skeleton className="size-9 rounded-md" />
+          <div className="flex flex-col gap-1.5">
+            <Skeleton className={cn("h-3.5", i % 3 === 0 ? "w-1/2" : i % 3 === 1 ? "w-2/3" : "w-2/5")} />
+            <Skeleton className={cn("h-3", i % 2 === 0 ? "w-1/3" : "w-1/4")} />
+          </div>
+          <Skeleton className="h-5 w-full rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /**
@@ -21,21 +48,30 @@ export interface EmptyStateProps extends Omit<ComponentProps<"div">, "title"> {
  * ad-hoc patterns in apps/web (`<p>Autentifică-te.</p>`, inline-style
  * fallbacks, NotSignedIn/NoCompanion cards).
  */
-export function EmptyState({ icon, title, description, actions, variant = "page", tone = "neutral", className, ...props }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, actions, backdrop, variant = "page", tone = "neutral", className, ...props }: EmptyStateProps) {
   return (
     <div
       role={tone === "error" ? "alert" : undefined}
       data-slot="empty-state"
       className={cn(
-        "flex w-full items-center justify-center",
+        "relative flex w-full items-center justify-center",
         variant === "page" ? "min-h-[60vh] p-6" : "p-4",
         className,
       )}
       {...props}
     >
+      {backdrop ? (
+        <div
+          data-slot="empty-state-backdrop"
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden opacity-40 select-none [mask-image:linear-gradient(to_bottom,black,transparent_85%)]"
+        >
+          {backdrop}
+        </div>
+      ) : null}
       <div
         className={cn(
-          "animate-rise-in flex w-full max-w-md flex-col items-center gap-4 text-center",
+          "animate-rise-in relative flex w-full max-w-md flex-col items-center gap-4 text-center",
           variant === "page" && "surface rounded-2xl px-8 py-10",
         )}
       >

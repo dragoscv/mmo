@@ -12,6 +12,7 @@
  * the component will fall back to the original English copy.
  */
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Laptop, LockKeyhole } from "lucide-react";
 import { Button, EmptyState } from "@mmo/ui";
 import { SignInButton } from "@/components/sign-in-button";
@@ -23,6 +24,8 @@ interface CommonProps {
     title?: string;
     description?: string;
     ctaLabel?: string;
+    /** Decorative content behind the card (see `EmptyState.backdrop`). */
+    backdrop?: ReactNode;
 }
 
 export function NotSignedIn({
@@ -30,6 +33,7 @@ export function NotSignedIn({
     title,
     description,
     ctaLabel,
+    backdrop,
 }: CommonProps) {
     return (
         <EmptyState
@@ -37,6 +41,7 @@ export function NotSignedIn({
             title={title ?? `Sign in to see ${feature}`}
             description={description ?? `Tracks, playlists, and scans are stored per user. Sign in to access ${feature}.`}
             actions={<SignInButton label={ctaLabel ?? "Sign in"} />}
+            backdrop={backdrop}
         />
     );
 }

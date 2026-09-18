@@ -4,6 +4,7 @@
  * by hand, keeping the auth-gate one-liner and avoiding 6 copies of
  * the same `getTranslations` boilerplate.
  */
+import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 import { NotSignedIn, NoCompanion } from "@/components/library-empty-state";
 
@@ -27,7 +28,7 @@ export type EmptyFeatureKey =
     | "devices"
     | "download";
 
-export async function notSignedInFor(featureKey: EmptyFeatureKey) {
+export async function notSignedInFor(featureKey: EmptyFeatureKey, opts?: { backdrop?: ReactNode }) {
     const t = await getTranslations("empty");
     const feature = t(`features.${featureKey}`);
     return (
@@ -36,6 +37,7 @@ export async function notSignedInFor(featureKey: EmptyFeatureKey) {
             title={t("notSignedIn.title", { feature })}
             description={t("notSignedIn.description", { feature })}
             ctaLabel={t("notSignedIn.cta")}
+            backdrop={opts?.backdrop}
         />
     );
 }

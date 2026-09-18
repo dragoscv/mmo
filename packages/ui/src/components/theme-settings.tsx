@@ -23,6 +23,7 @@ import { Label } from "./label";
 import { Button } from "./button";
 import { Badge } from "./badge";
 import { Slider } from "./slider";
+import { Input } from "./input";
 
 // ─── Building blocks ────────────────────────────────────────────────────────
 
@@ -291,7 +292,12 @@ export function ThemeSettings({ hide = [], allowArtworkAccent = false, children,
   );
 }
 
-/** Live preview card: shows how buttons, text and surfaces look under the current prefs. */
+const PREVIEW_ROWS = [
+  { title: "Neon Nocturne", artist: "Aurora Vale", bpm: "128", key: "8A" },
+  { title: "Glass Corridor", artist: "Mirror Fields", bpm: "124", key: "3B" },
+] as const;
+
+/** Live preview card: shows how buttons, text, tables and surfaces look under the current prefs. */
 export function ThemePreview({ className }: { className?: string }) {
   const t = useUiT();
   return (
@@ -302,14 +308,38 @@ export function ThemePreview({ className }: { className?: string }) {
       </div>
       <div className="h-2 w-2/3 rounded-full bg-gradient-accent" />
       <p className="text-sm text-muted-foreground">Now playing · Neon Nocturne — 128 BPM · 8A</p>
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm">{t("common.save")}</Button>
-        <Button size="sm" variant="outline">
-          {t("common.cancel")}
-        </Button>
-        <Button size="sm" variant="ghost">
-          {t("common.more")}
-        </Button>
+      <div aria-hidden className="flex flex-col gap-3 select-none">
+        <div data-slot="theme-preview-table" className="overflow-hidden rounded-lg border border-border">
+          <div className="grid h-row grid-cols-[minmax(0,1fr)_3.5rem_3rem] items-center gap-2 bg-muted/50 px-3 text-xs font-medium text-muted-foreground">
+            <span>Track</span>
+            <span className="text-right">BPM</span>
+            <span className="text-right">Key</span>
+          </div>
+          {PREVIEW_ROWS.map((r) => (
+            <div key={r.title} className="grid h-row grid-cols-[minmax(0,1fr)_3.5rem_3rem] items-center gap-2 border-t border-border px-3 text-sm">
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="truncate font-medium">{r.title}</span>
+                <span className="truncate text-xs text-muted-foreground">{r.artist}</span>
+              </span>
+              <span className="text-right font-mono text-xs tabular-nums">{r.bpm}</span>
+              <span className="flex justify-end">
+                <Badge variant="secondary">{r.key}</Badge>
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" tabIndex={-1}>
+            {t("common.save")}
+          </Button>
+          <Button size="sm" variant="secondary" tabIndex={-1}>
+            {t("common.more")}
+          </Button>
+          <Button size="sm" variant="outline" tabIndex={-1}>
+            {t("common.cancel")}
+          </Button>
+          <Input size="sm" tabIndex={-1} readOnly placeholder="Search tracks…" className="min-w-0 flex-1 basis-32" />
+        </div>
       </div>
     </div>
   );

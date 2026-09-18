@@ -3,6 +3,7 @@ import { listSavedSearches } from "@/actions/saved-searches";
 import { LibraryClient } from "./library-client";
 import { auth } from "@/auth";
 import { notSignedInFor } from "@/components/empty-state-server";
+import { GhostTable } from "@mmo/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export default async function LibraryPage({
     // companion syncs it up). It renders on any device even with no
     // companion reachable — only a sign-in is required.
     const session = await auth();
-    if (!session?.user?.id) return notSignedInFor("library");
+    if (!session?.user?.id) return notSignedInFor("library", { backdrop: <GhostTable rows={6} /> });
 
     const page = parseInt(params.page || "1");
     const pageSize = parseInt(params.pageSize || "50");
