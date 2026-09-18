@@ -1,25 +1,28 @@
-# 🎧 MuzicAI — AI Music Suite
+# 🎧 MixAI — Multi Media Organizer
 
-> **Open-source AI suite for DJs, producers, and music enthusiasts.**
-> Web app · desktop companion · browser extension · live infrastructure.
-> Live domain: [muzicai.ro](https://muzicai.ro) · Source: [github.com/dragoscv/mmo](https://github.com/dragoscv/mmo)
+> **Movies, music, DJ, on every screen.**
+> Self-hosted **MMO Server** (Raspberry Pi, PC, Docker) + MixAI apps (web, Companion, DJ, TV, mobile).
+> Live domain: [mixai.ro](https://mixai.ro) · Source: [github.com/dragoscv/mmo](https://github.com/dragoscv/mmo)
+> Media platform plan: [docs/followups/mixai-media-platform-plan.md](docs/followups/mixai-media-platform-plan.md)
 
 [![Status](https://img.shields.io/badge/status-active%20development-orange.svg)](https://github.com/dragoscv/mmo)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Companion](https://img.shields.io/github/v/release/dragoscv/mmo?label=companion)](https://github.com/dragoscv/mmo/releases)
 
 [🇷🇴 Română](README.md) · 🇬🇧 **English** (this file)
 
 ---
 
-## ⚡ What is MuzicAI?
+## ⚡ What is MixAI?
 
-MuzicAI is a complete AI suite for organizing, analyzing, mixing, and live-performing with music. It started as a personal rekordbox guide and grew into an ecosystem of components that work together:
+MixAI is a self-hosted media platform that organizes, analyzes and plays your movies and music — with a DJ mixer/DAW and AI at every step. It started as a personal rekordbox guide and grew into an ecosystem of components that work together:
 
 | Component | Purpose | Path |
 |---|---|---|
-| 🌐 **Web App** | Library, mixer, DAW, live, scanner, recordings, visualizations | [`apps/web/`](apps/web/) |
-| 🖥️ **MMO Companion** | Electron desktop app — local audio server + native bridge | [`server/`](server/) |
+| 🌐 **MixAI (web)** | Library, movies, mixer, DAW, live, scanner, recordings, visualizations | [`apps/web/`](apps/web/) |
+| 🖥️ **MMO Server** (MixAI Companion) | Self-hosted media server — local audio, transcoding, native bridge | [`server/`](server/) |
+| 🎛️ **MixAI DJ** | Native DJ app (Tauri 2 + Rust audio) | [`apps/mixai/`](apps/mixai/) |
+| 📱 **MixAI Native** | Desktop (Tauri) + mobile/TV (Capacitor) | [`apps/native/`](apps/native/) |
 | 🧩 **Browser Extension** | Detects & downloads audio from 15+ streaming platforms | [`apps/extension/`](apps/extension/) |
 | ☁️ **Infrastructure** | TURN/STUN server on GCP for WebRTC remote | [`infra/terraform/`](infra/terraform/) |
 | 📚 **Docs** | Rekordbox DJ guides, organization, genres, gear | [`docs/`](docs/), [`organizare/`](docs/organizare/), [`genuri/`](docs/genuri/), [`echipament/`](docs/echipament/) |
@@ -85,6 +88,10 @@ flowchart LR
 - **Prepare** USBs for CDJs / XDJs in the club
 - **Download** music from YouTube, SoundCloud, Bandcamp, etc. straight into the library
 - **Learn** rekordbox, professional organization, harmonic mixing
+- **Watch** movies and shows from every MMO Server you own on **Media Home** (`/`): one hero,
+  rows merged across servers (TMDB dedupe), "Continue watching" shared between web and TV, and
+  provider deep links (Netflix, HBO Max, Disney+ …) for titles you don't have
+  ([ADR-0010](docs/adr/0010-media-module-and-media-home.md))
 
 ### 👨‍💻 Contributors & Developers
 
@@ -101,7 +108,7 @@ flowchart LR
 
 ```bash
 # 1. Open web app in browser
-open https://muzicai.ro            # production
+open https://mixai.ro              # production
 # or run locally:
 cd app && pnpm install && pnpm dev # → http://localhost:3000
 
@@ -215,15 +222,31 @@ Before opening a PR:
 
 ---
 
+## 🏷️ Naming
+
+- **MixAI** — the brand and the user-facing apps (web, Companion, DJ, TV, mobile), domain `mixai.ro`.
+- **MMO Server** — the self-hosted media server (formerly “Companion”), package `mmo-server`.
+- **MMO** (Multi Media Organizer) — the repo name and technical identifiers (`@mmo/*`, `mmo-*`).
+
+Rationale: [ADR-0001](docs/adr/0001-naming-mixai-and-mmo-server.md). All architecture decisions: [`docs/adr/`](docs/adr/).
+
+---
+
 ## 📄 License
 
-MIT © 2024-2026 Dragoș Cătălin Vlăduțescu (`mwrty`)
+- Core (MMO Server + web app): **AGPL-3.0-only** — see [`LICENSE`](LICENSE).
+- `packages/sdk`: **MIT** — see [`packages/sdk/LICENSE`](packages/sdk/LICENSE).
+- Commercial licence for MixAI cloud / Pro: [`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md).
+- MixAI / MMO Server names and logos: [`TRADEMARKS.md`](TRADEMARKS.md).
+
+Decision: [ADR-0007](docs/adr/0007-licensing-agpl-core-mit-sdk.md). © 2024-2026 Dragos Catalin Vladulescu (`mwrty`)
 
 ---
 
 ## 🔗 Links
 
-- 🌐 **Live**: [muzicai.ro](https://muzicai.ro)
+- 🌐 **Live**: [mixai.ro](https://mixai.ro)
+- 🗺️ **Media platform plan**: [docs/followups/mixai-media-platform-plan.md](docs/followups/mixai-media-platform-plan.md)
 - 📦 **Releases**: [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
 - 🐛 **Issues**: [github.com/dragoscv/mmo/issues](https://github.com/dragoscv/mmo/issues)
 

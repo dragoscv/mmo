@@ -1,25 +1,28 @@
-# 🎧 MuzicAI — AI Music Suite
+# 🎧 MixAI — Multi Media Organizer
 
-> **Suită open-source AI pentru DJ-i, producători și pasionați de muzică.**
-> Web app · desktop companion · extensie browser · infrastructură live.
-> Domeniu live: [muzicai.ro](https://muzicai.ro) · Cod sursă: [github.com/dragoscv/mmo](https://github.com/dragoscv/mmo)
+> **Filme, muzică, DJ — pe orice ecran.**
+> Self-hosted **MMO Server** (Raspberry Pi, PC, Docker) + aplicațiile MixAI (web, Companion, DJ, TV, mobil).
+> Domeniu live: [mixai.ro](https://mixai.ro) · Cod sursă: [github.com/dragoscv/mmo](https://github.com/dragoscv/mmo)
+> Plan platformă media: [docs/followups/mixai-media-platform-plan.md](docs/followups/mixai-media-platform-plan.md)
 
 [![Status](https://img.shields.io/badge/status-active%20development-orange.svg)](https://github.com/dragoscv/mmo)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Companion](https://img.shields.io/github/v/release/dragoscv/mmo?label=companion)](https://github.com/dragoscv/mmo/releases)
 
 🇷🇴 **Română** (acest fișier) · [🇬🇧 English](README.en.md)
 
 ---
 
-## ⚡ Ce este MuzicAI?
+## ⚡ Ce este MixAI?
 
-MuzicAI este o suită AI completă pentru organizarea, analiza, mixajul și performance-ul live cu muzică. Pornit ca ghid personal pentru rekordbox, a evoluat într-un ecosistem cu mai multe componente care lucrează împreună:
+MixAI este platforma media self-hosted care organizează, analizează și redă filmele și muzica ta — cu mixer/DAW pentru DJ-i și AI la fiecare pas. Pornit ca ghid personal pentru rekordbox, a evoluat într-un ecosistem cu mai multe componente care lucrează împreună:
 
 | Componentă | Ce face | Cale |
 |---|---|---|
-| 🌐 **Web App** | Bibliotecă, mixer, DAW, live, scanner, recordings, vizualizări | [`apps/web/`](apps/web/) |
-| 🖥️ **MMO Companion** | App Electron desktop — server local audio + bridge nativ | [`server/`](server/) |
+| 🌐 **MixAI (web)** | Bibliotecă, filme, mixer, DAW, live, scanner, recordings, vizualizări | [`apps/web/`](apps/web/) |
+| 🖥️ **MMO Server** (MixAI Companion) | Server media self-hosted — audio local, transcodare, bridge nativ | [`server/`](server/) |
+| 🎛️ **MixAI DJ** | Aplicație nativă DJ (Tauri 2 + Rust audio) | [`apps/mixai/`](apps/mixai/) |
+| 📱 **MixAI Native** | Desktop (Tauri) + mobil/TV (Capacitor) | [`apps/native/`](apps/native/) |
 | 🧩 **Browser Extension** | Detectează & descarcă audio din 15+ platforme streaming | [`apps/extension/`](apps/extension/) |
 | ☁️ **Infrastructură** | Server TURN/STUN pe GCP pentru WebRTC remote | [`infra/terraform/`](infra/terraform/) |
 | 📚 **Documentație** | Ghiduri DJ rekordbox, organizare, genuri, echipament | [`docs/`](docs/), [`organizare/`](docs/organizare/), [`genuri/`](docs/genuri/), [`echipament/`](docs/echipament/) |
@@ -83,6 +86,10 @@ flowchart LR
 - **Pregătești** USB-uri pentru CDJ-uri / XDJ în club
 - **Descarci** muzică din YouTube, SoundCloud, Bandcamp etc. direct în bibliotecă
 - **Înveți** rekordbox, organizare profesională, mixaj armonic
+- **Vezi** filme și seriale din toate MMO Server-ele tale pe **Media Home** (`/`): un hero, rânduri
+    agregate cu deduplicare TMDB, „Continuă vizionarea” sincronizat între web și TV, iar pentru
+    titlurile pe care nu le ai — link direct către Netflix, HBO Max, Disney+ & co.
+    ([ADR-0010](docs/adr/0010-media-module-and-media-home.md))
 
 → Începe cu [Ghid Utilizator](#-ghid-utilizator)
 
@@ -103,7 +110,7 @@ flowchart LR
 
 ```bash
 # 1. Deschide web app în browser
-open https://muzicai.ro            # producție
+open https://mixai.ro              # producție
 # sau pornește local:
 cd app && pnpm install && pnpm dev # → http://localhost:3000
 
@@ -291,15 +298,31 @@ Contribuțiile sunt binevenite! Vezi [CONTRIBUTING.md](CONTRIBUTING.md) (TBD) pe
 
 ---
 
+## 🏷️ Denumiri (Naming)
+
+- **MixAI** — brandul și aplicațiile pentru utilizatori (web, Companion, DJ, TV, mobil), domeniul `mixai.ro`.
+- **MMO Server** — serverul media self-hosted (fostul „Companion”), pachetul `mmo-server`.
+- **MMO** (Multi Media Organizer) — numele repo-ului și al identificatorilor tehnici (`@mmo/*`, `mmo-*`).
+
+Detalii și motivație: [ADR-0001](docs/adr/0001-naming-mixai-and-mmo-server.md). Toate deciziile arhitecturale: [`docs/adr/`](docs/adr/).
+
+---
+
 ## 📄 Licență
 
-MIT © 2024-2026 Dragoș Cătălin Vlăduțescu (`mwrty`)
+- Nucleul (MMO Server + web app): **AGPL-3.0-only** — vezi [`LICENSE`](LICENSE).
+- `packages/sdk`: **MIT** — vezi [`packages/sdk/LICENSE`](packages/sdk/LICENSE).
+- Licență comercială pentru cloud-ul MixAI / Pro: [`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md).
+- Numele și logo-urile MixAI / MMO Server: [`TRADEMARKS.md`](TRADEMARKS.md).
+
+Decizie: [ADR-0007](docs/adr/0007-licensing-agpl-core-mit-sdk.md). © 2024-2026 Dragos Catalin Vladulescu (`mwrty`)
 
 ---
 
 ## 🔗 Linkuri utile
 
-- 🌐 **Live**: [muzicai.ro](https://muzicai.ro)
+- 🌐 **Live**: [mixai.ro](https://mixai.ro)
+- 🗺️ **Plan platformă media**: [docs/followups/mixai-media-platform-plan.md](docs/followups/mixai-media-platform-plan.md)
 - 📦 **Releases**: [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
 - 🐛 **Issues**: [github.com/dragoscv/mmo/issues](https://github.com/dragoscv/mmo/issues)
 - 📚 **Docs**: această pagină + [NAVIGARE.md](NAVIGARE.md)

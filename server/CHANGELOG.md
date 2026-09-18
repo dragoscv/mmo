@@ -2,8 +2,18 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
-## 3.1.0 — Media Home brain mounted at `/media` (WP10-05..07, 09) · remove third-party embed sources (WP10-08, ADR-0009)
+## 3.1.0 — Media module: MMO Server is the Media Home brain (WP10, ADR-0010) · remove third-party embed sources (WP10-08, ADR-0009)
 
+- **Media module (WP10-01..04, ADR-0010).** New `server/src/media/`: `media.sqlite` (titles,
+	providers, recs cache, progress, plays, library index; `PRAGMA user_version` migrations), `TmdbClient`
+	(v3 `api_key` / v4 Bearer, 30 req/s token bucket, `append_to_response`, trending/popular/discover with
+	`watch_region`), `ProviderRegistry` (Netflix, Disney+, HBO Max, Prime, Apple TV+, SkyShowtime, Voyo,
+	AntenaPlay, YouTube, Google TV — web URL, Android package, Tizen app id, search URL),
+	`AvailabilityResolver` (Movie of the Night v4 `country=ro` 7 d → TMDB `watch/providers` 24 h →
+	registry search URL, with attribution), recommendation rows (Continue, Top picks, Because you
+	watched ×3, Trending RO on your providers, Upcoming RO, New in library; 24 h cache) and
+	`ProgressStore`. Env: `TMDB_API_KEY`, `MOTN_API_KEY`, `MEDIA_REGION` (default `RO`) — every
+	integration is a no-op without its key.
 - **`/media/*` is live** (`server/src/media/`, behind `x-device-token`, including `/media/status`):
 	`status`, `etag`, `home`, `title/{kind}/{tmdbId}`, `search`, `library`, `providers`, `progress`
 	(GET/PUT), `plays` (GET/POST). No-op (200 with empty rows) without `TMDB_API_KEY`. `/video/probe`

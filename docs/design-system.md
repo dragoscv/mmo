@@ -112,6 +112,23 @@ otherwise hooks fail with "Cannot read properties of null (reading 'useState')".
   modal 60, popover 70, toast 80, tooltip 90.
 - TV: `overscan` utility (5 vw / 4 vh), `--focus-ring-w` 4 px, `--card-scale-focused` 1.06.
 
+### Media patterns (Media Home, ADR-0010)
+
+- **Hero billboard** (`.media-hero`): full-bleed backdrop clamped at 1600 px and centred on
+   ultrawide, two-direction scrim (`--background` to the bottom and left), content bottom-left
+   ≤ 640 px, TMDB logo treatment or the title in `--font-heading` 800; dots are `role=tab`. Decorative
+   motion (24 s Ken Burns drift, staggered entrance) exists only under `data-motion="full"`.
+- **Media row** (`.media-row`): heading + "See all" + prev/next, an embla viewport with `role=list`,
+   ←/→ page, Home/End jump, at most 40 slides then a dashed "+N" tile. Slides reuse `PosterCard`
+   (`--watch-poster-w` 180 px, 124 px < 48 rem); TVs mirror the layout with the focused card at
+   `--card-scale-focused`.
+- **Title page** (`.media-title`): hero backdrop, poster column (11 rem ≥ 48 rem) overlapping by
+   `clamp(-8rem, -14vh, -4rem)`, sections "Play on <server>" (`.media-sources`), "Where to watch"
+   (`.media-offers`, one tile per offer, `data-preferred`, `data-deeplink`) and the mandatory
+   attribution line (`.media-attribution`).
+- **Server chips** (`.media-chip`): pill per paired MMO Server with a `--success` dot,
+   `aria-pressed` filter state, `data-offline` dimming; notices use `--warning` at 12 %.
+
 ## 7. Motion
 
 Tokens: `--dur-fast` 120 ms, `--dur-base` 220 ms, `--dur-slow` 400 ms, `--dur-page` 320 ms;

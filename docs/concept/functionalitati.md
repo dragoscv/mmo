@@ -72,6 +72,20 @@
 | BPM distribution chart | 🟢 Medium | Medie | v0.4 |
 | Energy distribution chart | 🟢 Medium | Medie | v0.4 |
 
+### 🎬 Media Home (web 2.2 · MMO Server 3.1 · TV 1.1)
+
+| Feature | Prioritate | Complexitate | Versiune |
+|---------|-----------|-------------|----------|
+| Media Home la `/` (hero + rânduri Watch/Listen; dashboard-ul vechi la `/dashboard`) | 🔴 Critical | Medie | web 2.2 |
+| Multi-server: agregare peste toate MMO Server-ele împerecheate, dedupe TMDB, chip-uri per server | 🔴 Critical | Grea | web 2.2 |
+| Deep links furnizori (Movie of the Night → TMDB providers → registry) cu atribuire | 🟡 High | Medie | server 3.1 |
+| Pagină titlu unificată `/media/[kind]/[tmdbId]` (Play pe <server> / Unde vezi) | 🔴 Critical | Medie | web 2.2 |
+| Progres partajat web ↔ TV prin server (`/media/progress`, `/api/media/sync`) | 🟡 High | Medie | server 3.1 · TV 1.1 |
+| Recomandări server-side (TMDB + cache SQLite, rânduri 24 h) | 🟡 High | Grea | server 3.1 |
+| Istoric ascultare `track_plays` + rânduri Listen (Continue, Albume noi, Favorite, Playlist-uri) | 🟡 High | Medie | web 2.2 |
+| Curator Codai (opțional, titluri de rând + „de ce”) | 🟢 Medium | Medie | web 2.2 |
+| TV Android / Tizen: hero + rânduri, lansare aplicație furnizor, Watch Next (Android) | 🟡 High | Medie | TV 1.1 |
+
 ---
 
 ## 📊 Release Plan
@@ -80,27 +94,27 @@
 gantt
     title Music Organizer Roadmap
     dateFormat  YYYY-MM-DD
-    
+
     section v0.1 MVP
     Scanner basic           :a1, 2025-01-01, 14d
     Dashboard stats         :a2, after a1, 7d
-    
+
     section v0.2
     File organizer          :b1, after a2, 14d
     Manual tagging          :b2, after b1, 7d
-    
+
     section v0.3
     BPM/Key display         :c1, after b2, 14d
     Energy colors           :c2, after c1, 7d
-    
+
     section v0.4
     RB XML integration      :d1, after c2, 21d
     Genre suggestion        :d2, after d1, 7d
-    
+
     section v0.5
     Drive manager           :e1, after d2, 14d
     USB export              :e2, after e1, 14d
-    
+
     section v1.0
     Auto-tag AI             :f1, after e2, 21d
     Polish & release        :f2, after f1, 14d

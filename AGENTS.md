@@ -110,6 +110,6 @@ interleaved, killed by foreign Ctrl+C, or silently dropped.
 ## Docs map
 
 `docs/design-system.md` (spec) · `docs/adr/` (0002 headless, 0004 API, 0005 Subsonic, 0006 codai, 0008 design
-system) · `docs/mixai-design-tracker.md` = canonical tracker; regenerate the CSV with
+system, 0009 no embeds, 0010 media module + Media Home) · `docs/mixai-design-tracker.md` = canonical tracker; regenerate the CSV with
 `node scripts/tracker-regen-csv.mjs` in the same commit · `docs/arhitectura/build-performance.md` (measured
 build times) · `server/README.md` (Docker/Pi) · `apps/tv-android/README.md`, `apps/tv-tizen/README.md`.

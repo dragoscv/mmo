@@ -256,6 +256,28 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 | extension | `node apps/extension/scripts/check-version.mjs` + manifest lint | |
 | packages | `tsc --noEmit`, vitest where present | |
 
+### 6.1 Media Home closure run (WP14-01, 2026-09-18, logs `.copilot-tmp/wp14-*.log`)
+
+| Command | Exit | Result |
+|---|---|---|
+| web `pnpm exec tsc --noEmit` | 0 | clean (TS5097 from other agents' WIP filtered) |
+| web `vitest run --maxWorkers=2` | 1 | 50 files / 447 tests: **446 passed, 1 failed** — `url-guard.test.ts` "rejects private hosts in production" (pre-existing, in the known 13; the other 12 are now green) |
+| web `node scripts/i18n-parity.mjs` | 0 | RO/EN parity OK |
+| web `node scripts/lint-baseline.mjs check` | 0 | no new problems vs baseline |
+| web `run-build.ps1 -Command 'pnpm --filter music-organizer build' -Wait` | 0 | Turbopack + serwist |
+| web `bundle-budget.mjs --check apps/web/.next` | 0 | 72 routes, 3 new (`/`, `/media/[kind]/[tmdbId]`, `/settings/media`), all ≤ budget; typical +5.7 kB shared chunk |
+| server `pnpm build:headless` (tsc, Node 22.23.2) | 0 | |
+| server `pnpm ui:typecheck` | 0 | |
+| server `vitest run` | 1 → 0 | 18 files / 146 tests: `metrics.test.ts` timed out at 5 s under the parallel matrix load; re-run alone 2/2 passed (6.3 s) — load, not a regression |
+| server `openapi-check.mjs` | 0 | 194/194 routes, no drift |
+| `pnpm -C apps/tv-tizen typecheck` / `build` | 0 / 0 | built in 26 s |
+| tv-android `assembleDebug` (hidden Gradle) | 0 | |
+| `pnpm -C packages/ui typecheck` / vitest | 0 / 0 | 8 files / 46 tests |
+| `pnpm -C packages/design-tokens build` + `tokens-drift.mjs` | 0 / 0 | mirrors match |
+| `node scripts/hex-gate.mjs` | 0 | 0 hits |
+| `node scripts/tracker-drift.mjs` | 1 → 0 | stale only because this item edits the tracker; CSV regenerated in the same commit |
+| Versions | — | web 2.2.0 · server 3.1.0 · tv-android 1.1.0 (versionCode 3) · tv-tizen 1.1.0 · extension 3.0.1 · `@mmo/sdk` 0.1.0 · `@mmo/ui` 1.0.0 · `@mmo/design-tokens` 1.0.0 |
+
 ## 7. Added scope from round 2 (D13)
 
 | ID | Item | Status |
@@ -302,10 +324,10 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 ### WP10 — Server media module
 | ID | Item | Status |
 |---|---|---|
-| WP10-01 | `server/src/media/` scaffold: SQLite `media.sqlite` (titles/providers/recs_cache/progress/track_plays/library_index), env `TMDB_API_KEY`, `MOTN_API_KEY`, `MEDIA_REGION`=RO; no-op without keys | todo |
-| WP10-02 | TMDB client with limiter + `append_to_response`; trending/popular/discover(watch_region) | todo |
-| WP10-03 | Availability resolver: MOTN v4 (7 d) → TMDB providers (24 h) → registry search URLs; registry (Netflix, Disney+, HBO Max, Prime, Apple TV+, SkyShowtime, Voyo, AntenaPlay, YouTube, Google TV) with web/android/tizen launch data | todo |
-| WP10-04 | Recs engine + rows builder (Continue, Top picks, Because you watched ×3, Trending RO on your providers, Upcoming RO, New in library) 24 h cache | todo |
+| WP10-01 | `server/src/media/` scaffold: SQLite `media.sqlite` (titles/providers/recs_cache/progress/track_plays/library_index), env `TMDB_API_KEY`, `MOTN_API_KEY`, `MEDIA_REGION`=RO; no-op without keys | done 5e2af4b |
+| WP10-02 | TMDB client with limiter + `append_to_response`; trending/popular/discover(watch_region) | done 5e2af4b |
+| WP10-03 | Availability resolver: MOTN v4 (7 d) → TMDB providers (24 h) → registry search URLs; registry (Netflix, Disney+, HBO Max, Prime, Apple TV+, SkyShowtime, Voyo, AntenaPlay, YouTube, Google TV) with web/android/tizen launch data | done 5e2af4b |
+| WP10-04 | Recs engine + rows builder (Continue, Top picks, Because you watched ×3, Trending RO on your providers, Upcoming RO, New in library) 24 h cache | done 5e2af4b |
 | WP10-05 | Video library index with etag (scan + watcher), `GET /media/library?since=`, server returns `serverId` for attribution | done (`media/library.ts` + `library-hooks.ts`; fed by `/video/scan`, scan jobs and the watcher; tombstones for deltas; `matchTitle` cached TMDB search; `serverId`/`serverName` on home/title/library/status) |
 | WP10-06 | Progress + plays API (`/media/progress` GET/PUT seconds per profile; `/media/plays`) + push sync to web `/api/media/sync` | done (`media/sync-client.ts`: 10 s debounce, hourly full push, `meta.last_pushed_revision`, Bearer device token, 404/offline retry, 401 pause; `GET /media/progress?since=<rev>`; `PUT` batch 1..500) — web endpoint `/api/media/sync` still to be built (WP11) |
 | WP10-07 | Routes `/media/home`, `/media/title/:kind/:id`, `/media/search`, `/media/etag`; OpenAPI + `openapi:check` + Kotlin/SDK regen; server 3.1.0 | done (mounted `/media` behind `authMiddleware` incl. `/media/status`; 11 routes in `openapi.yaml`, `MOUNTS` entry, `openapi:check` OK 194/194, Models.kt +20 classes, `mmo-server.d.ts` regenerated; `media.*` in `/video/probe` capabilities) |
@@ -319,8 +341,8 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 | WP11-02 | `lib/media/aggregate.ts` fan-out + merge by tmdbId → `sources[]`, per-server status; DB migration `track_plays` + `media_sync_state` (expand-only) — `drizzle/0030_media_home.sql` (NOT yet applied to prod), `actions/track-plays.ts`, `lib/play-recorder.ts` wired into `player-context` (end / ≥90 % / switch, debounced) | done |
 | WP11-03 | `/` MediaHome RSC: `HeroBillboard` (backdrop + logo treatment, artwork accent), `MediaRow` (embla 8.6, keyboard, capped at 40 + "See all" instead of a virtualiser), server chips (nuqs `?servers=`), `loading.tsx`, empty/no-server states, ultrawide layout (hero clamps 1600 px) | done 20cf5e8 |
 | WP11-04 | Title page `/media/[kind]/[tmdbId]`: local sources per server (`/watch/play/<cid>?server=&cid=`), provider buttons (deep link / search fallback, attribution), trailer, similar, watchlist, mark watched, hide; redirects from `/watch/discover/*` | done 20cf5e8 |
-| WP11-05 | Listen rows: `track_plays` recording, Continue listening, New albums (album grouping), Favourites, Playlists aggregated, `AlbumCard`; localStorage history migrated once | todo |
-| WP11-06 | Settings › Media: region, preferred providers, hide watched, curator toggle; Settings › Video merged | todo |
+| WP11-05 | Listen rows: `track_plays` recording, Continue listening, New albums (album grouping), Favourites, Playlists aggregated, `AlbumCard`; localStorage history migrated once | done 5e5f2b8 |
+| WP11-06 | Settings › Media: region, preferred providers, hide watched, curator toggle; Settings › Video merged | done 5e5f2b8 |
 | WP11-07 | Codai curator (env-gated): `lib/media/curator.ts` (`generateObject` + zod, `codai-fast`, 6 s, 24 h `unstable_cache` per user/profile/region/rows hash), `CuratorNote` under the hero; `/media/home?providers=` from prefs + preferred-first offers with badge; `POST/GET /api/media/sync` (device bearer → `watch_history`/`track_plays`/`media_sync_state`) | done |
 | WP11-08 | i18n RO+EN for new strings + sweep hardcoded RO in `/watch/**` + `components/video/**` → `watch.*` keys (parity strict); a11y: rows `role=list` (verified), `aria-live` server notices, focus-visible on curator links, hero reduced motion (verified) | done |
 | WP11-09 | Tests: `sync-map`, `curator` (success/timeout/invalid JSON), preferred ordering (vitest); `e2e/media-home.spec.ts` (anon landing; signed-in hero+rows 390/1440/3440 light+dark + axe on `/` and `/media/movie/550` behind `E2E_SESSION_COOKIE`); `a11y.spec.ts` + `/media/movie/550` | done |
@@ -335,9 +357,9 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 ### WP13 — Agent config & gates (D23)
 | ID | Item | Status |
 |---|---|---|
-| WP13-01 | `AGENTS.md`, `.github/copilot-instructions.md`, 11 `.github/instructions/*.instructions.md` | todo |
-| WP13-02 | 11 `.github/skills/*/SKILL.md` | todo |
-| WP13-03 | Scripts promoted: `scripts/tracker-regen-csv.mjs`, `apps/web/scripts/i18n-parity.mjs`, `apps/web/scripts/bundle-budget.mjs`, `scripts/hex-gate.mjs`; tokens mirror list += mixai/server prehydrate | todo |
+| WP13-01 | `AGENTS.md`, `.github/copilot-instructions.md`, 11 `.github/instructions/*.instructions.md` | done 0fb356c |
+| WP13-02 | 11 `.github/skills/*/SKILL.md` | done 0fb356c |
+| WP13-03 | Scripts promoted: `scripts/tracker-regen-csv.mjs`, `apps/web/scripts/i18n-parity.mjs`, `apps/web/scripts/bundle-budget.mjs`, `scripts/hex-gate.mjs`; tokens mirror list += mixai/server prehydrate | done d501776 |
 | WP13-04 | Husky `prepare` + lint-staged path-scoped gates (i18n, tokens, OpenAPI, hex/Color(0x), tracker csv, version bumps server/packages) + commitlint | done — root `lint-staged` config, `scripts/{check-version-generic,tokens-drift,tracker-drift}.mjs`, `commitlint.config.mjs`, `.husky/commit-msg` |
 | WP13-05 | CI: `server-ci.yml`, web-ci += bundle budget/LHCI/axe/knip, `docs-ci.yml` lychee, actionlint, `deps-weekly.yml` | done — actionlint clean locally; first CI run pending push |
 | WP13-06 | Mutation-test every gate (break → red → restore) → `docs/arhitectura/gates.md` | done 2026-09-18 — all 11 hook gates + bundle budget + lint-baseline compare RED/GREEN in gates.md; scripts gained `--dir`/`--spec`/`--baseline-file`/`--results` overrides |
@@ -345,5 +367,5 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 ### WP14 — Closure
 | ID | Item | Status |
 |---|---|---|
-| WP14-01 | Matrix green; design-critic on Media Home; CHANGELOGs; versions web 2.1.0, server 3.1.0, tv 1.1.0; ADR-0009 + ADR-0010 | todo |
+| WP14-01 | Matrix green; design-critic on Media Home; CHANGELOGs; versions web 2.2.0, server 3.1.0, tv 1.1.0, sdk 0.1.0, extension 3.0.1; ADR-0009 + ADR-0010 | done — matrix §6.1 (1 pre-existing web test red, count 13 → 1); critic `docs/followups/design-critic-media-home-2026-09-18.md` (web `/` 47/60 after Rx1–2 applied in `media-home.css`, title 42, TV Android 41, Tizen 39); ADR-0010; root + server CHANGELOGs; design-system §6 media patterns; functionalitati matrix; READMEs |
 | WP14-02 | Round 4 askQuestions reality check | todo |

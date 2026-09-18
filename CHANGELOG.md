@@ -10,12 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
-## [Unreleased] — design system overhaul (web 2.0.0 · companion 3.0.0 · extension 3.0.0 · MixAI DJ / native / TV 1.0.0)
+## 2026-09-18 — Media Home (web 2.2.0 · MMO Server 3.1.0 · TV Android 1.1.0 · TV Tizen 1.1.0 · `@mmo/sdk` 0.1.0 · extension 3.0.1) and design system overhaul (web 2.0.0 · companion 3.0.0 · extension 3.0.0 · MixAI DJ / native / TV 1.0.0)
 
 Every surface now renders from one token source. Decisions and rationale:
 [ADR-0008](docs/adr/0008-design-system-and-theme-prefs.md); spec:
 [docs/design-system.md](docs/design-system.md); per-item status:
-[docs/mixai-design-tracker.md](docs/mixai-design-tracker.md).
+[docs/mixai-design-tracker.md](docs/mixai-design-tracker.md). Media Home architecture:
+[ADR-0010](docs/adr/0010-media-module-and-media-home.md); closure review:
+[docs/followups/design-critic-media-home-2026-09-18.md](docs/followups/design-critic-media-home-2026-09-18.md).
 
 ### Added — Media Home (web 2.1.0 → 2.2.0, tracker §10–11)
 
@@ -39,6 +41,36 @@ Every surface now renders from one token source. Decisions and rationale:
   Playwright `media-home.spec.ts` (anon landing; signed-in hero + rows at 390/1440/3440 light+dark
   and axe on `/` + `/media/movie/550` when `E2E_SESSION_COOKIE` is set); `a11y.spec.ts` now scans
   `/media/movie/550`.
+- **Hero polish (WP14-01)**: Ken Burns drift on the billboard and a staggered logo → meta →
+  overview → actions entrance, both only under `data-motion="full"`.
+
+### Added — MMO Server 3.1.0 media module (tracker §10, WP10)
+
+- `server/src/media/`: TMDB client + SQLite cache (`media.sqlite`), availability resolver (Movie of
+  the Night → TMDB providers → provider registry with web/Android/Tizen launch data),
+  recommendation rows, video library index with etag, progress + plays with revision deltas and a
+  push client to the web `/api/media/sync`. 11 `/media/*` routes in `openapi.yaml` (194 routes),
+  `Models.kt` and `@mmo/sdk` 0.1.0 (`mmo-server.d.ts`) regenerated. Details in
+  [`server/CHANGELOG.md`](server/CHANGELOG.md).
+
+### Added — TV apps 1.1.0 (tracker §11, WP12)
+
+- **Android TV** (`versionCode` 3): `MediaRepository` on `/media/*`, hero + rows with `/video/scan`
+  fallback, title screen with provider buttons (`ProviderLauncher` + `<queries>`), Watch Next
+  channel (`tvprovider` 1.1.0), `mixai://title/…` deep link, progress via server with one-shot
+  migration of the local store.
+- **Tizen**: `/media/*` client, hero + rows with scan fallback and focus-row memory, title screen
+  with `launchAppControl` app launch (`application.launch/info` privileges), progress via server;
+  installed and verified on the Odyssey G8.
+
+### Added — gates & agent config (tracker §11, WP13)
+
+- `AGENTS.md`, `.github/copilot-instructions.md`, 12 path-scoped instruction files and 11 skills.
+- Husky `lint-staged` gates: i18n parity (web + extension), tokens drift, OpenAPI drift, hex /
+  `Color(0x` gate, tracker CSV drift, version bumps (web, extension, server, packages), commitlint.
+  CI: `server-ci`, `docs-ci` (lychee), `ci-lint` (actionlint), `deps-weekly`, web bundle budget
+  (`scripts/bundle-budget.mjs` vs `.bundle-baseline.json`). Every gate mutation-tested —
+  [`docs/arhitectura/gates.md`](docs/arhitectura/gates.md).
 
 ### Removed — third-party embed sources (companion 3.1.0)
 

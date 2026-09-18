@@ -284,6 +284,7 @@ mindmap
 | [0007](docs/adr/0007-licensing-agpl-core-mit-sdk.md) | Licențiere: AGPL core, SDK MIT, comercial pentru cloud |
 | [0008](docs/adr/0008-design-system-and-theme-prefs.md) | Design system partajat: tokens OKLCH, Base UI, `mixai:prefs:v1` |
 | [0009](docs/adr/0009-remove-third-party-embed-sources.md) | Eliminarea surselor embed terțe (vidsrc & co.) |
+| [0010](docs/adr/0010-media-module-and-media-home.md) | Modul media pe MMO Server (TMDB + SQLite, deep links, progres partajat) și Media Home la `/` |
 
 > ADR-0004 (aplicațiile TV — Compose/Media3 + Tizen web) e descris în
 > [aplicatie/tv-android.md](docs/aplicatie/tv-android.md) și

@@ -62,6 +62,31 @@
     object-position: center 20%;
 }
 
+/* Living background (design-critic Rx1): a slow Ken Burns drift on the
+ * backdrop, full-motion only; `data-motion="reduced"` keeps it still. */
+@keyframes media-hero-drift {
+    from { scale: 1; }
+    to { scale: 1.06; }
+}
+
+:root[data-motion="full"] .media-hero-bg {
+    animation: media-hero-drift 24s var(--ease-in-out) infinite alternate;
+    transform-origin: center 30%;
+}
+
+/* Choreographed entrance (Rx2): logo → meta → overview → actions rise in. */
+@keyframes media-hero-rise {
+    from { opacity: 0; translate: 0 12px; }
+    to { opacity: 1; translate: 0 0; }
+}
+
+:root[data-motion="full"] .media-hero-content > * {
+    animation: media-hero-rise var(--dur-slow) var(--ease-out) both;
+}
+:root[data-motion="full"] .media-hero-content > :nth-child(2) { animation-delay: 80ms; }
+:root[data-motion="full"] .media-hero-content > :nth-child(3) { animation-delay: 160ms; }
+:root[data-motion="full"] .media-hero-content > :nth-child(4) { animation-delay: 240ms; }
+
 .media-hero-scrim {
     position: absolute;
     inset: 0;
