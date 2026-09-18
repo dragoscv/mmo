@@ -523,6 +523,27 @@
             "cta": "Gestionează dispozitive"
         }
     },
+    "landing": {
+        "eyebrow": "MixAI · Multi Media Organizer",
+        "title": "Biblioteca ta muzicală, organizată de AI",
+        "subtitle": "Scanează, analizează și etichetează colecția, construiește playlist-uri inteligente și mixează pe orice ecran — desktop, web, mobil sau TV.",
+        "ctaPrimary": "Autentificare",
+        "ctaSecondary": "Descarcă companion-ul",
+        "features": {
+            "library": {
+                "title": "O bibliotecă, toate dispozitivele",
+                "description": "Companion-ul local îți indexează fișierele; cloud-ul sincronizează etichetele, cue-urile și playlist-urile peste tot."
+            },
+            "ai": {
+                "title": "Analiză AI și AutoMix",
+                "description": "Tonalitate, BPM, energie și gen detectate automat; lasă AutoMix să aleagă următoarea piesă."
+            },
+            "everywhere": {
+                "title": "Redă oriunde",
+                "description": "Player web, deck-uri DJ, Android TV și Tizen — aceeași temă și aceleași controale pe fiecare ecran."
+            }
+        }
+    },
     "nav": {
         "dashboard": "Panou principal",
         "library": "Bibliotecă",

@@ -7,10 +7,11 @@ export const revalidate = 300; // 5 minutes
 
 import { auth } from "@/auth";
 import { getAllCompanionLinks } from "@/lib/companion-library";
-import { notSignedInFor, noCompanionFor } from "@/components/empty-state-server";
+import { noCompanionFor } from "@/components/empty-state-server";
+import { LandingPage } from "@/components/landing/landing-page";
 export default async function DashboardPage() {
     const session = await auth();
-    if (!session?.user?.id) return notSignedInFor("dashboard");
+    if (!session?.user?.id) return <LandingPage />;
     // Multi-companion: any paired device unlocks the dashboard (stats are
     // aggregated from cloud across all companions, not a single auto-picked one).
     const links = await getAllCompanionLinks();

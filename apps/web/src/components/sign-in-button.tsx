@@ -3,22 +3,24 @@
 import { useState } from "react";
 import { LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { ButtonProps } from "@/components/ui/button";
 import { LoginModal } from "@/components/login-modal";
 
 interface SignInButtonProps {
     label?: string;
     className?: string;
+    size?: ButtonProps["size"];
 }
 
 /**
  * Opens the authentication modal (shared <LoginForm>) instead of navigating
  * to /login. Used by empty-state CTAs so signing in keeps the user in place.
  */
-export function SignInButton({ label = "Sign in", className }: SignInButtonProps) {
+export function SignInButton({ label = "Sign in", className, size }: SignInButtonProps) {
     const [open, setOpen] = useState(false);
     return (
         <>
-            <Button className={className} onClick={() => setOpen(true)}>
+            <Button className={className} size={size} onClick={() => setOpen(true)}>
                 <LogIn className="mr-2 h-4 w-4" /> {label}
             </Button>
             <LoginModal open={open} onOpenChange={setOpen} />

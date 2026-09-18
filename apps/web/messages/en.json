@@ -523,6 +523,27 @@
             "cta": "Manage devices"
         }
     },
+    "landing": {
+        "eyebrow": "MixAI · Multi Media Organizer",
+        "title": "Your music library, organized by AI",
+        "subtitle": "Scan, analyze and tag your collection, build smarter playlists, and mix on any screen — desktop, web, mobile or TV.",
+        "ctaPrimary": "Sign in",
+        "ctaSecondary": "Get the companion",
+        "features": {
+            "library": {
+                "title": "One library, every device",
+                "description": "Your local companion indexes your files; the cloud keeps tags, cues and playlists in sync everywhere."
+            },
+            "ai": {
+                "title": "AI analysis & AutoMix",
+                "description": "Key, BPM, energy and genre detected automatically; let AutoMix pick the next track."
+            },
+            "everywhere": {
+                "title": "Play anywhere",
+                "description": "Web player, DJ decks, Android TV and Tizen — the same theme and controls on every screen."
+            }
+        }
+    },
     "nav": {
         "dashboard": "Dashboard",
         "library": "Library",
