@@ -24,18 +24,24 @@ export interface ProgressInput {
 export interface ProgressFilter {
     kind?: MediaKind;
     tmdbId?: number;
+    /** Revision watermark: only rows written at a revision > since. */
     since?: number;
     limit?: number;
 }
 
 type Row = {
     profile_id: string; kind: MediaKind; tmdb_id: number; season: number; episode: number;
-    position_sec: number; duration_sec: number; completed: number; updated_at: number;
+    position_sec: number; duration_sec: number; completed: number; updated_at: number; rev: number;
 };
 
 const rowToEntry = (r: Row): ProgressEntry => ({
     profileId: r.profile_id, kind: r.kind, tmdbId: r.tmdb_id, season: r.season, episode: r.episode,
-    positionSec: r.position_sec, durationSec: r.duration_sec, completed: r.completed === 1, updatedAt: r.updated_at,
+    positionSec: r.position_sec, durationSec: r.duration_sec, completed: r.completed === 1, updatedAt: r.updated_at, rev: r.rev,
+});
+
+type PlayRow = { id: number; profile_id: string; track_key: string; played_at: number; duration_sec: number; completed: number; rev: number };
+const rowToPlay = (r: PlayRow): TrackPlay => ({
+    id: r.id, profileId: r.profile_id, trackKey: r.track_key, playedAt: r.played_at, durationSec: r.duration_sec, completed: r.completed === 1, rev: r.rev,
 });
 
 export function isCompleted(positionSec: number, durationSec: number, explicit?: boolean): boolean {
@@ -62,12 +68,26 @@ export class ProgressStore {
         const args: (string | number)[] = [profileId];
         if (filter.kind) { where.push("kind = ?"); args.push(filter.kind); }
         if (filter.tmdbId !== undefined) { where.push("tmdb_id = ?"); args.push(filter.tmdbId); }
-        if (filter.since !== undefined) { where.push("updated_at > ?"); args.push(filter.since); }
+        if (filter.since !== undefined) { where.push("rev > ?"); args.push(filter.since); }
         const limit = Math.max(1, Math.min(1000, filter.limit ?? 500));
         const rows = this.db
             .prepare(`SELECT * FROM progress WHERE ${where.join(" AND ")} ORDER BY updated_at DESC LIMIT ${limit}`)
             .all(...args) as Row[];
         return rows.map(rowToEntry);
+    }
+
+    /** All profiles' progress rows written after `sinceRev` (for the push client). */
+    progressSince(sinceRev: number, limit = 1000): ProgressEntry[] {
+        const rows = this.db.prepare("SELECT * FROM progress WHERE rev > ? ORDER BY rev ASC LIMIT ?").all(sinceRev, limit) as Row[];
+        return rows.map(rowToEntry);
+    }
+
+    /** All profiles' plays recorded after `sinceRev`. */
+    playsSince(sinceRev: number, limit = 1000): TrackPlay[] {
+        const rows = this.db
+            .prepare("SELECT id, profile_id, track_key, played_at, duration_sec, completed, rev FROM track_plays WHERE rev > ? ORDER BY rev ASC LIMIT ?")
+            .all(sinceRev, limit) as PlayRow[];
+        return rows.map(rowToPlay);
     }
 
     putProgress(input: ProgressInput): ProgressEntry {
@@ -77,21 +97,27 @@ export class ProgressStore {
         const durationSec = Math.max(0, Number(input.durationSec) || 0);
         const completed = isCompleted(positionSec, durationSec, input.completed);
         const updatedAt = input.updatedAt ?? this.now();
+        const rev = this.bumpRevision();
         this.db.prepare(
-            `INSERT INTO progress (profile_id, kind, tmdb_id, season, episode, position_sec, duration_sec, completed, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `INSERT INTO progress (profile_id, kind, tmdb_id, season, episode, position_sec, duration_sec, completed, updated_at, rev)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(profile_id, kind, tmdb_id, season, episode) DO UPDATE SET
                position_sec = excluded.position_sec,
                duration_sec = CASE WHEN excluded.duration_sec > 0 THEN excluded.duration_sec ELSE progress.duration_sec END,
                completed = MAX(progress.completed, excluded.completed),
-               updated_at = excluded.updated_at
+               updated_at = excluded.updated_at,
+               rev = excluded.rev
              WHERE excluded.updated_at >= progress.updated_at`,
-        ).run(input.profileId, input.kind, input.tmdbId, season, episode, positionSec, durationSec, completed ? 1 : 0, updatedAt);
-        this.bumpRevision();
+        ).run(input.profileId, input.kind, input.tmdbId, season, episode, positionSec, durationSec, completed ? 1 : 0, updatedAt, rev);
         const row = this.db
             .prepare("SELECT * FROM progress WHERE profile_id = ? AND kind = ? AND tmdb_id = ? AND season = ? AND episode = ?")
             .get(input.profileId, input.kind, input.tmdbId, season, episode) as Row;
         return rowToEntry(row);
+    }
+
+    /** Batch upsert in one transaction (one revision bump per row keeps `since` deltas exact). */
+    putProgressBatch(inputs: ProgressInput[]): ProgressEntry[] {
+        return this.db.transaction(() => inputs.map((i) => this.putProgress(i)))();
     }
 
     /** In-progress titles (not completed, ≥ 2 % watched), newest first, one row per title. */
@@ -117,20 +143,17 @@ export class ProgressStore {
 
     recordPlay(profileId: string, trackKey: string, durationSec: number, completed: boolean, playedAt?: number): TrackPlay {
         const at = playedAt ?? this.now();
+        const rev = this.bumpRevision();
         const r = this.db
-            .prepare("INSERT INTO track_plays (profile_id, track_key, played_at, duration_sec, completed) VALUES (?, ?, ?, ?, ?)")
-            .run(profileId, trackKey, at, Math.max(0, Number(durationSec) || 0), completed ? 1 : 0);
-        this.bumpRevision();
-        return { id: Number(r.lastInsertRowid), profileId, trackKey, playedAt: at, durationSec, completed };
+            .prepare("INSERT INTO track_plays (profile_id, track_key, played_at, duration_sec, completed, rev) VALUES (?, ?, ?, ?, ?, ?)")
+            .run(profileId, trackKey, at, Math.max(0, Number(durationSec) || 0), completed ? 1 : 0, rev);
+        return { id: Number(r.lastInsertRowid), profileId, trackKey, playedAt: at, durationSec, completed, rev };
     }
 
     listRecentPlays(profileId: string, limit = 50): TrackPlay[] {
         const rows = this.db
-            .prepare("SELECT id, profile_id, track_key, played_at, duration_sec, completed FROM track_plays WHERE profile_id = ? ORDER BY played_at DESC LIMIT ?")
-            .all(profileId, Math.max(1, Math.min(500, limit))) as
-            { id: number; profile_id: string; track_key: string; played_at: number; duration_sec: number; completed: number }[];
-        return rows.map((r) => ({
-            id: r.id, profileId: r.profile_id, trackKey: r.track_key, playedAt: r.played_at, durationSec: r.duration_sec, completed: r.completed === 1,
-        }));
+            .prepare("SELECT id, profile_id, track_key, played_at, duration_sec, completed, rev FROM track_plays WHERE profile_id = ? ORDER BY played_at DESC LIMIT ?")
+            .all(profileId, Math.max(1, Math.min(500, limit))) as PlayRow[];
+        return rows.map(rowToPlay);
     }
 }

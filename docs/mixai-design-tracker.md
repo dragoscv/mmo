@@ -306,11 +306,11 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 | WP10-02 | TMDB client with limiter + `append_to_response`; trending/popular/discover(watch_region) | todo |
 | WP10-03 | Availability resolver: MOTN v4 (7 d) → TMDB providers (24 h) → registry search URLs; registry (Netflix, Disney+, HBO Max, Prime, Apple TV+, SkyShowtime, Voyo, AntenaPlay, YouTube, Google TV) with web/android/tizen launch data | todo |
 | WP10-04 | Recs engine + rows builder (Continue, Top picks, Because you watched ×3, Trending RO on your providers, Upcoming RO, New in library) 24 h cache | todo |
-| WP10-05 | Video library index with etag (scan + watcher), `GET /media/library?since=`, server returns `serverId` for attribution | todo |
-| WP10-06 | Progress + plays API (`/media/progress` GET/PUT seconds per profile; `/media/plays`) + push sync to web `/api/media/sync` | todo |
-| WP10-07 | Routes `/media/home`, `/media/title/:kind/:id`, `/media/search`, `/media/etag`; OpenAPI + `openapi:check` + Kotlin/SDK regen; server 3.1.0 | todo |
+| WP10-05 | Video library index with etag (scan + watcher), `GET /media/library?since=`, server returns `serverId` for attribution | done (`media/library.ts` + `library-hooks.ts`; fed by `/video/scan`, scan jobs and the watcher; tombstones for deltas; `matchTitle` cached TMDB search; `serverId`/`serverName` on home/title/library/status) |
+| WP10-06 | Progress + plays API (`/media/progress` GET/PUT seconds per profile; `/media/plays`) + push sync to web `/api/media/sync` | done (`media/sync-client.ts`: 10 s debounce, hourly full push, `meta.last_pushed_revision`, Bearer device token, 404/offline retry, 401 pause; `GET /media/progress?since=<rev>`; `PUT` batch 1..500) — web endpoint `/api/media/sync` still to be built (WP11) |
+| WP10-07 | Routes `/media/home`, `/media/title/:kind/:id`, `/media/search`, `/media/etag`; OpenAPI + `openapi:check` + Kotlin/SDK regen; server 3.1.0 | done (mounted `/media` behind `authMiddleware` incl. `/media/status`; 11 routes in `openapi.yaml`, `MOUNTS` entry, `openapi:check` OK 194/194, Models.kt +20 classes, `mmo-server.d.ts` regenerated; `media.*` in `/video/probe` capabilities) |
 | WP10-08 | Remove pirate embeds (D20): streaming-scrapers, `/video/streams`, vidsrc flag, web `StreamSourcePicker`; ADR-0009 | done (server 3.1.0, ADR-0009) |
-| WP10-09 | Tests: recs scoring, availability chain, progress upsert, routes (vitest, Node 22) | todo |
+| WP10-09 | Tests: recs scoring, availability chain, progress upsert, routes (vitest, Node 22) | done (7 files / 51 tests under `src/media`: library upsert/prune/etag/delta, TMDB match cache, sync client 200/404/offline/401/debounce, routes `/library?since`, batch progress, `/status` shape, v1→v2 migration; whole server suite 146/146) |
 
 ### WP11 — Web Media Home
 | ID | Item | Status |

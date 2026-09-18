@@ -37,6 +37,8 @@ import { engineRegistry } from "./voice/engines";
 import { createVideoRouter, shutdownVideoSubsystem } from "./library/video-routes";
 import { createCastRouter } from "./cast/router";
 import { createPairRouter } from "./pair/router";
+import { createMediaModule, type MediaModule } from "./media";
+import { createMediaLibraryHooks, setMediaLibraryHooks } from "./media/library-hooks";
 import { buildCompanionMetrics } from "./metrics";
 import {
     createScanJob,
@@ -92,6 +94,7 @@ function splatParam(value: unknown): string {
 
 
 let httpServer: http.Server | null = null;
+let mediaModule: MediaModule | null = null;
 let wss: WebSocketServer | null = null;
 let serverPort = 17899;
 const wsClients = new Set<WebSocket>();
@@ -1165,6 +1168,39 @@ export async function startServer(): Promise<void> {
     // token. See docs/aplicatie/pairing.md and server/src/pair/router.ts.
     app.use("/pair", createPairRouter({ authMiddleware, getPort: () => serverPort, getVersion: () => SERVER_VERSION }));
 
+    // ─── Media Home brain (recommendations, availability, progress) ─────
+    //
+    // `server/src/media/` — see tracker §10 (WP10). Everything under /media
+    // needs the device token, including /media/status: unlike /video/probe it
+    // reveals configured API keys and the library size. Cheap presence checks
+    // stay on /pair/info and /video/probe (which now lists `media.*`
+    // capabilities). The video scanner/watcher feed `library_index` through
+    // `media/library-hooks.ts`.
+    if (!mediaModule) {
+        const mediaLog = {
+            debug: (msg: string, fields?: Record<string, unknown>) => { if (process.env.MMO_MEDIA_DEBUG) log("info", msg, fields ?? ""); },
+            info: (msg: string, fields?: Record<string, unknown>) => log("info", msg, fields ?? ""),
+            warn: (msg: string, fields?: Record<string, unknown>, err?: unknown) => log("warn", msg, fields ?? "", err ?? ""),
+            error: (msg: string, err: unknown, fields?: Record<string, unknown>) => log("error", msg, err, fields ?? ""),
+        };
+        mediaModule = createMediaModule({
+            userDataDir: platform.getPath("userData"),
+            env: process.env,
+            log: mediaLog,
+            getServerId: () => (store.get("deviceId") as string | undefined) || os.hostname(),
+            getServerName: () => (store.get("deviceName") as string | undefined) || os.hostname(),
+            sync: {
+                getWebAppUrl: () => getSettings().webAppUrl,
+                getDeviceToken: () => (store.get("deviceToken") as string | undefined) || undefined,
+            },
+        });
+        setMediaLibraryHooks(createMediaLibraryHooks(mediaModule.library, {
+            getRoots: () => getSettings().scanFolders.filter((f) => f.kind === "movies" || f.kind === "tv-shows").map((f) => f.path),
+            log: mediaLog,
+        }));
+    }
+    app.use("/media", authMiddleware, mediaModule.router);
+
     // ─── Native low-latency audio engine ─────────────────────────────────
     //
     // These routes intentionally use `publicLocalhostMiddleware` instead of
@@ -1706,6 +1742,7 @@ export async function stopServer(): Promise<void> {
 
     try { closeLibraryDb(); } catch { /* ignore */ }
     try { shutdownVideoSubsystem(); } catch { /* ignore */ }
+    try { setMediaLibraryHooks(null); mediaModule?.close(); mediaModule = null; } catch { /* ignore */ }
     try { voiceHost.shutdown(); } catch { /* ignore */ }
     try { engineRegistry.shutdown(); } catch { /* ignore */ }
 

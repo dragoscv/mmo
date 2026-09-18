@@ -1,6 +1,6 @@
 {
   "name": "@mmo/sdk",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "Thin TypeScript client for MMO's REST + SSE API. Drop-in replacement for in-process @mmo/ai when calling MMO from external projects. ESM-only, zero React deps.",
   "type": "module",

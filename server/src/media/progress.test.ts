@@ -63,4 +63,24 @@ describe("progress", () => {
         expect(plays[1]!.completed).toBe(true);
         expect(store.getRevision()).toBe(3);
     });
+
+    it("stamps rows with the revision; since/progressSince/playsSince return only newer rows; batch is transactional", () => {
+        store.putProgress({ profileId: "p", kind: "movie", tmdbId: 1, positionSec: 1, durationSec: 10 }); // rev 1
+        store.recordPlay("p", "t:1", 1, false);                                                           // rev 2
+        const [a, b] = store.putProgressBatch([
+            { profileId: "p", kind: "movie", tmdbId: 2, positionSec: 1, durationSec: 10 },              // rev 3
+            { profileId: "q", kind: "tv", tmdbId: 3, season: 1, episode: 1, positionSec: 1, durationSec: 10 }, // rev 4
+        ]);
+        expect([a!.rev, b!.rev]).toEqual([3, 4]);
+        expect(store.getRevision()).toBe(4);
+        expect(store.getProgress("p", { since: 1 }).map((e) => e.tmdbId)).toEqual([2]);
+        expect(store.progressSince(0).map((e) => e.rev)).toEqual([1, 3, 4]);
+        expect(store.progressSince(3).map((e) => e.profileId)).toEqual(["q"]);
+        expect(store.playsSince(1).map((p) => p.rev)).toEqual([2]);
+        expect(store.playsSince(2)).toEqual([]);
+        // a stale write still consumes a revision but leaves the row's rev untouched
+        store.putProgress({ profileId: "p", kind: "movie", tmdbId: 1, positionSec: 0, durationSec: 10, updatedAt: 1 });
+        expect(store.getRevision()).toBe(5);
+        expect(store.getProgress("p", { tmdbId: 1 })[0]!.rev).toBe(1);
+    });
 });

@@ -85,6 +85,8 @@ tags:
     description: Change push from the cloud into the companion.
   - name: subsonic
     description: OpenSubsonic-compatible API.
+  - name: media
+    description: Media Home brain — TMDB recommendations, streaming availability, watch progress, local library index.
 security:
   - deviceToken: []
 paths:
@@ -4519,6 +4521,231 @@ paths:
             '*/*':
               schema: { type: string, format: binary }
 
+  # ---- media (Media Home brain, WP10) ---------------------------------------
+  /media/status:
+    get:
+      operationId: mediaStatus
+      tags: [media]
+      summary: Media module status
+      description: Configured API keys (booleans only), region/language, revision counters, server identity and push-sync state. Requires the device token — unlike `/video/probe` it reveals configuration and library size.
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/etag:
+    get:
+      operationId: mediaEtag
+      tags: [media]
+      summary: Cheap poll for changes
+      responses:
+        '200':
+          description: Revision counters
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaEtag' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/library:
+    get:
+      operationId: mediaLibrary
+      tags: [media]
+      summary: Local video library index (full or delta)
+      description: |
+        Without `since` (or with a stale/future value) the response is the full index (`full: true`).
+        With `since=<libraryEtag>` from a previous call only rows written after that etag are returned,
+        plus the `removed` file ids (tombstones). `serverFileId` is the id `/video/direct/{fileId}` expects.
+      parameters:
+        - { name: since, in: query, schema: { type: integer }, description: 'Previously seen libraryEtag.' }
+      responses:
+        '200':
+          description: Library index
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LibraryIndex' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/providers:
+    get:
+      operationId: mediaProviders
+      tags: [media]
+      summary: Streaming providers available in a region
+      parameters:
+        - { name: region, in: query, schema: { type: string }, description: 'ISO 3166-1 alpha-2; defaults to the server region.' }
+      responses:
+        '200':
+          description: Provider catalog merged with launch data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProviderCatalog' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/home:
+    get:
+      operationId: mediaHome
+      tags: [media]
+      summary: Home rows for a profile
+      description: Empty `rows` (no error) when `TMDB_API_KEY` is not configured.
+      parameters:
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { name: region, in: query, schema: { type: string } }
+        - { name: providers, in: query, schema: { type: string }, description: Comma-separated TMDB provider ids the user subscribes to. }
+        - { name: force, in: query, schema: { type: string, enum: ['1'] }, description: Bypass the 24 h rows cache. }
+      responses:
+        '200':
+          description: Home rows
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaHome' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/title/{kind}/{tmdbId}:
+    get:
+      operationId: mediaTitle
+      tags: [media]
+      summary: Title details, availability, local files and progress
+      parameters:
+        - { name: kind, in: path, required: true, schema: { $ref: '#/components/schemas/MediaKind' } }
+        - { name: tmdbId, in: path, required: true, schema: { type: integer } }
+        - { name: region, in: query, schema: { type: string } }
+        - { name: profile, in: query, schema: { type: string, default: default } }
+      responses:
+        '200':
+          description: Title
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaTitleResponse' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '503':
+          description: TMDB not configured
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /media/search:
+    get:
+      operationId: mediaSearch
+      tags: [media]
+      summary: TMDB multi search (movies + tv), flags titles present locally
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, maxLength: 200 } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+      responses:
+        '200':
+          description: Search page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaSearchPage' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/progress:
+    get:
+      operationId: mediaGetProgress
+      tags: [media]
+      summary: Watch progress for a profile
+      description: '`since` is a revision watermark (from `revision` in any media response): only rows written after it are returned — the web → TV direction of progress sync.'
+      parameters:
+        - { name: profile, in: query, required: true, schema: { type: string } }
+        - { name: kind, in: query, schema: { $ref: '#/components/schemas/MediaKind' } }
+        - { name: tmdbId, in: query, schema: { type: integer } }
+        - { name: since, in: query, schema: { type: integer }, description: Revision watermark. }
+        - { name: limit, in: query, schema: { type: integer, default: 500, maximum: 1000 } }
+      responses:
+        '200':
+          description: Progress entries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgressList' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      operationId: mediaPutProgress
+      tags: [media]
+      summary: Upsert watch progress (single entry or batch)
+      description: |
+        Body is one `ProgressInput` or an array of 1..500. `completed` is derived at ≥ 90 % when omitted.
+        Older `updatedAt` than the stored row is ignored (last-write-wins). Every write bumps `revision`
+        and schedules a debounced push to the web app (`POST {webAppUrl}/api/media/sync`).
+      parameters:
+        - { name: profile, in: query, schema: { type: string }, description: 'Fallback profileId for entries without one.' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { $ref: '#/components/schemas/ProgressInput' }
+                - { type: array, minItems: 1, maxItems: 500, items: { $ref: '#/components/schemas/ProgressInput' } }
+      responses:
+        '200':
+          description: Stored entry (single) or entries (batch) plus the new revision
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [entry, revision]
+                    properties:
+                      entry: { $ref: '#/components/schemas/ProgressEntry' }
+                      revision: { type: integer }
+                  - type: object
+                    required: [entries, revision]
+                    properties:
+                      entries: { type: array, items: { $ref: '#/components/schemas/ProgressEntry' } }
+                      revision: { type: integer }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/plays:
+    get:
+      operationId: mediaListPlays
+      tags: [media]
+      summary: Recent music plays for a profile
+      parameters:
+        - { name: profile, in: query, required: true, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 500 } }
+      responses:
+        '200':
+          description: Plays, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [plays]
+                properties:
+                  plays: { type: array, items: { $ref: '#/components/schemas/TrackPlay' } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      operationId: mediaRecordPlay
+      tags: [media]
+      summary: Record a music play
+      parameters:
+        - { name: profile, in: query, schema: { type: string }, description: 'Fallback profileId.' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TrackPlayInput' }
+      responses:
+        '201':
+          description: Stored play
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [play, revision]
+                properties:
+                  play: { $ref: '#/components/schemas/TrackPlay' }
+                  revision: { type: integer }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
 components:
   securitySchemes:
@@ -5621,3 +5848,287 @@ components:
               properties:
                 code: { type: integer }
                 message: { type: string }
+
+    # ---- media (Media Home brain) -------------------------------------------
+    MediaKind:
+      type: string
+      enum: [movie, tv]
+    OfferType:
+      type: string
+      enum: [subscription, rent, buy, free, ads]
+    LaunchData:
+      type: object
+      required: [web, search]
+      description: How to open a title on a provider — exact deep link when known, otherwise the provider's search page; native intents for TVs.
+      properties:
+        web: { type: string, format: uri }
+        search: { type: string, format: uri }
+        android:
+          type: object
+          required: [package]
+          properties:
+            package: { type: string }
+            uri: { type: string }
+        tizen:
+          type: object
+          required: [appId]
+          properties:
+            appId: { type: string }
+            payload: { type: string }
+    Offer:
+      type: object
+      required: [providerId, name, logo, type, launch]
+      properties:
+        providerId: { type: integer, description: TMDB watch-provider id. }
+        name: { type: string }
+        logo: { type: [string, 'null'], description: TMDB logo path. }
+        type: { $ref: '#/components/schemas/OfferType' }
+        link: { type: string, format: uri, description: 'Exact deep link (Movie of the Night); absent with TMDB/JustWatch data.' }
+        launch: { $ref: '#/components/schemas/LaunchData' }
+    Availability:
+      type: object
+      required: [offers, source, attribution]
+      properties:
+        offers: { type: array, items: { $ref: '#/components/schemas/Offer' } }
+        source: { type: string, enum: [motn, tmdb, none] }
+        attribution: { type: array, items: { type: string }, description: 'Data-source credits that must be shown (JustWatch, Movie of the Night).' }
+        fetchedAt: { type: integer }
+    TitleCard:
+      type: object
+      required: [kind, tmdbId, title, posterPath, backdropPath, genreIds]
+      properties:
+        kind: { $ref: '#/components/schemas/MediaKind' }
+        tmdbId: { type: integer }
+        title: { type: string }
+        originalTitle: { type: string }
+        overview: { type: string }
+        posterPath: { type: [string, 'null'] }
+        backdropPath: { type: [string, 'null'] }
+        releaseDate: { type: string }
+        voteAverage: { type: number }
+        voteCount: { type: integer }
+        popularity: { type: number }
+        genreIds: { type: array, items: { type: integer } }
+        inLibrary: { type: boolean, description: "Present in this server's library_index." }
+        progress: { type: number, minimum: 0, maximum: 1, description: Watched fraction (continue rows). }
+        reason: { type: string }
+    Person:
+      type: object
+      required: [id, name, role, profilePath]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        role: { type: string }
+        profilePath: { type: [string, 'null'] }
+    TitleDetails:
+      allOf:
+        - { $ref: '#/components/schemas/TitleCard' }
+        - type: object
+          required: [genres, keywords, cast, crew, externalIds, videos, logoPath, recommendations, similar, watchProviders]
+          properties:
+            runtime: { type: integer }
+            status: { type: string }
+            tagline: { type: string }
+            genres: { type: array, items: { type: object, required: [id, name], properties: { id: { type: integer }, name: { type: string } } } }
+            keywords: { type: array, items: { type: object, required: [id, name], properties: { id: { type: integer }, name: { type: string } } } }
+            cast: { type: array, items: { $ref: '#/components/schemas/Person' } }
+            crew: { type: array, items: { $ref: '#/components/schemas/Person' } }
+            collectionId: { type: [integer, 'null'] }
+            numberOfSeasons: { type: integer }
+            numberOfEpisodes: { type: integer }
+            externalIds: { type: object, additionalProperties: true }
+            videos:
+              type: array
+              items:
+                type: object
+                required: [key, site, type, name]
+                properties:
+                  key: { type: string }
+                  site: { type: string }
+                  type: { type: string }
+                  name: { type: string }
+            logoPath: { type: [string, 'null'] }
+            certification: { type: string }
+            recommendations: { type: array, items: { $ref: '#/components/schemas/TitleCard' } }
+            similar: { type: array, items: { $ref: '#/components/schemas/TitleCard' } }
+            watchProviders: { type: object, additionalProperties: true, description: 'Raw TMDB watch/providers.results keyed by region.' }
+    HomeRow:
+      type: object
+      required: [id, title, kind, items]
+      properties:
+        id: { type: string, description: 'Stable row id (continue, trending, because:<tmdbId>, provider:<id>, …).' }
+        title:
+          type: object
+          required: [ro, en]
+          properties:
+            ro: { type: string }
+            en: { type: string }
+        kind: { type: string, enum: [mixed, movie, tv] }
+        items: { type: array, items: { $ref: '#/components/schemas/TitleCard' } }
+        reason: { type: string }
+    MediaHome:
+      type: object
+      required: [region, profile, configured, revision, libraryEtag, serverId, serverName, rows]
+      properties:
+        region: { type: string }
+        profile: { type: string }
+        configured: { type: boolean, description: TMDB key present; rows are empty when false. }
+        revision: { type: integer }
+        libraryEtag: { type: integer }
+        serverId: { type: [string, 'null'], description: Device id of this server (attribution in multi-server setups). }
+        serverName: { type: string }
+        rows: { type: array, items: { $ref: '#/components/schemas/HomeRow' } }
+    LibraryIndexRow:
+      type: object
+      required: [serverFileId, kind, tmdbId, season, episode, path, size, mtime, updatedAt]
+      properties:
+        serverFileId: { type: string, description: 'Same id as /video/direct/{fileId}.' }
+        kind: { $ref: '#/components/schemas/MediaKind' }
+        tmdbId: { type: [integer, 'null'], description: Null when the title could not be matched (or no TMDB key). }
+        season: { type: [integer, 'null'] }
+        episode: { type: [integer, 'null'] }
+        path: { type: string }
+        size: { type: integer }
+        mtime: { type: integer }
+        updatedAt: { type: integer }
+        rev: { type: integer, description: Library etag at which this row was last written. }
+    LibraryIndex:
+      type: object
+      required: [revision, full, items, removed, serverId, serverName]
+      properties:
+        revision: { type: integer, description: 'Current libraryEtag; pass back as since.' }
+        full: { type: boolean }
+        items: { type: array, items: { $ref: '#/components/schemas/LibraryIndexRow' } }
+        removed: { type: array, items: { type: string }, description: 'File ids removed since `since` (empty on a full response).' }
+        serverId: { type: [string, 'null'] }
+        serverName: { type: string }
+    MediaTitleResponse:
+      type: object
+      required: [title, availability, files, progress, serverId, serverName]
+      properties:
+        title: { $ref: '#/components/schemas/TitleDetails' }
+        availability: { $ref: '#/components/schemas/Availability' }
+        files: { type: array, items: { $ref: '#/components/schemas/LibraryIndexRow' } }
+        progress: { type: array, items: { $ref: '#/components/schemas/ProgressEntry' } }
+        serverId: { type: [string, 'null'] }
+        serverName: { type: string }
+    MediaSearchPage:
+      type: object
+      required: [page, totalPages, results]
+      properties:
+        page: { type: integer }
+        totalPages: { type: integer }
+        results: { type: array, items: { $ref: '#/components/schemas/TitleCard' } }
+    ProviderCatalog:
+      type: object
+      required: [region, fetchedAt, providers]
+      properties:
+        region: { type: string }
+        fetchedAt: { type: integer }
+        providers:
+          type: array
+          items:
+            type: object
+            required: [providerId, key, name, logo, displayPriority, launch]
+            properties:
+              providerId: { type: integer }
+              key: { type: string }
+              name: { type: string }
+              logo: { type: [string, 'null'] }
+              displayPriority: { type: integer }
+              launch: { $ref: '#/components/schemas/LaunchData' }
+    ProgressInput:
+      type: object
+      required: [kind, tmdbId, positionSec]
+      properties:
+        profileId: { type: string, description: 'Required unless ?profile= is given.' }
+        kind: { $ref: '#/components/schemas/MediaKind' }
+        tmdbId: { type: integer, minimum: 1 }
+        season: { type: integer, minimum: 0, default: 0 }
+        episode: { type: integer, minimum: 0, default: 0 }
+        positionSec: { type: number, minimum: 0 }
+        durationSec: { type: number, minimum: 0, default: 0 }
+        completed: { type: boolean }
+        updatedAt: { type: integer, description: Epoch ms; defaults to server time. }
+    ProgressEntry:
+      type: object
+      required: [profileId, kind, tmdbId, season, episode, positionSec, durationSec, completed, updatedAt]
+      properties:
+        profileId: { type: string }
+        kind: { $ref: '#/components/schemas/MediaKind' }
+        tmdbId: { type: integer }
+        season: { type: integer }
+        episode: { type: integer }
+        positionSec: { type: number }
+        durationSec: { type: number }
+        completed: { type: boolean }
+        updatedAt: { type: integer }
+        rev: { type: integer, description: Revision at which this row was last written. }
+    ProgressList:
+      type: object
+      required: [revision, entries]
+      properties:
+        revision: { type: integer }
+        entries: { type: array, items: { $ref: '#/components/schemas/ProgressEntry' } }
+    TrackPlayInput:
+      type: object
+      required: [trackKey]
+      properties:
+        profileId: { type: string }
+        trackKey: { type: string, maxLength: 512 }
+        durationSec: { type: number, minimum: 0, default: 0 }
+        completed: { type: boolean, default: false }
+        playedAt: { type: integer }
+    TrackPlay:
+      type: object
+      required: [id, profileId, trackKey, playedAt, durationSec, completed]
+      properties:
+        id: { type: integer }
+        profileId: { type: string }
+        trackKey: { type: string }
+        playedAt: { type: integer }
+        durationSec: { type: number }
+        completed: { type: boolean }
+        rev: { type: integer }
+    MediaEtag:
+      type: object
+      required: [revision, libraryEtag]
+      properties:
+        revision: { type: integer, description: Bumps on every progress/play write. }
+        libraryEtag: { type: integer, description: Bumps on every library index change. }
+    MediaSyncResult:
+      type: object
+      required: [ok, status, pushed, revision]
+      properties:
+        ok: { type: boolean }
+        status:
+          oneOf:
+            - { type: integer }
+            - { type: string, enum: [offline, skipped] }
+        pushed: { type: integer }
+        revision: { type: integer }
+    MediaStatus:
+      type: object
+      required: [configured, tmdb, motn, region, language, revision, libraryEtag, libraryCount, serverId, serverName, sync]
+      properties:
+        configured: { type: boolean }
+        tmdb: { type: boolean }
+        motn: { type: boolean }
+        region: { type: string }
+        language: { type: string }
+        revision: { type: integer }
+        libraryEtag: { type: integer }
+        libraryCount: { type: integer }
+        serverId: { type: [string, 'null'] }
+        serverName: { type: string }
+        sync:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [lastPushedRevision, last]
+              properties:
+                lastPushedRevision: { type: integer }
+                last:
+                  oneOf:
+                    - { type: 'null' }
+                    - { $ref: '#/components/schemas/MediaSyncResult' }

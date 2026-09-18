@@ -1,12 +1,13 @@
 /**
- * /media/* — Media Home API (NOT mounted here; see WP10-07 in the tracker).
+ * /media/* — Media Home API (mounted behind authMiddleware in server.ts, WP10-07).
  *
- *   GET  /media/status                          configured flags, region, revision
+ *   GET  /media/status                          configured flags, region, revision, serverId/serverName
  *   GET  /media/home?profile=&region=&providers= HomeRow[]
  *   GET  /media/title/:kind/:tmdbId?region=&profile=  title + availability + local files + progress
  *   GET  /media/search?q=
- *   GET  /media/progress?profile=&kind=&tmdbId=&since=
- *   PUT  /media/progress                         body: ProgressInput
+ *   GET  /media/library?since=<libraryEtag>      {revision, full, items[], removed[]}
+ *   GET  /media/progress?profile=&kind=&tmdbId=&since=<revision>
+ *   PUT  /media/progress                         body: ProgressInput | ProgressInput[]
  *   POST /media/plays                            body: {profile, trackKey, durationSec, completed}
  *   GET  /media/plays?profile=&limit=
  *   GET  /media/etag                             {revision, libraryEtag}
@@ -16,13 +17,15 @@
  */
 
 import express from "express";
+import os from "node:os";
 import type { MediaDb } from "./db";
-import { getMeta } from "./db";
 import type { TmdbClient } from "./tmdb";
 import type { ProviderRegistry } from "./providers";
 import type { AvailabilityResolver } from "./availability";
 import { buildHomeRows, stripToCard, type ContinueItem, type LibraryItem } from "./recs";
 import { ProgressStore, type ProgressInput } from "./progress";
+import { LibraryIndex } from "./library";
+import type { MediaSyncClient } from "./sync-client";
 import type { HistoryEntry, LibraryIndexRow, MediaKind, MediaLogger } from "./types";
 
 export interface MediaRouterDeps {
@@ -31,10 +34,15 @@ export interface MediaRouterDeps {
     registry: ProviderRegistry;
     availability: AvailabilityResolver;
     progress?: ProgressStore;
+    library?: LibraryIndex;
+    /** When present, every progress/plays write schedules a debounced push. */
+    sync?: Pick<MediaSyncClient, "schedule" | "lastResult" | "getLastPushedRevision">;
     region: string;
     log: MediaLogger;
     /** Optional server id for multi-server attribution. */
     getServerId?: () => string;
+    /** Human label for the server (defaults to the OS hostname). */
+    getServerName?: () => string;
 }
 
 const isKind = (v: unknown): v is MediaKind => v === "movie" || v === "tv";
@@ -100,9 +108,12 @@ function parseProgressBody(body: unknown, fallbackProfile?: string): ProgressInp
 export function createMediaRouter(deps: MediaRouterDeps): express.Router {
     const { db, tmdb, registry, availability, log } = deps;
     const progress = deps.progress ?? new ProgressStore(db);
+    const library = deps.library ?? new LibraryIndex(db, tmdb, log);
     const defaultRegion = deps.region.toUpperCase();
+    const serverId = () => deps.getServerId?.() ?? null;
+    const serverName = () => deps.getServerName?.() ?? os.hostname();
     const router = express.Router();
-    router.use(express.json({ limit: "64kb" }));
+    router.use(express.json({ limit: "512kb" }));
 
     const wrap = (fn: (req: express.Request, res: express.Response) => Promise<void>): express.RequestHandler =>
         (req, res) => {
@@ -120,13 +131,24 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
             region: defaultRegion,
             language: tmdb.language,
             revision: progress.getRevision(),
-            libraryEtag: getMeta(db, "library_etag") ?? "0",
-            serverId: deps.getServerId?.() ?? null,
+            libraryEtag: library.getEtag(),
+            libraryCount: library.count(),
+            serverId: serverId(),
+            serverName: serverName(),
+            sync: deps.sync
+                ? { lastPushedRevision: deps.sync.getLastPushedRevision(), last: deps.sync.lastResult }
+                : null,
         });
     });
 
     router.get("/etag", (_req, res) => {
-        res.json({ revision: progress.getRevision(), libraryEtag: getMeta(db, "library_etag") ?? "0" });
+        res.json({ revision: progress.getRevision(), libraryEtag: library.getEtag() });
+    });
+
+    router.get("/library", (req, res) => {
+        const since = qint(req.query.since);
+        const delta = library.list(since);
+        res.json({ ...delta, serverId: serverId(), serverName: serverName() });
     });
 
     router.get("/providers", wrap(async (req, res) => {
@@ -152,7 +174,7 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
         const force = req.query.force === "1";
         const history = historyFromProgress(progress, profileId);
         const lib = libraryRows(db);
-        const library: LibraryItem[] = lib.filter((l) => l.tmdbId !== null).map((l) => ({ kind: l.kind, tmdbId: l.tmdbId!, updatedAt: l.updatedAt }));
+        const libraryItems: LibraryItem[] = lib.filter((l) => l.tmdbId !== null).map((l) => ({ kind: l.kind, tmdbId: l.tmdbId!, updatedAt: l.updatedAt }));
 
         const continueItems: ContinueItem[] = [];
         for (const p of progress.listContinue(profileId)) {
@@ -161,8 +183,11 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
             continueItems.push({ ...card, progress: p.durationSec > 0 ? p.positionSec / p.durationSec : 0 });
         }
 
-        const rows = await buildHomeRows({ db, tmdb, log }, { profileId, history, library, continueItems, region: r, providersPreferred, force });
-        res.json({ region: r, profile: profileId, configured: tmdb.configured, revision: progress.getRevision(), rows });
+        const rows = await buildHomeRows({ db, tmdb, log }, { profileId, history, library: libraryItems, continueItems, region: r, providersPreferred, force });
+        res.json({
+            region: r, profile: profileId, configured: tmdb.configured, revision: progress.getRevision(),
+            libraryEtag: library.getEtag(), serverId: serverId(), serverName: serverName(), rows,
+        });
     }));
 
     router.get("/title/:kind/:tmdbId", wrap(async (req, res) => {
@@ -182,7 +207,8 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
             availability: avail,
             files: libraryRows(db, kind, tmdbId),
             progress: progress.getProgress(profileId, { kind, tmdbId }),
-            serverId: deps.getServerId?.() ?? null,
+            serverId: serverId(),
+            serverName: serverName(),
         });
     }));
 
@@ -210,9 +236,24 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
     });
 
     router.put("/progress", (req, res) => {
-        const parsed = parseProgressBody(req.body, qs(req.query.profile));
+        const fallback = qs(req.query.profile);
+        if (Array.isArray(req.body)) {
+            if (req.body.length === 0 || req.body.length > 500) { res.status(400).json({ error: "batch must contain 1..500 entries" }); return; }
+            const inputs: ProgressInput[] = [];
+            for (let i = 0; i < req.body.length; i++) {
+                const parsed = parseProgressBody(req.body[i], fallback);
+                if ("error" in parsed) { res.status(400).json({ error: `entries[${i}]: ${parsed.error}` }); return; }
+                inputs.push(parsed);
+            }
+            const entries = progress.putProgressBatch(inputs);
+            deps.sync?.schedule();
+            res.json({ entries, revision: progress.getRevision() });
+            return;
+        }
+        const parsed = parseProgressBody(req.body, fallback);
         if ("error" in parsed) { res.status(400).json({ error: parsed.error }); return; }
         const entry = progress.putProgress(parsed);
+        deps.sync?.schedule();
         res.json({ entry, revision: progress.getRevision() });
     });
 
@@ -225,6 +266,7 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
         if (!Number.isFinite(durationSec) || durationSec < 0) { res.status(400).json({ error: "durationSec must be >= 0" }); return; }
         const playedAt = typeof b.playedAt === "number" && Number.isFinite(b.playedAt) ? b.playedAt : undefined;
         const play = progress.recordPlay(profileId, trackKey.slice(0, 512), durationSec, b.completed === true, playedAt);
+        deps.sync?.schedule();
         res.status(201).json({ play, revision: progress.getRevision() });
     });
 

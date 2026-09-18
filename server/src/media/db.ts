@@ -77,6 +77,21 @@ const MIGRATIONS: string[] = [
     INSERT OR IGNORE INTO meta (key, value) VALUES ('revision', '0');
     INSERT OR IGNORE INTO meta (key, value) VALUES ('library_etag', '0');
     `,
+    // v2 — per-row revision stamps (delta sync) + library tombstones + push state
+    `
+    ALTER TABLE progress ADD COLUMN rev INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE track_plays ADD COLUMN rev INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE library_index ADD COLUMN rev INTEGER NOT NULL DEFAULT 0;
+    CREATE INDEX IF NOT EXISTS idx_progress_rev ON progress(rev);
+    CREATE INDEX IF NOT EXISTS idx_track_plays_rev ON track_plays(rev);
+    CREATE INDEX IF NOT EXISTS idx_library_rev ON library_index(rev);
+    CREATE INDEX IF NOT EXISTS idx_library_path ON library_index(path);
+    CREATE TABLE IF NOT EXISTS library_tombstones (
+        server_file_id TEXT PRIMARY KEY,
+        rev INTEGER NOT NULL
+    );
+    INSERT OR IGNORE INTO meta (key, value) VALUES ('last_pushed_revision', '0');
+    `,
 ];
 
 export const MEDIA_SCHEMA_VERSION = MIGRATIONS.length;

@@ -2995,6 +2995,180 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Media module status
+         * @description Configured API keys (booleans only), region/language, revision counters, server identity and push-sync state. Requires the device token — unlike `/video/probe` it reveals configuration and library size.
+         */
+        get: operations["mediaStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/etag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cheap poll for changes */
+        get: operations["mediaEtag"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Local video library index (full or delta)
+         * @description Without `since` (or with a stale/future value) the response is the full index (`full: true`).
+         *     With `since=<libraryEtag>` from a previous call only rows written after that etag are returned,
+         *     plus the `removed` file ids (tombstones). `serverFileId` is the id `/video/direct/{fileId}` expects.
+         */
+        get: operations["mediaLibrary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Streaming providers available in a region */
+        get: operations["mediaProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Home rows for a profile
+         * @description Empty `rows` (no error) when `TMDB_API_KEY` is not configured.
+         */
+        get: operations["mediaHome"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/title/{kind}/{tmdbId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Title details, availability, local files and progress */
+        get: operations["mediaTitle"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** TMDB multi search (movies + tv), flags titles present locally */
+        get: operations["mediaSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Watch progress for a profile
+         * @description `since` is a revision watermark (from `revision` in any media response): only rows written after it are returned — the web → TV direction of progress sync.
+         */
+        get: operations["mediaGetProgress"];
+        /**
+         * Upsert watch progress (single entry or batch)
+         * @description Body is one `ProgressInput` or an array of 1..500. `completed` is derived at ≥ 90 % when omitted.
+         *     Older `updatedAt` than the stored row is ignored (last-write-wins). Every write bumps `revision`
+         *     and schedules a debounced push to the web app (`POST {webAppUrl}/api/media/sync`).
+         */
+        put: operations["mediaPutProgress"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/plays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent music plays for a profile */
+        get: operations["mediaListPlays"];
+        put?: never;
+        /** Record a music play */
+        post: operations["mediaRecordPlay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3849,6 +4023,260 @@ export interface components {
                 };
             } & {
                 [key: string]: unknown;
+            };
+        };
+        /** @enum {string} */
+        MediaKind: "movie" | "tv";
+        /** @enum {string} */
+        OfferType: "subscription" | "rent" | "buy" | "free" | "ads";
+        /** @description How to open a title on a provider — exact deep link when known, otherwise the provider's search page; native intents for TVs. */
+        LaunchData: {
+            /** Format: uri */
+            web: string;
+            /** Format: uri */
+            search: string;
+            android?: {
+                package: string;
+                uri?: string;
+            };
+            tizen?: {
+                appId: string;
+                payload?: string;
+            };
+        };
+        Offer: {
+            /** @description TMDB watch-provider id. */
+            providerId: number;
+            name: string;
+            /** @description TMDB logo path. */
+            logo: string | null;
+            type: components["schemas"]["OfferType"];
+            /**
+             * Format: uri
+             * @description Exact deep link (Movie of the Night); absent with TMDB/JustWatch data.
+             */
+            link?: string;
+            launch: components["schemas"]["LaunchData"];
+        };
+        Availability: {
+            offers: components["schemas"]["Offer"][];
+            /** @enum {string} */
+            source: "motn" | "tmdb" | "none";
+            /** @description Data-source credits that must be shown (JustWatch, Movie of the Night). */
+            attribution: string[];
+            fetchedAt?: number;
+        };
+        TitleCard: {
+            kind: components["schemas"]["MediaKind"];
+            tmdbId: number;
+            title: string;
+            originalTitle?: string;
+            overview?: string;
+            posterPath: string | null;
+            backdropPath: string | null;
+            releaseDate?: string;
+            voteAverage?: number;
+            voteCount?: number;
+            popularity?: number;
+            genreIds: number[];
+            /** @description Present in this server's library_index. */
+            inLibrary?: boolean;
+            /** @description Watched fraction (continue rows). */
+            progress?: number;
+            reason?: string;
+        };
+        Person: {
+            id: number;
+            name: string;
+            role: string;
+            profilePath: string | null;
+        };
+        TitleDetails: components["schemas"]["TitleCard"] & {
+            runtime?: number;
+            status?: string;
+            tagline?: string;
+            genres: {
+                id: number;
+                name: string;
+            }[];
+            keywords: {
+                id: number;
+                name: string;
+            }[];
+            cast: components["schemas"]["Person"][];
+            crew: components["schemas"]["Person"][];
+            collectionId?: number | null;
+            numberOfSeasons?: number;
+            numberOfEpisodes?: number;
+            externalIds: {
+                [key: string]: unknown;
+            };
+            videos: {
+                key: string;
+                site: string;
+                type: string;
+                name: string;
+            }[];
+            logoPath: string | null;
+            certification?: string;
+            recommendations: components["schemas"]["TitleCard"][];
+            similar: components["schemas"]["TitleCard"][];
+            /** @description Raw TMDB watch/providers.results keyed by region. */
+            watchProviders: {
+                [key: string]: unknown;
+            };
+        };
+        HomeRow: {
+            /** @description Stable row id (continue, trending, because:<tmdbId>, provider:<id>, …). */
+            id: string;
+            title: {
+                ro: string;
+                en: string;
+            };
+            /** @enum {string} */
+            kind: "mixed" | "movie" | "tv";
+            items: components["schemas"]["TitleCard"][];
+            reason?: string;
+        };
+        MediaHome: {
+            region: string;
+            profile: string;
+            /** @description TMDB key present; rows are empty when false. */
+            configured: boolean;
+            revision: number;
+            libraryEtag: number;
+            /** @description Device id of this server (attribution in multi-server setups). */
+            serverId: string | null;
+            serverName: string;
+            rows: components["schemas"]["HomeRow"][];
+        };
+        LibraryIndexRow: {
+            /** @description Same id as /video/direct/{fileId}. */
+            serverFileId: string;
+            kind: components["schemas"]["MediaKind"];
+            /** @description Null when the title could not be matched (or no TMDB key). */
+            tmdbId: number | null;
+            season: number | null;
+            episode: number | null;
+            path: string;
+            size: number;
+            mtime: number;
+            updatedAt: number;
+            /** @description Library etag at which this row was last written. */
+            rev?: number;
+        };
+        LibraryIndex: {
+            /** @description Current libraryEtag; pass back as since. */
+            revision: number;
+            full: boolean;
+            items: components["schemas"]["LibraryIndexRow"][];
+            /** @description File ids removed since `since` (empty on a full response). */
+            removed: string[];
+            serverId: string | null;
+            serverName: string;
+        };
+        MediaTitleResponse: {
+            title: components["schemas"]["TitleDetails"];
+            availability: components["schemas"]["Availability"];
+            files: components["schemas"]["LibraryIndexRow"][];
+            progress: components["schemas"]["ProgressEntry"][];
+            serverId: string | null;
+            serverName: string;
+        };
+        MediaSearchPage: {
+            page: number;
+            totalPages: number;
+            results: components["schemas"]["TitleCard"][];
+        };
+        ProviderCatalog: {
+            region: string;
+            fetchedAt: number;
+            providers: {
+                providerId: number;
+                key: string;
+                name: string;
+                logo: string | null;
+                displayPriority: number;
+                launch: components["schemas"]["LaunchData"];
+            }[];
+        };
+        ProgressInput: {
+            /** @description Required unless ?profile= is given. */
+            profileId?: string;
+            kind: components["schemas"]["MediaKind"];
+            tmdbId: number;
+            /** @default 0 */
+            season: number;
+            /** @default 0 */
+            episode: number;
+            positionSec: number;
+            /** @default 0 */
+            durationSec: number;
+            completed?: boolean;
+            /** @description Epoch ms; defaults to server time. */
+            updatedAt?: number;
+        };
+        ProgressEntry: {
+            profileId: string;
+            kind: components["schemas"]["MediaKind"];
+            tmdbId: number;
+            season: number;
+            episode: number;
+            positionSec: number;
+            durationSec: number;
+            completed: boolean;
+            updatedAt: number;
+            /** @description Revision at which this row was last written. */
+            rev?: number;
+        };
+        ProgressList: {
+            revision: number;
+            entries: components["schemas"]["ProgressEntry"][];
+        };
+        TrackPlayInput: {
+            profileId?: string;
+            trackKey: string;
+            /** @default 0 */
+            durationSec: number;
+            /** @default false */
+            completed: boolean;
+            playedAt?: number;
+        };
+        TrackPlay: {
+            id: number;
+            profileId: string;
+            trackKey: string;
+            playedAt: number;
+            durationSec: number;
+            completed: boolean;
+            rev?: number;
+        };
+        MediaEtag: {
+            /** @description Bumps on every progress/play write. */
+            revision: number;
+            /** @description Bumps on every library index change. */
+            libraryEtag: number;
+        };
+        MediaSyncResult: {
+            ok: boolean;
+            status: number | ("offline" | "skipped");
+            pushed: number;
+            revision: number;
+        };
+        MediaStatus: {
+            configured: boolean;
+            tmdb: boolean;
+            motn: boolean;
+            region: string;
+            language: string;
+            revision: number;
+            libraryEtag: number;
+            libraryCount: number;
+            serverId: string | null;
+            serverName: string;
+            sync: null | {
+                lastPushedRevision: number;
+                last: null | components["schemas"]["MediaSyncResult"];
             };
         };
     };
@@ -9625,6 +10053,310 @@ export interface operations {
                     "*/*": string;
                 };
             };
+        };
+    };
+    mediaStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaEtag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revision counters */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaEtag"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaLibrary: {
+        parameters: {
+            query?: {
+                /** @description Previously seen libraryEtag. */
+                since?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Library index */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryIndex"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaProviders: {
+        parameters: {
+            query?: {
+                /** @description ISO 3166-1 alpha-2; defaults to the server region. */
+                region?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Provider catalog merged with launch data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderCatalog"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaHome: {
+        parameters: {
+            query?: {
+                profile?: string;
+                region?: string;
+                /** @description Comma-separated TMDB provider ids the user subscribes to. */
+                providers?: string;
+                /** @description Bypass the 24 h rows cache. */
+                force?: "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Home rows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaHome"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaTitle: {
+        parameters: {
+            query?: {
+                region?: string;
+                profile?: string;
+            };
+            header?: never;
+            path: {
+                kind: components["schemas"]["MediaKind"];
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Title */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaTitleResponse"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+            /** @description TMDB not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    mediaSearch: {
+        parameters: {
+            query: {
+                q: string;
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Search page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaSearchPage"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaGetProgress: {
+        parameters: {
+            query: {
+                profile: string;
+                kind?: components["schemas"]["MediaKind"];
+                tmdbId?: number;
+                /** @description Revision watermark. */
+                since?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Progress entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressList"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaPutProgress: {
+        parameters: {
+            query?: {
+                /** @description Fallback profileId for entries without one. */
+                profile?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgressInput"] | components["schemas"]["ProgressInput"][];
+            };
+        };
+        responses: {
+            /** @description Stored entry (single) or entries (batch) plus the new revision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        entry: components["schemas"]["ProgressEntry"];
+                        revision: number;
+                    } | {
+                        entries: components["schemas"]["ProgressEntry"][];
+                        revision: number;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaListPlays: {
+        parameters: {
+            query: {
+                profile: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Plays, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        plays: components["schemas"]["TrackPlay"][];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaRecordPlay: {
+        parameters: {
+            query?: {
+                /** @description Fallback profileId. */
+                profile?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackPlayInput"];
+            };
+        };
+        responses: {
+            /** @description Stored play */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        play: components["schemas"]["TrackPlay"];
+                        revision: number;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
         };
     };
 }

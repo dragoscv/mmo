@@ -255,6 +255,239 @@ data class PreRemuxJob(
 )
 
 @Serializable
+data class MediaStatus(
+    val configured: Boolean = false,
+    val tmdb: Boolean = false,
+    val motn: Boolean = false,
+    val region: String = "",
+    val language: String = "",
+    val revision: Long = 0L,
+    val libraryEtag: Long = 0L,
+    val libraryCount: Long = 0L,
+    val serverId: String? = null,
+    val serverName: String = "",
+    val sync: JsonObject? = null,
+)
+
+@Serializable
+data class MediaEtag(
+    val revision: Long = 0L,
+    val libraryEtag: Long = 0L,
+)
+
+@Serializable
+data class TitleCard(
+    val kind: String = "",
+    val tmdbId: Long = 0L,
+    val title: String = "",
+    val originalTitle: String? = null,
+    val overview: String? = null,
+    val posterPath: String? = null,
+    val backdropPath: String? = null,
+    val releaseDate: String? = null,
+    val voteAverage: Double? = null,
+    val voteCount: Long? = null,
+    val popularity: Double? = null,
+    val genreIds: List<Long> = emptyList(),
+    val inLibrary: Boolean? = null,
+    val progress: Double? = null,
+    val reason: String? = null,
+)
+
+@Serializable
+data class HomeRow(
+    val id: String = "",
+    val title: JsonObject = JsonObject(emptyMap()),
+    val kind: String = "",
+    val items: List<TitleCard> = emptyList(),
+    val reason: String? = null,
+)
+
+@Serializable
+data class MediaHome(
+    val region: String = "",
+    val profile: String = "",
+    val configured: Boolean = false,
+    val revision: Long = 0L,
+    val libraryEtag: Long = 0L,
+    val serverId: String? = null,
+    val serverName: String = "",
+    val rows: List<HomeRow> = emptyList(),
+)
+
+@Serializable
+data class Person(
+    val id: Long = 0L,
+    val name: String = "",
+    val role: String = "",
+    val profilePath: String? = null,
+)
+
+@Serializable
+data class TitleDetails(
+    val kind: String = "",
+    val tmdbId: Long = 0L,
+    val title: String = "",
+    val originalTitle: String? = null,
+    val overview: String? = null,
+    val posterPath: String? = null,
+    val backdropPath: String? = null,
+    val releaseDate: String? = null,
+    val voteAverage: Double? = null,
+    val voteCount: Long? = null,
+    val popularity: Double? = null,
+    val genreIds: List<Long> = emptyList(),
+    val inLibrary: Boolean? = null,
+    val progress: Double? = null,
+    val reason: String? = null,
+    val runtime: Long? = null,
+    val status: String? = null,
+    val tagline: String? = null,
+    val genres: List<JsonObject> = emptyList(),
+    val keywords: List<JsonObject> = emptyList(),
+    val cast: List<Person> = emptyList(),
+    val crew: List<Person> = emptyList(),
+    val collectionId: Long? = null,
+    val numberOfSeasons: Long? = null,
+    val numberOfEpisodes: Long? = null,
+    val externalIds: Map<String, JsonElement> = emptyMap(),
+    val videos: List<JsonObject> = emptyList(),
+    val logoPath: String? = null,
+    val certification: String? = null,
+    val recommendations: List<TitleCard> = emptyList(),
+    val similar: List<TitleCard> = emptyList(),
+    val watchProviders: Map<String, JsonElement> = emptyMap(),
+)
+
+/** How to open a title on a provider — exact deep link when known, otherwise the provider's search page; native intents for TVs. */
+@Serializable
+data class LaunchData(
+    val web: String = "",
+    val search: String = "",
+    val android: JsonObject? = null,
+    val tizen: JsonObject? = null,
+)
+
+@Serializable
+data class Offer(
+    val providerId: Long = 0L,
+    val name: String = "",
+    val logo: String? = null,
+    val type: String = "",
+    val link: String? = null,
+    val launch: LaunchData = LaunchData(),
+)
+
+@Serializable
+data class Availability(
+    val offers: List<Offer> = emptyList(),
+    val source: String = "",
+    val attribution: List<String> = emptyList(),
+    val fetchedAt: Long? = null,
+)
+
+@Serializable
+data class LibraryIndexRow(
+    val serverFileId: String = "",
+    val kind: String = "",
+    val tmdbId: Long? = null,
+    val season: Long? = null,
+    val episode: Long? = null,
+    val path: String = "",
+    val size: Long = 0L,
+    val mtime: Long = 0L,
+    val updatedAt: Long = 0L,
+    val rev: Long? = null,
+)
+
+@Serializable
+data class ProgressEntry(
+    val profileId: String = "",
+    val kind: String = "",
+    val tmdbId: Long = 0L,
+    val season: Long = 0L,
+    val episode: Long = 0L,
+    val positionSec: Double = 0.0,
+    val durationSec: Double = 0.0,
+    val completed: Boolean = false,
+    val updatedAt: Long = 0L,
+    val rev: Long? = null,
+)
+
+@Serializable
+data class MediaTitleResponse(
+    val title: TitleDetails = TitleDetails(),
+    val availability: Availability = Availability(),
+    val files: List<LibraryIndexRow> = emptyList(),
+    val progress: List<ProgressEntry> = emptyList(),
+    val serverId: String? = null,
+    val serverName: String = "",
+)
+
+@Serializable
+data class MediaSearchPage(
+    val page: Long = 0L,
+    val totalPages: Long = 0L,
+    val results: List<TitleCard> = emptyList(),
+)
+
+@Serializable
+data class LibraryIndex(
+    val revision: Long = 0L,
+    val full: Boolean = false,
+    val items: List<LibraryIndexRow> = emptyList(),
+    val removed: List<String> = emptyList(),
+    val serverId: String? = null,
+    val serverName: String = "",
+)
+
+@Serializable
+data class ProgressInput(
+    val profileId: String? = null,
+    val kind: String = "",
+    val tmdbId: Long = 0L,
+    val season: Long? = null,
+    val episode: Long? = null,
+    val positionSec: Double = 0.0,
+    val durationSec: Double? = null,
+    val completed: Boolean? = null,
+    val updatedAt: Long? = null,
+)
+
+@Serializable
+data class ProgressList(
+    val revision: Long = 0L,
+    val entries: List<ProgressEntry> = emptyList(),
+)
+
+@Serializable
+data class TrackPlayInput(
+    val profileId: String? = null,
+    val trackKey: String = "",
+    val durationSec: Double? = null,
+    val completed: Boolean? = null,
+    val playedAt: Long? = null,
+)
+
+@Serializable
+data class TrackPlay(
+    val id: Long = 0L,
+    val profileId: String = "",
+    val trackKey: String = "",
+    val playedAt: Long = 0L,
+    val durationSec: Double = 0.0,
+    val completed: Boolean = false,
+    val rev: Long? = null,
+)
+
+@Serializable
+data class ProviderCatalog(
+    val region: String = "",
+    val fetchedAt: Long = 0L,
+    val providers: List<JsonObject> = emptyList(),
+)
+
+@Serializable
 data class Error(
     val error: String = "",
 )

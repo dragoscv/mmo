@@ -120,6 +120,8 @@ export interface LibraryIndexRow {
     size: number;
     mtime: number;
     updatedAt: number;
+    /** Global revision at which this row was last written. */
+    rev?: number;
 }
 
 export interface ProgressEntry {
@@ -132,6 +134,8 @@ export interface ProgressEntry {
     durationSec: number;
     completed: boolean;
     updatedAt: number;
+    /** Global revision at which this row was last written (delta sync watermark). */
+    rev?: number;
 }
 
 export interface TrackPlay {
@@ -141,6 +145,7 @@ export interface TrackPlay {
     playedAt: number;
     durationSec: number;
     completed: boolean;
+    rev?: number;
 }
 
 export interface HomeRow {

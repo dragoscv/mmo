@@ -24,6 +24,7 @@ import {
     type ScanJob,
     type ScannedVideoPayload,
 } from "./scan-jobs";
+import { mediaLibraryHooks } from "../media/library-hooks";
 
 async function discover(root: string, job: ScanJob, onUpdate: () => void): Promise<{ files: string[]; dirsVisited: number; dirsErrored: number; sampleErrors: Array<{ dir: string; error: string }> }> {
     let lastEmit = 0;
@@ -220,6 +221,11 @@ export async function runVideoScanJob(
         console.log(`[video-scan] complete job=${job.id} probed=${videos.length} errored=${job.errored} totalMs=${tTotal}`);
         completeVideoScanJob(job.id, videos);
         onUpdate();
+        // Feed the Media Home library index (WP10-05). Fire-and-forget: TMDB
+        // matching may take a while and must never delay job completion.
+        void mediaLibraryHooks().onScanComplete(job.folder, videos).catch((e: unknown) => {
+            console.warn(`[video-scan] media index failed: ${e instanceof Error ? e.message : String(e)}`);
+        });
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[video-scan] job=${job.id} crashed: ${msg}`);

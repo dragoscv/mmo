@@ -36,6 +36,7 @@ import { getSettings, updateSettings } from "../store";
 import { searchOpenSubtitles, searchAddic7ed, downloadOpenSubtitles } from "./subtitle-search";
 import { startVideoWatcher, stopVideoWatcher, videoLibraryBus } from "./video-watcher";
 import { rateLimit } from "./rate-limit";
+import { mediaLibraryHooks, showHintFor, type ScannedForIndex } from "../media/library-hooks";
 
 /** Persisted file registry: opaque fileId → absolute path. Populated by /video/scan
  *  and /video/lookup. Persisted across companion restarts so streaming URLs
@@ -141,7 +142,11 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
     r.get("/probe", (_req, res) => {
         res.json({
             ok: true,
-            capabilities: ["video.scan", "video.transcode", "video.subtitles", "video.tmdb-cache"],
+            capabilities: [
+                "video.scan", "video.transcode", "video.subtitles", "video.tmdb-cache",
+                // Media Home brain (WP10): /media/* behind the device token.
+                "media.home", "media.library", "media.progress", "media.plays",
+            ],
             ffmpeg: !!FFMPEG_BIN,
         });
     });
@@ -171,7 +176,10 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
         }
         const autoPreRemux = getSettings().preRemuxAutoOnScan;
         const files: Array<Record<string, unknown>> = [];
+        const forIndex = new Map<string, ScannedForIndex[]>();
         for (const root of roots) {
+            const indexed: ScannedForIndex[] = [];
+            forIndex.set(root, indexed);
             for await (const f of walkVideos(root)) {
                 const probed = await ffprobe(f);
                 if (!probed) continue;
@@ -179,6 +187,10 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
                 const parsed = parseFilename(f);
                 registerFile(fileId, { absPath: f, meta: { ...probed, parsed } });
                 files.push({ fileId, parsed, ...probed });
+                indexed.push({
+                    filepath: f, fileSize: probed.sizeBytes, mtime: probed.mtime.getTime(), parsedTitle: parsed.title, parsedYear: parsed.year,
+                    parsedSeason: parsed.season, parsedEpisode: parsed.episode, showHint: showHintFor(f, roots),
+                });
                 if (autoPreRemux) {
                     const dur = typeof (probed as { durationSec?: number }).durationSec === "number"
                         ? (probed as { durationSec: number }).durationSec : null;
@@ -187,6 +199,10 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
             }
         }
         res.json({ files, rootsScanned: roots.length });
+        // Media Home library index (WP10-05) — after the response, best effort.
+        for (const [root, indexed] of forIndex) {
+            void mediaLibraryHooks().onScanComplete(root, indexed).catch(() => { /* logged by hooks */ });
+        }
     });
 
     r.get("/file/:fileId/info", authMiddleware, (req, res) => {

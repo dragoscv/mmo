@@ -2,7 +2,33 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
-## 3.1.0 — remove third-party embed sources (WP10-08, ADR-0009)
+## 3.1.0 — Media Home brain mounted at `/media` (WP10-05..07, 09) · remove third-party embed sources (WP10-08, ADR-0009)
+
+- **`/media/*` is live** (`server/src/media/`, behind `x-device-token`, including `/media/status`):
+	`status`, `etag`, `home`, `title/{kind}/{tmdbId}`, `search`, `library`, `providers`, `progress`
+	(GET/PUT), `plays` (GET/POST). No-op (200 with empty rows) without `TMDB_API_KEY`. `/video/probe`
+	now advertises `media.home`, `media.library`, `media.progress`, `media.plays`.
+- **Library index with etag (WP10-05).** `library_index` is populated from `POST /video/scan`, from
+	video scan jobs (`POST /scan` kind movies/tv-shows) and incrementally from the chokidar watcher
+	(`media/library-hooks.ts`); rows use the same `fileId` as `/video/direct/{fileId}`; TMDB ids are
+	matched best-effort through a cached `search/multi` (`matchTitle`, 30 d hit / 24 h miss). Removed
+	files leave tombstones so `GET /media/library?since=<libraryEtag>` returns exact deltas
+	(`items[]` + `removed[]`). `home`, `title`, `library` and `status` carry `serverId` (device id)
+	and `serverName` for multi-server attribution.
+- **Progress sync (WP10-06).** Every progress/play write stamps the row with the global `revision`;
+	`GET /media/progress?since=<revision>` returns only newer rows (web → TV direction) and
+	`PUT /media/progress` accepts a batch (1..500). A debounced (10 s) push client sends
+	`{deviceId, revision, since, full, progress[], plays[]}` to `POST {webAppUrl}/api/media/sync`
+	with `Authorization: Bearer <deviceToken>`, plus an hourly full push; watermark
+	`meta.last_pushed_revision` advances only on 2xx, 404/offline retry, 401/403 pause until the
+	token changes. State is exposed in `/media/status.sync`. `media.sqlite` schema v2 (`rev`
+	columns, `library_tombstones`) migrates in place.
+- **Contract (WP10-07).** 11 `/media` routes + 24 `Media*`/`Title*`/`Progress*`/`Library*`
+	schemas in `openapi.yaml` (194 routes, `openapi:check` OK); `media/routes.ts` in the drift
+	guard `MOUNTS`; `Models.kt` (+20 classes) and `packages/sdk` `mmo-server.d.ts` regenerated.
+- **Tests (WP10-09).** `src/media` = 7 files / 51 tests (library upsert/prune/delta, TMDB match
+	cache, sync client 200/404/offline/401/debounce, batch progress, `/library?since`, `/status`
+	shape, v1→v2 migration); whole server suite 146/146 on Node 22.
 
 - **Removed: third-party embed sources (vidsrc & co.)** — see
 	[ADR-0009](../docs/adr/0009-remove-third-party-embed-sources.md). Deleted
