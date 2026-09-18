@@ -1,0 +1,32 @@
+@import "tailwindcss";
+@import "../../../packages/design-tokens/dist/tokens.css";
+@import "../../../packages/ui/src/styles.css";
+@source "../../../packages/ui/src";
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Text the user may want to copy (debug log, device names, emails). */
+pre,
+input,
+textarea,
+.select-text {
+  user-select: text;
+}
+
+/* Electron drag regions. The titlebar is only rendered on macOS (hiddenInset);
+   Windows/Linux use the native frame. */
+.app-region-drag {
+  -webkit-app-region: drag;
+}
+.app-region-no-drag {
+  -webkit-app-region: no-drag;
+}

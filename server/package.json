@@ -1,7 +1,7 @@
 {
-  "name": "muzicai-companion",
-  "version": "1.0.47",
-  "description": "MuzicAI Companion Server — serves local music files to the MuzicAI web app",
+  "name": "mmo-server",
+  "version": "2.0.0",
+  "description": "MMO Server (MixAI Companion) — serves local music and video files to the MixAI web app",
   "main": "dist/main.js",
   "author": {
     "name": "mwrty",
@@ -14,15 +14,22 @@
     "url": "https://github.com/dragoscv/mmo.git"
   },
   "scripts": {
-    "dev": "tsc-watch --onFirstSuccess \"electronmon .\"",
-    "dev:once": "tsc && electron .",
-    "dev:inspect": "tsc-watch --onFirstSuccess \"electronmon --inspect=0.0.0.0:9229 --remote-debugging-port=9222 .\"",
-    "build": "tsc",
+    "dev": "pnpm ui:build && tsc-watch --onFirstSuccess \"electronmon .\"",
+    "dev:once": "pnpm ui:build && tsc && electron .",
+    "dev:inspect": "pnpm ui:build && tsc-watch --onFirstSuccess \"electronmon --inspect=0.0.0.0:9229 --remote-debugging-port=9222 .\"",
+    "ui:dev": "vite --config ui/vite.config.ts",
+    "ui:build": "vite build --config ui/vite.config.ts",
+    "ui:typecheck": "tsc --noEmit -p ui/tsconfig.json",
+    "build": "pnpm ui:build && tsc",
+    "build:headless": "tsc",
     "start": "electron .",
-    "dist": "tsc && node scripts/prepare-rbexport.mjs && electron-builder --win --x64",
-    "dist:win": "tsc && node scripts/prepare-rbexport.mjs && electron-builder --win --x64",
-    "dist:mac": "tsc && node scripts/prepare-rbexport.mjs && electron-builder --mac",
-    "dist:linux": "tsc && node scripts/prepare-rbexport.mjs && electron-builder --linux",
+    "start:headless": "node dist/headless.js",
+    "rebuild:electron": "electron-builder install-app-deps",
+    "rebuild:node": "pnpm rebuild better-sqlite3 audify",
+    "dist": "pnpm build && node scripts/prepare-rbexport.mjs && electron-builder --win --x64",
+    "dist:win": "pnpm build && node scripts/prepare-rbexport.mjs && electron-builder --win --x64",
+    "dist:mac": "pnpm build && node scripts/prepare-rbexport.mjs && electron-builder --mac",
+    "dist:linux": "pnpm build && node scripts/prepare-rbexport.mjs && electron-builder --linux",
     "fetch:virtual-audio": "node scripts/fetch-virtual-audio.mjs",
     "fetch:cloudflared": "node scripts/fetch-cloudflared.mjs",
     "build:rbexport": "cargo build --release --manifest-path native/rbexport/Cargo.toml",
@@ -31,8 +38,8 @@
     "test:watch": "vitest"
   },
   "build": {
-    "appId": "ro.muzicai.companion",
-    "productName": "MuzicAI Companion",
+    "appId": "ro.mixai.companion",
+    "productName": "MixAI Companion",
     "artifactName": "${productName}-Setup-${version}.${ext}",
     "afterPack": "scripts/mac-adhoc-sign.js",
     "publish": [
@@ -49,7 +56,7 @@
     },
     "files": [
       "dist/**/*",
-      "ui/**/*",
+      "ui/dist/**/*",
       "assets/**/*",
       "!src/**",
       "!**/*.ts",
@@ -88,8 +95,7 @@
           "!.gitignore",
           "!README.md"
         ]
-      }
-      ,
+      },
       {
         "from": "assets/bin",
         "to": "bin",
@@ -168,14 +174,14 @@
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "icon": "assets/icon.png",
       "category": "AudioVideo;Audio",
-      "synopsis": "MMO Companion — local music server for the MMO web app",
-      "description": "Electron companion daemon that serves your local music library, recordings, and downloads to the MuzicAI web app. Bundles the BlackHole / pactl virtual-audio adapter so you can route per-deck audio without third-party drivers.",
+      "synopsis": "MixAI Companion — MMO Server, local media server for the MixAI web app",
+      "description": "Electron companion daemon (MMO Server) that serves your local music library, recordings, and downloads to the MixAI web app. Bundles the BlackHole / pactl virtual-audio adapter so you can route per-deck audio without third-party drivers.",
       "maintainer": "mwrty <vladulescu.catalin@gmail.com>",
       "vendor": "mwrty",
       "desktop": {
         "entry": {
-          "Name": "MuzicAI Companion",
-          "Comment": "Local music server for the MMO web app",
+          "Name": "MixAI Companion — MMO Server",
+          "Comment": "Local media server for the MixAI web app",
           "Categories": "AudioVideo;Audio;"
         }
       }
@@ -217,12 +223,11 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "MMO Companion",
+      "shortcutName": "MixAI Companion",
       "deleteAppDataOnUninstall": false
     }
   },
   "dependencies": {
-    "audify": "^1.10.1",
     "better-sqlite3": "^11.7.0",
     "bindings": "^1.5.0",
     "bonjour-service": "^1.3.0",
@@ -232,7 +237,6 @@
     "discord-rpc": "^4.0.1",
     "drizzle-orm": "^0.36.4",
     "ee-first": "^1.1.1",
-    "electron-store": "^8.2.0",
     "electron-updater": "^6.6.2",
     "encodeurl": "^2.0.0",
     "escape-html": "^1.0.3",
@@ -249,22 +253,39 @@
     "unpipe": "^1.0.0",
     "ws": "^8.18.0"
   },
+  "optionalDependencies": {
+    "audify": "^1.10.1"
+  },
   "devDependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/better-sqlite3": "^7.6.12",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "@types/ws": "^8.5.14",
+    "@vitejs/plugin-react": "^6.1.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "electron": "^34.3.0",
     "electron-builder": "^26.0.0",
     "electronmon": "^2.0.3",
+    "lucide-react": "^1.47.0",
+    "motion": "^13.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3",
     "tsc-watch": "^7.2.0",
     "typescript": "^5.8.3",
+    "vite": "^8.3.0",
     "vitest": "^2.1.9"
   },
   "electronmon": {
     "patterns": [
       "dist/**/*",
-      "ui/**/*",
+      "ui/dist/**/*",
       "preload.js",
       "!**/node_modules/**",
       "!**/release/**",

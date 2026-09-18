@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@mmo/ui": ["../../packages/ui/src/index.ts"],
+      "@mmo/ui/*": ["../../packages/ui/src/*"],
+      "@mmo/design-tokens": ["../../packages/design-tokens/src/index.ts"],
+      "react": ["../node_modules/@types/react"],
+      "react/jsx-runtime": ["../node_modules/@types/react/jsx-runtime"],
+      "react/jsx-dev-runtime": ["../node_modules/@types/react/jsx-dev-runtime"],
+      "react-dom": ["../node_modules/@types/react-dom"],
+      "react-dom/client": ["../node_modules/@types/react-dom/client"]
+    }
+  },
+  "include": ["src", "vite.config.ts"],
+  "exclude": ["dist", "public"]
+}

@@ -191,9 +191,9 @@ async function refreshAudioInventory(reason: string): Promise<void> {
 // macOS where Console.app sometimes misses very-early failures).
 //
 // Path:
-//   macOS:   ~/Library/Logs/MMO Companion/main.log
-//   Windows: %APPDATA%\MMO Companion\logs\main.log
-//   Linux:   ~/.config/MMO Companion/logs/main.log
+//   macOS:   ~/Library/Logs/MixAI Companion/main.log
+//   Windows: %APPDATA%\MixAI Companion\logs\main.log
+//   Linux:   ~/.config/MixAI Companion/logs/main.log
 //
 // We also surface uncaught exceptions in a dialog so the user can copy
 // the error text out instead of staring at a window-that-never-appears.
@@ -250,7 +250,7 @@ process.on("uncaughtException", (err) => {
     logLine("error", "uncaughtException:", err);
     try {
         dialog.showErrorBox(
-            "MMO Companion: uncaught exception",
+            "MixAI Companion: uncaught exception",
             `${err.message}\n\nFull log: ${LOG_FILE}\n\n${err.stack ?? ""}`,
         );
     } catch { /* ignore */ }
@@ -287,7 +287,7 @@ async function loadServerModule(): Promise<ServerModule | null> {
         logLine("error", "./server failed to load:", err);
         try {
             dialog.showErrorBox(
-                "MMO Companion: audio engine unavailable",
+                "MixAI Companion: audio engine unavailable",
                 `Could not initialize the local server / native audio engine.\n\nThe app will continue running but audio features will be disabled.\n\nLog: ${LOG_FILE}\n\n${(err as Error)?.message ?? err}`,
             );
         } catch { /* ignore */ }
@@ -495,13 +495,15 @@ function createWindow() {
     mainWindow.on("maximize", onBoundsChange);
     mainWindow.on("unmaximize", onBoundsChange);
 
-    const indexPath = path.join(__dirname, "../ui/index.html");
+    // Vite build output (server/ui → `pnpm ui:build`). Assets are relative
+    // (`base: "./"`) so file:// loading works from the asar.
+    const indexPath = path.join(__dirname, "../ui/dist/index.html");
     mainWindow.loadFile(indexPath).catch((err) => {
         console.error("[main] Failed to load UI:", err);
         // Surface the error visibly so the user isn't stuck staring at a
         // blank window.
         dialog.showErrorBox(
-            "MMO Companion failed to start",
+            "MixAI Companion failed to start",
             `Could not load UI from:\n${indexPath}\n\n${err?.message ?? err}`,
         );
     });
@@ -616,7 +618,7 @@ function buildTrayMenu(): Electron.Menu {
             label: "Open MMO in Browser",
             click: () => {
                 const settings = getSettings();
-                shell.openExternal(settings.webAppUrl || "https://muzicai.ro");
+                shell.openExternal(settings.webAppUrl || "https://mixai.ro");
             },
         },
         { type: "separator" },
@@ -675,7 +677,7 @@ function createTray() {
     }
 
     tray = new Tray(icon);
-    tray.setToolTip("MMO Companion Server");
+    tray.setToolTip("MixAI Companion (MMO Server)");
     tray.setContextMenu(buildTrayMenu());
     tray.on("double-click", () => {
         mainWindow?.show();
