@@ -31,6 +31,8 @@ const mirrors: Array<[string, string]> = [
   ["tokens.plain.css", join(repo, "apps", "native", "web", "tokens.css")],
   ["prehydrate.js", join(repo, "apps", "web", "public", "prehydrate.js")],
   ["prehydrate.js", join(repo, "apps", "tv-tizen", "public", "prehydrate.js")],
+  ["prehydrate.js", join(repo, "apps", "mixai", "public", "prehydrate.js")],
+  ["prehydrate.js", join(repo, "server", "ui", "public", "prehydrate.js")],
 ];
 for (const [name, target] of mirrors) {
   mkdirSync(dirname(target), { recursive: true });
