@@ -1,23 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { Menu, Search, ChevronRight, ArrowLeft, CircleHelp, Star, Pin } from "lucide-react";
 import {
-    Menu,
-    Search,
-    ChevronsLeft,
-    ChevronsRight,
-    ChevronRight,
-    ArrowLeft,
-    HelpCircle,
-    Star,
-    Pin,
-    X,
-} from "lucide-react";
+    Sidebar,
+    SidebarHeader,
+    SidebarContent,
+    SidebarFooter,
+    SidebarGroup,
+    SidebarGroupLabel,
+    SidebarMenu,
+    SidebarMenuItem,
+    SidebarMenuButton,
+    SidebarRail,
+    Kbd,
+} from "@mmo/ui";
 import { cn } from "@/lib/utils";
 import { UserCard } from "./user-card";
 import { LegendModal } from "./legend-modal";
@@ -35,51 +37,48 @@ import {
 } from "./sidebar/nav-tree";
 import { usePinnedHrefs } from "./sidebar/use-pinned";
 
+type LabelFor = (key: string, fallback: string) => string;
+
 // ─── Public mobile trigger (kept for compatibility) ──────────────────────
 export function MobileSidebarTrigger() {
     const { openMobile } = useSidebar();
+    const t = useTranslations("nav");
     return (
         <button
+            type="button"
             onClick={openMobile}
-            className="fixed top-3 left-3 z-50 flex h-9 w-9 items-center justify-center rounded-lg bg-card/80 backdrop-blur border border-border text-muted-foreground hover:text-foreground transition-colors md:hidden cursor-pointer"
-            aria-label="Open menu"
+            className="surface fixed top-3 left-3 z-(--z-sticky) flex size-9 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:hidden"
+            aria-label={t("openMenu")}
         >
-            <Menu className="h-4.5 w-4.5" />
+            <Menu className="size-4.5" aria-hidden />
         </button>
     );
 }
 
 // ─── i18n helper: fall back to baked-in English when key is missing ──────
-function useTranslatedLabel() {
+function useTranslatedLabel(): LabelFor {
     const t = useTranslations("nav");
-    return (key: string, fallback: string) => {
-        // next-intl 3+ surfaces missing keys via `.has()`; it doesn't throw.
-        const has = (t as unknown as { has?: (k: string) => boolean }).has;
-        if (typeof has === "function" && !has.call(t, key)) return fallback;
-        try {
-            const out = t(key);
-            return out === key ? fallback : out;
-        } catch {
-            return fallback;
-        }
-    };
+    return useCallback((key: string, fallback: string) => (t.has(key) ? t(key) : fallback), [t]);
 }
 
 function leafByHref(href: string): NavLeaf | undefined {
     return allLeaves.find((l) => l.href === href);
 }
 
-// ─── Sidebar content (root view + drilled view) ──────────────────────────
-function SidebarContent({ collapsed }: { collapsed: boolean }) {
+const VIEW_EASE = [0.32, 0.72, 0, 1] as const;
+
+// ─── Sidebar body (header + root/drilled views + footer) ─────────────────
+function SidebarBody({ onOpenSearch, onOpenLegend }: { onOpenSearch: () => void; onOpenLegend: () => void }) {
     const pathname = usePathname();
     const router = useRouter();
-    const [legendOpen, setLegendOpen] = useState(false);
-    const [searchOpen, setSearchOpen] = useState(false);
     const savedHrefs = useRouteMemoryHrefs();
-    const { closeMobile } = useSidebar();
+    const { collapsed: desktopCollapsed, isMobile, closeMobile } = useSidebar();
+    // The mobile drawer always renders expanded even when the desktop rail is collapsed.
+    const collapsed = desktopCollapsed && !isMobile;
     const labelFor = useTranslatedLabel();
-    const tCommon = useTranslations("common");
+    const t = useTranslations("nav");
     const { pinned, toggle: togglePin, isPinned } = usePinnedHrefs();
+    const reduceMotion = useReducedMotion();
 
     // Drilled view state. `null` = root view; otherwise the parent's key.
     const [view, setView] = useState<string | null>(() => findActiveParent(pathname)?.key ?? null);
@@ -123,61 +122,68 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
         closeMobile();
     };
 
+    const viewMotion = (dir: 1 | -1) =>
+        reduceMotion
+            ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
+            : {
+                initial: { opacity: 0, scale: 0.985, x: collapsed ? 0 : 6 * dir },
+                animate: { opacity: 1, scale: 1, x: 0 },
+                exit: { opacity: 0, scale: 0.985, x: collapsed ? 0 : 6 * dir },
+            };
+    const viewTransition = { duration: reduceMotion ? 0.1 : 0.18, ease: VIEW_EASE };
+
     return (
         <>
-            {/* Logo */}
-            <div className="flex items-center gap-2.5 border-b border-sidebar-border px-4 py-4">
+            <SidebarHeader className="h-16 gap-2.5 border-b border-sidebar-border px-4">
                 <Image
                     src="/logo.svg"
                     alt="MixAI"
                     width={32}
                     height={32}
-                    className="shrink-0 rounded-lg shadow-[0_0_12px_rgba(124,92,255,0.30)]"
+                    className="shrink-0 rounded-lg shadow-[0_0_12px_color-mix(in_oklch,var(--primary)_30%,transparent)]"
                 />
                 {!collapsed && (
-                    <div className="flex flex-col min-w-0 leading-tight">
-                        <span className="font-heading text-[15px] font-bold tracking-tight text-sidebar-foreground whitespace-nowrap overflow-hidden">
-                            Muzic<span className="text-brand-accent">AI</span>
+                    <div className="flex min-w-0 flex-col leading-tight">
+                        <span className="overflow-hidden font-heading text-[15px] font-bold tracking-tight whitespace-nowrap text-sidebar-foreground">
+                            Mix<span className="text-gradient-accent">AI</span>
                         </span>
-                        <span className="text-[10px] text-sidebar-foreground/30 whitespace-nowrap">
+                        <span className="text-[10px] whitespace-nowrap text-sidebar-foreground/40">
                             v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
                         </span>
                     </div>
                 )}
-            </div>
+            </SidebarHeader>
 
             {/* Search */}
             <div className="px-2 pt-2">
                 <button
-                    onClick={() => setSearchOpen(true)}
+                    type="button"
+                    onClick={onOpenSearch}
                     className={cn(
-                        "flex w-full items-center rounded-xl border border-sidebar-border/50 bg-sidebar-accent/30 text-sidebar-foreground/40 transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground/70 hover:border-sidebar-border cursor-pointer",
+                        "flex w-full cursor-pointer items-center rounded-lg border border-sidebar-border/50 bg-sidebar-accent/30 text-sidebar-foreground/50 transition-colors duration-(--dur-fast) hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground/80 focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none",
                         collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-2 text-sm"
                     )}
-                    title={collapsed ? "Search (⌘K)" : undefined}
+                    title={collapsed ? `${t("searchPlaceholder")} (⌘K)` : undefined}
+                    aria-label={t("searchPlaceholder")}
                 >
-                    <Search className={cn(collapsed ? "h-4 w-4" : "h-3.5 w-3.5")} />
+                    <Search className={cn(collapsed ? "size-4" : "size-3.5")} aria-hidden />
                     {!collapsed && (
                         <>
-                            <span className="flex-1 text-left">{tCommon("searchPlaceholder")}</span>
-                            <kbd className="inline-flex h-5 items-center rounded border border-sidebar-border/60 bg-sidebar-accent/50 px-1.5 font-mono text-[10px] font-medium text-sidebar-foreground/25">
-                                ⌘K
-                            </kbd>
+                            <span className="flex-1 truncate text-left">{t("searchPlaceholder")}</span>
+                            <Kbd>⌘K</Kbd>
                         </>
                     )}
                 </button>
             </div>
 
             {/* Animated nav region: cross-fade between root and drilled views */}
-            <div className="flex-1 min-h-0 relative">
+            <SidebarContent className="relative overflow-hidden p-0">
                 <AnimatePresence mode="wait" initial={false}>
                     {activeParent ? (
                         <motion.div
                             key={`drill-${activeParent.key}`}
-                            initial={{ opacity: 0, scale: 0.985, x: collapsed ? 0 : 6 }}
-                            animate={{ opacity: 1, scale: 1, x: 0 }}
-                            exit={{ opacity: 0, scale: 0.985, x: collapsed ? 0 : 6 }}
-                            transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+                            {...viewMotion(1)}
+                            transition={viewTransition}
                             className="absolute inset-0 flex flex-col"
                         >
                             <DrilledView
@@ -195,10 +201,8 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                     ) : (
                         <motion.div
                             key="root"
-                            initial={{ opacity: 0, scale: 0.985, x: collapsed ? 0 : -6 }}
-                            animate={{ opacity: 1, scale: 1, x: 0 }}
-                            exit={{ opacity: 0, scale: 0.985, x: collapsed ? 0 : -6 }}
-                            transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+                            {...viewMotion(-1)}
+                            transition={viewTransition}
                             className="absolute inset-0 flex flex-col"
                         >
                             <RootView
@@ -217,44 +221,42 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
                         </motion.div>
                     )}
                 </AnimatePresence>
-            </div>
+            </SidebarContent>
 
-            {/* Footer */}
-            <div className="border-t border-sidebar-border px-2 py-3 space-y-2">
+            <SidebarFooter>
                 {collapsed ? (
                     <div className="flex flex-col items-center gap-1">
                         <UserCard collapsed />
                         <DownloadHubButton collapsed />
-                        <button
-                            onClick={() => setLegendOpen(true)}
-                            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                            title="Legend & Help"
-                        >
-                            <HelpCircle className="h-4 w-4" />
-                        </button>
+                        <HelpButton onClick={onOpenLegend} label={t("help")} />
                     </div>
                 ) : (
                     <>
                         <div className="flex items-center gap-1.5">
-                            <div className="flex-1 min-w-0">
+                            <div className="min-w-0 flex-1">
                                 <DownloadHubButton />
                             </div>
-                            <button
-                                onClick={() => setLegendOpen(true)}
-                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                                title="Legend & Help"
-                            >
-                                <HelpCircle className="h-4 w-4" />
-                            </button>
+                            <HelpButton onClick={onOpenLegend} label={t("help")} />
                         </div>
                         <UserCard />
                     </>
                 )}
-            </div>
-
-            <LegendModal open={legendOpen} onOpenChange={setLegendOpen} />
-            <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
+            </SidebarFooter>
         </>
+    );
+}
+
+function HelpButton({ onClick, label }: { onClick: () => void; label: string }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors duration-(--dur-fast) hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none"
+            title={label}
+            aria-label={label}
+        >
+            <CircleHelp className="size-4" aria-hidden />
+        </button>
     );
 }
 
@@ -266,7 +268,7 @@ function RootView(props: {
     pinned: string[];
     onParentEnter: (p: NavParent) => void;
     onLeafClick: () => void;
-    labelFor: (key: string, fallback: string) => string;
+    labelFor: LabelFor;
     hoverKey: string | null;
     setHoverKey: (k: string | null) => void;
     isPinned: (href: string) => boolean;
@@ -276,6 +278,7 @@ function RootView(props: {
         collapsed, pathname, savedHrefs, pinned, onParentEnter, onLeafClick,
         labelFor, hoverKey, setHoverKey, isPinned, togglePin,
     } = props;
+    const t = useTranslations("nav");
 
     const pinnedLeaves = useMemo(
         () => pinned.map((h) => leafByHref(h)).filter((x): x is NavLeaf => !!x),
@@ -285,60 +288,63 @@ function RootView(props: {
     const activeParentKey = findActiveParent(pathname)?.key;
 
     return (
-        <nav className="h-full overflow-y-auto space-y-0.5 p-2" aria-label="Primary">
+        <nav className="flex h-full flex-col gap-2 overflow-y-auto overscroll-contain p-2" aria-label={t("primaryNavigation")}>
             {pinnedLeaves.length > 0 && (
-                <>
-                    {!collapsed && (
-                        <div className="px-3 pt-2 pb-1 text-[.65rem] uppercase tracking-wider text-sidebar-foreground/30 flex items-center gap-1.5">
-                            <Star className="h-3 w-3" /> Quick access
-                        </div>
-                    )}
-                    {pinnedLeaves.map((leaf) => (
-                        <LeafRow
-                            key={`pin-${leaf.key}`}
-                            leaf={leaf}
-                            href={savedHrefs[leaf.href] || leaf.href}
-                            collapsed={collapsed}
-                            isActive={isLeafActive(leaf, pathname)}
-                            onClick={onLeafClick}
-                            labelFor={labelFor}
-                            isPinned={isPinned(leaf.href)}
-                            onPinToggle={() => togglePin(leaf.href)}
-                        />
-                    ))}
-                    {!collapsed && <div className="my-2 mx-3 h-px bg-sidebar-border/50" />}
-                </>
+                <SidebarGroup className="border-b border-sidebar-border/50 pb-2">
+                    <SidebarGroupLabel className="gap-1.5 uppercase tracking-wider text-[.65rem]">
+                        <Star className="size-3" aria-hidden /> {t("quickAccess")}
+                    </SidebarGroupLabel>
+                    <SidebarMenu>
+                        {pinnedLeaves.map((leaf) => (
+                            <LeafRow
+                                key={`pin-${leaf.key}`}
+                                leaf={leaf}
+                                href={savedHrefs[leaf.href] || leaf.href}
+                                collapsed={collapsed}
+                                isActive={isLeafActive(leaf, pathname)}
+                                onClick={onLeafClick}
+                                labelFor={labelFor}
+                                isPinned={isPinned(leaf.href)}
+                                onPinToggle={() => togglePin(leaf.href)}
+                            />
+                        ))}
+                    </SidebarMenu>
+                </SidebarGroup>
             )}
 
-            {navTree.map((node) =>
-                node.kind === "leaf" ? (
-                    <LeafRow
-                        key={node.key}
-                        leaf={node}
-                        href={savedHrefs[node.href] || node.href}
-                        collapsed={collapsed}
-                        isActive={isLeafActive(node, pathname)}
-                        onClick={onLeafClick}
-                        labelFor={labelFor}
-                        isPinned={isPinned(node.href)}
-                        onPinToggle={() => togglePin(node.href)}
-                    />
-                ) : (
-                    <ParentRow
-                        key={node.key}
-                        parent={node}
-                        collapsed={collapsed}
-                        isActive={activeParentKey === node.key}
-                        labelFor={labelFor}
-                        onEnter={() => onParentEnter(node)}
-                        onHover={(open) => setHoverKey(open ? node.key : null)}
-                        hovering={hoverKey === node.key}
-                        pathname={pathname}
-                        savedHrefs={savedHrefs}
-                        onLeafClick={onLeafClick}
-                    />
-                )
-            )}
+            <SidebarGroup>
+                <SidebarMenu>
+                    {navTree.map((node) =>
+                        node.kind === "leaf" ? (
+                            <LeafRow
+                                key={node.key}
+                                leaf={node}
+                                href={savedHrefs[node.href] || node.href}
+                                collapsed={collapsed}
+                                isActive={isLeafActive(node, pathname)}
+                                onClick={onLeafClick}
+                                labelFor={labelFor}
+                                isPinned={isPinned(node.href)}
+                                onPinToggle={() => togglePin(node.href)}
+                            />
+                        ) : (
+                            <ParentRow
+                                key={node.key}
+                                parent={node}
+                                collapsed={collapsed}
+                                isActive={activeParentKey === node.key}
+                                labelFor={labelFor}
+                                onEnter={() => onParentEnter(node)}
+                                onHover={(open) => setHoverKey(open ? node.key : null)}
+                                hovering={hoverKey === node.key}
+                                pathname={pathname}
+                                savedHrefs={savedHrefs}
+                                onLeafClick={onLeafClick}
+                            />
+                        )
+                    )}
+                </SidebarMenu>
+            </SidebarGroup>
         </nav>
     );
 }
@@ -351,58 +357,55 @@ function DrilledView(props: {
     savedHrefs: Record<string, string>;
     onBack: () => void;
     onLeafClick: () => void;
-    labelFor: (key: string, fallback: string) => string;
+    labelFor: LabelFor;
     isPinned: (href: string) => boolean;
     togglePin: (href: string) => void;
 }) {
     const { parent, collapsed, pathname, savedHrefs, onBack, onLeafClick, labelFor, isPinned, togglePin } = props;
+    const t = useTranslations("nav");
+    const parentLabel = labelFor(parent.key, parent.label);
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex h-full flex-col">
             <div className={cn("flex items-center gap-2 px-2 pt-2 pb-1", collapsed && "justify-center")}>
                 <button
+                    type="button"
                     onClick={onBack}
                     className={cn(
-                        "flex items-center justify-center rounded-lg text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer",
-                        collapsed ? "h-9 w-9" : "h-8 w-8"
+                        "flex cursor-pointer items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors duration-(--dur-fast) hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none",
+                        collapsed ? "size-9" : "size-8"
                     )}
-                    title="Back (Esc)"
-                    aria-label="Back"
+                    title={`${t("back")} (Esc)`}
+                    aria-label={t("back")}
                 >
-                    <ArrowLeft className="h-4 w-4" />
+                    <ArrowLeft className="size-4" aria-hidden />
                 </button>
                 {!collapsed && (
-                    <div className="flex items-center gap-2 min-w-0">
-                        <span className={cn(
-                            "inline-flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br text-white shadow-sm",
-                            parent.accent
-                        )}>
-                            <parent.icon className="h-3.5 w-3.5" />
-                        </span>
-                        <span className="text-sm font-semibold tracking-tight text-sidebar-foreground truncate">
-                            {labelFor(parent.key, parent.label)}
-                        </span>
+                    <div className="flex min-w-0 items-center gap-2">
+                        <ParentChip parent={parent} size="md" />
+                        <span className="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">{parentLabel}</span>
                     </div>
                 )}
             </div>
 
-            {!collapsed && <div className="my-1 mx-3 h-px bg-sidebar-border/50" />}
+            {!collapsed && <div className="mx-3 my-1 h-px bg-sidebar-border/50" />}
 
-            <nav className="flex-1 overflow-y-auto p-2 space-y-0.5" aria-label={`${parent.label} navigation`}>
-                {parent.children.map((leaf) => (
-                    <LeafRow
-                        key={leaf.key}
-                        leaf={leaf}
-                        href={savedHrefs[leaf.href] || leaf.href}
-                        collapsed={collapsed}
-                        isActive={isLeafActive(leaf, pathname)}
-                        accent={parent.accent}
-                        onClick={onLeafClick}
-                        labelFor={labelFor}
-                        isPinned={isPinned(leaf.href)}
-                        onPinToggle={() => togglePin(leaf.href)}
-                    />
-                ))}
+            <nav className="flex-1 overflow-y-auto overscroll-contain p-2" aria-label={parentLabel}>
+                <SidebarMenu>
+                    {parent.children.map((leaf) => (
+                        <LeafRow
+                            key={leaf.key}
+                            leaf={leaf}
+                            href={savedHrefs[leaf.href] || leaf.href}
+                            collapsed={collapsed}
+                            isActive={isLeafActive(leaf, pathname)}
+                            onClick={onLeafClick}
+                            labelFor={labelFor}
+                            isPinned={isPinned(leaf.href)}
+                            onPinToggle={() => togglePin(leaf.href)}
+                        />
+                    ))}
+                </SidebarMenu>
 
                 {parent.showProjects && !collapsed && (
                     <RecentProjects parentKey={parent.key} />
@@ -412,69 +415,76 @@ function DrilledView(props: {
     );
 }
 
+/** Parent icon chip: token gradient from nav-tree (`deck-*` / `chart-*`). */
+function ParentChip({ parent, size, muted = false }: { parent: NavParent; size: "sm" | "md"; muted?: boolean }) {
+    return (
+        <span
+            className={cn(
+                "inline-flex shrink-0 items-center justify-center rounded-md transition-colors duration-(--dur-fast)",
+                size === "md" ? "size-6" : "size-5",
+                muted ? "bg-primary/10 text-primary" : cn("bg-gradient-to-br text-primary-foreground shadow-sm", parent.accent)
+            )}
+        >
+            <parent.icon className={size === "md" ? "size-3.5" : "size-3"} aria-hidden />
+        </span>
+    );
+}
+
+/** 3px active indicator on the left edge. */
+function ActiveBar() {
+    return (
+        <span
+            aria-hidden="true"
+            className="absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-gradient-accent motion-safe:animate-[slideUpFade_200ms_ease-out]"
+        />
+    );
+}
+
 // ─── Leaf row ────────────────────────────────────────────────────────────
 function LeafRow(props: {
     leaf: NavLeaf;
     href: string;
     collapsed: boolean;
     isActive: boolean;
-    accent?: string;
     onClick: () => void;
-    labelFor: (key: string, fallback: string) => string;
+    labelFor: LabelFor;
     isPinned: boolean;
     onPinToggle: () => void;
 }) {
-    const { leaf, href, collapsed, isActive, accent, onClick, labelFor, isPinned, onPinToggle } = props;
+    const { leaf, href, collapsed, isActive, onClick, labelFor, isPinned, onPinToggle } = props;
     const label = labelFor(leaf.key, leaf.label);
+    const t = useTranslations("nav");
     return (
-        <Link
-            href={href}
-            onClick={onClick}
-            aria-current={isActive ? "page" : undefined}
-            className={cn(
-                "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-primary focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
-                collapsed && "justify-center px-2",
-                isActive
-                    ? "bg-sidebar-primary/10 text-sidebar-primary shadow-[inset_0_0_0_1px_rgba(139,92,246,0.15)]"
-                    : "text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground/70"
-            )}
-            title={collapsed ? label : undefined}
-        >
-            {isActive && (
-                <span
-                    aria-hidden="true"
-                    className={cn(
-                        "absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b animate-[slideUpFade_200ms_ease-out]",
-                        accent ?? "from-purple-400 to-fuchsia-500"
-                    )}
-                />
-            )}
-            <leaf.icon
-                aria-hidden="true"
+        <SidebarMenuItem className="group/leaf">
+            <SidebarMenuButton
+                render={<Link href={href} />}
+                active={isActive}
+                icon={<leaf.icon aria-hidden />}
+                label={label}
+                onClick={onClick}
                 className={cn(
-                    "h-4 w-4 shrink-0 transition-colors duration-200",
-                    isActive && "text-sidebar-primary"
+                    "relative font-medium text-sidebar-foreground/60",
+                    "data-[active]:bg-sidebar-accent data-[active]:text-sidebar-primary data-[active]:[&_svg]:text-sidebar-primary"
                 )}
-            />
-            {!collapsed && (
-                <>
-                    <span className="flex-1 truncate">{label}</span>
+            >
+                {isActive && <ActiveBar />}
+                {!collapsed && (
                     <button
                         type="button"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPinToggle(); }}
                         className={cn(
-                            "opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 hover:bg-sidebar-accent/60",
-                            isPinned && "opacity-100 text-amber-400"
+                            "rounded p-1 opacity-0 transition-opacity duration-(--dur-fast) group-hover/leaf:opacity-100 hover:bg-sidebar-accent/60 focus-visible:opacity-100",
+                            isPinned && "text-deck-d opacity-100"
                         )}
-                        title={isPinned ? "Unpin from Quick access" : "Pin to Quick access"}
-                        aria-label={isPinned ? "Unpin" : "Pin"}
+                        title={isPinned ? t("unpin") : t("pin")}
+                        aria-label={isPinned ? t("unpin") : t("pin")}
+                        aria-pressed={isPinned}
                     >
-                        <Pin className={cn("h-3 w-3", isPinned && "fill-amber-400")} />
+                        <Pin className={cn("size-3", isPinned && "fill-current")} aria-hidden />
                     </button>
-                </>
-            )}
-        </Link>
+                )}
+            </SidebarMenuButton>
+        </SidebarMenuItem>
     );
 }
 
@@ -483,7 +493,7 @@ function ParentRow(props: {
     parent: NavParent;
     collapsed: boolean;
     isActive: boolean;
-    labelFor: (key: string, fallback: string) => string;
+    labelFor: LabelFor;
     onEnter: () => void;
     onHover: (open: boolean) => void;
     hovering: boolean;
@@ -493,66 +503,39 @@ function ParentRow(props: {
 }) {
     const { parent, collapsed, isActive, labelFor, onEnter, onHover, hovering, pathname, savedHrefs, onLeafClick } = props;
     const label = labelFor(parent.key, parent.label);
+    const reduceMotion = useReducedMotion();
     return (
-        <div
-            className="relative"
+        <SidebarMenuItem
             onMouseEnter={() => collapsed && onHover(true)}
             onMouseLeave={() => collapsed && onHover(false)}
         >
-            <button
-                type="button"
+            <SidebarMenuButton
                 onClick={onEnter}
                 aria-haspopup="menu"
                 aria-expanded={isActive}
-                className={cn(
-                    "relative w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 cursor-pointer",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-primary focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
-                    collapsed && "justify-center px-2",
-                    isActive
-                        ? "bg-sidebar-accent/60 text-sidebar-foreground"
-                        : "text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground/70"
-                )}
-                title={collapsed ? label : undefined}
+                active={isActive}
+                icon={<ParentChip parent={parent} size="sm" muted={!isActive} />}
+                label={label}
+                className="relative font-medium text-sidebar-foreground/60 data-[active]:bg-sidebar-accent data-[active]:text-sidebar-primary"
             >
-                {isActive && (
-                    <span
-                        aria-hidden="true"
-                        className={cn(
-                            "absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b",
-                            parent.accent
-                        )}
-                    />
-                )}
-                <span className={cn(
-                    "inline-flex shrink-0 items-center justify-center rounded-md transition-all duration-200",
-                    isActive
-                        ? cn("h-5 w-5 bg-gradient-to-br text-white shadow-sm", parent.accent)
-                        : "h-4 w-4 text-current"
-                )}>
-                    <parent.icon className={cn(isActive ? "h-3 w-3" : "h-4 w-4")} />
-                </span>
-                {!collapsed && (
-                    <>
-                        <span className="flex-1 truncate text-left">{label}</span>
-                        <ChevronRight className="h-3.5 w-3.5 opacity-50" />
-                    </>
-                )}
-            </button>
+                {isActive && <ActiveBar />}
+                {!collapsed && <ChevronRight className="size-3.5 opacity-50" aria-hidden />}
+            </SidebarMenuButton>
 
             <AnimatePresence>
                 {collapsed && hovering && (
                     <motion.div
-                        initial={{ opacity: 0, x: -6 }}
+                        initial={{ opacity: 0, x: reduceMotion ? 0 : -6 }}
                         animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -6 }}
-                        transition={{ duration: 0.14, ease: "easeOut" }}
-                        className="absolute left-full top-0 ml-2 z-50 w-56 rounded-xl border border-sidebar-border bg-sidebar shadow-xl p-2"
+                        exit={{ opacity: 0, x: reduceMotion ? 0 : -6 }}
+                        transition={{ duration: reduceMotion ? 0.08 : 0.14, ease: "easeOut" }}
+                        role="menu"
+                        aria-label={label}
+                        className="surface absolute top-0 left-full z-(--z-popover) ml-2 w-56 rounded-xl bg-sidebar p-2 text-sidebar-foreground"
                     >
-                        <div className="flex items-center gap-2 px-2 pb-2 mb-1 border-b border-sidebar-border">
-                            <span className={cn("inline-flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br text-white", parent.accent)}>
-                                <parent.icon className="h-3 w-3" />
-                            </span>
-                            <span className="text-sm font-semibold text-sidebar-foreground truncate">{label}</span>
+                        <div className="mb-1 flex items-center gap-2 border-b border-sidebar-border px-2 pb-2">
+                            <ParentChip parent={parent} size="sm" />
+                            <span className="truncate text-sm font-semibold text-sidebar-foreground">{label}</span>
                         </div>
                         {parent.children.map((leaf) => {
                             const active = isLeafActive(leaf, pathname);
@@ -562,22 +545,24 @@ function ParentRow(props: {
                                     key={leaf.key}
                                     href={href}
                                     onClick={onLeafClick}
+                                    role="menuitem"
+                                    aria-current={active ? "page" : undefined}
                                     className={cn(
-                                        "flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition-colors",
+                                        "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors duration-(--dur-fast)",
                                         active
-                                            ? "bg-sidebar-primary/10 text-sidebar-primary"
+                                            ? "bg-sidebar-accent text-sidebar-primary"
                                             : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                                     )}
                                 >
-                                    <leaf.icon className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="truncate">{leaf.label}</span>
+                                    <leaf.icon className="size-3.5 shrink-0" aria-hidden />
+                                    <span className="truncate">{labelFor(leaf.key, leaf.label)}</span>
                                 </Link>
                             );
                         })}
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
+        </SidebarMenuItem>
     );
 }
 
@@ -593,6 +578,7 @@ const PARENT_TO_PROJECT_KIND: Record<string, "daw" | "editor" | "live" | "mixer"
 
 function RecentProjects({ parentKey }: { parentKey: string }) {
     const [items, setItems] = useState<{ name: string; href: string }[]>([]);
+    const t = useTranslations("nav");
 
     useEffect(() => {
         let cancelled = false;
@@ -624,93 +610,47 @@ function RecentProjects({ parentKey }: { parentKey: string }) {
     }, [parentKey]);
 
     return (
-        <div className="mt-4 pt-3 border-t border-sidebar-border/50">
-            <div className="px-3 pb-1 text-[.65rem] uppercase tracking-wider text-sidebar-foreground/30">
-                Recent projects
-            </div>
+        <SidebarGroup className="mt-4 border-t border-sidebar-border/50 pt-3">
+            <SidebarGroupLabel className="uppercase tracking-wider text-[.65rem]">{t("recentProjects")}</SidebarGroupLabel>
             {items.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-sidebar-foreground/30 italic">
-                    No recent projects yet.
-                </p>
+                <p className="px-3 py-2 text-xs text-sidebar-foreground/40 italic">{t("noRecentProjects")}</p>
             ) : (
-                items.map((p) => (
-                    <Link
-                        key={p.href}
-                        href={p.href}
-                        className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors truncate"
-                    >
-                        <span className="h-1.5 w-1.5 rounded-full bg-sidebar-foreground/30" />
-                        <span className="truncate">{p.name}</span>
-                    </Link>
-                ))
+                <SidebarMenu>
+                    {items.map((p) => (
+                        <SidebarMenuItem key={p.href}>
+                            <SidebarMenuButton
+                                render={<Link href={p.href} />}
+                                icon={<span className="size-1.5 rounded-full bg-sidebar-foreground/40" aria-hidden />}
+                                label={p.name}
+                                className="h-8 text-sidebar-foreground/60"
+                            />
+                        </SidebarMenuItem>
+                    ))}
+                </SidebarMenu>
             )}
-        </div>
+        </SidebarGroup>
     );
 }
 
 // ─── Main sidebar component ──────────────────────────────────────────────
 export function AppSidebar() {
-    const { collapsed, toggle, mobileOpen, closeMobile } = useSidebar();
+    const [legendOpen, setLegendOpen] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const openSearch = useCallback(() => setSearchOpen(true), []);
+    const openLegend = useCallback(() => setLegendOpen(true), []);
 
     return (
         <>
-            {/* Desktop */}
-            <div className="hidden md:flex relative shrink-0 h-full">
-                <aside
-                    className={cn(
-                        "flex h-full flex-col bg-sidebar transition-[width] duration-300 ease-in-out overflow-hidden",
-                        collapsed ? "w-[60px]" : "w-60"
-                    )}
-                >
-                    <SidebarContent collapsed={collapsed} />
-                </aside>
+            {/* `Sidebar` renders the desktop rail (md+) and the mobile drawer (Base UI dialog,
+                swipe-to-close) from the same children. Flyouts use `overflow-visible`. */}
+            <Sidebar data-app-sidebar="" className="relative overflow-visible [body.daw-focus-mode_&]:hidden">
+                <SidebarBody onOpenSearch={openSearch} onOpenLegend={openLegend} />
+                <SidebarRail />
+            </Sidebar>
 
-                <button
-                    onClick={toggle}
-                    className="group absolute top-0 right-0 w-[1px] h-full bg-sidebar-border hover:w-[3px] hover:bg-purple-500/50 transition-all duration-200 cursor-col-resize z-10"
-                    title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                >
-                    <div className="absolute top-1/2 -translate-y-1/2 -right-3 flex h-6 w-6 items-center justify-center rounded-full bg-sidebar border border-sidebar-border shadow-md opacity-50 group-hover:opacity-100 transition-opacity duration-200">
-                        {collapsed ? (
-                            <ChevronsRight className="h-3 w-3 text-sidebar-foreground/60" />
-                        ) : (
-                            <ChevronsLeft className="h-3 w-3 text-sidebar-foreground/60" />
-                        )}
-                    </div>
-                </button>
-            </div>
-
-            {/* Mobile drawer */}
-            <div
-                className={cn(
-                    "fixed inset-0 z-[55] md:hidden transition-all duration-300",
-                    mobileOpen ? "pointer-events-auto" : "pointer-events-none"
-                )}
-            >
-                <div
-                    className={cn(
-                        "absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300",
-                        mobileOpen ? "opacity-100" : "opacity-0"
-                    )}
-                    onClick={closeMobile}
-                    aria-hidden="true"
-                />
-                <aside
-                    className={cn(
-                        "absolute left-0 top-0 bottom-0 w-64 bg-sidebar border-r border-sidebar-border flex flex-col transition-transform duration-300 ease-out",
-                        mobileOpen ? "translate-x-0" : "-translate-x-full"
-                    )}
-                >
-                    <button
-                        onClick={closeMobile}
-                        className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-lg text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors cursor-pointer z-10"
-                        aria-label="Close menu"
-                    >
-                        <X className="h-4 w-4" />
-                    </button>
-                    <SidebarContent collapsed={false} />
-                </aside>
-            </div>
+            {/* Modals mounted once (the drawer duplicates the body). */}
+            <LegendModal open={legendOpen} onOpenChange={setLegendOpen} />
+            <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
         </>
     );
 }

@@ -22,7 +22,7 @@ export interface NavParent {
     key: string;
     label: string;
     icon: LucideIcon;
-    /** Tailwind `from-X to-Y` gradient applied to the active accent. */
+    /** Tailwind `from-X to-Y` gradient applied to the active accent. Token colours only (`deck-*`, `chart-*`, `primary`). */
     accent: string;
     /** Auto-collapse the sidebar (focus mode) on these children's routes. */
     autoCollapse?: boolean;
@@ -40,7 +40,7 @@ export const navTree: NavNode[] = [
     },
     {
         kind: "parent", key: "watch", label: "Watch", icon: Clapperboard,
-        accent: "from-rose-400 to-orange-500",
+        accent: "from-deck-b to-deck-d",
         children: [
             { kind: "leaf", key: "watch-browse", href: "/watch", label: "Home", icon: Home, exact: true },
             { kind: "leaf", key: "watch-movies", href: "/watch/movies", label: "Movies", icon: Film },
@@ -54,7 +54,7 @@ export const navTree: NavNode[] = [
     },
     {
         kind: "parent", key: "library", label: "Library", icon: Library,
-        accent: "from-purple-400 to-fuchsia-500",
+        accent: "from-primary to-chart-2",
         children: [
             { kind: "leaf", key: "library-tracks", href: "/library", label: "Tracks", icon: Library, exact: true },
             { kind: "leaf", key: "playlists", href: "/playlists", label: "Playlists", icon: ListMusic },
@@ -63,7 +63,7 @@ export const navTree: NavNode[] = [
     },
     {
         kind: "parent", key: "music", label: "Music", icon: Music2,
-        accent: "from-cyan-400 to-blue-500",
+        accent: "from-deck-a to-chart-5",
         showProjects: true,
         autoCollapse: true,
         children: [
@@ -79,7 +79,7 @@ export const navTree: NavNode[] = [
     { kind: "leaf", key: "download", href: "/download", label: "Download", icon: Download },
     {
         kind: "parent", key: "devices", label: "Devices", icon: Monitor,
-        accent: "from-emerald-400 to-teal-500",
+        accent: "from-deck-c to-chart-3",
         children: [
             { kind: "leaf", key: "devices-list", href: "/devices", label: "Devices", icon: Monitor, exact: true },
             { kind: "leaf", key: "remote", href: "/remote", label: "Remote", icon: Smartphone },
@@ -89,7 +89,7 @@ export const navTree: NavNode[] = [
     },
     {
         kind: "parent", key: "tools", label: "Tools", icon: Wrench,
-        accent: "from-amber-400 to-yellow-500",
+        accent: "from-deck-d to-deck-c",
         children: [
             { kind: "leaf", key: "generate", href: "/generate", label: "AI Generate", icon: Sparkles },
             { kind: "leaf", key: "training", href: "/training", label: "Training", icon: Brain },
@@ -100,7 +100,7 @@ export const navTree: NavNode[] = [
     { kind: "leaf", key: "maestro", href: "/maestro", label: "Maestro", icon: Bot },
     {
         kind: "parent", key: "settings", label: "Settings", icon: Settings,
-        accent: "from-slate-400 to-zinc-500",
+        accent: "from-muted-foreground to-foreground/60",
         children: [
             { kind: "leaf", key: "settings-overview", href: "/settings", label: "Overview", icon: Settings, exact: true },
             { kind: "leaf", key: "settings-account", href: "/settings/account", label: "Account & billing", icon: User },

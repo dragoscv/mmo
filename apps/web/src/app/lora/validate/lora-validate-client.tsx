@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import {
@@ -10,16 +11,18 @@ import {
 } from "@/actions/lora-validate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge, DataTable, type DataTableColumnDef } from "@mmo/ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Upload, FolderOpen, CheckCircle2, AlertCircle } from "lucide-react";
 
-const VERDICT_COLOR: Record<ValidateCorpusReport["verdict"], string> = {
-    "ready-to-train": "bg-emerald-500 text-white",
-    "minimal-corpus": "bg-amber-500 text-white",
-    "insufficient": "bg-destructive text-white",
-    "error": "bg-destructive text-white",
+type ClipRow = ValidateCorpusReport["clips"][number];
+
+const VERDICT_VARIANT: Record<ValidateCorpusReport["verdict"], "success" | "warning" | "destructive"> = {
+    "ready-to-train": "success",
+    "minimal-corpus": "warning",
+    "insufficient": "destructive",
+    "error": "destructive",
 };
 
 export function LoraValidateClient() {
@@ -115,17 +118,80 @@ export function LoraValidateClient() {
 }
 
 function ReportCard({ report }: { report: ValidateCorpusReport }) {
+    const t = useTranslations("tables.loraValidate");
+
+    const columns = useMemo<Array<DataTableColumnDef<ClipRow, any>>>(
+        () => [
+            {
+                accessorKey: "file",
+                header: t("file"),
+                cell: ({ row }) => (
+                    <span className={row.original.ok ? "font-mono" : "font-mono text-destructive"} title={row.original.file}>
+                        {row.original.file}
+                    </span>
+                ),
+                meta: { priority: 1 },
+            },
+            {
+                accessorKey: "durationSec",
+                header: t("duration"),
+                cell: ({ getValue }) => {
+                    const v = getValue<number | undefined>();
+                    return <span className="tabular-nums">{v != null ? `${v.toFixed(1)}s` : "—"}</span>;
+                },
+                meta: { priority: 1, align: "right" },
+            },
+            {
+                accessorKey: "sampleRate",
+                header: t("sampleRate"),
+                cell: ({ getValue }) => <span className="tabular-nums">{getValue<number | undefined>() ?? "—"}</span>,
+                meta: { priority: 2, align: "right" },
+            },
+            {
+                accessorKey: "channels",
+                header: t("channels"),
+                cell: ({ getValue }) => <span className="tabular-nums">{getValue<number | undefined>() ?? "—"}</span>,
+                meta: { priority: 3, align: "right" },
+            },
+            {
+                accessorKey: "hasLyrics",
+                header: t("lyrics"),
+                cell: ({ getValue }) => (getValue<boolean | undefined>() ? <CheckCircle2 className="inline size-4 text-success" aria-label={t("ok")} /> : "—"),
+                meta: { priority: 2, align: "center" },
+            },
+            {
+                id: "issues",
+                accessorFn: (c) => c.issues.length,
+                header: t("issues"),
+                cell: ({ row }) =>
+                    row.original.issues.length ? (
+                        <span className="flex flex-wrap gap-1">
+                            {row.original.issues.map((i) => (
+                                <Badge key={i} variant="destructive">
+                                    {i}
+                                </Badge>
+                            ))}
+                        </span>
+                    ) : (
+                        <Badge variant="success">{t("ok")}</Badge>
+                    ),
+                meta: { priority: 1 },
+            },
+        ],
+        [t],
+    );
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="flex flex-wrap items-center gap-2 text-base">
                     {report.ok ? (
-                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                        <CheckCircle2 className="h-5 w-5 text-success" />
                     ) : (
                         <AlertCircle className="h-5 w-5 text-destructive" />
                     )}
                     Verdict
-                    <Badge className={VERDICT_COLOR[report.verdict]}>{report.verdict}</Badge>
+                    <Badge variant={VERDICT_VARIANT[report.verdict]}>{t(`verdict.${report.verdict}`)}</Badge>
                     <span className="ml-auto text-xs font-normal text-muted-foreground">
                         {report.clipCount} clips · {Math.round(report.totalDurationSec)}s total
                     </span>
@@ -137,34 +203,27 @@ function ReportCard({ report }: { report: ValidateCorpusReport }) {
                     <p className="text-xs text-destructive">Error: {report.error}</p>
                 ) : null}
                 {report.clips.length > 0 ? (
-                    <div className="overflow-hidden rounded border">
-                        <table className="w-full text-xs">
-                            <thead className="bg-muted/50 text-muted-foreground">
-                                <tr>
-                                    <th className="p-2 text-left">File</th>
-                                    <th className="p-2 text-right">Dur</th>
-                                    <th className="p-2 text-right">SR</th>
-                                    <th className="p-2 text-right">Ch</th>
-                                    <th className="p-2 text-center">Lyrics</th>
-                                    <th className="p-2 text-left">Issues</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {report.clips.map((c) => (
-                                    <tr key={c.file} className={c.ok ? "" : "bg-destructive/5"}>
-                                        <td className="p-2 font-mono">{c.file}</td>
-                                        <td className="p-2 text-right">{c.durationSec?.toFixed(1) ?? "—"}s</td>
-                                        <td className="p-2 text-right">{c.sampleRate ?? "—"}</td>
-                                        <td className="p-2 text-right">{c.channels ?? "—"}</td>
-                                        <td className="p-2 text-center">{c.hasLyrics ? "✓" : "—"}</td>
-                                        <td className="p-2 text-muted-foreground">
-                                            {c.issues.length ? c.issues.join(", ") : "—"}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <DataTable
+                        columns={columns}
+                        data={report.clips}
+                        getRowId={(c) => c.file}
+                        pageSize={25}
+                        pagination={report.clips.length > 25}
+                        tableClassName="text-xs"
+                        mobileCard={(c) => (
+                            <div className="flex flex-col gap-1 text-xs">
+                                <div className="flex items-start justify-between gap-2">
+                                    <span className="min-w-0 truncate font-mono" title={c.file}>{c.file}</span>
+                                    {c.ok ? <Badge variant="success">{t("ok")}</Badge> : <Badge variant="destructive">{c.issues.length}</Badge>}
+                                </div>
+                                <div className="text-muted-foreground tabular-nums">
+                                    {c.durationSec != null ? `${c.durationSec.toFixed(1)}s` : "—"} · {c.sampleRate ?? "—"} Hz · {c.channels ?? "—"} ch
+                                    {c.hasLyrics ? ` · ${t("lyrics")}` : ""}
+                                </div>
+                                {c.issues.length ? <div className="text-destructive">{c.issues.join(", ")}</div> : null}
+                            </div>
+                        )}
+                    />
                 ) : null}
             </CardContent>
         </Card>

@@ -1,68 +1,103 @@
 "use client";
 
-import {
-    createContext,
-    useContext,
-    useState,
-    useCallback,
-    useEffect,
-    useRef,
-    type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { SidebarProvider as UiSidebarProvider, useSidebar as useUiSidebar, type SidebarContextValue } from "@mmo/ui";
 
-interface SidebarContextType {
+/**
+ * Thin adapter over `@mmo/ui`'s SidebarProvider/useSidebar that preserves the
+ * app's historical API (`collapsed`, `mobileOpen`, `toggle`, `setCollapsed`,
+ * `openMobile`, `closeMobile`).
+ *
+ * Persistence lives in @mmo/ui (`mixai:sidebar`, migrated from the legacy
+ * `sidebar-collapsed` key — both prefixes are syncable, see lib/syncable-keys).
+ *
+ * `AppShell` mounts a second (inner) `SidebarProvider` for its own primitives.
+ * This module keeps ONE source of truth — the outer store from layout.tsx — and
+ * bridges the inner one via `useShellSidebarProps()` + `<SidebarSync/>`, so
+ * `openMobile()` from anywhere (e.g. AudioPlayer, outside the shell) works.
+ */
+export interface SidebarContextType {
     collapsed: boolean;
     mobileOpen: boolean;
+    /** Collapses/expands on desktop, opens/closes the drawer on mobile. */
     toggle: () => void;
     setCollapsed: (v: boolean) => void;
     openMobile: () => void;
     closeMobile: () => void;
+    isMobile: boolean;
 }
 
-const SidebarContext = createContext<SidebarContextType | null>(null);
+const OuterSidebarContext = createContext<SidebarContextValue | null>(null);
 
-export function useSidebar() {
-    const ctx = useContext(SidebarContext);
+function useOuterSidebar(): SidebarContextValue {
+    const ctx = useContext(OuterSidebarContext);
     if (!ctx) throw new Error("useSidebar must be used within SidebarProvider");
     return ctx;
 }
 
-const STORAGE_KEY = "sidebar-collapsed";
+export function useSidebar(): SidebarContextType {
+    const ui = useOuterSidebar();
+    const { setMobileOpen } = ui;
+    const openMobile = useCallback(() => setMobileOpen(true), [setMobileOpen]);
+    const closeMobile = useCallback(() => setMobileOpen(false), [setMobileOpen]);
+    return useMemo(
+        () => ({
+            collapsed: ui.collapsed,
+            mobileOpen: ui.mobileOpen,
+            toggle: ui.toggle,
+            setCollapsed: ui.setCollapsed,
+            openMobile,
+            closeMobile,
+            isMobile: ui.isMobile,
+        }),
+        [ui.collapsed, ui.mobileOpen, ui.toggle, ui.setCollapsed, ui.isMobile, openMobile, closeMobile]
+    );
+}
 
-export function SidebarProvider({ children }: { children: ReactNode }) {
-    // Lazy init reads localStorage *during* the initial render on the
-    // client, which matches the hydrated DOM and avoids the
-    // useEffect→setState→re-render flash. The `typeof window` guard
-    // keeps the function SSR-safe.
-    const [collapsed, setCollapsedState] = useState<boolean>(() => {
-        if (typeof window === "undefined") return false;
-        try { return localStorage.getItem(STORAGE_KEY) === "true"; } catch { return false; }
-    });
-    const [mobileOpen, setMobileOpen] = useState(false);
+/** Props for `AppShell.sidebarProps` so the inner provider mirrors the outer collapsed state. */
+export function useShellSidebarProps() {
+    const { collapsed, setCollapsed } = useOuterSidebar();
+    return useMemo(() => ({ collapsed, onCollapsedChange: setCollapsed }), [collapsed, setCollapsed]);
+}
 
-    const setCollapsed = useCallback((v: boolean) => {
-        setCollapsedState(v);
-        localStorage.setItem(STORAGE_KEY, String(v));
-    }, []);
+/** Mount INSIDE AppShell: two-way sync of `mobileOpen` between inner and outer providers. */
+export function SidebarSync() {
+    const inner = useUiSidebar();
+    const outer = useOuterSidebar();
+    const lastOuter = useRef(outer.mobileOpen);
+    const lastInner = useRef(inner.mobileOpen);
 
-    const toggle = useCallback(() => {
-        setCollapsed(!collapsed);
-    }, [collapsed, setCollapsed]);
+    useEffect(() => {
+        if (outer.mobileOpen !== lastOuter.current) {
+            lastOuter.current = outer.mobileOpen;
+            lastInner.current = outer.mobileOpen;
+            inner.setMobileOpen(outer.mobileOpen);
+        }
+    }, [outer.mobileOpen, inner]);
 
-    const openMobile = useCallback(() => setMobileOpen(true), []);
-    const closeMobile = useCallback(() => setMobileOpen(false), []);
+    useEffect(() => {
+        if (inner.mobileOpen !== lastInner.current) {
+            lastInner.current = inner.mobileOpen;
+            lastOuter.current = inner.mobileOpen;
+            outer.setMobileOpen(inner.mobileOpen);
+        }
+    }, [inner.mobileOpen, outer]);
 
-    // Close mobile on escape key
+    return null;
+}
+
+/** Edge-swipe to open + swipe-left to close + Esc to close (mobile only). */
+function SidebarGestures() {
+    const { setMobileOpen } = useUiSidebar();
+    const touchRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
     useEffect(() => {
         const handleKey = (e: KeyboardEvent) => {
             if (e.key === "Escape") setMobileOpen(false);
         };
         window.addEventListener("keydown", handleKey);
         return () => window.removeEventListener("keydown", handleKey);
-    }, []);
-
-    // Swipe gestures for mobile sidebar: right to open, left to close
-    const touchRef = useRef<{ x: number; y: number; time: number } | null>(null);
+    }, [setMobileOpen]);
 
     useEffect(() => {
         const isMobile = () => window.innerWidth < 768;
@@ -85,17 +120,14 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
             // Must be a quick, primarily horizontal swipe
             if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) || dt > 400) return;
 
-            // Don't interfere with Now Playing
             const target = e.target as HTMLElement;
-            if (target.closest("[data-nowplaying]")) return;
-
+            // Don't interfere with Now Playing or the drawer's own swipe-to-close
+            if (target.closest("[data-nowplaying], [data-slot='sidebar-mobile']")) return;
             // Don't interfere with scrollable containers (tables, overflow areas)
             if (target.closest("table, [data-radix-scroll-area-viewport], .overflow-x-auto, .overflow-auto")) return;
 
-            if (dx > 60) {
-                // Only open sidebar if swipe started from the left 15% of screen
-                if (startX <= window.innerWidth * 0.15) setMobileOpen(true);
-            }
+            // Only open when the swipe started from the left 15% of the screen
+            if (dx > 60 && startX <= window.innerWidth * 0.15) setMobileOpen(true);
             if (dx < -60) setMobileOpen(false);
         };
 
@@ -105,13 +137,23 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
             document.removeEventListener("touchstart", onTouchStart);
             document.removeEventListener("touchend", onTouchEnd);
         };
-    }, []);
+    }, [setMobileOpen]);
 
+    return null;
+}
+
+function OuterCapture({ children }: { children: ReactNode }) {
+    const ui = useUiSidebar();
+    return <OuterSidebarContext.Provider value={ui}>{children}</OuterSidebarContext.Provider>;
+}
+
+export function SidebarProvider({ children }: { children: ReactNode }) {
     return (
-        <SidebarContext.Provider
-            value={{ collapsed, mobileOpen, toggle, setCollapsed, openMobile, closeMobile }}
-        >
-            {children}
-        </SidebarContext.Provider>
+        <UiSidebarProvider>
+            <OuterCapture>
+                <SidebarGestures />
+                {children}
+            </OuterCapture>
+        </UiSidebarProvider>
     );
 }

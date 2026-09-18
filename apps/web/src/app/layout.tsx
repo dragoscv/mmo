@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Toaster } from "sonner";
-import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider } from "@/components/sidebar-context";
 import { PlayerProvider } from "@/components/player-context";
 import { AnalysisProvider } from "@/components/analysis-provider";
@@ -17,17 +16,15 @@ import { EQProvider } from "@/components/eq-context";
 import { MixerProvider } from "@/components/mixer-context";
 import { MidiProvider } from "@/hooks/use-midi";
 import { ControllerBridge } from "@/components/controller-bridge";
-import { MobileHeader } from "@/components/mobile-header";
 import { ConfirmLoadDialog } from "@/components/confirm-load-dialog";
 import { FocusModeProvider } from "@/components/focus-mode-context";
-import { FocusAwareSidebar, FocusAwareMobileHeader, FocusAwareNowPlayingBar } from "@/components/focus-aware-shell";
+import { FocusAwareNowPlayingBar } from "@/components/focus-aware-shell";
 import { ShortcutsOverlay } from "@/components/shortcuts-overlay";
 import { CinemaSettingsSync } from "@/components/cinema-settings-sync";
 import { AuthProvider } from "@/components/auth-provider";
 import { PreferencesSync } from "@/components/preferences-sync";
 import { CompanionStatusProvider } from "@/components/companion/companion-status-provider";
 import { QueryProvider } from "@/components/query-provider";
-import { ScrollRestoration } from "@/components/scroll-restoration";
 import { MaestroChatDock } from "@/components/maestro/chat-dock";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
@@ -171,23 +168,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                                                 <OfflineProvider>
                                                 <FocusModeProvider>
                                                     <PlayerAwareLayout>
-                                                        <FocusAwareSidebar>
-                                                            <AppSidebar />
-                                                        </FocusAwareSidebar>
-                                                        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                                                            <FocusAwareMobileHeader>
-                                                                <MobileHeader />
-                                                            </FocusAwareMobileHeader>
-                                                            <main
-                                                                data-scroll-container
-                                                                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
-                                                            >
-                                                                {children}
-                                                            </main>
-                                                            <Suspense>
-                                                                <ScrollRestoration />
-                                                            </Suspense>
-                                                        </div>
+                                                        {children}
                                                     </PlayerAwareLayout>
                                                     <FocusAwareNowPlayingBar>
                                                         <AudioPlayer />

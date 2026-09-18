@@ -4,6 +4,322 @@
         "appearance": {
             "title": "Appearance & language",
             "description": "Mode, accent colour, surfaces, density, motion and language. Saved to your viewing profile and applied on every device."
+        },
+        "daw": {
+            "title": "DAW",
+            "description": "Audio devices, clip and timeline display, note notation, status bar stats and MIDI. Saved in this browser.",
+            "audio": {
+                "title": "Audio devices",
+                "description": "Output and input used by the DAW engine.",
+                "output": "Output device",
+                "input": "Input device",
+                "monitor": "Input monitoring",
+                "monitorHint": "Hear the input signal through the output while recording."
+            },
+            "clips": {
+                "title": "Clips",
+                "description": "How clips are drawn on the timeline.",
+                "displayMode": "Clip content",
+                "modes": { "waveform": "Waveform", "notes": "Notes", "both": "Waveform + notes", "none": "None" },
+                "waveformStyle": "Waveform style",
+                "styles": { "classic": "Classic", "bars": "Bars", "lines": "Lines", "filled": "Filled" },
+                "waveformColor": "Waveform colour",
+                "colors": { "clip": "Clip colour", "mono": "Monochrome", "gradient": "Gradient" },
+                "showNames": "Show clip names",
+                "showBadges": "Show clip info badges",
+                "opacity": "Clip opacity"
+            },
+            "timeline": {
+                "title": "Timeline",
+                "description": "Track height, grid and playhead.",
+                "trackHeight": "Track height",
+                "heights": { "compact": "Compact", "normal": "Normal", "large": "Large" },
+                "gridStyle": "Grid style",
+                "grids": { "lines": "Lines", "dots": "Dots", "none": "None" },
+                "gridOpacity": "Grid opacity",
+                "playheadColor": "Playhead colour",
+                "playheads": { "green": "Green", "red": "Red", "white": "White", "cyan": "Cyan", "orange": "Orange" },
+                "snapToGrid": "Snap to grid",
+                "showAutomation": "Show automation lanes",
+                "activeClipHighlight": "Highlight the active clip"
+            },
+            "notation": {
+                "title": "Note notation",
+                "description": "How keys and notes are labelled across the DAW.",
+                "primary": "Primary notation",
+                "secondary": "Secondary notation",
+                "none": "None"
+            },
+            "stats": {
+                "title": "Status bar stats",
+                "description": "Performance counters shown in the DAW status bar.",
+                "keys": {
+                    "showFps": "Frames per second",
+                    "showHeapMemory": "JS heap used",
+                    "showJsHeapTotal": "JS heap total",
+                    "showDomNodes": "DOM nodes",
+                    "showAudioLatency": "Audio latency",
+                    "showCpuCores": "CPU cores",
+                    "showDeviceMemory": "Device memory"
+                }
+            },
+            "midi": {
+                "title": "MIDI",
+                "description": "Shared with the mixer console.",
+                "enabled": "MIDI input enabled",
+                "jogSensitivity": "Jog sensitivity",
+                "tempoRange": "Tempo range",
+                "crossfaderCurve": "Crossfader curve",
+                "curves": { "linear": "Linear", "smooth": "Smooth", "sharp": "Sharp" },
+                "driver": "Controller driver",
+                "autoDetect": "Auto-detect",
+                "devices": "{count, plural, =0 {No MIDI devices connected} one {# MIDI device connected} other {# MIDI devices connected}} · {status}"
+            },
+            "layout": {
+                "title": "Layout",
+                "description": "Reset the panel layout or all DAW display settings.",
+                "reset": "Reset DAW layout",
+                "confirmTitle": "Reset the DAW layout?",
+                "confirmBody": "Panel positions and sizes go back to the defaults the next time you open the DAW. Your projects are not affected.",
+                "cancel": "Cancel",
+                "resetDone": "DAW layout reset.",
+                "resetFailed": "Could not reset the layout.",
+                "defaults": "Restore default display settings",
+                "defaultsDone": "DAW display settings restored."
+            }
+        },
+        "sound-editor": {
+            "title": "Sound Editor",
+            "description": "Waveform, spectrogram and status bar preferences for the sound editor. Saved in this browser.",
+            "waveform": {
+                "title": "Waveform",
+                "description": "Colour and overlays in the editor view.",
+                "color": "Waveform colour",
+                "colors": { "blue": "Blue", "purple": "Purple", "green": "Green", "cyan": "Cyan", "orange": "Orange", "white": "White" },
+                "showRms": "Show RMS overlay",
+                "showGrid": "Show grid lines",
+                "showMinimap": "Show minimap"
+            },
+            "spectrogram": {
+                "title": "Spectrogram",
+                "description": "Colour map and analysis resolution.",
+                "colorMap": "Colour map",
+                "maps": { "magma": "Magma", "viridis": "Viridis", "inferno": "Inferno", "plasma": "Plasma", "grayscale": "Grayscale" },
+                "fftSize": "FFT size",
+                "fftHint": "Larger values give finer frequency detail but coarser timing."
+            },
+            "stats": {
+                "title": "Status bar stats",
+                "description": "Performance counters shown in the editor status bar.",
+                "keys": {
+                    "showFps": "Frames per second",
+                    "showHeapMemory": "JS heap used",
+                    "showJsHeapTotal": "JS heap total",
+                    "showDomNodes": "DOM nodes",
+                    "showAudioLatency": "Audio latency",
+                    "showCpuCores": "CPU cores",
+                    "showDeviceMemory": "Device memory"
+                },
+                "reset": "Restore defaults",
+                "resetDone": "Editor status bar restored."
+            }
+        },
+        "mixer": {
+            "title": "Mixer",
+            "description": "Audio output, waveform view and controller behaviour for the DJ mixer. Saved in this browser.",
+            "audio": {
+                "title": "Audio output",
+                "description": "Device the mixer master goes to.",
+                "output": "Output device",
+                "nativeHint": "Native routing belongs to the Live engine.",
+                "appliesNext": "Applies the next time you open the mixer."
+            },
+            "waveform": {
+                "title": "Waveforms",
+                "description": "Zoom level per deck and beat grid overlay.",
+                "linked": "Link deck zoom",
+                "zoomA": "Deck A zoom",
+                "zoomB": "Deck B zoom",
+                "beatgrid": "Beat grid",
+                "beatgridHint": "Draw beat markers on top of the waveform."
+            },
+            "midi": {
+                "title": "Controller",
+                "description": "Jog, tempo and crossfader behaviour. Shared with the DAW.",
+                "jogSensitivity": "Jog sensitivity",
+                "tempoRange": "Tempo range",
+                "crossfaderCurve": "Crossfader curve",
+                "curves": { "linear": "Linear", "smooth": "Smooth", "sharp": "Sharp" }
+            },
+            "console": {
+                "title": "Full console settings",
+                "description": "Presets, MIDI learn, LED colours and diagnostics live in the mixer console (gear icon in the top bar).",
+                "open": "Open the mixer"
+            }
+        },
+        "live": {
+            "title": "Live",
+            "description": "Output device, tuner and coach display, accent colour and widget layout. Saved in this browser.",
+            "audio": {
+                "title": "Audio output",
+                "description": "Device the Live engine plays through.",
+                "output": "Output device"
+            },
+            "notation": {
+                "title": "Note notation",
+                "description": "How the tuner and coach label notes.",
+                "primary": "Primary notation",
+                "secondary": "Secondary notation",
+                "none": "None",
+                "showCents": "Show cents next to the note"
+            },
+            "display": {
+                "title": "Display",
+                "description": "Refresh rate and how long readings stay on screen.",
+                "refreshHz": "Widget refresh (Hz)",
+                "tunerStickiness": "Tuner hold (ms)",
+                "coachStickiness": "Coach tip hold (ms)",
+                "coachVerbosity": "Coach verbosity",
+                "verbosity": { "minimal": "Minimal", "normal": "Normal", "verbose": "Verbose" }
+            },
+            "accent": {
+                "title": "Accent colour",
+                "description": "Highlight colour for the Live page.",
+                "names": { "rose": "Rose", "violet": "Violet", "emerald": "Emerald", "cyan": "Cyan", "amber": "Amber" }
+            },
+            "layout": {
+                "title": "Layout",
+                "description": "Reset the widget grid or all Live settings.",
+                "reset": "Reset widget layout",
+                "confirmTitle": "Reset the Live widget layout?",
+                "confirmBody": "Widget positions and sizes go back to the defaults the next time you open Live.",
+                "cancel": "Cancel",
+                "resetDone": "Live layout reset.",
+                "resetFailed": "Could not reset the layout.",
+                "defaults": "Restore default settings",
+                "defaultsDone": "Live settings restored."
+            }
+        },
+        "notifications": {
+            "title": "Notifications",
+            "description": "Web push notifications from this browser.",
+            "push": {
+                "title": "Push notifications",
+                "description": "Get notified when scans, renders and training jobs finish — even with the tab closed.",
+                "status": {
+                    "loading": "Checking…",
+                    "unsupported": "Unsupported",
+                    "no-vapid": "Not configured",
+                    "denied": "Blocked",
+                    "subscribed": "On",
+                    "unsubscribed": "Off"
+                },
+                "explain": {
+                    "denied": "Notifications are blocked for this site. Allow them in your browser's site settings, then reload this page.",
+                    "subscribed": "This browser receives push notifications.",
+                    "unsubscribed": "This browser is not subscribed. Your browser will ask for permission."
+                },
+                "noVapidTitle": "Server not configured",
+                "noVapidBody": "Push is disabled because {env} is not set on the server. Set it and redeploy to enable notifications.",
+                "unsupportedTitle": "Not supported here",
+                "unsupportedBody": "This browser does not support service workers or the Push API.",
+                "subscribe": "Enable notifications",
+                "unsubscribe": "Disable notifications",
+                "subscribed": "Push notifications enabled.",
+                "unsubscribed": "Push notifications disabled.",
+                "failed": "Could not change the push subscription."
+            }
+        },
+        "security": {
+            "title": "Security",
+            "description": "Active sessions, connected sign-in providers and issued tokens.",
+            "sessions": {
+                "title": "Active sessions",
+                "description": "{count, plural, =0 {No sessions} one {# session} other {# sessions}} stored for your account.",
+                "empty": "No sessions found.",
+                "token": "Session",
+                "expires": "Expires",
+                "state": "State",
+                "active": "Active",
+                "expired": "Expired"
+            },
+            "accounts": {
+                "title": "Connected accounts",
+                "description": "Sign-in providers linked to this account.",
+                "empty": "No OAuth providers connected."
+            },
+            "tokens": {
+                "title": "Tokens",
+                "description": "Device tokens for paired companions and personal access tokens for agents.",
+                "devices": "{count, plural, =0 {No paired devices} one {# paired device} other {# paired devices}}",
+                "manageDevices": "Manage devices",
+                "patsEmpty": "No agent access tokens.",
+                "patName": "Name",
+                "patCreated": "Created",
+                "patLastUsed": "Last used",
+                "patExpires": "Expires",
+                "never": "Never",
+                "noExpiry": "No expiry"
+            },
+            "auth": {
+                "title": "Sign-in methods",
+                "description": "Passkeys and two-factor authentication are not yet available. Sign-in is handled by the connected providers above.",
+                "passkeys": "Passkeys — coming soon",
+                "twoFactor": "Two-factor — coming soon"
+            },
+            "data": {
+                "title": "Your data",
+                "description": "Export everything we store about you, or delete the account. Both live on the Account page.",
+                "export": "Export my data",
+                "delete": "Delete account"
+            }
+        },
+        "devices": {
+            "title": "Devices & remote",
+            "description": "Paired companions, Quick Connect and remote streaming quality.",
+            "list": {
+                "title": "Paired devices",
+                "description": "Companions and TVs signed in to this account.",
+                "empty": "No paired devices",
+                "emptyDetail": "Install the companion or use Quick Connect from a TV to pair one."
+            },
+            "columns": {
+                "name": "Name",
+                "platform": "Platform",
+                "lanUrl": "LAN address",
+                "lastSeen": "Last seen",
+                "status": "Status",
+                "actions": "Actions"
+            },
+            "status": { "online": "Online", "offline": "Offline" },
+            "never": "Never",
+            "actions": {
+                "rename": "Rename",
+                "remove": "Remove",
+                "renamed": "Device renamed.",
+                "removed": "Device removed."
+            },
+            "rename": {
+                "title": "Rename device",
+                "description": "The name is shown on every surface signed in to this account.",
+                "label": "Name",
+                "cancel": "Cancel",
+                "save": "Save"
+            },
+            "remove": {
+                "title": "Remove device?",
+                "body": "“{name}” loses access immediately and must be paired again. Its tunnel, if any, is torn down.",
+                "cancel": "Cancel",
+                "confirm": "Remove"
+            },
+            "remote": {
+                "title": "Remote & Quick Connect",
+                "description": "Stream audio to a phone or approve a TV.",
+                "quality": "Remote audio quality",
+                "qualityHint": "Opus profile used by the remote stream. Applies on the next connection.",
+                "pair": "Quick Connect",
+                "open": "Open remote"
+            }
         }
     },
     "activate": {
@@ -178,7 +494,18 @@
         "settings-devices": "Devices & remote",
         "settings-notifications": "Notifications",
         "settings-appearance": "Appearance & language",
-        "settings-advanced": "Advanced"
+        "settings-advanced": "Advanced",
+        "more": "More",
+        "back": "Back",
+        "help": "Legend & help",
+        "openMenu": "Open menu",
+        "primaryNavigation": "Primary",
+        "quickAccess": "Quick access",
+        "pin": "Pin to Quick access",
+        "unpin": "Unpin from Quick access",
+        "recentProjects": "Recent projects",
+        "noRecentProjects": "No recent projects yet.",
+        "searchPlaceholder": "Search tracks, artists…"
     },
     "common": {
         "loading": "Loading…",
@@ -627,5 +954,104 @@
         "analyze": "Analyze",
         "hide": "Hide",
         "delete": "Delete"
+    },
+    "tables": {
+        "common": {
+            "actions": "Actions",
+            "copy": "Copy",
+            "copied": "Copied to clipboard",
+            "open": "Open",
+            "remove": "Remove",
+            "retry": "Retry",
+            "unknown": "Unknown",
+            "never": "Never",
+            "justNow": "just now"
+        },
+        "companions": {
+            "title": "Companions",
+            "description": "Desktop companion apps paired with this account.",
+            "name": "Name",
+            "platform": "Platform",
+            "version": "Version",
+            "lanUrl": "LAN address",
+            "lastSeen": "Last seen",
+            "status": "Status",
+            "online": "Online",
+            "offline": "Offline",
+            "empty": "No paired devices",
+            "emptyDetail": "Install the desktop companion and pair it with this account to see it here.",
+            "configTitle": "Companion configurations",
+            "configPlatform": "Platform",
+            "configStatus": "Status",
+            "configUpdated": "Updated"
+        },
+        "hidden": {
+            "back": "Library",
+            "title": "Hidden tracks",
+            "count": "{count, plural, =1 {# hidden track} other {# hidden tracks}}",
+            "searchPlaceholder": "Search hidden tracks…",
+            "clear": "Clear",
+            "range": "{from}–{to} of {total}",
+            "empty": "No hidden tracks",
+            "emptyDetail": "Tracks you hide from the library show up here so you can restore them.",
+            "artist": "Artist",
+            "title_col": "Title",
+            "album": "Album",
+            "bpm": "BPM",
+            "genre": "Genre",
+            "energy": "Energy",
+            "duration": "Time",
+            "addedAt": "Added",
+            "unhide": "Unhide",
+            "unhideSelected": "Unhide {count}",
+            "selected": "{count} selected",
+            "restored": "{count, plural, =1 {Restored # track} other {Restored # tracks}}",
+            "restoreFailed": "Could not restore tracks",
+            "page": "Page {page} of {total}"
+        },
+        "renderJobs": {
+            "nativeOnly": "Render-job history is only persisted in the native desktop shell. Open this app inside the desktop client to see queued and completed renders.",
+            "loading": "Loading render jobs…",
+            "count": "{count, plural, =1 {# job} other {# jobs}}",
+            "clearFinished": "Clear finished",
+            "clearConfirm": "Clear all finished render jobs?",
+            "empty": "No render jobs yet",
+            "created": "Created",
+            "project": "Project",
+            "format": "Format",
+            "mode": "Mode",
+            "progress": "Progress",
+            "status": "Status",
+            "eta": "ETA",
+            "size": "Size",
+            "stage": {
+                "queued": "Queued",
+                "uploading": "Uploading",
+                "ready": "Ready",
+                "done": "Done",
+                "error": "Error"
+            },
+            "etaDone": "Finished",
+            "etaUnknown": "—",
+            "etaSeconds": "{seconds}s left",
+            "etaMinutes": "{minutes} min left"
+        },
+        "loraValidate": {
+            "title": "LoRA training corpus validator",
+            "description": "Check whether your audio clips are ready to fine-tune an ACE-Step LoRA. Drop a folder of .wav / .flac / .mp3 files (plus optional .txt lyric sidecars with the same basename) and we'll run the same checks the local training script enforces: sample-rate ≥ 16 kHz, 1–2 channels, 10–300 s per clip, and a non-empty lyrics file for vocal training.",
+            "file": "File",
+            "duration": "Duration",
+            "sampleRate": "Sample rate",
+            "channels": "Channels",
+            "lyrics": "Lyrics",
+            "issues": "Issues",
+            "ok": "OK",
+            "verdict": {
+                "ready-to-train": "Ready to train",
+                "minimal-corpus": "Minimal corpus",
+                "insufficient": "Insufficient",
+                "error": "Error"
+            }
+        }
     }
 }
