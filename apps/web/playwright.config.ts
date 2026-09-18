@@ -10,7 +10,7 @@ import { defineConfig, devices } from "@playwright/test";
  * and asserting the sign-in screen renders.
  *
  * Local run:  pnpm e2e          (auto-starts the dev server)
- * CI run:    PLAYWRIGHT_BASE_URL=https://staging.muzicai.ro pnpm e2e
+ * CI run:    PLAYWRIGHT_BASE_URL=https://staging.mixai.ro pnpm e2e
  */
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -32,7 +32,17 @@ export default defineConfig({
         video: "off",
     },
     projects: [
-        { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+        { name: "chromium", testIgnore: /(theme-matrix|a11y)\.spec\.ts$/, use: { ...devices["Desktop Chrome"] } },
+        // Fixed-width projects for the responsive matrices (WP8-02). The theme
+        // matrix runs at all four widths; axe runs at phone + desktop only.
+        ...([390, 768, 1440, 3440] as const).map((width) => ({
+            name: `w${width}`,
+            testMatch: width === 390 || width === 1440 ? /(theme-matrix|a11y)\.spec\.ts$/ : /theme-matrix\.spec\.ts$/,
+            use: {
+                ...devices["Desktop Chrome"],
+                viewport: { width, height: Math.max(720, Math.round(width * 0.62)) },
+            },
+        })),
     ],
     // Only spin up the dev server when we're hitting localhost; in CI
     // against a deployed env the server is already running.

@@ -1,50 +1,77 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 /**
- * Accessibility smoke — public routes get a full axe-core scan with the
- * WCAG 2.1 A + AA + Section 508 rule sets. The bar starts low: we fail
- * the build only on `serious` and `critical` violations, the two tiers
- * that map to "real users are blocked". `moderate` and `minor` are
- * recorded in the test output for triage but do not break CI yet.
+ * Accessibility gate — axe-core (WCAG 2.1 A/AA + Section 508) over the shell
+ * routes in light AND dark, at the widths supplied by the Playwright projects
+ * (`w390` + `w1440`, see playwright.config.ts).
  *
- * Why not authed routes? They redirect to /api/auth/signin, which is a
- * NextAuth-rendered page out of our control — failing the build on its
- * styling would be noise. The sign-in form itself is exercised by the
- * smoke spec for "did it render", which is enough for now.
+ * We fail only on `serious` and `critical` — the two tiers that map to "a real
+ * user is blocked". `moderate`/`minor` are printed for triage but do not break
+ * the build yet. To raise the bar, extend BLOCKING_IMPACTS.
  *
- * To raise the bar later, switch the filter to `["minor", "moderate",
- * "serious", "critical"]` and clean up the warnings that surface.
+ * Auth-gated routes render their own NotSignedIn empty state inside the shell
+ * (they do NOT redirect to the NextAuth page any more), so the shell chrome —
+ * sidebar, bottom tab bar, theme controls — is what gets scanned.
+ *
+ * ALLOWED_RULES is the escape hatch for a known, documented violation. It is
+ * intentionally empty: adding an id here needs a comment with the issue link.
  */
 
-const A11Y_ROUTES = ["/", "/offline", "/status"];
+const ROUTES = ["/", "/library", "/settings/appearance", "/get"] as const;
+const MODES = ["light", "dark"] as const;
 const BLOCKING_IMPACTS: ReadonlyArray<string> = ["serious", "critical"];
+/** axe rule ids exempted from the gate. Keep empty; document any addition. */
+const ALLOWED_RULES: ReadonlyArray<string> = [];
+const PREFS_KEY = "mixai:prefs:v1";
 
-for (const route of A11Y_ROUTES) {
-    test(`a11y: ${route} has no serious or critical violations`, async ({ page }) => {
-        const response = await page.goto(route);
-        expect(response, `expected response for ${route}`).not.toBeNull();
-        // Wait for the network to be quiet so client-side hydration finishes
-        // and any lazy-mounted nodes (sonner toaster region, theme provider)
-        // are present in the DOM before axe walks it.
-        await page.waitForLoadState("networkidle");
+async function setMode(page: Page, mode: (typeof MODES)[number]) {
+    await page.addInitScript(
+        ([key, m]) => {
+            const prev = (() => {
+                try {
+                    return JSON.parse(localStorage.getItem(key as string) ?? "{}") as Record<string, unknown>;
+                } catch {
+                    return {};
+                }
+            })();
+            localStorage.setItem(key as string, JSON.stringify({ ...prev, mode: m }));
+        },
+        [PREFS_KEY, mode] as const,
+    );
+}
 
-        const results = await new AxeBuilder({ page })
-            .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "section508"])
-            .analyze();
+for (const mode of MODES) {
+    for (const route of ROUTES) {
+        test(`a11y: ${route} (${mode}) has no serious/critical violations`, async ({ page }) => {
+            const width = page.viewportSize()?.width ?? 0;
+            expect(width, "spec must run under a w<width> project").toBeGreaterThan(0);
 
-        const blocking = results.violations.filter((v) =>
-            BLOCKING_IMPACTS.includes(v.impact ?? ""),
-        );
-        if (blocking.length > 0) {
-            // Format a compact report so the failure is actionable in the
-            // GitHub Actions log without needing the full Playwright trace.
+            await setMode(page, mode);
+            const response = await page.goto(route);
+            expect(response, `expected response for ${route}`).not.toBeNull();
+            expect(response!.status(), `${route} status`).toBeLessThan(400);
+            // Let hydration + lazy-mounted regions (toaster, theme provider,
+            // measured tab bar) settle before axe walks the tree.
+            await page.waitForLoadState("networkidle");
+            await expect(page.locator("html")).toHaveAttribute("data-mode", mode);
+
+            const results = await new AxeBuilder({ page })
+                .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "section508"])
+                .disableRules([...ALLOWED_RULES])
+                .analyze();
+
+            const nonBlocking = results.violations.filter((v) => !BLOCKING_IMPACTS.includes(v.impact ?? ""));
+            if (nonBlocking.length > 0) {
+                // Visible in the reporter without failing the run.
+                console.log(`[a11y triage] ${route} ${mode} @${width}: ${nonBlocking.map((v) => `${v.impact}:${v.id}×${v.nodes.length}`).join(", ")}`);
+            }
+
+            const blocking = results.violations.filter((v) => BLOCKING_IMPACTS.includes(v.impact ?? ""));
             const summary = blocking
-                .map((v) => `  • [${v.impact}] ${v.id} — ${v.help} (${v.nodes.length} node${v.nodes.length === 1 ? "" : "s"})`)
+                .map((v) => `  • [${v.impact}] ${v.id} — ${v.help} (${v.nodes.length} node${v.nodes.length === 1 ? "" : "s"})\n` + v.nodes.slice(0, 3).map((n) => `      ${n.target.join(" ")}`).join("\n"))
                 .join("\n");
-            throw new Error(
-                `axe-core found ${blocking.length} blocking violation${blocking.length === 1 ? "" : "s"} on ${route}:\n${summary}`,
-            );
-        }
-    });
+            expect(blocking, `axe-core blocking violations on ${route} (${mode}, ${width}px):\n${summary}`).toEqual([]);
+        });
+    }
 }
