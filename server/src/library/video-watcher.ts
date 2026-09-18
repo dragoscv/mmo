@@ -14,6 +14,7 @@ import path from "node:path";
 import type { FSWatcher } from "chokidar";
 import { lazyEsm } from "../lib/esm-import";
 import { getSettings } from "../store";
+import { mediaLibraryHooks } from "../media/library-hooks";
 
 // chokidar 5 is ESM-only; this build is CommonJS (see lib/esm-import).
 const loadChokidar = lazyEsm<typeof import("chokidar")>("chokidar");
@@ -51,6 +52,8 @@ function scheduleFlush(): void {
         pending.added.clear();
         pending.removed.clear();
         bus.emit("change", payload);
+        // Incremental media library index (WP10-05).
+        void mediaLibraryHooks().onFilesChanged(payload.added, payload.removed).catch((err: unknown) => bus.emit("error", err));
     }, FLUSH_DELAY);
 }
 
