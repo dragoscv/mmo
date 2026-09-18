@@ -1,26 +1,29 @@
 [package]
 name = "mixai-core"
-version = "0.1.0"
+version = "1.0.0"
 description = "MIXAI real-time DJ audio engine — cpal output, symphonia decode, native DSP signal chain."
 authors = ["mwrty <vladulescu.catalin@gmail.com>"]
 # Permissive license on purpose: this crate links ONLY permissive DSP and
 # must remain distributable inside a proprietary/commercial build.
 license = "MIT OR Apache-2.0"
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.85"
 
 [dependencies]
 # Cross-platform low-latency audio I/O. Enable `asio` on Windows via a feature
 # so a plain `cargo build` doesn't require the ASIO SDK during scaffolding.
-cpal = "0.15"
+# Pinned to 0.15: 0.17+ changes `SampleRate` to u32 and 0.18 takes `StreamConfig` by value in
+# `build_output_stream` (engine.rs) — upgrade requires source changes.
+cpal = "0.15.3"
 # Pure-Rust audio decoding (MPL-2.0): mp3, aac, flac, wav, ogg, …
-symphonia = { version = "0.5", features = ["all-codecs", "all-formats"] }
-# High-quality async resampling (MIT) to match decode rate → device rate.
-rubato = "0.15"
-# Lock-free SPSC/MPSC for the UI→audio command path (no locks in the RT thread).
-crossbeam-channel = "0.5"
-serde = { version = "1", features = ["derive"] }
-thiserror = "1"
+# Pinned to 0.5: 0.6 reworks `AudioBufferRef`/`codec_params` used in decoder.rs.
+symphonia = { version = "0.5.5", features = ["all-codecs", "all-formats"] }
+# High-quality async resampling (MIT) to match decode rate  device rate.
+rubato = "5.0"
+# Lock-free SPSC/MPSC for the UIaudio command path (no locks in the RT thread).
+crossbeam-channel = "0.5.17"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"
 log = "0.4"
 # WAV writing for master recording (MIT/Apache, permissive).
 hound = "3.5"

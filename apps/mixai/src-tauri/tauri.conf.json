@@ -16,7 +16,7 @@
                 "title": "MixAI DJ",
                 "width": 1500,
                 "height": 940,
-                "minWidth": 1180,
+                "minWidth": 1024,
                 "minHeight": 820,
                 "resizable": true,
                 "fullscreen": false,
