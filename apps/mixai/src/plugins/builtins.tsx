@@ -365,7 +365,7 @@ function FilterRiserPanel({ ctx, accent }: PluginPanelProps) {
                     borderRadius: 8,
                     cursor: running ? "default" : "pointer",
                     background: running ? "var(--bg-elev-2)" : accent,
-                    color: running ? "var(--fg-dim)" : "#000",
+                    color: running ? "var(--fg-dim)" : "var(--accent-fg)",
                     border: `1px solid ${running ? "var(--border)" : accent}`,
                 }}
             >

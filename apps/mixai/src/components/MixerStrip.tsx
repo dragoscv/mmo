@@ -44,7 +44,7 @@ function ChannelStrip({ deckId }: { deckId: DeckId }) {
                     padding: "4px 10px",
                     borderRadius: 6,
                     background: deck.cue ? "var(--good)" : "var(--bg-elev-2)",
-                    color: deck.cue ? "#000" : "var(--fg)",
+                    color: deck.cue ? "var(--accent-fg)" : "var(--fg)",
                 }}
             >
                 CUE

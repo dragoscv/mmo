@@ -1,8 +1,8 @@
 {
     "$schema": "https://schema.tauri.app/config/2",
-    "productName": "MIXAI",
-    "version": "0.1.0",
-    "identifier": "ro.muzicai.mixai",
+    "productName": "MixAI DJ",
+    "version": "1.0.0",
+    "identifier": "ro.mixai.dj",
     "build": {
         "frontendDist": "../dist",
         "devUrl": "http://localhost:14420",
@@ -13,7 +13,7 @@
         "windows": [
             {
                 "label": "main",
-                "title": "MIXAI",
+                "title": "MixAI DJ",
                 "width": 1500,
                 "height": 940,
                 "minWidth": 1180,
@@ -35,11 +35,11 @@
         "targets": "all",
         "createUpdaterArtifacts": false,
         "category": "Music",
-        "shortDescription": "MIXAI — native DJ software",
-        "longDescription": "MIXAI is the native DJ application of the muzicai.ro suite: low-latency Rust audio engine, themeable animated UI, broad controller support, and muzicai.ro library + AI integration.",
+        "shortDescription": "MixAI DJ — native DJ software",
+        "longDescription": "MixAI DJ is the native DJ application of the mixai.ro suite: low-latency Rust audio engine, themeable animated UI, broad controller support, and mixai.ro library + AI integration.",
         "copyright": "© mwrty",
         "publisher": "mwrty",
-        "homepage": "https://muzicai.ro",
+        "homepage": "https://mixai.ro",
         "icon": [
             "icons/32x32.png",
             "icons/128x128.png",

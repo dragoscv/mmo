@@ -1,129 +1,112 @@
+import { useEffect, useState } from "react";
+import { Circle, Command, Keyboard, Settings } from "lucide-react";
+import { Button, ToggleGroup, ToggleGroupItem, Tooltip, TooltipContent, TooltipTrigger, KbdCombo } from "@mmo/ui";
 import { useMixerStore } from "@/state/mixer-store";
 import { useUiStore } from "@/state/ui-store";
-import { THEMES, type ThemeId } from "@/themes/themes";
-import { engine } from "@/bridge/engine";
-import { useEffect, useRef, useState } from "react";
+import { useRecordingStore } from "@/state/recording-store";
+import { useT } from "@/i18n";
 
-export function TopBar() {
+export function TopBar({ deckCount, canFourDeck }: { deckCount: 2 | 4; canFourDeck: boolean }) {
+    const t = useT();
     const native = useMixerStore((s) => s.native);
     const latencyMs = useMixerStore((s) => s.latencyMs);
     const sampleRate = useMixerStore((s) => s.sampleRate);
-    const theme = useUiStore((s) => s.theme);
-    const setTheme = useUiStore((s) => s.setTheme);
-    const deckCount = useUiStore((s) => s.deckCount);
     const setDeckCount = useUiStore((s) => s.setDeckCount);
     const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
     const setShortcutsOpen = useUiStore((s) => s.setShortcutsOpen);
+    const setCommandOpen = useUiStore((s) => s.setCommandOpen);
 
     return (
-        <div className="panel" style={{ padding: "8px 14px", display: "flex", alignItems: "center", gap: 14 }}>
-            <strong style={{ fontSize: 18, letterSpacing: "0.18em", background: "linear-gradient(90deg,var(--accent),var(--accent-2))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                MIXAI
-            </strong>
+        <header className="panel flex items-center gap-3.5 px-3.5 py-2">
+            <strong className="text-gradient-brand font-heading text-lg tracking-[0.18em]">{t("app.name")}</strong>
 
             <span
-                style={{
-                    fontSize: 10,
-                    padding: "2px 8px",
-                    borderRadius: 99,
-                    background: native ? "var(--good)" : "var(--warn)",
-                    color: "#000",
-                    fontWeight: 700,
-                }}
+                className={"rounded-full px-2 py-0.5 text-[10px] font-bold " + (native ? "bg-success" : "bg-warning")}
+                // Dark ink in both modes: success/warning chips are light hues.
+                style={{ color: "oklch(0.14 0.02 285)" }}
             >
-                {native ? "AUDIO CORE" : "UI PREVIEW"}
+                {native ? t("app.audioCore") : t("app.uiPreview")}
             </span>
 
             {native && (
-                <span className="mono" style={{ fontSize: 11, color: "var(--fg-dim)" }}>
+                <span className="mono text-[11px] text-muted-foreground">
                     {(sampleRate / 1000).toFixed(1)} kHz · {latencyMs.toFixed(1)} ms
                 </span>
             )}
 
-            <div style={{ flex: 1 }} />
+            <div className="flex-1" />
 
             {native && <RecordButton />}
 
-            <Segmented
-                options={[
-                    { id: "2", label: "2 DECK" },
-                    { id: "4", label: "4 DECK" },
-                ]}
-                value={String(deckCount)}
-                onChange={(v) => setDeckCount(v === "4" ? 4 : 2)}
-            />
-
-            <select
-                value={theme}
-                onChange={(e) => setTheme(e.target.value as ThemeId)}
-                style={{
-                    background: "var(--bg-elev-2)",
-                    color: "var(--fg)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    padding: "6px 8px",
-                    fontSize: 12,
+            <ToggleGroup
+                value={[String(deckCount)]}
+                onValueChange={(v) => {
+                    const next = v[0];
+                    if (next) setDeckCount(next === "4" ? 4 : 2);
                 }}
+                variant="outline"
+                size="sm"
+                aria-label={t("topbar.deckCount")}
+                title={canFourDeck ? undefined : t("topbar.deck4Unavailable")}
             >
-                {Object.values(THEMES).map((t) => (
-                    <option key={t.id} value={t.id}>
-                        {t.name}
-                    </option>
-                ))}
-            </select>
+                <ToggleGroupItem value="2" className="text-[11px] font-bold">
+                    {t("topbar.deck2")}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="4" disabled={!canFourDeck} className="text-[11px] font-bold">
+                    {t("topbar.deck4")}
+                </ToggleGroupItem>
+            </ToggleGroup>
 
-            <button
-                onClick={() => setShortcutsOpen(true)}
-                title="Keyboard shortcuts (press ?)"
-                style={{ padding: "6px 12px", borderRadius: 8, background: "var(--bg-elev-2)", fontSize: 12 }}
-            >
-                ⌨ Keys
-            </button>
+            <Tooltip>
+                <TooltipTrigger
+                    render={
+                        <Button variant="outline" size="sm" onClick={() => setCommandOpen(true)}>
+                            <Command aria-hidden />
+                            {t("topbar.commands")}
+                        </Button>
+                    }
+                />
+                <TooltipContent>
+                    <KbdCombo combo="mod+k" />
+                </TooltipContent>
+            </Tooltip>
 
-            <button
-                onClick={() => setSettingsOpen(true)}
-                style={{ padding: "6px 12px", borderRadius: 8, background: "var(--bg-elev-2)", fontSize: 12 }}
-            >
-                ⚙ Settings
-            </button>
-        </div>
+            <Tooltip>
+                <TooltipTrigger
+                    render={
+                        <Button variant="outline" size="sm" onClick={() => setShortcutsOpen(true)}>
+                            <Keyboard aria-hidden />
+                            {t("topbar.keys")}
+                        </Button>
+                    }
+                />
+                <TooltipContent>{t("topbar.keysHint")}</TooltipContent>
+            </Tooltip>
+
+            <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
+                <Settings aria-hidden />
+                {t("topbar.settings")}
+            </Button>
+        </header>
     );
 }
 
 function RecordButton() {
-    const [recording, setRecording] = useState(false);
+    const t = useT();
+    const recording = useRecordingStore((s) => s.recording);
+    const busy = useRecordingStore((s) => s.busy);
+    const startedAt = useRecordingStore((s) => s.startedAt);
+    const toggle = useRecordingStore((s) => s.toggle);
     const [elapsed, setElapsed] = useState(0);
-    const [busy, setBusy] = useState(false);
-    const startedAt = useRef<number>(0);
 
     useEffect(() => {
-        if (!recording) return;
-        const id = setInterval(() => {
-            setElapsed((Date.now() - startedAt.current) / 1000);
-        }, 250);
-        return () => clearInterval(id);
-    }, [recording]);
-
-    async function toggle() {
-        if (busy) return;
-        setBusy(true);
-        try {
-            if (recording) {
-                await engine.stopRecording();
-                setRecording(false);
-                setElapsed(0);
-            } else {
-                const path = await engine.startRecording();
-                if (path) {
-                    startedAt.current = Date.now();
-                    setElapsed(0);
-                    setRecording(true);
-                }
-            }
-        } finally {
-            setBusy(false);
+        if (!recording) {
+            setElapsed(0);
+            return;
         }
-    }
+        const id = setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 250);
+        return () => clearInterval(id);
+    }, [recording, startedAt]);
 
     const mm = Math.floor(elapsed / 60)
         .toString()
@@ -133,71 +116,27 @@ function RecordButton() {
         .padStart(2, "0");
 
     return (
-        <button
-            onClick={toggle}
-            disabled={busy}
-            title={recording ? "Stop recording" : "Record master mix to WAV"}
-            style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-                padding: "6px 12px",
-                borderRadius: 8,
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                background: recording ? "var(--danger, #e2354a)" : "var(--bg-elev-2)",
-                color: recording ? "#fff" : "var(--fg-dim)",
-                border: recording ? "1px solid transparent" : "1px solid var(--border)",
-                cursor: busy ? "wait" : "pointer",
-            }}
-        >
-            <span
-                style={{
-                    width: 9,
-                    height: 9,
-                    borderRadius: 99,
-                    background: recording ? "#fff" : "var(--danger, #e2354a)",
-                    boxShadow: recording ? "0 0 8px #fff" : "none",
-                    animation: recording ? "mixai-rec-pulse 1s ease-in-out infinite" : "none",
-                }}
+        <Tooltip>
+            <TooltipTrigger
+                render={
+                    <Button
+                        variant={recording ? "destructive" : "outline"}
+                        size="sm"
+                        onClick={() => void toggle()}
+                        disabled={busy}
+                        aria-pressed={recording}
+                        className={recording ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : "text-muted-foreground"}
+                    >
+                        <Circle
+                            aria-hidden
+                            className={"size-2.5 fill-current " + (recording ? "text-destructive-foreground" : "text-destructive")}
+                            style={{ animation: recording ? "mixai-rec-pulse 1s ease-in-out infinite" : undefined }}
+                        />
+                        {recording ? <span className="mono">{`${mm}:${ss}`}</span> : <span>{t("topbar.rec")}</span>}
+                    </Button>
+                }
             />
-            {recording ? (
-                <span className="mono">{`${mm}:${ss}`}</span>
-            ) : (
-                <span>REC</span>
-            )}
-        </button>
-    );
-}
-
-function Segmented({
-    options,
-    value,
-    onChange,
-}: {
-    options: { id: string; label: string }[];
-    value: string;
-    onChange: (v: string) => void;
-}) {
-    return (
-        <div style={{ display: "flex", background: "var(--bg-elev-2)", borderRadius: 8, padding: 2 }}>
-            {options.map((o) => (
-                <button
-                    key={o.id}
-                    onClick={() => onChange(o.id)}
-                    style={{
-                        padding: "5px 10px",
-                        borderRadius: 6,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        background: value === o.id ? "var(--accent)" : "transparent",
-                        color: value === o.id ? "#000" : "var(--fg-dim)",
-                    }}
-                >
-                    {o.label}
-                </button>
-            ))}
-        </div>
+            <TooltipContent>{recording ? t("topbar.recStop") : t("topbar.recStart")}</TooltipContent>
+        </Tooltip>
     );
 }

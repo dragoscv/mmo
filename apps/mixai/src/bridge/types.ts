@@ -18,7 +18,7 @@ export interface AudioDevice {
 
 export interface DeckState {
     id: DeckId;
-    /** Loaded track id (muzicai.ro / library), or null when empty. */
+    /** Loaded track id (mixai.ro / library), or null when empty. */
     trackId: string | null;
     title: string | null;
     artist: string | null;
@@ -88,7 +88,7 @@ export interface MixerState {
 
 export interface LoadTrackRequest {
     deck: DeckId;
-    /** Absolute local path OR a muzicai.ro/companion URL. */
+    /** Absolute local path OR a mixai.ro/companion URL. */
     source: string;
     trackId?: string;
     title?: string;

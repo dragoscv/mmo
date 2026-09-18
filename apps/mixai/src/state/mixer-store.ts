@@ -59,6 +59,9 @@ const initialState: MixerState = {
 interface MixerStore extends MixerState {
     native: boolean;
     setNative: (v: boolean) => void;
+    /** True once the first engine snapshot (or the "no engine" verdict) arrived. */
+    hydrated: boolean;
+    setHydrated: () => void;
     /** Replace the whole snapshot (from a core event or getState). */
     hydrate: (s: MixerState) => void;
     /** Patch a single deck locally (optimistic UI). */
@@ -78,7 +81,9 @@ export const useMixerStore = create<MixerStore>((set, get) => ({
     ...initialState,
     native: false,
     setNative: (v) => set({ native: v }),
-    hydrate: (s) => set({ ...s }),
+    hydrated: false,
+    setHydrated: () => set({ hydrated: true }),
+    hydrate: (s) => set({ ...s, hydrated: true }),
     patchDeck: (id, patch) =>
         set((state) => ({
             decks: state.decks.map((d) => (d.id === id ? { ...d, ...patch } : d)),

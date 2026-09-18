@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, FolderOpen, Sparkles, WifiOff, Link2Off } from "lucide-react";
+import { Button, EmptyState, ErrorState, Input, NoResultsState, SkeletonText, ToggleGroup, ToggleGroupItem } from "@mmo/ui";
 import { engine } from "@/bridge/engine";
 import type { DeckId, LibraryTrack } from "@/bridge/types";
 import { useMixerStore } from "@/state/mixer-store";
+import { useUiStore } from "@/state/ui-store";
 import { parseCamelot, transitionScore } from "@/lib/harmonic";
 import type { TransitionScore } from "@/lib/harmonic";
 import { useAutoMixStore } from "@/state/auto-mix-store";
+import { useT } from "@/i18n";
 
 /**
  * Library browser. Two sources:
- *   - **Companion** — browse the muzicai.ro library served by the local MMO
- *     Companion (`server/`) over HTTP, proxied through Rust. Tracks live on the
+ *   - **Companion** — browse the mixai.ro library served by the local MMO
+ *     Server (`server/`) over HTTP, proxied through Rust. Tracks live on the
  *     same machine, so loading uses the row's local `filepath` directly.
  *   - **Local** — pick any audio file from disk (Tauri dialog).
  */
@@ -17,31 +21,28 @@ import { useAutoMixStore } from "@/state/auto-mix-store";
 type Source = "companion" | "local";
 
 export function Library() {
+    const t = useT();
     const [source, setSource] = useState<Source>("companion");
 
     return (
         <div className="panel" style={{ padding: 12, display: "grid", gridTemplateRows: "auto auto 1fr", gap: 8, minHeight: 0 }}>
-            <div style={{ display: "flex", gap: 4, background: "var(--bg-elev-2)", borderRadius: 8, padding: 2 }}>
-                {(["companion", "local"] as const).map((s) => (
-                    <button
-                        key={s}
-                        onClick={() => setSource(s)}
-                        style={{
-                            flex: 1,
-                            padding: "6px 10px",
-                            borderRadius: 6,
-                            fontSize: 11,
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.06em",
-                            background: source === s ? "var(--accent)" : "transparent",
-                            color: source === s ? "#000" : "var(--fg-dim)",
-                        }}
-                    >
-                        {s === "companion" ? "muzicai.ro" : "Local file"}
-                    </button>
-                ))}
-            </div>
+            <ToggleGroup
+                value={[source]}
+                onValueChange={(v) => {
+                    const next = v[0];
+                    if (next === "companion" || next === "local") setSource(next);
+                }}
+                variant="outline"
+                size="sm"
+                className="w-full"
+            >
+                <ToggleGroupItem value="companion" className="flex-1 text-[11px] font-bold uppercase tracking-[0.06em]">
+                    {t("library.companion")}
+                </ToggleGroupItem>
+                <ToggleGroupItem value="local" className="flex-1 text-[11px] font-bold uppercase tracking-[0.06em]">
+                    {t("library.local")}
+                </ToggleGroupItem>
+            </ToggleGroup>
 
             {source === "companion" ? <CompanionLibrary /> : <LocalFiles />}
         </div>
@@ -81,6 +82,8 @@ function useLoadToDeck() {
 // ─── Companion ──────────────────────────────────────────────────────────────
 
 function CompanionLibrary() {
+    const t = useT();
+    const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
     const patchDeck = useMixerStore((s) => s.patchDeck);
     const setWaveform = useMixerStore((s) => s.setWaveform);
     const setDeckKey = useMixerStore((s) => s.setDeckKey);
@@ -232,31 +235,50 @@ function CompanionLibrary() {
         })();
 
     if (status === "checking") {
-        return <Hint>Connecting to companion…</Hint>;
+        return (
+            <div className="min-h-0 overflow-hidden p-2" aria-busy="true">
+                <SkeletonText lines={5} />
+            </div>
+        );
     }
     if (status === "offline") {
         return (
-            <Hint>
-                MMO Companion not reachable. Start the companion app, then reopen this panel.
-            </Hint>
+            <EmptyState
+                variant="inline"
+                tone="warning"
+                icon={<WifiOff aria-hidden />}
+                title={t("library.offline")}
+                description={t("library.offlineDetail")}
+                className="min-h-0 overflow-y-auto"
+            />
         );
     }
     if (status === "unconfigured") {
         return (
-            <Hint>
-                Companion online, but not paired. Add your device token and user id in{" "}
-                <strong>Settings → muzicai.ro library</strong>.
-            </Hint>
+            <EmptyState
+                variant="inline"
+                icon={<Link2Off aria-hidden />}
+                title={t("library.unconfigured")}
+                description={t("library.unconfiguredDetail")}
+                actions={
+                    <Button size="sm" onClick={() => setSettingsOpen(true)}>
+                        {t("library.openSettings")}
+                    </Button>
+                }
+                className="min-h-0 overflow-y-auto"
+            />
         );
     }
 
     return (
         <>
-            <input
+            <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search muzicai.ro library…"
-                style={searchStyle}
+                placeholder={t("library.search")}
+                size="sm"
+                type="search"
+                aria-label={t("library.search")}
             />
                 <MixAssistBar
                     decks={decks}
@@ -265,9 +287,25 @@ function CompanionLibrary() {
                     setAssistDeck={setAssistDeck}
                 />
                 <div style={{ overflowY: "auto", display: "grid", gap: 4, alignContent: "start", minHeight: 0 }}>
-                    {error && <Hint>⚠ {error}</Hint>}
-                    {!error && loading && tracks.length === 0 && <Hint>Loading…</Hint>}
-                    {!error && !loading && tracks.length === 0 && <Hint>No tracks found.</Hint>}
+                    {error && (
+                        <ErrorState
+                            variant="inline"
+                            title={t("library.error")}
+                            detail={error}
+                            onRetry={() => void fetchTracks(query)}
+                        />
+                    )}
+                    {!error && loading && tracks.length === 0 && (
+                        <div className="p-2" aria-busy="true">
+                            <SkeletonText lines={4} />
+                        </div>
+                    )}
+                    {!error && !loading && tracks.length === 0 && query.trim() && (
+                        <NoResultsState title={t("library.noResults")} description={t("library.noResultsDetail")} />
+                    )}
+                    {!error && !loading && tracks.length === 0 && !query.trim() && (
+                        <EmptyState variant="inline" title={t("library.empty")} description={t("library.emptyDetail")} />
+                    )}
                     {ranked.map(({ t, match }) => (
                         <TrackRow
                             key={t.id}
@@ -291,6 +329,7 @@ function CompanionLibrary() {
 // ─── Local files ─────────────────────────────────────────────────────────────
 
 function LocalFiles() {
+    const t = useT();
     const loadToDeck = useLoadToDeck();
 
     const openFileTo = async (deck: DeckId) => {
@@ -304,18 +343,19 @@ function LocalFiles() {
     return (
         <>
             <div style={{ display: "flex", gap: 6 }}>
-                <span style={{ fontSize: 11, color: "var(--fg-dim)", alignSelf: "center", marginRight: "auto" }}>
-                    Open a file from disk →
+                <span style={{ fontSize: 11, color: "var(--fg-dim)", alignSelf: "center", marginRight: "auto", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <FolderOpen size={14} aria-hidden />
+                    {t("library.pickFile")}
                 </span>
                 <button onClick={() => void openFileTo("a")} style={loadBtn("var(--accent-deck-a)")}>
-                    ◄ Deck A
+                    <ChevronLeft size={12} aria-hidden /> {t("library.loadA")}
                 </button>
                 <button onClick={() => void openFileTo("b")} style={loadBtn("var(--accent-deck-b)")}>
-                    Deck B ►
+                    {t("library.loadB")} <ChevronRight size={12} aria-hidden />
                 </button>
             </div>
             <div style={{ overflowY: "auto", minHeight: 0 }}>
-                <Hint>Pick any MP3, WAV, FLAC, AAC, M4A, OGG or AIFF file to load it onto a deck.</Hint>
+                <EmptyState variant="inline" icon={<FolderOpen aria-hidden />} title={t("library.local")} description={t("library.localHint")} />
             </div>
         </>
     );
@@ -348,6 +388,7 @@ function TrackRow({
 }) {
     const busy = stemJob && stemJob.state !== "done" && stemJob.state !== "error";
     const ready = stemsStatus === "ready";
+    const tt = useT();
     return (
         <div
             style={{
@@ -381,9 +422,9 @@ function TrackRow({
                     <span
                         title="Stems ready — loading a track auto-attaches them"
                         className="mono"
-                        style={{ fontSize: 10, fontWeight: 700, color: "var(--accent)" }}
+                        style={{ fontSize: 10, fontWeight: 700, color: "var(--accent)", display: "inline-flex", alignItems: "center", gap: 3 }}
                     >
-                        ✦ STEMS
+                        <Sparkles size={10} aria-hidden /> {tt("library.stems")}
                     </span>
                 ) : busy ? (
                     <span className="mono" style={{ fontSize: 10, color: "var(--fg-dim)" }}>
@@ -405,21 +446,17 @@ function TrackRow({
                             border: "1px solid var(--border)",
                         }}
                     >
-                        ✦
+                        <Sparkles size={11} aria-hidden />
                     </button>
                 ))}
             <button onClick={onA} style={loadBtn("var(--accent-deck-a)")}>
-                ◄ A
+                <ChevronLeft size={12} aria-hidden /> A
             </button>
             <button onClick={onB} style={loadBtn("var(--accent-deck-b)")}>
-                B ►
+                B <ChevronRight size={12} aria-hidden />
             </button>
         </div>
     );
-}
-
-function Hint({ children }: { children: React.ReactNode }) {
-    return <p style={{ fontSize: 12, color: "var(--fg-dim)", padding: "8px 4px", lineHeight: 1.5 }}>{children}</p>;
 }
 
 /**
@@ -437,6 +474,7 @@ function MixAssistBar({
     assistDeck: DeckId | null;
     setAssistDeck: (d: DeckId | null) => void;
 }) {
+    const t = useT();
     const loaded = decks.filter((d) => d.loaded);
     const ref = assistDeck ? decks.find((d) => d.id === assistDeck) : null;
     return (
@@ -450,8 +488,8 @@ function MixAssistBar({
                 background: "var(--bg-elev-2)",
             }}
         >
-            <span style={{ fontSize: 10, color: "var(--fg-dim)", letterSpacing: "0.1em", marginRight: "auto" }}>
-                ✦ MIX ASSIST
+            <span style={{ fontSize: 10, color: "var(--fg-dim)", letterSpacing: "0.1em", marginRight: "auto", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <Sparkles size={10} aria-hidden /> {t("library.mixAssist")}
                 {ref && (
                     <span className="mono" style={{ marginLeft: 8, color: "var(--accent-2)" }}>
                         → {deckKeys[ref.id] ?? "?"} · {ref.bpm > 0 ? ref.bpm.toFixed(0) : "--"} BPM
@@ -486,7 +524,7 @@ function MixAssistBar({
 function MatchBadge({ match }: { match: TransitionScore }) {
     const pct = Math.round(match.score * 100);
     // Green ≥80, amber ≥55, dim otherwise.
-    const color = match.score >= 0.8 ? "#34d399" : match.score >= 0.55 ? "#fbbf24" : "var(--fg-dim)";
+    const color = match.score >= 0.8 ? "var(--success)" : match.score >= 0.55 ? "var(--warning)" : "var(--fg-dim)";
     const adj = match.bpmAdjustPct;
     const adjLabel = Math.abs(adj) < 0.05 ? "±0%" : `${adj > 0 ? "+" : ""}${adj.toFixed(1)}%`;
     return (
@@ -517,19 +555,10 @@ function assistPill(active: boolean): React.CSSProperties {
         padding: "3px 9px",
         borderRadius: 6,
         background: active ? "var(--accent)" : "var(--bg-elev)",
-        color: active ? "#000" : "var(--fg-dim)",
+        color: active ? "var(--accent-fg)" : "var(--fg-dim)",
         border: "1px solid var(--border)",
     };
 }
-
-const searchStyle: React.CSSProperties = {
-    background: "var(--bg-elev-2)",
-    border: "1px solid var(--border)",
-    borderRadius: 8,
-    padding: "8px 10px",
-    color: "var(--fg)",
-    fontSize: 13,
-};
 
 function loadBtn(color: string): React.CSSProperties {
     return {
@@ -540,5 +569,8 @@ function loadBtn(color: string): React.CSSProperties {
         background: "var(--bg-elev-2)",
         color,
         border: `1px solid ${color}`,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 2,
     };
 }

@@ -1,3 +1,4 @@
+import { Play, Sparkles } from "lucide-react";
 import { useAutoMixStore } from "@/state/auto-mix-store";
 
 /**
@@ -24,8 +25,8 @@ export function AutoMixPanel() {
     return (
         <div style={{ display: "grid", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 10, color: "var(--fg-dim)", letterSpacing: "0.12em", marginRight: "auto" }}>
-                    ✦ AUTO-MIX
+                <span style={{ fontSize: 10, color: "var(--fg-dim)", letterSpacing: "0.12em", marginRight: "auto", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <Sparkles size={10} aria-hidden /> AUTO-MIX
                 </span>
                 <button
                     onClick={() => setEnabled(!enabled)}
@@ -36,7 +37,7 @@ export function AutoMixPanel() {
                         borderRadius: 8,
                         letterSpacing: "0.06em",
                         background: enabled ? "var(--accent)" : "var(--bg-elev-2)",
-                        color: enabled ? "#000" : "var(--fg-dim)",
+                        color: enabled ? "var(--accent-fg)" : "var(--fg-dim)",
                         border: "1px solid var(--border)",
                     }}
                 >
@@ -82,7 +83,7 @@ export function AutoMixPanel() {
                         padding: "6px 8px",
                         borderRadius: 7,
                         background: autoSync ? "var(--accent)" : "var(--bg-elev-2)",
-                        color: autoSync ? "#000" : "var(--fg-dim)",
+                        color: autoSync ? "var(--accent-fg)" : "var(--fg-dim)",
                         border: "1px solid var(--border)",
                     }}
                 >
@@ -90,7 +91,7 @@ export function AutoMixPanel() {
                 </button>
                 <button
                     onClick={() => setAutoQueue(!autoQueue)}
-                    title="Auto-load the best harmonic match from the muzicai.ro library onto the idle deck"
+                    title="Auto-load the best harmonic match from the mixai.ro library onto the idle deck"
                     style={{
                         flex: 1,
                         fontSize: 10,
@@ -98,7 +99,7 @@ export function AutoMixPanel() {
                         padding: "6px 8px",
                         borderRadius: 7,
                         background: autoQueue ? "var(--accent)" : "var(--bg-elev-2)",
-                        color: autoQueue ? "#000" : "var(--fg-dim)",
+                        color: autoQueue ? "var(--accent-fg)" : "var(--fg-dim)",
                         border: "1px solid var(--border)",
                     }}
                 >
@@ -120,7 +121,7 @@ export function AutoMixPanel() {
                         opacity: !enabled || mixing ? 0.5 : 1,
                     }}
                 >
-                    MIX NOW ►
+                    MIX NOW <Play size={10} aria-hidden style={{ verticalAlign: "-1px", marginLeft: 4 }} />
                 </button>
             </div>
         </div>

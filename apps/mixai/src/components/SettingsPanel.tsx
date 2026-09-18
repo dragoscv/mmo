@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
+import { Check, RefreshCw, SlidersHorizontal, X } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, ThemeSettings } from "@mmo/ui";
 import { engine } from "@/bridge/engine";
 import type { AudioDevice } from "@/bridge/types";
 import { subscribeMidiLearn, type MidiLearnEvent } from "@/bridge/events";
 import { subscribeHidInput } from "@/bridge/events";
 import { useUiStore } from "@/state/ui-store";
-import { THEMES, EDITABLE_TOKENS, exportTheme, isCustomThemeId } from "@/themes/themes";
 import { useCompanionStore } from "@/state/companion-store";
+import { useT } from "@/i18n";
 import type { CompanionStatus, DeckId, HidDeviceInfo, HidInputEvent, MidiAction, MidiPreset } from "@/bridge/types";
 import {
     exportPreset,
@@ -31,6 +33,8 @@ import { HID_DEVICE_PRESETS, presetForDevice } from "@/lib/hid-device-presets";
 import { resetHidFeedback } from "@/lib/hid-feedback";
 
 export function SettingsPanel() {
+    const t = useT();
+    const open = useUiStore((s) => s.settingsOpen);
     const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
     const [devices, setDevices] = useState<AudioDevice[]>([]);
 
@@ -42,69 +46,52 @@ export function SettingsPanel() {
     }, []);
 
     return (
-        <div
-            onClick={() => setSettingsOpen(false)}
-            style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0,0,0,0.5)",
-                display: "grid",
-                placeItems: "center",
-                zIndex: 50,
-            }}
-        >
-            <div
-                className="panel"
-                onClick={(e) => e.stopPropagation()}
-                style={{ padding: 20, width: 520, maxHeight: "80vh", overflowY: "auto", display: "grid", gap: 18 }}
-            >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h2 style={{ fontSize: 18 }}>Settings</h2>
-                    <button onClick={() => setSettingsOpen(false)} style={{ fontSize: 20, color: "var(--fg-dim)" }}>
-                        ✕
-                    </button>
-                </div>
+        <Sheet open={open} onOpenChange={setSettingsOpen}>
+            <SheetContent side="right" className="w-full max-w-xl gap-5 sm:max-w-xl">
+                <SheetHeader>
+                    <SheetTitle>{t("settings.title")}</SheetTitle>
+                    <SheetDescription>{t("settings.description")}</SheetDescription>
+                </SheetHeader>
 
-                <Section title="Theme">
-                    <ThemeSection />
+                <Section title={t("settings.appearance")}>
+                    {/* mixai has no locale switch yet beyond the shared one; hide nothing else. */}
+                    <ThemeSettings hide={["locale"]} className="[&_section]:p-4" />
                 </Section>
 
-                <Section title="Audio output (master)">
+                <Section title={t("settings.audioOut")}>
                     <DeviceSelect
                         devices={devices}
                         onChange={(id) => void engine.setOutputDevice(id)}
                     />
                 </Section>
 
-                <Section title="Headphone cue output">
+                <Section title={t("settings.cueOut")}>
                     <DeviceSelect devices={devices} onChange={(id) => void engine.setCueDevice(id)} />
                 </Section>
 
-                <Section title="MIDI controllers">
+                <Section title={t("settings.midi")}>
                     <MidiSection />
                 </Section>
 
-                <Section title="HID controllers">
+                <Section title={t("settings.hid")}>
                     <HidSection />
                 </Section>
 
-                <Section title="muzicai.ro library">
+                <Section title={t("settings.library")}>
                     <CompanionSection />
                 </Section>
 
-                <Section title="Profile backup">
+                <Section title={t("settings.profile")}>
                     <ProfileSection />
                 </Section>
 
-                <Section title="Plugins">
+                <Section title={t("settings.plugins")}>
                     <PluginManager />
                 </Section>
 
-                <p style={{ fontSize: 11, color: "var(--fg-dim)" }}>
-                    Settings will sync to your muzicai.ro account and restore on any device.
-                </p>
-            </div>
-        </div>
+                <p style={{ fontSize: 11, color: "var(--fg-dim)" }}>{t("settings.syncNote")}</p>
+            </SheetContent>
+        </Sheet>
     );
 }
 
@@ -115,8 +102,9 @@ function DeviceSelect({
     devices: AudioDevice[];
     onChange: (id: string) => void;
 }) {
+    const t = useT();
     if (devices.length === 0) {
-        return <p style={{ fontSize: 12, color: "var(--fg-dim)" }}>No audio devices (run inside the app).</p>;
+        return <p style={{ fontSize: 12, color: "var(--fg-dim)" }}>{t("settings.noDevices")}</p>;
     }
     return (
         <select
@@ -141,6 +129,7 @@ function DeviceSelect({
 }
 
 function MidiSection() {
+    const t = useT();
     const [inputs, setInputs] = useState<string[]>([]);
     const [connected, setConnected] = useState<string | null>(null);
     const [learn, setLearn] = useState(false);
@@ -269,7 +258,7 @@ function MidiSection() {
                             <span>{name}</span>
                             {connected === name ? (
                                 <button onClick={() => void disconnect()} style={midiBtn(true)}>
-                                    Connected ✓
+                                    <Check size={12} aria-hidden /> Connected
                                 </button>
                             ) : (
                                 <button onClick={() => void connect(name)} style={midiBtn(false)}>
@@ -301,7 +290,7 @@ function MidiSection() {
 
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <button onClick={() => void refresh()} style={midiBtn(false)}>
-                    ↻ Refresh
+                    <RefreshCw size={12} aria-hidden /> {t("settings.refresh")}
                 </button>
                 <button onClick={() => void toggleLearn()} style={midiBtn(learn)}>
                     {learn ? "Learn… (touch a control)" : "MIDI Learn"}
@@ -380,7 +369,7 @@ function MidiSection() {
                             {preset.mappings.length} bindings
                         </span>
                         <button onClick={() => void copyShare()} style={midiBtn(false)}>
-                            {copied ? "Copied ✓" : "Share"}
+                            {copied ? <><Check size={11} aria-hidden /> Copied</> : "Share"}
                         </button>
                     </div>
                     <BindingsTable preset={preset} onDelete={(i) => void deleteBinding(i)} />
@@ -429,6 +418,7 @@ function BindingsTable({
     preset: MidiPreset;
     onDelete?: (index: number) => void;
 }) {
+    const t = useT();
     return (
         <div style={{ maxHeight: 160, overflowY: "auto", display: "grid", gap: 2 }}>
             {preset.mappings.map((m, i) => (
@@ -462,7 +452,8 @@ function BindingsTable({
                     {onDelete && (
                         <button
                             onClick={() => onDelete(i)}
-                            title="Remove binding"
+                            title={t("settings.remove")}
+                            aria-label={t("settings.remove")}
                             style={{
                                 fontSize: 11,
                                 lineHeight: 1,
@@ -472,9 +463,10 @@ function BindingsTable({
                                 color: "var(--fg-dim)",
                                 border: "1px solid var(--border)",
                                 cursor: "pointer",
+                                display: "inline-flex",
                             }}
                         >
-                            ✕
+                            <X size={11} aria-hidden />
                         </button>
                     )}
                 </div>
@@ -561,7 +553,7 @@ function ProfileSection() {
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button onClick={() => void doExport()} style={midiBtn(false)}>
-                    {copied ? "Copied ✓" : "Export profile"}
+                    {copied ? <><Check size={11} aria-hidden /> Copied</> : "Export profile"}
                 </button>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -596,7 +588,7 @@ function ProfileSection() {
                 </span>
             )}
             {status === "ok" && (
-                <span style={{ fontSize: 11, color: "var(--good)" }}>Profile restored ✓</span>
+                <span style={{ fontSize: 11, color: "var(--good)" }}><Check size={11} aria-hidden style={{ verticalAlign: "-2px" }} /> Profile restored</span>
             )}
             <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
             <p style={{ fontSize: 12, color: "var(--fg-dim)" }}>
@@ -609,14 +601,14 @@ function ProfileSection() {
                     disabled={!cloudReady || cloud === "saving" || cloud === "loading"}
                     style={midiBtn(false)}
                 >
-                    {cloud === "saving" ? "Saving…" : cloud === "saved" ? "Saved ✓" : "Save to cloud"}
+                    {cloud === "saving" ? "Saving…" : cloud === "saved" ? <><Check size={11} aria-hidden /> Saved</> : "Save to cloud"}
                 </button>
                 <button
                     onClick={() => void doCloudLoad()}
                     disabled={!cloudReady || cloud === "saving" || cloud === "loading"}
                     style={midiBtn(false)}
                 >
-                    {cloud === "loading" ? "Loading…" : cloud === "loaded" ? "Loaded ✓" : "Load from cloud"}
+                    {cloud === "loading" ? "Loading…" : cloud === "loaded" ? <><Check size={11} aria-hidden /> Loaded</> : "Load from cloud"}
                 </button>
             </div>
             {!cloudReady && (
@@ -645,12 +637,16 @@ function midiBtn(active: boolean): React.CSSProperties {
         padding: "6px 12px",
         borderRadius: 8,
         background: active ? "var(--accent)" : "var(--bg-elev-2)",
-        color: active ? "#000" : "var(--fg)",
+        color: active ? "var(--accent-fg)" : "var(--fg)",
         border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
     };
 }
 
 function HidSection() {
+    const t = useT();
     const [devices, setDevices] = useState<HidDeviceInfo[]>([]);
     const [connected, setConnected] = useState<string | null>(null);
     const [last, setLast] = useState<HidInputEvent | null>(null);
@@ -775,7 +771,11 @@ function HidSection() {
                             }}
                         >
                             <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                                {d.isDjGear && <span title="Known DJ gear">🎚️</span>}
+                                {d.isDjGear && (
+                                    <span title={t("settings.knownGear")} style={{ display: "inline-flex" }}>
+                                        <SlidersHorizontal size={13} aria-label={t("settings.knownGear")} />
+                                    </span>
+                                )}
                                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {d.label}
                                 </span>
@@ -785,7 +785,7 @@ function HidSection() {
                             </span>
                             {connected === d.path ? (
                                 <button onClick={() => void disconnect()} style={midiBtn(true)} disabled={busy}>
-                                    Connected ✓
+                                    <Check size={12} aria-hidden /> Connected
                                 </button>
                             ) : (
                                 <button onClick={() => void connect(d.path)} style={midiBtn(false)} disabled={busy}>
@@ -829,7 +829,7 @@ function HidSection() {
 
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <button onClick={() => void refresh()} style={midiBtn(false)}>
-                    ↻ Refresh
+                    <RefreshCw size={12} aria-hidden /> {t("settings.refresh")}
                 </button>
                 <button
                     onClick={() => setLearning(!learning)}
@@ -933,8 +933,8 @@ function HidSection() {
                                             ? `b${m.byteIndex}.0x${m.mask.toString(16)}`
                                             : `b${m.byteIndex}`}
                                     </code>
-                                    <button onClick={() => remove(i)} style={{ color: "var(--fg-dim)", fontSize: 14 }}>
-                                        ✕
+                                    <button onClick={() => remove(i)} aria-label={t("settings.remove")} title={t("settings.remove")} style={{ color: "var(--fg-dim)", fontSize: 14, display: "inline-flex" }}>
+                                        <X size={13} aria-hidden />
                                     </button>
                                 </span>
                             </div>
@@ -945,7 +945,7 @@ function HidSection() {
 
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <button onClick={() => void copyShare()} style={midiBtn(false)} disabled={preset.mappings.length === 0}>
-                    {copied ? "Copied ✓" : "Share mapping"}
+                    {copied ? <><Check size={11} aria-hidden /> Copied</> : "Share mapping"}
                 </button>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -981,6 +981,7 @@ const selStyle: React.CSSProperties = {
 };
 
 function CompanionSection() {
+    const t = useT();
     const { baseUrl, deviceToken, userId, update } = useCompanionStore();
     const [status, setStatus] = useState<CompanionStatus | null>(null);
     const [checking, setChecking] = useState(false);
@@ -1011,7 +1012,7 @@ function CompanionSection() {
                 <span style={{ width: 9, height: 9, borderRadius: 99, background: dot }} />
                 <span style={{ color: "var(--fg-dim)" }}>{label}</span>
                 <button onClick={() => void probe()} style={midiBtn(false)} disabled={checking}>
-                    ↻ Check
+                    <RefreshCw size={12} aria-hidden /> {t("settings.check")}
                 </button>
             </div>
 
@@ -1031,7 +1032,7 @@ function CompanionSection() {
             <Field
                 label="User id"
                 value={userId}
-                placeholder="your muzicai.ro user id"
+                placeholder="your mixai.ro user id"
                 onChange={(v) => update({ userId: v })}
             />
             <p style={{ fontSize: 11, color: "var(--fg-dim)", lineHeight: 1.5 }}>
@@ -1075,192 +1076,6 @@ function Field({
         </label>
     );
 }
-
-function ThemeSection() {
-    const theme = useUiStore((s) => s.theme);
-    const customThemes = useUiStore((s) => s.customThemes);
-    const setTheme = useUiStore((s) => s.setTheme);
-    const addCustomTheme = useUiStore((s) => s.addCustomTheme);
-    const updateColor = useUiStore((s) => s.updateCustomThemeColor);
-    const renameCustomTheme = useUiStore((s) => s.renameCustomTheme);
-    const deleteCustomTheme = useUiStore((s) => s.deleteCustomTheme);
-    const importThemeString = useUiStore((s) => s.importThemeString);
-    const [importText, setImportText] = useState("");
-    const [copied, setCopied] = useState(false);
-    const [importError, setImportError] = useState(false);
-
-    const active = customThemes.find((t) => t.id === theme);
-
-    const pill = (id: string, name: string) => (
-        <button
-            key={id}
-            onClick={() => setTheme(id as never)}
-            style={{
-                padding: "8px 12px",
-                borderRadius: 10,
-                border: `1px solid ${theme === id ? "var(--accent)" : "var(--border)"}`,
-                background: theme === id ? "var(--bg-elev-2)" : "transparent",
-                fontSize: 12,
-                fontWeight: 600,
-            }}
-        >
-            {name}
-        </button>
-    );
-
-    const copyShare = async () => {
-        if (!active) return;
-        try {
-            await navigator.clipboard.writeText(exportTheme(active));
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-        } catch {
-            /* clipboard may be blocked; non-fatal */
-        }
-    };
-
-    const doImport = () => {
-        const ok = importThemeString(importText.trim());
-        if (ok) {
-            setImportText("");
-            setImportError(false);
-        } else {
-            setImportError(true);
-        }
-    };
-
-    return (
-        <div style={{ display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {Object.values(THEMES).map((t) => pill(t.id, t.name))}
-                {customThemes.map((t) => pill(t.id, t.name))}
-                <button
-                    onClick={() => addCustomTheme("My Theme")}
-                    title="Create a custom theme"
-                    style={{
-                        padding: "8px 12px",
-                        borderRadius: 10,
-                        border: "1px dashed var(--border)",
-                        background: "transparent",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "var(--fg-dim)",
-                    }}
-                >
-                    + New
-                </button>
-            </div>
-
-            {active && isCustomThemeId(active.id) && (
-                <div
-                    style={{
-                        display: "grid",
-                        gap: 10,
-                        padding: 12,
-                        borderRadius: 12,
-                        border: "1px solid var(--border)",
-                        background: "var(--bg-elev)",
-                    }}
-                >
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <input
-                            value={active.name}
-                            onChange={(e) => renameCustomTheme(active.id, e.target.value)}
-                            style={{
-                                flex: 1,
-                                fontSize: 13,
-                                fontWeight: 600,
-                                padding: "6px 8px",
-                                borderRadius: 8,
-                                background: "var(--bg-elev-2)",
-                                border: "1px solid var(--border)",
-                                color: "var(--fg)",
-                            }}
-                        />
-                        <button onClick={() => void copyShare()} style={smallBtn}>
-                            {copied ? "Copied ✓" : "Share"}
-                        </button>
-                        <button
-                            onClick={() => deleteCustomTheme(active.id)}
-                            style={{ ...smallBtn, color: "var(--danger)" }}
-                        >
-                            Delete
-                        </button>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
-                        {EDITABLE_TOKENS.map(({ key, label }) => (
-                            <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
-                                <input
-                                    type="color"
-                                    value={toHex(active.tokens[key] ?? "#888888")}
-                                    onChange={(e) => updateColor(active.id, key, e.target.value)}
-                                    style={{ width: 28, height: 22, border: "none", background: "none", padding: 0 }}
-                                />
-                                <span style={{ color: "var(--fg-dim)" }}>{label}</span>
-                            </label>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            <div style={{ display: "flex", gap: 8 }}>
-                <input
-                    value={importText}
-                    onChange={(e) => {
-                        setImportText(e.target.value);
-                        setImportError(false);
-                    }}
-                    placeholder="Paste a shared theme code…"
-                    style={{
-                        flex: 1,
-                        fontSize: 11,
-                        padding: "6px 8px",
-                        borderRadius: 8,
-                        background: "var(--bg-elev-2)",
-                        border: `1px solid ${importError ? "var(--danger)" : "var(--border)"}`,
-                        color: "var(--fg)",
-                    }}
-                />
-                <button onClick={doImport} disabled={!importText.trim()} style={smallBtn}>
-                    Import
-                </button>
-            </div>
-            {importError && (
-                <span style={{ fontSize: 11, color: "var(--danger)" }}>That doesn't look like a valid theme code.</span>
-            )}
-        </div>
-    );
-}
-
-/** Coerce any CSS color to a #rrggbb hex for the native color input. */
-function toHex(color: string): string {
-    const c = color.trim();
-    if (/^#[0-9a-f]{6}$/i.test(c)) return c;
-    if (/^#[0-9a-f]{3}$/i.test(c)) {
-        return `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`;
-    }
-    // rgb()/rgba() → hex (ignore alpha for the swatch).
-    const m = /rgba?\(([^)]+)\)/i.exec(c);
-    if (m) {
-        const parts = m[1]!.split(",").map((p) => p.trim());
-        const r = Math.max(0, Math.min(255, parseInt(parts[0] ?? "0", 10)));
-        const g = Math.max(0, Math.min(255, parseInt(parts[1] ?? "0", 10)));
-        const b = Math.max(0, Math.min(255, parseInt(parts[2] ?? "0", 10)));
-        const hx = (n: number) => n.toString(16).padStart(2, "0");
-        return `#${hx(r)}${hx(g)}${hx(b)}`;
-    }
-    return "#888888";
-}
-
-const smallBtn: React.CSSProperties = {
-    fontSize: 11,
-    fontWeight: 700,
-    padding: "6px 10px",
-    borderRadius: 8,
-    background: "var(--bg-elev-2)",
-    border: "1px solid var(--border)",
-    color: "var(--fg)",
-};
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (

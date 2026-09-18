@@ -1,6 +1,8 @@
+import { Lock, LockOpen, Pause, Play, RefreshCw } from "lucide-react";
 import { engine } from "@/bridge/engine";
 import type { DeckId } from "@/bridge/types";
 import { useMixerStore } from "@/state/mixer-store";
+import { useT } from "@/i18n";
 import { Waveform } from "./Waveform";
 import { PerformancePads } from "./PerformancePads";
 import { StemControls } from "./StemControls";
@@ -14,10 +16,12 @@ function fmtTime(sec: number): string {
 }
 
 export function Deck({ deckId }: { deckId: DeckId }) {
+    const t = useT();
     const deck = useMixerStore((s) => s.deck(deckId));
     const patchDeck = useMixerStore((s) => s.patchDeck);
 
-    const accent = deckId === "a" || deckId === "c" ? "var(--accent-deck-a)" : "var(--accent-deck-b)";
+    // Deck colours are fixed per deck (D9) and never follow the theme accent.
+    const accent = `var(--deck-${deckId})`;
 
     const togglePlay = () => {
         const next = !deck.playing;
@@ -50,7 +54,7 @@ export function Deck({ deckId }: { deckId: DeckId }) {
                             boxShadow: `var(--glow) ${accent}`,
                         }}
                     />
-                    <strong style={{ letterSpacing: "0.1em" }}>DECK {deckId.toUpperCase()}</strong>
+                    <strong style={{ letterSpacing: "0.1em" }}>{t("deck.title", { id: deckId.toUpperCase() })}</strong>
                 </div>
                 <span className="mono" style={{ fontSize: 11, color: "var(--fg-dim)" }}>
                     {deck.bpm > 0 ? (deck.bpm * deck.tempo).toFixed(1) : "--"} BPM
@@ -58,7 +62,7 @@ export function Deck({ deckId }: { deckId: DeckId }) {
             </div>
 
             <div style={{ minHeight: 30 }}>
-                <div style={{ fontWeight: 600 }}>{deck.title ?? "No track loaded"}</div>
+                <div style={{ fontWeight: 600 }}>{deck.title ?? t("deck.noTrack")}</div>
                 <div style={{ fontSize: 12, color: "var(--fg-dim)" }}>{deck.artist ?? "—"}</div>
             </div>
 
@@ -78,12 +82,17 @@ export function Deck({ deckId }: { deckId: DeckId }) {
                         padding: "10px 0",
                         borderRadius: 10,
                         background: deck.playing ? accent : "var(--bg-elev-2)",
-                        color: deck.playing ? "#000" : "var(--fg)",
+                        color: deck.playing ? "var(--background)" : "var(--fg)",
                         fontWeight: 700,
                         opacity: deck.loaded ? 1 : 0.4,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
                     }}
                 >
-                    {deck.playing ? "❚❚ PAUSE" : "▶ PLAY"}
+                    {deck.playing ? <Pause size={14} aria-hidden /> : <Play size={14} aria-hidden />}
+                    {deck.playing ? t("deck.pause") : t("deck.play")}
                 </button>
                 <button
                     onClick={toggleKeyLock}
@@ -92,12 +101,16 @@ export function Deck({ deckId }: { deckId: DeckId }) {
                         padding: "10px 12px",
                         borderRadius: 10,
                         background: deck.keyLock ? "var(--accent)" : "var(--bg-elev-2)",
-                        color: deck.keyLock ? "#000" : "var(--fg)",
+                        color: deck.keyLock ? "var(--accent-fg)" : "var(--fg)",
                         fontWeight: 700,
                         fontSize: 12,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
                     }}
                 >
-                    🔒 KEY
+                    {deck.keyLock ? <Lock size={13} aria-hidden /> : <LockOpen size={13} aria-hidden />}
+                    {t("deck.key")}
                 </button>
                 <button
                     onClick={() => void engine.sync(deckId)}
@@ -111,15 +124,19 @@ export function Deck({ deckId }: { deckId: DeckId }) {
                         fontWeight: 700,
                         fontSize: 12,
                         opacity: deck.loaded ? 1 : 0.4,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
                     }}
                 >
-                    ⟲ SYNC
+                    <RefreshCw size={13} aria-hidden />
+                    {t("deck.sync")}
                 </button>
             </div>
 
             <div style={{ display: "grid", gap: 4 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--fg-dim)" }}>
-                    <span>TEMPO</span>
+                    <span style={{ textTransform: "uppercase" }}>{t("deck.tempo")}</span>
                     <span className="mono">{((deck.tempo - 1) * 100 >= 0 ? "+" : "") + ((deck.tempo - 1) * 100).toFixed(1)}%</span>
                 </div>
                 <input

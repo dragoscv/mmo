@@ -1,16 +1,62 @@
 /**
- * Keyboard shortcuts cheat-sheet. Toggled with `?` (or the TopBar button).
- * Doubles as the keybind editor: each row shows the *effective* key (default
+ * Keyboard shortcuts cheat-sheet + keybind editor. Toggled with `?`, the TopBar
+ * button or the command palette. Each row shows the *effective* key (default
  * or user override) and can be clicked to capture a new key. Overrides live in
  * the keybind store (persisted + profile-synced).
+ *
+ * The effective bindings are also mirrored into @mmo/ui's shortcut registry so
+ * the shared `CommandDialog` / other surfaces can list them. Dispatch stays in
+ * `lib/use-shortcuts` (it matches on `KeyboardEvent.code`, layout-independent),
+ * so the registry entries are list-only (`when: () => false`).
  */
 
 import { useEffect, useState } from "react";
+import { RotateCcw } from "lucide-react";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Kbd,
+    registerShortcut,
+    useInstallShortcutListener,
+} from "@mmo/ui";
 import { useUiStore } from "@/state/ui-store";
 import { SHORTCUT_GROUPS, codeLabel, shortcutId } from "@/lib/shortcuts";
 import { useKeybindStore } from "@/state/keybind-store";
+import { useT, type MessageKey } from "@/i18n";
+
+const GROUP_KEYS: Record<string, MessageKey> = {
+    "Deck A": "shortcuts.group.deckA",
+    "Deck B": "shortcuts.group.deckB",
+    Mixer: "shortcuts.group.mixer",
+};
+
+/** Mirror the effective mixai bindings into the shared registry (list-only). */
+function useMirrorShortcutsToRegistry() {
+    const bindings = useKeybindStore((s) => s.bindings);
+    useEffect(() => {
+        const unregister: Array<() => void> = [];
+        for (const [code, s] of bindings) {
+            unregister.push(
+                registerShortcut({
+                    id: `mixai:${shortcutId(s)}`,
+                    keys: [codeLabel(code).toLowerCase()],
+                    label: s.label,
+                    group: s.deck ? `deck-${s.deck}` : "mixer",
+                    handler: () => {},
+                    when: () => false,
+                }),
+            );
+        }
+        return () => unregister.forEach((u) => u());
+    }, [bindings]);
+}
 
 export function ShortcutsOverlay() {
+    const t = useT();
     const open = useUiStore((s) => s.shortcutsOpen);
     const setOpen = useUiStore((s) => s.setShortcutsOpen);
     const overrides = useKeybindStore((s) => s.overrides);
@@ -18,6 +64,10 @@ export function ShortcutsOverlay() {
     const reset = useKeybindStore((s) => s.reset);
     const resetAll = useKeybindStore((s) => s.resetAll);
     const [capturing, setCapturing] = useState<string | null>(null);
+
+    // Shared registry: install the single keydown dispatcher (mod+k etc.).
+    useInstallShortcutListener();
+    useMirrorShortcutsToRegistry();
 
     // While capturing, the next key press (sans modifiers) becomes the binding.
     useEffect(() => {
@@ -37,149 +87,89 @@ export function ShortcutsOverlay() {
         return () => window.removeEventListener("keydown", onKey, true);
     }, [capturing, rebind]);
 
-    if (!open) return null;
-
     return (
-        <div
-            onClick={() => {
-                setCapturing(null);
-                setOpen(false);
-            }}
-            style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0,0,0,0.5)",
-                display: "grid",
-                placeItems: "center",
-                zIndex: 60,
+        <Dialog
+            open={open}
+            onOpenChange={(o) => {
+                if (!o) setCapturing(null);
+                setOpen(o);
             }}
         >
-            <div
-                className="panel"
-                onClick={(e) => e.stopPropagation()}
-                style={{ padding: 20, width: 620, maxHeight: "80vh", overflowY: "auto", display: "grid", gap: 16 }}
-            >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h2 style={{ fontSize: 18 }}>Keyboard shortcuts</h2>
-                    <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                            onClick={() => {
-                                setCapturing(null);
-                                resetAll();
-                            }}
-                            style={{
-                                fontSize: 12,
-                                fontWeight: 700,
-                                padding: "6px 12px",
-                                borderRadius: 8,
-                                background: "transparent",
-                                color: "var(--fg-dim)",
-                                border: "1px solid var(--border)",
-                            }}
-                            title="Restore all default keys"
-                        >
-                            Reset all
-                        </button>
-                        <button
-                            onClick={() => setOpen(false)}
-                            style={{
-                                fontSize: 12,
-                                fontWeight: 700,
-                                padding: "6px 12px",
-                                borderRadius: 8,
-                                background: "var(--bg-elev-2)",
-                                color: "var(--fg)",
-                                border: "1px solid var(--border)",
-                            }}
-                        >
-                            Close
-                        </button>
+            <DialogContent size="lg" className="max-h-[85dvh] overflow-hidden">
+                <DialogHeader className="flex-row items-start justify-between gap-4 pr-8">
+                    <div>
+                        <DialogTitle>{t("shortcuts.title")}</DialogTitle>
+                        <DialogDescription className="mt-1">
+                            {t("shortcuts.help", { key: "?" })}
+                        </DialogDescription>
                     </div>
-                </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        title={t("shortcuts.resetAllHint")}
+                        onClick={() => {
+                            setCapturing(null);
+                            resetAll();
+                        }}
+                    >
+                        <RotateCcw aria-hidden />
+                        {t("shortcuts.resetAll")}
+                    </Button>
+                </DialogHeader>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                <div className="grid gap-4 overflow-y-auto pb-1 sm:grid-cols-3">
                     {SHORTCUT_GROUPS.map((group) => (
-                        <div key={group.title} style={{ display: "grid", gap: 6, alignContent: "start" }}>
-                            <span
-                                style={{
-                                    fontSize: 10,
-                                    fontWeight: 700,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.16em",
-                                    color: "var(--fg-dim)",
-                                }}
-                            >
-                                {group.title}
-                            </span>
+                        <section key={group.title} className="grid content-start gap-1">
+                            <h3 className="px-1 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                                {t(GROUP_KEYS[group.title] ?? "shortcuts.group.general")}
+                            </h3>
                             {group.items.map((s) => {
                                 const id = shortcutId(s);
                                 const overridden = id in overrides;
                                 const effectiveCode = overrides[id] ?? s.code;
                                 const isCapturing = capturing === id;
                                 return (
-                                    <div
-                                        key={id}
-                                        style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}
-                                    >
+                                    <div key={id} className="flex h-8 items-center gap-2 rounded-md px-1 text-xs hover:bg-muted/60">
                                         <button
+                                            type="button"
                                             onClick={() => setCapturing(isCapturing ? null : id)}
-                                            title={isCapturing ? "Press a key…" : "Click to rebind"}
-                                            style={{
-                                                minWidth: 30,
-                                                textAlign: "center",
-                                                padding: "2px 6px",
-                                                borderRadius: 6,
-                                                cursor: "pointer",
-                                                background: isCapturing ? "var(--accent)" : "var(--bg-elev-2)",
-                                                color: isCapturing ? "#000" : "var(--fg)",
-                                                border: `1px solid ${overridden ? "var(--accent)" : "var(--border)"}`,
-                                                fontFamily: "var(--font-mono, monospace)",
-                                                fontSize: 11,
-                                                fontWeight: 700,
-                                            }}
+                                            title={isCapturing ? t("shortcuts.pressKey") : t("shortcuts.rebind")}
+                                            aria-pressed={isCapturing}
+                                            className="focus-visible:ring-ring/40 rounded-md outline-none focus-visible:ring-3"
                                         >
-                                            {isCapturing ? "…" : codeLabel(effectiveCode)}
-                                        </button>
-                                        <span style={{ color: "var(--fg-dim)", flex: 1 }}>{s.label}</span>
-                                        {overridden && !isCapturing && (
-                                            <button
-                                                onClick={() => reset(id)}
-                                                title="Reset to default"
-                                                style={{
-                                                    fontSize: 10,
-                                                    color: "var(--fg-dim)",
-                                                    background: "transparent",
-                                                    border: "none",
-                                                    cursor: "pointer",
-                                                    padding: 0,
-                                                }}
+                                            <Kbd
+                                                size="md"
+                                                className={
+                                                    "pointer-events-auto cursor-pointer " +
+                                                    (isCapturing
+                                                        ? "border-primary bg-primary text-primary-foreground"
+                                                        : overridden
+                                                          ? "border-primary text-foreground"
+                                                          : "text-foreground")
+                                                }
                                             >
-                                                ↺
-                                            </button>
+                                                {isCapturing ? "…" : codeLabel(effectiveCode)}
+                                            </Kbd>
+                                        </button>
+                                        <span className="flex-1 truncate text-muted-foreground">{s.label}</span>
+                                        {overridden && !isCapturing && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon-xs"
+                                                title={t("shortcuts.resetOne")}
+                                                aria-label={t("shortcuts.resetOne")}
+                                                onClick={() => reset(id)}
+                                            >
+                                                <RotateCcw aria-hidden />
+                                            </Button>
                                         )}
                                     </div>
                                 );
                             })}
-                        </div>
+                        </section>
                     ))}
                 </div>
-
-                <p style={{ fontSize: 11, color: "var(--fg-dim)" }}>
-                    Click any key to rebind it, then press the new key (Esc to cancel). Shortcuts
-                    are ignored while typing in a text field. Press{" "}
-                    <kbd
-                        style={{
-                            padding: "1px 5px",
-                            borderRadius: 5,
-                            background: "var(--bg-elev-2)",
-                            border: "1px solid var(--border)",
-                        }}
-                    >
-                        ?
-                    </kbd>{" "}
-                    any time to toggle this panel.
-                </p>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 }

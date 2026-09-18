@@ -1,10 +1,10 @@
 /**
- * Companion connection config (base URL, device token, muzicai.ro user id).
+ * Companion connection config (base URL, device token, mixai.ro user id).
  *
  * Persisted to localStorage and pushed to the Rust side via
  * `engine.companionConfigure` whenever it changes, so the native HTTP proxy
  * always has current credentials. Later this will hydrate from the signed-in
- * muzicai.ro account instead of manual entry.
+ * mixai.ro account instead of manual entry.
  */
 
 import { create } from "zustand";

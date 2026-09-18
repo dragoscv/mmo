@@ -62,7 +62,7 @@ export function FxPanel({ deckId, deck, accent }: { deckId: DeckId; deck: DeckSt
                                 fontWeight: 700,
                                 letterSpacing: "0.04em",
                                 background: kind === k ? accent : "var(--bg-elev-2)",
-                                color: kind === k ? "#000" : "var(--fg-dim)",
+                                color: kind === k ? "var(--accent-fg)" : "var(--fg-dim)",
                                 transition: "background 120ms ease, color 120ms ease",
                             }}
                         >
@@ -114,7 +114,7 @@ export function FxPanel({ deckId, deck, accent }: { deckId: DeckId; deck: DeckSt
                                 fontSize: 9,
                                 fontWeight: 700,
                                 background: Math.abs(beats - value) < 1e-6 ? accent : "var(--bg-elev-2)",
-                                color: Math.abs(beats - value) < 1e-6 ? "#000" : "var(--fg-dim)",
+                                color: Math.abs(beats - value) < 1e-6 ? "var(--accent-fg)" : "var(--fg-dim)",
                             }}
                         >
                             {label}

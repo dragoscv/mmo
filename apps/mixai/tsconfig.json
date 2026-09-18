@@ -18,10 +18,15 @@
         "noFallthroughCasesInSwitch": true,
         "noUncheckedIndexedAccess": true,
         "verbatimModuleSyntax": true,
-        "baseUrl": ".",
+        "incremental": true,
+        "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo",
         "paths": {
-            "@/*": ["./src/*"]
+            "@/*": ["./src/*"],
+            "@mmo/ui": ["../../packages/ui/src/index.ts"],
+            "@mmo/ui/*": ["../../packages/ui/src/*"],
+            "@mmo/design-tokens": ["../../packages/design-tokens/src/index.ts"]
         }
     },
-    "include": ["src", "vite.config.ts"]
+    "include": ["src", "vite.config.ts", "../../packages/ui/src", "../../packages/design-tokens/src"],
+    "exclude": ["../../packages/**/*.test.ts", "../../packages/**/*.test.tsx", "../../packages/**/build.ts", "../../packages/**/generate.ts"]
 }

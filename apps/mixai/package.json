@@ -1,8 +1,8 @@
 {
     "name": "@mmo/mixai",
-    "version": "0.1.40",
+    "version": "1.0.0",
     "private": true,
-    "description": "MIXAI — native DJ software (Tauri 2 + Rust audio core + React/TS UI). Part of the muzicai.ro suite.",
+    "description": "MixAI DJ — native DJ software (Tauri 2 + Rust audio core + React/TS UI). Part of the mixai.ro suite.",
     "type": "module",
     "scripts": {
         "dev": "vite",
@@ -15,20 +15,29 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@tauri-apps/api": "^2.1.0",
-        "@tauri-apps/plugin-dialog": "^2.0.0",
-        "framer-motion": "^11.11.0",
-        "react": "^19.0.0",
-        "react-dom": "^19.0.0",
-        "zustand": "^5.0.0"
+        "@base-ui/react": "^1.8.0",
+        "@tanstack/react-table": "^9.2.4",
+        "@tauri-apps/api": "^2.11.1",
+        "@tauri-apps/plugin-dialog": "^2.6.0",
+        "class-variance-authority": "^0.7.1",
+        "clsx": "^2.1.1",
+        "cmdk": "^1.1.1",
+        "lucide-react": "^1.47.0",
+        "motion": "^13.4.0",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "tailwind-merge": "^3.7.0",
+        "zustand": "^5.0.11"
     },
     "devDependencies": {
-        "@tauri-apps/cli": "^2.1.0",
-        "@types/node": "^22.14.1",
-        "@types/react": "^19.0.0",
-        "@types/react-dom": "^19.0.0",
-        "@vitejs/plugin-react": "^4.3.0",
-        "typescript": "^5.8.3",
-        "vite": "^6.0.0"
+        "@tailwindcss/vite": "^4.3.3",
+        "@tauri-apps/cli": "^2.11.4",
+        "@types/node": "^22.19.20",
+        "@types/react": "^19.2.17",
+        "@types/react-dom": "^19.2.3",
+        "@vitejs/plugin-react": "^6.1.1",
+        "tailwindcss": "^4.3.3",
+        "typescript": "^7.0.2",
+        "vite": "^8.3.0"
     }
 }

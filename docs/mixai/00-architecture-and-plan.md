@@ -1,8 +1,8 @@
-# MIXAI — Native DJ Software · Architecture & Implementation Plan
+# MixAI DJ — Native DJ Software · Architecture & Implementation Plan
 
 > The goal: the best DJ software on the planet for bedroom/hobbyist DJs first,
 > with pro-grade depth — combining the strengths of rekordbox, Serato, Traktor,
-> VirtualDJ and djay, plus muzicai.ro / AI integration nobody else has.
+> VirtualDJ and djay, plus mixai.ro / AI integration nobody else has.
 > Beautiful, themeable, animated, low-latency, every controller, freemium.
 
 Status: **v0.1 + v0.2 shipped; v0.3 in progress** (current build `apps/mixai` 0.1.34).
@@ -18,14 +18,14 @@ This is the canonical living doc. Last updated: 2026-06-10.
 | **Beauty** | Cinematic, themeable, animated | Glassmorphism+neon default + neumorphism + flat-pro themes, React/Framer Motion |
 | **Hardware** | Every controller brand | Port the existing 2-layer MIDI arch + MIDI-learn + HID (later) |
 | **Stems** | On-device AND cloud, user choice | Companion/cloud (BS-Roformer/Demucs) + on-device model (v0.2) |
-| **Library** | Local + muzicai.ro unified | Companion file access + muzicai.ro API, account-synced |
-| **Account** | Settings/themes/mappings sync | All prefs in muzicai.ro account, restored on any device |
+| **Library** | Local + mixai.ro unified | Companion file access + mixai.ro API, account-synced |
+| **Account** | Settings/themes/mappings sync | All prefs in mixai.ro account, restored on any device |
 | **Open** | Plugins, shared themes/mappings | Plugin SDK + shareable presets (later milestone) |
 
 **Target user (first):** bedroom/hobbyist DJ — ease + beauty + cheap — but the
 engine and hardware support are pro-grade from day one.
 
-**Monetization:** freemium tied to the muzicai.ro account. Free core; paid pro
+**Monetization:** freemium tied to the mixai.ro account. Free core; paid pro
 tier (advanced FX, on-device stems, unlimited cloud analysis, plugin marketplace).
 
 ---
@@ -42,7 +42,7 @@ tier (advanced FX, on-device stems, unlimited cloud analysis, plugin marketplace
 | Mixxx | Free/open, all controllers | GPL (study only), rough UI |
 
 **Our wedge:** djay beauty + Traktor sound + Serato stems + Mixxx-level open
-hardware + muzicai.ro/AI + freemium.
+hardware + mixai.ro/AI + freemium.
 
 ---
 
@@ -66,7 +66,7 @@ hardware + muzicai.ro/AI + freemium.
                                                     │
                   ┌─────────────────────────────────┼─────────────┐
                   ▼                                  ▼             ▼
-          cpal backend                     muzicai.ro API   companion (server/)
+          cpal backend                     mixai.ro API   companion (server/)
    ASIO / WASAPI (Win)                    library + stems   local files + HW
    CoreAudio (mac)                        account sync      cloud GPU stems
    ALSA/JACK/PipeWire (Linux)
@@ -127,7 +127,7 @@ Cue: separate device/channel (full flexible routing matrix — any device, any c
 | BPM / beatgrid / key | **offline in companion/cloud** (aubio/Essentia/QM ok there) OR permissive Rust analyzer | GPL stays out of shipped binary | companion / worker |
 | Stems | companion/cloud (Demucs/BS-Roformer) + on-device ONNX (v0.2) | model-dependent | companion/cloud |
 
-**Licensing rule:** the shipped MIXAI binary links **only permissive** DSP.
+**Licensing rule:** the shipped MixAI DJ binary links **only permissive** DSP.
 Any GPL/AGPL analysis (aubio/Essentia/Rubber Band) runs as a **separate process**
 (companion or cloud) so it never statically links into the proprietary app.
 The repo itself is dual-licensed (AGPL + `COMMERCIAL-LICENSE.md`); the commercial
@@ -166,8 +166,8 @@ NI Traktor Kontrol, Hercules/Reloop, HID advanced.
 ## 6. Library & companion integration
 
 - **Local files:** companion (`server/`) already exposes local files + audio HW.
-  MIXAI talks to it over the existing local HTTP + device-token auth.
-- **muzicai.ro:** unified browse, load, and (later) stream. Account-synced.
+  MixAI DJ talks to it over the existing local HTTP + device-token auth.
+- **mixai.ro:** unified browse, load, and (later) stream. Account-synced.
 - **Stems:** user choice — on-device model OR companion/cloud GPU (existing
   `cloud-gpu-stems.ts` / `stems-engine.ts` patterns). Taxonomy: vocals/drums/
   bass/melody.
@@ -176,7 +176,7 @@ NI Traktor Kontrol, Hercules/Reloop, HID advanced.
 
 ## 7. Account sync (settings/themes/mappings)
 
-All preferences persist to the muzicai.ro account and restore on any device:
+All preferences persist to the mixai.ro account and restore on any device:
 MIDI presets + driver/color choices, themes, deck/FX defaults, jog sensitivity,
 tempo range, crossfader curve, audio routing matrix, library prefs. Local cache
 for offline; reconcile on login. Reuse `apps/web` auth/session + a `mixer_setups`
@@ -186,15 +186,25 @@ for offline; reconcile on login. Reuse `apps/web` auth/session + a `mixer_setups
 
 ## 8. UI / UX
 
-- **Themeable from day 1**, 3 shipped themes:
-  1. **Neon Glass** (default) — dark glassmorphism + neon accents + cinematic motion.
-  2. **Studio Metal** — neumorphism / realistic hardware.
-  3. **Flat Pro** — minimal, function-first (Traktor/Ableton-like).
-- Theme = CSS variable token set + motion profile; user-swappable, shareable.
-- Layouts: 2-deck (default) and 4-deck. Touch-friendly for tablet later.
+- **Shared design system** (`docs/design-system.md`): Tailwind v4 on
+  `@mmo/design-tokens` + `@mmo/ui` (Base UI primitives, lucide, `motion`). One
+  theme model across web / DJ / Companion / TV — `mode` (light + dark),
+  `accent`, `surface`, `density`, `radius`, `motion`, `locale` — persisted as
+  `mixai:prefs:v1`, applied pre-paint by `prehydrate.js`, synced through the
+  profile blob.
+- The three original skins are **surface presets** (decision D9): Neon Glass →
+  `glass`, Studio Metal → `solid`, Flat Pro → `flat`. Deck colours are fixed per
+  deck and never follow the accent. Legacy `mixai-ui.theme` values migrate once.
+- Layouts: fluid from 1024 px; 2-deck (default) and 4-deck (≥ 1600 px only);
+  ultra-wide (≥ 21:9) moves Library + AutoMix/Sampler into side columns.
+  Touch-friendly for tablet later.
+- Loading/empty/error states from `@mmo/ui` (`Skeleton`, `EmptyState`,
+  `ErrorState`), root error boundary; RO/EN strings via app `t()` + shared
+  `uiMessages`; `⌘/Ctrl K` command palette and `?` shortcuts overlay/keybind
+  editor.
 - Components: decks (jog, transport, tempo, key), waveforms (overview + scrolling
   GPU), mixer strip (EQ/filter/volume/cue/xfader), FX racks, hot cues, loops,
-  browser, settings (audio routing, MIDI, themes, account).
+  browser, settings (appearance, audio routing, MIDI/HID, library, profile, plugins).
 
 ---
 
@@ -210,7 +220,7 @@ for offline; reconcile on login. Reuse `apps/web` auth/session + a `mixer_setups
 - [x] UI: themed 2-deck mixer (Neon Glass theme).
 - [x] Waveform render + beatgrid from in-app analyzer.
 - [x] MIDI: generic MIDI-learn + DDJ-FLX4 input + LED feedback.
-- [x] muzicai.ro library browse + load track; companion local files.
+- [x] mixai.ro library browse + load track; companion local files.
 - [x] Hot cues + loops.
 - [x] Theming system (custom + shareable themes) + account-synced settings.
 - [ ] Full flexible audio routing matrix (cue bus done; per-device matrix TODO).

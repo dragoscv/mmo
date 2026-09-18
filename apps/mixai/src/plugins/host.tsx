@@ -6,6 +6,7 @@
 import { usePluginStore } from "./plugin-store";
 import type { MixaiPlugin } from "./sdk";
 import { useEffect, useState } from "react";
+import { Package, X } from "lucide-react";
 import { PluginBuilder } from "./builder";
 import { PLUGIN_CATALOG } from "./catalog";
 import { hotkeyFromEvent, runMacro, readMetric, triggerMet } from "./external";
@@ -284,7 +285,7 @@ function PluginRow({
                         border: "1px solid var(--border)",
                     }}
                 >
-                    ✕
+                    <X size={11} aria-hidden />
                 </button>
             )}
             <button
@@ -296,7 +297,7 @@ function PluginRow({
                     borderRadius: 8,
                     cursor: "pointer",
                     background: on ? "var(--accent)" : "transparent",
-                    color: on ? "#000" : "var(--fg)",
+                    color: on ? "var(--accent-fg)" : "var(--fg)",
                     border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
                 }}
             >
@@ -370,7 +371,7 @@ function ExternalLoader() {
                     resize: "vertical",
                 }}
             />
-            {error && <span style={{ fontSize: 11, color: "#ff6b6b" }}>{error}</span>}
+            {error && <span style={{ fontSize: 11, color: "var(--danger)" }}>{error}</span>}
             {ok && <span style={{ fontSize: 11, color: "var(--accent)" }}>Plugin installed.</span>}
             <div style={{ display: "flex", gap: 6 }}>
                 <button
@@ -383,7 +384,7 @@ function ExternalLoader() {
                         borderRadius: 8,
                         cursor: text.trim() ? "pointer" : "not-allowed",
                         background: "var(--accent)",
-                        color: "#000",
+                        color: "var(--accent-fg)",
                         border: "1px solid var(--accent)",
                         opacity: text.trim() ? 1 : 0.5,
                     }}
@@ -436,7 +437,8 @@ function PluginCatalog() {
                     border: "1px dashed var(--border)",
                 }}
             >
-                📦 Browse plugin catalog
+                <Package size={12} aria-hidden style={{ verticalAlign: "-2px", marginRight: 6 }} />
+                Browse plugin catalog
             </button>
         );
     }
@@ -497,7 +499,7 @@ function PluginCatalog() {
                                 borderRadius: 8,
                                 cursor: installed ? "default" : "pointer",
                                 background: installed ? "transparent" : "var(--accent)",
-                                color: installed ? "var(--fg-dim)" : "#000",
+                                color: installed ? "var(--fg-dim)" : "var(--accent-fg)",
                                 border: `1px solid ${installed ? "var(--border)" : "var(--accent)"}`,
                             }}
                         >

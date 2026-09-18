@@ -1,45 +1,42 @@
 /**
- * UI-only state: theme, deck count, panel visibility. Persisted to
- * localStorage now; will sync to the muzicai.ro account later.
+ * UI-only state: deck count, panel visibility. Persisted to localStorage and
+ * synced to the mixai.ro account via the profile blob.
+ *
+ * Appearance (mode / accent / surface / density / radius / motion / locale) is
+ * NOT here any more — it lives in the shared `@mmo/ui` ThemeProvider
+ * (`mixai:prefs:v1`). The old `theme` field of this blob (`neon-glass` /
+ * `studio-metal` / `flat-pro`) is migrated once by @mmo/ui's prefs-store into
+ * a `surface` preset (glass / solid / flat).
  */
 
 import { create } from "zustand";
-import {
-    applyTheme,
-    applyThemeDef,
-    blankCustomTheme,
-    importTheme as parseTheme,
-    isCustomThemeId,
-    makeCustomTheme,
-    THEMES,
-    type CustomTheme,
-    type ThemeId,
-} from "@/themes/themes";
 
 const STORAGE_KEY = "mixai-ui";
 
-/** A theme id is either a built-in `ThemeId` or a `custom:<uuid>` string. */
-type AnyThemeId = ThemeId | `custom:${string}`;
+export type DeckCount = 2 | 4;
 
 interface PersistedUi {
-    theme: AnyThemeId;
-    deckCount: 2 | 4;
-    customThemes: CustomTheme[];
+    deckCount: DeckCount;
 }
 
 function load(): PersistedUi {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return { theme: "neon-glass", deckCount: 2, customThemes: [], ...JSON.parse(raw) };
+        if (raw) {
+            const parsed = JSON.parse(raw) as Partial<PersistedUi>;
+            return { deckCount: parsed.deckCount === 4 ? 4 : 2 };
+        }
     } catch {
         // ignore corrupt storage
     }
-    return { theme: "neon-glass", deckCount: 2, customThemes: [] };
+    return { deckCount: 2 };
 }
 
 function persist(ui: PersistedUi): void {
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(ui));
+        // Merge so the legacy `theme` key survives until prefs migration has run.
+        const prev = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as Record<string, unknown>;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...prev, ...ui }));
     } catch {
         // storage may be unavailable; non-fatal
     }
@@ -48,137 +45,30 @@ function persist(ui: PersistedUi): void {
 interface UiStore extends PersistedUi {
     settingsOpen: boolean;
     shortcutsOpen: boolean;
-    setTheme: (theme: AnyThemeId) => void;
-    setDeckCount: (n: 2 | 4) => void;
+    commandOpen: boolean;
+    setDeckCount: (n: DeckCount) => void;
     setSettingsOpen: (open: boolean) => void;
     setShortcutsOpen: (open: boolean) => void;
-    /** Create a new custom theme (cloned from Neon Glass) and select it. */
-    addCustomTheme: (name: string) => void;
-    /** Patch a single editable color token on a custom theme. */
-    updateCustomThemeColor: (id: string, key: string, value: string) => void;
-    /** Rename a custom theme. */
-    renameCustomTheme: (id: string, name: string) => void;
-    /** Delete a custom theme (falls back to Neon Glass if it was active). */
-    deleteCustomTheme: (id: string) => void;
-    /** Import a shared theme JSON string; returns false when malformed. */
-    importThemeString: (json: string) => boolean;
-    /** (Re)apply the currently-selected theme (built-in or custom) to the DOM. */
-    applyActiveTheme: () => void;
-    /**
-     * Restore theme-related preferences from a profile backup. Missing fields
-     * are left untouched. Custom themes are merged by id (imported wins).
-     */
-    restoreProfile: (patch: {
-        theme?: AnyThemeId;
-        deckCount?: 2 | 4;
-        customThemes?: CustomTheme[];
-    }) => void;
-}
-
-const initial = load();
-
-/** Resolve a theme id to its definition (built-in or custom). */
-function resolveTheme(id: AnyThemeId, custom: CustomTheme[]): CustomTheme | (typeof THEMES)[ThemeId] {
-    if (isCustomThemeId(id)) {
-        return custom.find((t) => t.id === id) ?? THEMES["neon-glass"];
-    }
-    return THEMES[id as ThemeId] ?? THEMES["neon-glass"];
-}
-
-function newId(): `custom:${string}` {
-    const rnd =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-            ? crypto.randomUUID()
-            : Math.random().toString(36).slice(2);
-    return `custom:${rnd}`;
+    setCommandOpen: (open: boolean) => void;
+    /** Restore layout preferences from a profile backup. */
+    restoreProfile: (patch: { deckCount?: DeckCount }) => void;
 }
 
 export const useUiStore = create<UiStore>((set, get) => ({
-    ...initial,
+    ...load(),
     settingsOpen: false,
     shortcutsOpen: false,
-    setTheme: (theme) => {
-        applyThemeDef(resolveTheme(theme, get().customThemes));
-        set({ theme });
-        persist({ theme, deckCount: get().deckCount, customThemes: get().customThemes });
-    },
+    commandOpen: false,
     setDeckCount: (deckCount) => {
         set({ deckCount });
-        persist({ theme: get().theme, deckCount, customThemes: get().customThemes });
+        persist({ deckCount });
     },
     setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
     setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
-
-    addCustomTheme: (name) => {
-        const id = newId();
-        const theme = blankCustomTheme(id, name.trim() || "My Theme");
-        const customThemes = [...get().customThemes, theme];
-        applyThemeDef(theme);
-        set({ customThemes, theme: id });
-        persist({ theme: id, deckCount: get().deckCount, customThemes });
-    },
-
-    updateCustomThemeColor: (id, key, value) => {
-        const customThemes = get().customThemes.map((t) => {
-            if (t.id !== id) return t;
-            const colors: Record<string, string> = {};
-            for (const [k, v] of Object.entries(t.tokens)) colors[k] = v;
-            colors[key] = value;
-            return makeCustomTheme(t.id, t.name, t.motion, colors);
-        });
-        set({ customThemes });
-        if (get().theme === id) {
-            const updated = customThemes.find((t) => t.id === id);
-            if (updated) applyThemeDef(updated);
-        }
-        persist({ theme: get().theme, deckCount: get().deckCount, customThemes });
-    },
-
-    renameCustomTheme: (id, name) => {
-        const customThemes = get().customThemes.map((t) =>
-            t.id === id ? { ...t, name: name.trim() || t.name } : t,
-        );
-        set({ customThemes });
-        persist({ theme: get().theme, deckCount: get().deckCount, customThemes });
-    },
-
-    deleteCustomTheme: (id) => {
-        const customThemes = get().customThemes.filter((t) => t.id !== id);
-        const wasActive = get().theme === id;
-        const theme: AnyThemeId = wasActive ? "neon-glass" : get().theme;
-        if (wasActive) applyTheme("neon-glass");
-        set({ customThemes, theme });
-        persist({ theme, deckCount: get().deckCount, customThemes });
-    },
-
-    importThemeString: (json) => {
-        const id = newId();
-        const theme = parseTheme(json, id);
-        if (!theme) return false;
-        const customThemes = [...get().customThemes, theme];
-        applyThemeDef(theme);
-        set({ customThemes, theme: id });
-        persist({ theme: id, deckCount: get().deckCount, customThemes });
-        return true;
-    },
-
-    applyActiveTheme: () => {
-        applyThemeDef(resolveTheme(get().theme, get().customThemes));
-    },
-
+    setCommandOpen: (commandOpen) => set({ commandOpen }),
     restoreProfile: (patch) => {
-        // Merge custom themes by id (imported entries override existing).
-        const existing = get().customThemes;
-        const merged = patch.customThemes
-            ? [
-                  ...existing.filter((t) => !patch.customThemes!.some((p) => p.id === t.id)),
-                  ...patch.customThemes,
-              ]
-            : existing;
         const deckCount = patch.deckCount ?? get().deckCount;
-        const theme = patch.theme ?? get().theme;
-        set({ customThemes: merged, deckCount, theme });
-        applyThemeDef(resolveTheme(theme, merged));
-        persist({ theme, deckCount, customThemes: merged });
+        set({ deckCount });
+        persist({ deckCount });
     },
 }));

@@ -1,3 +1,4 @@
+import { Plus, Repeat, X } from "lucide-react";
 import { engine } from "@/bridge/engine";
 import { NUM_PADS, useSamplerStore } from "@/state/sampler-store";
 
@@ -10,7 +11,7 @@ function stem(path: string): string {
 
 /**
  * One-shot sampler: an 8-pad bank. Click a loaded pad to trigger it from the
- * start (re-trigger restarts). Load samples via the pad's ⊕ button, toggle
+ * start (re-trigger restarts). Load samples via the pad's + button, toggle
  * loop, set per-pad gain, or clear. Pads mix straight into the master bus.
  */
 export function SamplerPanel({ accent }: { accent: string }) {
@@ -82,7 +83,7 @@ export function SamplerPanel({ accent }: { accent: string }) {
                                     textOverflow: "ellipsis",
                                     whiteSpace: "nowrap",
                                     background: loaded ? accent : "var(--bg-elev-2)",
-                                    color: loaded ? "#000" : "var(--fg-dim)",
+                                    color: loaded ? "var(--accent-fg)" : "var(--fg-dim)",
                                     cursor: loaded ? "pointer" : "default",
                                 }}
                             >
@@ -113,9 +114,11 @@ export function SamplerPanel({ accent }: { accent: string }) {
                                         fontWeight: 700,
                                         background: "var(--bg-elev-2)",
                                         color: "var(--fg-dim)",
+                                        display: "inline-flex",
+                                        justifyContent: "center",
                                     }}
                                 >
-                                    ⊕
+                                    <Plus size={10} aria-hidden />
                                 </button>
                                 <button
                                     onClick={() => toggleLoop(idx)}
@@ -128,10 +131,12 @@ export function SamplerPanel({ accent }: { accent: string }) {
                                         fontSize: 9,
                                         fontWeight: 700,
                                         background: looping ? accent : "var(--bg-elev-2)",
-                                        color: looping ? "#000" : "var(--fg-dim)",
+                                        color: looping ? "var(--accent-fg)" : "var(--fg-dim)",
+                                        display: "inline-flex",
+                                        justifyContent: "center",
                                     }}
                                 >
-                                    ↻
+                                    <Repeat size={10} aria-hidden />
                                 </button>
                                 <button
                                     onClick={() => clear(idx)}
@@ -145,9 +150,11 @@ export function SamplerPanel({ accent }: { accent: string }) {
                                         fontWeight: 700,
                                         background: "var(--bg-elev-2)",
                                         color: "var(--fg-dim)",
+                                        display: "inline-flex",
+                                        justifyContent: "center",
                                     }}
                                 >
-                                    ✕
+                                    <X size={10} aria-hidden />
                                 </button>
                             </div>
                         </div>

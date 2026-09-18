@@ -1,5 +1,5 @@
 /**
- * Hook-free helper to load a companion (muzicai.ro) library track onto a deck.
+ * Hook-free helper to load a companion (mixai.ro) library track onto a deck.
  *
  * Shared by the Library browser (user clicks A/B) and the auto-mix auto-queue
  * (loads the next harmonic match onto the idle deck). Reads/writes the mixer

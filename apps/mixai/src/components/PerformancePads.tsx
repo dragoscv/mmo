@@ -46,7 +46,7 @@ export function PerformancePads({ deckId, deck, accent }: { deckId: DeckId; deck
                                 fontSize: 11,
                                 fontWeight: 700,
                                 background: isSet ? accent : "var(--bg-elev-2)",
-                                color: isSet ? "#000" : "var(--fg-dim)",
+                                color: isSet ? "var(--accent-fg)" : "var(--fg-dim)",
                                 boxShadow: isSet ? `var(--glow) ${accent}` : "none",
                                 opacity: deck.loaded ? 1 : 0.4,
                                 transition: "background 120ms ease, color 120ms ease",
@@ -91,7 +91,7 @@ export function PerformancePads({ deckId, deck, accent }: { deckId: DeckId; deck
                         fontSize: 11,
                         fontWeight: 700,
                         background: deck.loopActive ? "var(--accent)" : "var(--bg-elev-2)",
-                        color: deck.loopActive ? "#000" : "var(--fg)",
+                        color: deck.loopActive ? "var(--accent-fg)" : "var(--fg)",
                         boxShadow: deck.loopActive ? "var(--glow) var(--accent)" : "none",
                         opacity: deck.loaded ? 1 : 0.4,
                     }}

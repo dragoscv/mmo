@@ -10,6 +10,7 @@
 
 import type { CSSProperties } from "react";
 import { useState } from "react";
+import { Wand2, X } from "lucide-react";
 import type { DeckId } from "@/bridge/types";
 import { usePluginStore } from "./plugin-store";
 import type { PluginCategory } from "./sdk";
@@ -286,7 +287,8 @@ export function PluginBuilder() {
     if (!open) {
         return (
             <button onClick={() => setOpen(true)} style={{ ...btn("transparent", "var(--fg)"), borderStyle: "dashed" }}>
-                ✨ Build a macro plugin
+                <Wand2 size={12} aria-hidden style={{ verticalAlign: "-2px", marginRight: 6 }} />
+                Build a macro plugin
             </button>
         );
     }
@@ -367,7 +369,7 @@ export function PluginBuilder() {
                             title="Optional global hotkey, e.g. shift+a"
                         />
                         <button onClick={() => removeButton(bi)} style={btn("transparent", "var(--fg-dim)")} title="Remove button">
-                            ✕
+                            <X size={11} aria-hidden />
                         </button>
                     </div>
                     {b.steps.map((s, si) => (
@@ -389,7 +391,7 @@ export function PluginBuilder() {
                                 style={{ ...btn("transparent", "var(--fg-dim)"), marginLeft: "auto" }}
                                 title="Remove step"
                             >
-                                ✕
+                                <X size={11} aria-hidden />
                             </button>
                         </div>
                     ))}
@@ -417,7 +419,7 @@ export function PluginBuilder() {
                             placeholder="Trigger label"
                         />
                         <button onClick={() => removeTrigger(ti)} style={btn("transparent", "var(--fg-dim)")} title="Remove trigger">
-                            ✕
+                            <X size={11} aria-hidden />
                         </button>
                     </div>
                     {/* Condition row: when <deck> <metric> <op> <value> */}
@@ -470,7 +472,7 @@ export function PluginBuilder() {
                                 style={{ ...btn("transparent", "var(--fg-dim)"), marginLeft: "auto" }}
                                 title="Remove step"
                             >
-                                ✕
+                                <X size={11} aria-hidden />
                             </button>
                         </div>
                     ))}
@@ -484,10 +486,10 @@ export function PluginBuilder() {
             </button>
 
             {status && (
-                <span style={{ fontSize: 11, color: status.ok ? "var(--accent)" : "#ff6b6b" }}>{status.msg}</span>
+                <span style={{ fontSize: 11, color: status.ok ? "var(--accent)" : "var(--danger)" }}>{status.msg}</span>
             )}
             <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={doInstall} style={btn("var(--accent)", "#000")}>
+                <button onClick={doInstall} style={btn("var(--accent)", "var(--accent-fg)")}>
                     Install
                 </button>
                 <button onClick={copyJson} style={btn("transparent", "var(--fg)")}>

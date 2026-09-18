@@ -1,14 +1,14 @@
 /**
- * Profile backup & restore — export the user's entire MIXAI setup (themes,
- * custom themes, deck count, companion/library config, and the active MIDI
- * mapping) to one portable file, and restore it on another machine.
+ * Profile backup & restore — export the user's entire MIXAI setup (appearance
+ * prefs, deck count, companion/library config, and the active MIDI mapping) to
+ * one portable file, and restore it on another machine.
  *
- * This is the local-first precursor to muzicai.ro account sync: the same
+ * This is the local-first precursor to mixai.ro account sync: the same
  * snapshot shape will later be pushed to / pulled from the signed-in account.
  */
 
 import type { CompanionConfig } from "@/state/companion-store";
-import type { CustomTheme } from "@/themes/themes";
+import { normalizePrefs, type ThemePrefs } from "@mmo/design-tokens";
 import type { MidiPreset } from "@/bridge/types";
 import { importPreset } from "@/lib/midi-preset";
 import type { HidPreset } from "@/lib/hid-mapping";
@@ -19,13 +19,11 @@ import type { KeybindOverrides } from "@/state/keybind-store";
 import { SHORTCUTS_BY_ID } from "@/lib/shortcuts";
 
 export interface ProfileSnapshot {
-    /** Active theme id (built-in `ThemeId` or `custom:<uuid>`). */
-    theme: string;
+    /** Shared appearance prefs (mode / accent / surface / density / …). */
+    prefs: ThemePrefs;
     /** Deck layout. */
     deckCount: 2 | 4;
-    /** User-authored themes. */
-    customThemes: CustomTheme[];
-    /** Companion / muzicai.ro connection config (token included by choice). */
+    /** Companion / mixai.ro connection config (token included by choice). */
     companion: CompanionConfig;
     /** Active MIDI controller mapping, when one is loaded. */
     midiPreset: MidiPreset | null;
@@ -46,19 +44,15 @@ function isDeckCount(n: unknown): n is 2 | 4 {
     return n === 2 || n === 4;
 }
 
-/** Validate one custom theme object; returns it typed or null. */
-function parseCustomTheme(raw: unknown): CustomTheme | null {
-    if (!raw || typeof raw !== "object") return null;
-    const t = raw as Record<string, unknown>;
-    if (typeof t.id !== "string" || !t.id.startsWith("custom:")) return null;
-    if (typeof t.name !== "string") return null;
-    if (t.motion !== "cinematic" && t.motion !== "subtle" && t.motion !== "minimal") return null;
-    if (!t.tokens || typeof t.tokens !== "object") return null;
-    const tokens: Record<string, string> = {};
-    for (const [k, v] of Object.entries(t.tokens as Record<string, unknown>)) {
-        if (typeof v === "string") tokens[k] = v;
-    }
-    return { id: t.id, name: t.name, motion: t.motion, tokens } as CustomTheme;
+/**
+ * Legacy (v1, pre design-system) profiles carried a skin id instead of prefs.
+ * Map it onto a surface preset so an old backup still restores the look.
+ */
+function legacySkinToPrefs(theme: unknown): Partial<ThemePrefs> | null {
+    if (theme === "flat-pro") return { surface: "flat" };
+    if (theme === "studio-metal") return { surface: "solid" };
+    if (theme === "neon-glass") return { surface: "glass" };
+    return null;
 }
 
 function parseCompanion(raw: unknown): CompanionConfig | null {
@@ -88,13 +82,13 @@ export function importProfile(json: string): Partial<ProfileSnapshot> | null {
 
     const out: Partial<ProfileSnapshot> = {};
 
-    if (typeof data.theme === "string") out.theme = data.theme;
-    if (isDeckCount(data.deckCount)) out.deckCount = data.deckCount;
-    if (Array.isArray(data.customThemes)) {
-        out.customThemes = data.customThemes
-            .map(parseCustomTheme)
-            .filter((t): t is CustomTheme => t !== null);
+    if (data.prefs && typeof data.prefs === "object") {
+        out.prefs = normalizePrefs(data.prefs);
+    } else {
+        const legacy = legacySkinToPrefs(data.theme);
+        if (legacy) out.prefs = normalizePrefs(legacy);
     }
+    if (isDeckCount(data.deckCount)) out.deckCount = data.deckCount;
     const companion = parseCompanion(data.companion);
     if (companion) out.companion = companion;
     if (data.midiPreset) {

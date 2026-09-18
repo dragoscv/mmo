@@ -2,10 +2,10 @@
  * Cloud profile sync — the engine behind MIXAI's "your setup, on any device"
  * promise.
  *
- * The user's whole profile (theme + custom themes, deck layout, companion
+ * The user's whole profile (appearance prefs, deck layout, companion
  * connection, MIDI + HID mappings, keyboard shortcuts and installed plugins)
  * is serialized by {@link buildProfileJson} and stored as one opaque blob in
- * the muzicai.ro account (via the companion's `/mixai-profile` route).
+ * the mixai.ro account (via the companion's `/mixai-profile` route).
  *
  * Two paths use it:
  *   - Manual: the Settings → Profile "Save/Load to cloud" buttons.
@@ -25,6 +25,7 @@ import { useHidStore } from "@/state/hid-store";
 import { useKeybindStore } from "@/state/keybind-store";
 import { usePluginStore } from "@/plugins/plugin-store";
 import { exportProfile, importProfile } from "@/lib/profile";
+import { PREFS_CHANGED_EVENT, applyPrefs, emitPrefsChanged, loadPrefs, savePrefs } from "@mmo/ui/theme";
 
 /** Serialize the live app state into a portable profile JSON string. */
 export async function buildProfileJson(): Promise<string> {
@@ -32,9 +33,8 @@ export async function buildProfileJson(): Promise<string> {
     const comp = useCompanionStore.getState();
     const midiPreset = await engine.midiGetPreset();
     return exportProfile({
-        theme: ui.theme,
+        prefs: loadPrefs(),
         deckCount: ui.deckCount,
-        customThemes: ui.customThemes,
         companion: {
             baseUrl: comp.baseUrl,
             deviceToken: comp.deviceToken,
@@ -62,11 +62,13 @@ export async function applyProfileJson(
 ): Promise<boolean> {
     const parsed = importProfile(raw.trim());
     if (!parsed) return false;
-    useUiStore.getState().restoreProfile({
-        theme: parsed.theme as never,
-        deckCount: parsed.deckCount,
-        customThemes: parsed.customThemes,
-    });
+    useUiStore.getState().restoreProfile({ deckCount: parsed.deckCount });
+    if (parsed.prefs) {
+        // Persist + apply + notify the ThemeProvider (it listens for this event).
+        savePrefs(parsed.prefs);
+        applyPrefs(parsed.prefs);
+        emitPrefsChanged(parsed.prefs);
+    }
     if (opts.includeCompanion && parsed.companion) {
         useCompanionStore.getState().update(parsed.companion);
     }
@@ -166,6 +168,9 @@ export function startCloudAutoSync(): () => void {
     unsubs.push(useHidStore.subscribe(schedulePush));
     unsubs.push(useKeybindStore.subscribe(schedulePush));
     unsubs.push(usePluginStore.subscribe(schedulePush));
+    // Appearance prefs live outside zustand (shared ThemeProvider store).
+    window.addEventListener(PREFS_CHANGED_EVENT, schedulePush);
+    unsubs.push(() => window.removeEventListener(PREFS_CHANGED_EVENT, schedulePush));
 
     return () => {
         disposed = true;

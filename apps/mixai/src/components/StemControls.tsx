@@ -76,7 +76,7 @@ export function StemControls({ deckId, deck, accent }: { deckId: DeckId; deck: D
                         fontSize: 10,
                         fontWeight: 700,
                         background: deck.stemsActive ? accent : "var(--bg-elev-2)",
-                        color: deck.stemsActive ? "#000" : "var(--fg)",
+                        color: deck.stemsActive ? "var(--accent-fg)" : "var(--fg)",
                     }}
                 >
                     {deck.stemsActive ? "ON" : "OFF"}
@@ -118,7 +118,7 @@ export function StemControls({ deckId, deck, accent }: { deckId: DeckId; deck: D
                                         fontSize: 9,
                                         fontWeight: 700,
                                         background: muted ? "var(--danger)" : "var(--bg-elev-2)",
-                                        color: muted ? "#fff" : "var(--fg-dim)",
+                                        color: muted ? "var(--destructive-foreground)" : "var(--fg-dim)",
                                     }}
                                 >
                                     M
@@ -133,7 +133,7 @@ export function StemControls({ deckId, deck, accent }: { deckId: DeckId; deck: D
                                         fontSize: 9,
                                         fontWeight: 700,
                                         background: isSolo ? accent : "var(--bg-elev-2)",
-                                        color: isSolo ? "#000" : "var(--fg-dim)",
+                                        color: isSolo ? "var(--accent-fg)" : "var(--fg-dim)",
                                     }}
                                 >
                                     S
