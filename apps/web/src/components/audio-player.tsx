@@ -24,6 +24,8 @@ import {
 import { useRef, useCallback, useEffect, useState } from "react";
 import { TrackContextMenu } from "./track-actions";
 import { useSidebar } from "./sidebar-context";
+import { CastButton } from "@/components/cast/cast-button";
+import { useHaptics } from "@mmo/ui";
 
 // Touch swipe helpers — detects swipe-up and swipe-right
 function useBarSwipe(onSwipeUp: () => void, onSwipeRight: () => void) {
@@ -96,6 +98,7 @@ export function AudioPlayer() {
 
     const { openMobile } = useSidebar();
     const swipe = useBarSwipe(openNowPlaying, openMobile);
+    const haptic = useHaptics(); // WP9-04: no-op unless prefs.feedback
 
     if (!currentTrack && player.currentVideo) {
         return <VideoNowPlayingBar />;
@@ -284,14 +287,14 @@ export function AudioPlayer() {
                             </button>
 
                             <button
-                                onClick={prev}
+                                onClick={() => { haptic("tap"); prev(); }}
                                 className="text-muted-foreground hover:text-foreground hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer"
                             >
                                 <SkipBack className="h-4.5 w-4.5" />
                             </button>
 
                             <button
-                                onClick={togglePlay}
+                                onClick={() => { haptic("tap"); togglePlay(); }}
                                 className={cn(
                                     "flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 cursor-pointer",
                                     "bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white",
@@ -308,7 +311,7 @@ export function AudioPlayer() {
                             </button>
 
                             <button
-                                onClick={next}
+                                onClick={() => { haptic("tap"); next(); }}
                                 className="text-muted-foreground hover:text-foreground hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer"
                             >
                                 <SkipForward className="h-4.5 w-4.5" />
@@ -338,6 +341,13 @@ export function AudioPlayer() {
 
                         {/* ─── Right – Queue + Volume ─────────────────────────── */}
                         <div className="flex items-center gap-3 justify-end">
+                            {/* Play on… (Chromecast / DLNA / Home Assistant) */}
+                            <CastButton
+                                variant="audio"
+                                media={{ type: "track", trackId: currentTrack.id }}
+                                currentTime={currentTime}
+                                onRemoteStart={() => { if (isPlaying) togglePlay(); }}
+                            />
                             {/* Queue indicator */}
                             {upNextCount > 0 && (
                                 <button

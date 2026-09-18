@@ -17,6 +17,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Download } from "lucide-react";
+import { useHaptics } from "@mmo/ui";
 
 // `beforeinstallprompt` isn't in lib.dom.d.ts yet (still a Web App
 // Manifest WG draft). Narrow type rather than `any`.
@@ -30,6 +31,7 @@ const DISMISS_KEY = "mmo.pwa.installDismissedAt";
 const DISMISS_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
 
 export function PwaInstallButton({ className }: { className?: string }) {
+    const haptic = useHaptics(); // WP9-04
     const [evt, setEvt] = useState<BeforeInstallPromptEvent | null>(null);
     // Lazy initial computation avoids a setState-in-effect cascade: the
     // standalone check only depends on the initial mount environment.
@@ -54,6 +56,7 @@ export function PwaInstallButton({ className }: { className?: string }) {
             setEvt(e as BeforeInstallPromptEvent);
         };
         const onInstalled = () => {
+            haptic("success");
             setInstalled(true);
             setEvt(null);
         };
@@ -64,7 +67,7 @@ export function PwaInstallButton({ className }: { className?: string }) {
             window.removeEventListener("beforeinstallprompt", onPrompt);
             window.removeEventListener("appinstalled", onInstalled);
         };
-    }, [installed]);
+    }, [installed, haptic]);
 
     const onClick = useCallback(async () => {
         if (!evt) return;
@@ -89,7 +92,7 @@ export function PwaInstallButton({ className }: { className?: string }) {
             className={className ??
                 "inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-zinc-200 hover:bg-white/10 transition-colors"
             }
-            aria-label="Install MuzicAI as an app"
+            aria-label="Install MixAI as an app"
         >
             <Download className="h-3.5 w-3.5" aria-hidden />
             Install app

@@ -21,6 +21,7 @@ import { useFocusMode } from "@/components/focus-mode-context";
 import { ProjectChrome } from "@/components/projects/project-chrome";
 import { cn } from "@/lib/utils";
 import { useRenderCount } from "@/lib/dev-debugger";
+import { useHaptics } from "@mmo/ui";
 import {
     Mic, MicOff, Square, Circle, Play, Pause, Volume2, VolumeX,
     Music, Power, Plus, Trash2, ChevronDown, ChevronRight, Sparkles,
@@ -1695,6 +1696,7 @@ function BackingPanel() {
 
 function LooperBank() {
     const live = useLive();
+    const haptic = useHaptics(); // WP9-04
 
     const stateColor = (s: string) => {
         switch (s) {
@@ -1746,7 +1748,7 @@ function LooperBank() {
                                     </button>
                                 )}
                             </div>
-                            <button onClick={() => live.toggleLooper(loop.id)}
+                            <button onClick={() => { haptic("heavy"); live.toggleLooper(loop.id); }}
                                 className={cn("w-full py-2 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer transition-all",
                                     loop.state === "empty" ? "bg-white/[0.04] text-white/40 hover:bg-red-500/15 hover:text-red-300 border border-white/[0.06]"
                                         : loop.state === "recording" ? "bg-red-500/25 text-red-400 border border-red-500/40 animate-pulse"
@@ -1788,6 +1790,7 @@ function PadGrid() {
 
 function PadButton({ pad }: { pad: { id: number; name: string; color: string; buffer: AudioBuffer | null; isPlaying: boolean; volume: number; loop: boolean } }) {
     const live = useLive();
+    const haptic = useHaptics(); // WP9-04
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [showSettings, setShowSettings] = useState(false);
 
@@ -1807,7 +1810,7 @@ function PadButton({ pad }: { pad: { id: number; name: string; color: string; bu
         <div className="relative">
             <input ref={fileInputRef} type="file" accept="audio/*" hidden onChange={handleFile} />
             <button
-                onClick={() => pad.buffer ? live.triggerPad(pad.id) : fileInputRef.current?.click()}
+                onClick={() => { if (pad.buffer) { haptic("tap"); live.triggerPad(pad.id); } else fileInputRef.current?.click(); }}
                 onContextMenu={(e) => { e.preventDefault(); setShowSettings(s => !s); }}
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
