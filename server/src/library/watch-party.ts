@@ -114,7 +114,11 @@ function safeEq(a: string, b: string): boolean {
 }
 
 /** Mount the HTTP route for creating a room. */
-export function createWatchPartyRouter(authMiddleware: express.RequestHandler): express.Router {
+export function createWatchPartyRouter(authMiddlewareIn: express.RequestHandler): express.Router {
+    // @types/express 5 types the default params as `string | string[]`
+    // (wildcards are arrays); re-typing the guard keeps `:roomId` a string.
+    // None of these routes use a wildcard.
+    const authMiddleware = authMiddlewareIn as express.RequestHandler<Record<string, string>>;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const router = (require("express") as typeof express).Router();
     router.post("/party/create", authMiddleware, (_req, res) => {

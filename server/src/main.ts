@@ -694,10 +694,9 @@ function setupIPC() {
         updateSettings(patch);
         // Apply auto-launch setting
         if (patch.startAtLogin !== undefined) {
-            app.setLoginItemSettings({
-                openAtLogin: patch.startAtLogin,
-                openAsHidden: true,
-            });
+            // `openAsHidden` (macOS-only) was removed from Electron's login-item
+            // Settings; the companion starts to the tray on every platform anyway.
+            app.setLoginItemSettings({ openAtLogin: patch.startAtLogin });
         }
         if (patch.telemetryEnabled !== undefined) {
             setTelemetryEnabled(patch.telemetryEnabled);
@@ -1347,10 +1346,7 @@ app.whenReady().then(async () => {
     setupAutoUpdater();
 
     const settings = getSettings();
-    app.setLoginItemSettings({
-        openAtLogin: settings.startAtLogin,
-        openAsHidden: true,
-    });
+    app.setLoginItemSettings({ openAtLogin: settings.startAtLogin });
 
     // macOS: ensure the dock icon is visible and the app comes forward
     try {

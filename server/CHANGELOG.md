@@ -1,6 +1,74 @@
-# Changelog — MMO Companion
+# Changelog — MMO Server (MixAI Companion)
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
+
+## 3.0.0 — runtime upgrade: Electron 44, Express 5, better-sqlite3 13 (WP1-13, WP9-07)
+
+- **Electron 34.5 → 44.4** (Chromium 152, Node 24.21 in the main process),
+	`electron-builder` 26.15, `electron-updater` 6.8, `electronmon` 2.0.4.
+	Companion major bump (D14) — auto-update from 2.x works as usual; the
+	appId is unchanged.
+- **better-sqlite3 11 → 13.** Version 13 runs on N-API and ships its prebuilt
+	binaries inside the npm tarball (`prebuilds/<platform>-<arch>.node`), so
+	**one binary now serves Electron, Node 22 and the system Node** — the
+	`rebuild:node` / `rebuild:electron` dance and `prebuild-install` are no
+	longer needed for SQLite (`rebuild:node` now only rebuilds `audify`).
+	Requires Node ≥ 22 (the headless image is already `node:22`).
+- **Express 4 → 5** (`path-to-regexp` v8). Route syntax changes made:
+	`/audio/*` → `/audio/*filePath`, `/download/*` → `/download/*filePath`,
+	`/video/tmdb-image/:size/*` → `/video/tmdb-image/:size/*rest` (wildcards
+	arrive as segment arrays and are re-joined); the 16 `/library` routes that
+	used inline regex constraints (`:id(\\d+)`, `:trackId(\\d+)`) now enforce
+	numeric ids through `router.param()` on `/tracks`, `/playlists`,
+	`/drives/saved` and `/stems` (non-numeric → 404, as before);
+	`/stems/:trackId/:stem([a-z]+\\.wav)` validates the stem name in the handler.
+	Express 5 leaves `req.body` `undefined` when nothing was parsed; a tiny
+	middleware after the JSON parsers restores the v4 `{}` default so existing
+	handlers keep destructuring safely. Public URLs are unchanged.
+- **Dependencies dropped.** `ee-first`, `encodeurl`, `escape-html`,
+	`finalhandler`, `ms`, `on-finished`, `parseurl`, `statuses`, `unpipe` were
+	pinned only so electron-builder could pack Express 4's transitive tree
+	(commit 64b37f7); `.npmrc` `node-linker=hoisted` already solves that and
+	Express 5 has a different tree. `cheerio` was declared but never imported.
+- **Other bumps:** `drizzle-orm` 0.36 → 0.45 (no API change for the
+	`drizzle-orm/better-sqlite3` driver), `music-metadata` 10 → 11 (ESM-only;
+	loaded via dynamic `import()` from the CommonJS build), `chokidar` 4 → 5
+	(ESM-only; same treatment), `bonjour-service` 1.4, `ws` 8.21, `cors` 2.8.6,
+	`ffmpeg-static` 5.3, `vitest` 2 → 5 (with `pnpm.overrides.vite ^8.3`),
+	`@types/express` 5, `@types/better-sqlite3` 9. `discord-rpc` 4.0.1 stays
+	(unmaintained upstream, no newer release). `typescript` stays on 5.9.
+
+## 2.0.0 — rebrand: MuzicAI Companion → MixAI Companion (MMO Server)
+
+- **Headless core (ADR-0002).** The server now runs without Electron:
+	`node dist/headless.js` (`pnpm start:headless`) and a multi-arch Docker
+	image (`server/Dockerfile`, `ghcr.io/dragoscv/mmo-server`, amd64 + arm64,
+	built by `.github/workflows/mmo-server-docker.yml` on `server-v*` tags).
+	Electron access is confined to `src/platform/` (paths, version, folder
+	picker, before-quit); `electron-store` is replaced by a JSON store with the
+	identical `<userData>/config.json` format, so existing settings are read
+	unchanged. `audify` is lazy-loaded and an `optionalDependency`;
+	`/audio/native/probe` reports `available`/`reason`. ffmpeg resolution
+	honours `FFMPEG_PATH`/`FFPROBE_PATH` before `ffmpeg-static`/PATH. Env:
+	`MMO_HEADLESS`, `MMO_DATA`, `MMO_PORT`, `MMO_MEDIA`. Pi deploy: `infra/pi/`.
+- **Rebrand.** The product is now **MixAI** (web app at `https://mixai.ro`,
+	gateway at `https://api.mixai.ro`); the desktop app is **MixAI Companion**
+	and the npm package / self-hosted core is **`mmo-server`**. See
+	`docs/adr/0001-naming-mixai-and-mmo-server.md`.
+- **BREAKING — appId changed** `ro.muzicai.companion` → `ro.mixai.companion`.
+	The installer is a *different application* to the OS, so **auto-update
+	cannot deliver this release**: download and install 2.0.0 manually once
+	(the old MuzicAI Companion can be uninstalled afterwards). Auto-update
+	resumes normally from 2.0.0 onwards.
+- **Settings carry over.** Electron `userData` moves to `mixai-companion`; on
+	first start the companion copies forward `config.json` from
+	`muzicai-companion` (or the older `mmo-companion`) — scan folders, device
+	pairing, tunnel token and audio allowlist are preserved.
+- **Defaults** now point at `mixai.ro` / `api.mixai.ro`. `*.muzicai.ro` stays
+	in the built-in audio-origin allowlist for the transition period.
+- Release asset names change to `MixAI Companion-Setup-<version>.exe` (and the
+	matching mac/linux artifacts); tray, splash, mDNS TXT and log lines say
+	"MixAI Companion". Logs: `%APPDATA%\mixai-companion\logs\main.log`.
 
 ## 1.0.47 — DSP: don't hang on silent/dead-decode files
 

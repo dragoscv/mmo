@@ -7,7 +7,7 @@ import path from "node:path";
 import os from "node:os";
 import { EventEmitter } from "node:events";
 import { WebSocketServer, WebSocket } from "ws";
-import { dialog, BrowserWindow } from "electron";
+import { platform } from "./platform";
 import { store, getSettings, updateSettings, FOLDER_KINDS, type AuthorizedAudioDevice, type FolderKind } from "./store";
 import {
     NativeAudioEngine,
@@ -15,11 +15,13 @@ import {
     listDevices,
     resolveDeviceId,
     invalidateAudioInventoryCache,
+    nativeAudioAvailability,
     type AudioBackend,
     type EngineConfig,
 } from "./audio/native-engine";
 import type { ScaleConfig } from "./audio/pitch-dsp";
 import { createLibraryRouter } from "./library/routes";
+import { createSubsonicRouter } from "./subsonic/router";
 import { createSyncRouter } from "./sync/http-router";
 import { createProjectsRouter } from "./projects/router";
 import { createProfileRouter } from "./profile/routes";
@@ -33,6 +35,8 @@ import { createVoiceRouter } from "./voice/router";
 import { voiceHost } from "./voice/host";
 import { engineRegistry } from "./voice/engines";
 import { createVideoRouter, shutdownVideoSubsystem } from "./library/video-routes";
+import { createCastRouter } from "./cast/router";
+import { createPairRouter } from "./pair/router";
 import { buildCompanionMetrics } from "./metrics";
 import {
     createScanJob,
@@ -74,6 +78,18 @@ const MIME_TYPES: Record<string, string> = {
     ".aif": "audio/aiff",
     ".opus": "audio/opus",
 };
+
+/**
+ * Express 5 hands a `/*name` wildcard back as an array of path segments
+ * (`GET /audio/a/b.mp3` → `["a", "b.mp3"]`); Express 4 gave one string in
+ * `req.params[0]`. Re-join so the rest of the handler keeps working on the
+ * raw, still URL-encoded path string.
+ */
+function splatParam(value: unknown): string {
+    if (Array.isArray(value)) return value.join("/");
+    return typeof value === "string" ? value : "";
+}
+
 
 let httpServer: http.Server | null = null;
 let wss: WebSocketServer | null = null;
@@ -201,6 +217,17 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
     next();
 }
 
+/**
+ * `authMiddleware` with its route params narrowed to plain strings.
+ *
+ * @types/express 5 types the default `ParamsDictionary` values as
+ * `string | string[]`, because a `/*splat` wildcard now yields an array. A
+ * guard declared with that default widens `req.params.x` for every handler
+ * sharing the route, so `:name`-only routes use this narrowed alias. The two
+ * wildcard routes keep the plain guard and read their splat via `splatParam`.
+ */
+const pathAuth = authMiddleware as express.RequestHandler<Record<string, string>>;
+
 // ─── Localhost-only middleware (no auth required) ────────────────────────────
 //
 // Used for the realtime audio routes (/audio/native/*). The threat model:
@@ -247,20 +274,21 @@ function isAllowedOrigin(origin: string | undefined): boolean {
         if (u.hostname === "localhost" || u.hostname === "127.0.0.1") return true;
 
         // Allowlist from companion settings. Defaults to common dev + prod
-        // origins for the MMO web app. Users can extend this in settings.
+        // origins for the MixAI web app (mixai.ro; *.muzicai.ro is kept in the
+        // defaults during the rebrand transition). Users can extend this in settings.
         const settings = getSettings();
         const allowlist = settings.audioOriginAllowlist ?? [];
         for (const pattern of allowlist) {
             // SECURITY: explicit "*" is rejected to prevent accidental
             // open-WS. If a user actually needs cross-origin access from
             // an unknown site, they must add the exact origin. Wildcard
-            // subdomain patterns ("https://*.muzicai.ro") are still ok.
+            // subdomain patterns ("https://*.mixai.ro") are still ok.
             if (pattern === "*") continue;
             if (pattern === origin) return true;
-            // Simple wildcard suffix support: "https://*.muzicai.ro"
+            // Simple wildcard suffix support: "https://*.mixai.ro"
             if (pattern.startsWith("https://*.") || pattern.startsWith("http://*.")) {
                 const proto = pattern.startsWith("https://") ? "https:" : "http:";
-                const suffix = pattern.slice(pattern.indexOf("*.") + 1); // ".muzicai.ro"
+                const suffix = pattern.slice(pattern.indexOf("*.") + 1); // ".mixai.ro"
                 if (u.protocol === proto && u.hostname.endsWith(suffix)) return true;
             }
         }
@@ -344,6 +372,14 @@ export async function startServer(): Promise<void> {
     //     skips when req._body is already true).
     app.use("/library/tracks/ingest", express.json({ limit: "64mb" }));
     app.use(express.json({ limit: "1mb" }));
+    // Express 5 leaves `req.body` undefined when nothing was parsed (no body /
+    // non-JSON content-type); Express 4 gave `{}`. Handlers here destructure
+    // `req.body` directly, so keep the v4 contract in one place instead of
+    // turning every empty POST into a 500 via the async error handler.
+    app.use((req, _res, next) => {
+        if (req.body === undefined) req.body = {};
+        next();
+    });
 
     // ─── Auth Callback (no auth middleware — this IS the auth endpoint) ───
 
@@ -442,7 +478,7 @@ export async function startServer(): Promise<void> {
     // so we must explicitly bail out for non-streaming subpaths — otherwise
     // those routes 403 here as "Path not in allowed folders" because the
     // streaming handler treats the URL tail as a filesystem path.
-    app.get("/audio/*", (req, res, next) => {
+    app.get("/audio/*filePath", (req, res, next) => {
         if (
             req.path.startsWith("/audio/native/") ||
             req.path === "/audio/devices" ||
@@ -451,10 +487,17 @@ export async function startServer(): Promise<void> {
             next("route");
             return;
         }
+        // Query-string auth (?t=token&u=userId) so DLNA / Cast renderers —
+        // which cannot set custom headers — can fetch tracks. Mirrors
+        // `queryAuth` in library/video-routes.ts.
+        const t = req.query.t;
+        const u = req.query.u;
+        if (typeof t === "string" && !req.headers["x-device-token"]) req.headers["x-device-token"] = t;
+        if (typeof u === "string" && !req.headers["x-user-id"]) req.headers["x-user-id"] = u;
         next();
     }, authMiddleware, (req, res) => {
         // Filepath comes URL-encoded after /audio/
-        const filePath = decodeURIComponent(req.params[0] || "");
+        const filePath = decodeURIComponent(splatParam(req.params.filePath));
 
         if (!filePath) {
             res.status(400).json({ error: "No file path" });
@@ -508,8 +551,8 @@ export async function startServer(): Promise<void> {
 
     // ─── Download entire file (for offline caching) ──────────────────────
 
-    app.get("/download/*", authMiddleware, (req, res) => {
-        const filePath = decodeURIComponent(req.params[0] || "");
+    app.get("/download/*filePath", authMiddleware, (req, res) => {
+        const filePath = decodeURIComponent(splatParam(req.params.filePath));
         if (!filePath) {
             res.status(400).json({ error: "No file path" });
             return;
@@ -804,16 +847,10 @@ export async function startServer(): Promise<void> {
             const desiredKind = (req.body && typeof (req.body as { kind?: unknown }).kind === "string"
                 && (FOLDER_KINDS as readonly string[]).includes((req.body as { kind: string }).kind))
                 ? ((req.body as { kind: FolderKind }).kind) : "music";
-            const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
-            const result = win
-                ? await dialog.showOpenDialog(win, {
-                    title: "Pick a music folder",
-                    properties: ["openDirectory", "createDirectory"],
-                })
-                : await dialog.showOpenDialog({
-                    title: "Pick a music folder",
-                    properties: ["openDirectory", "createDirectory"],
-                });
+            const result = await platform.showOpenDialog({
+                title: "Pick a music folder",
+                properties: ["openDirectory", "createDirectory"],
+            });
 
             if (result.canceled || result.filePaths.length === 0) {
                 res.json({ canceled: true, folders: settings.scanFolders });
@@ -968,7 +1005,7 @@ export async function startServer(): Promise<void> {
         res.json({ jobs: listAllScanJobs(), active: listActiveScanJobs().length });
     });
 
-    app.get("/scan/jobs/:id", authMiddleware, (req, res) => {
+    app.get("/scan/jobs/:id", pathAuth, (req, res) => {
         const job = getScanJob(req.params.id);
         if (!job) {
             res.status(404).json({ error: "Job not found" });
@@ -981,7 +1018,7 @@ export async function startServer(): Promise<void> {
      *  memory so a long-lived companion doesn't leak. The job itself
      *  remains visible (so a reload can still see "100% — done") but
      *  its tracks are cleared. */
-    app.post("/scan/jobs/:id/ack", authMiddleware, (req, res) => {
+    app.post("/scan/jobs/:id/ack", pathAuth, (req, res) => {
         const job = getScanJob(req.params.id);
         if (!job) { res.status(404).json({ error: "Job not found" }); return; }
         clearJobTracks(job.id);
@@ -1048,6 +1085,13 @@ export async function startServer(): Promise<void> {
 
     app.use("/library", createLibraryRouter(authMiddleware));
 
+    // ─── OpenSubsonic API (ADR-0005) ─────────────────────────────────────
+    //
+    // Mounted WITHOUT authMiddleware: Subsonic clients authenticate via
+    // `apiKey` / `u`+`t`+`s` / `u`+`p` query params (password = device
+    // token). See `server/src/subsonic/router.ts`.
+    app.use("/rest", createSubsonicRouter());
+
     // ─── Cloud sync ingestion ────────────────────────────────────────
     //
     // Lets the cloud (or any device-token-authed client) push a batch
@@ -1107,6 +1151,20 @@ export async function startServer(): Promise<void> {
     app.use("/video", createVideoRouter(authMiddleware));
     app.use("/video", createWatchPartyRouter(authMiddleware));
 
+    // ─── Casting (DLNA renderers + Home Assistant media players) ────────
+    //
+    // See ADR-0003 and `server/src/cast/router.ts`. Browser-side Google
+    // Cast is handled by the web app; this surface covers everything the
+    // companion can reach on the LAN / through HA.
+    app.use("/cast", createCastRouter(authMiddleware));
+
+    // ─── Quick Connect pairing (TVs / phones, zero typing) ──────────────
+    //
+    // /pair/request, /pair/poll and /pair/info are deliberately unauthenticated
+    // (the requester has no token yet); approval needs the real device
+    // token. See docs/aplicatie/pairing.md and server/src/pair/router.ts.
+    app.use("/pair", createPairRouter({ authMiddleware, getPort: () => serverPort, getVersion: () => SERVER_VERSION }));
+
     // ─── Native low-latency audio engine ─────────────────────────────────
     //
     // These routes intentionally use `publicLocalhostMiddleware` instead of
@@ -1119,17 +1177,26 @@ export async function startServer(): Promise<void> {
     app.get("/audio/native/probe", publicLocalhostMiddleware, (_req, res) => {
         // Cheap presence beacon — used by the web app to detect "is the
         // companion installed and running?" without any credentials.
+        const native = nativeAudioAvailability();
         res.json({
             ok: true,
             product: "MMOCompanion",
             version: SERVER_VERSION,
             platform: process.platform,
-            capabilities: ["audio.native"],
+            headless: !platform.isElectron,
+            available: native.available,
+            ...(native.reason ? { reason: native.reason } : {}),
+            capabilities: native.available ? ["audio.native"] : [],
         });
     });
 
     app.get("/audio/native/info", publicLocalhostMiddleware, (_req, res) => {
         try {
+            const native = nativeAudioAvailability();
+            if (!native.available) {
+                res.json({ supported: false, platform: process.platform, backends: [], running: false, error: native.reason });
+                return;
+            }
             res.json({
                 supported: true,
                 platform: process.platform,
@@ -1386,7 +1453,7 @@ export async function startServer(): Promise<void> {
     //
     // These routes are auth'd with the device token (not publicLocalhost),
     // so the user can configure them from the web UI even when it lives
-    // on muzicai.ro.
+    // on mixai.ro.
 
     app.get("/audio/devices", authMiddleware, (_req, res) => {
         try {
@@ -1588,7 +1655,7 @@ export async function startServer(): Promise<void> {
             if (addr && typeof addr === "object" && typeof addr.port === "number" && addr.port > 0) {
                 serverPort = addr.port;
             }
-            console.log(`MMO Companion Server running on port ${serverPort}`);
+            console.log(`MixAI Companion (MMO Server) running on port ${serverPort}`);
             // Publish LAN URL + mDNS so other devices on the user's
             // network can discover the companion. Re-announces every
             // 5 min so DHCP renewals / Wi-Fi roams self-heal.

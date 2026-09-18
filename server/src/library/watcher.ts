@@ -20,10 +20,14 @@
  * memory footprint stays bounded even if the web app never reconnects.
  */
 
-import chokidar, { type FSWatcher } from "chokidar";
+import type { FSWatcher } from "chokidar";
 import { EventEmitter } from "node:events";
+import { lazyEsm } from "../lib/esm-import";
 import { AUDIO_EXTENSIONS, parseSingleFile } from "./scan-runner";
 import type { ScannedTrackPayload } from "./scan-jobs";
+
+// chokidar 5 is ESM-only; this build is CommonJS (see lib/esm-import).
+const loadChokidar = lazyEsm<typeof import("chokidar")>("chokidar");
 
 export interface WatchEvent {
     id: number;
@@ -50,7 +54,10 @@ let nextEventId = 1;
 
 interface ManagedWatcher {
     folder: string;
-    fsw: FSWatcher;
+    /** Null until the (async) chokidar import resolves. */
+    fsw: FSWatcher | null;
+    /** Resolves once `fsw` is set (or the import failed). */
+    ready: Promise<void>;
     status: WatcherStatus;
 }
 
@@ -92,14 +99,32 @@ export function startWatcher(folder: string): WatcherStatus {
         eventsSeen: 0,
         error: null,
     };
-    // We rely on chokidar's awaitWriteFinish so we don't try to parse a
-    // file mid-copy (which would frequently produce truncated metadata).
-    const fsw = chokidar.watch(folder, {
-        ignoreInitial: true,
-        persistent: true,
-        depth: 99,
-        awaitWriteFinish: { stabilityThreshold: 750, pollInterval: 150 },
+    const managed: ManagedWatcher = { folder, fsw: null, ready: Promise.resolve(), status };
+    // The FSWatcher is attached asynchronously (ESM import). The status
+    // object is returned immediately and mutated once chokidar is up, which
+    // is the contract callers already had (`readyAt` was null until `ready`).
+    managed.ready = loadChokidar().then((chokidar) => {
+        // Stopped before the import resolved — don't start watching.
+        if (watchers.get(folder) !== managed) return;
+        // We rely on chokidar's awaitWriteFinish so we don't try to parse a
+        // file mid-copy (which would frequently produce truncated metadata).
+        const fsw = chokidar.watch(folder, {
+            ignoreInitial: true,
+            persistent: true,
+            depth: 99,
+            awaitWriteFinish: { stabilityThreshold: 750, pollInterval: 150 },
+        });
+        managed.fsw = fsw;
+        wireWatcher(fsw, folder, status);
+    }, (err: unknown) => {
+        status.active = false;
+        status.error = err instanceof Error ? err.message : String(err);
     });
+    watchers.set(folder, managed);
+    return status;
+}
+
+function wireWatcher(fsw: FSWatcher, folder: string, status: WatcherStatus): void {
     const handle = (kind: "add" | "change") => async (filepath: string) => {
         const ext = filepath.toLowerCase().slice(filepath.lastIndexOf("."));
         if (!AUDIO_EXTENSIONS.has(ext)) return;
@@ -134,8 +159,6 @@ export function startWatcher(folder: string): WatcherStatus {
     fsw.on("error", (err: unknown) => {
         status.error = err instanceof Error ? err.message : String(err);
     });
-    watchers.set(folder, { folder, fsw, status });
-    return status;
 }
 
 export async function stopWatcher(folder: string): Promise<void> {
@@ -143,7 +166,8 @@ export async function stopWatcher(folder: string): Promise<void> {
     if (!w) return;
     watchers.delete(folder);
     w.status.active = false;
-    try { await w.fsw.close(); } catch { /* ignore */ }
+    await w.ready;
+    try { await w.fsw?.close(); } catch { /* ignore */ }
 }
 
 export function getWatcherStatus(folder: string): WatcherStatus | null {
@@ -164,7 +188,9 @@ export function getEventsSince(since: number): WatchEvent[] {
 
 export async function stopAllWatchers(): Promise<void> {
     const tasks: Promise<void>[] = [];
-    for (const w of watchers.values()) tasks.push(w.fsw.close().catch(() => { /* ignore */ }));
+    for (const w of watchers.values()) {
+        tasks.push(w.ready.then(() => w.fsw?.close()).catch(() => { /* ignore */ }));
+    }
     watchers.clear();
     await Promise.all(tasks);
 }

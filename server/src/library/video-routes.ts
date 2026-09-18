@@ -24,7 +24,8 @@ import express from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import Store from "electron-store";
+import { SettingsStore as Store } from "../platform/settings-store";
+import { platform } from "../platform";
 import { walkVideos, ffprobe, parseFilename } from "./video-scanner";
 import { ensureHlsSession, touchSession, canDirectPlay, destroySessionsForFile, type VideoQuality, type TranscodeMode, destroyAllSessions } from "./transcode-video";
 import { FFMPEG_BIN } from "./ffmpeg-paths";
@@ -114,14 +115,23 @@ async function resolveOrRecoverFileId(fileId: string): Promise<string | null> {
     return resolveFileId(fileId) ?? await recoverFileId(fileId);
 }
 
-export function createVideoRouter(authMiddleware: express.RequestHandler): express.Router {
+export function createVideoRouter(authMiddlewareIn: express.RequestHandler): express.Router {
     const r = express.Router();
+
+    // @types/express 5 types the default params (`ParamsDictionary`) as
+    // `string | string[]` because a wildcard now yields an array. A guard
+    // declared with the bare `RequestHandler` therefore pins every route it
+    // is mounted on to that widened type, and `req.params.fileId` stops being
+    // a `string`. Re-typing the guards to `Record<string, string>` keeps the
+    // path params narrow; none of these routes use a wildcard (the one that
+    // does — /tmdb-image — reads its splat defensively).
+    const authMiddleware = authMiddlewareIn as express.RequestHandler<Record<string, string>>;
 
     // Allow query-string auth (?t=token&u=userId) on streaming endpoints,
     // because <video>, <track> and `hls.js` cannot set custom headers.
     // We rewrite the request headers from the query so the same
     // authMiddleware works without modification.
-    const queryAuth: express.RequestHandler = (req, _res, next) => {
+    const queryAuth: express.RequestHandler<Record<string, string>> = (req, _res, next) => {
         const t = req.query.t;
         const u = req.query.u;
         if (typeof t === "string" && !req.headers["x-device-token"]) req.headers["x-device-token"] = t;
@@ -382,9 +392,11 @@ export function createVideoRouter(authMiddleware: express.RequestHandler): expre
         req.on("close", () => { if (!child.killed) killChild(); });
     });
 
-    r.get("/tmdb-image/:size/*", queryAuth, authMiddleware, async (req, res) => {
+    r.get("/tmdb-image/:size/*rest", queryAuth, authMiddleware, async (req, res) => {
         const size = req.params.size;
-        const rest = "/" + (req.params as Record<string, string>)["0"];
+        // Express 5 returns the `*rest` wildcard as an array of segments.
+        const restParam = (req.params as Record<string, unknown>).rest;
+        const rest = "/" + (Array.isArray(restParam) ? restParam.join("/") : String(restParam ?? ""));
         try {
             const cached = await getCachedTmdbImage(size, rest);
             res.set("Cache-Control", "public, max-age=2592000, immutable");
@@ -1107,14 +1119,7 @@ async function probeDurationSec(ffprobeBin: string, abs: string): Promise<number
 }
 
 async function getThumbsBaseDir(): Promise<string> {
-    let baseDir: string;
-    try {
-        const { app } = await import("electron");
-        baseDir = app.getPath("userData");
-    } catch {
-        baseDir = path.join(process.cwd(), "data");
-    }
-    const dir = path.join(baseDir, "thumbs");
+    const dir = path.join(platform.getPath("userData"), "thumbs");
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     return dir;
 }

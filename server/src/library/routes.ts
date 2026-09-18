@@ -87,7 +87,12 @@ function pushPlaylistChange(
 
 // ─── Auth helpers ────────────────────────────────────────────────────────────
 
-interface AuthedRequest extends express.Request {
+// Generic over the route params so `req as AuthedRequest` still type-checks
+// with @types/express 5, where a typed route (`/tracks/:id`) yields
+// `Request<{ id: string }>` that no longer overlaps the default
+// `ParamsDictionary` (`string | string[]`).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface AuthedRequest<P = any> extends express.Request<P> {
     userId: string;
 }
 
@@ -281,6 +286,21 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     router.use(authMiddleware);
     router.use(requireUser);
 
+    // Express 5 (path-to-regexp v8) dropped inline regex constraints such as
+    // `:id(\\d+)`. Numeric ids are enforced here instead for the SQLite-row
+    // routes (/tracks, /playlists, /drives/saved, /stems); a non-numeric value
+    // answers 404 exactly like the v4 regex non-match did. /analyze/* job ids
+    // are UUIDs and are deliberately not covered.
+    const numericParam: express.RequestParamHandler = (req, res, next, value) => {
+        const p = req.path;
+        const numericRoute = p.startsWith("/tracks/") || p.startsWith("/playlists/")
+            || p.startsWith("/drives/saved/") || p.startsWith("/stems/");
+        if (!numericRoute || (typeof value === "string" && /^\d+$/.test(value))) next();
+        else res.status(404).json({ error: "Not found" });
+    };
+    router.param("id", numericParam);
+    router.param("trackId", numericParam);
+
     // ── Tracks: list ─────────────────────────────────────────────────────
     router.get("/tracks", (req, res) => {
         const { userId } = req as AuthedRequest;
@@ -306,7 +326,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     });
 
     // ── Tracks: get one ──────────────────────────────────────────────────
-    router.get("/tracks/:id(\\d+)", (req, res) => {
+    router.get("/tracks/:id", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const db = getLibraryDb();
@@ -317,7 +337,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     });
 
     // ── Tracks: update (PATCH) ───────────────────────────────────────────
-    router.patch("/tracks/:id(\\d+)", (req, res) => {
+    router.patch("/tracks/:id", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const data = req.body as Partial<NewTrack>;
@@ -335,7 +355,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     });
 
     // ── Tracks: delete ───────────────────────────────────────────────────
-    router.delete("/tracks/:id(\\d+)", (req, res) => {
+    router.delete("/tracks/:id", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const db = getLibraryDb();
@@ -347,7 +367,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     });
 
     // ── Tracks: toggle favorite ──────────────────────────────────────────
-    router.post("/tracks/:id(\\d+)/favorite", (req, res) => {
+    router.post("/tracks/:id/favorite", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const db = getLibraryDb();
@@ -364,7 +384,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     });
 
     // ── Tracks: set rating ───────────────────────────────────────────────
-    router.post("/tracks/:id(\\d+)/rating", (req, res) => {
+    router.post("/tracks/:id/rating", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const { rating } = req.body as { rating: unknown };
@@ -384,7 +404,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     });
 
     // ── Tracks: set tags ─────────────────────────────────────────────────
-    router.post("/tracks/:id(\\d+)/tags", (req, res) => {
+    router.post("/tracks/:id/tags", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const { tags: newTags } = req.body as { tags: unknown };
@@ -1114,7 +1134,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         }
     });
 
-    router.delete("/drives/saved/:id(\\d+)", (req, res) => {
+    router.delete("/drives/saved/:id", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const db = getLibraryDb();
@@ -1159,7 +1179,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         res.json({ playlist: row });
     });
 
-    router.patch("/playlists/:id(\\d+)", (req, res) => {
+    router.patch("/playlists/:id", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const data = req.body as { name?: string; description?: string };
@@ -1172,7 +1192,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         res.json({ success: true });
     });
 
-    router.delete("/playlists/:id(\\d+)", (req, res) => {
+    router.delete("/playlists/:id", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const db = getLibraryDb();
@@ -1186,7 +1206,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         res.json({ success: true });
     });
 
-    router.get("/playlists/:id(\\d+)/tracks", (req, res) => {
+    router.get("/playlists/:id/tracks", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const page = Math.max(parseInt(String(req.query.page ?? "1"), 10), 1);
@@ -1217,7 +1237,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         });
     });
 
-    router.post("/playlists/:id(\\d+)/tracks", (req, res) => {
+    router.post("/playlists/:id/tracks", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const { trackIds } = req.body as { trackIds: unknown };
@@ -1259,7 +1279,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         res.json({ success: true, added: toAdd.length });
     });
 
-    router.delete("/playlists/:id(\\d+)/tracks/:trackId(\\d+)", (req, res) => {
+    router.delete("/playlists/:id/tracks/:trackId", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const trackId = parseInt(req.params.trackId, 10);
@@ -1279,7 +1299,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     //   ignored; any tracks in the playlist not present in the body are
     //   appended at the end (preserving their relative order). This
     //   keeps drag-and-drop and "move up/down" both as one round trip.
-    router.post("/playlists/:id(\\d+)/reorder", (req, res) => {
+    router.post("/playlists/:id/reorder", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const body = req.body as { trackIds?: unknown };
@@ -1608,7 +1628,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     // can use it both as <audio src=…> and as a sequential read for
     // training-dataset materialization (web app pulls each file and
     // re-uploads to GCS).
-    router.get("/tracks/:id(\\d+)/audio", (req, res) => {
+    router.get("/tracks/:id/audio", (req, res) => {
         const { userId } = req as AuthedRequest;
         const id = parseInt(req.params.id, 10);
         const db = getLibraryDb();
@@ -1654,10 +1674,13 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     // instrumental|guitar|piano. Validates ownership before opening
     // the file. Supports HTTP range so the web client can use it as a
     // <audio src=…> for previews.
-    router.get("/stems/:trackId(\\d+)/:stem([a-z]+\\.wav)", (req, res) => {
+    router.get("/stems/:trackId/:stem", (req, res) => {
         const { userId } = req as AuthedRequest;
         const trackId = parseInt(req.params.trackId, 10);
         const stem = req.params.stem;
+        // Was `:stem([a-z]+\\.wav)` in Express 4; the constraint keeps the
+        // filename to a plain stem name (no traversal / other extensions).
+        if (!/^[a-z]+\.wav$/.test(stem)) { res.status(404).json({ error: "Not found" }); return; }
         const db = getLibraryDb();
         const row = db.select({ id: tracks.id }).from(tracks)
             .where(and(eq(tracks.id, trackId), eq(tracks.userId, userId)))
@@ -1695,7 +1718,7 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
     // browser decodes with `new Int16Array(arrayBuffer)`. ~8 KB per
     // track (2000 pairs × 4 bytes). Cached for an hour by the client
     // since peak data is immutable for a given trackId+content.
-    router.get("/tracks/:id(\\d+)/peaks", (req, res) => {
+    router.get("/tracks/:id/peaks", (req, res) => {
         const { userId } = req as AuthedRequest;
         const trackId = parseInt(req.params.id, 10);
         const db = getLibraryDb();

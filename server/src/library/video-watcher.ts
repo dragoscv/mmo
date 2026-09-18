@@ -11,14 +11,20 @@
 
 import { EventEmitter } from "node:events";
 import path from "node:path";
-import chokidar, { type FSWatcher } from "chokidar";
+import type { FSWatcher } from "chokidar";
+import { lazyEsm } from "../lib/esm-import";
 import { getSettings } from "../store";
+
+// chokidar 5 is ESM-only; this build is CommonJS (see lib/esm-import).
+const loadChokidar = lazyEsm<typeof import("chokidar")>("chokidar");
 
 const VIDEO_EXT = new Set([".mp4", ".mkv", ".m4v", ".webm", ".mov", ".avi", ".wmv", ".flv", ".ts", ".m2ts"]);
 
 const bus = new EventEmitter();
 let watcher: FSWatcher | null = null;
 let watchedRoots: string[] = [];
+/** Generation counter so a stop/restart racing the async import wins. */
+let generation = 0;
 
 interface PendingChange {
     added: Set<string>;
@@ -59,30 +65,37 @@ export function startVideoWatcher(): void {
 
     stopVideoWatcher();
     watchedRoots = [...roots];
-    watcher = chokidar.watch(roots, {
-        ignoreInitial: true,
-        persistent: true,
-        depth: 8,
-        awaitWriteFinish: { stabilityThreshold: 1500, pollInterval: 200 },
-        ignored: (p) => /[\\/](?:\.|node_modules|System Volume Information|\$Recycle\.Bin)/.test(p),
-    });
+    const gen = ++generation;
+    void loadChokidar().then((chokidar) => {
+        // Stopped or restarted while the import was in flight.
+        if (gen !== generation) return;
+        const w = chokidar.watch(roots, {
+            ignoreInitial: true,
+            persistent: true,
+            depth: 8,
+            awaitWriteFinish: { stabilityThreshold: 1500, pollInterval: 200 },
+            ignored: (p) => /[\\/](?:\.|node_modules|System Volume Information|\$Recycle\.Bin)/.test(p),
+        });
+        watcher = w;
 
-    watcher.on("add", (p) => {
-        if (!isVideo(p)) return;
-        pending.added.add(p);
-        pending.removed.delete(p);
-        scheduleFlush();
-    });
-    watcher.on("unlink", (p) => {
-        if (!isVideo(p)) return;
-        pending.removed.add(p);
-        pending.added.delete(p);
-        scheduleFlush();
-    });
-    watcher.on("error", (err) => bus.emit("error", err));
+        w.on("add", (p) => {
+            if (!isVideo(p)) return;
+            pending.added.add(p);
+            pending.removed.delete(p);
+            scheduleFlush();
+        });
+        w.on("unlink", (p) => {
+            if (!isVideo(p)) return;
+            pending.removed.add(p);
+            pending.added.delete(p);
+            scheduleFlush();
+        });
+        w.on("error", (err) => bus.emit("error", err));
+    }, (err: unknown) => bus.emit("error", err));
 }
 
 export function stopVideoWatcher(): void {
+    generation++;
     if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
     pending.added.clear();
     pending.removed.clear();

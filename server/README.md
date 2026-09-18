@@ -1,6 +1,6 @@
-# 🖥️ MMO Companion — Setup pentru dezvoltatori
+# 🖥️ MixAI Companion — Setup pentru dezvoltatori
 
-> Setup, comenzi și convenții pentru lucrul la **MMO Companion** (Electron desktop, `server/`).
+> Setup, comenzi și convenții pentru lucrul la **MixAI Companion** (Electron desktop, `server/`).
 > Pentru ghidul utilizatorului → [`docs/companion/`](../docs/companion/).
 > Pentru arhitectura globală → [`docs/arhitectura/`](../docs/arhitectura/).
 
@@ -48,8 +48,30 @@ curl http://127.0.0.1:17899/healthz
 | `pnpm dist:win` | Build NSIS installer pentru Windows x64 |
 | `pnpm dist:mac` | Build DMG pentru macOS x64 + arm64 (cu ad-hoc signing) |
 | `pnpm dist:linux` | Build AppImage + deb pentru Linux |
+| `pnpm start:headless` | `node dist/headless.js` — serverul FĂRĂ Electron (Docker / Pi / systemd) |
+| `pnpm rebuild:electron` | Recompilează `audify` pentru ABI-ul Electron (după `rebuild:node`) |
+| `pnpm rebuild:node` | Recompilează `audify` pentru Node-ul de sistem (headless local). `better-sqlite3` 13 e N-API — același binar merge în Electron și Node, nu mai trebuie rebuild |
 
 Output build: `server/release/` (ignorat în Git).
+
+### Headless (Docker, Raspberry Pi)
+
+Același cod rulează și ca proces Node 22 simplu, fără Electron / `audify`
+(ADR-0002, `src/platform/` este singurul loc care atinge Electron):
+
+```bash
+MMO_HEADLESS=1 MMO_DATA=~/.local/share/mmo-server MMO_PORT=17899 MMO_MEDIA=/media/Music node dist/headless.js
+# sau
+docker build -f server/Dockerfile -t mmo-server:dev server
+docker run --rm -p 17899:17899 -v mmo-data:/data -v /srv/media:/media:ro mmo-server:dev
+```
+
+Env: `MMO_PORT` (17899), `MMO_DATA` (dir config/db/logs), `MMO_MEDIA`
+(foldere separate prin virgulă, înregistrate la primul boot dacă store-ul e gol),
+`FFMPEG_PATH` / `FFPROBE_PATH` (altfel `ffmpeg-static`, apoi PATH).
+Imaginea multi-arch (amd64 + arm64) e publicată de
+`.github/workflows/mmo-server-docker.yml` la tag `server-v*` →
+`ghcr.io/dragoscv/mmo-server`. Deploy pe Pi: `infra/pi/README.md`.
 
 ---
 
@@ -79,15 +101,15 @@ server/
 
 | Pachet | Rol |
 |---|---|
-| `electron` | Runtime |
-| `electron-builder` | Build & dist |
+| `electron` 44 | Runtime (Chromium 152, Node 24) |
+| `electron-builder` 26.15 | Build & dist |
 | `electron-updater` | Auto-update din GitHub Releases |
-| `electron-store` | Settings persistente (encrypted la nevoie) |
-| `express` | HTTP server local |
+| `express` 5 | HTTP server local (`path-to-regexp` v8: `/*name` wildcard, fără regex inline în rute) |
+| `better-sqlite3` 13 | SQLite (N-API, prebuilt în tarball, Node ≥ 22) + `drizzle-orm` 0.45 |
 | `cors` | CORS pentru web app origin |
 | `ws` | WebSocket server (pentru SSE alternative) |
-| `chokidar` | Watch folders cross-platform |
-| `music-metadata` | Extragere metadate (la fel ca în web app) |
+| `chokidar` 5 | Watch folders cross-platform (ESM-only → `import()` dinamic din build-ul CJS) |
+| `music-metadata` 11 | Extragere metadate (ESM-only → `import()` dinamic) |
 | `audify` | Native audio I/O (PortAudio binding) |
 
 ---
@@ -106,7 +128,29 @@ server/
 | `/midi/listen` | WS | WebSocket cu mesaje MIDI raw |
 | `/yt-dlp/download` | POST | Descarcă track via yt-dlp (dacă e disponibil) |
 
-> Toate endpoint-urile sunt limitate la `127.0.0.1` (loopback) și verifică `Origin` să fie `localhost:3000` sau `muzicai.ro`.
+> Toate endpoint-urile sunt limitate la `127.0.0.1` (loopback) și verifică `Origin` să fie `localhost:13789` sau `mixai.ro`.
+
+---
+
+## 🎧 OpenSubsonic API (`/rest/*`)
+
+MMO Server expune API-ul Subsonic 1.16.1 + extensii OpenSubsonic (ADR-0005), deci
+orice client Subsonic (Symfonium, Feishin, Amperfy, DSub, Supersonic, Music
+Assistant…) poate reda biblioteca direct. Cod în `src/subsonic/`.
+
+- URL server: `http://<host>:17899` · user: orice · **parolă = device token**
+   (sau `apiKey=<device token>` — extensia `apiKeyAuthentication`).
+- Răspuns XML implicit, JSON cu `f=json`; GET și POST form (`formPost`).
+- Metode: ping, getLicense, getOpenSubsonicExtensions, getMusicFolders,
+   getIndexes, getArtists, getArtist, getAlbum, getSong, getAlbumList2,
+   getRandomSongs, getSongsByGenre, getGenres, search3, getStarred2, star/unstar,
+   setRating, scrobble, getPlaylists/getPlaylist/createPlaylist/updatePlaylist/
+   deletePlaylist, stream, download, getCoverArt, getLyricsBySongId, getUser,
+   getScanStatus, startScan.
+- Teste: `node node_modules/vitest/vitest.mjs run src/subsonic` cu Node 22 pe
+   PATH (vitest 5; `better-sqlite3` 13 nu mai are nevoie de rebuild per runtime).
+
+Ghid utilizator: `docs/aplicatie/opensubsonic.md`.
 
 ---
 
@@ -150,6 +194,13 @@ xcode-select --install
 
 ### Port 17899 ocupat
 Schimbă în `src/server.ts` (constanta `PORT`). Dacă schimbi, actualizează și web app-ul (`apps/web/src/lib/native-companion.ts`).
+
+### `better_sqlite3.node was compiled against a different Node.js version`
+Nu ar mai trebui să apară de la 3.0.0: `better-sqlite3` 13 e N-API și încarcă
+`node_modules/better-sqlite3/prebuilds/<platform>-<arch>.node`, valabil pentru Electron
+și Node ≥ 22 deopotrivă. Dacă apare, ai un `build/Release/better_sqlite3.node` vechi
+(compilat local) care are prioritate doar când lipsește prebuild-ul — șterge folderul
+`build/` și reinstalează. Pentru `audify` rămâne valabil `rebuild:node` / `rebuild:electron`.
 
 ### Auto-update eșuează în dev
 `electron-updater` e dezactivat în dev mode (verificat prin `app.isPackaged`). Funcționează doar în builduri pachetate.

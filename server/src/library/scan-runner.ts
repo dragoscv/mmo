@@ -15,13 +15,16 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parseFile } from "music-metadata";
+import { lazyEsm } from "../lib/esm-import";
 import {
     completeScanJob,
     failScanJob,
     type ScanJob,
     type ScannedTrackPayload,
 } from "./scan-jobs";
+
+// music-metadata 11 is ESM-only; this build is CommonJS (see lib/esm-import).
+const loadMusicMetadata = lazyEsm<typeof import("music-metadata")>("music-metadata");
 
 export const AUDIO_EXTENSIONS = new Set([
     ".mp3", ".wav", ".flac", ".aiff", ".aif", ".m4a", ".aac", ".ogg", ".opus", ".wma",
@@ -64,6 +67,7 @@ async function parseAll(files: string[], job: ScanJob, onUpdate: () => void): Pr
         job.currentFile = filename;
         try {
             const stat = fs.statSync(fullPath);
+            const { parseFile } = await loadMusicMetadata();
             const metadata = await parseFile(fullPath, { duration: true });
             tracks.push({
                 filepath: fullPath,
@@ -107,6 +111,7 @@ export async function parseSingleFile(fullPath: string): Promise<ScannedTrackPay
     const filename = path.basename(fullPath);
     try {
         const stat = fs.statSync(fullPath);
+        const { parseFile } = await loadMusicMetadata();
         const metadata = await parseFile(fullPath, { duration: true });
         return {
             filepath: fullPath,
