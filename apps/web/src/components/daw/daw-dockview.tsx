@@ -34,36 +34,18 @@ import {
     Maximize2, Minimize2, PanelTop, PanelBottom, X,
     Columns2, Copy, ExternalLink,
 } from "lucide-react";
+import { LAYOUT_STORAGE_KEY, PANEL_IDS, setDockviewApi } from "./daw-dockview-api";
+// Re-exported for existing consumers; the canonical home is daw-dockview-api.ts
+// (dependency-light so it can be imported without pulling in `dockview`).
+export { getDockviewApi, PANEL_IDS, resetDockviewLayout } from "./daw-dockview-api";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
 // ═══════════════════════════════════════════════════════════════════════════
 
-const LAYOUT_STORAGE_KEY = "daw_dockview_layout";
 const SAVE_DEBOUNCE_MS = 500;
 
-// Module-level API reference for external access
-let _dockviewApi: DockviewApi | null = null;
 let touchDnDApplied = false;
-
-/** Get the current dockview API instance (or null if not mounted) */
-export function getDockviewApi(): DockviewApi | null {
-    return _dockviewApi;
-}
-
-// Panel IDs
-export const PANEL_IDS = {
-    timeline: "panel_timeline",
-    browser: "panel_browser",
-    mixer: "panel_mixer",
-    pianoRoll: "panel_piano_roll",
-    stepSequencer: "panel_step_sequencer",
-    effectsRack: "panel_effects_rack",
-    synthesizer: "panel_synthesizer",
-    history: "panel_history",
-    clipboard: "panel_clipboard",
-    voiceProcessor: "panel_voice_processor",
-} as const;
 
 // Panel metadata
 const PANEL_META: Record<string, { title: string; component: string; shortcut: string }> = {
@@ -524,7 +506,7 @@ export function DAWDockview() {
     const onReady = useCallback((event: DockviewReadyEvent) => {
         const dockApi = event.api;
         apiRef.current = dockApi;
-        _dockviewApi = dockApi;
+        setDockviewApi(dockApi);
         setApi(dockApi);
 
         // Try to restore saved layout
@@ -688,7 +670,7 @@ export function DAWDockview() {
     // ─── Cleanup module-level ref on unmount ───────────────────────────
     useEffect(() => {
         return () => {
-            _dockviewApi = null;
+            setDockviewApi(null);
         };
     }, []);
 
@@ -704,13 +686,4 @@ export function DAWDockview() {
             />
         </div>
     );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Utility: Reset layout
-// ═══════════════════════════════════════════════════════════════════════════
-
-export function resetDockviewLayout() {
-    localStorage.removeItem(LAYOUT_STORAGE_KEY);
-    window.location.reload();
 }

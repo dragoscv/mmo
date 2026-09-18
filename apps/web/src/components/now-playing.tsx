@@ -64,8 +64,8 @@ import { Equalizer } from "./equalizer";
 import { useEQ } from "./eq-context";
 import { PerformanceInline, SessionRestoreIndicator } from "./performance-stats";
 import { TrackContextMenu } from "./track-actions";
-import { SortableUpNext } from "./sortable-up-next";
 import { motion, AnimatePresence } from "motion/react";
+import { Skeleton } from "@mmo/ui";
 
 // Dynamic imports for heavy components (code-split, no SSR)
 const VisualizationCanvas = dynamic(
@@ -75,6 +75,19 @@ const VisualizationCanvas = dynamic(
 const MixerView = dynamic(
     () => import("./mixer-view").then(m => ({ default: m.MixerView })),
     { ssr: false, loading: () => <div className="flex-1 flex items-center justify-center text-white/30">Loading mixer...</div> }
+);
+// @dnd-kit (core + sortable + utilities) is only needed once the queue panel
+// is opened; NowPlaying itself is mounted on every route.
+const SortableUpNext = dynamic(
+    () => import("./sortable-up-next").then(m => ({ default: m.SortableUpNext })),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="space-y-2 p-2" aria-busy="true">
+                {Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+        ),
+    }
 );
 import type { Track } from "@/db/schema";
 

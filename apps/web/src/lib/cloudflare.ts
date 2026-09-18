@@ -1,12 +1,12 @@
 /**
  * Cloudflare Tunnel provisioning client.
  *
- * Why this exists: the browser at https://muzicai.ro cannot reach the
+ * Why this exists: the browser at https://mixai.ro cannot reach the
  * companion at http://192.168.x.x:17899 — mixed-content + Private
  * Network Access kill it. Instead we give every device its own named
  * Cloudflare Tunnel: the companion runs `cloudflared --token <t>` which
  * opens an outbound QUIC connection to the CF edge; the browser fetches
- * https://device-<id>.devices.muzicai.ro which the edge proxies to the
+ * https://device-<id>.devices.mixai.ro which the edge proxies to the
  * companion's localhost:17899. End-to-end ~30-80ms anywhere on the
  * planet, real HTTPS, no LAN games.
  *
@@ -30,7 +30,7 @@ export interface CloudflareConfig {
     apiToken: string;
     accountId: string;
     zoneId: string;
-    baseHostname: string; // e.g. "devices.muzicai.ro"
+    baseHostname: string; // e.g. "devices.mixai.ro"
 }
 
 export function getCloudflareConfig(): CloudflareConfig | null {

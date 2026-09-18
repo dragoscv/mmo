@@ -69,7 +69,7 @@ async function resolveDevice(deviceId: string): Promise<DeviceRow | null> {
     // a LAN address (http://192.168.x.y:9876) which works from a
     // localhost dev server but is UNREACHABLE from Vercel — making
     // every server-action call (scan, audio, folders) time out on the
-    // cloud build. Routing through `https://device-<slug>.muzicai.ro`
+    // cloud build. Routing through `https://device-<slug>.mixai.ro`
     // costs ~30-80 ms via the CF edge instead.
     if (row.tunnelHostname) {
         return { id: row.id, apiUrl: `https://${row.tunnelHostname}`, token: bearer };

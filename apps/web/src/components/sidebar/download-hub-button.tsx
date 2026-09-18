@@ -2,19 +2,19 @@
 
 /**
  * Download Hub — single button in the sidebar that opens a modal showing
- * every way to get MuzicAI on the user's machine / phone / browser:
+ * every way to get MixAI on the user's machine / phone / browser:
  *
- *   - MuzicAI Companion (Win/Mac/Linux installers; local audio server)
- *   - MuzicAI Native desktop (Win/Mac/Linux Tauri shell)
- *   - MuzicAI Native mobile (iOS / Android Capacitor shell)
- *   - MuzicAI Browser Extension (Chrome / Firefox / Edge)
+ *   - MixAI Companion (Win/Mac/Linux installers; local audio server)
+ *   - MixAI Native desktop (Win/Mac/Linux Tauri shell)
+ *   - MixAI Native mobile (iOS / Android Capacitor shell)
+ *   - MixAI Browser Extension (Chrome / Firefox / Edge)
  *
  * Detection layers (best-effort, fall back gracefully):
  *   - OS         → User-Agent + UA-Client-Hints when available.
  *   - Browser    → User-Agent string.
  *   - Companion  → loopback probe via `discoverCompanion()`.
  *   - Extension  → looks for a `<meta name="mmo-extension">` tag the
- *                  content script injects on muzicai.ro pages.
+ *                  content script injects on mixai.ro pages.
  *
  * Recommended-for-you highlight: green ring + "Recommended" badge on
  * the row that best matches the detected platform.
@@ -218,7 +218,7 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
                     <button
                         type="button"
                         className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative"
-                        title="Download MuzicAI apps & extensions"
+                        title="Download MixAI apps & extensions"
                     >
                         <Download className="h-4 w-4" />
                         {companionPresent === true && (
@@ -232,7 +232,7 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
                     >
                         <Download className="h-3.5 w-3.5" />
                         <span className="flex-1 truncate text-left">
-                            Get MuzicAI apps
+                            Get MixAI apps
                         </span>
                         {(companionPresent === true ||
                             extensionPresent !== null) && (
@@ -244,11 +244,11 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
 
             <DialogContent className="max-w-3xl">
                 <DialogHeader>
-                    <DialogTitle>Get MuzicAI everywhere</DialogTitle>
+                    <DialogTitle>Get MixAI everywhere</DialogTitle>
                     <DialogDescription>
                         Native apps, browser extension, and the local companion
                         server. Pick what fits your setup; everything works
-                        against the same muzicai.ro account.
+                        against the same mixai.ro account.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -342,7 +342,7 @@ export function DownloadHubButton({ collapsed = false }: { collapsed?: boolean }
                                 osFilter={(o) =>
                                     o === "win" || o === "mac" || o === "linux"
                                 }
-                                emptyHint="The native desktop app hasn't shipped a release yet. The web app at muzicai.ro works in any browser in the meantime."
+                                emptyHint="The native desktop app hasn't shipped a release yet. The web app at mixai.ro works in any browser in the meantime."
                             />
                         </TabsContent>
 
@@ -585,7 +585,7 @@ function ExtensionSection({
             )}
             <p className="text-xs text-muted-foreground">
                 Lets you download audio from YouTube, SoundCloud, Bandcamp,
-                Mixcloud, and 10+ other platforms directly into your MuzicAI
+                Mixcloud, and 10+ other platforms directly into your MixAI
                 library.
             </p>
             <ul className="space-y-1.5">

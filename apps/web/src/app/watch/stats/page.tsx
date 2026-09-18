@@ -4,7 +4,7 @@ import { watchHistory, movies, tvShows, tvEpisodes } from "@/db/schema";
 import { getActiveProfileId } from "@/lib/active-profile";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import Link from "next/link";
-import { WatchDailyChart } from "@/components/watch/stats-chart";
+import { WatchDailyChart } from "@/components/watch/stats-chart-lazy";
 import { notSignedInFor } from "@/components/empty-state-server";
 
 export const dynamic = "force-dynamic";

@@ -10,7 +10,7 @@
  * Auth: `X-Device-Token` header. The plaintext bearer is fetched once
  * per session via `getDeviceBearerForOwner()` and cached in memory
  * (never persisted). Trust boundary is identical to the existing
- * session — XSS on muzicai.ro already grants full device control via
+ * session — XSS on mixai.ro already grants full device control via
  * the queue-based actions.
  *
  * Returns `null` on ANY failure (network, CORS, 4xx, 5xx, timeout) so

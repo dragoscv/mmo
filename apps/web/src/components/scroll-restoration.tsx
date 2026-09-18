@@ -12,14 +12,17 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { migrateLegacyStorageKey } from "@/lib/storage-migration";
 
-const STORE_KEY = "muzicai-scroll-positions";
+const LEGACY_STORE_KEY = "muzicai-scroll-positions";
+const STORE_KEY = "mixai-scroll-positions";
 const MAX_ENTRIES = 50;
 
 type PositionMap = Record<string, number>;
 
 function loadPositions(): PositionMap {
     try {
+        migrateLegacyStorageKey(LEGACY_STORE_KEY, STORE_KEY, sessionStorage);
         return JSON.parse(sessionStorage.getItem(STORE_KEY) || "{}");
     } catch {
         return {};

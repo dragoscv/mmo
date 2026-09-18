@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { MixerSettingsPanel } from "@/components/settings/mixer-settings-panel";
 
-export const dynamic = "force-dynamic";
+// No `force-dynamic`: no per-user server data here — the panel reads its
+// state client-side. Dynamic rendering still follows from the locale cookie.
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("nav");

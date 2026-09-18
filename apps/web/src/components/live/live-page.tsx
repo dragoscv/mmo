@@ -16,12 +16,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, createContext, useContext } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { useLive } from "./live-context";
 import { useFocusMode } from "@/components/focus-mode-context";
 import { ProjectChrome } from "@/components/projects/project-chrome";
 import { cn } from "@/lib/utils";
 import { useRenderCount } from "@/lib/dev-debugger";
-import { useHaptics } from "@mmo/ui";
+import { useHaptics, Skeleton } from "@mmo/ui";
 import {
     Mic, MicOff, Square, Circle, Play, Pause, Volume2, VolumeX,
     Music, Power, Plus, Trash2, ChevronDown, ChevronRight, Sparkles,
@@ -43,7 +44,23 @@ import { AudioDiagnosticsLogger } from "@/components/live/audio-diagnostics-logg
 import { LiveInstrumentWidget } from "@/components/live/live-instrument-widget";
 import { LivePluginsWidget } from "@/components/live/live-plugins-widget";
 import { LiveWidgetSlotContext, useLiveWidgetSlot, AutoSize } from "@/components/live/live-widget-slot";
-import { LiveWidgetGrid, type WidgetMeta } from "@/components/live/live-widget-grid";
+import type { WidgetMeta, LiveWidgetGrid as LiveWidgetGridComponent } from "@/components/live/live-widget-grid";
+
+// react-grid-layout is client-only (measures the container, persists to
+// localStorage) and is the largest third-party chunk on /live. Code-split it
+// so the master bar / metronome controls paint first. The cast restores the
+// generic signature that `dynamic()` erases.
+const LiveWidgetGrid = dynamic(
+    () => import("@/components/live/live-widget-grid").then((m) => ({ default: m.LiveWidgetGrid })),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="flex-1 min-h-0 p-3 grid grid-cols-2 md:grid-cols-4 auto-rows-[140px] gap-3" aria-busy="true">
+                {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-full w-full" />)}
+            </div>
+        ),
+    },
+) as typeof LiveWidgetGridComponent;
 import { useLiveMetersField, liveMetersStore } from "@/components/live/live-meters-store";
 import { useUIRefreshHz, UI_REFRESH_HZ_MIN, UI_REFRESH_HZ_MAX } from "@/lib/use-ui-refresh-rate";
 import { useLiveSettings } from "@/hooks/use-live-settings";

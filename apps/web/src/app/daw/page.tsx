@@ -5,7 +5,8 @@ import { DAWRemoteBridge } from "@/components/remote/daw-remote-bridge";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+// No `force-dynamic`: `auth()` reads the session cookie, which is already
+// enough to make this route dynamic. Everything else is client-side.
 
 export default async function DAWRoute() {
     const session = await auth();

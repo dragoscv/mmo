@@ -38,8 +38,8 @@ export async function POST(req: Request) {
     // the request `Origin` header would let an attacker on evil.com
     // POST a fetch with their own origin and receive a Stripe URL whose
     // success/cancel links point back to evil.com (open-redirect-via-
-    // Stripe). Fall back to muzicai.ro when the env var is unset.
-    const origin = process.env.NEXT_PUBLIC_APP_URL ?? "https://muzicai.ro";
+    // Stripe). Fall back to mixai.ro when the env var is unset.
+    const origin = process.env.NEXT_PUBLIC_APP_URL ?? "https://mixai.ro";
 
     const checkout = await stripe().checkout.sessions.create({
         mode: "subscription",

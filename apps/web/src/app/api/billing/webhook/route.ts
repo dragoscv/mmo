@@ -2,7 +2,7 @@
  * Stripe webhook — keeps the local `subscriptions` table in sync.
  *
  * Configure in Stripe dashboard:
- *   Endpoint URL: https://muzicai.ro/api/billing/webhook
+ *   Endpoint URL: https://mixai.ro/api/billing/webhook
  *   Events: customer.subscription.created
  *           customer.subscription.updated
  *           customer.subscription.deleted

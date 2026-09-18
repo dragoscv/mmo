@@ -26,8 +26,10 @@ import { type ReactNode, useState } from "react";
 import { get, set, del } from "idb-keyval";
 import type { Persister } from "@tanstack/react-query-persist-client";
 import { toast } from "sonner";
+import { migrateLegacyIdbKey } from "@/lib/storage-migration";
 
-const CACHE_KEY = "muzicai-query-cache";
+const LEGACY_CACHE_KEY = "muzicai-query-cache";
+const CACHE_KEY = "mixai-query-cache";
 
 /** Async persister backed by IndexedDB (via idb-keyval). Survives reloads and
  *  is larger/safer than localStorage for the library cache. */
@@ -37,7 +39,10 @@ function createIdbPersister(idbKey: string = CACHE_KEY): Persister {
             try { await set(idbKey, client); } catch { /* quota / private mode */ }
         },
         restoreClient: async () => {
-            try { return await get(idbKey); } catch { return undefined; }
+            try {
+                if (idbKey === CACHE_KEY) await migrateLegacyIdbKey(LEGACY_CACHE_KEY, CACHE_KEY);
+                return await get(idbKey);
+            } catch { return undefined; }
         },
         removeClient: async () => {
             try { await del(idbKey); } catch { /* ignore */ }

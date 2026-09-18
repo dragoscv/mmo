@@ -10,6 +10,7 @@ import { SubtitlePicker } from "@/components/video/subtitle-picker";
 import { SubtitleUploadButton } from "@/components/video/subtitle-upload-button";
 import { BookmarkPanel } from "@/components/video/bookmark-panel";
 import { WatchPartyPanel, ReactionBurst } from "@/components/video/watch-party-panel";
+import { CastButton } from "@/components/cast/cast-button";
 import { saveProgress, pushDiscordPresence } from "@/actions/video-playback";
 import { createPartyRoom } from "@/actions/watch-party";
 import { getShowPrefs } from "@/actions/show-prefs";
@@ -407,6 +408,12 @@ export function VideoPlayerHost() {
                     preferSdh={cinema.preferSdh}
                 />
                 <SubtitleUploadButton onPick={addTrack} />
+                <CastButton
+                    variant="video"
+                    media={{ type: "video", fileId: video.fileId }}
+                    currentTime={player.videoCurrentTime}
+                    onRemoteStart={() => { if (player.isPlaying) player.videoTogglePlay(); }}
+                />
                 <BookmarkPanel
                     movieId={video.movieId}
                     episodeId={video.episodeId}

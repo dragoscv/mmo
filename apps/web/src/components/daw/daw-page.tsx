@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
+import { Skeleton } from "@mmo/ui";
 import { useRenderCount } from "@/lib/dev-debugger";
 import { useDAW } from "./daw-context";
 import { DAWToolbar } from "./daw-toolbar";
@@ -9,8 +11,24 @@ import { DAWProjectModal } from "./daw-project-modal";
 import { DAWSettingsModal } from "./daw-settings-modal";
 import { DAWStatusBar } from "./daw-status-bar";
 import { DAWExportModal } from "./daw-export-modal";
-import { DAWDockview } from "./daw-dockview";
 import { DAWContextMenuProvider } from "./daw-context-menu";
+
+// `dockview` (+ mobile-drag-drop + every DAW panel) is the heaviest chunk on
+// this route and is client-only anyway (localStorage layout, touch DnD
+// polyfill). Code-split it so the toolbar/transport paint first.
+const DAWDockview = dynamic(
+    () => import("./daw-dockview").then((m) => ({ default: m.DAWDockview })),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="h-full w-full p-2 grid grid-cols-[220px_1fr] grid-rows-[1fr_180px] gap-2" aria-busy="true">
+                <Skeleton className="row-span-2 h-full w-full" />
+                <Skeleton className="h-full w-full" />
+                <Skeleton className="h-full w-full" />
+            </div>
+        ),
+    },
+);
 import { DAWMidiBridge } from "./daw-midi-bridge";
 
 export function DAWPage() {

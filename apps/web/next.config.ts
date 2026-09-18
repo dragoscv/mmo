@@ -95,6 +95,18 @@ const nextConfig: NextConfig = {
     },
 
     experimental: {
+        // Barrel-file optimisation. Next 16 already ships `lucide-react`,
+        // `date-fns` and `recharts` in its own default list (see
+        // next/dist/server/config.ts) — they are repeated here only as
+        // documentation of intent; the real additions are the workspace
+        // barrels (`@mmo/ui`) and `motion`, which Next does not know about.
+        optimizePackageImports: [
+            "@mmo/ui",
+            "motion",
+            "lucide-react",
+            "date-fns",
+            "recharts",
+        ],
         // NOTE: `cacheComponents: true` (Next.js 16 opt-in caching via the
         // `"use cache"` directive) is the next logical step but requires a
         // sweeping refactor across the app:

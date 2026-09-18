@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { headers } from "next/headers";
 
 /**
  * Public /get landing page (formerly /downloads; redirected in next.config.ts).
@@ -11,9 +10,23 @@ import { headers } from "next/headers";
  * Download Hub modal content but optimised for SEO and unauthenticated
  * visitors who land here from external links or search results.
  *
- * Rendered server-side and cached for 5 min so first paint is instant
- * and the GH API quota is preserved.
+ * Caching: the manifest `fetch` below is cached for 5 min through the
+ * Data Cache (`next: { revalidate: 300 }`), so the GH API is hit at most
+ * once per 5 min regardless of traffic. The previous implementation read
+ * `headers()` to compute its own origin, which opted the render out of
+ * every cache and re-fetched the manifest on every request; the origin is
+ * now derived from `AUTH_URL` (falls back to the canonical mixai.ro).
+ *
+ * The HTML itself still renders dynamically (ƒ) because the ROOT layout
+ * reads the `mmo-locale` cookie via `getLocale()` — that applies to every
+ * route in the app and is out of scope here (see
+ * docs/followups/web-bundle-report.md). `revalidate` is kept so the page
+ * flips to ISR automatically once the layout stops reading cookies.
  */
+
+export const revalidate = 300;
+
+const SELF_ORIGIN = (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "https://mixai.ro").replace(/\/$/, "");
 
 interface PlatformAsset {
     os: "win" | "mac" | "linux" | "android" | "ios";
@@ -69,12 +82,8 @@ export const metadata: Metadata = {
 async function getManifest(): Promise<Manifest | null> {
     // Reuse the existing /api/downloads/manifest route as the single
     // source of truth for the GH-release crawl + store URLs.
-    const h = await headers();
-    const host = h.get("x-forwarded-host") ?? h.get("host");
-    const proto = h.get("x-forwarded-proto") ?? "https";
-    const base = host ? `${proto}://${host}` : "https://mixai.ro";
     try {
-        const res = await fetch(`${base}/api/downloads/manifest`, {
+        const res = await fetch(`${SELF_ORIGIN}/api/downloads/manifest`, {
             next: { revalidate: 300 },
         });
         if (!res.ok) return null;

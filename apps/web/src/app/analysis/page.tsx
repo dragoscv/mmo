@@ -2,7 +2,9 @@ import { auth } from "@/auth";
 import { notSignedInFor } from "@/components/empty-state-server";
 import { AnalysisClient } from "./analysis-client";
 
-export const dynamic = "force-dynamic";
+// No `force-dynamic`: the only server work is the `auth()` gate, which reads
+// the session cookie and already opts the route out of static rendering.
+// All job/queue data is fetched client-side by AnalysisClient.
 
 /**
  * Library Analysis page.

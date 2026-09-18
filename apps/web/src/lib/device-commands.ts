@@ -3,7 +3,7 @@
  *
  * Why this exists: Vercel functions cannot reach the user's home LAN
  * where the companion runs, and browsers can't cross mixed-content+PNA
- * to talk to http://192.168.x.x from https://muzicai.ro. So the
+ * to talk to http://192.168.x.x from https://mixai.ro. So the
  * companion polls (via its existing announce heartbeat) for pending
  * commands; we wait here on the DB until the result row materialises.
  *

@@ -10,7 +10,7 @@ import { hashDeviceToken } from "@/lib/device-token";
 // Used by the Tauri shell after the user completes the companion-style
 // browser OAuth flow: the local Rust HTTP listener captures the device
 // token, then the webview navigates here to exchange that token for a
-// real NextAuth session cookie (so the user is signed in to muzicai.ro
+// real NextAuth session cookie (so the user is signed in to mixai.ro
 // inside the embedded WebView, not just on the device-token API surface).
 //
 // Security:

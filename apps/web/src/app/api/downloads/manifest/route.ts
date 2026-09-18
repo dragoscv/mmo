@@ -243,13 +243,13 @@ export async function GET() {
     const extensionStores = {
         chrome:
             process.env.NEXT_PUBLIC_CHROME_EXTENSION_URL ||
-            "https://chromewebstore.google.com/search/mmo%20muzicai",
+            "https://chromewebstore.google.com/search/mmo%20mixai",
         firefox:
             process.env.NEXT_PUBLIC_FIREFOX_EXTENSION_URL ||
-            "https://addons.mozilla.org/firefox/search/?q=mmo+muzicai",
+            "https://addons.mozilla.org/firefox/search/?q=mmo+mixai",
         edge:
             process.env.NEXT_PUBLIC_EDGE_EXTENSION_URL ||
-            "https://microsoftedge.microsoft.com/addons/search/mmo%20muzicai",
+            "https://microsoftedge.microsoft.com/addons/search/mmo%20mixai",
     };
 
     const mobileStores = {

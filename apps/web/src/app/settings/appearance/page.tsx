@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { AppearanceClient } from "./appearance-client";
 
-export const dynamic = "force-dynamic";
+// No `force-dynamic`: this page reads no per-user server data. All state
+// lives client-side (theme prefs in localStorage). It still renders
+// dynamically because `getTranslations()` reads the `mmo-locale` cookie —
+// declaring it explicitly only prevented Next from ever doing better.
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("nav");

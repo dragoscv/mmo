@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     }
     const customerId = await ensureCustomer(session.user.id);
     // Pin to server-controlled origin (see checkout/route.ts for rationale).
-    const origin = process.env.NEXT_PUBLIC_APP_URL ?? "https://muzicai.ro";
+    const origin = process.env.NEXT_PUBLIC_APP_URL ?? "https://mixai.ro";
 
     const portal = await stripe().billingPortal.sessions.create({
         customer: customerId,

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-    title: { template: "%s · Settings · MuzicAI", default: "Settings · MuzicAI" },
+    title: { template: "%s · Settings · MixAI", default: "Settings · MixAI" },
 };
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {

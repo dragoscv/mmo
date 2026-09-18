@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { resetDockviewLayout } from "./daw-dockview";
+import { resetDockviewLayout } from "./daw-dockview-api";
 import type { ToolMode, SnapValue } from "@/lib/daw-engine";
 import { canUndo as histCanUndo, canRedo as histCanRedo } from "@/lib/history-engine";
 import { useScrollAdjust } from "./daw-ui-utils";

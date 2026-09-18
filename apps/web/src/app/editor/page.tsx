@@ -4,7 +4,8 @@ import { DAWProvider } from "@/components/daw/daw-context";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+// No `force-dynamic`: `auth()` reads the session cookie, which is already
+// enough to make this route dynamic. Everything else is client-side.
 
 export default async function EditorRoute() {
     const session = await auth();

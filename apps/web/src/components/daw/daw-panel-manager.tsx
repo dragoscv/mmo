@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useDAW } from "./daw-context";
-import { getDockviewApi, PANEL_IDS } from "./daw-dockview";
+import { getDockviewApi, PANEL_IDS } from "./daw-dockview-api";
 import {
     Popover,
     PopoverContent,

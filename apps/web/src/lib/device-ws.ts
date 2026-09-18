@@ -4,7 +4,7 @@
  * Why a separate client from `NativeCompanionClient`:
  *  - NativeCompanionClient targets http://localhost:17899 (the local
  *    audio engine path) and is one-per-page.
- *  - This client targets wss://device-<hex>.muzicai.ro/ws and is
+ *  - This client targets wss://device-<hex>.mixai.ro/ws and is
  *    one-per-remote-device. Lives in the Devices page to surface live
  *    scan progress + watcher events without the 750 ms pull loop.
  *

@@ -471,7 +471,7 @@ export async function getCompanionFolders(deviceId: string): Promise<CompanionFo
 
     // FAST PATH: direct HTTP via the Cloudflare Tunnel (~30-80 ms). The
     // queue path below takes a full announce cycle (up to 3 s when idle,
-    // longer if the companion's outbound fetch to muzicai.ro is unhealthy
+    // longer if the companion's outbound fetch to mixai.ro is unhealthy
     // — which is exactly the symptom that pushed us to fix this).
     try {
         const list = await companionControl.listFolders(deviceId);
