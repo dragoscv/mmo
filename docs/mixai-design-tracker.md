@@ -219,7 +219,7 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 | WP8-02 | Playwright visual + axe at 4 widths, light+dark, RO+EN | done ee81854 |
 | WP8-03 | design-critic pass on web shell, mixai, companion | done docs/followups/design-critic-2026-09-18.md (42–47/60, 5 prescriptions) |
 | WP8-04 | CHANGELOG entries (web/companion/extension/tv), version bumps, ADR-0008 design system | done 85a8bc3 (CHANGELOGs, ADR-0008, versions: web 2.0.0, companion 3.0.0, extension 3.0.0, mixai/native/tv 1.0.0) |
-| WP8-05 | Reality-check round with askQuestions | todo |
+| WP8-05 | Reality-check round with askQuestions | done round 3 answered 2026-09-18 (apply 5 Rx, code-split mixai+companion, no push yet) |
 
 ## 5. Recommendations beyond the brief (proposed; decide in §7)
 
@@ -257,3 +257,7 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 | WP9-05 | `@serwist/next` replaces hand-rolled SW; offline shell | done 95ef92c |
 | WP9-06 | OpenAPI spec for MMO Server (`server/openapi.yaml`) + generated TS (`@mmo/sdk`) and Kotlin (tv-android) clients | done |
 | WP9-07 | server: express 4 → 5 | done da3538e |
+
+## 8. Follow-ups
+
+- **WP1-07 — Weekly (Mondays):** retry `typescript@7` on apps/web once typescript-eslint ≥ 8.71 / TS7-capable ships (typescript-eslint#10940), and `eslint@10` once eslint-plugin-react peer allows it; command: `pnpm outdated typescript eslint typescript-eslint eslint-plugin-react` in apps/web. Owner: agent, next check 2026-09-21.

@@ -65,7 +65,7 @@ id,type,surface,title,status,owner,decision_or_notes
 "WP8-02","","","Playwright visual + axe at 4 widths, light+dark, RO+EN","done","agent","ee81854"
 "WP8-03","","","design-critic pass on web shell, mixai, companion","done","agent","docs/followups/design-critic-2026-09-18.md (42–47/60, 5 prescriptions)"
 "WP8-04","","","CHANGELOG entries (web/companion/extension/tv), version bumps, ADR-0008 design system","done","agent","85a8bc3 (CHANGELOGs, ADR-0008, versions: web 2.0.0, companion 3.0.0, extension 3.0.0, mixai/native/tv 1.0.0)"
-"WP8-05","","","Reality-check round with askQuestions","todo","agent",""
+"WP8-05","","","Reality-check round with askQuestions","done","agent","round 3 answered 2026-09-18 (apply 5 Rx, code-split mixai+companion, no push yet)"
 "WP9-01","","","`/dev/ui` catalog route (dev-only) rendering every `@mmo/ui` component × mode × surface × accent","done","agent","5cdc24b"
 "WP9-02","","","Unified command palette + shortcuts registry (`@mmo/ui/command`) on web, mixai, companion","done","agent","5cdc24b"
 "WP9-03","","","`nuqs` URL state for library/playlists filters","done","agent","4bd3530"
@@ -74,8 +74,6 @@ id,type,surface,title,status,owner,decision_or_notes
 "WP9-06","","","OpenAPI spec for MMO Server (`server/openapi.yaml`) + generated TS (`@mmo/sdk`) and Kotlin (tv-android) clients","done","agent",""
 "WP9-07","","","server: express 4 → 5","done","agent","da3538e"
 
-"WP8-03","","","design-critic pass on web shell, mixai, companion","todo","agent",""
-"WP8-04","","","CHANGELOG entries (web/companion/extension/tv), version bumps, ADR-0008 design system","todo","agent",""
 D1,decision,all,Surfaces in scope,done,user,"all six: web, mixai, native, server/ui, tv-tizen+tv-android, extension"
 D2,decision,all,Design system location,done,user,"packages/design-tokens + packages/ui"
 D3,decision,all,Dependency upgrade policy,done,user,"every stable major; one verified slice each"
