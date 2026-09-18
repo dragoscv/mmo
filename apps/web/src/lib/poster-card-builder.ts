@@ -182,7 +182,7 @@ export function buildTmdbHitPosterProps(
     const title = (kind === "movie" ? (hit.title ?? hit.name) : (hit.name ?? hit.title)) ?? "Untitled";
     const href = opts.localId
         ? (kind === "movie" ? `/watch/movies/${opts.localId}` : `/watch/shows/${opts.localId}`)
-        : (kind === "movie" ? `/watch/discover/movie/${hit.id}` : `/watch/discover/tv/${hit.id}`);
+        : `/media/${kind}/${hit.id}`;
     return {
         href,
         title,

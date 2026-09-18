@@ -3,21 +3,62 @@ import { db } from "@/db";
 import { videoFiles, movies, tvEpisodes, tvShows, watchHistory, watchProfiles } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { getPlaybackHandle, companionHlsUrl, companionDirectUrl, canBrowserDirectPlay } from "@/lib/companion-video";
+import { getCompanionLinkForDevice } from "@/lib/companion-library";
 import { notFound } from "next/navigation";
 import { PlayerHost } from "./_player-host";
 import { getActiveProfileId } from "@/lib/active-profile";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Media Home entry (WP11-04): `/watch/play/<companionFileId>?server=<deviceId>&cid=<companionFileId>`.
+ * The MMO Server already told us its own file id, so skip the Postgres
+ * `video_files` lookup and build the stream URLs for that device directly.
+ * Progress is not persisted (no DB row to attach it to) — the server-side
+ * `/media/progress` sync (WP10-06) covers it.
+ */
+async function playCompanionFile(deviceId: string, cid: string, q: string, startSec: number) {
+    const link = await getCompanionLinkForDevice(deviceId);
+    if (!link) return null;
+    const info = await fetch(`${link.apiUrl}/video/file/${encodeURIComponent(cid)}/info`, {
+        headers: { "X-Device-Token": link.token, "X-User-Id": link.userId },
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+    }).then((r) => (r.ok ? r.json() : null)).catch(() => null) as
+        { parsed?: { title?: string; year?: number | null }; container?: string | null; videoCodec?: string | null; audioCodec?: string | null; durationSec?: number | null } | null;
+    const hlsUrl = companionHlsUrl(link.apiUrl, cid, q, link.token, link.userId, startSec);
+    const directUrl = canBrowserDirectPlay(info?.container, info?.videoCodec, info?.audioCodec)
+        ? companionDirectUrl(link.apiUrl, cid, link.token, link.userId)
+        : null;
+    return (
+        <main style={{ width: "100vw", height: "100vh", background: "var(--background)" }}>
+            <PlayerHost
+                hlsUrl={hlsUrl}
+                directUrl={directUrl}
+                title={info?.parsed?.title ?? "Video"}
+                subtitle={info?.parsed?.year ? String(info.parsed.year) : undefined}
+                durationHint={info?.durationSec ?? null}
+                startSec={startSec}
+            />
+        </main>
+    );
+}
+
 export default async function PlayPage({ params, searchParams }: {
     params: Promise<{ fileId: string }>;
-    searchParams: Promise<{ q?: string; start?: string }>;
+    searchParams: Promise<{ q?: string; start?: string; server?: string; cid?: string }>;
 }) {
     const { fileId } = await params;
-    const { q = "original", start = "0" } = await searchParams;
+    const { q = "original", start = "0", server, cid } = await searchParams;
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) return notFound();
+
+    if (server && cid) {
+        const direct = await playCompanionFile(server, cid, q, parseInt(start, 10) || 0);
+        if (direct) return direct;
+        return notFound();
+    }
 
     const activeProfileId = await getActiveProfileId();
 

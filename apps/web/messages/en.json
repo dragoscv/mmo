@@ -745,7 +745,38 @@
     },
     "home": {
         "title": "Home",
-        "subtitle": "Movies, shows and music from every MixAI server — pick up where you left off."
+        "subtitle": "Movies, shows and music from every MixAI server — pick up where you left off.",
+        "hero": {
+            "label": "Featured titles",
+            "pick": "Pick a featured title",
+            "playOn": "Play on {server}",
+            "whereToWatch": "Where to watch",
+            "watchlist": "Watchlist",
+            "details": "Details"
+        },
+        "row": {
+            "prev": "Scroll left",
+            "next": "Scroll right",
+            "seeAll": "See all ({count})",
+            "more": "+{count} more"
+        },
+        "servers": {
+            "label": "Filter by server",
+            "all": "All servers",
+            "offline": "offline",
+            "countLabel": "servers",
+            "unreachableSince": "Unreachable since {when}",
+            "unreachable": "{name} is not responding",
+            "offlineNotice": "{name} is offline — its titles are hidden until it comes back.",
+            "outdated": "{name} runs an older MixAI Server without Media Home — update it.",
+            "noneForSelection": "Nothing to play on the selected servers."
+        },
+        "empty": {
+            "title": "Nothing to show yet",
+            "description": "Your servers are online but have no indexed movies or shows. Run a video scan, or browse your music library.",
+            "ctaSettings": "Settings › Video",
+            "ctaLibrary": "Library"
+        }
     },
     "dashboard": {
         "empty": {
@@ -1299,5 +1330,52 @@
         "search": "Search",
         "cheatsheet": "This cheat sheet",
         "closeOverlays": "Close overlays"
+    },
+    "media": {
+        "unavailable": {
+            "title": "Title unavailable",
+            "description": "No online MixAI Server could load this title. Start a server or check its TMDB key in Settings › Media."
+        },
+        "meta": {
+            "runtime": "{min} min",
+            "seasons": "{count, plural, one {# season} other {# seasons}}"
+        },
+        "trailer": "Trailer",
+        "trailerFor": "Trailer — {title}",
+        "cast": "Cast",
+        "similar": "More like this",
+        "sources": {
+            "title": "Play from your servers",
+            "none": "Not in your library on any server.",
+            "playOn": "Play on {server}",
+            "resumeOn": "Resume on {server}",
+            "moreFiles": "+{count} more files"
+        },
+        "offers": {
+            "title": "Where to watch",
+            "none": "No streaming offers found for your region.",
+            "type": {
+                "subscription": "Subscription",
+                "free": "Free",
+                "ads": "Free with ads",
+                "rent": "Rent",
+                "buy": "Buy"
+            },
+            "tmdb": "This product uses the TMDB API but is not endorsed or certified by TMDB.",
+            "justwatch": "Streaming data by JustWatch.",
+            "motn": "Deep links by Movie of the Night."
+        },
+        "actions": {
+            "addWatchlist": "Add to watchlist",
+            "removeWatchlist": "Remove from watchlist",
+            "markWatched": "Mark as watched",
+            "markUnwatched": "Mark as unwatched",
+            "hide": "Hide from recommendations",
+            "unhide": "Show in recommendations",
+            "hidden": "Hidden from recommendations",
+            "unhidden": "Back in recommendations",
+            "needsLocal": "Available once this title is in your library.",
+            "failed": "Action failed. Try again."
+        }
     }
 }

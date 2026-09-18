@@ -11,10 +11,14 @@ export type MediaKind = "movie" | "tv";
 export interface TitleSource {
     serverId: string;
     serverName: string;
-    /** Server-side video file id (`/video/*` endpoints). */
-    fileId: number;
+    /** Server-side video file id (`/video/*` endpoints, companion hash). Absent when the
+     *  server only flagged `inLibrary` without listing files (home rows). */
+    fileId?: string | number;
     /** e.g. "2160p", "1080p", "720p". */
     quality?: string;
+    season?: number | null;
+    episode?: number | null;
+    path?: string;
 }
 
 export interface TitleCard {
@@ -22,11 +26,13 @@ export interface TitleCard {
     tmdbId: number;
     title: string;
     year?: number | null;
+    overview?: string | null;
     poster?: string | null;
     backdrop?: string | null;
     /** Title-treatment PNG (TMDB `logos`) for the hero. */
     logo?: string | null;
     rating?: number | null;
+    genreIds?: number[];
     /** 0..1 progress for Continue rows. */
     progress?: number | null;
     /** True when at least one server has a local file. */
@@ -59,6 +65,44 @@ export interface Offer {
         /** Provider-side search URL used when `link` is missing. */
         search: string;
     };
+}
+
+export interface Availability {
+    offers: Offer[];
+    source: "motn" | "tmdb" | "none";
+    attribution: string[];
+}
+
+export interface Person {
+    id: number;
+    name: string;
+    role: string;
+    profilePath: string | null;
+}
+
+/** Full title (`/media/title/:kind/:tmdbId`) merged across servers. */
+export interface TitleDetails extends Omit<TitleCard, "inLibrary" | "sources"> {
+    tagline?: string | null;
+    runtime?: number | null;
+    genres: string[];
+    cast: Person[];
+    /** YouTube key of the best trailer, if any. */
+    trailerKey?: string | null;
+    certification?: string | null;
+    numberOfSeasons?: number | null;
+    numberOfEpisodes?: number | null;
+    similar: TitleCard[];
+    recommendations: TitleCard[];
+}
+
+export interface MergedTitleDetails {
+    title: TitleDetails;
+    sources: TitleSource[];
+    availability: Availability;
+    /** Progress 0..1 (max across servers), null when never played. */
+    progress: number | null;
+    /** Servers that failed for this title (rendered as inline notices). */
+    errors: Array<{ serverId: string; name: string; error: string }>;
 }
 
 /** Title merged across servers (same tmdbId) — what the web renders. */

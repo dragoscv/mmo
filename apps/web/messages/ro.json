@@ -745,7 +745,38 @@
     },
     "home": {
         "title": "Acasă",
-        "subtitle": "Filme, seriale și muzică de pe toate serverele MixAI — continuă de unde ai rămas."
+        "subtitle": "Filme, seriale și muzică de pe toate serverele MixAI — continuă de unde ai rămas.",
+        "hero": {
+            "label": "Titluri recomandate",
+            "pick": "Alege un titlu recomandat",
+            "playOn": "Redă pe {server}",
+            "whereToWatch": "Unde vezi",
+            "watchlist": "Watchlist",
+            "details": "Detalii"
+        },
+        "row": {
+            "prev": "Derulează la stânga",
+            "next": "Derulează la dreapta",
+            "seeAll": "Vezi toate ({count})",
+            "more": "+{count} în plus"
+        },
+        "servers": {
+            "label": "Filtrează după server",
+            "all": "Toate serverele",
+            "offline": "offline",
+            "countLabel": "servere",
+            "unreachableSince": "Inaccesibil de {when}",
+            "unreachable": "{name} nu răspunde",
+            "offlineNotice": "{name} este offline — titlurile lui sunt ascunse până revine.",
+            "outdated": "{name} rulează un MixAI Server mai vechi, fără Media Home — actualizează-l.",
+            "noneForSelection": "Nimic de redat pe serverele selectate."
+        },
+        "empty": {
+            "title": "Nimic de afișat încă",
+            "description": "Serverele sunt online dar nu au filme sau seriale indexate. Rulează o scanare video sau răsfoiește biblioteca muzicală.",
+            "ctaSettings": "Setări › Video",
+            "ctaLibrary": "Bibliotecă"
+        }
     },
     "dashboard": {
         "empty": {
@@ -1299,5 +1330,52 @@
         "search": "Caută",
         "cheatsheet": "Acest cheatsheet",
         "closeOverlays": "Închide overlay-uri"
+    },
+    "media": {
+        "unavailable": {
+            "title": "Titlu indisponibil",
+            "description": "Niciun MixAI Server online nu a putut încărca acest titlu. Pornește un server sau verifică cheia TMDB în Setări › Media."
+        },
+        "meta": {
+            "runtime": "{min} min",
+            "seasons": "{count, plural, one {# sezon} few {# sezoane} other {# de sezoane}}"
+        },
+        "trailer": "Trailer",
+        "trailerFor": "Trailer — {title}",
+        "cast": "Distribuție",
+        "similar": "Titluri asemănătoare",
+        "sources": {
+            "title": "Redă de pe serverele tale",
+            "none": "Nu există în bibliotecă pe niciun server.",
+            "playOn": "Redă pe {server}",
+            "resumeOn": "Continuă pe {server}",
+            "moreFiles": "+{count} fișiere"
+        },
+        "offers": {
+            "title": "Unde vezi",
+            "none": "Nicio ofertă de streaming găsită pentru regiunea ta.",
+            "type": {
+                "subscription": "Abonament",
+                "free": "Gratuit",
+                "ads": "Gratuit cu reclame",
+                "rent": "Închiriere",
+                "buy": "Cumpărare"
+            },
+            "tmdb": "Acest produs folosește API-ul TMDB, dar nu este aprobat sau certificat de TMDB.",
+            "justwatch": "Date de streaming de la JustWatch.",
+            "motn": "Linkuri directe de la Movie of the Night."
+        },
+        "actions": {
+            "addWatchlist": "Adaugă în watchlist",
+            "removeWatchlist": "Scoate din watchlist",
+            "markWatched": "Marchează ca vizionat",
+            "markUnwatched": "Marchează ca nevizionat",
+            "hide": "Ascunde din recomandări",
+            "unhide": "Arată în recomandări",
+            "hidden": "Ascuns din recomandări",
+            "unhidden": "Din nou în recomandări",
+            "needsLocal": "Disponibil după ce titlul ajunge în bibliotecă.",
+            "failed": "Acțiunea a eșuat. Încearcă din nou."
+        }
     }
 }
