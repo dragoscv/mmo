@@ -97,12 +97,12 @@ export default async function ShowsPage({ searchParams }: { searchParams: Promis
 
     return (
         <main>
-            <header style={{ padding: "2rem 1.5rem 0" }}>
-                <h1 style={{ fontSize: "2rem", fontWeight: 800 }}>Serialele tale</h1>
+            <header className="px-6 pt-8">
+                <h1 className="text-[2rem] font-extrabold">Serialele tale</h1>
             </header>
             <WatchFilterBar genres={facetGenres} years={facetYears} count={visible.length} />
             {visible.length === 0 ? (
-                <div style={{ padding: "4rem 2rem", color: "var(--watch-fg-dim)" }}>
+                <div className="px-8 py-16 text-[var(--watch-fg-dim)]">
                     {rows.length > 0 ? (
                         <p>Niciun serial care să corespundă filtrelor.</p>
                     ) : (

@@ -1,0 +1,14 @@
+/* WP2-08. `player-aware-layout.tsx` publishes `--player-h` as an INLINE style
+ * on the AppShell root: 72px with a track, 56px without, 0 in focus mode.
+ * The mobile mini-player (AudioPlayer, `useIsMobile()`) is a 56px row even
+ * when a track is loaded, so below `md` the desktop 72px would leave a 16px
+ * dead gap above it. An inline style can only be beaten by `!important`;
+ * focus mode (0px) must still win, hence the `:not([data-focus-mode])` guard.
+ *
+ * Keep the 56px in step with the mini-player row height in audio-player.tsx.
+ */
+@media (max-width: 47.99rem) {
+    [data-app-layout]:not([data-focus-mode]) {
+        --player-h: 56px !important;
+    }
+}

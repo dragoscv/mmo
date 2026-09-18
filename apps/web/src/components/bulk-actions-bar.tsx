@@ -84,8 +84,8 @@ export function BulkActionsBar({ onDone }: BulkActionsBarProps) {
 
     return (
         <>
-            <div className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/5 px-3 py-2 animate-[fadeIn_150ms_ease-out]">
-                <div className="flex items-center gap-1.5 text-sm font-medium text-purple-400">
+            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 animate-[fadeIn_150ms_ease-out]">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-primary">
                     <CheckSquare className="h-4 w-4" />
                     <span>{selection.count} selected</span>
                 </div>
@@ -94,7 +94,7 @@ export function BulkActionsBar({ onDone }: BulkActionsBarProps) {
 
                 <button
                     onClick={() => setPlaylistOpen(true)}
-                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-purple-500/10 transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-primary/10 transition-colors cursor-pointer"
                 >
                     <ListMusic className="h-3.5 w-3.5" />
                     Add to Playlist
@@ -113,7 +113,7 @@ export function BulkActionsBar({ onDone }: BulkActionsBarProps) {
                     onClick={handleAiSuggest}
                     disabled={isSuggesting}
                     title="Use the AI provider configured in Settings → AI to fill empty genre / mood / energy / etc. fields. Only fills empty fields, never overwrites."
-                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-fuchsia-500/10 hover:text-fuchsia-300 transition-colors cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-chart-2/10 hover:text-chart-2 transition-colors cursor-pointer disabled:opacity-50"
                 >
                     {isSuggesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                     AI Suggest

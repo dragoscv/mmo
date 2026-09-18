@@ -1,0 +1,48 @@
+/* Route transitions (WP2-09). React 19.3 <ViewTransition default="mixai-page">
+ * in app/template.tsx assigns the `mixai-page` view-transition-class to the
+ * page root, so these rules only style the shared page cross-fade. Named
+ * elements (poster → hero morph under /watch, np-video-*) keep their own
+ * group animations and are untouched here. */
+
+::view-transition-old(.mixai-page),
+::view-transition-new(.mixai-page) {
+    animation-duration: var(--dur-page);
+    animation-timing-function: var(--ease-out);
+    mix-blend-mode: normal;
+}
+
+::view-transition-old(.mixai-page) {
+    animation-name: mixai-page-out;
+}
+
+::view-transition-new(.mixai-page) {
+    animation-name: mixai-page-in;
+}
+
+@keyframes mixai-page-out {
+    to {
+        opacity: 0;
+        translate: 0 -8px;
+    }
+}
+
+@keyframes mixai-page-in {
+    from {
+        opacity: 0;
+        translate: 0 8px;
+    }
+}
+
+[data-motion="reduced"] ::view-transition-old(.mixai-page),
+[data-motion="reduced"] ::view-transition-new(.mixai-page),
+[data-motion="reduced"] ::view-transition-group(.mixai-page) {
+    animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(.mixai-page),
+    ::view-transition-new(.mixai-page),
+    ::view-transition-group(.mixai-page) {
+        animation: none;
+    }
+}

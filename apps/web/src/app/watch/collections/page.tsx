@@ -41,10 +41,10 @@ export default async function CollectionsPage() {
         .orderBy(videoCollections.sortOrder);
 
     return (
-        <main style={{ padding: "2rem 1.5rem 6rem" }}>
-            <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+        <main className="px-6 pt-8 pb-24">
+            <header className="mb-8 flex items-center justify-between">
                 <div>
-                    <h1 style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.02em" }}>Colecții</h1>
+                    <h1 className="text-[2rem] font-extrabold tracking-tight">Colecții</h1>
                     <p style={{ color: "var(--watch-fg-dim)", marginTop: ".25rem" }}>
                         Listele tale: wishlist, watch-later și colecții personalizate.
                     </p>
@@ -58,7 +58,7 @@ export default async function CollectionsPage() {
                 </p>
             )}
 
-            <div style={{ display: "grid", gap: "2rem" }}>
+            <div className="grid gap-8">
                 {rows.map(async ({ c, count }) => {
                     const items = await db.select({
                         i: videoCollectionItems, m: movies, s: tvShows,
@@ -90,7 +90,7 @@ export default async function CollectionsPage() {
 
                     return (
                         <section key={c.id}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "0 .25rem .75rem" }}>
+                            <div className="flex items-baseline justify-between px-1 pb-3">
                                 <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>
                                     {c.name}
                                     <span style={{ color: "var(--watch-fg-dim)", fontWeight: 400, marginLeft: ".5rem" }}>
@@ -102,7 +102,7 @@ export default async function CollectionsPage() {
                                 </Link>
                             </div>
                             {items.length === 0 ? (
-                                <p style={{ color: "var(--watch-fg-dim)", padding: "0 .25rem" }}>(gol)</p>
+                                <p className="px-1 text-[var(--watch-fg-dim)]">(gol)</p>
                             ) : (
                                 <PosterRow title="">
                                     {items.map(({ i, m, s }) => {

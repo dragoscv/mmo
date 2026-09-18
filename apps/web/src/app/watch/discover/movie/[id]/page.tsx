@@ -116,7 +116,7 @@ export default async function DiscoverMovie({ params }: { params: Promise<{ id: 
             }
             streamPicker={
                 flags?.vidsrcEnabled ? (
-                    <section style={{ padding: "1.5rem" }}>
+                    <section className="p-6">
                         <h2 className="watch-row-title">External sources</h2>
                         <StreamSourcePicker kind="movie" tmdbId={tmdbId} />
                     </section>

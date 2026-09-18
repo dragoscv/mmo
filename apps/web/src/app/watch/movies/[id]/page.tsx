@@ -132,7 +132,7 @@ export default async function MovieDetail({ params }: { params: Promise<{ id: st
             }
             streamPicker={
                 flags?.vidsrcEnabled && movie.tmdbId ? (
-                    <section style={{ padding: "1.5rem" }}>
+                    <section className="p-6">
                         <h2 className="watch-row-title">External sources</h2>
                         <StreamSourcePicker
                             kind="movie"

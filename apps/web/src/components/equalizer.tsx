@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRenderCount } from "@/lib/dev-debugger";
+import { themeColor } from "./waveform-seekbar";
 
 // ─── Rotary Knob ─────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ function Knob({
     const angle = -135 + pct * 270; // -135° to +135°
 
     const colors = {
-        purple: { ring: "stroke-purple-500", glow: "rgba(168,85,247,0.3)", text: "text-purple-400" },
+        purple: { ring: "stroke-primary", glow: "color-mix(in oklch, var(--primary) 30%, transparent)", text: "text-primary" },
         blue: { ring: "stroke-blue-500", glow: "rgba(59,130,246,0.3)", text: "text-blue-400" },
         emerald: { ring: "stroke-emerald-500", glow: "rgba(16,185,129,0.3)", text: "text-emerald-400" },
         amber: { ring: "stroke-amber-500", glow: "rgba(245,158,11,0.3)", text: "text-amber-400" },
@@ -199,7 +200,7 @@ function BandSlider({
                 }}>
                     <div className={cn(
                         "w-full h-full rounded-full",
-                        isPositive ? "bg-gradient-to-t from-purple-500/60 to-purple-400/40" : "bg-gradient-to-b from-blue-500/60 to-blue-400/40"
+                        isPositive ? "bg-gradient-to-t from-primary/60 to-primary/40" : "bg-gradient-to-b from-blue-500/60 to-blue-400/40"
                     )} />
                 </div>
 
@@ -231,16 +232,16 @@ function Toggle({ enabled, onChange, label, color = "purple" }: {
         >
             <div className={cn(
                 "relative w-8 h-4 rounded-full transition-colors",
-                enabled ? "bg-purple-500/40" : "bg-white/10"
+                enabled ? "bg-primary/40" : "bg-white/10"
             )}>
                 <div className={cn(
                     "absolute top-0.5 w-3 h-3 rounded-full transition-all shadow-sm",
-                    enabled ? "left-[18px] bg-purple-400" : "left-0.5 bg-white/40"
+                    enabled ? "left-[18px] bg-primary" : "left-0.5 bg-white/40"
                 )} />
             </div>
             <span className={cn(
                 "text-[10px] uppercase tracking-wider transition-colors",
-                enabled ? "text-purple-400" : "text-white/30"
+                enabled ? "text-primary" : "text-white/30"
             )}>{label}</span>
         </button>
     );
@@ -284,8 +285,8 @@ function SpectrumAnalyzer({ getAnalyser }: { getAnalyser: () => AnalyserNode | n
                 lastDpr = dpr;
                 // Gradient depends on logical height — rebuild on resize only.
                 cachedGradient = ctx.createLinearGradient(0, cssH, 0, 0);
-                cachedGradient.addColorStop(0, "rgba(168, 85, 247, 0.6)");
-                cachedGradient.addColorStop(1, "rgba(59, 130, 246, 0.3)");
+                cachedGradient.addColorStop(0, themeColor("primary", 0.6));
+                cachedGradient.addColorStop(1, themeColor("chart-5", 0.3));
             }
 
             const dataBuffer = getSharedFrequencyData(analyser);
@@ -375,15 +376,15 @@ function EQCurve({ bands, enabled }: { bands: { frequency: number; gain: number 
             <path
                 d={pathD}
                 fill="none"
-                stroke={enabled ? "rgb(168, 85, 247)" : "rgba(255,255,255,0.2)"}
+                stroke={enabled ? "var(--primary)" : "rgba(255,255,255,0.2)"}
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
             <defs>
                 <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="rgb(168, 85, 247)" stopOpacity="0.4" />
-                    <stop offset="100%" stopColor="rgb(168, 85, 247)" stopOpacity="0" />
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.4" />
+                    <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
                 </linearGradient>
             </defs>
         </svg>
@@ -410,7 +411,7 @@ export function Equalizer({ getAnalyser }: { getAnalyser: () => AnalyserNode | n
                         className={cn(
                             "flex h-8 w-8 items-center justify-center rounded-lg transition-all cursor-pointer",
                             eq.enabled
-                                ? "bg-purple-500/20 text-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.2)]"
+                                ? "bg-primary/20 text-primary shadow-glow"
                                 : "bg-white/5 text-white/30 hover:text-white/50"
                         )}
                     >
@@ -500,7 +501,7 @@ function EasyMode() {
                             className={cn(
                                 "flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg text-[10px] transition-all cursor-pointer",
                                 eq.activePreset === preset.name
-                                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                                    ? "bg-primary/20 text-primary border border-primary/30"
                                     : "bg-white/[0.03] text-white/40 hover:bg-white/[0.06] hover:text-white/60 border border-transparent"
                             )}
                         >
@@ -522,7 +523,7 @@ function EasyMode() {
                                 type="range" min="0" max="1" step="0.05"
                                 value={eq.effects.bassBoostAmount}
                                 onChange={(e) => eq.setEffect("bassBoostAmount", parseFloat(e.target.value))}
-                                className="w-full h-1 accent-purple-500"
+                                className="w-full h-1 accent-primary"
                             />
                         )}
                     </div>
@@ -536,7 +537,7 @@ function EasyMode() {
                                 type="range" min="0" max="1" step="0.05"
                                 value={eq.effects.reverbMix}
                                 onChange={(e) => eq.setEffect("reverbMix", parseFloat(e.target.value))}
-                                className="w-full h-1 accent-purple-500"
+                                className="w-full h-1 accent-primary"
                             />
                         )}
                     </div>
@@ -547,7 +548,7 @@ function EasyMode() {
                                 type="range" min="0" max="1" step="0.05"
                                 value={eq.effects.delayMix}
                                 onChange={(e) => eq.setEffect("delayMix", parseFloat(e.target.value))}
-                                className="w-full h-1 accent-purple-500"
+                                className="w-full h-1 accent-primary"
                             />
                         )}
                     </div>
@@ -615,7 +616,7 @@ function AdvancedMode({
                         className={cn(
                             "px-2 py-1 rounded text-[10px] transition-all cursor-pointer",
                             eq.activePreset === preset.name
-                                ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                                ? "bg-primary/20 text-primary border border-primary/30"
                                 : "bg-white/[0.03] text-white/30 hover:text-white/50 border border-transparent"
                         )}
                     >
@@ -645,7 +646,7 @@ function AdvancedMode({
                             onClick={() => setActiveEffectsTab(key)}
                             className={cn(
                                 "flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] transition-colors cursor-pointer relative",
-                                activeEffectsTab === key ? "text-purple-400" : "text-white/30 hover:text-white/50"
+                                activeEffectsTab === key ? "text-primary" : "text-white/30 hover:text-white/50"
                             )}
                         >
                             <Icon className="h-3 w-3" />
@@ -656,7 +657,7 @@ function AdvancedMode({
                                 (key === "delay" && eq.effects.delayEnabled) ||
                                 (key === "enhance" && (eq.effects.bassBoostEnabled || eq.effects.stereoEnabled))
                             ) && (
-                                    <span className="absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-purple-400" />
+                                    <span className="absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-primary" />
                                 )}
                         </button>
                     ))}

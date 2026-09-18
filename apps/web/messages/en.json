@@ -1,5 +1,18 @@
 {
     "appName": "MixAI",
+    "dev": {
+        "ui": {
+            "title": "UI catalog",
+            "description": "Every @mmo/ui component family. Flip the theme dimensions in the toolbar; enable the matrix to compare light/dark × glass/solid/flat side by side.",
+            "mode": "Mode",
+            "surface": "Surface",
+            "density": "Density",
+            "accent": "Accent",
+            "matrix": "Matrix",
+            "matrixTitle": "Matrix — Buttons + Cards × mode × surface",
+            "allSettings": "All appearance settings"
+        }
+    },
     "settings": {
         "appearance": {
             "title": "Appearance & language",
@@ -469,6 +482,12 @@
         "continuePage": {
             "title": "Continue watching",
             "lead": "Pick up exactly where you left off on any screen tied to your profile."
+        },
+        "error": {
+            "title": "Watch stopped rendering",
+            "detail": "Something failed on the server (probably a database or external service query). Full details are in the server logs under code",
+            "retry": "Try again",
+            "backHome": "Back to Watch"
         }
     },
     "tagline": "AI music suite for DJs and producers",
@@ -655,8 +674,34 @@
         }
     },
     "palette": {
-        "placeholder": "Search tracks, artists, albums, playlists…",
+        "title": "Command palette",
+        "placeholder": "Type a command or search the library…",
+        "navigate": "Navigate",
         "actions": "Actions",
+        "theme": "Theme",
+        "library": "Library",
+        "searchLibrary": "Search library for \"{query}\"",
+        "shortcuts": "Keyboard shortcuts",
+        "installApp": "Install MixAI as an app",
+        "cycleAccent": "Accent: switch to {accent}",
+        "mode": {
+            "light": "Light mode",
+            "dark": "Dark mode",
+            "system": "Follow system theme"
+        },
+        "surface": {
+            "glass": "Glass surfaces",
+            "solid": "Solid surfaces",
+            "flat": "Flat surfaces"
+        },
+        "density": {
+            "comfortable": "Comfortable density",
+            "compact": "Compact density"
+        },
+        "movies": "Films",
+        "shows": "Series",
+        "projects": "Projects",
+        "trackCount": "{count, plural, one {# track} other {# tracks}}",
         "pages": "Pages",
         "tracks": "Tracks",
         "artists": "Artists",

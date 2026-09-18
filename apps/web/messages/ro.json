@@ -1,5 +1,18 @@
 {
     "appName": "MixAI",
+    "dev": {
+        "ui": {
+            "title": "Catalog UI",
+            "description": "Toate familiile de componente @mmo/ui. Schimbă dimensiunile temei din bara de sus; activează matricea pentru a compara luminos/întunecat × sticlă/solid/plat unul lângă altul.",
+            "mode": "Mod",
+            "surface": "Suprafață",
+            "density": "Densitate",
+            "accent": "Accent",
+            "matrix": "Matrice",
+            "matrixTitle": "Matrice — Butoane + Carduri × mod × suprafață",
+            "allSettings": "Toate setările de aspect"
+        }
+    },
     "tagline": "Suită muzicală AI pentru DJ-i și producători",
     "activate": {
         "title": "Conectezi {device} ({platform})?",
@@ -470,6 +483,12 @@
         "continuePage": {
             "title": "Continuă vizionarea",
             "lead": "Reia exact de unde ai rămas pe orice ecran asociat profilului tău."
+        },
+        "error": {
+            "title": "Watch s-a oprit din randare",
+            "detail": "Ceva a eșuat pe server (probabil o interogare către baza de date sau un serviciu extern). Detaliile complete sunt în log-urile serverului pentru codul",
+            "retry": "Reîncearcă",
+            "backHome": "Înapoi la Vizionare"
         }
     },
     "empty": {
@@ -655,8 +674,34 @@
         }
     },
     "palette": {
-        "placeholder": "Caută piese, artiști, albume, playlisturi…",
+        "title": "Paletă de comenzi",
+        "placeholder": "Scrie o comandă sau caută în bibliotecă…",
+        "navigate": "Navighează",
         "actions": "Acțiuni",
+        "theme": "Temă",
+        "library": "Bibliotecă",
+        "searchLibrary": "Caută în bibliotecă „{query}”",
+        "shortcuts": "Taste rapide",
+        "installApp": "Instalează MixAI ca aplicație",
+        "cycleAccent": "Accent: schimbă pe {accent}",
+        "mode": {
+            "light": "Mod luminos",
+            "dark": "Mod întunecat",
+            "system": "Urmează tema sistemului"
+        },
+        "surface": {
+            "glass": "Suprafețe sticlă",
+            "solid": "Suprafețe solide",
+            "flat": "Suprafețe plate"
+        },
+        "density": {
+            "comfortable": "Densitate confortabilă",
+            "compact": "Densitate compactă"
+        },
+        "movies": "Filme",
+        "shows": "Seriale",
+        "projects": "Proiecte",
+        "trackCount": "{count, plural, one {# piesă} few {# piese} other {# de piese}}",
         "pages": "Pagini",
         "tracks": "Piese",
         "artists": "Artiști",

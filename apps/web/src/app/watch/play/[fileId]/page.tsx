@@ -49,9 +49,9 @@ export default async function PlayPage({ params, searchParams }: {
     const handle = await getPlaybackHandle();
     if (!handle) {
         return (
-            <main style={{ padding: "4rem 2rem", textAlign: "center" }}>
+            <main className="px-8 py-16 text-center">
                 <h1>Companion offline</h1>
-                <p style={{ color: "var(--watch-fg-dim)" }}>Pornește aplicația MuzicAI Companion pentru a reda fișierele locale.</p>
+                <p style={{ color: "var(--watch-fg-dim)" }}>Pornește aplicația MixAI Companion pentru a reda fișierele locale.</p>
             </main>
         );
     }
@@ -69,7 +69,7 @@ export default async function PlayPage({ params, searchParams }: {
     }).catch(() => null);
     if (!fileIdResp || !fileIdResp.ok) {
         return (
-            <main style={{ padding: "4rem 2rem", textAlign: "center" }}>
+            <main className="px-8 py-16 text-center">
                 <h1>Fișier negăsit în companion</h1>
                 <p style={{ color: "var(--watch-fg-dim)" }}>Rulează din nou un scan din /watch pentru a re-înregistra fișierele.</p>
                 <p style={{ color: "var(--watch-fg-dim)", fontFamily: "monospace", fontSize: ".8rem", marginTop: "1rem" }}>{dbFile.path}</p>

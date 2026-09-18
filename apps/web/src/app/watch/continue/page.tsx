@@ -70,9 +70,9 @@ export default async function ContinueWatchingPage() {
     const t = await getTranslations("watch.continuePage");
 
     return (
-        <main style={{ padding: "1.5rem" }}>
-            <header style={{ marginBottom: "1.5rem" }}>
-                <h1 style={{ fontSize: "1.8rem", fontWeight: 800 }}>{t("title")}</h1>
+        <main className="p-6">
+            <header className="mb-6">
+                <h1 className="text-[1.8rem] font-extrabold">{t("title")}</h1>
                 <p style={{ color: "var(--watch-fg-dim)" }}>
                     {t("lead")}
                 </p>

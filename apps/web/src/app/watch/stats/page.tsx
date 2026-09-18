@@ -16,7 +16,7 @@ export default async function WatchStatsPage() {
     const profileId = await getActiveProfileId().catch(() => null);
     if (!profileId) {
         return (
-            <main style={{ padding: "2rem" }}>
+            <main className="p-8">
                 <h1 className="watch-row-title">Statistici</h1>
                 <p style={{ color: "var(--watch-fg-dim)" }}>Niciun profil activ.</p>
                 <Link className="watch-cta" href="/watch">Înapoi</Link>
@@ -141,7 +141,7 @@ export default async function WatchStatsPage() {
     const avgSession = sessionAvg[0]?.avg ?? 0;
 
     return (
-        <main style={{ padding: "2rem", maxWidth: 1200, margin: "0 auto" }}>
+        <main className="mx-auto max-w-[1200px] p-8">
             <h1 className="watch-row-title">Statistici vizionare</h1>
 
             <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem", marginTop: "1.5rem" }}>
@@ -157,7 +157,7 @@ export default async function WatchStatsPage() {
             <section style={{ marginTop: "2rem" }}>
                 <h2 className="watch-row-title">Ultimele 30 de zile</h2>
                 {daily.length > 0 ? (
-                    <div style={{ background: "var(--watch-bg-2)", padding: "1rem", borderRadius: 12 }}>
+                    <div className="rounded-xl bg-[var(--watch-bg-2)] p-4">
                         <WatchDailyChart data={daily} />
                     </div>
                 ) : (
@@ -168,10 +168,10 @@ export default async function WatchStatsPage() {
             {topShows.length > 0 && (
                 <section style={{ marginTop: "2rem" }}>
                     <h2 className="watch-row-title">Top seriale</h2>
-                    <ul style={{ display: "grid", gap: ".5rem", listStyle: "none", padding: 0 }}>
+                    <ul className="grid list-none gap-2 p-0">
                         {topShows.map((s) => (
                             <li key={s.id}>
-                                <Link href={`/watch/shows/${s.id}`} style={{ display: "flex", gap: "1rem", alignItems: "center", padding: ".75rem", background: "var(--watch-bg-2)", borderRadius: 8, textDecoration: "none", color: "var(--watch-fg)" }}>
+                                <Link href={`/watch/shows/${s.id}`} className="flex items-center gap-4 rounded-lg bg-[var(--watch-bg-2)] p-3 text-[var(--watch-fg)] no-underline">
                                     <strong style={{ flex: 1 }}>{s.title}</strong>
                                     <span style={{ color: "var(--watch-fg-dim)", fontVariantNumeric: "tabular-nums" }}>{s.minutes} min</span>
                                 </Link>
@@ -184,10 +184,10 @@ export default async function WatchStatsPage() {
             {topMovies.length > 0 && (
                 <section style={{ marginTop: "2rem" }}>
                     <h2 className="watch-row-title">Top filme</h2>
-                    <ul style={{ display: "grid", gap: ".5rem", listStyle: "none", padding: 0 }}>
+                    <ul className="grid list-none gap-2 p-0">
                         {topMovies.map((m) => (
                             <li key={m.id}>
-                                <Link href={`/watch/movies/${m.id}`} style={{ display: "flex", gap: "1rem", alignItems: "center", padding: ".75rem", background: "var(--watch-bg-2)", borderRadius: 8, textDecoration: "none", color: "var(--watch-fg)" }}>
+                                <Link href={`/watch/movies/${m.id}`} className="flex items-center gap-4 rounded-lg bg-[var(--watch-bg-2)] p-3 text-[var(--watch-fg)] no-underline">
                                     <strong style={{ flex: 1 }}>{m.title}</strong>
                                     <span style={{ color: "var(--watch-fg-dim)", fontVariantNumeric: "tabular-nums" }}>{m.minutes} min</span>
                                 </Link>
@@ -215,7 +215,7 @@ export default async function WatchStatsPage() {
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
     return (
-        <div style={{ background: "var(--watch-bg-2)", borderRadius: 12, padding: "1.25rem" }}>
+        <div className="rounded-xl bg-[var(--watch-bg-2)] p-5">
             <p style={{ color: "var(--watch-fg-dim)", fontSize: ".8rem", textTransform: "uppercase", letterSpacing: ".05em" }}>{label}</p>
             <p style={{ fontSize: "2rem", fontWeight: 700, margin: ".25rem 0", color: "var(--watch-fg)" }}>{value}</p>
             {hint && <p style={{ color: "var(--watch-fg-dim)", fontSize: ".75rem" }}>{hint}</p>}

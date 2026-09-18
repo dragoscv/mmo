@@ -30,6 +30,18 @@ interface WaveformSeekbarProps {
 const peaksCache = new Map<number, number[]>();
 const rgbPeaksCache = new Map<number, RGBPeak[]>();
 
+/**
+ * Theme colour for canvas/SVG paint. `var()` does not resolve inside a 2D
+ * context, so read the token from the root's computed style at draw time
+ * (cheap; the browsers we target accept `oklch()`/`color-mix()` as fillStyle).
+ * `alpha` in 0..1 is applied via color-mix so accent hue changes propagate.
+ */
+export function themeColor(token: "primary" | "chart-2" | "chart-5" | "foreground", alpha = 1): string {
+    if (typeof document === "undefined") return `rgba(255,255,255,${alpha})`;
+    const v = getComputedStyle(document.documentElement).getPropertyValue(`--${token}`).trim() || "currentColor";
+    return alpha >= 1 ? v : `color-mix(in oklch, ${v} ${Math.round(alpha * 100)}%, transparent)`;
+}
+
 export function WaveformSeekbar({
     trackId,
     progress,
@@ -210,10 +222,10 @@ export function WaveformSeekbar({
                 ctx.moveTo(xPos, 0);
                 ctx.lineTo(xPos, h);
                 ctx.strokeStyle = overlay
-                    ? "rgba(168, 85, 247, 0.6)"
+                    ? themeColor("primary", 0.6)
                     : "rgba(255, 255, 255, 0.9)";
                 ctx.lineWidth = 1.5;
-                ctx.shadowColor = isRgb ? "rgba(255, 255, 255, 0.6)" : "rgba(168, 85, 247, 0.5)";
+                ctx.shadowColor = isRgb ? "rgba(255, 255, 255, 0.6)" : themeColor("primary", 0.5);
                 ctx.shadowBlur = 6;
                 ctx.stroke();
                 ctx.restore();
@@ -335,16 +347,16 @@ function drawBar(
     ctx.roundRect(x, y, w, h, radius);
 
     if (isPlayed) {
-        // Played: vibrant purple gradient
+        // Played: accent gradient (primary → chart-2)
         const grad = ctx.createLinearGradient(x, y, x, y + h);
         const baseAlpha = overlay ? 0.7 : 0.9;
-        grad.addColorStop(0, `rgba(168, 85, 247, ${baseAlpha * alphaMultiplier})`);
-        grad.addColorStop(1, `rgba(217, 70, 239, ${(baseAlpha - 0.1) * alphaMultiplier})`);
+        grad.addColorStop(0, themeColor("primary", baseAlpha * alphaMultiplier));
+        grad.addColorStop(1, themeColor("chart-2", (baseAlpha - 0.1) * alphaMultiplier));
         ctx.fillStyle = grad;
     } else if (isInHover) {
         // Hover preview: lighter
         const alpha = overlay ? 0.35 : 0.45;
-        ctx.fillStyle = `rgba(200, 180, 255, ${alpha * alphaMultiplier})`;
+        ctx.fillStyle = themeColor("primary", alpha * alphaMultiplier);
     } else {
         // Unplayed: subtle
         const alpha = overlay ? 0.15 : 0.25;
@@ -355,7 +367,7 @@ function drawBar(
 
     // Subtle glow on played bars
     if (isPlayed && alphaMultiplier > 0.5) {
-        ctx.shadowColor = "rgba(168, 85, 247, 0.3)";
+        ctx.shadowColor = themeColor("primary", 0.3);
         ctx.shadowBlur = 4;
         ctx.fill();
     }

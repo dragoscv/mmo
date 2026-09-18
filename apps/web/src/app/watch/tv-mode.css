@@ -12,7 +12,7 @@
 .tv-mode button:focus-visible,
 .tv-mode input:focus-visible,
 .tv-mode [tabindex]:focus-visible {
-    outline: 3px solid var(--watch-accent, #ff3366);
+    outline: 3px solid var(--watch-accent);
     outline-offset: 4px;
     border-radius: 8px;
     transition: outline-offset 80ms ease-out;

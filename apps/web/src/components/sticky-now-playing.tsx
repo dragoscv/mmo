@@ -220,14 +220,14 @@ export function StickyNowPlaying() {
             onClick={scrollToTrack}
             style={mainRect ? { left: mainRect.left, width: mainRect.width } : undefined}
             className={cn(
-                "fixed z-40 flex items-center gap-3 px-4 py-2 bg-card/95 backdrop-blur-sm shadow-lg cursor-pointer transition-all duration-200 hover:bg-card group border-purple-500/30",
+                "surface fixed z-(--z-sticky) flex items-center gap-3 px-4 py-2 rounded-none border-x-0 cursor-pointer transition-all duration-200 hover:bg-card group",
                 isAbove
                     ? "top-0 border-b"
                     : "bottom-[73px] border-t"
             )}
         >
             {/* Direction indicator */}
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20 transition-colors shrink-0">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors shrink-0">
                 {isAbove ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </div>
 
@@ -236,7 +236,7 @@ export function StickyNowPlaying() {
 
             {/* Track info */}
             <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium text-purple-400 truncate">
+                <p className="text-sm font-medium text-primary truncate">
                     {track.title || track.filename}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
@@ -262,12 +262,12 @@ export function StickyNowPlaying() {
             <div className="flex items-center gap-1.5 shrink-0">
                 {player.isPlaying ? (
                     <div className="flex items-center gap-0.5">
-                        <span className="w-0.5 h-3 bg-purple-400 rounded-full animate-pulse" />
-                        <span className="w-0.5 h-4 bg-purple-400 rounded-full animate-pulse [animation-delay:150ms]" />
-                        <span className="w-0.5 h-2.5 bg-purple-400 rounded-full animate-pulse [animation-delay:300ms]" />
+                        <span className="w-0.5 h-3 bg-primary rounded-full animate-pulse" />
+                        <span className="w-0.5 h-4 bg-primary rounded-full animate-pulse [animation-delay:150ms]" />
+                        <span className="w-0.5 h-2.5 bg-primary rounded-full animate-pulse [animation-delay:300ms]" />
                     </div>
                 ) : (
-                    <Pause className="h-3.5 w-3.5 text-purple-400" />
+                    <Pause className="h-3.5 w-3.5 text-primary" />
                 )}
             </div>
 

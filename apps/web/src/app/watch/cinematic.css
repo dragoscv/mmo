@@ -1,31 +1,49 @@
 /* Cinematic theme for /watch routes.
  *
- * Scoped via `.watch-shell` (set by app/watch/layout.tsx). Each theme
+ * Scoped via `.watch-shell` (set by app/watch/layout.tsx). Each skin
  * overrides the CSS variable bag inside its `[data-watch-theme="…"]`
  * block; everything else (hero, rows, posters, etc.) consumes those
  * vars so a single attribute swap re-skins the entire surface.
+ *
+ * WP2-15: every `--watch-*` value derives from the shared design tokens
+ * (`@mmo/design-tokens`): neutrals come from --background/--card/--foreground
+ * (so light/dark mode applies inside /watch), spacing from --space-unit /
+ * --text-scale (density), radii from --radius-*, easing from --ease-out.
+ * A skin only contributes its SIGNATURE HUE (`--watch-h`) and a few shape
+ * knobs (radius, hover scale, row gap). Accent = oklch(--primary-l --primary-c
+ * --watch-h); `mmo` follows the user's accent (--accent-h).
  */
 
 /* ─── Base / default (mmo) ────────────────────────────────────────────── */
 .watch-shell {
-    --watch-bg: oklch(0.13 0.04 285);
-    --watch-bg-2: oklch(0.17 0.05 285);
-    --watch-surface: oklch(0.20 0.04 285);
-    --watch-surface-hi: oklch(0.24 0.05 285);
-    --watch-border: oklch(0.30 0.03 285 / 0.4);
-    --watch-fg: oklch(0.96 0.01 80);
-    --watch-fg-dim: oklch(0.70 0.02 285);
-    --watch-fg-muted: oklch(0.55 0.02 285);
-    --watch-accent: oklch(0.72 0.18 18);
-    --watch-accent-2: oklch(0.80 0.16 50);
-    --watch-accent-glow: oklch(0.72 0.18 18 / 0.35);
-    --watch-radius: 14px;
-    --watch-radius-lg: 24px;
+    /* skin signature hue + neutral tint (chroma of the neutrals) */
+    --watch-h: var(--accent-h);
+    --watch-tint-c: 0.02;
+    --watch-tint-h: var(--watch-h);
+
+    /* neutrals — derived from tokens, re-hued by the skin */
+    --watch-bg: oklch(from var(--background) l var(--watch-tint-c) var(--watch-tint-h));
+    --watch-bg-2: oklch(from var(--card) l var(--watch-tint-c) var(--watch-tint-h));
+    --watch-surface: color-mix(in oklch, var(--watch-bg-2) 92%, var(--foreground));
+    --watch-surface-hi: color-mix(in oklch, var(--watch-bg-2) 85%, var(--foreground));
+    --watch-border: var(--border);
+    --watch-fg: var(--foreground);
+    --watch-fg-dim: var(--muted-foreground);
+    --watch-fg-muted: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+
+    /* accent — token lightness/chroma, skin hue */
+    --watch-accent: oklch(var(--primary-l) var(--primary-c) var(--watch-h));
+    --watch-accent-2: oklch(var(--primary-l) var(--primary-c) calc(var(--watch-h) + 45));
+    --watch-accent-glow: oklch(var(--primary-l) var(--primary-c) var(--watch-h) / 0.35);
+
+    /* shape / motion / density */
+    --watch-radius: calc(var(--radius) * 1.4);
+    --watch-radius-lg: calc(var(--radius) * 2.2);
     --watch-hover-scale: 1.08;
-    --watch-ease: cubic-bezier(0.22, 1, 0.36, 1);
-    --watch-row-gap: 0.875rem;
-    --watch-poster-w: 180px;
-    --watch-font-display: "Inter", "SF Pro Display", system-ui, sans-serif;
+    --watch-ease: var(--ease-out);
+    --watch-row-gap: calc(var(--space-unit) * 3.5);
+    --watch-poster-w: calc(180px * var(--text-scale));
+    --watch-font-display: var(--font-heading);
 
     background:
         radial-gradient(ellipse at top, color-mix(in oklch, var(--watch-accent) 14%, transparent), transparent 55%),
@@ -49,61 +67,45 @@
 
 /* ─── Theme: Netflix ──────────────────────────────────────────────────── */
 [data-watch-theme="netflix"].watch-shell {
-    --watch-bg: oklch(0.04 0 0);
-    --watch-bg-2: oklch(0.10 0 0);
-    --watch-surface: oklch(0.14 0 0);
-    --watch-surface-hi: oklch(0.20 0 0);
-    --watch-border: oklch(0.30 0 0 / 0.5);
-    --watch-fg: oklch(0.96 0 0);
-    --watch-fg-dim: oklch(0.70 0 0);
-    --watch-fg-muted: oklch(0.50 0 0);
-    --watch-accent: oklch(0.55 0.22 27);
-    --watch-accent-2: oklch(0.62 0.21 27);
-    --watch-accent-glow: oklch(0.55 0.22 27 / 0.45);
-    --watch-radius: 6px;
-    --watch-radius-lg: 8px;
+    --watch-h: 25;
+    --watch-tint-c: 0; /* pure neutral */
+    /* Netflix is darker than the app background in dark mode; light mode stays light */
+    --watch-bg: oklch(from var(--background) calc(l * 0.7) 0 0);
+    --watch-accent-2: oklch(calc(var(--primary-l) + 0.06) var(--primary-c) var(--watch-h));
+    --watch-accent-glow: oklch(var(--primary-l) var(--primary-c) var(--watch-h) / 0.45);
+    --watch-radius: calc(var(--radius) * 0.6);
+    --watch-radius-lg: calc(var(--radius) * 0.8);
     --watch-hover-scale: 1.10;
-    --watch-row-gap: 0.5rem;
+    --watch-row-gap: calc(var(--space-unit) * 2);
     background: var(--watch-bg);
 }
 
 /* ─── Theme: Plex ─────────────────────────────────────────────────────── */
 [data-watch-theme="plex"].watch-shell {
-    --watch-bg: oklch(0.21 0.01 250);
-    --watch-bg-2: oklch(0.25 0.01 250);
-    --watch-surface: oklch(0.28 0.01 250);
-    --watch-surface-hi: oklch(0.33 0.01 250);
-    --watch-border: oklch(0.40 0.01 250 / 0.5);
-    --watch-fg: oklch(0.95 0.01 90);
-    --watch-fg-dim: oklch(0.72 0.01 90);
-    --watch-fg-muted: oklch(0.55 0.01 90);
-    --watch-accent: oklch(0.78 0.16 75);
-    --watch-accent-2: oklch(0.82 0.13 90);
-    --watch-accent-glow: oklch(0.78 0.16 75 / 0.30);
-    --watch-radius: 4px;
-    --watch-radius-lg: 6px;
+    --watch-h: 75;
+    --watch-tint-c: 0.01;
+    --watch-tint-h: 250; /* charcoal panels */
+    --watch-accent: oklch(calc(var(--primary-l) + 0.08) calc(var(--primary-c) - 0.04) var(--watch-h));
+    --watch-accent-2: oklch(calc(var(--primary-l) + 0.1) calc(var(--primary-c) - 0.07) 90);
+    --watch-accent-glow: oklch(var(--primary-l) var(--primary-c) var(--watch-h) / 0.30);
+    --watch-radius: calc(var(--radius) * 0.6);
+    --watch-radius-lg: calc(var(--radius) * 0.6);
     --watch-hover-scale: 1.04;
-    --watch-row-gap: 0.625rem;
+    --watch-row-gap: calc(var(--space-unit) * 2.5);
     background: var(--watch-bg);
 }
 
 /* ─── Theme: Disney+ ──────────────────────────────────────────────────── */
 [data-watch-theme="disney"].watch-shell {
-    --watch-bg: oklch(0.10 0.05 260);
-    --watch-bg-2: oklch(0.15 0.07 260);
-    --watch-surface: oklch(0.19 0.06 260);
-    --watch-surface-hi: oklch(0.24 0.07 260);
-    --watch-border: oklch(0.55 0.15 235 / 0.35);
-    --watch-fg: oklch(0.97 0.01 235);
-    --watch-fg-dim: oklch(0.75 0.04 235);
-    --watch-fg-muted: oklch(0.55 0.04 235);
-    --watch-accent: oklch(0.62 0.18 235);
-    --watch-accent-2: oklch(0.78 0.16 225);
-    --watch-accent-glow: oklch(0.62 0.18 235 / 0.45);
-    --watch-radius: 12px;
-    --watch-radius-lg: 20px;
+    --watch-h: 250;
+    --watch-tint-c: 0.05; /* deep navy */
+    --watch-border: color-mix(in oklch, var(--watch-accent) 35%, transparent);
+    --watch-accent-2: oklch(calc(var(--primary-l) + 0.1) calc(var(--primary-c) - 0.03) 225);
+    --watch-accent-glow: oklch(var(--primary-l) var(--primary-c) var(--watch-h) / 0.45);
+    --watch-radius: var(--radius);
+    --watch-radius-lg: calc(var(--radius) * 1.8);
     --watch-hover-scale: 1.06;
-    --watch-row-gap: 0.875rem;
+    --watch-row-gap: calc(var(--space-unit) * 3.5);
     background:
         radial-gradient(ellipse at top, color-mix(in oklch, var(--watch-accent) 22%, transparent), transparent 65%),
         var(--watch-bg);
@@ -111,21 +113,15 @@
 
 /* ─── Theme: HBO Max ──────────────────────────────────────────────────── */
 [data-watch-theme="hbo"].watch-shell {
-    --watch-bg: oklch(0.10 0.03 295);
-    --watch-bg-2: oklch(0.15 0.04 295);
-    --watch-surface: oklch(0.19 0.04 295);
-    --watch-surface-hi: oklch(0.24 0.05 295);
-    --watch-border: oklch(0.40 0.06 295 / 0.45);
-    --watch-fg: oklch(0.96 0.01 80);
-    --watch-fg-dim: oklch(0.72 0.02 295);
-    --watch-fg-muted: oklch(0.55 0.02 295);
-    --watch-accent: oklch(0.70 0.18 295);
-    --watch-accent-2: oklch(0.78 0.16 320);
-    --watch-accent-glow: oklch(0.70 0.18 295 / 0.40);
-    --watch-radius: 10px;
-    --watch-radius-lg: 16px;
+    --watch-h: 285;
+    --watch-tint-c: 0.03; /* warm violet dark */
+    --watch-border: color-mix(in oklch, var(--watch-accent) 30%, transparent);
+    --watch-accent-2: oklch(calc(var(--primary-l) + 0.08) calc(var(--primary-c) - 0.03) 320);
+    --watch-accent-glow: oklch(var(--primary-l) var(--primary-c) var(--watch-h) / 0.40);
+    --watch-radius: var(--radius);
+    --watch-radius-lg: calc(var(--radius) * 1.4);
     --watch-hover-scale: 1.07;
-    --watch-row-gap: 0.875rem;
+    --watch-row-gap: calc(var(--space-unit) * 3.5);
     background:
         radial-gradient(ellipse at top right, color-mix(in oklch, var(--watch-accent) 18%, transparent), transparent 60%),
         var(--watch-bg);
@@ -225,7 +221,7 @@
 }
 
 .watch-hero-iconbtn:focus-visible {
-    outline: 2px solid var(--watch-accent, #fff);
+    outline: 2px solid var(--watch-accent);
     outline-offset: 2px;
 }
 
@@ -653,11 +649,11 @@
 .poster-preview {
     border-radius: 8px;
     overflow: hidden;
-    background: #141414;
+    background: var(--watch-bg-2);
     box-shadow:
         0 30px 80px -10px rgba(0, 0, 0, 0.85),
         0 0 0 1px rgba(255, 255, 255, 0.08);
-    color: #fff;
+    color: var(--watch-fg);
     font-family: inherit;
 }
 
@@ -691,7 +687,7 @@
     position: absolute;
     inset: auto 0 0 0;
     height: 60%;
-    background: linear-gradient(180deg, transparent, #141414 95%);
+    background: linear-gradient(180deg, transparent, var(--watch-bg-2) 95%);
     pointer-events: none;
 }
 
@@ -725,20 +721,20 @@
 
 .poster-preview-btn:hover {
     background: rgba(80, 80, 80, 0.9);
-    border-color: #fff;
+    border-color: var(--watch-fg);
     transform: scale(1.08);
 }
 
 .poster-preview-btn[aria-pressed="true"] {
-    background: #fff;
-    color: #000;
-    border-color: #fff;
+    background: var(--watch-fg);
+    color: var(--watch-bg);
+    border-color: var(--watch-fg);
 }
 
 .poster-preview-btn--primary {
-    background: #fff;
-    color: #000;
-    border-color: #fff;
+    background: var(--watch-fg);
+    color: var(--watch-bg);
+    border-color: var(--watch-fg);
     width: 36px;
     height: 36px;
 }
@@ -769,7 +765,7 @@
 }
 
 .poster-preview-rating {
-    color: #46d369;
+    color: var(--success);
     font-weight: 700;
 }
 
@@ -823,26 +819,26 @@
 }
 
 .tech-badge--res {
-    color: #ffffff;
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.45), rgba(168, 85, 247, 0.35));
+    color: #fff;
+    background: linear-gradient(135deg, color-mix(in oklch, var(--info) 45%, transparent), color-mix(in oklch, var(--primary) 35%, transparent));
     border-color: rgba(168, 85, 247, 0.55);
 }
 
 .tech-badge--hdr {
-    color: #fff7d6;
+    color: color-mix(in oklch, var(--warning) 30%, white);
     background: linear-gradient(135deg, rgba(234, 179, 8, 0.55), rgba(249, 115, 22, 0.55));
     border-color: rgba(249, 115, 22, 0.7);
     text-shadow: 0 0 8px rgba(249, 115, 22, 0.6);
 }
 
 .tech-badge--audio {
-    color: #e0f2fe;
+    color: color-mix(in oklch, var(--info) 25%, white);
     background: rgba(14, 165, 233, 0.22);
     border-color: rgba(14, 165, 233, 0.45);
 }
 
 .tech-badge--lang {
-    color: #d1fae5;
+    color: color-mix(in oklch, var(--success) 25%, white);
     background: rgba(16, 185, 129, 0.18);
     border-color: rgba(16, 185, 129, 0.4);
 }
@@ -1007,9 +1003,9 @@
     position: relative;
     width: 100%;
     max-width: 1080px;
-    background: #141414;
+    background: var(--watch-bg-2);
     border-radius: 12px;
-    color: #fff;
+    color: var(--watch-fg);
     overflow: hidden;
     box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
     transform: scale(0.94);
@@ -1068,7 +1064,7 @@
     position: absolute;
     inset: auto 0 0 0;
     height: 50%;
-    background: linear-gradient(180deg, transparent, #141414 95%);
+    background: linear-gradient(180deg, transparent, var(--watch-bg-2) 95%);
     pointer-events: none;
 }
 
@@ -1117,8 +1113,8 @@
 }
 
 .poster-modal-btn--play {
-    background: #fff;
-    color: #000;
+    background: var(--watch-fg);
+    color: var(--watch-bg);
 }
 
 .poster-modal-btn--play:hover {
@@ -1147,7 +1143,7 @@
 }
 
 .poster-modal-rating {
-    color: #46d369;
+    color: var(--success);
     font-weight: 700;
 }
 
@@ -1215,7 +1211,7 @@
 
 .poster-modal-cast-item strong {
     font-weight: 700;
-    color: #fff;
+    color: var(--watch-fg);
 }
 
 .poster-modal-cast-item em {
@@ -1680,7 +1676,7 @@
 .watch-topbar-toggle:hover { color: var(--watch-fg); background: color-mix(in oklch, var(--watch-fg) 8%, transparent); }
 .watch-topbar-toggle.is-on {
     background: color-mix(in oklch, var(--watch-accent) 35%, transparent);
-    color: #fff;
+    color: var(--primary-foreground);
 }
 
 .watch-topbar-switch {
@@ -1700,7 +1696,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--watch-fg);
     transition: transform 200ms var(--watch-ease);
 }
 .watch-topbar-toggle.is-on .watch-topbar-switch-knob { transform: translateX(10px); }
@@ -1754,7 +1750,7 @@
 .watch-pill:hover { color: var(--watch-fg); border-color: var(--watch-accent); }
 .watch-pill.is-active {
     background: var(--watch-accent);
-    color: #fff;
+    color: var(--primary-foreground);
     border-color: var(--watch-accent);
 }
 
@@ -1779,7 +1775,7 @@
 .watch-cta:hover {
     border-color: var(--watch-accent);
     background: color-mix(in oklch, var(--watch-accent) 18%, transparent);
-    color: #fff;
+    color: var(--watch-fg);
 }
 
 /* ─── Tab strip (Watch settings modal) ────────────────────────────────── */
@@ -1931,7 +1927,7 @@
 .watch-backfill-cta {
     margin-left: auto;
     background: var(--watch-accent);
-    color: #fff;
+    color: var(--primary-foreground);
     border: none;
     padding: 0.4rem 0.85rem;
     border-radius: 999px;
@@ -2020,28 +2016,28 @@
     font-size: 0.68rem;
     font-weight: 700;
     border-radius: 999px;
-    background: color-mix(in oklch, #000 65%, transparent);
+    background: oklch(0 0 0 / 0.65);
     color: #fff;
     backdrop-filter: blur(6px);
     letter-spacing: 0.02em;
 }
 
 .poster-badge--rating {
-    color: #ffd166;
+    color: var(--warning);
 }
 
 .poster-badge--watched {
     background: color-mix(in oklch, var(--watch-accent) 80%, transparent);
-    color: #fff;
+    color: var(--primary-foreground);
 }
 
 .poster-badge--liked {
-    color: #ff4d6d;
-    background: color-mix(in oklch, #000 60%, transparent);
+    color: var(--destructive);
+    background: oklch(0 0 0 / 0.6);
 }
 
 .poster-badge--local {
-    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    background: linear-gradient(135deg, var(--success) 0%, color-mix(in oklch, var(--success) 80%, black) 100%);
     color: #fff;
     font-size: 0.6rem;
     letter-spacing: 0.06em;
@@ -2049,7 +2045,7 @@
 }
 
 .poster-badge--progress {
-    background: color-mix(in oklch, #000 55%, transparent);
+    background: oklch(0 0 0 / 0.55);
     color: var(--watch-fg);
 }
 
@@ -2182,7 +2178,7 @@
 }
 
 .external-ratings-error {
-    color: #ff6b6b;
+    color: var(--destructive);
     font-size: 0.8rem;
 }
 

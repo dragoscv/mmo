@@ -136,7 +136,7 @@ export default async function DiscoverTv({ params }: { params: Promise<{ id: str
             }
             streamPicker={
                 flags?.vidsrcEnabled && seasonsForPicker.length > 0 ? (
-                    <section style={{ padding: "1.5rem" }}>
+                    <section className="p-6">
                         <h2 className="watch-row-title">External sources</h2>
                         <StreamSourcePicker kind="tv" tmdbId={tmdbId} seasons={seasonsForPicker} />
                     </section>

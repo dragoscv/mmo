@@ -10,7 +10,7 @@ import { WatchTopBar } from "@/components/video/watch-top-bar";
 import { getWatchPrefs } from "@/actions/watch-prefs";
 
 export const metadata: Metadata = {
-    title: { template: "%s · Watch · MuzicAI", default: "Watch · MuzicAI" },
+    title: { template: "%s · Watch · MixAI", default: "Watch · MixAI" },
     description: "Filme, seriale și alte clipuri din biblioteca ta locală.",
 };
 

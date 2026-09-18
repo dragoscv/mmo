@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useTransition, useCallback, useRef, useMemo } from "react";
+import { Activity, useState, useEffect, useTransition, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { usePlayer } from "./player-context";
+import { useThemePrefs, dominantHueFromImage } from "@mmo/ui/theme";
 import { usePersonalization, getMixerBackgroundStyle } from "@/hooks/use-personalization";
 import { Artwork } from "./artwork";
 import { FavoriteButton } from "./favorite-button";
@@ -79,7 +80,7 @@ import type { Track } from "@/db/schema";
 
 // Genre-based gradient colors
 const GENRE_GRADIENTS: Record<string, string> = {
-    Techno: "from-purple-900/40 via-zinc-900/60",
+    Techno: "from-primary/25 via-zinc-900/60",
     House: "from-blue-900/40 via-zinc-900/60",
     "Drum & Bass": "from-orange-900/40 via-zinc-900/60",
     Trance: "from-cyan-900/40 via-zinc-900/60",
@@ -88,7 +89,7 @@ const GENRE_GRADIENTS: Record<string, string> = {
     Electronic: "from-violet-900/40 via-zinc-900/60",
     Reggae: "from-green-900/40 via-zinc-900/60",
     "Hip-Hop": "from-amber-900/40 via-zinc-900/60",
-    Dance: "from-fuchsia-900/40 via-zinc-900/60",
+    Dance: "from-chart-2/25 via-zinc-900/60",
 };
 
 function getGenreGradient(genre?: string | null): string {
@@ -96,7 +97,7 @@ function getGenreGradient(genre?: string | null): string {
     for (const [key, val] of Object.entries(GENRE_GRADIENTS)) {
         if (genre.toLowerCase().includes(key.toLowerCase())) return val;
     }
-    return "from-purple-900/30 via-zinc-900/60";
+    return "from-primary/20 via-zinc-900/60";
 }
 
 interface RecommendedTrack {
@@ -114,7 +115,50 @@ interface RecommendedTrack {
 type TabType = "queue" | "recommended" | "lyrics";
 type LeftView = "artwork" | "visualization" | "equalizer" | "mixer" | "video";
 
+/**
+ * Artwork accent (theme dimension `accent: "artwork"`): derive the dominant
+ * OKLCH hue from the current cover and push it into the ThemeProvider.
+ * Debounced + aborted on rapid track changes; cleared when no artwork.
+ */
+function useArtworkAccent(artworkUrl: string | null | undefined) {
+    const { prefs, setArtworkHue } = useThemePrefs();
+    const active = prefs.accent === "artwork";
+    useEffect(() => {
+        if (!active) return;
+        if (!artworkUrl) {
+            setArtworkHue(null);
+            return;
+        }
+        let cancelled = false;
+        const timer = window.setTimeout(() => {
+            void dominantHueFromImage(artworkUrl).then((hue) => {
+                if (!cancelled && hue !== null) setArtworkHue(hue);
+            });
+        }, 150);
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [active, artworkUrl, setArtworkHue]);
+}
+
+/**
+ * Fullscreen Now Playing. The surface used to unmount on close, dropping the
+ * selected view, visualizer index, queue tab, etc. React 19.3 <Activity>
+ * keeps that state (and the loaded MixerView / visualizer chunks) alive while
+ * hidden; effects are suspended so no rAF/canvas work runs in the background.
+ */
 export function NowPlaying() {
+    const player = usePlayer();
+    useArtworkAccent(player.currentTrack?.artworkUrl);
+    return (
+        <Activity mode={player.isNowPlayingOpen ? "visible" : "hidden"}>
+            <NowPlayingSurface />
+        </Activity>
+    );
+}
+
+function NowPlayingSurface() {
     const player = usePlayer();
     const personalization = usePersonalization();
     const { noteNotations } = useDAWSettings();
@@ -346,7 +390,7 @@ export function NowPlaying() {
         if (dx > 50 && mobilePanel) setMobilePanel(false);
     };
 
-    if (!hasMounted || !player.isNowPlayingOpen) return null;
+    if (!hasMounted) return null;
 
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
     const gradient = getGenreGradient(currentTrack?.genre);
@@ -395,7 +439,7 @@ export function NowPlaying() {
         <div
             data-nowplaying
             className={cn(
-                "fixed inset-0 z-[60] flex flex-col",
+                "fixed inset-0 z-(--z-modal) flex flex-col",
                 isClosing
                     ? "animate-[slideDown_300ms_ease-in_forwards]"
                     : "animate-[slideUp_300ms_cubic-bezier(0.16,1,0.3,1)_forwards]"
@@ -426,7 +470,7 @@ export function NowPlaying() {
                 </div>
             ) : (
                 <>
-                    <div className={cn("absolute inset-0 bg-gradient-to-b to-[#0a0a0a]", gradient)} />
+                    <div className={cn("absolute inset-0 bg-gradient-to-b to-background", gradient)} />
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-xl" />
                 </>
             )}
@@ -541,7 +585,7 @@ export function NowPlaying() {
                             className={cn(
                                 "p-2 rounded-lg transition-colors cursor-pointer",
                                 leftView !== "mixer" && leftView !== "video" && "lg:hidden",
-                                mobilePanel ? "bg-purple-500/20 text-purple-400" : "hover:bg-white/10"
+                                mobilePanel ? "bg-primary/20 text-primary" : "hover:bg-white/10"
                             )}
                         >
                             <ListMusic className="h-4 w-4" />
@@ -594,7 +638,7 @@ export function NowPlaying() {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="relative w-52 h-52 sm:w-64 sm:h-64 lg:w-72 lg:h-72 rounded-2xl bg-gradient-to-br from-purple-500/30 to-blue-500/30 flex items-center justify-center shadow-2xl animate-[pulseGlow_3s_ease-in-out_infinite]">
+                                                <div className="relative w-52 h-52 sm:w-64 sm:h-64 lg:w-72 lg:h-72 rounded-2xl bg-gradient-to-br from-primary/30 to-chart-5/30 flex items-center justify-center shadow-2xl animate-[pulseGlow_3s_ease-in-out_infinite]">
                                                     <Disc3
                                                         className={cn(
                                                             "h-24 w-24 text-white/20",
@@ -656,7 +700,7 @@ export function NowPlaying() {
                                                 </span>
                                             )}
                                             {currentTrack.genre && (
-                                                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300">
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary">
                                                     {currentTrack.genre}
                                                 </span>
                                             )}
@@ -734,7 +778,7 @@ export function NowPlaying() {
                                             onClick={player.toggleShuffle}
                                             className={cn(
                                                 "p-2 rounded-full transition-colors cursor-pointer",
-                                                player.shuffle ? "text-purple-400" : "text-white/50 hover:text-white"
+                                                player.shuffle ? "text-primary" : "text-white/50 hover:text-white"
                                             )}
                                             title={player.shuffle ? "Shuffle: On" : "Shuffle: Off"}
                                         >
@@ -770,7 +814,7 @@ export function NowPlaying() {
                                             onClick={player.toggleRepeat}
                                             className={cn(
                                                 "p-2 rounded-full transition-colors cursor-pointer",
-                                                player.repeat !== "off" ? "text-purple-400" : "text-white/50 hover:text-white"
+                                                player.repeat !== "off" ? "text-primary" : "text-white/50 hover:text-white"
                                             )}
                                             title={`Repeat: ${player.repeat}`}
                                         >
@@ -806,7 +850,7 @@ export function NowPlaying() {
                         )}
                         {leftView === "artwork" && !currentTrack && (
                             <div className="flex flex-col items-center justify-center flex-1 gap-4 animate-[fadeIn_400ms_ease-out]">
-                                <div className="w-52 h-52 sm:w-64 sm:h-64 lg:w-72 lg:h-72 rounded-2xl bg-gradient-to-br from-purple-500/10 to-fuchsia-500/10 flex items-center justify-center shadow-2xl border border-white/5">
+                                <div className="w-52 h-52 sm:w-64 sm:h-64 lg:w-72 lg:h-72 rounded-2xl bg-gradient-to-br from-primary/10 to-chart-2/10 flex items-center justify-center shadow-2xl border border-white/5">
                                     <Disc3 className="h-24 w-24 text-white/10" />
                                 </div>
                                 <div className="text-center space-y-2">
@@ -911,7 +955,7 @@ export function NowPlaying() {
                                             }}
                                         >
                                             <div
-                                                className="h-full rounded-full bg-purple-500 transition-[width] duration-200"
+                                                className="h-full rounded-full bg-primary transition-[width] duration-200"
                                                 style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
                                             />
                                         </div>
@@ -922,7 +966,7 @@ export function NowPlaying() {
                                     </div>
                                     {/* Buttons */}
                                     <div className="flex items-center justify-center gap-5">
-                                        <button onClick={player.toggleShuffle} className={cn("p-1.5 rounded-full transition-colors cursor-pointer", player.shuffle ? "text-purple-400" : "text-white/40 hover:text-white/70")}>
+                                        <button onClick={player.toggleShuffle} className={cn("p-1.5 rounded-full transition-colors cursor-pointer", player.shuffle ? "text-primary" : "text-white/40 hover:text-white/70")}>
                                             <Shuffle className="h-4 w-4" />
                                         </button>
                                         <button onClick={player.prev} className="p-1.5 text-white/70 hover:text-white transition-colors cursor-pointer">
@@ -934,7 +978,7 @@ export function NowPlaying() {
                                         <button onClick={player.next} className="p-1.5 text-white/70 hover:text-white transition-colors cursor-pointer">
                                             <SkipForward className="h-5 w-5" />
                                         </button>
-                                        <button onClick={player.toggleRepeat} className={cn("p-1.5 rounded-full transition-colors cursor-pointer", player.repeat !== "off" ? "text-purple-400" : "text-white/40 hover:text-white/70")}>
+                                        <button onClick={player.toggleRepeat} className={cn("p-1.5 rounded-full transition-colors cursor-pointer", player.repeat !== "off" ? "text-primary" : "text-white/40 hover:text-white/70")}>
                                             {player.repeat === "one" ? <Repeat1 className="h-4 w-4" /> : <Repeat className="h-4 w-4" />}
                                         </button>
                                     </div>
@@ -978,7 +1022,7 @@ export function NowPlaying() {
                                 className={cn(
                                     // Base: off-screen slide panel
                                     "fixed inset-y-0 right-0 z-[66] w-[85vw] max-w-md",
-                                    "flex flex-col bg-[#0a0a0a]/95 backdrop-blur-2xl border-l border-white/10",
+                                    "flex flex-col bg-background/95 backdrop-blur-2xl border-l border-white/10",
                                     "transition-transform duration-300 ease-out",
                                     "overflow-hidden",
                                     // Slide in/out
@@ -1003,7 +1047,7 @@ export function NowPlaying() {
                                         className={cn(
                                             "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors cursor-pointer",
                                             activeTab === "queue"
-                                                ? "text-white border-b-2 border-purple-400"
+                                                ? "text-white border-b-2 border-primary"
                                                 : "text-white/50 hover:text-white/80"
                                         )}
                                     >
@@ -1015,7 +1059,7 @@ export function NowPlaying() {
                                         className={cn(
                                             "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors cursor-pointer",
                                             activeTab === "recommended"
-                                                ? "text-white border-b-2 border-purple-400"
+                                                ? "text-white border-b-2 border-primary"
                                                 : "text-white/50 hover:text-white/80"
                                         )}
                                     >
@@ -1027,7 +1071,7 @@ export function NowPlaying() {
                                         className={cn(
                                             "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors cursor-pointer",
                                             activeTab === "lyrics"
-                                                ? "text-white border-b-2 border-purple-400"
+                                                ? "text-white border-b-2 border-primary"
                                                 : "text-white/50 hover:text-white/80"
                                         )}
                                     >
@@ -1115,14 +1159,14 @@ export function NowPlaying() {
                                                         transition={{ duration: 0.35, ease: [0.34, 1.56, 0.64, 1] }}
                                                     >
                                                         <TrackContextMenu track={currentTrack} onMutate={() => { }}>
-                                                            <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                                                            <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
                                                                 {/* Waveform indicator */}
                                                                 <div className="flex items-end gap-0.5 h-4 w-4 shrink-0">
                                                                     {[0, 1, 2].map((i) => (
                                                                         <div
                                                                             key={i}
                                                                             className={cn(
-                                                                                "w-1 bg-purple-400 rounded-full",
+                                                                                "w-1 bg-primary rounded-full",
                                                                                 isPlaying && "animate-[waveform_0.8s_ease-in-out_infinite]"
                                                                             )}
                                                                             style={{
@@ -1133,7 +1177,7 @@ export function NowPlaying() {
                                                                     ))}
                                                                 </div>
                                                                 <div className="min-w-0 flex-1">
-                                                                    <p className="text-sm font-medium truncate text-purple-300">
+                                                                    <p className="text-sm font-medium truncate text-primary">
                                                                         {currentTrack.title || currentTrack.filename}
                                                                     </p>
                                                                     <p className="text-xs text-white/40 truncate">
@@ -1216,7 +1260,7 @@ export function NowPlaying() {
                                                                                     <p className="text-xs text-white/40 truncate">
                                                                                         {rec.artist || "Unknown"}
                                                                                     </p>
-                                                                                    <p className="text-[10px] text-purple-400/70 leading-relaxed mt-0.5">
+                                                                                    <p className="text-[10px] text-primary/70 leading-relaxed mt-0.5">
                                                                                         {rec.reason}
                                                                                         {rec.bpm ? ` · ${Math.round(rec.bpm)} BPM` : ""}
                                                                                         {rec.keyCamelot ? ` · ${formatKey(rec.keyCamelot, noteNotations)}` : ""}
@@ -1251,7 +1295,7 @@ export function NowPlaying() {
                                                                         <p className="text-xs text-white/50 mt-0.5">{rec.artist || "Unknown"}</p>
                                                                         <div className="flex flex-wrap gap-1.5 mt-2">
                                                                             {rec.bpm && (
-                                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary">
                                                                                     {Math.round(rec.bpm)} BPM
                                                                                 </span>
                                                                             )}
@@ -1271,7 +1315,7 @@ export function NowPlaying() {
                                                                                 </span>
                                                                             )}
                                                                         </div>
-                                                                        <p className="text-[11px] text-purple-300/90 leading-relaxed mt-2">
+                                                                        <p className="text-[11px] text-primary/90 leading-relaxed mt-2">
                                                                             {rec.reason}
                                                                         </p>
                                                                     </TooltipContent>
@@ -1340,7 +1384,7 @@ function EQTabButton({ leftView, onClick }: { leftView: LeftView; onClick: () =>
             <SlidersHorizontal className="h-3.5 w-3.5" />
             EQ
             {eq.enabled && (
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_6px_rgba(168,85,247,0.5)]" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary shadow-[0_0_6px_var(--primary)]" />
             )}
         </button>
     );
@@ -1391,7 +1435,7 @@ function VizBrowserPanel({
                         placeholder="Search..."
                         value={searchQuery}
                         onChange={e => onSearch(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-purple-500/50"
+                        className="w-full pl-8 pr-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-primary/50"
                     />
                 </div>
             </div>
@@ -1403,7 +1447,7 @@ function VizBrowserPanel({
                     className={cn(
                         "px-2 py-1 rounded text-[10px] font-medium transition-colors cursor-pointer",
                         !selectedCategory && !searchQuery
-                            ? "bg-purple-500/20 text-purple-300"
+                            ? "bg-primary/20 text-primary"
                             : "bg-white/5 text-white/40 hover:text-white/70"
                     )}
                 >
@@ -1416,7 +1460,7 @@ function VizBrowserPanel({
                         className={cn(
                             "px-2 py-1 rounded text-[10px] font-medium transition-colors cursor-pointer",
                             selectedCategory === cat
-                                ? "bg-purple-500/20 text-purple-300"
+                                ? "bg-primary/20 text-primary"
                                 : "bg-white/5 text-white/40 hover:text-white/70"
                         )}
                     >
@@ -1435,14 +1479,14 @@ function VizBrowserPanel({
                             className={cn(
                                 "w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors cursor-pointer",
                                 viz.id === currentVizId
-                                    ? "bg-purple-500/15 border border-purple-500/30"
+                                    ? "bg-primary/15 border border-primary/30"
                                     : "hover:bg-white/5 border border-transparent"
                             )}
                         >
                             <div className="min-w-0 flex-1">
                                 <p className={cn(
                                     "text-xs font-medium truncate",
-                                    viz.id === currentVizId ? "text-purple-300" : "text-white/80"
+                                    viz.id === currentVizId ? "text-primary" : "text-white/80"
                                 )}>
                                     {viz.name}
                                 </p>
@@ -1452,7 +1496,7 @@ function VizBrowserPanel({
                                 <Heart className="h-3 w-3 fill-rose-400 text-rose-400 shrink-0" />
                             )}
                             {viz.interactive && (
-                                <span className="text-[8px] px-1 py-0.5 rounded bg-purple-500/20 text-purple-300 shrink-0">
+                                <span className="text-[8px] px-1 py-0.5 rounded bg-primary/20 text-primary shrink-0">
                                     ✦
                                 </span>
                             )}
@@ -1461,7 +1505,7 @@ function VizBrowserPanel({
                                     {[0, 1, 2].map(i => (
                                         <div
                                             key={i}
-                                            className="w-0.5 bg-purple-400 rounded-full animate-[waveform_0.8s_ease-in-out_infinite]"
+                                            className="w-0.5 bg-primary rounded-full animate-[waveform_0.8s_ease-in-out_infinite]"
                                             style={{ animationDelay: `${i * 0.15}s` }}
                                         />
                                     ))}
@@ -1521,7 +1565,7 @@ function VizMediaBar({
                         // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
                         <img src={track.artworkUrl} alt="" className="h-full w-full object-cover" />
                     ) : (
-                        <Disc3 className={cn("h-4 w-4 text-purple-400", isPlaying && "animate-[vinylSpin_3s_linear_infinite]")} />
+                        <Disc3 className={cn("h-4 w-4 text-primary", isPlaying && "animate-[vinylSpin_3s_linear_infinite]")} />
                     )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -1556,7 +1600,7 @@ function VizMediaBar({
                             onSeek(pct * duration);
                         }}
                     >
-                        <div className="absolute h-full rounded-full bg-white/70 group-hover:bg-purple-400 transition-colors" style={{ width: `${progress}%` }} />
+                        <div className="absolute h-full rounded-full bg-white/70 group-hover:bg-primary transition-colors" style={{ width: `${progress}%` }} />
                     </div>
                     <span className="text-[9px] text-white/40 w-8 tabular-nums">{formatDuration(Math.floor(duration))}</span>
                 </div>

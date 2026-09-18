@@ -140,7 +140,7 @@ export default async function ShowDetail({ params }: { params: Promise<{ id: str
             }
             streamPicker={
                 flags?.vidsrcEnabled && show.tmdbId && seasonsForPicker.length > 0 ? (
-                    <section style={{ padding: "1.5rem" }}>
+                    <section className="p-6">
                         <h2 className="watch-row-title">Surse externe</h2>
                         <StreamSourcePicker
                             kind="tv"
@@ -154,13 +154,13 @@ export default async function ShowDetail({ params }: { params: Promise<{ id: str
             extraSections={
                 <>
                     {[...bySeason.entries()].sort(([a], [b]) => a - b).map(([season, eps]) => (
-                        <section key={season} style={{ padding: "1.5rem" }}>
+                        <section key={season} className="p-6">
                             <h2 className="watch-row-title">Sezonul {season}</h2>
-                            <ul style={{ display: "grid", gap: ".5rem", listStyle: "none", padding: 0 }}>
+                            <ul className="grid list-none gap-2 p-0">
                                 {eps.map((e) => {
                                     const fileId = epFile.get(e.id);
                                     return (
-                                        <li key={e.id} style={{ display: "flex", gap: "1rem", padding: ".75rem", borderRadius: 8, background: "var(--watch-bg-2)" }}>
+                                        <li key={e.id} className="flex gap-4 rounded-lg bg-[var(--watch-bg-2)] p-3">
                                             <div style={{ minWidth: 80, fontVariantNumeric: "tabular-nums", color: "var(--watch-fg-dim)" }}>
                                                 E{String(e.episodeNumber).padStart(2, "0")}
                                             </div>

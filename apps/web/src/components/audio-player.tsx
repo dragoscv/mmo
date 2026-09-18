@@ -25,7 +25,11 @@ import { useRef, useCallback, useEffect, useState } from "react";
 import { TrackContextMenu } from "./track-actions";
 import { useSidebar } from "./sidebar-context";
 import { CastButton } from "@/components/cast/cast-button";
-import { useHaptics } from "@mmo/ui";
+import { useHaptics, BOTTOM_TAB_BAR_HEIGHT } from "@mmo/ui";
+import { useIsMobile } from "@mmo/ui/hooks";
+import { fade, rise, fast } from "@mmo/ui/motion";
+import { AnimatePresence, motion as m, useReducedMotion } from "motion/react";
+import { themeColor } from "./waveform-seekbar";
 
 // Touch swipe helpers — detects swipe-up and swipe-right
 function useBarSwipe(onSwipeUp: () => void, onSwipeRight: () => void) {
@@ -60,8 +64,8 @@ function PlayingIndicator({ isPlaying }: { isPlaying: boolean }) {
                     className={cn(
                         "w-[2.5px] rounded-full origin-bottom transition-all duration-300",
                         isPlaying
-                            ? "bg-purple-400 animate-[barBounce_0.8s_ease-in-out_infinite]"
-                            : "bg-purple-400/40 h-[3px]"
+                            ? "bg-primary animate-[barBounce_0.8s_ease-in-out_infinite]"
+                            : "bg-primary/40 h-[3px]"
                     )}
                     style={{
                         animationDelay: isPlaying ? `${i * 0.12}s` : undefined,
@@ -99,6 +103,13 @@ export function AudioPlayer() {
     const { openMobile } = useSidebar();
     const swipe = useBarSwipe(openNowPlaying, openMobile);
     const haptic = useHaptics(); // WP9-04: no-op unless prefs.feedback
+    const isMobile = useIsMobile();
+    const reduced = useReducedMotion();
+    const trackVariants = reduced ? undefined : rise;
+    const fadeVariants = reduced ? undefined : fade;
+    // The bar is rendered OUTSIDE AppShell, so `--shell-tabbar-height` is not in
+    // scope here; the tab bar height is a constant + safe area (see BottomTabBar).
+    const mobileBottom = { bottom: `calc(${BOTTOM_TAB_BAR_HEIGHT} + var(--safe-bottom, 0px))` } as React.CSSProperties;
 
     if (!currentTrack && player.currentVideo) {
         return <VideoNowPlayingBar />;
@@ -108,22 +119,23 @@ export function AudioPlayer() {
         // Minimal bar when no track is loaded — allows opening Now Playing
         return (
             <div
-                className="fixed bottom-0 left-0 right-0 z-50"
+                className="fixed bottom-0 left-0 right-0 z-(--z-player)"
+                style={isMobile ? mobileBottom : undefined}
                 onTouchStart={swipe.onTouchStart}
                 onTouchEnd={swipe.onTouchEnd}
             >
                 <div className="absolute -top-8 left-0 right-0 h-8 bg-gradient-to-t from-background/80 to-transparent pointer-events-none" />
-                <div className="relative bg-card/95 border-t border-border pb-[env(safe-area-inset-bottom)]">
+                <div className="surface relative border-x-0 border-b-0 rounded-none md:pb-[var(--safe-bottom)]">
                     <div className="flex items-center justify-center gap-3 px-4 py-3 h-[56px]">
                         <button
                             onClick={openNowPlaying}
                             className="flex items-center gap-2.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer group"
                         >
-                            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-purple-500/20 to-fuchsia-500/20 flex items-center justify-center ring-1 ring-border group-hover:ring-purple-500/30 transition-all">
-                                <Disc3 className="h-4 w-4 text-purple-400/60" />
+                            <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary/20 to-chart-2/20 flex items-center justify-center ring-1 ring-border group-hover:ring-primary/30 transition-all">
+                                <Disc3 className="h-4 w-4 text-primary/60" />
                             </div>
                             <div className="text-left">
-                                <p className="text-xs font-medium group-hover:text-purple-300 transition-colors">Now Playing</p>
+                                <p className="text-xs font-medium group-hover:text-primary transition-colors">Now Playing</p>
                                 <p className="text-[10px] text-muted-foreground/60">No track loaded · Press N to open</p>
                             </div>
                             <ChevronUp className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors ml-1" />
@@ -138,23 +150,88 @@ export function AudioPlayer() {
     const upNextCount = queue.length - queueIndex - 1;
     const volumePercent = Math.round(volume * 100);
 
+    if (isMobile) {
+        // Mini-player: 56px row above the bottom tab bar (matches
+        // PlayerAwareLayout's --player-h on mobile). Swipe up / tap opens NowPlaying.
+        return (
+            <TrackContextMenu track={currentTrack} onMutate={() => { }}>
+                <div
+                    data-mini-player
+                    className="fixed left-0 right-0 z-(--z-player)"
+                    style={mobileBottom}
+                    onTouchStart={swipe.onTouchStart}
+                    onTouchEnd={swipe.onTouchEnd}
+                >
+                    <div className="surface relative border-x-0 border-b-0 rounded-none">
+                        <div
+                            className="absolute top-0 left-0 right-0 h-[2px] bg-muted"
+                            onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                seek(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * duration);
+                            }}
+                        >
+                            <div className="h-full bg-gradient-accent transition-[width] duration-200 ease-linear" style={{ width: `${progress}%` }} />
+                        </div>
+                        <div className="flex items-center gap-3 px-3 h-[56px]">
+                            <button onClick={openNowPlaying} className="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer">
+                                <div className="h-10 w-10 shrink-0 rounded-lg overflow-hidden ring-1 ring-border bg-gradient-to-br from-primary/20 to-chart-2/20 flex items-center justify-center">
+                                    {currentTrack.artworkUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork
+                                        <img src={currentTrack.artworkUrl} alt="" className="h-full w-full object-cover" />
+                                    ) : (
+                                        <Disc3 className="h-5 w-5 text-primary/60" />
+                                    )}
+                                </div>
+                                <AnimatePresence mode="wait" initial={false}>
+                                    <m.div
+                                        key={currentTrack.id}
+                                        variants={trackVariants}
+                                        initial="initial"
+                                        animate="animate"
+                                        exit="exit"
+                                        transition={fast()}
+                                        className="min-w-0 flex-1"
+                                    >
+                                        <p className="text-[13px] font-semibold truncate">{currentTrack.title || currentTrack.filename}</p>
+                                        <p className="text-[11px] text-muted-foreground truncate">{currentTrack.artist || "Unknown Artist"}</p>
+                                    </m.div>
+                                </AnimatePresence>
+                            </button>
+                            <button
+                                onClick={() => { haptic("tap"); togglePlay(); }}
+                                className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-accent text-primary-foreground active:scale-95 transition-transform cursor-pointer"
+                                aria-label={isPlaying ? "Pause" : "Play"}
+                            >
+                                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+                            </button>
+                            <button
+                                onClick={() => { haptic("tap"); next(); }}
+                                className="flex h-10 w-10 items-center justify-center text-muted-foreground active:scale-95 transition-transform cursor-pointer"
+                                aria-label="Next"
+                            >
+                                <SkipForward className="h-5 w-5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </TrackContextMenu>
+        );
+    }
+
     return (
         <TrackContextMenu track={currentTrack} onMutate={() => { }}>
             <div
-                className="fixed bottom-0 left-0 right-0 z-50 animate-[slideUpFade_300ms_ease-out]"
+                className="fixed bottom-0 left-0 right-0 z-(--z-player) animate-rise-in"
                 onTouchStart={swipe.onTouchStart}
                 onTouchEnd={swipe.onTouchEnd}
             >
                 {/* Gradient glow behind the bar */}
                 <div className="absolute -top-8 left-0 right-0 h-8 bg-gradient-to-t from-background/80 to-transparent pointer-events-none" />
 
-                {/* Glass container — `bg-card/95` is effectively opaque, so a
-                    heavy backdrop-filter would only re-blur what's already
-                    covered. An animated <BarWaveformBg> behind it meant
-                    Chromium was re-blurring the whole bar width every frame
-                    during playback — a large chunk of the compositor cost on
-                    any page that hosts this bar (mixer included). */}
-                <div className="relative bg-card/95 border-t border-border pb-[env(safe-area-inset-bottom)]">
+                {/* `surface` follows data-surface (glass/solid/flat). The
+                    <BarWaveformBg> canvas sits INSIDE the surface so the
+                    backdrop-filter never re-blurs it per frame. */}
+                <div className="surface relative border-x-0 border-b-0 rounded-none pb-[var(--safe-bottom)]">
                     {/* Decorative background waveform */}
                     <BarWaveformBg trackId={currentTrack.id} progress={progress / 100} isPlaying={isPlaying} />
                     {/* Animated progress line at top — clickable for seeking */}
@@ -168,12 +245,12 @@ export function AudioPlayer() {
                     >
                         <div className="absolute bottom-[7px] left-0 right-0 h-[2px] bg-muted">
                             <div
-                                className="h-full bg-gradient-to-r from-purple-500 via-purple-400 to-fuchsia-500 transition-[width] duration-200 ease-linear"
+                                className="h-full bg-gradient-accent transition-[width] duration-200 ease-linear"
                                 style={{ width: `${progress}%` }}
                             />
                             {/* Glow dot at the end of progress */}
                             <div
-                                className="absolute top-1/2 h-2.5 w-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(139,92,246,0.6)] transition-[left] duration-200 ease-linear group-hover/top:h-3.5 group-hover/top:w-3.5"
+                                className="absolute top-1/2 h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary)] transition-[left] duration-200 ease-linear group-hover/top:h-3.5 group-hover/top:w-3.5"
                                 style={{ left: `${progress}%`, transform: "translate(-50%, -50%)", opacity: progress > 0 ? 1 : 0 }}
                             />
                         </div>
@@ -189,8 +266,8 @@ export function AudioPlayer() {
                             <div className="relative shrink-0">
                                 <div className={cn(
                                     "h-12 w-12 rounded-xl overflow-hidden ring-1 ring-border transition-all duration-300",
-                                    "group-hover:ring-purple-500/30 group-hover:shadow-[0_0_20px_rgba(139,92,246,0.15)]",
-                                    isPlaying && "shadow-[0_0_16px_rgba(139,92,246,0.1)]"
+                                    "group-hover:ring-primary/30 group-hover:shadow-glow",
+                                    isPlaying && "shadow-glow"
                                 )}>
                                     {currentTrack.artworkUrl ? (
                                         // eslint-disable-next-line @next/next/no-img-element -- dynamic blob/data/remote artwork; next/image cannot optimise unknown remotes
@@ -203,10 +280,10 @@ export function AudioPlayer() {
                                             )}
                                         />
                                     ) : (
-                                        <div className="h-full w-full bg-gradient-to-br from-purple-500/20 to-fuchsia-500/20 flex items-center justify-center">
+                                        <div className="h-full w-full bg-gradient-to-br from-primary/20 to-chart-2/20 flex items-center justify-center">
                                             <Disc3
                                                 className={cn(
-                                                    "h-6 w-6 text-purple-400/60",
+                                                    "h-6 w-6 text-primary/60",
                                                     isPlaying && "animate-[vinylSpin_3s_linear_infinite]"
                                                 )}
                                             />
@@ -216,9 +293,18 @@ export function AudioPlayer() {
                             </div>
 
                             {/* Track text + details */}
-                            <div className="min-w-0 flex-1 space-y-0.5">
+                            <AnimatePresence mode="wait" initial={false}>
+                            <m.div
+                                key={currentTrack.id}
+                                variants={trackVariants}
+                                initial="initial"
+                                animate="animate"
+                                exit="exit"
+                                transition={fast()}
+                                className="min-w-0 flex-1 space-y-0.5"
+                            >
                                 <div className="flex items-center gap-2">
-                                    <p className="text-[13px] font-semibold truncate group-hover:text-purple-300 transition-colors duration-200">
+                                    <p className="text-[13px] font-semibold truncate group-hover:text-primary transition-colors duration-200">
                                         {currentTrack.title || currentTrack.filename}
                                     </p>
                                     {currentTrack.isFavorite && (
@@ -237,7 +323,7 @@ export function AudioPlayer() {
                                             </span>
                                         )}
                                         {currentTrack.genre && (
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">
                                                 {currentTrack.genre}
                                             </span>
                                         )}
@@ -262,7 +348,8 @@ export function AudioPlayer() {
                                     </p>
                                     {isPlaying && <PlayingIndicator isPlaying={isPlaying} />}
                                 </div>
-                            </div>
+                            </m.div>
+                            </AnimatePresence>
 
                             <ChevronUp className="h-4 w-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 group-hover:text-muted-foreground transition-all duration-200 shrink-0" />
                         </button>
@@ -278,7 +365,7 @@ export function AudioPlayer() {
                                 className={cn(
                                     "p-1 rounded-md transition-all duration-200 hidden sm:block cursor-pointer",
                                     shuffle
-                                        ? "text-purple-400 bg-purple-500/10"
+                                        ? "text-primary bg-primary/10"
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                                 )}
                                 title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
@@ -297,10 +384,10 @@ export function AudioPlayer() {
                                 onClick={() => { haptic("tap"); togglePlay(); }}
                                 className={cn(
                                     "flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 cursor-pointer",
-                                    "bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white",
-                                    "hover:from-purple-400 hover:to-fuchsia-500 hover:shadow-[0_0_20px_rgba(139,92,246,0.4)]",
+                                    "bg-gradient-accent text-primary-foreground",
+                                    "hover:brightness-110 hover:shadow-glow",
                                     "hover:scale-105 active:scale-95",
-                                    isPlaying && "shadow-[0_0_12px_rgba(139,92,246,0.25)]"
+                                    isPlaying && "shadow-glow"
                                 )}
                             >
                                 {isPlaying ? (
@@ -322,7 +409,7 @@ export function AudioPlayer() {
                                 className={cn(
                                     "p-1 rounded-md transition-all duration-200 hidden sm:block cursor-pointer",
                                     repeat !== "off"
-                                        ? "text-purple-400 bg-purple-500/10"
+                                        ? "text-primary bg-primary/10"
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                                 )}
                                 title={`Repeat: ${repeat}`}
@@ -349,16 +436,24 @@ export function AudioPlayer() {
                                 onRemoteStart={() => { if (isPlaying) togglePlay(); }}
                             />
                             {/* Queue indicator */}
+                            <AnimatePresence initial={false}>
                             {upNextCount > 0 && (
-                                <button
+                                <m.button
+                                    key="queue"
+                                    variants={fadeVariants}
+                                    initial="initial"
+                                    animate="animate"
+                                    exit="exit"
+                                    transition={fast()}
                                     onClick={openNowPlaying}
                                     className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-muted hover:bg-accent text-muted-foreground hover:text-foreground transition-all duration-200 cursor-pointer"
                                     title={`${upNextCount} tracks in queue`}
                                 >
                                     <ListMusic className="h-3.5 w-3.5" />
                                     <span className="text-[10px] tabular-nums font-medium">{upNextCount}</span>
-                                </button>
+                                </m.button>
                             )}
+                            </AnimatePresence>
 
                             {/* Volume */}
                             <div className="flex items-center gap-2 w-32 group/vol">
@@ -465,7 +560,7 @@ function BarWaveformBg({
             ctx.roundRect(x, h - barH, barWidth, barH, barWidth / 2);
 
             if (isPlayed) {
-                ctx.fillStyle = "rgba(168, 85, 247, 0.12)";
+                ctx.fillStyle = themeColor("primary", 0.12);
             } else {
                 ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
             }
@@ -521,7 +616,7 @@ function VideoNowPlayingBar() {
                     onClick={onSeek}
                 >
                     <div
-                        className="h-full bg-gradient-to-r from-fuchsia-500 to-purple-500 transition-[width] duration-100"
+                        className="h-full bg-gradient-accent transition-[width] duration-100"
                         style={{ width: `${pct}%` }}
                     />
                 </div>
@@ -549,7 +644,7 @@ function VideoNowPlayingBar() {
                             )}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-foreground truncate group-hover:text-purple-300 transition-colors">{v.title}</p>
+                            <p className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors">{v.title}</p>
                             {v.subtitle && <p className="text-[10px] text-muted-foreground truncate">{v.subtitle}</p>}
                             <p className="text-[10px] text-muted-foreground/60 font-mono">
                                 {formatDuration(player.videoCurrentTime)} / {formatDuration(player.videoDuration || (v.durationSec ?? 0))}
