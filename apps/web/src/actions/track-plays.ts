@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import { and, desc, eq, inArray, max, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, max, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { db } from "@/db";
@@ -16,7 +16,9 @@ import { trackPlays, tracks } from "@/db/schema";
 import { getActiveProfileId } from "@/lib/active-profile";
 import { rowToCompanionTrack } from "@/lib/cloud-library";
 import type { CompanionTrack } from "@/lib/companion-library";
+import { albumKey, trackProgress, type Album, type ListenHome, type TrackWithProgress } from "@/lib/media/listen-types";
 import { log } from "@/lib/logger";
+import { getPlaylistsAggregated } from "./playlists-aggregate";
 
 const recordSchema = z.object({
     /** Companion-side track id (what the player carries) or cloud id. */
@@ -190,10 +192,86 @@ export async function getFavouriteTracks(limit = 20): Promise<CompanionTrack[]> 
     }
 }
 
-/** Resolve a list of cloud track ids to CompanionTracks (helper for row builders). */
+/** Resolve a list of cloud track ids to CompanionTracks, in the requested
+ *  order (the returned `id` is the companion id, so callers cannot re-sort). */
 export async function getTracksByCloudIds(ids: number[]): Promise<CompanionTrack[]> {
     const uid = await userId();
     if (!uid || ids.length === 0) return [];
     const rows = await db.select().from(tracks).where(and(eq(tracks.userId, uid), inArray(tracks.id, ids)));
-    return rows.map(rowToCompanionTrack);
+    const byCloudId = new Map(rows.map((r) => [r.id, r]));
+    return ids.map((id) => byCloudId.get(id)).filter((r): r is TrackRow => !!r).map(rowToCompanionTrack);
+}
+
+/** Tracks ranked by play count (all time), ties broken by most recent play. */
+export async function getMostPlayed(limit = 20): Promise<CompanionTrack[]> {
+    const uid = await userId();
+    if (!uid) return [];
+    try {
+        const plays = count(trackPlays.id);
+        const rows = await db
+            .select({ track: tracks, plays, last: max(trackPlays.playedAt) })
+            .from(trackPlays)
+            .innerJoin(tracks, eq(tracks.id, trackPlays.trackId))
+            .where(and(eq(trackPlays.userId, uid), eq(tracks.isHidden, false)))
+            .groupBy(tracks.id)
+            .orderBy(desc(plays), desc(max(trackPlays.playedAt)))
+            .limit(limitSchema.parse(limit));
+        return rows.map((r) => rowToCompanionTrack(r.track));
+    } catch (err) {
+        log.warn("trackPlays.mostPlayed failed", undefined, err);
+        return [];
+    }
+}
+
+/** Albums (title+artist) ordered by newest added track, with their cloud track ids for queueing. */
+export async function getRecentAlbums(limit = 12): Promise<Album[]> {
+    const uid = await userId();
+    if (!uid) return [];
+    try {
+        const rows = await db
+            .select({
+                album: tracks.album,
+                artist: tracks.artist,
+                cover: sql<string | null>`(array_remove(array_agg(${tracks.artworkUrl} order by ${tracks.addedAt} desc), null))[1]`,
+                trackCount: sql<number>`count(*)::int`,
+                trackIds: sql<number[]>`array_agg(${tracks.id} order by ${tracks.filename})`,
+                year: max(tracks.year),
+            })
+            .from(tracks)
+            .where(and(eq(tracks.userId, uid), eq(tracks.isHidden, false), sql`${tracks.album} is not null and ${tracks.album} <> ''`))
+            .groupBy(tracks.album, tracks.artist)
+            .orderBy(desc(max(tracks.addedAt)))
+            .limit(limitSchema.parse(limit));
+        return rows.map((r) => {
+            const title = r.album ?? "";
+            return {
+                key: albumKey(r.artist, title),
+                title,
+                artist: r.artist,
+                year: r.year ?? null,
+                cover: r.cover,
+                trackCount: Number(r.trackCount),
+                trackIds: (r.trackIds ?? []).map(Number),
+            };
+        });
+    } catch (err) {
+        log.warn("trackPlays.recentAlbums failed", undefined, err);
+        return [];
+    }
+}
+
+function withProgress(t: PlayedTrack): TrackWithProgress {
+    return { ...t, progress: trackProgress(t.lastDurationSec, t.duration) };
+}
+
+/** Everything the Listen half of Media Home needs, fetched in parallel. */
+export async function getListenHome(): Promise<ListenHome> {
+    const [cont, recentAlbums, favourites, playlists, mostPlayed] = await Promise.all([
+        getContinueListening(12),
+        getRecentAlbums(12),
+        getFavouriteTracks(20),
+        getPlaylistsAggregated(),
+        getMostPlayed(20),
+    ]);
+    return { continue: cont.map(withProgress), recentAlbums, favourites, playlists, mostPlayed };
 }

@@ -42,6 +42,12 @@ export interface WatchPrefs {
     posterSize: "sm" | "md" | "lg";
     /** Reduce motion (disable parallax, hover popover, autoplay trailers). */
     reduceMotion: boolean;
+    /** Preferred streaming providers (TMDB provider ids) — ranked first in offers. */
+    preferredProviders: number[];
+    /** AI curator row on Media Home (env-gated: needs a codai key server-side). */
+    curator: boolean;
+    /** Show the Listen half of Media Home. */
+    showListen: boolean;
 }
 
 export const DEFAULT_PREFS: WatchPrefs = {
@@ -62,7 +68,29 @@ export const DEFAULT_PREFS: WatchPrefs = {
     autoplayNext: true,
     posterSize: "md",
     reduceMotion: false,
+    preferredProviders: [],
+    curator: false,
+    showListen: true,
 };
+
+/** TMDB regions offered in Settings › Media. */
+export const MEDIA_REGIONS = ["RO", "US", "GB", "DE", "FR", "ES", "IT", "HU"] as const;
+
+/** RO streaming registry (TMDB provider ids) — mirrors server/src/media/providers.ts. */
+export const MEDIA_PROVIDERS: ReadonlyArray<{ id: number; name: string }> = [
+    { id: 8, name: "Netflix" },
+    { id: 9, name: "Prime Video" },
+    { id: 337, name: "Disney+" },
+    { id: 1899, name: "HBO Max" },
+    { id: 350, name: "Apple TV+" },
+    { id: 1773, name: "SkyShowtime" },
+    { id: 192, name: "YouTube" },
+    { id: 1002, name: "Voyo" },
+    { id: 1932, name: "AntenaPLAY" },
+];
+
+const numberArray = (v: unknown): number[] =>
+    Array.isArray(v) ? v.filter((x): x is number => typeof x === "number" && Number.isInteger(x) && x > 0) : [];
 
 export function mergeWatchPrefs(raw: unknown): WatchPrefs {
     if (!raw || typeof raw !== "object") return DEFAULT_PREFS;
@@ -85,5 +113,8 @@ export function mergeWatchPrefs(raw: unknown): WatchPrefs {
         autoplayNext: typeof p.autoplayNext === "boolean" ? p.autoplayNext : DEFAULT_PREFS.autoplayNext,
         posterSize: p.posterSize === "sm" || p.posterSize === "lg" ? p.posterSize : DEFAULT_PREFS.posterSize,
         reduceMotion: typeof p.reduceMotion === "boolean" ? p.reduceMotion : DEFAULT_PREFS.reduceMotion,
+        preferredProviders: numberArray(p.preferredProviders),
+        curator: typeof p.curator === "boolean" ? p.curator : DEFAULT_PREFS.curator,
+        showListen: typeof p.showListen === "boolean" ? p.showListen : DEFAULT_PREFS.showListen,
     };
 }

@@ -115,7 +115,7 @@ export const navTree: NavNode[] = [
             { kind: "leaf", key: "settings-security", href: "/settings/security", label: "Security", icon: ShieldCheck },
             { kind: "leaf", key: "settings-library", href: "/settings/library", label: "Library", icon: Library },
             { kind: "leaf", key: "settings-music", href: "/settings/music", label: "Music", icon: Music2 },
-            { kind: "leaf", key: "settings-video", href: "/settings/video", label: "Video", icon: Clapperboard },
+            { kind: "leaf", key: "settings-media", href: "/settings/media", label: "Media", icon: Clapperboard },
             { kind: "leaf", key: "settings-mixer", href: "/settings/mixer", label: "Mixer", icon: Disc3 },
             { kind: "leaf", key: "settings-daw", href: "/settings/daw", label: "DAW", icon: Piano },
             { kind: "leaf", key: "settings-editor", href: "/settings/sound-editor", label: "Sound Editor", icon: Waves },

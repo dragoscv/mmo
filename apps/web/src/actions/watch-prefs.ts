@@ -12,9 +12,23 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { watchProfiles } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { z } from "zod";
 import { getActiveProfileId } from "@/lib/active-profile";
 import { revalidatePath } from "next/cache";
-import { DEFAULT_PREFS, mergeWatchPrefs, type WatchPrefs } from "@/lib/watch-prefs";
+import { DEFAULT_PREFS, MEDIA_PROVIDERS, mergeWatchPrefs, type WatchPrefs } from "@/lib/watch-prefs";
+
+const PROVIDER_IDS = new Set(MEDIA_PROVIDERS.map((p) => p.id));
+
+/** Validates only the fields added in WP11-06; the legacy fields keep the
+ *  permissive `mergeWatchPrefs` sanitising below. */
+const mediaFieldsSchema = z.object({
+    preferredProviders: z.array(z.number().int().positive().refine((id) => PROVIDER_IDS.has(id), "unknown provider")).max(32).optional(),
+    curator: z.boolean().optional(),
+    showListen: z.boolean().optional(),
+    defaultRegion: z.string().regex(/^[A-Z]{2}$/).optional(),
+    regions: z.array(z.string().regex(/^[A-Z]{2}$/)).min(1).max(16).optional(),
+    hideWatched: z.boolean().optional(),
+});
 
 async function getActiveOwnedProfileId(): Promise<{ userId: string; profileId: number } | null> {
     const session = await auth();
@@ -38,6 +52,7 @@ export async function saveWatchPrefs(next: Partial<WatchPrefs>): Promise<{ ok: b
     const ctx = await getActiveOwnedProfileId();
     if (!ctx) return { ok: false, prefs: DEFAULT_PREFS };
     const current = await getWatchPrefs();
+    if (!mediaFieldsSchema.safeParse(next).success) return { ok: false, prefs: current };
     const merged: WatchPrefs = {
         ...current,
         ...next,
@@ -51,6 +66,7 @@ export async function saveWatchPrefs(next: Partial<WatchPrefs>): Promise<{ ok: b
     revalidatePath("/watch");
     revalidatePath("/watch/settings");
     revalidatePath("/settings/video");
+    revalidatePath("/settings/media");
     return { ok: true, prefs: merged };
 }
 

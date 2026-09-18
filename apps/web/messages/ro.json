@@ -416,6 +416,70 @@
                 "pair": "Quick Connect",
                 "open": "Deschide remote"
             }
+        },
+        "media": {
+            "title": "Media",
+            "description": "Regiune, furnizori de streaming, rândurile din Media Home, chei de metadate, cinema și subtitrări.",
+            "saved": "Preferințe salvate",
+            "saveFailed": "Nu am putut salva",
+            "region": {
+                "title": "Regiune",
+                "description": "Țara folosită pentru disponibilitatea în streaming și link-urile către furnizori.",
+                "label": "Regiune implicită",
+                "codes": {
+                    "RO": "România",
+                    "US": "Statele Unite",
+                    "GB": "Regatul Unit",
+                    "DE": "Germania",
+                    "FR": "Franța",
+                    "ES": "Spania",
+                    "IT": "Italia",
+                    "HU": "Ungaria"
+                }
+            },
+            "providers": {
+                "title": "Furnizori preferați",
+                "description": "Serviciile la care ești abonat apar primele la „Unde vezi”."
+            },
+            "home": {
+                "title": "Media Home",
+                "description": "Ce apare pe pagina principală.",
+                "hideWatched": "Ascunde ce ai văzut",
+                "hideWatchedHint": "Titlurile terminate (≥90 %) sau marcate ca văzute dispar din rândurile de recomandări.",
+                "showListen": "Arată secțiunea Ascultă",
+                "showListenHint": "Continuă ascultarea, albume noi, favorite, cele mai ascultate și playlist-uri.",
+                "curator": "Curator AI",
+                "curatorHint": "Un rând zilnic „Alese pentru tine” scris de curatorul MixAI din istoricul tău. Păstrat în cache 24 h.",
+                "curatorUnavailable": "Necesită o cheie codai pe server (CODAI_API_KEY). Comutatorul se salvează, dar nu face nimic până atunci."
+            },
+            "keys": {
+                "title": "Chei API metadate și subtitrări",
+                "configured": "✓ configurat",
+                "missing": "✗ lipsește {env}",
+                "missingOptional": "✗ opțional, lipsește {env}",
+                "hint": "Setează cheile în .env și repornește serverul."
+            },
+            "cinema": {
+                "title": "Cinema",
+                "description": "Comportament redare video, subtitrări, scurtături."
+            }
+        }
+    },
+    "listen": {
+        "title": "Ascultă",
+        "prev": "Derulează înapoi",
+        "next": "Derulează înainte",
+        "play": "Redă",
+        "playAlbum": "Redă albumul",
+        "trackCount": "{count} piese",
+        "albumUnavailable": "Nicio piesă redabilă din acest album momentan.",
+        "serverOffline": "offline",
+        "rows": {
+            "continue": "Continuă ascultarea",
+            "newAlbums": "Albume noi",
+            "favourites": "Favorite",
+            "mostPlayed": "Cele mai ascultate",
+            "playlists": "Playlist-uri"
         }
     },
     "pair": {
@@ -590,6 +654,7 @@
         "settings-library": "Bibliotecă",
         "settings-music": "Muzică",
         "settings-video": "Video",
+        "settings-media": "Media",
         "settings-mixer": "Mixer",
         "settings-daw": "DAW",
         "settings-editor": "Editor sunet",

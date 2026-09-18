@@ -395,6 +395,70 @@
                 "pair": "Quick Connect",
                 "open": "Open remote"
             }
+        },
+        "media": {
+            "title": "Media",
+            "description": "Region, streaming providers, Media Home rows, metadata keys, cinema and subtitles.",
+            "saved": "Preferences saved",
+            "saveFailed": "Could not save",
+            "region": {
+                "title": "Region",
+                "description": "Country used for streaming availability and provider deep links.",
+                "label": "Default region",
+                "codes": {
+                    "RO": "Romania",
+                    "US": "United States",
+                    "GB": "United Kingdom",
+                    "DE": "Germany",
+                    "FR": "France",
+                    "ES": "Spain",
+                    "IT": "Italy",
+                    "HU": "Hungary"
+                }
+            },
+            "providers": {
+                "title": "Preferred providers",
+                "description": "Services you subscribe to are ranked first in “Where to watch”."
+            },
+            "home": {
+                "title": "Media Home",
+                "description": "What appears on the home page.",
+                "hideWatched": "Hide watched",
+                "hideWatchedHint": "Titles you finished (≥90 %) or marked as watched disappear from recommendation rows.",
+                "showListen": "Show Listen section",
+                "showListenHint": "Continue listening, new albums, favourites, most played and playlists.",
+                "curator": "AI curator",
+                "curatorHint": "A daily “Picked for you” row written by the MixAI curator from your history. Cached for 24 h.",
+                "curatorUnavailable": "Needs a codai key on the server (CODAI_API_KEY). The toggle is saved but does nothing until then."
+            },
+            "keys": {
+                "title": "Metadata & subtitle API keys",
+                "configured": "✓ configured",
+                "missing": "✗ missing {env}",
+                "missingOptional": "✗ optional, missing {env}",
+                "hint": "Set the keys in .env and restart the server."
+            },
+            "cinema": {
+                "title": "Cinema",
+                "description": "Video playback behaviour, subtitles, shortcuts."
+            }
+        }
+    },
+    "listen": {
+        "title": "Listen",
+        "prev": "Scroll back",
+        "next": "Scroll forward",
+        "play": "Play",
+        "playAlbum": "Play album",
+        "trackCount": "{count} tracks",
+        "albumUnavailable": "No playable tracks in this album right now.",
+        "serverOffline": "offline",
+        "rows": {
+            "continue": "Continue listening",
+            "newAlbums": "New albums",
+            "favourites": "Favourites",
+            "mostPlayed": "Most played",
+            "playlists": "Playlists"
         }
     },
     "activate": {
@@ -590,6 +654,7 @@
         "settings-library": "Library",
         "settings-music": "Music",
         "settings-video": "Video",
+        "settings-media": "Media",
         "settings-mixer": "Mixer",
         "settings-daw": "DAW",
         "settings-editor": "Sound Editor",
