@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { useIsUltrawide, useMediaQuery } from "@mmo/ui/hooks";
-import { Skeleton } from "@mmo/ui";
+import { Skeleton, SkeletonText } from "@mmo/ui";
 import { engine } from "./bridge/engine";
 import { subscribeMixerState, subscribeHidInput } from "./bridge/events";
 import { useMixerStore } from "./state/mixer-store";
@@ -10,18 +10,37 @@ import { TopBar } from "./components/TopBar";
 import { Deck } from "./components/Deck";
 import { MixerStrip } from "./components/MixerStrip";
 import { Crossfader } from "./components/Crossfader";
-import { Library } from "./components/Library";
-import { SettingsPanel } from "./components/SettingsPanel";
-import { SamplerPanel } from "./components/SamplerPanel";
-import { AutoMixPanel } from "./components/AutoMixPanel";
 import { useAutoMixStore } from "./state/auto-mix-store";
-import { ShortcutsOverlay } from "./components/ShortcutsOverlay";
-import { CommandPalette } from "./components/CommandPalette";
 import { useShortcuts } from "./lib/use-shortcuts";
-import { PluginDock, PluginToasts, PluginHotkeys, PluginAutomation } from "./plugins/host";
 import { useHidStore } from "./state/hid-store";
 import { pushHidFeedback } from "./lib/hid-feedback";
 import { startCloudAutoSync } from "./lib/cloud-sync";
+
+// Code-split: everything that is not the 2-deck transport (decks + mixer +
+// top bar) loads on demand so the entry chunk stays small. Named exports are
+// re-wrapped as `default` for React.lazy.
+const Library = lazy(() => import("./components/Library").then((m) => ({ default: m.Library })));
+const SettingsPanel = lazy(() => import("./components/SettingsPanel").then((m) => ({ default: m.SettingsPanel })));
+const SamplerPanel = lazy(() => import("./components/SamplerPanel").then((m) => ({ default: m.SamplerPanel })));
+const AutoMixPanel = lazy(() => import("./components/AutoMixPanel").then((m) => ({ default: m.AutoMixPanel })));
+const ShortcutsOverlay = lazy(() =>
+    import("./components/ShortcutsOverlay").then((m) => ({ default: m.ShortcutsOverlay })),
+);
+const CommandPalette = lazy(() => import("./components/CommandPalette").then((m) => ({ default: m.CommandPalette })));
+const PluginDock = lazy(() => import("./plugins/host").then((m) => ({ default: m.PluginDock })));
+const PluginServices = lazy(() =>
+    import("./plugins/host").then((m) => ({
+        default: function PluginServices() {
+            return (
+                <>
+                    <m.PluginToasts />
+                    <m.PluginHotkeys />
+                    <m.PluginAutomation />
+                </>
+            );
+        },
+    })),
+);
 
 /** 4 decks need ≥ 1600 px (100 rem) — see docs/mixai-design-tracker WP3-04. */
 export const FOUR_DECK_QUERY = "(min-width: 100rem)";
@@ -102,7 +121,11 @@ export function App() {
                         : "1fr auto 1fr",
                 }}
             >
-                {sidePanels && <Library />}
+                {sidePanels && (
+                    <Suspense fallback={<PanelSkeleton />}>
+                        <Library />
+                    </Suspense>
+                )}
 
                 <div className="grid min-h-0 gap-3 overflow-y-auto" style={{ gridAutoRows: "max-content" }}>
                     {leftDecks.map((id) => (hydrated ? <Deck key={id} deckId={id} /> : <DeckSkeleton key={id} />))}
@@ -122,13 +145,19 @@ export function App() {
                 {sidePanels && (
                     <div className="grid min-h-0 gap-3" style={{ gridTemplateRows: "auto minmax(0, 1fr) auto" }}>
                         <div className="panel min-h-0 overflow-y-auto p-3">
-                            <AutoMixPanel />
+                            <Suspense fallback={<SkeletonText lines={3} />}>
+                                <AutoMixPanel />
+                            </Suspense>
                         </div>
                         <div className="panel min-h-0 overflow-y-auto p-3">
-                            <SamplerPanel accent="var(--accent-deck-a)" />
+                            <Suspense fallback={<SkeletonText lines={4} />}>
+                                <SamplerPanel accent="var(--accent-deck-a)" />
+                            </Suspense>
                         </div>
                         <div className="grid min-h-0 gap-3 overflow-y-auto">
-                            <PluginDock accent="var(--accent)" />
+                            <Suspense fallback={null}>
+                                <PluginDock accent="var(--accent)" />
+                            </Suspense>
                         </div>
                     </div>
                 )}
@@ -142,27 +171,48 @@ export function App() {
                     className="grid min-h-0 gap-3"
                     style={{ gridTemplateColumns: "minmax(0, 1fr) clamp(14rem, 18vw, 16.25rem) clamp(16rem, 20vw, 18.75rem) auto" }}
                 >
-                    <Library />
+                    <Suspense fallback={<PanelSkeleton />}>
+                        <Library />
+                    </Suspense>
                     <div className="panel min-h-0 overflow-y-auto p-3">
-                        <AutoMixPanel />
+                        <Suspense fallback={<SkeletonText lines={3} />}>
+                            <AutoMixPanel />
+                        </Suspense>
                     </div>
                     <div className="panel min-h-0 overflow-y-auto p-3">
-                        <SamplerPanel accent="var(--accent-deck-a)" />
+                        <Suspense fallback={<SkeletonText lines={4} />}>
+                            <SamplerPanel accent="var(--accent-deck-a)" />
+                        </Suspense>
                     </div>
                     {/* Plugin dock: `auto` column collapses to 0 when no plugin
                         panels are active, so it doesn't reserve dead space. */}
                     <div className="grid min-h-0 gap-3 overflow-y-auto" style={{ gridAutoFlow: "column" }}>
-                        <PluginDock accent="var(--accent)" />
+                        <Suspense fallback={null}>
+                            <PluginDock accent="var(--accent)" />
+                        </Suspense>
                     </div>
                 </div>
             )}
 
-            {settingsOpen && <SettingsPanel />}
-            <ShortcutsOverlay />
-            <CommandPalette />
-            <PluginToasts />
-            <PluginHotkeys />
-            <PluginAutomation />
+            {/* Overlays render nothing until opened; the Suspense fallback is
+                therefore invisible, and the chunk fetch (~ms from disk/file://)
+                happens on first open. */}
+            <Suspense fallback={null}>
+                {settingsOpen && <SettingsPanel />}
+                <ShortcutsOverlay />
+                <CommandPalette />
+                <PluginServices />
+            </Suspense>
+        </div>
+    );
+}
+
+/** Placeholder for a side/bottom panel chunk in flight. */
+function PanelSkeleton() {
+    return (
+        <div className="panel grid gap-3 p-3" aria-busy="true">
+            <Skeleton className="h-8 w-full" />
+            <SkeletonText lines={5} />
         </div>
     );
 }

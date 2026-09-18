@@ -1,12 +1,16 @@
+import { Suspense, lazy } from "react";
 import { Lock, LockOpen, Pause, Play, RefreshCw } from "lucide-react";
+import { Skeleton } from "@mmo/ui";
 import { engine } from "@/bridge/engine";
 import type { DeckId } from "@/bridge/types";
 import { useMixerStore } from "@/state/mixer-store";
 import { useT } from "@/i18n";
 import { Waveform } from "./Waveform";
 import { PerformancePads } from "./PerformancePads";
-import { StemControls } from "./StemControls";
-import { FxPanel } from "./FxPanel";
+
+// Below-the-fold deck sections: not needed for first paint of the transport.
+const StemControls = lazy(() => import("./StemControls").then((m) => ({ default: m.StemControls })));
+const FxPanel = lazy(() => import("./FxPanel").then((m) => ({ default: m.FxPanel })));
 
 function fmtTime(sec: number): string {
     if (!isFinite(sec) || sec < 0) sec = 0;
@@ -42,7 +46,11 @@ export function Deck({ deckId }: { deckId: DeckId }) {
     };
 
     return (
-        <div className="panel" style={{ padding: 12, display: "grid", gap: 8, alignContent: "start" }}>
+        <div
+            className="panel deck-card"
+            data-playing={deck.playing ? "true" : "false"}
+            style={{ ["--deck" as string]: accent, padding: 12, display: "grid", gap: 8, alignContent: "start" }}
+        >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span
@@ -149,9 +157,10 @@ export function Deck({ deckId }: { deckId: DeckId }) {
                 />
             </div>
 
-            <StemControls deckId={deckId} deck={deck} accent={accent} />
-
-            <FxPanel deckId={deckId} deck={deck} accent={accent} />
+            <Suspense fallback={<Skeleton className="h-16 w-full" />}>
+                <StemControls deckId={deckId} deck={deck} accent={accent} />
+                <FxPanel deckId={deckId} deck={deck} accent={accent} />
+            </Suspense>
 
             <PerformancePads deckId={deckId} deck={deck} accent={accent} />
         </div>

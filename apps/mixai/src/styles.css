@@ -112,6 +112,49 @@ button {
     background: none;
 }
 
+/*
+ * Deck card = the hero (design-critic Rx 4). `--deck` is set inline by Deck.tsx
+ * to the fixed per-deck colour (--deck-a/b/c/d). While playing: deck-colour
+ * ring + soft glow; a 2 px top-edge gradient line on the card always hints the
+ * colour. Scale only under full motion; reduced motion keeps the ring.
+ */
+.deck-card {
+    position: relative;
+    overflow: hidden;
+    transition:
+        box-shadow var(--dur-base) var(--ease-out),
+        transform var(--dur-base) var(--ease-out);
+}
+.deck-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    pointer-events: none;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in oklch, var(--deck) 70%, transparent) 30%,
+        var(--deck) 50%,
+        color-mix(in oklch, var(--deck) 70%, transparent) 70%,
+        transparent
+    );
+    opacity: 0.55;
+    transition: opacity var(--dur-base) var(--ease-out);
+}
+.deck-card[data-playing="true"] {
+    box-shadow:
+        var(--surface-shadow),
+        0 0 0 1px color-mix(in oklch, var(--deck) 60%, transparent),
+        0 0 32px -8px var(--deck);
+}
+.deck-card[data-playing="true"]::before {
+    opacity: 1;
+}
+:root[data-motion="full"] .deck-card[data-playing="true"] {
+    transform: scale(1.015);
+}
+
 input[type="range"] {
     accent-color: var(--primary);
 }

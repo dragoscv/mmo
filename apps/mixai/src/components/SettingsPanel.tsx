@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Check, RefreshCw, SlidersHorizontal, X } from "lucide-react";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, ThemeSettings } from "@mmo/ui";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SkeletonText, ThemeSettings } from "@mmo/ui";
 import { engine } from "@/bridge/engine";
 import type { AudioDevice } from "@/bridge/types";
 import { subscribeMidiLearn, type MidiLearnEvent } from "@/bridge/events";
@@ -21,7 +21,8 @@ import {
 import { DEVICE_PRESETS } from "@/lib/device-presets";
 import { buildProfileJson, applyProfileJson } from "@/lib/cloud-sync";
 import { useHidStore } from "@/state/hid-store";
-import { PluginManager } from "@/plugins/host";
+// Plugin manager pulls in the macro builder — load it only when the sheet renders.
+const PluginManager = lazy(() => import("@/plugins/host").then((m) => ({ default: m.PluginManager })));
 import {
     ALL_HID_ACTIONS,
     hidActionLabel,
@@ -86,7 +87,9 @@ export function SettingsPanel() {
                 </Section>
 
                 <Section title={t("settings.plugins")}>
-                    <PluginManager />
+                    <Suspense fallback={<SkeletonText lines={3} />}>
+                        <PluginManager />
+                    </Suspense>
                 </Section>
 
                 <p style={{ fontSize: 11, color: "var(--fg-dim)" }}>{t("settings.syncNote")}</p>

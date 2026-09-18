@@ -13,6 +13,9 @@ export default defineConfig({
     plugins: [react(), tailwindcss()],
     // Prevent Vite from obscuring Rust panics printed to the terminal.
     clearScreen: false,
+    // Relative asset URLs so the Tauri webview can load the built `dist/`
+    // (including dynamically imported chunks) from a file:// / tauri:// origin.
+    base: "./",
     resolve: {
         alias: {
             "@": here("./src"),
@@ -44,5 +47,21 @@ export default defineConfig({
         sourcemap: false,
         // Skip the gzip pass used only for the size report.
         reportCompressedSize: false,
+        rolldownOptions: {
+            output: {
+                // Vite 8 / rolldown: `codeSplitting.groups` replaces manualChunks.
+                // Framework + UI libraries go into a stable `vendor` chunk so app
+                // edits don't invalidate the cached library bytes.
+                codeSplitting: {
+                    groups: [
+                        {
+                            name: "vendor",
+                            test: /[\\/]node_modules[\\/](react|react-dom|scheduler|motion|framer-motion|@base-ui|lucide-react|cmdk|@tanstack)[\\/]/,
+                            priority: 10,
+                        },
+                    ],
+                },
+            },
+        },
     },
 });
