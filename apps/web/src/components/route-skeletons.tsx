@@ -19,6 +19,29 @@ function Header({ actions = 1 }: { actions?: number }) {
     );
 }
 
+/** Media Home (`/`): hero billboard + 3 poster rows (2:3). */
+export function MediaHomeSkeleton({ rows = 3 }: { rows?: number }) {
+    return (
+        <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8" aria-busy>
+            <div className="mb-6 flex flex-col gap-2">
+                <Skeleton className="h-7 w-40" />
+                <Skeleton className="h-4 w-72 max-w-full" />
+            </div>
+            <Skeleton className="mb-8 h-[38vh] w-full rounded-2xl" />
+            {Array.from({ length: rows }, (_, i) => (
+                <section key={i} className="mb-8">
+                    <Skeleton className="mb-3 h-5 w-40" />
+                    <div className="flex gap-3 overflow-hidden">
+                        {Array.from({ length: 8 }, (_, j) => (
+                            <Skeleton key={j} className="aspect-[2/3] w-36 shrink-0 rounded-xl" />
+                        ))}
+                    </div>
+                </section>
+            ))}
+        </div>
+    );
+}
+
 /** Dashboard: stat tiles + two content columns. */
 export function DashboardSkeleton() {
     return (

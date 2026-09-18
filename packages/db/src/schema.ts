@@ -140,7 +140,7 @@ export const devices = pgTable("devices", {
      *  via a per-device hostname. NULL until first provision. See
      *  drizzle/0015_device_tunnel.sql. */
     tunnelId: text("tunnel_id"),
-    /** FQDN the browser fetches (e.g. device-<short>.devices.muzicai.ro).
+    /** FQDN the browser fetches (e.g. device-<short>.devices.mixai.ro).
      *  CNAME of <tunnelId>.cfargotunnel.com. */
     tunnelHostname: text("tunnel_hostname"),
     /** AES-256-GCM envelope of the `cloudflared --token` bearer.
@@ -155,6 +155,36 @@ export const devices = pgTable("devices", {
     syncCursor: bigint("sync_cursor", { mode: "number" }).default(0),
     createdAt: timestamp("created_at").defaultNow(),
 });
+
+// ─── Device-code login (TV / limited-input) ─────────────────────────────────
+//
+// Plex/Netflix-style activation: the TV asks POST /api/device/code, shows
+// the `user_code`, the phone approves it on /activate, the TV polls
+// POST /api/device/token and receives an Auth.js `session` row. See
+// drizzle/0029_device_auth_codes.sql and docs/aplicatie/pairing.md.
+export const deviceAuthCodes = pgTable(
+    "device_auth_codes",
+    {
+        id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+        /** sha256(hex) of the opaque device_code the TV polls with. */
+        deviceCodeHash: text("device_code_hash").notNull().unique(),
+        /** 8 chars, alphabet without 0/O/1/I, stored WITHOUT dash. */
+        userCode: text("user_code").notNull().unique(),
+        deviceName: text("device_name").notNull(),
+        platform: text("platform").notNull(),
+        ip: text("ip"),
+        userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+        /** pending | approved | denied | consumed | expired */
+        status: text("status").notNull().default("pending"),
+        lastPolledAt: timestamp("last_polled_at", { withTimezone: true }),
+        expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+        createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    },
+    (t) => [
+        index("device_auth_codes_user_code_idx").on(t.userCode),
+        index("device_auth_codes_expires_idx").on(t.expiresAt),
+    ],
+);
 
 // ─── Device command queue ───────────────────────────────────────────────────
 //
@@ -982,3 +1012,43 @@ export type VideoRatingRow = typeof videoRatings.$inferSelect;
 export type VideoCollectionRow = typeof videoCollections.$inferSelect;
 export type VideoCollectionItemRow = typeof videoCollectionItems.$inferSelect;
 export type VideoBookmarkRow = typeof videoBookmarks.$inferSelect;
+
+// ─── Media Home — listen history + server sync (WP11-02) ─────────────────────
+// Server-side music play log (replaces the localStorage-only `playHistory`)
+// feeding Continue listening / Recently played rows, plus a per-device
+// revision marker for the MMO Server → web `/api/media/sync` push.
+// Expand-only: see drizzle/0030_media_home.sql.
+
+export const trackPlays = pgTable(
+    "track_plays",
+    {
+        id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        /** Family sub-profile, when one is active (watch_profiles is shared by Watch + Listen). */
+        profileId: bigint("profile_id", { mode: "number" }).references(() => watchProfiles.id, { onDelete: "set null" }),
+        trackId: integer("track_id").notNull().references(() => tracks.id, { onDelete: "cascade" }),
+        /** Companion / MMO Server the audio was streamed from (devices.id). */
+        deviceId: text("device_id"),
+        playedAt: timestamp("played_at", { withTimezone: true }).defaultNow().notNull(),
+        /** Seconds actually listened. */
+        durationSec: integer("duration_sec"),
+        /** True once ≥90 % of the track (or the natural end) was reached. */
+        completed: boolean("completed").default(false).notNull(),
+        /** web | companion | tv */
+        source: text("source").notNull().default("web"),
+    },
+    (t) => [
+        index("track_plays_user_played_idx").on(t.userId, t.playedAt.desc()),
+        index("track_plays_track_idx").on(t.trackId),
+    ],
+);
+
+/** Last library revision each MMO Server pushed to the web (etag-style sync cursor). */
+export const mediaSyncState = pgTable("media_sync_state", {
+    deviceId: text("device_id").primaryKey().references(() => devices.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull().default(0),
+    syncedAt: timestamp("synced_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type TrackPlayRow = typeof trackPlays.$inferSelect;
+export type MediaSyncStateRow = typeof mediaSyncState.$inferSelect;

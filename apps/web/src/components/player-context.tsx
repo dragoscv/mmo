@@ -13,6 +13,7 @@ import { getCinemaSettings } from "@/hooks/use-cinema-settings";
 import type { Track } from "@/db/schema";
 import { audioPreloadCache } from "@/lib/audio-preload-cache";
 import { useRenderCount, dlog } from "@/lib/dev-debugger";
+import { createPlayRecorder } from "@/lib/play-recorder";
 
 type RepeatMode = "off" | "one" | "all";
 
@@ -237,6 +238,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const videoSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
     const videoGainRef = useRef<GainNode | null>(null);
     const videoElListenersRef = useRef<{ el: HTMLVideoElement; cleanup: () => void } | null>(null);
+    // Server-side listen history (track_plays) — fire-and-forget, debounced.
+    const [playRecorder] = useState(() => createPlayRecorder());
+    const playRecorderRef = useRef(playRecorder);
+    useEffect(() => () => playRecorder.dispose(), [playRecorder]);
 
     // Safe play helper — resumes AudioContext (browser autoplay policy) and
     // catches AbortError when src changes mid-play
@@ -374,6 +379,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const history = s.currentTrack
             ? [s.currentTrack, ...s.playHistory].slice(0, 100)
             : s.playHistory;
+        // Record the outgoing track (switch = debounced; the `ended` handler
+        // pushes an immediate completed event before calling us).
+        if (s.currentTrack && s.currentTrack.id !== newTrack.id) {
+            playRecorderRef.current?.push({
+                trackId: s.currentTrack.id,
+                listenedSec: s.currentTime,
+                durationSec: s.duration || s.currentTrack.duration || null,
+            });
+        }
         // Starting audio playback always supersedes video — close any active video.
         if (s.currentVideo) videoElRef.current?.pause();
         return {
@@ -463,6 +477,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             setState((s) => ({ ...s, duration: audio.duration }));
         });
         audio.addEventListener("ended", () => {
+            const ended = stateRef.current.currentTrack;
+            if (ended) {
+                playRecorderRef.current?.push({
+                    trackId: ended.id,
+                    listenedSec: audio.duration || stateRef.current.currentTime,
+                    durationSec: audio.duration || ended.duration || null,
+                    ended: true,
+                });
+            }
             setState((s) => {
                 const repeat = repeatRef.current;
                 const shuffle = shuffleRef.current;

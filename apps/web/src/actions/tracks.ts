@@ -168,6 +168,7 @@ export async function updateTrack(
         await companionLibrary.updateTrack(link, idCheck.data, dataCheck.data as Partial<CompanionTrack>);
         revalidatePath("/library");
         revalidatePath("/");
+        revalidatePath("/dashboard");
         return { success: true };
     } catch (err) {
         return { success: false, error: err instanceof Error ? err.message : "Update failed" };
@@ -239,6 +240,7 @@ export async function deleteTrack(
         await companionLibrary.deleteTrack(link, idCheck.data);
         revalidatePath("/library");
         revalidatePath("/");
+        revalidatePath("/dashboard");
         return { success: true };
     } catch (err) {
         return { success: false, error: err instanceof Error ? err.message : "Delete failed" };
@@ -259,6 +261,7 @@ export async function hideTracks(
         const r = await companionLibrary.setHidden(link, check.data, true);
         revalidatePath("/library");
         revalidatePath("/");
+        revalidatePath("/dashboard");
         return { success: true, count: r.count };
     } catch (err) {
         return { success: false, count: 0, error: err instanceof Error ? err.message : "Hide failed" };
@@ -278,6 +281,7 @@ export async function unhideTracks(
         revalidatePath("/library");
         revalidatePath("/library/hidden");
         revalidatePath("/");
+        revalidatePath("/dashboard");
         return { success: true, count: r.count };
     } catch (err) {
         return { success: false, count: 0, error: err instanceof Error ? err.message : "Unhide failed" };

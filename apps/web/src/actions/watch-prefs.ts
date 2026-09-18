@@ -47,6 +47,7 @@ export async function saveWatchPrefs(next: Partial<WatchPrefs>): Promise<{ ok: b
     if (!merged.regions.includes(merged.defaultRegion)) merged.defaultRegion = merged.regions[0];
     await db.update(watchProfiles).set({ prefs: merged })
         .where(and(eq(watchProfiles.userId, ctx.userId), eq(watchProfiles.id, ctx.profileId)));
+    revalidatePath("/");
     revalidatePath("/watch");
     revalidatePath("/watch/settings");
     revalidatePath("/settings/video");

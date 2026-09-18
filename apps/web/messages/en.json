@@ -493,6 +493,7 @@
     "tagline": "AI music suite for DJs and producers",
     "empty": {
         "features": {
+            "home": "your home",
             "dashboard": "your dashboard",
             "library": "your library",
             "playlists": "your playlists",
@@ -545,6 +546,7 @@
         }
     },
     "nav": {
+        "home": "Home",
         "dashboard": "Dashboard",
         "library": "Library",
         "analysis": "Analysis",
@@ -676,6 +678,10 @@
         "skipNoteLine1": "You can also use the app without signing in.",
         "skipNoteLine2": "Settings will be stored locally in your browser."
     },
+    "home": {
+        "title": "Home",
+        "subtitle": "Movies, shows and music from every MixAI server — pick up where you left off."
+    },
     "dashboard": {
         "empty": {
             "scanToPopulate": "Scan & analyze tracks to populate",
@@ -742,7 +748,8 @@
         "onboardingHint": "Replay the welcome tour",
         "signOut": "Sign out",
         "pageKeywords": {
-            "dashboard": "home overview stats",
+            "home": "home start media watch listen continue",
+            "dashboard": "dashboard overview stats library",
             "library-tracks": "tracks songs music browse",
             "playlists": "playlist collections sets",
             "visualizations": "charts graphs visual",

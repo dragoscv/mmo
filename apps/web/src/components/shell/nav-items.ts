@@ -14,7 +14,7 @@ export interface ShellTab {
 }
 
 /** Root nav keys that get a bottom-tab slot, in order. */
-const TAB_KEYS = ["dashboard", "library", "watch", "music"] as const;
+const TAB_KEYS = ["home", "library", "watch", "music"] as const;
 
 function nodeByKey(key: string): NavLeaf | NavParent | undefined {
     return navTree.find((n) => n.key === key);

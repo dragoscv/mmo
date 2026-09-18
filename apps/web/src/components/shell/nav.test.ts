@@ -73,17 +73,29 @@ describe("shellTabs", () => {
         expect(shellTabs.length).toBeLessThanOrEqual(5);
         expect(shellTabs.at(-1)).toMatchObject({ id: "more", more: true });
         expect(shellTabs.find((t) => t.id === "library")?.href).toBe("/library");
-        expect(shellTabs.find((t) => t.id === "dashboard")?.href).toBe("/");
+        expect(shellTabs.find((t) => t.id === "home")?.href).toBe("/");
+        expect(shellTabs.find((t) => t.id === "dashboard")).toBeUndefined();
+    });
+
+    it("dashboard moved to /dashboard and home owns /", () => {
+        const dashboard = allLeaves.find((l) => l.key === "dashboard")!;
+        const home = allLeaves.find((l) => l.key === "home")!;
+        expect(dashboard.href).toBe("/dashboard");
+        expect(home.href).toBe("/");
+        expect(home.exact).toBe(true);
+        expect(currentNavLabel("/dashboard")).toEqual({ key: "dashboard", label: "Dashboard" });
+        expect(currentNavLabel("/")).toEqual({ key: "home", label: "Home" });
     });
 
     it("isTabActive matches the parent namespace and never the 'more' tab", () => {
         const library = shellTabs.find((t) => t.id === "library")!;
-        const dashboard = shellTabs.find((t) => t.id === "dashboard")!;
+        const home = shellTabs.find((t) => t.id === "home")!;
         const more = shellTabs.find((t) => t.id === "more")!;
         expect(isTabActive(library, "/playlists")).toBe(true);
         expect(isTabActive(library, "/mixer")).toBe(false);
-        expect(isTabActive(dashboard, "/")).toBe(true);
-        expect(isTabActive(dashboard, "/library")).toBe(false);
+        expect(isTabActive(home, "/")).toBe(true);
+        expect(isTabActive(home, "/dashboard")).toBe(false);
+        expect(isTabActive(home, "/library")).toBe(false);
         expect(isTabActive(more, "/settings")).toBe(false);
     });
 

@@ -161,6 +161,7 @@ export async function renameSession(sessionId: string, title: string): Promise<{
         .set({ title: title.slice(0, 200), updatedAt: new Date() })
         .where(and(eq(aiAgentSessions.id, sessionId), eq(aiAgentSessions.userId, userId)));
     revalidatePath("/");
+    revalidatePath("/dashboard");
     return { ok: true };
 }
 
@@ -182,6 +183,7 @@ export async function updateSessionMeta(
         .set(set)
         .where(and(eq(aiAgentSessions.id, sessionId), eq(aiAgentSessions.userId, userId)));
     revalidatePath("/");
+    revalidatePath("/dashboard");
     return { ok: true };
 }
 
@@ -191,6 +193,7 @@ export async function deleteSession(sessionId: string): Promise<{ ok: true }> {
         .delete(aiAgentSessions)
         .where(and(eq(aiAgentSessions.id, sessionId), eq(aiAgentSessions.userId, userId)));
     revalidatePath("/");
+    revalidatePath("/dashboard");
     return { ok: true };
 }
 

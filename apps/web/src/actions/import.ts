@@ -89,6 +89,7 @@ export async function importRekordboxAction(xmlPath?: string) {
         const r = await companionLibrary.ingestTracks(link, tracksToIngest);
 
         revalidatePath("/");
+        revalidatePath("/dashboard");
         revalidatePath("/library");
         revalidatePath("/playlists");
 

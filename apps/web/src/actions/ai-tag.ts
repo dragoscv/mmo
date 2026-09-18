@@ -334,6 +334,7 @@ export async function bulkSuggestAndApplyTags(
     }
     revalidatePath("/library");
     revalidatePath("/");
+    revalidatePath("/dashboard");
     return {
         success: true,
         provider: picked.provider,

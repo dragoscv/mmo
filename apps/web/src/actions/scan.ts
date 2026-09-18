@@ -68,6 +68,7 @@ export async function scanFolderAction(folderPath: string): Promise<ScanResult> 
     }
 
     revalidatePath("/");
+    revalidatePath("/dashboard");
     revalidatePath("/library");
     revalidatePath("/scanner");
 

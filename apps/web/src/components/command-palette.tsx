@@ -192,7 +192,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                     } catch {
                         /* storage disabled */
                     }
-                    router.push("/");
+                    router.push("/dashboard");
                 },
             },
         ];

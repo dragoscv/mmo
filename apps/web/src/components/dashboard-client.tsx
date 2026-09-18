@@ -601,10 +601,11 @@ function formatTotalDuration(seconds: number) {
 // ── Main Dashboard ───────────────────────────────────────────────
 
 export function DashboardClient({ stats, recommendedCategories, recentScans, growth = [] }: DashboardClientProps) {
-    useRenderCount("Page:/");
+    useRenderCount("Page:/dashboard");
     useSyncRefresh();
     const greeting = getGreeting();
     const locale = useLocale() as "ro" | "en";
+    const tNav = useTranslations("nav");
 
     return (
         <div className="flex flex-col h-full">
@@ -620,7 +621,7 @@ export function DashboardClient({ stats, recommendedCategories, recentScans, gro
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div>
                             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                                Dashboard
+                                {tNav("dashboard")}
                                 <span className="text-xl">{greeting.emoji}</span>
                             </h1>
                             <p className="text-muted-foreground mt-1">{greeting.text} — your library at a glance</p>

@@ -66,6 +66,7 @@ export async function organizeTrack(trackId: number, genre: string) {
         revalidatePath("/library");
         revalidatePath("/scanner");
         revalidatePath("/");
+        revalidatePath("/dashboard");
     }
 
     return result;

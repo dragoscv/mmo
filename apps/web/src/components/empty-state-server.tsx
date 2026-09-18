@@ -9,6 +9,7 @@ import { getTranslations } from "next-intl/server";
 import { NotSignedIn, NoCompanion } from "@/components/library-empty-state";
 
 export type EmptyFeatureKey =
+    | "home"
     | "dashboard"
     | "library"
     | "playlists"

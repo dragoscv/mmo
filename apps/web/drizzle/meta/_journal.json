@@ -120,6 +120,20 @@
       "when": 1737072000000,
       "tag": "0016_device_folders_mirror",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1789862400000,
+      "tag": "0029_device_auth_codes",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1789948800000,
+      "tag": "0030_media_home",
+      "breakpoints": true
     }
   ]
 }

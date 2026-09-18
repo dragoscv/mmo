@@ -196,10 +196,12 @@ export async function reconcileCloudWithCompanions(): Promise<ReconcileSummary> 
     if (totalPruned > 0) {
         revalidatePath("/library");
         revalidatePath("/");
+        revalidatePath("/dashboard");
     }
     if (deduped > 0 || totalPruned > 0) {
         revalidatePath("/library");
         revalidatePath("/");
+        revalidatePath("/dashboard");
     }
     return { results, totalPruned, backfilled, deduped };
 }

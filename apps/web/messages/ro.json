@@ -493,6 +493,7 @@
     },
     "empty": {
         "features": {
+            "home": "pagina ta de start",
             "dashboard": "panoul tău principal",
             "library": "biblioteca ta",
             "playlists": "playlist-urile tale",
@@ -545,6 +546,7 @@
         }
     },
     "nav": {
+        "home": "Acasă",
         "dashboard": "Panou principal",
         "library": "Bibliotecă",
         "analysis": "Analiză",
@@ -676,6 +678,10 @@
         "skipNoteLine1": "Poți folosi aplicația și fără autentificare.",
         "skipNoteLine2": "Setările vor fi salvate local în browser."
     },
+    "home": {
+        "title": "Acasă",
+        "subtitle": "Filme, seriale și muzică de pe toate serverele MixAI — continuă de unde ai rămas."
+    },
     "dashboard": {
         "empty": {
             "scanToPopulate": "Scanează și analizează piese ca să populezi",
@@ -742,7 +748,8 @@
         "onboardingHint": "Reia turul de bun venit",
         "signOut": "Deconectare",
         "pageKeywords": {
-            "dashboard": "acasă home overview statistici",
+            "home": "acasă start media vizionare ascultare continuă",
+            "dashboard": "panou overview statistici bibliotecă",
             "library-tracks": "piese melodii muzică bibliotecă",
             "playlists": "playlist colecții seturi",
             "visualizations": "grafice vizualizări",

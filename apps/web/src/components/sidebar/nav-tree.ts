@@ -35,8 +35,9 @@ export interface NavParent {
 export type NavNode = NavLeaf | NavParent;
 
 export const navTree: NavNode[] = [
+    { kind: "leaf", key: "home", href: "/", label: "Home", icon: Home, exact: true },
     {
-        kind: "leaf", key: "dashboard", href: "/", label: "Dashboard",
+        kind: "leaf", key: "dashboard", href: "/dashboard", label: "Dashboard",
         icon: LayoutDashboard, exact: true,
     },
     {
