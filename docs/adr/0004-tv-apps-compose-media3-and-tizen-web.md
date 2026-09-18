@@ -31,6 +31,9 @@ Capacitor over the existing web, `react-native-tvos` + Expo, Kotlin + Compose fo
 ## Consequences
 - New toolchain in CI (JDK 17, Gradle 9.7, AGP 9.4, Android SDK 37). The Kotlin API
   client (`data/MmoApi.kt`) is **hand-written** over `HttpURLConnection` +
-  kotlinx.serialization; generating it from an OpenAPI document is tracked as WP9-06
-  in `docs/mixai-design-tracker.md`. *(Corrected 2026-09-18.)*
+  kotlinx.serialization. **WP9-06 (done 2026-09-18):** the server now ships an OpenAPI 3.1
+  document (`server/openapi.yaml`, drift-guarded by `pnpm openapi:check`); `pnpm openapi:gen`
+  emits `data/generated/Models.kt` (`@Serializable` data classes) for this app and the typed
+  TS client `@mmo/sdk/mmo-server`. Rewiring `MmoApi.kt` onto the generated models is a
+  follow-up. See `docs/companion/api.md`. *(Corrected 2026-09-18.)*
 - Login on TV uses Quick Connect (6-digit code approved from a logged-in device).

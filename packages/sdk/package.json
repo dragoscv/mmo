@@ -6,10 +6,25 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./mmo-server": "./src/mmo-server.ts",
+    "./generated/mmo-server": "./src/generated/mmo-server.d.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src"
+  ],
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "gen:openapi": "pnpm --dir ../../server exec openapi-typescript openapi.yaml -o ../packages/sdk/src/generated/mmo-server.d.ts"
   },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.17.0"
   }
 }

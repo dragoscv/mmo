@@ -11,6 +11,7 @@
 | Document | Subiect |
 |----------|---------|
 | [tunnel-setup.md](tunnel-setup.md) | Cloudflare Tunnel per device — acces din browser fără LAN |
+| [api.md](api.md) | OpenAPI 3.1 (`server/openapi.yaml`), drift guard `openapi:check`, regenerare clienți TS + Kotlin |
 | [server/README.md § Endpoints](../../server/README.md#-endpoints-http-expuse) | Endpoints HTTP locale expuse pe `:17899` |
 | [server/README.md § OpenSubsonic](../../server/README.md#-opensubsonic-api-rest) | API OpenSubsonic (`/rest/*`) pentru Symfonium, Feishin, DSub… |
 | [server/README.md § Release flow](../../server/README.md#-release-flow) | Auto-update prin GitHub Releases |
