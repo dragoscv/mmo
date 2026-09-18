@@ -1,4 +1,4 @@
- done ff5ac02 | done ee81854 | done matrix 22/22 (.copilot-tmp/matrix.log) | done 3fa73f2 | done 70b637f | done 85a8bc3 | done ee81854 | done 1d7ea4f |# MixAI Design System & UX Overhaul — canonical plan and tracker
+# MixAI Design System & UX Overhaul — canonical plan and tracker
 
 > Single source of truth for the cross-surface design overhaul (2026-09). Pairs with
 > `docs/mixai-design-tracker.csv` (same items, spreadsheet form). Update both in the same commit.
@@ -22,6 +22,16 @@
 | D12 | Delivery order | WP0 → WP1 (web upgrades) → WP2 (web UI) → WP3–7 in parallel subagents → WP8 | 2026-09-17 |
 | D13 | Extra recommendations | ALL in: web CI, `/dev/ui` catalog, unified command palette + shortcuts, nuqs, haptics/sound cues (opt-in), `@serwist/next`, OpenAPI-generated Kotlin/TS clients | 2026-09-17 |
 | D14 | Versioning | **major bump everywhere**: web 2.0.0, companion 3.0.0, extension 3.0.0, mixai/native 1.0.0, tv 1.0.0 | 2026-09-17 |
+| D15 | Media Home location | `/` becomes **Media Home** (Watch rows + Listen rows); music dashboard moves to `/dashboard` | 2026-09-18 |
+| D16 | Multi-server | aggregated by default across all paired MMO Servers, dedupe by TMDB id, per-server chips + unreachable state | 2026-09-18 |
+| D17 | Recommendation brain | **MMO Server** owns TMDB client + cache (SQLite) + recs; web/TV consume `/media/*`; history synced server↔web | 2026-09-18 |
+| D18 | Exact deep links | **Movie of the Night** Streaming Availability (free 1k/mo, RO, commercial OK) cached 7 d → fallback TMDB watch/providers → provider search URL; **no** JustWatch GraphQL | 2026-09-18 |
+| D19 | Trakt | dropped — own history/watchlist/ratings model + own sync; existing scrobble stays env-gated no-op | 2026-09-18 |
+| D20 | Pirate embeds | **remove** `streaming-scrapers.ts`, `/video/streams`, `StreamSourcePicker`, vidsrc flag (ADR-0009) | 2026-09-18 |
+| D21 | Shared progress | TVs read/write progress via MMO Server → web (seconds, per profile); local fallback offline; one-shot migration of local progress | 2026-09-18 |
+| D22 | Listen half | full: `track_plays` table + actions, Continue listening / New albums / Favourites / Playlists aggregated, `AlbumCard` | 2026-09-18 |
+| D23 | Agent config & gates | AGENTS.md + copilot-instructions + 11 instructions + 11 skills; lint-staged path-scoped gates; CI bundle/LHCI/axe/knip/lychee/actionlint; commitlint; weekly `pnpm outdated` issue | 2026-09-18 |
+| D24 | Keys | user authenticates in browser (MOTN developer portal) and provides key out-of-band; all integrations no-op without key | 2026-09-18 |
 
 ## 1. Research summary (verified 2026-09-17)
 
@@ -261,3 +271,79 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 ## 8. Follow-ups
 
 - **WP1-07 — Weekly (Mondays):** retry `typescript@7` on apps/web once typescript-eslint ≥ 8.71 / TS7-capable ships (typescript-eslint#10940), and `eslint@10` once eslint-plugin-react peer allows it; command: `pnpm outdated typescript eslint typescript-eslint eslint-plugin-react` in apps/web. Owner: agent, next check 2026-09-21.
+
+---
+
+## 9. Media Home — research summary (verified 2026-09-18)
+
+- **Web** `/watch/*` already has: TMDB client (`lib/tmdb.ts`, key `TMDB_API_KEY`, 1 h fetch cache), `tmdbWatchProviders(Multi)` + `ExternalProvidersRow` (logos only), `video-recommendations.ts`, `up-next.ts`, `watch-prefs.ts` (`regions ["RO","US"]`, `localOnly`, `hideWatched`), `watch_history` per **profile** (`completed` at >90 %), `PosterRow`/`PosterCard`, `discover/{movie,tv}/[id]` for non-owned titles. Every video path uses **one** `getCompanionLink()`; `aggregateAcrossCompanions` exists but only music uses it. `video_files.device_id` set from an arbitrary first `companion_devices` row. No companion fileId stored → `/video/lookup?path=` at play.
+- **Two device tables**: `devices` (urls, token, tunnel) vs `companion_devices` (FK target of `video_files`) bridged by `machine_id = devices.id`.
+- **Server**: no video DB, no TMDB API key, no progress, no etag; `POST /video/scan` is the only list (synchronous ffprobe). `tmdb-cache.ts` = images only. `streaming-scrapers.ts` = pirate embed URL builder (flag OFF) → remove (D20).
+- **TVs**: single server each, local progress (Android ms / Tizen s), zero deep-link code; tv-android has no `<queries>`; tizen lacks `application.launch` privilege. Both proxy TMDB images through the server.
+- **Music**: no server-side play history (localStorage only), no album grouping/card, playlists via single companion.
+- **External APIs**: TMDB ~40 req/s, `append_to_response` (≤20); providers `link` = TMDB→JustWatch page (attribution required). MOTN v4 `GET /shows/movie/{tmdbId}?country=ro` → `streamingOptions.ro[].{service,type,link}`, free 1 000 req/mo. Trakt needs VIP to register apps → dropped (D19).
+- **Deep links**: web URL / Android package + `ACTION_VIEW`+`setPackage` (`<queries>`) / Tizen `launchAppControl(view,url,PAYLOAD)` + `getAppInfo`. Full table in `docs/aplicatie/media-home.md`.
+- **Agent config**: repo has NO `.github/copilot-instructions.md`, instructions or skills; husky bumps only web/extension; LHCI/axe/OpenAPI/i18n gates exist as scripts but are not wired.
+
+## 10. Media Home — architecture
+
+```
+ web (Next 16) ──/media/* (device token)──▶ MMO Server A ──▶ TMDB / MOTN (keys on server, SQLite cache)
+   │  fan-out to N servers, dedupe by tmdbId  │ media.sqlite: titles, providers, recs, progress, plays, library etag
+   │  chips per server                        ◀── TV Android / Tizen (same /media/*; native intents)
+   └──▶ Postgres (profiles, history mirror, track_plays, prefs) ◀── sync: server → web on change + hourly
+```
+- Server `media` module (`server/src/media/`): `tmdb.ts` (bearer, limiter, `append_to_response`), `availability.ts` (MOTN → TMDB providers → search URL; `providers.ts` registry with web/android/tizen launch data), `recs.ts` (profile vector from watched/ratings; RRF over TMDB recs of last 15; WR prior; exclude watched/owned/dismissed; ≤2 per collection; cold-start trending RO), `progress.ts`, `library.ts` (video index + etag), `routes.ts`. TTLs: details/images 30 d, recs 24 h, providers 24 h, MOTN 7 d, trending 6 h.
+- Web: `/` = `MediaHome` RSC → fan-out via `aggregateAcrossCompanions`, merge by `tmdbId` with `sources[]`; `HeroBillboard` + `MediaRow` (embla, keyboard/D-pad, virtualised >40) + Listen rows; `/media/[kind]/[tmdbId]` unified title page (Play on <server> if local, else provider deep links); `/dashboard` = old page. Codai curator optional.
+- TVs: same JSON; Android `ProviderLauncher` (`<queries>`, fallback), Watch Next channel; Tizen `launch.ts` (`launchAppControl`, `getAppInfo`); progress via `/media/progress` with local fallback queue.
+
+## 11. Media Home — work packages
+
+### WP10 — Server media module
+| ID | Item | Status |
+|---|---|---|
+| WP10-01 | `server/src/media/` scaffold: SQLite `media.sqlite` (titles/providers/recs_cache/progress/track_plays/library_index), env `TMDB_API_KEY`, `MOTN_API_KEY`, `MEDIA_REGION`=RO; no-op without keys | todo |
+| WP10-02 | TMDB client with limiter + `append_to_response`; trending/popular/discover(watch_region) | todo |
+| WP10-03 | Availability resolver: MOTN v4 (7 d) → TMDB providers (24 h) → registry search URLs; registry (Netflix, Disney+, HBO Max, Prime, Apple TV+, SkyShowtime, Voyo, AntenaPlay, YouTube, Google TV) with web/android/tizen launch data | todo |
+| WP10-04 | Recs engine + rows builder (Continue, Top picks, Because you watched ×3, Trending RO on your providers, Upcoming RO, New in library) 24 h cache | todo |
+| WP10-05 | Video library index with etag (scan + watcher), `GET /media/library?since=`, server returns `serverId` for attribution | todo |
+| WP10-06 | Progress + plays API (`/media/progress` GET/PUT seconds per profile; `/media/plays`) + push sync to web `/api/media/sync` | todo |
+| WP10-07 | Routes `/media/home`, `/media/title/:kind/:id`, `/media/search`, `/media/etag`; OpenAPI + `openapi:check` + Kotlin/SDK regen; server 3.1.0 | todo |
+| WP10-08 | Remove pirate embeds (D20): streaming-scrapers, `/video/streams`, vidsrc flag, web `StreamSourcePicker`; ADR-0009 | todo |
+| WP10-09 | Tests: recs scoring, availability chain, progress upsert, routes (vitest, Node 22) | todo |
+
+### WP11 — Web Media Home
+| ID | Item | Status |
+|---|---|---|
+| WP11-01 | Move dashboard to `/dashboard` (nav-tree, TAB_KEYS, i18n, tests, revalidate paths, palette) | todo |
+| WP11-02 | `lib/media/aggregate.ts` fan-out + merge by tmdbId → `sources[]`, per-server status; DB migration `track_plays` + `media_sync_state` (expand-only) | todo |
+| WP11-03 | `/` MediaHome RSC: `HeroBillboard` (backdrop + logo treatment, artwork accent), `MediaRow` (embla 8.6, keyboard, virtualised), server chips (nuqs), `loading.tsx`, empty/no-server states, ultrawide layout | todo |
+| WP11-04 | Title page `/media/[kind]/[tmdbId]`: local sources per server, provider buttons (deep link / search fallback, attribution), trailer, similar, watchlist, mark watched, hide; redirects from `/watch/discover/*` | todo |
+| WP11-05 | Listen rows: `track_plays` recording, Continue listening, New albums (album grouping), Favourites, Playlists aggregated, `AlbumCard`; localStorage history migrated once | todo |
+| WP11-06 | Settings › Media: region, preferred providers, hide watched, curator toggle; Settings › Video merged | todo |
+| WP11-07 | Codai curator (env-gated): row titles + one-line "why", 24 h cache | todo |
+| WP11-08 | i18n RO+EN for new strings + sweep hardcoded RO in watch pages; a11y (rows role=list, focus, reduced motion) | todo |
+| WP11-09 | Tests: aggregate merge, row builders, title page states; e2e home at 4 widths light/dark | todo |
+
+### WP12 — TV apps
+| ID | Item | Status |
+|---|---|---|
+| WP12-01 | tv-android: `MediaRepository` on `/media/*`, hero + rows, title screen with provider buttons, `ProviderLauncher` + `<queries>`, Watch Next, progress via server + local fallback; RO/EN | todo |
+| WP12-02 | tv-tizen: `/media/*` client, hero + rows, title screen, `launch.ts` (`launchAppControl`, `getAppInfo`, privilege), progress via server | todo |
+| WP12-03 | Device verification: Google TV 192.168.100.31 + Odyssey 192.168.100.135 — open Netflix/YouTube from a title, progress round-trip web↔TV | todo |
+
+### WP13 — Agent config & gates (D23)
+| ID | Item | Status |
+|---|---|---|
+| WP13-01 | `AGENTS.md`, `.github/copilot-instructions.md`, 11 `.github/instructions/*.instructions.md` | todo |
+| WP13-02 | 11 `.github/skills/*/SKILL.md` | todo |
+| WP13-03 | Scripts promoted: `scripts/tracker-regen-csv.mjs`, `apps/web/scripts/i18n-parity.mjs`, `apps/web/scripts/bundle-budget.mjs`, `scripts/hex-gate.mjs`; tokens mirror list += mixai/server prehydrate | todo |
+| WP13-04 | Husky `prepare` + lint-staged path-scoped gates (i18n, tokens, OpenAPI, hex/Color(0x), tracker csv, version bumps server/packages) + commitlint | todo |
+| WP13-05 | CI: `server-ci.yml`, web-ci += bundle budget/LHCI/axe/knip, `docs-ci.yml` lychee, actionlint, `deps-weekly.yml` | todo |
+| WP13-06 | Mutation-test every gate (break → red → restore) → `docs/arhitectura/gates.md` | todo |
+
+### WP14 — Closure
+| ID | Item | Status |
+|---|---|---|
+| WP14-01 | Matrix green; design-critic on Media Home; CHANGELOGs; versions web 2.1.0, server 3.1.0, tv 1.1.0; ADR-0009 + ADR-0010 | todo |
+| WP14-02 | Round 4 askQuestions reality check | todo |
