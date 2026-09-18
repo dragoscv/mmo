@@ -2,6 +2,15 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.1.0 — remove third-party embed sources (WP10-08, ADR-0009)
+
+- **Removed: third-party embed sources (vidsrc & co.)** — see
+	[ADR-0009](../docs/adr/0009-remove-third-party-embed-sources.md). Deleted
+	`library/streaming-scrapers.ts` and `library/vidsrc-flag.ts`; dropped `GET /video/streams/:kind/:tmdbId`;
+	`vidsrcEnabled` no longer appears in `/video/probe` or `/video/flags` (the settings key
+	`video.externalEmbed.vidsrc.enabled` is ignored). OpenAPI 3.1.0: path and `EmbedOption` schema removed,
+	Kotlin/TS models regenerated.
+
 ## 3.0.0 — UI rewrite on the shared design system + runtime upgrade (WP1-13, WP5, WP9-07)
 
 - **Renderer rewritten (WP5).** The 1400-line vanilla `ui/index.html` ("Connect to MMO",

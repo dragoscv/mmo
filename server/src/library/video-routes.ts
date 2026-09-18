@@ -3,7 +3,7 @@
  *
  * Routes:
  *   GET    /video/probe                  health + capabilities
- *   GET    /video/flags                  feature flags (vidsrc etc.)
+ *   GET    /video/flags                  feature flags (preRemuxAutoOnScan)
  *   POST   /video/flags                  update feature flags
  *   POST   /video/scan                   scan configured folders, returns probed metadata
  *   GET    /video/stream/:fileId         HLS playlist for a known file (returns m3u8)
@@ -31,10 +31,8 @@ import { ensureHlsSession, touchSession, canDirectPlay, destroySessionsForFile, 
 import { FFMPEG_BIN } from "./ffmpeg-paths";
 import { enqueuePreRemux, getPreRemuxJob, listPreRemuxJobs, cancelPreRemux, sidecarIfExists, preRemuxBus } from "./pre-remux";
 import { getCachedTmdbImage } from "./tmdb-cache";
-import { isVidsrcEnabled, setVidsrcEnabled } from "./vidsrc-flag";
 import { initDiscordRpc, setPresence, shutdownDiscordRpc, rpcBus } from "../plugins/discord-rpc";
 import { getSettings, updateSettings } from "../store";
-import { resolveStreamingEmbeds, type ScrapeKind } from "./streaming-scrapers";
 import { searchOpenSubtitles, searchAddic7ed, downloadOpenSubtitles } from "./subtitle-search";
 import { startVideoWatcher, stopVideoWatcher, videoLibraryBus } from "./video-watcher";
 import { rateLimit } from "./rate-limit";
@@ -144,24 +142,20 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
         res.json({
             ok: true,
             capabilities: ["video.scan", "video.transcode", "video.subtitles", "video.tmdb-cache"],
-            vidsrcEnabled: isVidsrcEnabled(),
             ffmpeg: !!FFMPEG_BIN,
         });
     });
 
     r.get("/flags", authMiddleware, (_req, res) => {
         res.json({
-            vidsrcEnabled: isVidsrcEnabled(),
             preRemuxAutoOnScan: getSettings().preRemuxAutoOnScan,
         });
     });
 
     r.post("/flags", authMiddleware, express.json(), (req, res) => {
-        const body = req.body as { vidsrcEnabled?: boolean; preRemuxAutoOnScan?: boolean };
-        if (typeof body.vidsrcEnabled === "boolean") setVidsrcEnabled(body.vidsrcEnabled);
+        const body = req.body as { preRemuxAutoOnScan?: boolean };
         if (typeof body.preRemuxAutoOnScan === "boolean") updateSettings({ preRemuxAutoOnScan: body.preRemuxAutoOnScan });
         res.json({
-            vidsrcEnabled: isVidsrcEnabled(),
             preRemuxAutoOnScan: getSettings().preRemuxAutoOnScan,
         });
     });
@@ -477,20 +471,6 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
             bus.off("change", onChange);
             bus.off("error", onError);
         });
-    });
-
-    // ----- External streaming embed sources -----
-    const scrapersLimiter = rateLimit({ windowMs: 60_000, max: 30 });
-    r.get("/streams/:kind/:tmdbId", authMiddleware, scrapersLimiter, (req, res) => {
-        const kind = req.params.kind as ScrapeKind;
-        if (kind !== "movie" && kind !== "tv") { res.status(400).json({ error: "bad kind" }); return; }
-        const tmdbId = parseInt(req.params.tmdbId, 10);
-        if (!Number.isFinite(tmdbId)) { res.status(400).json({ error: "bad tmdbId" }); return; }
-        const imdbId = typeof req.query.imdb === "string" ? req.query.imdb : undefined;
-        const season = req.query.season ? parseInt(String(req.query.season), 10) : undefined;
-        const episode = req.query.episode ? parseInt(String(req.query.episode), 10) : undefined;
-        const options = resolveStreamingEmbeds({ tmdbId, imdbId, kind, season, episode });
-        res.json({ options });
     });
 
     // ----- Subtitle providers -----

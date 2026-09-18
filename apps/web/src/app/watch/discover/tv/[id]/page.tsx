@@ -12,11 +12,9 @@ import {
     tmdbTvRecommendations,
     tmdbWatchProvidersMulti,
 } from "@/lib/tmdb";
-import { getCompanionVideoFlags } from "@/lib/companion-video";
 import { getWatchPrefs } from "@/actions/watch-prefs";
 import { MovieDetailLayout } from "@/components/video/movie-detail-layout";
 import { TrailerButton } from "@/components/video/trailer-modal";
-import { StreamSourcePicker } from "@/components/video/stream-source-picker";
 import { ExternalProvidersRow } from "@/components/video/external-providers-row";
 
 export const dynamic = "force-dynamic";
@@ -37,14 +35,13 @@ export default async function DiscoverTv({ params }: { params: Promise<{ id: str
     }
 
     const prefs = await getWatchPrefs();
-    const [tv, credits, videos, providers, similarHits, recHits, flags] = await Promise.all([
+    const [tv, credits, videos, providers, similarHits, recHits] = await Promise.all([
         tmdbTv(tmdbId),
         tmdbTvCredits(tmdbId),
         tmdbTvVideos(tmdbId),
         tmdbWatchProvidersMulti("tv", tmdbId, prefs.regions),
         tmdbTvSimilar(tmdbId).catch(() => []),
         tmdbTvRecommendations(tmdbId).catch(() => []),
-        getCompanionVideoFlags(),
     ]);
     if (!tv) notFound();
 
@@ -65,17 +62,6 @@ export default async function DiscoverTv({ params }: { params: Promise<{ id: str
     }
 
     const creator = credits?.crew.find((c) => c.job === "Creator" || c.job === "Executive Producer");
-
-    // Build a representative season list for the stream picker. Without
-    // hitting /tv/{id}/season we can only assume episode counts; pick a
-    // conservative default of `number_of_episodes / number_of_seasons`.
-    const seasonsForPicker = tv.number_of_seasons
-        ? Array.from({ length: tv.number_of_seasons }, (_, i) => ({
-            season: i + 1,
-            episodeCount: Math.max(1, Math.ceil((tv.number_of_episodes ?? tv.number_of_seasons ?? 1) / tv.number_of_seasons!)),
-            label: `Sezonul ${i + 1}`,
-        }))
-        : [];
 
     return (
         <MovieDetailLayout
@@ -132,14 +118,6 @@ export default async function DiscoverTv({ params }: { params: Promise<{ id: str
                         buy={providers.buy}
                         free={providers.free}
                     />
-                ) : null
-            }
-            streamPicker={
-                flags?.vidsrcEnabled && seasonsForPicker.length > 0 ? (
-                    <section className="p-6">
-                        <h2 className="watch-row-title">External sources</h2>
-                        <StreamSourcePicker kind="tv" tmdbId={tmdbId} seasons={seasonsForPicker} />
-                    </section>
                 ) : null
             }
             similar={similarHits}

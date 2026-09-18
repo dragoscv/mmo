@@ -1,4 +1,3 @@
-import { getCompanionVideoFlags } from "@/lib/companion-video";
 import { CinemaSettingsPanel } from "@/components/settings/cinema-settings-panel";
 import { WatchPrefsPanel } from "@/components/settings/watch-prefs-panel";
 import { getWatchPrefs } from "@/actions/watch-prefs";
@@ -6,7 +5,6 @@ import { getWatchPrefs } from "@/actions/watch-prefs";
 export const dynamic = "force-dynamic";
 
 export default async function VideoSettingsPage() {
-    const flags = await getCompanionVideoFlags();
     const prefs = await getWatchPrefs();
     const tmdbConfigured = !!process.env.TMDB_API_KEY;
     const omdbConfigured = !!process.env.OMDB_API_KEY;
@@ -17,20 +15,8 @@ export default async function VideoSettingsPage() {
         <main className="p-4 sm:p-6 max-w-3xl space-y-6">
             <header>
                 <h1 className="text-2xl font-bold">Video</h1>
-                <p className="text-sm text-muted-foreground">Surse externe, metadate, prezență Discord.</p>
+                <p className="text-sm text-muted-foreground">Metadate, subtitrări, prezență Discord.</p>
             </header>
-
-            <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-                <h2 className="font-semibold">Embed extern (vidsrc &amp; co.)</h2>
-                <p className="text-sm text-muted-foreground">
-                    {flags?.vidsrcEnabled
-                        ? "ACTIV — butonul „Play” pe filme apare cu sursă vidsrc dacă lipsește fișierul local."
-                        : "DEZACTIVAT — playerul folosește doar fișiere locale scanate de companion."}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                    Comutator pe companion (Electron): <code>video.externalEmbed.vidsrc.enabled</code>. Modifică-l din UI companion.
-                </p>
-            </section>
 
             <section className="rounded-lg border border-border bg-card p-4 space-y-2">
                 <h2 className="font-semibold">Chei API metadate &amp; subtitrări</h2>

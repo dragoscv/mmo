@@ -5,13 +5,11 @@ import { and, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { tmdbWatchProvidersMulti, tmdbMovieSimilar, tmdbMovieRecommendations } from "@/lib/tmdb";
-import { getCompanionVideoFlags } from "@/lib/companion-video";
 import { WishlistButton } from "@/components/video/wishlist-button";
 import { PlayHereMenu } from "@/components/video/play-here-menu";
 import { PreRemuxButton } from "@/components/video/pre-remux-button";
 import { PlayNextButton, AddToQueueButton } from "@/components/video/queue-buttons";
 import { ExternalRatingsPanel } from "@/components/video/external-ratings-panel";
-import { StreamSourcePicker } from "@/components/video/stream-source-picker";
 import { ExternalProvidersRow } from "@/components/video/external-providers-row";
 import { TrailerButton } from "@/components/video/trailer-modal";
 import { MovieDetailLayout } from "@/components/video/movie-detail-layout";
@@ -40,9 +38,8 @@ export default async function MovieDetail({ params }: { params: Promise<{ id: st
     const files = await db.select().from(videoFiles)
         .where(and(eq(videoFiles.userId, userId), eq(videoFiles.movieId, movieId)));
     const prefs = await getWatchPrefs();
-    const [providers, flags, wishlistRow, similarHits, recHits] = await Promise.all([
+    const [providers, wishlistRow, similarHits, recHits] = await Promise.all([
         movie.tmdbId ? tmdbWatchProvidersMulti("movie", movie.tmdbId, prefs.regions) : null,
-        getCompanionVideoFlags(),
         db.select({ id: videoCollectionItems.id })
             .from(videoCollectionItems)
             .innerJoin(videoCollections, eq(videoCollections.id, videoCollectionItems.collectionId))
@@ -128,18 +125,6 @@ export default async function MovieDetail({ params }: { params: Promise<{ id: st
                         buy={providers.buy}
                         free={providers.free}
                     />
-                ) : null
-            }
-            streamPicker={
-                flags?.vidsrcEnabled && movie.tmdbId ? (
-                    <section className="p-6">
-                        <h2 className="watch-row-title">External sources</h2>
-                        <StreamSourcePicker
-                            kind="movie"
-                            tmdbId={movie.tmdbId}
-                            imdbId={movie.imdbId ?? undefined}
-                        />
-                    </section>
                 ) : null
             }
             similar={similarHits}

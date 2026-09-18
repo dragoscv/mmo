@@ -309,7 +309,7 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 | WP10-05 | Video library index with etag (scan + watcher), `GET /media/library?since=`, server returns `serverId` for attribution | todo |
 | WP10-06 | Progress + plays API (`/media/progress` GET/PUT seconds per profile; `/media/plays`) + push sync to web `/api/media/sync` | todo |
 | WP10-07 | Routes `/media/home`, `/media/title/:kind/:id`, `/media/search`, `/media/etag`; OpenAPI + `openapi:check` + Kotlin/SDK regen; server 3.1.0 | todo |
-| WP10-08 | Remove pirate embeds (D20): streaming-scrapers, `/video/streams`, vidsrc flag, web `StreamSourcePicker`; ADR-0009 | todo |
+| WP10-08 | Remove pirate embeds (D20): streaming-scrapers, `/video/streams`, vidsrc flag, web `StreamSourcePicker`; ADR-0009 | done (server 3.1.0, ADR-0009) |
 | WP10-09 | Tests: recs scoring, availability chain, progress upsert, routes (vitest, Node 22) | todo |
 
 ### WP11 — Web Media Home

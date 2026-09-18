@@ -57,12 +57,6 @@ export async function scanCompanionVideos(roots?: string[]): Promise<{ files: Co
     return videoCall(link, "POST", "/scan", { roots });
 }
 
-export async function getCompanionVideoFlags(): Promise<{ vidsrcEnabled: boolean } | null> {
-    const link = await getCompanionLink();
-    if (!link) return null;
-    return videoCall(link, "GET", "/flags");
-}
-
 /** Build a browser-facing URL that proxies a TMDB image through the
  *  companion's local cache. Returns null when there's no companion. */
 export async function companionTmdbImageUrl(size: string, imagePath: string | null): Promise<string | null> {

@@ -12,11 +12,9 @@ import {
     tmdbMovieRecommendations,
     tmdbWatchProvidersMulti,
 } from "@/lib/tmdb";
-import { getCompanionVideoFlags } from "@/lib/companion-video";
 import { getWatchPrefs } from "@/actions/watch-prefs";
 import { MovieDetailLayout } from "@/components/video/movie-detail-layout";
 import { TrailerButton } from "@/components/video/trailer-modal";
-import { StreamSourcePicker } from "@/components/video/stream-source-picker";
 import { ExternalProvidersRow } from "@/components/video/external-providers-row";
 
 export const dynamic = "force-dynamic";
@@ -38,14 +36,13 @@ export default async function DiscoverMovie({ params }: { params: Promise<{ id: 
     }
 
     const prefs = await getWatchPrefs();
-    const [tm, credits, videos, providers, similarHits, recHits, flags] = await Promise.all([
+    const [tm, credits, videos, providers, similarHits, recHits] = await Promise.all([
         tmdbMovie(tmdbId),
         tmdbMovieCredits(tmdbId),
         tmdbMovieVideos(tmdbId),
         tmdbWatchProvidersMulti("movie", tmdbId, prefs.regions),
         tmdbMovieSimilar(tmdbId).catch(() => []),
         tmdbMovieRecommendations(tmdbId).catch(() => []),
-        getCompanionVideoFlags(),
     ]);
     if (!tm) notFound();
 
@@ -112,14 +109,6 @@ export default async function DiscoverMovie({ params }: { params: Promise<{ id: 
                         buy={providers.buy}
                         free={providers.free}
                     />
-                ) : null
-            }
-            streamPicker={
-                flags?.vidsrcEnabled ? (
-                    <section className="p-6">
-                        <h2 className="watch-row-title">External sources</h2>
-                        <StreamSourcePicker kind="movie" tmdbId={tmdbId} />
-                    </section>
                 ) : null
             }
             similar={similarHits}

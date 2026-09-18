@@ -80,7 +80,7 @@ id,type,surface,title,status,owner,decision_or_notes
 "WP10-05","","","Video library index with etag (scan + watcher), `GET /media/library?since=`, server returns `serverId` for attribution","todo","agent",""
 "WP10-06","","","Progress + plays API (`/media/progress` GET/PUT seconds per profile; `/media/plays`) + push sync to web `/api/media/sync`","todo","agent",""
 "WP10-07","","","Routes `/media/home`, `/media/title/:kind/:id`, `/media/search`, `/media/etag`; OpenAPI + `openapi:check` + Kotlin/SDK regen; server 3.1.0","todo","agent",""
-"WP10-08","","","Remove pirate embeds (D20): streaming-scrapers, `/video/streams`, vidsrc flag, web `StreamSourcePicker`; ADR-0009","todo","agent",""
+"WP10-08","","","Remove pirate embeds (D20): streaming-scrapers, `/video/streams`, vidsrc flag, web `StreamSourcePicker`; ADR-0009","done","agent","(server 3.1.0, ADR-0009)"
 "WP10-09","","","Tests: recs scoring, availability chain, progress upsert, routes (vitest, Node 22)","todo","agent",""
 "WP11-01","","","Move dashboard to `/dashboard` (nav-tree, TAB_KEYS, i18n, tests, revalidate paths, palette)","todo","agent",""
 "WP11-02","","","`lib/media/aggregate.ts` fan-out + merge by tmdbId → `sources[]`, per-server status; DB migration `track_plays` + `media_sync_state` (expand-only)","todo","agent",""

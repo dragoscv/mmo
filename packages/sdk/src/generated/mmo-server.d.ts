@@ -1836,26 +1836,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/video/streams/{kind}/{tmdbId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * External embed options for a TMDB title
-         * @description Rate limited to 30 requests per minute.
-         */
-        get: operations["videoExternalStreams"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/video/subs/search": {
         parameters: {
             query?: never;
@@ -3612,7 +3592,6 @@ export interface components {
             jobId?: string;
         };
         VideoFlags: {
-            vidsrcEnabled: boolean;
             preRemuxAutoOnScan: boolean;
         };
         ParsedFilename: {
@@ -3665,13 +3644,6 @@ export interface components {
         TimeRange: {
             start?: number;
             end?: number;
-        };
-        EmbedOption: {
-            provider: string;
-            iframeUrl: string;
-            language?: string;
-            quality?: string;
-            notes?: string;
         };
         SubtitleResult: {
             /** @enum {string} */
@@ -6855,7 +6827,6 @@ export interface operations {
                         /** @constant */
                         ok: true;
                         capabilities: string[];
-                        vidsrcEnabled: boolean;
                         ffmpeg: boolean;
                     };
                 };
@@ -6893,7 +6864,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    vidsrcEnabled?: boolean;
                     preRemuxAutoOnScan?: boolean;
                 };
             };
@@ -7367,38 +7337,6 @@ export interface operations {
         responses: {
             200: components["responses"]["EventStream"];
             401: components["responses"]["Unauthorized"];
-        };
-    };
-    videoExternalStreams: {
-        parameters: {
-            query?: {
-                imdb?: string;
-                season?: number;
-                episode?: number;
-            };
-            header?: never;
-            path: {
-                kind: "movie" | "tv";
-                tmdbId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Options */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        options: components["schemas"]["EmbedOption"][];
-                    };
-                };
-            };
-            400: components["responses"]["ErrorJson"];
-            401: components["responses"]["Unauthorized"];
-            429: components["responses"]["RateLimited"];
         };
     };
     videoSubsSearch: {

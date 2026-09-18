@@ -47,8 +47,6 @@ export interface MovieDetailLayoutProps {
     cast?: Array<{ name: string; character?: string | null; profile_path?: string | null }>;
     /** ExternalProvidersRow — both pages. */
     providers?: ReactNode;
-    /** StreamSourcePicker — both pages. */
-    streamPicker?: ReactNode;
     /** Arbitrary page-specific sections placed before similar/recommendations (e.g. TV seasons list). */
     extraSections?: ReactNode;
     /** "Similar titles" TMDB row. */
@@ -83,7 +81,6 @@ export function MovieDetailLayout({
     ratings,
     cast = [],
     providers,
-    streamPicker,
     extraSections,
     similar = [],
     recommendations = [],
@@ -220,7 +217,6 @@ export function MovieDetailLayout({
             )}
 
             {providers}
-            {streamPicker}
             {extraSections}
 
             {similar.length > 0 && (

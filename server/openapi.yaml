@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.0.0
+  version: 3.1.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -2367,11 +2367,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [ok, capabilities, vidsrcEnabled, ffmpeg]
+                required: [ok, capabilities, ffmpeg]
                 properties:
                   ok: { type: boolean, const: true }
                   capabilities: { type: array, items: { type: string } }
-                  vidsrcEnabled: { type: boolean }
                   ffmpeg: { type: boolean }
 
   /video/flags:
@@ -2397,7 +2396,6 @@ paths:
             schema:
               type: object
               properties:
-                vidsrcEnabled: { type: boolean }
                 preRemuxAutoOnScan: { type: boolean }
       responses:
         '200':
@@ -2747,32 +2745,6 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/EventStream' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-
-  /video/streams/{kind}/{tmdbId}:
-    get:
-      operationId: videoExternalStreams
-      tags: [video]
-      summary: External embed options for a TMDB title
-      description: Rate limited to 30 requests per minute.
-      parameters:
-        - { name: kind, in: path, required: true, schema: { type: string, enum: [movie, tv] } }
-        - { name: tmdbId, in: path, required: true, schema: { type: integer } }
-        - { name: imdb, in: query, schema: { type: string } }
-        - { name: season, in: query, schema: { type: integer } }
-        - { name: episode, in: query, schema: { type: integer } }
-      responses:
-        '200':
-          description: Options
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [options]
-                properties:
-                  options: { type: array, items: { $ref: '#/components/schemas/EmbedOption' } }
-        '400': { $ref: '#/components/responses/ErrorJson' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '429': { $ref: '#/components/responses/RateLimited' }
 
   /video/subs/search:
     get:
@@ -5330,9 +5302,8 @@ components:
     # ---- video --------------------------------------------------------------
     VideoFlags:
       type: object
-      required: [vidsrcEnabled, preRemuxAutoOnScan]
+      required: [preRemuxAutoOnScan]
       properties:
-        vidsrcEnabled: { type: boolean }
         preRemuxAutoOnScan: { type: boolean }
     ParsedFilename:
       type: object
@@ -5398,15 +5369,6 @@ components:
       properties:
         start: { type: number }
         end: { type: number }
-    EmbedOption:
-      type: object
-      required: [provider, iframeUrl]
-      properties:
-        provider: { type: string }
-        iframeUrl: { type: string }
-        language: { type: string }
-        quality: { type: string }
-        notes: { type: string }
     SubtitleResult:
       type: object
       required: [provider, id, language, title, downloadToken]

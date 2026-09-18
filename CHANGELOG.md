@@ -17,6 +17,12 @@ Every surface now renders from one token source. Decisions and rationale:
 [docs/design-system.md](docs/design-system.md); per-item status:
 [docs/mixai-design-tracker.md](docs/mixai-design-tracker.md).
 
+### Removed — third-party embed sources (companion 3.1.0)
+
+- Third-party embed sources (vidsrc & co.) are gone from the companion (`/video/streams`, the
+  `vidsrcEnabled` flag) and the web app (`StreamSourcePicker`, the "Embed extern" settings card) —
+  see [ADR-0009](docs/adr/0009-remove-third-party-embed-sources.md).
+
 ### Added — `@mmo/design-tokens` + `@mmo/ui`
 
 - **`packages/design-tokens`** — OKLCH colour roles, radii, motion, breakpoints, safe-area and

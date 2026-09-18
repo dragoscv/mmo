@@ -283,6 +283,7 @@ mindmap
 | [0006](docs/adr/0006-codai-as-default-ai-provider.md) | codai ca provider AI implicit |
 | [0007](docs/adr/0007-licensing-agpl-core-mit-sdk.md) | Licențiere: AGPL core, SDK MIT, comercial pentru cloud |
 | [0008](docs/adr/0008-design-system-and-theme-prefs.md) | Design system partajat: tokens OKLCH, Base UI, `mixai:prefs:v1` |
+| [0009](docs/adr/0009-remove-third-party-embed-sources.md) | Eliminarea surselor embed terțe (vidsrc & co.) |
 
 > ADR-0004 (aplicațiile TV — Compose/Media3 + Tizen web) e descris în
 > [aplicatie/tv-android.md](docs/aplicatie/tv-android.md) și

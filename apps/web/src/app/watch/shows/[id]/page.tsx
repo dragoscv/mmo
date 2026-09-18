@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { tvShows, tvEpisodes, tvSeasons, videoFiles } from "@/db/schema";
+import { tvShows, tvEpisodes, videoFiles } from "@/db/schema";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -8,12 +8,10 @@ import { PlayHereButton } from "@/components/video/play-here-button";
 import { PlayNextButton, AddToQueueButton } from "@/components/video/queue-buttons";
 import { MarkWatchedButton } from "@/components/video/mark-watched-button";
 import { ExternalRatingsPanel } from "@/components/video/external-ratings-panel";
-import { StreamSourcePicker } from "@/components/video/stream-source-picker";
 import { ExternalProvidersRow } from "@/components/video/external-providers-row";
 import { TrailerButton } from "@/components/video/trailer-modal";
 import { MovieDetailLayout } from "@/components/video/movie-detail-layout";
 import { refreshShowRatings } from "@/actions/external-ratings";
-import { getCompanionVideoFlags } from "@/lib/companion-video";
 import { tmdbWatchProvidersMulti, tmdbTvSimilar, tmdbTvRecommendations } from "@/lib/tmdb";
 import { getWatchPrefs } from "@/actions/watch-prefs";
 import type { ExternalRatings } from "@/lib/ratings/scrape";
@@ -53,27 +51,11 @@ export default async function ShowDetail({ params }: { params: Promise<{ id: str
     }
 
     const prefs = await getWatchPrefs();
-    const [flags, providers, similarHits, recHits, seasonRows] = await Promise.all([
-        getCompanionVideoFlags(),
+    const [providers, similarHits, recHits] = await Promise.all([
         show.tmdbId ? tmdbWatchProvidersMulti("tv", show.tmdbId, prefs.regions) : null,
         show.tmdbId ? tmdbTvSimilar(show.tmdbId).catch(() => []) : Promise.resolve([]),
         show.tmdbId ? tmdbTvRecommendations(show.tmdbId).catch(() => []) : Promise.resolve([]),
-        db.select().from(tvSeasons).where(eq(tvSeasons.showId, showId)).orderBy(asc(tvSeasons.seasonNumber)),
     ]);
-
-    const seasonsForPicker = seasonRows
-        .filter((s) => s.seasonNumber > 0)
-        .map((s) => ({
-            season: s.seasonNumber,
-            episodeCount: s.episodeCount ?? bySeason.get(s.seasonNumber)?.length ?? 1,
-            label: s.name ?? `Sezonul ${s.seasonNumber}`,
-        }));
-    if (seasonsForPicker.length === 0) {
-        for (const [season, eps] of bySeason.entries()) {
-            if (season > 0) seasonsForPicker.push({ season, episodeCount: eps.length, label: `Sezonul ${season}` });
-        }
-        seasonsForPicker.sort((a, b) => a.season - b.season);
-    }
 
     const similarAll = [...similarHits, ...recHits];
     const similarTmdbIds = Array.from(new Set(similarAll.map((h) => h.id))).filter((x): x is number => !!x);
@@ -136,19 +118,6 @@ export default async function ShowDetail({ params }: { params: Promise<{ id: str
                         buy={providers.buy}
                         free={providers.free}
                     />
-                ) : null
-            }
-            streamPicker={
-                flags?.vidsrcEnabled && show.tmdbId && seasonsForPicker.length > 0 ? (
-                    <section className="p-6">
-                        <h2 className="watch-row-title">Surse externe</h2>
-                        <StreamSourcePicker
-                            kind="tv"
-                            tmdbId={show.tmdbId}
-                            imdbId={show.imdbId ?? undefined}
-                            seasons={seasonsForPicker}
-                        />
-                    </section>
                 ) : null
             }
             extraSections={
