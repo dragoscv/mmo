@@ -130,5 +130,23 @@ Done 2026-09-18 — every row above carries its RED and GREEN line. Runner: `.co
 	gates [WP13-06]`) ran `.husky/pre-commit` end to end — output pasted below.
 
 <!-- HOOK-PROOF-START -->
-(pasted after the commit)
+```text
+# ea12336 docs(gates): mutation-test results for all local gates [WP13-06]  (2026-09-18, .copilot-tmp/wp13-06-commit.log)
+# staged: apps/web/scripts/{bundle-budget,i18n-parity,lint-baseline}.mjs docs/arhitectura/gates.md
+#         docs/mixai-design-tracker.{md,csv} scripts/{i18n-parity-ext,tracker-regen-csv}.mjs server/scripts/openapi-check.mjs
+node apps/extension/scripts/check-version.mjs --staged   → silent (no apps/extension/ path staged)
+node apps/web/scripts/check-version.mjs --staged         → silent (apps/web/scripts/ is an ignored prefix)
+node apps/web/scripts/check-migrations.mjs --staged      → silent (no apps/web/src/db/ path staged)
+pnpm exec lint-staged --no-stash →
+	⚠ Skipping backup because `--no-stash` was used.
+	✔ Done preparing lint-staged!
+	❯ Running tasks for staged files…
+			docs/mixai-design-tracker.md — 1 file            ❯ node scripts/tracker-drift.mjs
+			{server,packages/…}/** — 1 file                  ❯ node scripts/check-version-generic.mjs --staged
+	✔ node scripts/check-version-generic.mjs --staged     (server 1.0.47 at origin/main → 3.1.0)
+	✔ node scripts/tracker-drift.mjs
+	✔ Done running tasks for staged files!
+.husky/commit-msg → commitlint --edit                     → exit 0
+[main ea12336] … 9 files changed, 64 insertions(+), 25 deletions(-)   COMMIT_EXIT=0
+```
 <!-- HOOK-PROOF-END -->
