@@ -1,36 +1,36 @@
 [package]
 name = "mmo-native"
-version = "0.1.0"
-description = "MuzicAI native desktop shell"
+version = "1.0.0"
+description = "MixAI native desktop shell"
 authors = ["mwrty <vladulescu.catalin@gmail.com>"]
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/dragoscv/mmo"
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.88"
 
 [lib]
 name = "mmo_native_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.6", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
-tauri-plugin-shell = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+tauri = { version = "2.11", features = [] }
+tauri-plugin-shell = "2.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 # Desktop auth flow: tiny local HTTP listener captures the OAuth
 # callback after the user signs in via the system browser, mirroring
 # the Electron companion's `/auth/callback` endpoint.
 tiny_http = "0.12"
-uuid = { version = "1", features = ["v4"] }
-open = "5"
-tokio = { version = "1", features = ["sync", "time", "rt-multi-thread", "macros"] }
-url = "2"
+uuid = { version = "1.26", features = ["v4"] }
+open = "5.4"
+tokio = { version = "1.53", features = ["sync", "time", "rt-multi-thread", "macros"] }
+url = "2.5"
 # Persistent render-job queue (apps/native/src-tauri/src/render_jobs.rs).
 # `bundled` avoids needing a system SQLite on Windows.
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
 
 [profile.release]
 panic = "abort"
