@@ -1,6 +1,7 @@
 package ro.mixai.tv
 
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -13,8 +14,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
@@ -22,12 +25,16 @@ import ro.mixai.tv.data.AccountSession
 import ro.mixai.tv.data.Album
 import ro.mixai.tv.data.Connection
 import ro.mixai.tv.data.DiscoveredServer
+import ro.mixai.tv.data.MediaRef
+import ro.mixai.tv.data.MediaRepository
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.Progress
+import ro.mixai.tv.data.ProgressSync
 import ro.mixai.tv.data.Settings
 import ro.mixai.tv.data.Show
 import ro.mixai.tv.data.Song
 import ro.mixai.tv.data.VideoFile
+import ro.mixai.tv.data.WatchNext
 import ro.mixai.tv.player.PlayRequest
 import ro.mixai.tv.player.PlayerScreen
 import ro.mixai.tv.ui.AlbumScreen
@@ -39,6 +46,7 @@ import ro.mixai.tv.ui.PairScreen
 import ro.mixai.tv.ui.SettingsScreen
 import ro.mixai.tv.ui.ShowScreen
 import ro.mixai.tv.ui.SignInScreen
+import ro.mixai.tv.ui.TitleScreen
 import ro.mixai.tv.ui.WelcomeScreen
 import ro.mixai.tv.ui.theme.MixaiTheme
 import java.net.URI
@@ -59,12 +67,19 @@ sealed interface Screen {
     data class Movie(val file: VideoFile) : Screen
     data class ShowDetail(val show: Show) : Screen
     data class AlbumDetail(val album: Album) : Screen
-    data class Play(val request: PlayRequest) : Screen
+    /** `resumeMs` > 0 overrides the local DataStore position (server progress from the title page). */
+    data class Play(val request: PlayRequest, val resumeMs: Long = -1L) : Screen
+    /** Unified TMDB title page (`/media/title/:kind/:tmdbId`). */
+    data class Title(val kind: String, val tmdbId: Long) : Screen
 }
 
 class MainActivity : ComponentActivity() {
+    /** Pending `mixai://title/<kind>/<tmdbId>` from Watch Next; consumed by `App`. */
+    private val deepLink = mutableStateOf<Pair<String, Long>?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        deepLink.value = WatchNext.parseDeepLink(intent)
         val settings = (application as MixaiApp).settings
         setContent {
             val localeTag by settings.locale.collectAsState(initial = "")
@@ -75,8 +90,11 @@ class MainActivity : ComponentActivity() {
                     val progress by settings.progress.collectAsState(initial = emptyMap())
                     val c = conn ?: return@MixaiTheme
                     val s = session ?: return@MixaiTheme
+                    val link by deepLink
                     App(
                         c, s, progress, settings, localeTag,
+                        deepLink = link,
+                        onDeepLinkConsumed = { deepLink.value = null },
                         onSave = { host, token, userId -> settings.save(host, token, userId) },
                         onSaveSession = { tok, user -> settings.saveSession(tok, user) },
                         onForget = { settings.clear() },
@@ -85,6 +103,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        WatchNext.parseDeepLink(intent)?.let { deepLink.value = it }
     }
 }
 
@@ -120,6 +144,8 @@ private fun App(
     progress: Map<String, Progress>,
     settings: Settings,
     localeTag: String,
+    deepLink: Pair<String, Long>?,
+    onDeepLinkConsumed: () -> Unit,
     onSave: suspend (String, String, String) -> Unit,
     onSaveSession: suspend (String, ro.mixai.tv.data.SessionUser) -> Unit,
     onForget: suspend () -> Unit,
@@ -128,6 +154,9 @@ private fun App(
     val scope = rememberCoroutineScope()
     val stack = remember { mutableStateListOf<Screen>(if (conn.isComplete) Screen.Home else Screen.Welcome) }
     val api = remember(conn.baseUrl, conn.token) { if (conn.isComplete) MmoApi(conn.baseUrl, conn.token) else null }
+    val media = remember(api) { api?.let { MediaRepository(it) } }
+    val progressSync = remember(media) { media?.let { ProgressSync(it, settings) } }
+    val context = LocalContext.current
 
     fun push(s: Screen) = stack.add(s)
     fun pop() { if (stack.size > 1) stack.removeAt(stack.lastIndex) }
@@ -137,6 +166,22 @@ private fun App(
     fun signOut() { scope.launch { onSignOut(); goWelcome() } }
 
     BackHandler(enabled = stack.size > 1) { pop() }
+
+    // Watch Next deep link → title page on top of Home.
+    LaunchedEffect(deepLink, api) {
+        val l = deepLink ?: return@LaunchedEffect
+        if (api == null) return@LaunchedEffect
+        if (stack.lastOrNull() != Screen.Home) { stack.clear(); stack.add(Screen.Home) }
+        stack.add(Screen.Title(l.first, l.second))
+        onDeepLinkConsumed()
+    }
+
+    // One-shot legacy progress migration + queued writes flush, once a media-capable server answers.
+    LaunchedEffect(progressSync) {
+        val ps = progressSync ?: return@LaunchedEffect
+        val m = media ?: return@LaunchedEffect
+        runCatching { if (m.status() != null) ps.migrateLegacyOnce() }
+    }
 
     // Saved server: skip to Home, but if it no longer answers /health fall back
     // to discovery with that server preselected.
@@ -187,14 +232,33 @@ private fun App(
             val a = api ?: run { goWelcome(); return }
             HomeScreen(
                 api = a,
+                media = media!!,
                 progress = progress,
                 userName = if (session.isSignedIn) session.displayName else null,
                 onMovie = { push(Screen.Movie(it)) },
                 onShow = { push(Screen.ShowDetail(it)) },
                 onAlbum = { push(Screen.AlbumDetail(it)) },
+                onTitle = { push(Screen.Title(it.kind, it.tmdbId)) },
                 onSettings = { push(Screen.Settings) },
+                onMediaHome = { home ->
+                    val cont = home.rows.firstOrNull { it.id == MediaRepository.ROW_CONTINUE }?.items.orEmpty()
+                    scope.launch { WatchNext.publish(context, cont) { c -> a.tmdbImageUrl("w342", c.posterPath) } }
+                },
             )
         }
+        is Screen.Title -> TitleScreen(
+            api = api!!,
+            media = media!!,
+            progressSync = progressSync!!,
+            kind = top.kind,
+            tmdbId = top.tmdbId,
+            onPlay = { req, ref, resumeMs ->
+                val r = (req as PlayRequest.Video).copy(ref = ref)
+                push(Screen.Play(r, resumeMs))
+            },
+            onOpenTitle = { k, id -> push(Screen.Title(k, id)) },
+            onBack = { pop() },
+        )
         Screen.Settings -> SettingsScreen(
             api = api!!,
             localeTag = localeTag,
@@ -228,8 +292,15 @@ private fun App(
         is Screen.Play -> PlayerScreen(
             api = api!!,
             request = top.request,
-            resumeMs = (top.request as? PlayRequest.Video)?.let { r -> if (r.fromStart) 0L else progress[r.file.fileId]?.pos ?: 0L } ?: 0L,
+            resumeMs = (top.request as? PlayRequest.Video)?.let { r ->
+                when {
+                    r.fromStart -> 0L
+                    top.resumeMs >= 0 -> top.resumeMs
+                    else -> progress[r.file.fileId]?.pos ?: 0L
+                }
+            } ?: 0L,
             onProgress = { fileId, pos, dur -> scope.launch { settings.saveProgress(fileId, pos, dur) } },
+            onServerProgress = { ref: MediaRef, pos, dur -> progressSync?.let { ps -> scope.launch { ps.save(ref, pos, dur) } } },
             onExit = { pop() },
         )
     }

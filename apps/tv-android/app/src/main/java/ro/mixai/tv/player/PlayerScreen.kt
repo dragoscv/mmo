@@ -50,6 +50,7 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import ro.mixai.tv.BuildConfig
 import ro.mixai.tv.R
+import ro.mixai.tv.data.MediaRef
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.Song
 import ro.mixai.tv.data.VideoFile
@@ -58,13 +59,14 @@ import ro.mixai.tv.ui.EmptyTone
 import ro.mixai.tv.ui.theme.Tokens
 
 sealed interface PlayRequest {
-    /** `fromStart` ignores any saved resume position. */
-    data class Video(val file: VideoFile, val hls: Boolean, val fromStart: Boolean = false) : PlayRequest
+    /** `fromStart` ignores any saved resume position. `ref` = TMDB identity for server progress (WP12-01); null → local-only. */
+    data class Video(val file: VideoFile, val hls: Boolean, val fromStart: Boolean = false, val ref: MediaRef? = null) : PlayRequest
     data class Music(val songs: List<Song>, val startIndex: Int) : PlayRequest
 }
 
 private const val SEEK_MS = 10_000L
 private const val PROGRESS_EVERY_MS = 5_000L
+private const val SERVER_PROGRESS_EVERY_MS = 10_000L
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -73,6 +75,8 @@ fun PlayerScreen(
     request: PlayRequest,
     resumeMs: Long = 0L,
     onProgress: (fileId: String, posMs: Long, durMs: Long) -> Unit = { _, _, _ -> },
+    /** Server progress (`PUT /media/progress`), called every 10 s while playing and on pause/stop. */
+    onServerProgress: (ref: MediaRef, posMs: Long, durMs: Long) -> Unit = { _, _, _ -> },
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -103,16 +107,23 @@ fun PlayerScreen(
         val dur = player.duration
         if (dur > 0 && dur != C.TIME_UNSET) onProgress(v.file.fileId, player.currentPosition, dur)
     }
+    fun reportServer() {
+        val v = request as? PlayRequest.Video ?: return
+        val ref = v.ref ?: return
+        val dur = player.duration
+        if (dur > 0 && dur != C.TIME_UNSET) onServerProgress(ref, player.currentPosition, dur)
+    }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlayerError(e: PlaybackException) { error = "${e.errorCodeName}: ${e.message}" }
             override fun onMediaMetadataChanged(m: MediaMetadata) { nowPlaying = m }
-            override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying; if (!isPlaying) report() }
+            override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying; if (!isPlaying) { report(); reportServer() } }
         }
         player.addListener(listener)
         onDispose {
             report()
+            reportServer()
             player.removeListener(listener)
             session.release()
             player.release()
@@ -133,6 +144,10 @@ fun PlayerScreen(
     // Persist the resume position every 5 s while playing.
     LaunchedEffect(playing) {
         while (playing) { delay(PROGRESS_EVERY_MS); report() }
+    }
+    // Server progress every 10 s while playing.
+    LaunchedEffect(playing) {
+        while (playing) { delay(SERVER_PROGRESS_EVERY_MS); reportServer() }
     }
 
     Box(

@@ -29,8 +29,8 @@ android {
         applicationId = "ro.mixai.tv"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 2
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.1.0"
         buildConfigField("String", "MIXAI_ORIGIN", "\"$mixaiOrigin\"")
     }
 
@@ -92,4 +92,7 @@ dependencies {
 
     // QR code for Quick Connect (BitMatrix only; drawn with Compose Canvas, no camera)
     implementation(libs.zxing.core)
+
+    // Watch Next channel (WP12-01)
+    implementation(libs.tvprovider)
 }

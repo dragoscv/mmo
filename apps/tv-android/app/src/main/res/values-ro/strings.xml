@@ -124,4 +124,35 @@
     <string name="settings_cleared">Progresul a fost șters.</string>
     <string name="settings_app_version">Versiune aplicație %1$s</string>
     <string name="settings_account">Cont</string>
+
+    <!-- Media Home (WP12-01) -->
+    <string name="media_kind_movie">Film</string>
+    <string name="media_kind_tv">Serial</string>
+    <string name="media_cta_play">▶  Redă</string>
+    <string name="media_cta_where">Unde vezi</string>
+    <string name="media_hero_next">Următorul</string>
+    <string name="media_badge_library">În bibliotecă</string>
+
+    <!-- Title page -->
+    <string name="title_sources">Surse</string>
+    <string name="title_no_local">Nu e în biblioteca ta — vezi mai jos unde îl poți urmări.</string>
+    <string name="title_play_from">Redă de pe %1$s</string>
+    <string name="title_where">Unde vezi</string>
+    <string name="title_no_offers">Nicio ofertă de streaming găsită pentru regiunea ta.</string>
+    <string name="title_attribution">Date: %1$s</string>
+    <string name="title_mark_watched">Marchează văzut</string>
+    <string name="title_watched">Văzut</string>
+    <string name="title_cast">Distribuție: %1$s</string>
+    <string name="title_similar">Titluri similare</string>
+
+    <!-- Provider offers -->
+    <string name="offer_subscription">Abonament</string>
+    <string name="offer_rent">Închiriere</string>
+    <string name="offer_buy">Cumpărare</string>
+    <string name="offer_free">Gratuit</string>
+    <string name="offer_ads">Gratuit cu reclame</string>
+    <string name="offer_install">Instalează</string>
+    <string name="provider_no_link">%1$s nu are un link pentru acest titlu.</string>
+    <string name="provider_install_hint">%1$s nu este instalat — deschid magazinul.</string>
+    <string name="provider_launch_failed">Nu am putut deschide %1$s.</string>
 </resources>

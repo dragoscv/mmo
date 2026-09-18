@@ -56,11 +56,25 @@ class MmoApi(val baseUrl: String, private val token: String) {
     suspend fun scanMovies(): List<VideoFile> =
         scanAll().filter { it.parsed.season == null }.sortedBy { it.title.lowercase() }
 
+    /** Registry metadata for one known file id (`GET /video/file/{id}/info`) — same shape as a scan entry. */
+    suspend fun fileInfo(fileId: String): VideoFile = json.decodeFromString(get("$baseUrl/video/file/${enc(fileId)}/info", auth = true))
+
     fun directUrl(fileId: String) = "$baseUrl/video/direct/$fileId?t=${enc(token)}"
     fun hlsUrl(fileId: String, quality: String = "720p") = "$baseUrl/video/stream/$fileId?q=$quality&t=${enc(token)}"
     fun subtitleUrl(fileId: String, ordinal: Int) = "$baseUrl/video/subs/$fileId/$ordinal?t=${enc(token)}"
     /** Scrubber sprite: 12×12 grid of 160×90 tiles, generated lazily by ffmpeg (503 until ready). */
     fun spriteUrl(fileId: String) = "$baseUrl/video/thumbs/$fileId/sprite.jpg?t=${enc(token)}"
+    /** Cached TMDB image proxy (`/video/tmdb-image/{size}/{path}`); `path` is the TMDB path incl. its leading `/`. */
+    fun tmdbImageUrl(size: String, path: String?): String? =
+        path?.takeIf { it.isNotBlank() }?.let { "$baseUrl/video/tmdb-image/$size${if (it.startsWith("/")) it else "/$it"}?t=${enc(token)}" }
+
+    // ─── generic JSON transport for feature repositories (MediaRepository) ─
+
+    /** `GET {baseUrl}{path}` with the device token; `path` starts with `/`. */
+    suspend fun getJson(path: String): String = get("$baseUrl$path", auth = true)
+    suspend fun putJson(path: String, body: String): String = request("PUT", "$baseUrl$path", body, auth = true)
+    suspend fun postJson(path: String, body: String): String = request("POST", "$baseUrl$path", body, auth = true)
+    fun encode(s: String) = enc(s)
 
     // ─── OpenSubsonic ─────────────────────────────────────────────────────
 
@@ -92,7 +106,7 @@ class MmoApi(val baseUrl: String, private val token: String) {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = method
             connectTimeout = 8_000
-            readTimeout = if (method == "POST") 180_000 else 20_000 // scan can take a while
+            readTimeout = if (method == "POST" && url.endsWith("/video/scan")) 180_000 else 20_000 // scan can take a while
             setRequestProperty("Accept", "application/json")
             if (auth) setRequestProperty("x-device-token", token)
             if (body != null) {

@@ -14,6 +14,7 @@ serialization = "1.11.0"
 coroutines = "1.11.0"
 coil = "3.6.2"
 zxing = "3.5.4"
+tvprovider = "1.1.0"
 
 # compose-bom 2026.09.00 / coil 3.6.2 AARs require compileSdk ≥ 37 (checkAarMetadata); targetSdk stays 36.
 compileSdk = "37"
@@ -46,6 +47,9 @@ coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref 
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+
+# Android TV "Watch Next" channel (WatchNextProgram / TvContractCompat). 1.1.0 is the latest stable (Google Maven 2025-05).
+tvprovider = { group = "androidx.tvprovider", name = "tvprovider", version.ref = "tvprovider" }
 
 # Kotlin Gradle plugin as a buildscript classpath dep — overrides the KGP bundled with AGP's built-in Kotlin.
 kotlin-gradle-plugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }

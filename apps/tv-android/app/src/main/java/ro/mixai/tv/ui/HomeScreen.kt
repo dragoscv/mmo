@@ -28,7 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -41,11 +43,14 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import ro.mixai.tv.R
 import ro.mixai.tv.data.Album
+import ro.mixai.tv.data.MediaRepository
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.Progress
 import ro.mixai.tv.data.Show
 import ro.mixai.tv.data.VideoFile
 import ro.mixai.tv.data.episodeCode
+import ro.mixai.tv.data.generated.MediaHome
+import ro.mixai.tv.data.generated.TitleCard
 import ro.mixai.tv.ui.theme.Tokens
 import ro.mixai.tv.ui.theme.mixaiCardBorder
 import ro.mixai.tv.ui.theme.mixaiCardColors
@@ -60,32 +65,55 @@ private data class HomeData(
     val albumError: String?,
 )
 
+/** Server-driven Media Home (`/media/home`). `null` rows = server too old / TMDB not configured → scan fallback. */
+private data class MediaData(val home: MediaHome?, val error: String?)
+
 private val STILL_W = 320.dp
 private val STILL_H = 180.dp
 
 @Composable
 fun HomeScreen(
     api: MmoApi,
+    media: MediaRepository,
     progress: Map<String, Progress>,
     userName: String? = null,
     onMovie: (VideoFile) -> Unit,
     onShow: (Show) -> Unit,
     onAlbum: (Album) -> Unit,
+    onTitle: (TitleCard) -> Unit,
     onSettings: () -> Unit,
+    onMediaHome: (MediaHome) -> Unit = {},
 ) {
     var data by remember { mutableStateOf<HomeData?>(null) }
+    var mediaData by remember { mutableStateOf<MediaData?>(null) }
     val firstFocus = remember { FocusRequester() }
+    val lang = LocalConfiguration.current.locales[0]?.language ?: "en"
 
-    LaunchedEffect(api) {
+    // Media rows first (fast, cached server-side); scan rows only when the server has no media module
+    // or TMDB is not configured. Albums always.
+    LaunchedEffect(api, media) {
+        val md = try {
+            val st = media.status()
+            if (st == null || !st.tmdb) MediaData(null, null)
+            else {
+                val home = media.home()
+                MediaData(if (home.configured && home.rows.any { it.items.isNotEmpty() }) home else null, null)
+            }
+        } catch (e: Exception) { MediaData(null, e.message) }
+        mediaData = md
+        md.home?.let(onMediaHome)
+
         var files: List<VideoFile> = emptyList(); var albums: List<Album> = emptyList()
         var ve: String? = null; var ae: String? = null
         try { albums = api.newestAlbums() } catch (e: Exception) { ae = e.message }
-        try { files = api.scanAll() } catch (e: Exception) { ve = e.message }
+        if (md.home == null) try { files = api.scanAll() } catch (e: Exception) { ve = e.message }
         val movies = files.filter { it.parsed.season == null }.sortedBy { it.title.lowercase() }
         data = HomeData(movies, Show.group(files), albums, files.associateBy { it.fileId }, ve, ae)
     }
 
     val d = data
+    val md = mediaData
+    val serverRows = md?.home
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 40.dp)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 56.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.home_title), style = MaterialTheme.typography.headlineLarge, color = Tokens.foreground)
@@ -100,29 +128,57 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(32.dp))
 
+        if (md == null) {
+            MediaHomeSkeleton()
+            return@Column
+        }
+
+        // ── Server media rows (hero + one LazyRow per HomeRow) ──────────────
+        if (serverRows != null) {
+            val rows = serverRows.rows.filter { it.items.isNotEmpty() }
+            val continueRow = rows.firstOrNull { it.id == MediaRepository.ROW_CONTINUE }
+            val heroSource = rows.firstOrNull { it.id != MediaRepository.ROW_CONTINUE } ?: rows.first()
+            val heroItems = remember(serverRows) { heroSource.items.filter { it.backdropPath != null }.take(6).ifEmpty { heroSource.items.take(1) } }
+            LaunchedEffect(serverRows) { kotlinx.coroutines.delay(50); runCatching { firstFocus.requestFocus() } }
+
+            HeroBillboard(api, heroItems, onOpen = onTitle, firstFocus = Modifier.focusRequester(firstFocus))
+            Spacer(Modifier.height(16.dp))
+            // Continue first, then the rest in server order.
+            (listOfNotNull(continueRow) + rows.filter { it !== continueRow }).forEach { row ->
+                MediaRowView(api, row, lang, onOpen = onTitle)
+                Spacer(Modifier.height(28.dp))
+            }
+            if (md.error != null) Text(stringResource(R.string.common_row_error, md.error), color = Tokens.destructive, modifier = Modifier.padding(horizontal = 56.dp))
+        }
+
         if (d == null) {
-            RowHeader(stringResource(R.string.home_movies), null, null)
-            SkeletonRow(count = 5, width = STILL_W, height = STILL_H)
-            Spacer(Modifier.height(36.dp))
-            RowHeader(stringResource(R.string.home_shows), null, null)
-            SkeletonRow(count = 5, width = STILL_W, height = STILL_H)
-            Spacer(Modifier.height(36.dp))
+            if (serverRows == null) {
+                RowHeader(stringResource(R.string.home_movies), null, null)
+                SkeletonRow(count = 5, width = STILL_W, height = STILL_H)
+                Spacer(Modifier.height(36.dp))
+                RowHeader(stringResource(R.string.home_shows), null, null)
+                SkeletonRow(count = 5, width = STILL_W, height = STILL_H)
+                Spacer(Modifier.height(36.dp))
+            }
             RowHeader(stringResource(R.string.home_albums), null, null)
             SkeletonRow(count = 6, width = 220.dp, height = 220.dp)
             return@Column
         }
 
-        // Continue watching: files with saved progress, most recent first.
-        val continueList = remember(d, progress) {
-            progress.entries.sortedByDescending { it.value.at }.mapNotNull { (id, p) -> d.all[id]?.let { it to p } }
+        // ── Legacy scan-based rows (only when the server has no media rows) ──
+        // Continue watching: files with saved progress, most recent first (local-only; the server
+        // `continue` row replaces it when media rows are present).
+        val continueList = remember(d, progress, serverRows) {
+            if (serverRows != null) emptyList()
+            else progress.entries.sortedByDescending { it.value.at }.mapNotNull { (id, p) -> d.all[id]?.let { it to p } }
         }
-        val firstId = continueList.firstOrNull()?.first?.fileId ?: d.movies.firstOrNull()?.fileId
+        val firstId = if (serverRows != null) null else continueList.firstOrNull()?.first?.fileId ?: d.movies.firstOrNull()?.fileId
             ?: d.shows.firstOrNull()?.key ?: d.albums.firstOrNull()?.id
-        LaunchedEffect(firstId) { if (firstId != null) runCatching { firstFocus.requestFocus() } }
+        LaunchedEffect(firstId) { if (firstId != null) { kotlinx.coroutines.delay(50); runCatching { firstFocus.requestFocus() } } }
 
         if (continueList.isNotEmpty()) {
             RowHeader(stringResource(R.string.home_continue), continueList.size, null)
-            LazyRow(contentPadding = PaddingValues(horizontal = 56.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = 56.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 items(continueList, key = { "cw-" + it.first.fileId }) { (f, p) ->
                     val mod = if (f.fileId == firstId) Modifier.focusRequester(firstFocus) else Modifier
                     val code = f.episodeCode()
@@ -137,50 +193,53 @@ fun HomeScreen(
             Spacer(Modifier.height(36.dp))
         }
 
-        RowHeader(stringResource(R.string.home_movies), d.movies.size, d.videoError)
-        when {
-            d.videoError != null -> EmptyState("⚠", stringResource(R.string.home_load_failed), d.videoError, tone = EmptyTone.Error)
-            d.movies.isEmpty() -> EmptyState("🎬", stringResource(R.string.home_movies_empty), stringResource(R.string.home_movies_empty_hint))
-            else -> LazyRow(contentPadding = PaddingValues(horizontal = 56.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                items(d.movies, key = { it.fileId }) { f ->
-                    val mod = if (continueList.isEmpty() && f.fileId == firstId) Modifier.focusRequester(firstFocus) else Modifier
-                    StillCard(
-                        title = f.title,
-                        subtitle = listOfNotNull(f.parsed.year?.toString(), f.height?.let { "${it}p" }).joinToString(" · "),
-                        imageUrl = api.spriteUrl(f.fileId), progress = progress[f.fileId]?.fraction, modifier = mod,
-                        onClick = { onMovie(f) },
-                    )
+        if (serverRows == null) {
+            RowHeader(stringResource(R.string.home_movies), d.movies.size, d.videoError)
+            when {
+                d.videoError != null -> EmptyState("⚠", stringResource(R.string.home_load_failed), d.videoError, tone = EmptyTone.Error)
+                d.movies.isEmpty() -> EmptyState("🎬", stringResource(R.string.home_movies_empty), stringResource(R.string.home_movies_empty_hint))
+                else -> LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = 56.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    items(d.movies, key = { it.fileId }) { f ->
+                        val mod = if (continueList.isEmpty() && f.fileId == firstId) Modifier.focusRequester(firstFocus) else Modifier
+                        StillCard(
+                            title = f.title,
+                            subtitle = listOfNotNull(f.parsed.year?.toString(), f.height?.let { "${it}p" }).joinToString(" · "),
+                            imageUrl = api.spriteUrl(f.fileId), progress = progress[f.fileId]?.fraction, modifier = mod,
+                            onClick = { onMovie(f) },
+                        )
+                    }
                 }
             }
-        }
 
-        Spacer(Modifier.height(36.dp))
-        RowHeader(stringResource(R.string.home_shows), d.shows.size, d.videoError)
-        when {
-            d.videoError != null -> {}
-            d.shows.isEmpty() -> EmptyState("📺", stringResource(R.string.home_shows_empty), stringResource(R.string.home_shows_empty_hint))
-            else -> LazyRow(contentPadding = PaddingValues(horizontal = 56.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                items(d.shows, key = { it.key }) { s ->
-                    val mod = if (continueList.isEmpty() && d.movies.isEmpty() && s.key == firstId) Modifier.focusRequester(firstFocus) else Modifier
-                    val inProgress = s.episodes.mapNotNull { progress[it.fileId] }.maxByOrNull { it.at }
-                    StillCard(
-                        title = s.title,
-                        subtitle = stringResource(R.string.home_episodes, s.episodes.size) + " · " + stringResource(R.string.home_seasons, s.seasons),
-                        imageUrl = api.spriteUrl(s.episodes.first().fileId), progress = inProgress?.fraction, modifier = mod,
-                        onClick = { onShow(s) },
-                    )
+            Spacer(Modifier.height(36.dp))
+            RowHeader(stringResource(R.string.home_shows), d.shows.size, d.videoError)
+            when {
+                d.videoError != null -> {}
+                d.shows.isEmpty() -> EmptyState("📺", stringResource(R.string.home_shows_empty), stringResource(R.string.home_shows_empty_hint))
+                else -> LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = 56.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    items(d.shows, key = { it.key }) { s ->
+                        val mod = if (continueList.isEmpty() && d.movies.isEmpty() && s.key == firstId) Modifier.focusRequester(firstFocus) else Modifier
+                        val inProgress = s.episodes.mapNotNull { progress[it.fileId] }.maxByOrNull { it.at }
+                        StillCard(
+                            title = s.title,
+                            subtitle = stringResource(R.string.home_episodes, s.episodes.size) + " · " + stringResource(R.string.home_seasons, s.seasons),
+                            imageUrl = api.spriteUrl(s.episodes.first().fileId), progress = inProgress?.fraction, modifier = mod,
+                            onClick = { onShow(s) },
+                        )
+                    }
                 }
             }
+            Spacer(Modifier.height(36.dp))
         }
 
-        Spacer(Modifier.height(36.dp))
+        // ── Music rows stay below the media rows ────────────────────────────
         RowHeader(stringResource(R.string.home_albums), d.albums.size, d.albumError)
         when {
             d.albumError != null -> EmptyState("⚠", stringResource(R.string.home_load_failed), d.albumError, tone = EmptyTone.Error)
             d.albums.isEmpty() -> EmptyState("💿", stringResource(R.string.home_albums_empty), stringResource(R.string.home_albums_empty_hint))
-            else -> LazyRow(contentPadding = PaddingValues(horizontal = 56.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            else -> LazyRow(Modifier.focusRestorer(), contentPadding = PaddingValues(horizontal = 56.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 items(d.albums, key = { it.id }) { a ->
-                    val mod = if (continueList.isEmpty() && d.movies.isEmpty() && d.shows.isEmpty() && a.id == firstId) Modifier.focusRequester(firstFocus) else Modifier
+                    val mod = if (firstId != null && continueList.isEmpty() && d.movies.isEmpty() && d.shows.isEmpty() && a.id == firstId) Modifier.focusRequester(firstFocus) else Modifier
                     PosterCard(title = a.name, subtitle = a.artist ?: "", imageUrl = api.coverArtUrl(a.coverArt ?: a.id),
                         width = 220.dp, height = 220.dp, modifier = mod, onClick = { onAlbum(a) })
                 }

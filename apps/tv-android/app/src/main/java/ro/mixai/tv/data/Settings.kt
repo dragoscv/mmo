@@ -7,9 +7,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import ro.mixai.tv.data.generated.ProgressInput
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "mixai_tv")
 
@@ -29,6 +32,10 @@ data class Progress(val pos: Long, val dur: Long, val at: Long) {
     val fraction: Float get() = if (dur <= 0) 0f else (pos.toFloat() / dur).coerceIn(0f, 1f)
 }
 
+/** Server-side identity of what is playing (`/media/progress` key): TMDB title + optional episode. */
+@Serializable
+data class MediaRef(val kind: String, val tmdbId: Long, val season: Long? = null, val episode: Long? = null)
+
 /** Persisted server connection: normalised base URL + device token. */
 class Settings(private val context: Context) {
     private val keyBase = stringPreferencesKey("base_url")
@@ -39,8 +46,11 @@ class Settings(private val context: Context) {
     private val keySessionName = stringPreferencesKey("session_user_name")
     private val keySessionImage = stringPreferencesKey("session_user_image")
     private val keyProgress = stringPreferencesKey("progress_json")
+    private val keyProgressQueue = stringPreferencesKey("progress_queue_json")
+    private val keyMediaMigrated = stringPreferencesKey("media_progress_migrated")
     private val keyLocale = stringPreferencesKey("ui_locale")
     private val json = Json { ignoreUnknownKeys = true }
+    private val queueSerializer = ListSerializer(ProgressInput.serializer())
 
     val connection: Flow<Connection> = context.dataStore.data.map { p ->
         Connection(p[keyBase] ?: "", p[keyToken] ?: "", p[keyUser] ?: "")
@@ -73,6 +83,34 @@ class Settings(private val context: Context) {
     suspend fun clearProgress() {
         context.dataStore.edit { p -> p.remove(keyProgress) }
     }
+
+    // ─── server progress: offline queue + one-shot migration (WP12-01) ──────
+
+    /** Entries that failed to reach `PUT /media/progress`; flushed on the next successful write. */
+    suspend fun enqueueProgress(input: ProgressInput) {
+        context.dataStore.edit { p ->
+            val list = decodeQueue(p[keyProgressQueue]).filterNot {
+                it.kind == input.kind && it.tmdbId == input.tmdbId && it.season == input.season && it.episode == input.episode
+            } + input
+            p[keyProgressQueue] = json.encodeToString(queueSerializer, list.takeLast(500))
+        }
+    }
+
+    suspend fun pendingProgress(): List<ProgressInput> = decodeQueue(context.dataStore.data.first()[keyProgressQueue])
+
+    suspend fun clearPendingProgress() {
+        context.dataStore.edit { p -> p.remove(keyProgressQueue) }
+    }
+
+    /** `true` once the legacy `progress_json` (fileId → ms) has been pushed to a media-capable server. */
+    suspend fun isMediaMigrated(): Boolean = context.dataStore.data.first()[keyMediaMigrated] == "1"
+
+    suspend fun markMediaMigrated() {
+        context.dataStore.edit { p -> p[keyMediaMigrated] = "1" }
+    }
+
+    private fun decodeQueue(raw: String?): List<ProgressInput> =
+        if (raw.isNullOrBlank()) emptyList() else runCatching { json.decodeFromString(queueSerializer, raw) }.getOrDefault(emptyList())
 
     private fun decodeProgress(raw: String?): Map<String, Progress> =
         if (raw.isNullOrBlank()) emptyMap() else runCatching { json.decodeFromString<Map<String, Progress>>(raw) }.getOrDefault(emptyMap())

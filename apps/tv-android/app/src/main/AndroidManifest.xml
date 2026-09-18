@@ -9,6 +9,26 @@
     <uses-feature android:name="android.software.leanback" android:required="true" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
+    <!-- Package visibility (API 30+) for ProviderLauncher: registry apps (server/src/media/providers.ts)
+         + any https handler for the browser fallback. -->
+    <queries>
+        <package android:name="com.netflix.ninja" />
+        <package android:name="com.disney.disneyplus" />
+        <package android:name="com.wbd.stream" />
+        <package android:name="com.amazon.amazonvideo.livingroom" />
+        <package android:name="com.apple.atve.androidtv.appletv" />
+        <package android:name="com.google.android.youtube.tv" />
+        <package android:name="com.skyshowtime.skyshowtime.google" />
+        <package android:name="net.cme.voyo.ro.tvapp" />
+        <package android:name="ro.antenaplay.app" />
+        <package android:name="com.google.android.videos" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
     <application
         android:name=".MixaiApp"
         android:label="@string/app_name"
@@ -29,6 +49,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <!-- Watch Next deep links: mixai://title/<kind>/<tmdbId> -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mixai" android:host="title" />
             </intent-filter>
         </activity>
     </application>

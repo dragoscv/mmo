@@ -124,4 +124,35 @@
     <string name="settings_cleared">Resume data cleared.</string>
     <string name="settings_app_version">App version %1$s</string>
     <string name="settings_account">Account</string>
+
+    <!-- Media Home (WP12-01) -->
+    <string name="media_kind_movie">Movie</string>
+    <string name="media_kind_tv">TV series</string>
+    <string name="media_cta_play">▶  Play</string>
+    <string name="media_cta_where">Where to watch</string>
+    <string name="media_hero_next">Next</string>
+    <string name="media_badge_library">In library</string>
+
+    <!-- Title page -->
+    <string name="title_sources">Sources</string>
+    <string name="title_no_local">Not in your library — see where to watch below.</string>
+    <string name="title_play_from">Play from %1$s</string>
+    <string name="title_where">Where to watch</string>
+    <string name="title_no_offers">No streaming offers found for your region.</string>
+    <string name="title_attribution">Data: %1$s</string>
+    <string name="title_mark_watched">Mark as watched</string>
+    <string name="title_watched">Watched</string>
+    <string name="title_cast">Cast: %1$s</string>
+    <string name="title_similar">More like this</string>
+
+    <!-- Provider offers -->
+    <string name="offer_subscription">Subscription</string>
+    <string name="offer_rent">Rent</string>
+    <string name="offer_buy">Buy</string>
+    <string name="offer_free">Free</string>
+    <string name="offer_ads">Free with ads</string>
+    <string name="offer_install">Install</string>
+    <string name="provider_no_link">%1$s has no link for this title.</string>
+    <string name="provider_install_hint">%1$s is not installed — opening the store.</string>
+    <string name="provider_launch_failed">Could not open %1$s.</string>
 </resources>
