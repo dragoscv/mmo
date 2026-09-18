@@ -8,6 +8,10 @@
 > OKLCH, dimensiuni de temă mode/accent/surface/density/radius/motion, `@mmo/design-tokens` +
 > `@mmo/ui`). Tabelul de culori de mai jos este **istoric** (era "Music Organizer", hex fix,
 > doar dark) și nu mai reflectă codul; îl păstrăm pentru maparea energie→culoare și schițele de layout.
+>
+> De ce s-a schimbat (cinci palete, trei chei de storage, dark-only) și ce s-a decis în loc:
+> [ADR-0008 — Shared design system](../adr/0008-design-system-and-theme-prefs.md).
+> Starea per item: [`docs/mixai-design-tracker.md`](../mixai-design-tracker.md).
 
 ## 🎨 Design System
 
@@ -75,13 +79,13 @@ graph TD
         S3["💾 USB Ready<br/>342 tracks"]
         S4["⏰ Last Scan<br/>2h ago"]
     end
-    
+
     subgraph RECENT["🕐 Recent Activity"]
         R1["Added 5 tracks to Techno"]
         R2["Exported USB for Friday gig"]
         R3["12 tracks in _Inbox"]
     end
-    
+
     subgraph QUICK["⚡ Quick Actions"]
         Q1["🔍 Scan Now"]
         Q2["💾 Export USB"]

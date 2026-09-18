@@ -1,12 +1,152 @@
 # Changelog
 
-All notable changes to **MuzicAI — AI Music Suite** are documented here.
+All notable changes to **MixAI — Multi Media Organizer** (formerly MuzicAI — AI Music Suite) are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 > Web app and companion are versioned independently:
-> - **Web app** (`apps/web/`): see [`apps/web/package.json`](apps/web/package.json) — currently `0.4.2`
-> - **MuzicAI Companion** (`server/`): see [`server/package.json`](server/package.json) — currently `1.0.14`, releases at [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
+> - **Web app** (`apps/web/`): see [`apps/web/package.json`](apps/web/package.json)
+> - **MMO Server / MixAI Companion** (`server/`): see [`server/package.json`](server/package.json), releases at [github.com/dragoscv/mmo/releases](https://github.com/dragoscv/mmo/releases)
+
+---
+
+## [Unreleased] — design system overhaul (web 2.0.0 · companion 3.0.0 · extension 3.0.0 · MixAI DJ / native / TV 1.0.0)
+
+Every surface now renders from one token source. Decisions and rationale:
+[ADR-0008](docs/adr/0008-design-system-and-theme-prefs.md); spec:
+[docs/design-system.md](docs/design-system.md); per-item status:
+[docs/mixai-design-tracker.md](docs/mixai-design-tracker.md).
+
+### Added — `@mmo/design-tokens` + `@mmo/ui`
+
+- **`packages/design-tokens`** — OKLCH colour roles, radii, motion, breakpoints, safe-area and
+  the seven theme dimensions declared once and generated into `dist/tokens.css` (Tailwind v4
+  `@theme inline` + variants `dark/glass/solid/flat/compact/tv/standalone/ultrawide` + utilities
+  `surface`, `pb-safe`, `overscan`, `content-*`), `tokens.plain.css` (Tizen, extension, native
+  shell), `Tokens.kt` (Compose), `prehydrate.js` and `tokens.json`.
+- **`packages/ui`** — shared component library on **Base UI** (`@base-ui/react` 1.8, not Radix):
+  `ThemeProvider`/`ThemeSettings`, `AppShell`/`Sidebar`/`BottomTabBar`/`Page*`, `DataTable`
+  (TanStack Table 9, column priority + mobile cards), `Skeleton*`/`EmptyState`, overlays, forms,
+  motion presets, hooks (`useIsMobile`, `useIsStandalone`, `useSafeArea`, `useHaptics`) and the
+  shortcut registry. Consumed through tsconfig `paths`.
+- **One preference blob** `localStorage["mixai:prefs:v1"]` (mode, accent, surface, density,
+  radius, motion, locale, feedback), synced to the account, migrated once from the legacy `theme`
+  / `mixai-ui` keys and the `mmo-locale` cookie. `prehydrate.js` applies it before first paint —
+  no dark→light flash on any web surface.
+
+### Changed — web app (2.0.0)
+
+- App shell rebuilt on `@mmo/ui` (collapsible sidebar, mobile header, **bottom tab bar** + "More"
+  sheet, mini-player); 47 `loading.tsx` skeletons, `not-found`/`error` boundaries, unified
+  empty/not-signed-in states; the 7 stub settings routes are real pages (~245 new i18n keys,
+  RO + EN) and `/settings/appearance` exposes all theme dimensions.
+- `components/ui/*` are now thin wrappers over `@mmo/ui` (`asChild` → `render`); route
+  transitions use React 19.3 `<ViewTransition>`; `NowPlaying` keeps its state via `<Activity>`;
+  the player, `/watch` skins and visualisers read tokens instead of hardcoded hex.
+- `/dev/ui` component catalogue, unified command palette (⌘K) + shortcuts overlay, `nuqs` for
+  library filters, `@serwist/next` service worker (configurator mode, Turbopack-compatible),
+  `/downloads` → `/get` with a redirect, JetBrains Mono as `--font-mono`.
+- **Upgrades**: Next 16.3.5 (Turbopack production build), React 19.3, Motion 13, Vitest 5,
+  AI SDK 7 (`ai` 7.0.105). TypeScript stays 5.9 and ESLint 9 on web — `typescript-eslint` has no
+  TS 7 API and `eslint-plugin-react` peers ESLint 9; `packages/*`, MixAI DJ, Tizen and the
+  Companion renderer are on TS 7.
+- **Installed-app polish**: `<html data-standalone>` is set for PWA / iOS home screen / Capacitor
+  / Tauri, and the shell honours `--safe-*` insets (`viewport-fit=cover`).
+
+### Changed — other surfaces
+
+- **MixAI Companion 3.0.0** — the 1400-line vanilla renderer is replaced by a Vite 8 + React 19
+  app on `@mmo/ui` (`server/ui`), same `window.mmo` preload API; Electron 44, Express 5,
+  better-sqlite3 13, drizzle 0.45, Vitest 5. `app.asar` now carries `ui/dist` and excludes
+  sources/`*.ts`/`*.map`; CI builds the renderer before packaging on Node 22 + pnpm 10 with an
+  Electron download cache.
+- **MixAI DJ 1.0.0** — Vite 8 + Tailwind 4 + `@mmo/ui`; the three dark skins became `surface`
+  presets on the shared accent (green survives as `emerald`), deck A–D colours kept.
+- **TV 1.0.0** — Tizen (Vite 8, TS 7, generated `tokens.plain.css` with an sRGB fallback for its
+  pre-OKLCH Chromium) and Android TV (Compose, AGP 9.4 / Kotlin 2.4, generated `Tokens.kt`,
+  compileSdk 37); both gained RO/EN and account sign-in.
+- **Native shells 1.0.0** — Capacitor 8, the Android scaffold is versioned again, brand tokens
+  and safe areas applied. **Extension 3.0.0** — OKLCH tokens scoped to its injected button,
+  MixAI naming, RO/EN.
+
+---
+
+## web 1.0.0 · companion 2.0.0 — 2026-09-17
+
+### Changed — rebrand MuzicAI → MixAI, self-hosted server becomes MMO Server
+
+- **Brand**: all user-facing "MuzicAI" strings are now **MixAI**; the desktop
+  app is **MixAI Companion**; the native DJ app is **MixAI DJ**; the
+  self-hosted server package is **MMO Server** (`server/package.json` name
+  `mmo-server`). The repo, `@mmo/*` scopes and `mmo-*` technical identifiers
+  are unchanged ([ADR-0001](docs/adr/0001-naming-mixai-and-mmo-server.md)).
+- **Domain**: `muzicai.ro` → **`mixai.ro`** (`api.mixai.ro`,
+  `staging.mixai.ro`, device tunnels `device-<id>.mixai.ro`).
+- **Bundle / app IDs**: `ro.muzicai.app` → `ro.mixai.app`,
+  `ro.muzicai.mixai` → `ro.mixai.dj`, `ro.muzicai.companion` →
+  `ro.mixai.companion`; Firefox extension id `mixai-downloader@mixai.ro`.
+  Native log directories move accordingly (see
+  [docs/aplicatie/debug-native.md](docs/aplicatie/debug-native.md)).
+- **Storage-key migration**: web `localStorage` keys
+  `muzicai-query-cache` → `mixai-query-cache` and
+  `muzicai-scroll-positions` → `mixai-scroll-positions` are migrated once on
+  first access; Electron `userData` dir `muzicai-companion` →
+  `mixai-companion` (copied forward once, existing chain
+  `mmo-companion → muzicai-companion → mixai-companion` kept).
+- **Licence** ([ADR-0007](docs/adr/0007-licensing-agpl-core-mit-sdk.md)):
+  core (MMO Server + web app) is **AGPL-3.0-only** (`LICENSE`),
+  `packages/sdk` is **MIT**, `COMMERCIAL-LICENSE.md` covers MixAI cloud / Pro,
+  new `TRADEMARKS.md` for the MixAI / MMO Server names and logos.
+
+### Added — architecture decision records and media-platform plan
+
+- `docs/adr/` with ADR-0001 (naming), 0002 (MMO Server headless core),
+  0003 (casting strategy), 0004 (TV apps: Compose/Media3 + Tizen web),
+  0005 (OpenSubsonic API), 0006 (codai as default AI provider),
+  0007 (licensing).
+- Plan for the self-hosted media platform (movies + music, Raspberry Pi /
+  PC / Docker, casting, TV, mobile):
+  [docs/followups/mixai-media-platform-plan.md](docs/followups/mixai-media-platform-plan.md).
+
+### Added — MMO Server headless core, Docker/arm64, casting, OpenSubsonic, codai, TV apps
+
+- **MMO Server headless** (`server/src/headless.ts`, `server/src/platform/`):
+  the companion core runs as a plain Node 22 process with no Electron/audify;
+  `server/Dockerfile` (multi-arch amd64+arm64, distro ffmpeg), GHCR workflow
+  `mmo-server-docker.yml`, Raspberry Pi compose + deploy script
+  (`infra/pi/`, `scripts/deploy-mmo-server-pi.ps1`). Env `MMO_DATA`,
+  `MMO_MEDIA`, `MMO_PORT`, `MMO_DEVICE_TOKEN` (auto-generated on first boot).
+- **Casting phase 1** ([ADR-0003](docs/adr/0003-casting-strategy.md)): "Play
+  on…" picker in the video player and the music bar — Google Cast Web Sender
+  (Default Media Receiver), DLNA/UPnP renderers discovered by the server
+  (SSDP, dependency-free), Home Assistant `media_player` bridge
+  (`HA_URL`/`HA_TOKEN`). Server `/cast/*` router; `/audio/*` accepts `?t=`
+  query auth for renderers. Docs: `docs/aplicatie/casting.md`.
+- **OpenSubsonic API** at `/rest/*` ([ADR-0005](docs/adr/0005-opensubsonic-api.md)):
+  Symfonium, Feishin, Amperfy, DSub, Music Assistant… connect with the device
+  token as password or `apiKey`. Docs: `docs/aplicatie/opensubsonic.md`.
+- **codai as default AI provider** ([ADR-0006](docs/adr/0006-codai-as-default-ai-provider.md)):
+  `packages/ai` `codaiAdapter`, per-user key minting via codai mgmt, ephemeral
+  tokens (`/api/ai/token`), existing providers kept as fallback. Docs:
+  `docs/arhitectura/ai-codai.md`.
+- **MixAI TV** for Android TV / Google TV (`apps/tv-android`, Kotlin + Compose
+  for TV + Media3, `ro.mixai.tv`, CI `tv-android-release.yml`) and for Samsung
+  Tizen (`apps/tv-tizen`, Vite web app packaged as `.wgt`). Docs:
+  `docs/aplicatie/tv-android.md`, `docs/aplicatie/tv-tizen.md`.
+- **Zero-typing onboarding** for TV/mobile: LAN autodiscovery (mDNS
+  `_mmo-companion._tcp` on Android TV via NsdManager; `/pair/info` sweep on
+  Tizen), **Quick Connect** (6-digit code + QR, `server /pair/*`, approve from
+  `mixai.ro/pair` or the Devices page) and **MixAI account device-code login**
+  (`POST /api/device/code|token`, `/activate` page, table
+  `device_auth_codes`, migration `0029`) which hands the TV its session and
+  companion list. Server mDNS now advertises a `.local` host it owns and picks
+  the default-route LAN IP (`MMO_LAN_IP` override). Docs:
+  `docs/aplicatie/pairing.md`.
+- **Build performance**: all images/builds happen locally (never on the Pi);
+  MMO Server image 2.13 GB → 495 MB (amd64) / 682 MB (arm64), arm64 build
+  21 min → 145 s cold / 5 s cached, deploy 62 s; incremental tsc, Vite/tsup/
+  Gradle tuning, `scripts/measure-builds.ps1`. Docs:
+  `docs/arhitectura/build-performance.md`.
 
 ---
 
@@ -1919,7 +2059,7 @@ Fixes:
   - **Resurrected cancellations.** A `customer.subscription.updated` snapshot created at T0 (status=`active`) arriving *after* a `customer.subscription.deleted` at T1 would un-cancel a closed subscription and leave the user on Pro forever.
   - **Re-downgraded upgrades.** A delayed `invoice.payment_failed` from a stale retry could clobber a fresh `subscription.updated` triggered by the user's manual upgrade seconds earlier — quietly downgrading a paying customer.
   - **Replay amplification on the invoice path.** Each duplicate delivery of an invoice event triggered another `stripe.subscriptions.retrieve` round-trip and another DB write.
-  
+
   Fix: persist the most recent applied event on the subscription row and gate every write on it.
   - **New columns `last_event_id` + `last_event_at`** on `subscriptions` (migration `0004_subscription_event_dedupe.sql`, both nullable so existing rows keep flowing).
   - **Webhook now resolves the target row first**, then short-circuits if `existing.lastEventId === event.id` (replay) or `existing.lastEventAt >= new Date(event.created * 1000)` (stale / out-of-order). Only newer events apply, and they bump both columns atomically with the rest of the snapshot.

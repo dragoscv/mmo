@@ -15,6 +15,22 @@
 
 ---
 
+## 🧱 Shell-ul din jurul paginii (2026-09)
+
+Dashboard-ul (ca orice pagină) e randat în `AppShell` din [`@mmo/ui`](../design-system.md):
+
+- **Desktop**: sidebar colapsabil (stare partajată prin `sidebar-context`), header de pagină
+  (`PageHeader`), lățime de conținut `content-lg`, centrare pe ultra-wide.
+- **Mobil**: `MobileHeader` (cu safe-area sub notch) + **bottom tab bar** cu 5 sloturi și sheet
+  „More”, mini-player deasupra; în aplicația instalată (PWA / Capacitor / Tauri) `<html>` primește
+  `data-standalone` și shell-ul respectă `--safe-*`.
+- **Încărcare**: fiecare rută are `loading.tsx` cu skeleton de aceeași geometrie (fără CLS) —
+  nu spinner. Stările goale / „nu ești logat” / „fără companion” folosesc `EmptyState`.
+- **Navigare**: tranziții de rută cu React 19.3 `<ViewTransition>` (`app/template.tsx`);
+  paleta de comenzi (`⌘K` / `Ctrl+K`) și overlay-ul de scurtături sunt globale.
+
+---
+
 ## 🖼️ Layout
 
 ```

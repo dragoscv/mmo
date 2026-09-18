@@ -1,13 +1,43 @@
 # ⚙️ Settings (`/settings`)
 
-> Configurezi music root, watch folders, import din rekordbox, mod offline și profile utilizator.
+> Configurezi aspectul aplicației, music root, watch folders, import din rekordbox, mod offline,
+> device-uri și profile utilizator.
 
 [← docs/aplicatie/](README.md) · [🏠 Home](../../README.md)
 
 ---
 
+## 🗺️ Rute (2026-09)
+
+Settings nu mai e o pagină cu tab-uri, ci un **layout cu sub-rute** (`/settings/<domeniu>`),
+fiecare cu propriul panou din `src/components/settings/<domeniu>-settings-panel.tsx` și
+chei i18n sub `settings.<domeniu>` (RO + EN):
+
+| Rută | Ce conține |
+|---|---|
+| [`/settings/appearance`](#-appearance) | Temă: mod, accent, suprafață, densitate, rază, mișcare, limbă, feedback |
+| `/settings/account` · `/settings/security` | Profil, sesiuni, parolă/passkey |
+| `/settings/library` · `/settings/music` | Music root, inbox, recordings, watch folders, genre → folder |
+| `/settings/companions` · `/settings/devices` | Companion-uri pereche (tabel), device-uri, Quick Connect |
+| `/settings/mixer` · `/settings/daw` · `/settings/live` · `/settings/sound-editor` · `/settings/video` | Preferințe per modul |
+| `/settings/notifications` · `/settings/copilot` · `/settings/github` | Notificări, asistentul AI, integrare GitHub |
+| `/settings/profiles` · `/settings/advanced` | Profile utilizator, reset, import rekordbox, offline |
+
+### 🎨 Appearance
+
+Randează `<ThemeSettings />` din [`@mmo/ui`](../design-system.md) — aceleași 7 dimensiuni ca pe
+MixAI DJ, Companion și TV: **mod** (light/dark/system), **accent** (6 presetări + hue custom +
+„din cover art"), **suprafață** (glass/solid/flat), **densitate** (comfortable/compact), **rază**
+(sm/md/lg), **mișcare** (full/reduced) și **limbă** (RO/EN). Preferințele se salvează în
+`localStorage["mixai:prefs:v1"]`, se sincronizează pe cont (`PreferencesSync`) și se aplică
+înainte de primul paint prin `prehydrate.js` — fără flash dark→light. Detalii:
+[ADR-0008](../adr/0008-design-system-and-theme-prefs.md).
+
+---
+
 ## 🎯 Ce faci aici
 
+- Alegi **tema** (mod, accent, suprafață, densitate, rază, mișcare) și **limba**
 - Setezi **folderul root** unde ține MMO muzica
 - Configurezi **watch folders** (auto-scan)
 - Mapezi genuri → foldere (auto-organize la import)
@@ -18,7 +48,7 @@
 
 ---
 
-## 🖼️ Layout (tabs)
+## 🖼️ Layout (schiță legacy — tab-urile au devenit sub-rute)
 
 ```
 ┌──────────────────────────────────────────┐

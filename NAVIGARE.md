@@ -3,7 +3,7 @@
 > **Hartă completă** a tuturor documentelor din acest repository.
 > Click pe orice link pentru a naviga direct.
 
-[🏠 Home](README.md) · [🇬🇧 EN](README.en.md) · [🗺️ Plan platformă media](docs/followups/mixai-media-platform-plan.md) · [📜 ADR-uri](docs/adr/)
+[🏠 Home](README.md) · [🇬🇧 EN](README.en.md) · [🗺️ Plan platformă media](docs/followups/mixai-media-platform-plan.md) · [📜 ADR-uri](#-adr--decizii-arhitecturale) · [🎨 Design system](docs/design-system.md) · [📊 Tracker design](docs/mixai-design-tracker.md)
 
 ---
 
@@ -137,11 +137,13 @@ mindmap
 
 | Document | Descriere |
 |----------|-----------|
-| [companion/README.md](docs/companion/README.md) | Overview & instalare |
-| [companion/api-local.md](docs/companion/api-local.md) | HTTP endpoints exposed local |
-| [companion/ipc-protocol.md](docs/companion/ipc-protocol.md) | Bridge IPC main ↔ renderer |
-| [companion/audio-pipeline.md](docs/companion/audio-pipeline.md) | Pipeline audio nativ |
-| [companion/auto-update.md](docs/companion/auto-update.md) | Auto-update prin GitHub Releases |
+| [companion/README.md](docs/companion/README.md) | Overview, instalare, UI 3.0, rulare headless pe PC |
+| [companion/tunnel-setup.md](docs/companion/tunnel-setup.md) | Cloudflare Tunnel per device (`device-<id>.mixai.ro`) |
+| [server/README.md § Endpoints](server/README.md#-endpoints-http-expuse) | HTTP endpoints expuse local pe `:17899` |
+| [server/README.md § OpenSubsonic](server/README.md#-opensubsonic-api-rest) | API OpenSubsonic (`/rest/*`) |
+| [server/README.md § Release flow](server/README.md#-release-flow) | Auto-update prin GitHub Releases, `companion-release.yml` |
+| [aplicatie/pairing.md](docs/aplicatie/pairing.md) | Quick Connect / device-code login |
+| [aplicatie/casting.md](docs/aplicatie/casting.md) | Casting (Google Cast, DLNA, Home Assistant) |
 
 ---
 
@@ -270,13 +272,34 @@ mindmap
 
 ---
 
+## 📜 ADR — decizii arhitecturale
+
+| ADR | Subiect |
+|---|---|
+| [0001](docs/adr/0001-naming-mixai-and-mmo-server.md) | Naming: MixAI (produs) + MMO Server (core self-hosted) |
+| [0002](docs/adr/0002-mmo-server-headless-core.md) | MMO Server headless (fără Electron), Docker/Pi |
+| [0003](docs/adr/0003-casting-strategy.md) | Casting: Google Cast + DLNA + Home Assistant |
+| [0005](docs/adr/0005-opensubsonic-api.md) | API OpenSubsonic la `/rest/*` |
+| [0006](docs/adr/0006-codai-as-default-ai-provider.md) | codai ca provider AI implicit |
+| [0007](docs/adr/0007-licensing-agpl-core-mit-sdk.md) | Licențiere: AGPL core, SDK MIT, comercial pentru cloud |
+| [0008](docs/adr/0008-design-system-and-theme-prefs.md) | Design system partajat: tokens OKLCH, Base UI, `mixai:prefs:v1` |
+
+> ADR-0004 (aplicațiile TV — Compose/Media3 + Tizen web) e descris în
+> [aplicatie/tv-android.md](docs/aplicatie/tv-android.md) și
+> [aplicatie/tv-tizen.md](docs/aplicatie/tv-tizen.md).
+
+---
+
 ## 📦 Componente repo (READMEs tehnici)
 
 | Path | Descriere |
 |------|-----------|
 | [apps/web/README.md](apps/web/README.md) | Setup web app dev |
-| [server/README.md](server/README.md) | Setup MMO Companion dev |
+| [server/README.md](server/README.md) | Setup MMO Companion / MMO Server dev (scripts, `app.asar`, release flow) |
 | [apps/extension/README.md](apps/extension/README.md) | Setup extensie dev |
+| [packages/README.md](packages/README.md) | `@mmo/design-tokens`, `@mmo/ui`, `@mmo/db`, `@mmo/ai`, `@mmo/sdk` |
+| [docs/arhitectura/03-stack-tehnologic.md](docs/arhitectura/03-stack-tehnologic.md) | Stack & versiuni livrate |
+| [docs/companion/README.md](docs/companion/README.md) | Ghid utilizator Companion (UI 3.0, împachetare) |
 | [infra/terraform/README.md](infra/terraform/README.md) | Provisioning infra |
 
 ---

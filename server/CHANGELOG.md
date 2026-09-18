@@ -2,7 +2,30 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
-## 3.0.0 — runtime upgrade: Electron 44, Express 5, better-sqlite3 13 (WP1-13, WP9-07)
+## 3.0.0 — UI rewrite on the shared design system + runtime upgrade (WP1-13, WP5, WP9-07)
+
+- **Renderer rewritten (WP5).** The 1400-line vanilla `ui/index.html` ("Connect to MMO",
+	`#a855f7`, emoji icons, dark only, fake Windows titlebar) is gone. `server/ui/` is now a
+	**Vite 8 + React 19** app built on `@mmo/ui` (Base UI) and `@mmo/design-tokens`: the same
+	OKLCH palette and the same theme dimensions (mode, accent, surface, density, radius, motion,
+	locale) as the web app and MixAI DJ, persisted in `mixai:prefs:v1`, applied before first
+	paint by the generated `prehydrate.js`. Light mode works. The preload contract
+	(`window.mmo`) is unchanged, so `src/main.ts` only swapped the loaded file
+	(`../ui/dist/index.html`, `base: "./"`). See [ADR-0008](../docs/adr/0008-design-system-and-theme-prefs.md).
+- **Build & packaging (WP5-04).** `pnpm build` = `pnpm ui:build && tsc`, so the renderer bundle
+	exists before `electron-builder` runs (`pnpm ui:dev` for HMR, `pnpm ui:typecheck` for the
+	renderer's own tsconfig; `build:headless` stays `tsc` only for Docker/Pi). `build.files` now
+	packs `dist/**` + `ui/dist/**` + `assets/**` and explicitly excludes `src/`, `ui/src`,
+	`ui/public`, `ui/index.html`, every `*.ts` and every `*.map`, `tsconfig.json` and
+	`vitest.config.ts`. Verified on a `--dir` build: `app.asar` = 4627 entries / 17.5 MB with
+	`ui/dist/{index.html,prehydrate.js,tokens.plain.css,assets/*}` present and **zero** `.ts`,
+	`.map` or source files; `audify`, `better-sqlite3`, `bindings`, `ffmpeg-static`,
+	`ffprobe-static`, `register-scheme` stay in `app.asar.unpacked`; `python/`, `fpcalc`,
+	`virtual-audio`, `cloudflared`, `bin/rbexport` in `resources/`.
+- **CI** (`.github/workflows/companion-release.yml`): Node 22 (matches the headless image and
+	the better-sqlite3 N-API prebuilds) and pnpm 10 pinned, `~/.cache/electron` +
+	`electron-builder` caches restored per OS, the renderer build is an explicit step with an
+	assertion that `ui/dist/index.html` exists before any packaging step runs.
 
 - **Electron 34.5 → 44.4** (Chromium 152, Node 24.21 in the main process),
 	`electron-builder` 26.15, `electron-updater` 6.8, `electronmon` 2.0.4.
