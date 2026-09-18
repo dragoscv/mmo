@@ -2,6 +2,21 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.2.0 — ffmpeg/ffprobe only ever run inside explicit jobs
+
+- **`POST /video/scan` no longer runs ffprobe inline.** It answers from the persisted
+	video registry (`video-registry.json`, now `library/video-registry.ts`) in ~25 ms; roots
+	with nothing registered yet get a background video `ScanJob` (same pipeline as `POST /scan`)
+	and are returned in `pendingRoots` + `jobIds` for polling. Measured on boot + scan with
+	4 roots / 88 files: 0 ffmpeg/ffprobe processes.
+- **The scan job owns the registry and the optional pre-remux.** `runVideoScanJob` registers
+	every probed file and, only when `preRemuxAutoOnScan` is on (default OFF), enqueues the
+	single-flight pre-remux queue. Nothing at server start spawns ffmpeg: watchers are pure
+	chokidar, `hydrateScanJobsOnBoot` only marks stale jobs failed.
+- Remaining inline ffprobe calls are on-demand and single-file: `/video/lookup` (registering a
+	path the web already knows), `recoverFileId` (one probe for the file about to stream) and
+	`POST /video/audio-tracks/:id/extract` (an explicit user action).
+
 ## 3.1.0 — Media module: MMO Server is the Media Home brain (WP10, ADR-0010) · remove third-party embed sources (WP10-08, ADR-0009)
 
 - **Media module (WP10-01..04, ADR-0010).** New `server/src/media/`: `media.sqlite` (titles,

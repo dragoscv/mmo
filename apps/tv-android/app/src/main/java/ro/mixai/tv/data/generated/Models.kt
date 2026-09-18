@@ -122,6 +122,8 @@ data class VideoFile(
 data class VideoScanResult(
     val files: List<VideoFile> = emptyList(),
     val rootsScanned: Long = 0L,
+    val pendingRoots: List<String>? = null,
+    val jobIds: List<String>? = null,
 )
 
 @Serializable

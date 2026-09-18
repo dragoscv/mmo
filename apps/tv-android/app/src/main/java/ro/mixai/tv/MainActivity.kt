@@ -154,7 +154,9 @@ private fun App(
     val scope = rememberCoroutineScope()
     val stack = remember { mutableStateListOf<Screen>(if (conn.isComplete) Screen.Home else Screen.Welcome) }
     val api = remember(conn.baseUrl, conn.token) { if (conn.isComplete) MmoApi(conn.baseUrl, conn.token) else null }
-    val media = remember(api) { api?.let { MediaRepository(it) } }
+    // Same profile rule as tv-tizen: the paired user id, else the server default — so progress
+    // written from one TV shows up in "Continue watching" on the other.
+    val media = remember(api, conn.userId) { api?.let { MediaRepository(it, conn.userId.ifBlank { "default" }) } }
     val progressSync = remember(media) { media?.let { ProgressSync(it, settings) } }
     val context = LocalContext.current
 

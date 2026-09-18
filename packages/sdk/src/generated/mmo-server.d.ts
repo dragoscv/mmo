@@ -1587,9 +1587,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Walk the library roots and register every probed video
+         * Registered (already probed) videos under the library roots
          * @description When `roots` is omitted or empty the configured scan folders are used.
-         *     Files that fail `ffprobe` are skipped.
+         *     Answers from the persisted registry and never runs ffprobe inline.
+         *     Roots with nothing registered yet get a background video scan job
+         *     (`GET /scan/jobs/{id}`) and are listed in `pendingRoots`; call again
+         *     once the job completes.
          */
         post: operations["videoScan"];
         delete?: never;
@@ -3810,7 +3813,12 @@ export interface components {
         };
         VideoScanResult: {
             files: components["schemas"]["VideoFile"][];
+            /** @description Roots answered from the registry. */
             rootsScanned: number;
+            /** @description Roots with no registered files yet; a scan job was enqueued for each. */
+            pendingRoots?: string[];
+            /** @description Scan job ids (one per pending root), pollable via `/scan/jobs/{id}`. */
+            jobIds?: string[];
         };
         VideoInfo: components["schemas"]["VideoFile"] & {
             hasSidecar: boolean;

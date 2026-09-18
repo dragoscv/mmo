@@ -40,12 +40,14 @@ object ProviderLauncher {
         val uri = url?.let(Uri::parse)
         // 1) pinned to the provider app
         if (pkg != null && uri != null && tryStart(context, Intent(Intent.ACTION_VIEW, uri).setPackage(pkg))) return
-        // 1b) app installed but the URL is not routed → just open the app
-        if (pkg != null && uri == null) {
+        // 1b) app installed but it declares no http(s) intent filter (verified on Google TV:
+        //     `resolve-activity -p com.netflix.ninja` → "No activity found"). Open the app itself
+        //     rather than dumping the user in a browser.
+        if (pkg != null) {
             val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
             if (launchIntent != null && tryStart(context, launchIntent)) return
         }
-        // 2) any handler (browser or another app)
+        // 2) app not installed → any handler (browser or another app)
         if (uri != null && tryStart(context, Intent(Intent.ACTION_VIEW, uri))) return
         // 3) Play Store fallback
         if (pkg != null) {

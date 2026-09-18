@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.1.0
+  version: 3.2.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -2411,10 +2411,13 @@ paths:
     post:
       operationId: videoScan
       tags: [video]
-      summary: Walk the library roots and register every probed video
+      summary: Registered (already probed) videos under the library roots
       description: |
         When `roots` is omitted or empty the configured scan folders are used.
-        Files that fail `ffprobe` are skipped.
+        Answers from the persisted registry and never runs ffprobe inline.
+        Roots with nothing registered yet get a background video scan job
+        (`GET /scan/jobs/{id}`) and are listed in `pendingRoots`; call again
+        once the job completes.
       requestBody:
         required: true
         content:
@@ -5583,7 +5586,15 @@ components:
       required: [files, rootsScanned]
       properties:
         files: { type: array, items: { $ref: '#/components/schemas/VideoFile' } }
-        rootsScanned: { type: integer }
+        rootsScanned: { type: integer, description: Roots answered from the registry. }
+        pendingRoots:
+          type: array
+          items: { type: string }
+          description: Roots with no registered files yet; a scan job was enqueued for each.
+        jobIds:
+          type: array
+          items: { type: string }
+          description: Scan job ids (one per pending root), pollable via `/scan/jobs/{id}`.
     VideoInfo:
       allOf:
         - { $ref: '#/components/schemas/VideoFile' }

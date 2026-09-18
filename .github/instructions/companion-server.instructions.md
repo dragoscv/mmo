@@ -28,6 +28,11 @@ description: "MMO Server / Companion (Express 5, Electron 44 shell, headless Nod
   ARRAY (`splatParam()` joins it); `req.body` is `undefined` without a parsed body (middleware restores `{}`).
   Type guards as `RequestHandler<Record<string,string>>` or `req.params.x` widens to `string | string[]`.
 - ESM-only deps (`music-metadata` 11, `chokidar` 5) in this CJS tsc build go through `src/lib/esm-import.ts`.
+- **ffmpeg/ffprobe only inside explicit jobs** (3.2.0). Nothing at boot and no read endpoint may spawn them:
+  `POST /video/scan` answers from `library/video-registry.ts` and enqueues a `ScanJob` for cold roots;
+  `runVideoScanJob` is the only bulk prober and the only place that may `enqueuePreRemux`
+  (`preRemuxAutoOnScan` default OFF). Transcode = HLS session on demand, pre-remux = single-flight queue.
+  Verify: `Get-CimInstance Win32_Process | ? Name -match '^ff(mpeg|probe)'` must be empty after boot + `/video/scan`.
 - Versioning: bump `server/package.json` + `server/CHANGELOG.md` on user-visible change; release tags
   `companion-v*` (Electron installers) and `server-v*` (Docker image, `mmo-server-docker.yml`, context `server/`).
 - Docker: Dockerfile pins pnpm 10.0.0 via corepack; copy `.npmrc`; never set `npm_config_build_from_source`

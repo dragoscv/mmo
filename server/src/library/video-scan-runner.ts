@@ -25,6 +25,9 @@ import {
     type ScannedVideoPayload,
 } from "./scan-jobs";
 import { mediaLibraryHooks } from "../media/library-hooks";
+import { makeFileId, registerFile } from "./video-registry";
+import { enqueuePreRemux } from "./pre-remux";
+import { getSettings } from "../store";
 
 async function discover(root: string, job: ScanJob, onUpdate: () => void): Promise<{ files: string[]; dirsVisited: number; dirsErrored: number; sampleErrors: Array<{ dir: string; error: string }> }> {
     let lastEmit = 0;
@@ -90,6 +93,7 @@ async function probeAll(
 ): Promise<ScannedVideoPayload[]> {
     const videos: ScannedVideoPayload[] = [];
     let lastEmit = 0;
+    const autoPreRemux = getSettings().preRemuxAutoOnScan;
     for (let i = 0; i < files.length; i++) {
         const fullPath = files[i];
         const filename = path.basename(fullPath);
@@ -129,6 +133,11 @@ async function probeAll(
                 });
             } catch { /* file vanished mid-scan, skip silently */ }
         } else {
+            // Feed the streaming registry so `/video/scan` (cache read) and
+            // `/video/direct|stream/:fileId` never need an inline ffprobe.
+            const fileId = makeFileId(fullPath);
+            registerFile(fileId, { absPath: fullPath, meta: { ...probed, parsed } });
+            if (autoPreRemux) enqueuePreRemux(fileId, fullPath, probed.durationSec ?? null);
             videos.push({
                 filepath: fullPath,
                 filename,
