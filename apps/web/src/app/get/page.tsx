@@ -4,7 +4,7 @@ import Image from "next/image";
 import { headers } from "next/headers";
 
 /**
- * Public /downloads landing page.
+ * Public /get landing page (formerly /downloads; redirected in next.config.ts).
  *
  * Auth-free entry point for sharing direct download links (companion,
  * native shells, browser extension, app stores). Mirrors the in-app
@@ -44,22 +44,22 @@ interface Manifest {
 }
 
 export const metadata: Metadata = {
-    title: "Descarcă MuzicAI — companion, aplicație nativă, extensie de browser",
+    title: { absolute: "Descarcă MixAI · companion, aplicație nativă, extensie de browser" },
     description:
-        "Descarcă MuzicAI — suita muzicală AI pentru Windows, macOS, Linux, Android și iOS. Aplicația companion, build-uri native și extensia pentru Chrome, Firefox și Edge.",
-    alternates: { canonical: "https://muzicai.ro/downloads" },
+        "Descarcă MixAI — suita muzicală AI pentru Windows, macOS, Linux, Android și iOS. Aplicația companion, build-uri native și extensia pentru Chrome, Firefox și Edge.",
+    alternates: { canonical: "https://mixai.ro/get" },
     openGraph: {
-        title: "Descarcă MuzicAI",
+        title: "Descarcă MixAI",
         description:
             "Aplicații desktop, mobile și extensii browser pentru organizarea muzicii — gratuit, open source.",
-        url: "https://muzicai.ro/downloads",
-        siteName: "MuzicAI",
+        url: "https://mixai.ro/get",
+        siteName: "MixAI",
         type: "website",
-        images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "MuzicAI" }],
+        images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "MixAI" }],
     },
     twitter: {
         card: "summary_large_image",
-        title: "Descarcă MuzicAI",
+        title: "Descarcă MixAI",
         description:
             "Aplicații desktop, mobile și extensii browser pentru organizarea muzicii.",
         images: ["/og-image.png"],
@@ -72,7 +72,7 @@ async function getManifest(): Promise<Manifest | null> {
     const h = await headers();
     const host = h.get("x-forwarded-host") ?? h.get("host");
     const proto = h.get("x-forwarded-proto") ?? "https";
-    const base = host ? `${proto}://${host}` : "https://muzicai.ro";
+    const base = host ? `${proto}://${host}` : "https://mixai.ro";
     try {
         const res = await fetch(`${base}/api/downloads/manifest`, {
             next: { revalidate: 300 },
@@ -188,7 +188,7 @@ export default async function DownloadsPublicPage() {
                     >
                         <Image
                             src="/icon-192.png"
-                            alt="MuzicAI"
+                            alt="MixAI"
                             width={48}
                             height={48}
                             className="rounded-xl shadow-[0_0_24px_rgba(139,92,246,0.35)]"
@@ -196,7 +196,7 @@ export default async function DownloadsPublicPage() {
                         <span className="font-heading text-2xl font-bold tracking-tight">Muzic<span className="text-brand-accent">AI</span></span>
                     </Link>
                     <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl">
-                        Descarcă MuzicAI
+                        Descarcă MixAI
                     </h1>
                     <p className="mx-auto mt-3 max-w-2xl text-base text-white/60">
                         Aplicații desktop, mobile și extensii de browser pentru
@@ -206,7 +206,7 @@ export default async function DownloadsPublicPage() {
                             href="/"
                             className="text-purple-300 hover:underline"
                         >
-                            muzicai.ro
+                            mixai.ro
                         </Link>
                         .
                     </p>
@@ -238,7 +238,7 @@ export default async function DownloadsPublicPage() {
                         />
                         <ChannelSection
                             channel={manifest.channels.extension}
-                            blurb="Extensie pentru browser care leagă MuzicAI de paginile de unde descarci muzică (YouTube, Bandcamp, SoundCloud)."
+                            blurb="Extensie pentru browser care leagă MixAI de paginile de unde descarci muzică (YouTube, Bandcamp, SoundCloud)."
                         />
 
                         <section className="rounded-xl border border-white/10 bg-white/[0.03] p-5">

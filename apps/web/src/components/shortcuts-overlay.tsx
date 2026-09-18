@@ -1,111 +1,59 @@
 "use client";
 
-/** Press `?` to toggle a keyboard-shortcuts cheat sheet overlay.
- *  Mounted once at the top of the layout. */
+/** Press `?` to toggle the keyboard-shortcuts cheat sheet.
+ *  Built on @mmo/ui's registry + ShortcutsOverlay; mounted once in the root layout.
+ *
+ *  The playback/navigation shortcuts below are HANDLED by the player and the
+ *  route components themselves — they are registered here documentation-only
+ *  (`when: () => false`) so the overlay lists them without double-firing. */
 
-import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect } from "react";
+import { useTranslations } from "next-intl";
+import { ShortcutsOverlay as UiShortcutsOverlay, registerShortcut, useInstallShortcutListener, useShortcutsOverlay } from "@mmo/ui";
 
-interface Shortcut { keys: string[]; label: string; section: string }
+type Doc = { id: string; keys: string[]; group: "playback" | "navigation" | "help"; label: string };
 
-const SHORTCUTS: Shortcut[] = [
-    { section: "Playback", keys: ["Space"], label: "Play / Pause" },
-    { section: "Playback", keys: ["←"], label: "Înapoi 5s (audio) / 10s (video)" },
-    { section: "Playback", keys: ["→"], label: "Înainte 5s (audio) / 10s (video)" },
-    { section: "Playback", keys: ["J"], label: "Înapoi 10s" },
-    { section: "Playback", keys: ["L"], label: "Înainte 10s" },
-    { section: "Playback", keys: ["K"], label: "Pauză / Redă" },
-    { section: "Playback", keys: ["M"], label: "Mute / Unmute" },
-    { section: "Playback", keys: ["F"], label: "Fullscreen" },
-    { section: "Playback", keys: ["P"], label: "Detach video (PiP)" },
-    { section: "Playback", keys: ["N"], label: "Skip intro" },
-    { section: "Navigation", keys: ["Shift", "N"], label: "Now Playing" },
-    { section: "Navigation", keys: ["G", "L"], label: "Library" },
-    { section: "Navigation", keys: ["G", "W"], label: "Watch" },
-    { section: "Navigation", keys: ["G", "S"], label: "Stats" },
-    { section: "Navigation", keys: ["/"], label: "Caută" },
-    { section: "Help", keys: ["?"], label: "Acest cheatsheet" },
-    { section: "Help", keys: ["Esc"], label: "Închide overlay-uri" },
-];
+const never = () => false;
+const noop = () => {};
 
 export function ShortcutsOverlay() {
-    const [open, setOpen] = useState(false);
+    const t = useTranslations("shortcuts");
+    useInstallShortcutListener();
+    const { open, setOpen } = useShortcutsOverlay();
 
     useEffect(() => {
-        const onKey = (e: KeyboardEvent) => {
-            const target = e.target as HTMLElement | null;
-            if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
-            if (e.key === "?" || (e.shiftKey && e.key === "/")) {
-                e.preventDefault();
-                setOpen((o) => !o);
-            } else if (e.key === "Escape" && open) {
-                setOpen(false);
-            }
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [open]);
-
-    if (!open) return null;
-
-    const sections = [...new Set(SHORTCUTS.map((s) => s.section))];
+        const docs: Doc[] = [
+            { id: "doc-play-pause", keys: ["space"], group: "playback", label: t("playPause") },
+            { id: "doc-seek-back", keys: ["left"], group: "playback", label: t("seekBack") },
+            { id: "doc-seek-forward", keys: ["right"], group: "playback", label: t("seekForward") },
+            { id: "doc-back-10", keys: ["j"], group: "playback", label: t("back10") },
+            { id: "doc-forward-10", keys: ["l"], group: "playback", label: t("forward10") },
+            { id: "doc-pause-resume", keys: ["k"], group: "playback", label: t("pauseResume") },
+            { id: "doc-mute", keys: ["m"], group: "playback", label: t("mute") },
+            { id: "doc-fullscreen", keys: ["f"], group: "playback", label: t("fullscreen") },
+            { id: "doc-pip", keys: ["p"], group: "playback", label: t("pip") },
+            { id: "doc-skip-intro", keys: ["n"], group: "playback", label: t("skipIntro") },
+            { id: "doc-now-playing", keys: ["shift+n"], group: "navigation", label: t("nowPlaying") },
+            { id: "doc-go-library", keys: ["g l"], group: "navigation", label: t("library") },
+            { id: "doc-go-watch", keys: ["g w"], group: "navigation", label: t("watch") },
+            { id: "doc-go-stats", keys: ["g s"], group: "navigation", label: t("stats") },
+            { id: "doc-search", keys: ["/"], group: "navigation", label: t("search") },
+            { id: "doc-close-overlays", keys: ["esc"], group: "help", label: t("closeOverlays") },
+        ];
+        const offs = docs.map((d) => registerShortcut({ ...d, handler: noop, when: never }));
+        return () => offs.forEach((off) => off());
+    }, [t]);
 
     return (
-        <div
-            onClick={() => setOpen(false)}
-            style={{
-                position: "fixed", inset: 0, zIndex: 9999,
-                background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
-                display: "grid", placeItems: "center", padding: 24,
+        <UiShortcutsOverlay
+            open={open}
+            onOpenChange={setOpen}
+            groupLabels={{
+                playback: t("groups.playback"),
+                navigation: t("groups.navigation"),
+                help: t("groups.help"),
+                general: t("groups.help"),
             }}
-        >
-            <div
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                    background: "linear-gradient(180deg, rgba(20,20,28,0.95), rgba(12,12,18,0.95))",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 12, padding: 24, maxWidth: 720, width: "100%",
-                    maxHeight: "80vh", overflowY: "auto", color: "white",
-                    boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Scurtături tastatură</h2>
-                    <button onClick={() => setOpen(false)} style={{ background: "transparent", border: "none", color: "white", cursor: "pointer", padding: 4 }}>
-                        <X size={18} />
-                    </button>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
-                    {sections.map((sec) => (
-                        <div key={sec}>
-                            <h3 style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, color: "rgba(255,255,255,0.4)", margin: "0 0 8px 0" }}>
-                                {sec}
-                            </h3>
-                            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-                                {SHORTCUTS.filter((s) => s.section === sec).map((s, i) => (
-                                    <li key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
-                                        <span style={{ color: "rgba(255,255,255,0.75)" }}>{s.label}</span>
-                                        <span style={{ display: "flex", gap: 4 }}>
-                                            {s.keys.map((k, ki) => (
-                                                <kbd key={ki} style={{
-                                                    background: "rgba(255,255,255,0.08)",
-                                                    border: "1px solid rgba(255,255,255,0.12)",
-                                                    borderRadius: 4, padding: "2px 6px",
-                                                    fontSize: 11, fontFamily: "ui-monospace, monospace",
-                                                    minWidth: 20, textAlign: "center",
-                                                }}>{k}</kbd>
-                                            ))}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    ))}
-                </div>
-                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 16, marginBottom: 0 }}>
-                    Apasă <kbd style={{ background: "rgba(255,255,255,0.08)", padding: "1px 5px", borderRadius: 3 }}>?</kbd> oricând pentru a deschide acest panou.
-                </p>
-            </div>
-        </div>
+        />
     );
 }

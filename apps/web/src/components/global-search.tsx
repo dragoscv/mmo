@@ -22,12 +22,6 @@ import {
   User,
   Disc3,
   ListMusic,
-  LayoutDashboard,
-  Library,
-  ScanSearch,
-  HardDrive,
-  Settings,
-  AudioWaveform,
   Hash,
   ArrowRight,
   Loader2,
@@ -41,7 +35,6 @@ import {
   Film,
   Tv,
   Layers,
-  Mic,
 } from "lucide-react";
 import { cn, formatDuration, formatKey } from "@/lib/utils";
 import { useDAWSettings } from "@/hooks/use-daw-settings";
@@ -49,18 +42,18 @@ import { globalSearch, type SearchResult } from "@/actions/search";
 import { usePlayer } from "@/components/player-context";
 import { useFocusMode } from "@/components/focus-mode-context";
 import { signOutAndPurge } from "@/lib/auth-client";
+import { allLeaves } from "@/components/sidebar/nav-tree";
 
-const PAGES = [
-  { label: "Dashboard", key: "dashboard", href: "/", icon: LayoutDashboard, keywords: "home overview stats" },
-  { label: "Library", key: "library", href: "/library", icon: Library, keywords: "tracks songs music browse" },
-  { label: "Duplicates", key: "duplicates", href: "/library/duplicates", icon: Copy, keywords: "duplicate dedupe sha fingerprint exact fuzzy audio" },
-  { label: "Playlists", key: "playlists", href: "/playlists", icon: ListMusic, keywords: "playlist collections sets" },
-  { label: "Visualizations", key: "visualizations", href: "/visualizations", icon: AudioWaveform, keywords: "charts graphs visual" },
-  { label: "Scanner", key: "scanner", href: "/scanner", icon: ScanSearch, keywords: "scan import analyze folder" },
-  { label: "Drives", key: "drives", href: "/drives", icon: HardDrive, keywords: "usb disk drive export" },
-  { label: "Settings", key: "settings", href: "/settings", icon: Settings, keywords: "preferences config options" },
-  { label: "Voice Wizard", key: "voice-wizard", href: "/voice-wizard", icon: Mic, keywords: "voice clone tts wizard xtts synthesize sing" },
+/** Extra pages not in the nav tree but worth surfacing in the palette. */
+const EXTRA_PAGES = [
+  { key: "duplicates", href: "/library/duplicates", icon: Copy },
 ] as const;
+
+/** Palette pages = every nav leaf + extras. Labels come from `nav.*`, keywords from `palette.pageKeywords.*`. */
+const PAGES = [
+  ...allLeaves.map((l) => ({ key: l.key, href: l.href, icon: l.icon })),
+  ...EXTRA_PAGES,
+];
 
 interface GlobalSearchProps {
   open: boolean;
@@ -285,10 +278,13 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                 </CommandGroup>
                 <CommandSeparator className="my-1" />
                 <CommandGroup heading={t("pages")}>
-                  {PAGES.map((page) => (
+                  {PAGES.map((page) => {
+                    const label = tNav(page.key);
+                    const kw = t.has(`pageKeywords.${page.key}`) ? t(`pageKeywords.${page.key}`) : "";
+                    return (
                     <CommandItem
                       key={page.href}
-                      value={`page-${page.label} ${page.keywords}`}
+                      value={`page-${page.key} ${label} ${kw}`}
                       onSelect={() => navigate(page.href)}
                       className="gap-3 rounded-lg px-3 py-2.5"
                     >
@@ -296,11 +292,12 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                         <page.icon className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{tNav(page.key)}</p>
+                        <p className="text-sm font-medium">{label}</p>
                       </div>
                       <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40" />
                     </CommandItem>
-                  ))}
+                    );
+                  })}
                 </CommandGroup>
               </>
             )}

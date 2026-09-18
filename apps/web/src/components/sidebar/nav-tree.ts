@@ -4,6 +4,7 @@ import {
     ListMusic, Activity, UserCircle, HardDrive, ScanSearch, Smartphone,
     AudioWaveform, BookOpen, User, ShieldCheck, Palette, Bell,
     Home, Film, Tv, History, Sparkles, Bot, Brain,
+    FolderInput, BadgeCheck, Link2, GitBranch,
     type LucideIcon,
 } from "lucide-react";
 
@@ -59,6 +60,7 @@ export const navTree: NavNode[] = [
             { kind: "leaf", key: "library-tracks", href: "/library", label: "Tracks", icon: Library, exact: true },
             { kind: "leaf", key: "playlists", href: "/playlists", label: "Playlists", icon: ListMusic },
             { kind: "leaf", key: "analysis", href: "/analysis", label: "Analysis", icon: Activity },
+            { kind: "leaf", key: "library-import", href: "/library/import", label: "Import", icon: FolderInput },
         ],
     },
     {
@@ -85,6 +87,7 @@ export const navTree: NavNode[] = [
             { kind: "leaf", key: "remote", href: "/remote", label: "Remote", icon: Smartphone },
             { kind: "leaf", key: "drives", href: "/drives", label: "Drives", icon: HardDrive },
             { kind: "leaf", key: "scanner", href: "/scanner", label: "Scanner", icon: ScanSearch },
+            { kind: "leaf", key: "pair", href: "/pair", label: "Pair device", icon: Link2 },
         ],
     },
     {
@@ -94,6 +97,8 @@ export const navTree: NavNode[] = [
             { kind: "leaf", key: "generate", href: "/generate", label: "AI Generate", icon: Sparkles },
             { kind: "leaf", key: "training", href: "/training", label: "Training", icon: Brain },
             { kind: "leaf", key: "visualizations", href: "/visualizations", label: "Visualizations", icon: AudioWaveform },
+            { kind: "leaf", key: "voice-wizard", href: "/voice-wizard", label: "Voice Wizard", icon: Mic },
+            { kind: "leaf", key: "lora-validate", href: "/lora/validate", label: "LoRA validator", icon: BadgeCheck },
             { kind: "leaf", key: "learn", href: "/learn", label: "Learn", icon: BookOpen },
         ],
     },
@@ -116,6 +121,7 @@ export const navTree: NavNode[] = [
             { kind: "leaf", key: "settings-live", href: "/settings/live", label: "Live", icon: Mic },
             { kind: "leaf", key: "settings-companions", href: "/settings/companions", label: "Companions", icon: Monitor },
             { kind: "leaf", key: "settings-devices", href: "/settings/devices", label: "Devices & remote", icon: Smartphone },
+            { kind: "leaf", key: "settings-github", href: "/settings/github", label: "GitHub", icon: GitBranch },
             { kind: "leaf", key: "settings-notifications", href: "/settings/notifications", label: "Notifications", icon: Bell },
             { kind: "leaf", key: "settings-appearance", href: "/settings/appearance", label: "Appearance & language", icon: Palette },
             { kind: "leaf", key: "settings-advanced", href: "/settings/advanced", label: "Advanced", icon: Settings },

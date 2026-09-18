@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import MaestroPageClient from "./maestro-client";
 
 export const metadata: Metadata = {
-    title: "Maestro · MuzicAI",
+    title: "Maestro",
     description: "Conversational control plane for your music workflow.",
 };
 

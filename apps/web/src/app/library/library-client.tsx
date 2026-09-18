@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useCallback, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryStates } from "nuqs";
+import { librarySearchParams, serializeLibraryUrl, type LibraryQuery } from "./_filters/library-search-params";
 import { useSyncRefresh } from "@/hooks/use-sync-refresh";
 import { useAvailabilityRefresh } from "@/hooks/use-availability-refresh";
 import { useRouteMemorySave, clearRouteMemory } from "@/hooks/use-route-memory";
@@ -17,7 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { NativeSelect as Select } from "@/components/ui/select";
 import { ComboboxFilter } from "@/components/combobox-filter";
 import { StarRating } from "@/components/star-rating";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -125,6 +127,14 @@ export function LibraryClient({
     const offline = useOffline();
     const searchParams = useSearchParams();
     const [isNavigating, startNavigation] = useTransition();
+    // WP9-03: filter/sort/page state lives in the URL via nuqs. `shallow: false`
+    // re-runs the server page (which reads the same keys) exactly like the old
+    // `router.push("/library?…")` did; `clearOnDefault` keeps the URL short.
+    const [query, setQuery] = useQueryStates(librarySearchParams, {
+        shallow: false,
+        clearOnDefault: true,
+        startTransition: startNavigation,
+    });
     const [searchInput, setSearchInput] = useState(currentFilters.search);
     const player = usePlayer();
     const selection = useSelection();
@@ -172,57 +182,47 @@ export function LibraryClient({
     const keyValues = useMemo(() => currentFilters.key ? currentFilters.key.split(",") : [], [currentFilters.key]);
     const tagValues = useMemo(() => currentFilters.tag ? currentFilters.tag.split(",") : [], [currentFilters.tag]);
 
-    const buildUrl = useCallback(
-        (updates: Record<string, string | undefined>) => {
-            const params = new URLSearchParams(searchParams.toString());
-            for (const [key, value] of Object.entries(updates)) {
-                if (value) {
-                    params.set(key, value);
-                } else {
-                    params.delete(key);
-                }
-            }
-            return `/library?${params.toString()}`;
-        },
-        [searchParams]
-    );
+    type QueryUpdate = Partial<{ [K in keyof LibraryQuery]: LibraryQuery[K] | null }>;
 
-    function navigate(updates: Record<string, string | undefined>) {
-        // Wrap in a transition so the current page stays interactive and
-        // visible (no blank flash / blocking) while the next one loads, and we
-        // can show a subtle pending state on the list.
-        startNavigation(() => {
-            router.push(buildUrl(updates));
-        });
+    // Typing / filter tweaks replace the history entry; page + sort changes
+    // push so Back walks through pages. The transition keeps the current
+    // list interactive while the server page reloads.
+    function navigate(updates: QueryUpdate, history: "replace" | "push" = "replace") {
+        void setQuery(updates, { history });
+    }
+
+    /** Comma-joined multi-value filters map to nuqs arrays; "" clears. */
+    function toUpdate(key: string, value: string): QueryUpdate {
+        if (key === "genre" || key === "key" || key === "tag") {
+            return { [key]: value ? value.split(",") : null };
+        }
+        return { [key]: value || null } as QueryUpdate;
     }
 
     function handleSort(column: string) {
         if (currentSort === column) {
-            navigate({
-                sort: column,
-                order: currentOrder === "asc" ? "desc" : "asc",
-            });
+            navigate({ sort: column as LibraryQuery["sort"], order: currentOrder === "asc" ? "desc" : "asc" }, "push");
         } else {
-            navigate({ sort: column, order: "asc", page: "1" });
+            navigate({ sort: column as LibraryQuery["sort"], order: "asc", page: null }, "push");
         }
     }
 
     function handleFilter(key: string, value: string) {
-        navigate({ [key]: value || undefined, page: "1" });
+        navigate({ ...toUpdate(key, value), page: null });
     }
 
     function handleSearch() {
-        navigate({ search: searchInput || undefined, page: "1" });
+        navigate({ search: searchInput || null, page: null });
     }
 
     function handlePageChange(newPage: number) {
-        navigate({ page: String(newPage) });
+        navigate({ page: newPage }, "push");
     }
 
     // Warm the client router cache for a page so the click feels instant.
     function prefetchPage(targetPage: number) {
         if (targetPage < 1 || targetPage > totalPages || targetPage === page) return;
-        router.prefetch(buildUrl({ page: String(targetPage) }));
+        router.prefetch(`/library${serializeLibraryUrl({ ...query, page: targetPage })}`);
     }
 
     function handlePlay(track: Track) {
@@ -232,7 +232,7 @@ export function LibraryClient({
     function clearAllFilters() {
         clearRouteMemory("/library");
         setSearchInput("");
-        router.push("/library");
+        void setQuery(null, { history: "push" });
     }
 
     const hasFilters =
@@ -896,7 +896,7 @@ export function LibraryClient({
                             <Select
                                 value={String(pageSize)}
                                 onChange={(e) =>
-                                    navigate({ pageSize: e.target.value, page: "1" })
+                                    navigate({ pageSize: Number(e.target.value), page: null }, "push")
                                 }
                                 className="w-20 h-8 text-xs"
                             >

@@ -23,7 +23,7 @@
 import { useState, useTransition, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { NativeSelect as Select } from "@/components/ui/select";
 import {
     Dialog,
     DialogContent,

@@ -1,25 +1,27 @@
-import * as React from "react";
-import { cn } from "@/lib/utils";
+"use client";
 
-function Checkbox({
-    className,
-    ...props
-}: React.ComponentProps<"input">) {
-    return (
-        <input
-            type="checkbox"
-            data-slot="checkbox"
-            className={cn(
-                "h-4 w-4 shrink-0 cursor-pointer rounded border border-input bg-card accent-purple-500 transition-colors",
-                "checked:bg-purple-500 checked:border-purple-500",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
-                "dark:bg-input/30 dark:border-input",
-                className
-            )}
-            {...props}
-        />
-    );
+/**
+ * Compat wrapper over @mmo/ui Checkbox (Base UI button[role=checkbox]).
+ * Legacy call sites used a native <input type=checkbox> with `onChange(e)`;
+ * we synthesise `e.target.checked` so they keep working.
+ */
+import type * as React from "react";
+import { Checkbox as UiCheckbox, type CheckboxProps as UiCheckboxProps } from "@mmo/ui";
+
+type LegacyChangeEvent = { target: { checked: boolean }; currentTarget: { checked: boolean } };
+
+export interface CheckboxProps extends Omit<UiCheckboxProps, "onChange"> {
+    /** Legacy native-style handler. Prefer `onCheckedChange`. */
+    onChange?: (event: LegacyChangeEvent) => void;
 }
 
-export { Checkbox };
+export function Checkbox({ onChange, onCheckedChange, ...props }: CheckboxProps) {
+    const handle: UiCheckboxProps["onCheckedChange"] = (checked, details) => {
+        onCheckedChange?.(checked, details);
+        if (onChange) {
+            const ev = { target: { checked }, currentTarget: { checked } };
+            onChange(ev);
+        }
+    };
+    return <UiCheckbox onCheckedChange={handle} {...(props as React.ComponentProps<typeof UiCheckbox>)} />;
+}

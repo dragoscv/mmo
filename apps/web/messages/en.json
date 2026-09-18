@@ -20,11 +20,25 @@
                 "title": "Clips",
                 "description": "How clips are drawn on the timeline.",
                 "displayMode": "Clip content",
-                "modes": { "waveform": "Waveform", "notes": "Notes", "both": "Waveform + notes", "none": "None" },
+                "modes": {
+                    "waveform": "Waveform",
+                    "notes": "Notes",
+                    "both": "Waveform + notes",
+                    "none": "None"
+                },
                 "waveformStyle": "Waveform style",
-                "styles": { "classic": "Classic", "bars": "Bars", "lines": "Lines", "filled": "Filled" },
+                "styles": {
+                    "classic": "Classic",
+                    "bars": "Bars",
+                    "lines": "Lines",
+                    "filled": "Filled"
+                },
                 "waveformColor": "Waveform colour",
-                "colors": { "clip": "Clip colour", "mono": "Monochrome", "gradient": "Gradient" },
+                "colors": {
+                    "clip": "Clip colour",
+                    "mono": "Monochrome",
+                    "gradient": "Gradient"
+                },
                 "showNames": "Show clip names",
                 "showBadges": "Show clip info badges",
                 "opacity": "Clip opacity"
@@ -33,12 +47,26 @@
                 "title": "Timeline",
                 "description": "Track height, grid and playhead.",
                 "trackHeight": "Track height",
-                "heights": { "compact": "Compact", "normal": "Normal", "large": "Large" },
+                "heights": {
+                    "compact": "Compact",
+                    "normal": "Normal",
+                    "large": "Large"
+                },
                 "gridStyle": "Grid style",
-                "grids": { "lines": "Lines", "dots": "Dots", "none": "None" },
+                "grids": {
+                    "lines": "Lines",
+                    "dots": "Dots",
+                    "none": "None"
+                },
                 "gridOpacity": "Grid opacity",
                 "playheadColor": "Playhead colour",
-                "playheads": { "green": "Green", "red": "Red", "white": "White", "cyan": "Cyan", "orange": "Orange" },
+                "playheads": {
+                    "green": "Green",
+                    "red": "Red",
+                    "white": "White",
+                    "cyan": "Cyan",
+                    "orange": "Orange"
+                },
                 "snapToGrid": "Snap to grid",
                 "showAutomation": "Show automation lanes",
                 "activeClipHighlight": "Highlight the active clip"
@@ -70,7 +98,11 @@
                 "jogSensitivity": "Jog sensitivity",
                 "tempoRange": "Tempo range",
                 "crossfaderCurve": "Crossfader curve",
-                "curves": { "linear": "Linear", "smooth": "Smooth", "sharp": "Sharp" },
+                "curves": {
+                    "linear": "Linear",
+                    "smooth": "Smooth",
+                    "sharp": "Sharp"
+                },
                 "driver": "Controller driver",
                 "autoDetect": "Auto-detect",
                 "devices": "{count, plural, =0 {No MIDI devices connected} one {# MIDI device connected} other {# MIDI devices connected}} · {status}"
@@ -95,7 +127,14 @@
                 "title": "Waveform",
                 "description": "Colour and overlays in the editor view.",
                 "color": "Waveform colour",
-                "colors": { "blue": "Blue", "purple": "Purple", "green": "Green", "cyan": "Cyan", "orange": "Orange", "white": "White" },
+                "colors": {
+                    "blue": "Blue",
+                    "purple": "Purple",
+                    "green": "Green",
+                    "cyan": "Cyan",
+                    "orange": "Orange",
+                    "white": "White"
+                },
                 "showRms": "Show RMS overlay",
                 "showGrid": "Show grid lines",
                 "showMinimap": "Show minimap"
@@ -104,7 +143,13 @@
                 "title": "Spectrogram",
                 "description": "Colour map and analysis resolution.",
                 "colorMap": "Colour map",
-                "maps": { "magma": "Magma", "viridis": "Viridis", "inferno": "Inferno", "plasma": "Plasma", "grayscale": "Grayscale" },
+                "maps": {
+                    "magma": "Magma",
+                    "viridis": "Viridis",
+                    "inferno": "Inferno",
+                    "plasma": "Plasma",
+                    "grayscale": "Grayscale"
+                },
                 "fftSize": "FFT size",
                 "fftHint": "Larger values give finer frequency detail but coarser timing."
             },
@@ -149,7 +194,11 @@
                 "jogSensitivity": "Jog sensitivity",
                 "tempoRange": "Tempo range",
                 "crossfaderCurve": "Crossfader curve",
-                "curves": { "linear": "Linear", "smooth": "Smooth", "sharp": "Sharp" }
+                "curves": {
+                    "linear": "Linear",
+                    "smooth": "Smooth",
+                    "sharp": "Sharp"
+                }
             },
             "console": {
                 "title": "Full console settings",
@@ -180,12 +229,22 @@
                 "tunerStickiness": "Tuner hold (ms)",
                 "coachStickiness": "Coach tip hold (ms)",
                 "coachVerbosity": "Coach verbosity",
-                "verbosity": { "minimal": "Minimal", "normal": "Normal", "verbose": "Verbose" }
+                "verbosity": {
+                    "minimal": "Minimal",
+                    "normal": "Normal",
+                    "verbose": "Verbose"
+                }
             },
             "accent": {
                 "title": "Accent colour",
                 "description": "Highlight colour for the Live page.",
-                "names": { "rose": "Rose", "violet": "Violet", "emerald": "Emerald", "cyan": "Cyan", "amber": "Amber" }
+                "names": {
+                    "rose": "Rose",
+                    "violet": "Violet",
+                    "emerald": "Emerald",
+                    "cyan": "Cyan",
+                    "amber": "Amber"
+                }
             },
             "layout": {
                 "title": "Layout",
@@ -291,7 +350,10 @@
                 "status": "Status",
                 "actions": "Actions"
             },
-            "status": { "online": "Online", "offline": "Offline" },
+            "status": {
+                "online": "Online",
+                "offline": "Offline"
+            },
             "never": "Never",
             "actions": {
                 "rename": "Rename",
@@ -505,7 +567,16 @@
         "unpin": "Unpin from Quick access",
         "recentProjects": "Recent projects",
         "noRecentProjects": "No recent projects yet.",
-        "searchPlaceholder": "Search tracks, artists…"
+        "searchPlaceholder": "Search tracks, artists…",
+        "library-import": "Import",
+        "lora-validate": "LoRA validator",
+        "pair": "Pair device",
+        "settings-github": "GitHub",
+        "music-overview": "Overview",
+        "generate": "AI Generate",
+        "training": "Training",
+        "maestro": "Maestro",
+        "settings-copilot": "AI Copilot"
     },
     "common": {
         "loading": "Loading…",
@@ -603,7 +674,19 @@
         "usbWizardHint": "Rekordbox XML / Serato .crate",
         "onboarding": "Show onboarding wizard",
         "onboardingHint": "Replay the welcome tour",
-        "signOut": "Sign out"
+        "signOut": "Sign out",
+        "pageKeywords": {
+            "dashboard": "home overview stats",
+            "library-tracks": "tracks songs music browse",
+            "playlists": "playlist collections sets",
+            "visualizations": "charts graphs visual",
+            "scanner": "scan import analyze folder",
+            "drives": "usb disk drive export",
+            "settings-overview": "preferences config options",
+            "voice-wizard": "voice clone tts wizard xtts synthesize sing",
+            "library-import": "import folder files upload",
+            "duplicates": "duplicate dedupe sha fingerprint exact fuzzy audio"
+        }
     },
     "usb": {
         "title": "USB Export Wizard",
@@ -1053,5 +1136,30 @@
                 "error": "Error"
             }
         }
+    },
+    "shortcuts": {
+        "title": "Keyboard shortcuts",
+        "groups": {
+            "playback": "Playback",
+            "navigation": "Navigation",
+            "help": "Help"
+        },
+        "playPause": "Play / Pause",
+        "seekBack": "Back 5s (audio) / 10s (video)",
+        "seekForward": "Forward 5s (audio) / 10s (video)",
+        "back10": "Back 10s",
+        "forward10": "Forward 10s",
+        "pauseResume": "Pause / Resume",
+        "mute": "Mute / Unmute",
+        "fullscreen": "Fullscreen",
+        "pip": "Detach video (PiP)",
+        "skipIntro": "Skip intro",
+        "nowPlaying": "Now Playing",
+        "library": "Library",
+        "watch": "Watch",
+        "stats": "Stats",
+        "search": "Search",
+        "cheatsheet": "This cheat sheet",
+        "closeOverlays": "Close overlays"
     }
 }

@@ -1,11 +1,12 @@
 {
   "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "radix-vega",
+  "_note": "Primitives live in packages/ui (@mmo/ui, Base UI). src/components/ui/* are thin re-exports/compat wrappers — do not `shadcn add` new Radix primitives here.",
+  "style": "base-vega",
   "rsc": true,
   "tsx": true,
   "tailwind": {
     "config": "",
-    "css": "src/app/globals.css",
+    "css": "src/app/globals.src.css",
     "baseColor": "neutral",
     "cssVariables": true,
     "prefix": ""

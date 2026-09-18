@@ -447,7 +447,7 @@ body.daw-focus-mode [data-app-layout] {
     border: 1px solid var(--daw-border);
     border-radius: 6px;
     color: var(--daw-text);
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-mono);
     text-align: center;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -1023,7 +1023,7 @@ html.daw-dockview-dragging * {
     padding: 0.1rem 0.35rem;
     border-radius: 4px;
     font-size: 0.9em;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono);
 }
 
 .learn-prose pre {

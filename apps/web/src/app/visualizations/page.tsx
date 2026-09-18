@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 
 export const metadata = {
-    title: "Visualizations | MuzicAI",
+    title: "Visualizations",
 };
 
 export default async function VisualizationsPage() {

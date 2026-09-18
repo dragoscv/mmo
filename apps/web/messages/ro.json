@@ -21,328 +21,390 @@
             "already_decided": "Acest cod a fost deja folosit."
         }
     },
-            "settings": {
-                "appearance": {
-                    "title": "Aspect & limbă",
-                    "description": "Mod, culoare de accent, suprafețe, densitate, animații și limbă. Salvate în profilul tău și aplicate pe fiecare dispozitiv."
+    "settings": {
+        "appearance": {
+            "title": "Aspect & limbă",
+            "description": "Mod, culoare de accent, suprafețe, densitate, animații și limbă. Salvate în profilul tău și aplicate pe fiecare dispozitiv."
+        },
+        "daw": {
+            "title": "DAW",
+            "description": "Dispozitive audio, afișarea clipurilor și a timeline-ului, notație, statistici în bara de stare și MIDI. Salvate în acest browser.",
+            "audio": {
+                "title": "Dispozitive audio",
+                "description": "Ieșirea și intrarea folosite de motorul DAW.",
+                "output": "Dispozitiv de ieșire",
+                "input": "Dispozitiv de intrare",
+                "monitor": "Monitorizare intrare",
+                "monitorHint": "Auzi semnalul de intrare prin ieșire în timpul înregistrării."
+            },
+            "clips": {
+                "title": "Clipuri",
+                "description": "Cum sunt desenate clipurile pe timeline.",
+                "displayMode": "Conținut clip",
+                "modes": {
+                    "waveform": "Formă de undă",
+                    "notes": "Note",
+                    "both": "Formă de undă + note",
+                    "none": "Nimic"
                 },
-                "daw": {
-                    "title": "DAW",
-                    "description": "Dispozitive audio, afișarea clipurilor și a timeline-ului, notație, statistici în bara de stare și MIDI. Salvate în acest browser.",
-                    "audio": {
-                        "title": "Dispozitive audio",
-                        "description": "Ieșirea și intrarea folosite de motorul DAW.",
-                        "output": "Dispozitiv de ieșire",
-                        "input": "Dispozitiv de intrare",
-                        "monitor": "Monitorizare intrare",
-                        "monitorHint": "Auzi semnalul de intrare prin ieșire în timpul înregistrării."
-                    },
-                    "clips": {
-                        "title": "Clipuri",
-                        "description": "Cum sunt desenate clipurile pe timeline.",
-                        "displayMode": "Conținut clip",
-                        "modes": { "waveform": "Formă de undă", "notes": "Note", "both": "Formă de undă + note", "none": "Nimic" },
-                        "waveformStyle": "Stil formă de undă",
-                        "styles": { "classic": "Clasic", "bars": "Bare", "lines": "Linii", "filled": "Umplut" },
-                        "waveformColor": "Culoare formă de undă",
-                        "colors": { "clip": "Culoarea clipului", "mono": "Monocrom", "gradient": "Gradient" },
-                        "showNames": "Afișează numele clipurilor",
-                        "showBadges": "Afișează insignele cu informații",
-                        "opacity": "Opacitate clip"
-                    },
-                    "timeline": {
-                        "title": "Timeline",
-                        "description": "Înălțimea pistelor, grila și capul de redare.",
-                        "trackHeight": "Înălțime pistă",
-                        "heights": { "compact": "Compact", "normal": "Normal", "large": "Mare" },
-                        "gridStyle": "Stil grilă",
-                        "grids": { "lines": "Linii", "dots": "Puncte", "none": "Fără" },
-                        "gridOpacity": "Opacitate grilă",
-                        "playheadColor": "Culoare cap de redare",
-                        "playheads": { "green": "Verde", "red": "Roșu", "white": "Alb", "cyan": "Cyan", "orange": "Portocaliu" },
-                        "snapToGrid": "Aliniere la grilă",
-                        "showAutomation": "Afișează benzile de automatizare",
-                        "activeClipHighlight": "Evidențiază clipul activ"
-                    },
-                    "notation": {
-                        "title": "Notație muzicală",
-                        "description": "Cum sunt etichetate tonalitățile și notele în DAW.",
-                        "primary": "Notație principală",
-                        "secondary": "Notație secundară",
-                        "none": "Niciuna"
-                    },
-                    "stats": {
-                        "title": "Statistici în bara de stare",
-                        "description": "Contoare de performanță afișate în bara de stare a DAW-ului.",
-                        "keys": {
-                            "showFps": "Cadre pe secundă",
-                            "showHeapMemory": "Memorie JS folosită",
-                            "showJsHeapTotal": "Memorie JS totală",
-                            "showDomNodes": "Noduri DOM",
-                            "showAudioLatency": "Latență audio",
-                            "showCpuCores": "Nuclee CPU",
-                            "showDeviceMemory": "Memorie dispozitiv"
-                        }
-                    },
-                    "midi": {
-                        "title": "MIDI",
-                        "description": "Partajate cu consola mixerului.",
-                        "enabled": "Intrare MIDI activă",
-                        "jogSensitivity": "Sensibilitate jog",
-                        "tempoRange": "Interval tempo",
-                        "crossfaderCurve": "Curbă crossfader",
-                        "curves": { "linear": "Liniară", "smooth": "Lină", "sharp": "Abruptă" },
-                        "driver": "Driver controller",
-                        "autoDetect": "Detectare automată",
-                        "devices": "{count, plural, =0 {Niciun dispozitiv MIDI conectat} one {# dispozitiv MIDI conectat} few {# dispozitive MIDI conectate} other {# de dispozitive MIDI conectate}} · {status}"
-                    },
-                    "layout": {
-                        "title": "Aspect",
-                        "description": "Resetează aranjarea panourilor sau toate setările de afișare DAW.",
-                        "reset": "Resetează aspectul DAW",
-                        "confirmTitle": "Resetezi aspectul DAW?",
-                        "confirmBody": "Pozițiile și dimensiunile panourilor revin la valorile implicite la următoarea deschidere a DAW-ului. Proiectele nu sunt afectate.",
-                        "cancel": "Anulează",
-                        "resetDone": "Aspect DAW resetat.",
-                        "resetFailed": "Aspectul nu a putut fi resetat.",
-                        "defaults": "Restaurează setările implicite de afișare",
-                        "defaultsDone": "Setările de afișare DAW au fost restaurate."
-                    }
+                "waveformStyle": "Stil formă de undă",
+                "styles": {
+                    "classic": "Clasic",
+                    "bars": "Bare",
+                    "lines": "Linii",
+                    "filled": "Umplut"
                 },
-                "sound-editor": {
-                    "title": "Sound Editor",
-                    "description": "Preferințe pentru forma de undă, spectrogramă și bara de stare din editorul de sunet. Salvate în acest browser.",
-                    "waveform": {
-                        "title": "Formă de undă",
-                        "description": "Culoare și suprapuneri în vizualizarea editorului.",
-                        "color": "Culoare formă de undă",
-                        "colors": { "blue": "Albastru", "purple": "Violet", "green": "Verde", "cyan": "Cyan", "orange": "Portocaliu", "white": "Alb" },
-                        "showRms": "Afișează suprapunerea RMS",
-                        "showGrid": "Afișează liniile grilei",
-                        "showMinimap": "Afișează minimap"
-                    },
-                    "spectrogram": {
-                        "title": "Spectrogramă",
-                        "description": "Hartă de culori și rezoluția analizei.",
-                        "colorMap": "Hartă de culori",
-                        "maps": { "magma": "Magma", "viridis": "Viridis", "inferno": "Inferno", "plasma": "Plasma", "grayscale": "Tonuri de gri" },
-                        "fftSize": "Dimensiune FFT",
-                        "fftHint": "Valorile mai mari dau detaliu mai fin în frecvență, dar timp mai grosier."
-                    },
-                    "stats": {
-                        "title": "Statistici în bara de stare",
-                        "description": "Contoare de performanță afișate în bara de stare a editorului.",
-                        "keys": {
-                            "showFps": "Cadre pe secundă",
-                            "showHeapMemory": "Memorie JS folosită",
-                            "showJsHeapTotal": "Memorie JS totală",
-                            "showDomNodes": "Noduri DOM",
-                            "showAudioLatency": "Latență audio",
-                            "showCpuCores": "Nuclee CPU",
-                            "showDeviceMemory": "Memorie dispozitiv"
-                        },
-                        "reset": "Restaurează implicitele",
-                        "resetDone": "Bara de stare a editorului a fost restaurată."
-                    }
+                "waveformColor": "Culoare formă de undă",
+                "colors": {
+                    "clip": "Culoarea clipului",
+                    "mono": "Monocrom",
+                    "gradient": "Gradient"
                 },
-                "mixer": {
-                    "title": "Mixer",
-                    "description": "Ieșire audio, vizualizare formă de undă și comportamentul controllerului pentru mixerul DJ. Salvate în acest browser.",
-                    "audio": {
-                        "title": "Ieșire audio",
-                        "description": "Dispozitivul către care merge master-ul mixerului.",
-                        "output": "Dispozitiv de ieșire",
-                        "nativeHint": "Rutarea nativă aparține motorului Live.",
-                        "appliesNext": "Se aplică la următoarea deschidere a mixerului."
-                    },
-                    "waveform": {
-                        "title": "Forme de undă",
-                        "description": "Nivel de zoom per deck și grila de beat-uri.",
-                        "linked": "Leagă zoom-ul deck-urilor",
-                        "zoomA": "Zoom deck A",
-                        "zoomB": "Zoom deck B",
-                        "beatgrid": "Grilă de beat-uri",
-                        "beatgridHint": "Desenează marcajele de beat peste forma de undă."
-                    },
-                    "midi": {
-                        "title": "Controller",
-                        "description": "Comportament jog, tempo și crossfader. Partajat cu DAW-ul.",
-                        "jogSensitivity": "Sensibilitate jog",
-                        "tempoRange": "Interval tempo",
-                        "crossfaderCurve": "Curbă crossfader",
-                        "curves": { "linear": "Liniară", "smooth": "Lină", "sharp": "Abruptă" }
-                    },
-                    "console": {
-                        "title": "Setările complete ale consolei",
-                        "description": "Preseturi, MIDI learn, culori LED și diagnosticare se află în consola mixerului (rotița din bara de sus).",
-                        "open": "Deschide mixerul"
-                    }
+                "showNames": "Afișează numele clipurilor",
+                "showBadges": "Afișează insignele cu informații",
+                "opacity": "Opacitate clip"
+            },
+            "timeline": {
+                "title": "Timeline",
+                "description": "Înălțimea pistelor, grila și capul de redare.",
+                "trackHeight": "Înălțime pistă",
+                "heights": {
+                    "compact": "Compact",
+                    "normal": "Normal",
+                    "large": "Mare"
                 },
-                "live": {
-                    "title": "Live",
-                    "description": "Dispozitiv de ieșire, afișare tuner și coach, culoare de accent și aranjarea widgeturilor. Salvate în acest browser.",
-                    "audio": {
-                        "title": "Ieșire audio",
-                        "description": "Dispozitivul prin care redă motorul Live.",
-                        "output": "Dispozitiv de ieșire"
-                    },
-                    "notation": {
-                        "title": "Notație muzicală",
-                        "description": "Cum etichetează tunerul și coach-ul notele.",
-                        "primary": "Notație principală",
-                        "secondary": "Notație secundară",
-                        "none": "Niciuna",
-                        "showCents": "Afișează cenții lângă notă"
-                    },
-                    "display": {
-                        "title": "Afișare",
-                        "description": "Rata de reîmprospătare și cât timp rămân valorile pe ecran.",
-                        "refreshHz": "Reîmprospătare widgeturi (Hz)",
-                        "tunerStickiness": "Menținere tuner (ms)",
-                        "coachStickiness": "Menținere sfaturi coach (ms)",
-                        "coachVerbosity": "Detaliere coach",
-                        "verbosity": { "minimal": "Minimă", "normal": "Normală", "verbose": "Detaliată" }
-                    },
-                    "accent": {
-                        "title": "Culoare de accent",
-                        "description": "Culoarea de evidențiere pentru pagina Live.",
-                        "names": { "rose": "Roz", "violet": "Violet", "emerald": "Smarald", "cyan": "Cyan", "amber": "Ambră" }
-                    },
-                    "layout": {
-                        "title": "Aspect",
-                        "description": "Resetează grila de widgeturi sau toate setările Live.",
-                        "reset": "Resetează aranjarea widgeturilor",
-                        "confirmTitle": "Resetezi aranjarea widgeturilor Live?",
-                        "confirmBody": "Pozițiile și dimensiunile widgeturilor revin la valorile implicite la următoarea deschidere a paginii Live.",
-                        "cancel": "Anulează",
-                        "resetDone": "Aspect Live resetat.",
-                        "resetFailed": "Aspectul nu a putut fi resetat.",
-                        "defaults": "Restaurează setările implicite",
-                        "defaultsDone": "Setările Live au fost restaurate."
-                    }
+                "gridStyle": "Stil grilă",
+                "grids": {
+                    "lines": "Linii",
+                    "dots": "Puncte",
+                    "none": "Fără"
                 },
-                "notifications": {
-                    "title": "Notificări",
-                    "description": "Notificări push din acest browser.",
-                    "push": {
-                        "title": "Notificări push",
-                        "description": "Primești o notificare când scanările, randările și antrenamentele se termină — chiar și cu tab-ul închis.",
-                        "status": {
-                            "loading": "Se verifică…",
-                            "unsupported": "Nesuportat",
-                            "no-vapid": "Neconfigurat",
-                            "denied": "Blocat",
-                            "subscribed": "Activ",
-                            "unsubscribed": "Inactiv"
-                        },
-                        "explain": {
-                            "denied": "Notificările sunt blocate pentru acest site. Permite-le din setările site-ului în browser, apoi reîncarcă pagina.",
-                            "subscribed": "Acest browser primește notificări push.",
-                            "unsubscribed": "Acest browser nu este abonat. Browserul îți va cere permisiunea."
-                        },
-                        "noVapidTitle": "Serverul nu este configurat",
-                        "noVapidBody": "Push-ul este dezactivat pentru că {env} nu este setat pe server. Setează-l și redeploy pentru a activa notificările.",
-                        "unsupportedTitle": "Nu este suportat aici",
-                        "unsupportedBody": "Acest browser nu suportă service workers sau Push API.",
-                        "subscribe": "Activează notificările",
-                        "unsubscribe": "Dezactivează notificările",
-                        "subscribed": "Notificări push activate.",
-                        "unsubscribed": "Notificări push dezactivate.",
-                        "failed": "Abonamentul push nu a putut fi modificat."
-                    }
+                "gridOpacity": "Opacitate grilă",
+                "playheadColor": "Culoare cap de redare",
+                "playheads": {
+                    "green": "Verde",
+                    "red": "Roșu",
+                    "white": "Alb",
+                    "cyan": "Cyan",
+                    "orange": "Portocaliu"
                 },
-                "security": {
-                    "title": "Securitate",
-                    "description": "Sesiuni active, furnizori de autentificare conectați și tokenuri emise.",
-                    "sessions": {
-                        "title": "Sesiuni active",
-                        "description": "{count, plural, =0 {Nicio sesiune} one {# sesiune} few {# sesiuni} other {# de sesiuni}} stocate pentru contul tău.",
-                        "empty": "Nu s-au găsit sesiuni.",
-                        "token": "Sesiune",
-                        "expires": "Expiră",
-                        "state": "Stare",
-                        "active": "Activă",
-                        "expired": "Expirată"
-                    },
-                    "accounts": {
-                        "title": "Conturi conectate",
-                        "description": "Furnizori de autentificare legați de acest cont.",
-                        "empty": "Niciun furnizor OAuth conectat."
-                    },
-                    "tokens": {
-                        "title": "Tokenuri",
-                        "description": "Tokenuri de dispozitiv pentru companionii perechi și tokenuri de acces personal pentru agenți.",
-                        "devices": "{count, plural, =0 {Niciun dispozitiv pereche} one {# dispozitiv pereche} few {# dispozitive pereche} other {# de dispozitive pereche}}",
-                        "manageDevices": "Gestionează dispozitivele",
-                        "patsEmpty": "Niciun token de acces pentru agenți.",
-                        "patName": "Nume",
-                        "patCreated": "Creat",
-                        "patLastUsed": "Ultima folosire",
-                        "patExpires": "Expiră",
-                        "never": "Niciodată",
-                        "noExpiry": "Fără expirare"
-                    },
-                    "auth": {
-                        "title": "Metode de autentificare",
-                        "description": "Passkeys și autentificarea în doi pași nu sunt încă disponibile. Autentificarea se face prin furnizorii conectați de mai sus.",
-                        "passkeys": "Passkeys — în curând",
-                        "twoFactor": "Doi factori — în curând"
-                    },
-                    "data": {
-                        "title": "Datele tale",
-                        "description": "Exportă tot ce stocăm despre tine sau șterge contul. Ambele se află pe pagina Cont.",
-                        "export": "Exportă datele mele",
-                        "delete": "Șterge contul"
-                    }
-                },
-                "devices": {
-                    "title": "Dispozitive și remote",
-                    "description": "Companioni perechi, Quick Connect și calitatea streamingului remote.",
-                    "list": {
-                        "title": "Dispozitive pereche",
-                        "description": "Companioni și TV-uri autentificate în acest cont.",
-                        "empty": "Niciun dispozitiv pereche",
-                        "emptyDetail": "Instalează companionul sau folosește Quick Connect de pe un TV pentru a împerechea unul."
-                    },
-                    "columns": {
-                        "name": "Nume",
-                        "platform": "Platformă",
-                        "lanUrl": "Adresă LAN",
-                        "lastSeen": "Văzut ultima dată",
-                        "status": "Stare",
-                        "actions": "Acțiuni"
-                    },
-                    "status": { "online": "Online", "offline": "Offline" },
-                    "never": "Niciodată",
-                    "actions": {
-                        "rename": "Redenumește",
-                        "remove": "Elimină",
-                        "renamed": "Dispozitiv redenumit.",
-                        "removed": "Dispozitiv eliminat."
-                    },
-                    "rename": {
-                        "title": "Redenumește dispozitivul",
-                        "description": "Numele apare pe fiecare suprafață autentificată în acest cont.",
-                        "label": "Nume",
-                        "cancel": "Anulează",
-                        "save": "Salvează"
-                    },
-                    "remove": {
-                        "title": "Elimini dispozitivul?",
-                        "body": "„{name}” pierde accesul imediat și trebuie împerecheat din nou. Tunelul lui, dacă există, este închis.",
-                        "cancel": "Anulează",
-                        "confirm": "Elimină"
-                    },
-                    "remote": {
-                        "title": "Remote și Quick Connect",
-                        "description": "Transmite audio către un telefon sau aprobă un TV.",
-                        "quality": "Calitate audio remote",
-                        "qualityHint": "Profilul Opus folosit de streamul remote. Se aplică la următoarea conexiune.",
-                        "pair": "Quick Connect",
-                        "open": "Deschide remote"
-                    }
+                "snapToGrid": "Aliniere la grilă",
+                "showAutomation": "Afișează benzile de automatizare",
+                "activeClipHighlight": "Evidențiază clipul activ"
+            },
+            "notation": {
+                "title": "Notație muzicală",
+                "description": "Cum sunt etichetate tonalitățile și notele în DAW.",
+                "primary": "Notație principală",
+                "secondary": "Notație secundară",
+                "none": "Niciuna"
+            },
+            "stats": {
+                "title": "Statistici în bara de stare",
+                "description": "Contoare de performanță afișate în bara de stare a DAW-ului.",
+                "keys": {
+                    "showFps": "Cadre pe secundă",
+                    "showHeapMemory": "Memorie JS folosită",
+                    "showJsHeapTotal": "Memorie JS totală",
+                    "showDomNodes": "Noduri DOM",
+                    "showAudioLatency": "Latență audio",
+                    "showCpuCores": "Nuclee CPU",
+                    "showDeviceMemory": "Memorie dispozitiv"
                 }
             },
+            "midi": {
+                "title": "MIDI",
+                "description": "Partajate cu consola mixerului.",
+                "enabled": "Intrare MIDI activă",
+                "jogSensitivity": "Sensibilitate jog",
+                "tempoRange": "Interval tempo",
+                "crossfaderCurve": "Curbă crossfader",
+                "curves": {
+                    "linear": "Liniară",
+                    "smooth": "Lină",
+                    "sharp": "Abruptă"
+                },
+                "driver": "Driver controller",
+                "autoDetect": "Detectare automată",
+                "devices": "{count, plural, =0 {Niciun dispozitiv MIDI conectat} one {# dispozitiv MIDI conectat} few {# dispozitive MIDI conectate} other {# de dispozitive MIDI conectate}} · {status}"
+            },
+            "layout": {
+                "title": "Aspect",
+                "description": "Resetează aranjarea panourilor sau toate setările de afișare DAW.",
+                "reset": "Resetează aspectul DAW",
+                "confirmTitle": "Resetezi aspectul DAW?",
+                "confirmBody": "Pozițiile și dimensiunile panourilor revin la valorile implicite la următoarea deschidere a DAW-ului. Proiectele nu sunt afectate.",
+                "cancel": "Anulează",
+                "resetDone": "Aspect DAW resetat.",
+                "resetFailed": "Aspectul nu a putut fi resetat.",
+                "defaults": "Restaurează setările implicite de afișare",
+                "defaultsDone": "Setările de afișare DAW au fost restaurate."
+            }
+        },
+        "sound-editor": {
+            "title": "Sound Editor",
+            "description": "Preferințe pentru forma de undă, spectrogramă și bara de stare din editorul de sunet. Salvate în acest browser.",
+            "waveform": {
+                "title": "Formă de undă",
+                "description": "Culoare și suprapuneri în vizualizarea editorului.",
+                "color": "Culoare formă de undă",
+                "colors": {
+                    "blue": "Albastru",
+                    "purple": "Violet",
+                    "green": "Verde",
+                    "cyan": "Cyan",
+                    "orange": "Portocaliu",
+                    "white": "Alb"
+                },
+                "showRms": "Afișează suprapunerea RMS",
+                "showGrid": "Afișează liniile grilei",
+                "showMinimap": "Afișează minimap"
+            },
+            "spectrogram": {
+                "title": "Spectrogramă",
+                "description": "Hartă de culori și rezoluția analizei.",
+                "colorMap": "Hartă de culori",
+                "maps": {
+                    "magma": "Magma",
+                    "viridis": "Viridis",
+                    "inferno": "Inferno",
+                    "plasma": "Plasma",
+                    "grayscale": "Tonuri de gri"
+                },
+                "fftSize": "Dimensiune FFT",
+                "fftHint": "Valorile mai mari dau detaliu mai fin în frecvență, dar timp mai grosier."
+            },
+            "stats": {
+                "title": "Statistici în bara de stare",
+                "description": "Contoare de performanță afișate în bara de stare a editorului.",
+                "keys": {
+                    "showFps": "Cadre pe secundă",
+                    "showHeapMemory": "Memorie JS folosită",
+                    "showJsHeapTotal": "Memorie JS totală",
+                    "showDomNodes": "Noduri DOM",
+                    "showAudioLatency": "Latență audio",
+                    "showCpuCores": "Nuclee CPU",
+                    "showDeviceMemory": "Memorie dispozitiv"
+                },
+                "reset": "Restaurează implicitele",
+                "resetDone": "Bara de stare a editorului a fost restaurată."
+            }
+        },
+        "mixer": {
+            "title": "Mixer",
+            "description": "Ieșire audio, vizualizare formă de undă și comportamentul controllerului pentru mixerul DJ. Salvate în acest browser.",
+            "audio": {
+                "title": "Ieșire audio",
+                "description": "Dispozitivul către care merge master-ul mixerului.",
+                "output": "Dispozitiv de ieșire",
+                "nativeHint": "Rutarea nativă aparține motorului Live.",
+                "appliesNext": "Se aplică la următoarea deschidere a mixerului."
+            },
+            "waveform": {
+                "title": "Forme de undă",
+                "description": "Nivel de zoom per deck și grila de beat-uri.",
+                "linked": "Leagă zoom-ul deck-urilor",
+                "zoomA": "Zoom deck A",
+                "zoomB": "Zoom deck B",
+                "beatgrid": "Grilă de beat-uri",
+                "beatgridHint": "Desenează marcajele de beat peste forma de undă."
+            },
+            "midi": {
+                "title": "Controller",
+                "description": "Comportament jog, tempo și crossfader. Partajat cu DAW-ul.",
+                "jogSensitivity": "Sensibilitate jog",
+                "tempoRange": "Interval tempo",
+                "crossfaderCurve": "Curbă crossfader",
+                "curves": {
+                    "linear": "Liniară",
+                    "smooth": "Lină",
+                    "sharp": "Abruptă"
+                }
+            },
+            "console": {
+                "title": "Setările complete ale consolei",
+                "description": "Preseturi, MIDI learn, culori LED și diagnosticare se află în consola mixerului (rotița din bara de sus).",
+                "open": "Deschide mixerul"
+            }
+        },
+        "live": {
+            "title": "Live",
+            "description": "Dispozitiv de ieșire, afișare tuner și coach, culoare de accent și aranjarea widgeturilor. Salvate în acest browser.",
+            "audio": {
+                "title": "Ieșire audio",
+                "description": "Dispozitivul prin care redă motorul Live.",
+                "output": "Dispozitiv de ieșire"
+            },
+            "notation": {
+                "title": "Notație muzicală",
+                "description": "Cum etichetează tunerul și coach-ul notele.",
+                "primary": "Notație principală",
+                "secondary": "Notație secundară",
+                "none": "Niciuna",
+                "showCents": "Afișează cenții lângă notă"
+            },
+            "display": {
+                "title": "Afișare",
+                "description": "Rata de reîmprospătare și cât timp rămân valorile pe ecran.",
+                "refreshHz": "Reîmprospătare widgeturi (Hz)",
+                "tunerStickiness": "Menținere tuner (ms)",
+                "coachStickiness": "Menținere sfaturi coach (ms)",
+                "coachVerbosity": "Detaliere coach",
+                "verbosity": {
+                    "minimal": "Minimă",
+                    "normal": "Normală",
+                    "verbose": "Detaliată"
+                }
+            },
+            "accent": {
+                "title": "Culoare de accent",
+                "description": "Culoarea de evidențiere pentru pagina Live.",
+                "names": {
+                    "rose": "Roz",
+                    "violet": "Violet",
+                    "emerald": "Smarald",
+                    "cyan": "Cyan",
+                    "amber": "Ambră"
+                }
+            },
+            "layout": {
+                "title": "Aspect",
+                "description": "Resetează grila de widgeturi sau toate setările Live.",
+                "reset": "Resetează aranjarea widgeturilor",
+                "confirmTitle": "Resetezi aranjarea widgeturilor Live?",
+                "confirmBody": "Pozițiile și dimensiunile widgeturilor revin la valorile implicite la următoarea deschidere a paginii Live.",
+                "cancel": "Anulează",
+                "resetDone": "Aspect Live resetat.",
+                "resetFailed": "Aspectul nu a putut fi resetat.",
+                "defaults": "Restaurează setările implicite",
+                "defaultsDone": "Setările Live au fost restaurate."
+            }
+        },
+        "notifications": {
+            "title": "Notificări",
+            "description": "Notificări push din acest browser.",
+            "push": {
+                "title": "Notificări push",
+                "description": "Primești o notificare când scanările, randările și antrenamentele se termină — chiar și cu tab-ul închis.",
+                "status": {
+                    "loading": "Se verifică…",
+                    "unsupported": "Nesuportat",
+                    "no-vapid": "Neconfigurat",
+                    "denied": "Blocat",
+                    "subscribed": "Activ",
+                    "unsubscribed": "Inactiv"
+                },
+                "explain": {
+                    "denied": "Notificările sunt blocate pentru acest site. Permite-le din setările site-ului în browser, apoi reîncarcă pagina.",
+                    "subscribed": "Acest browser primește notificări push.",
+                    "unsubscribed": "Acest browser nu este abonat. Browserul îți va cere permisiunea."
+                },
+                "noVapidTitle": "Serverul nu este configurat",
+                "noVapidBody": "Push-ul este dezactivat pentru că {env} nu este setat pe server. Setează-l și redeploy pentru a activa notificările.",
+                "unsupportedTitle": "Nu este suportat aici",
+                "unsupportedBody": "Acest browser nu suportă service workers sau Push API.",
+                "subscribe": "Activează notificările",
+                "unsubscribe": "Dezactivează notificările",
+                "subscribed": "Notificări push activate.",
+                "unsubscribed": "Notificări push dezactivate.",
+                "failed": "Abonamentul push nu a putut fi modificat."
+            }
+        },
+        "security": {
+            "title": "Securitate",
+            "description": "Sesiuni active, furnizori de autentificare conectați și tokenuri emise.",
+            "sessions": {
+                "title": "Sesiuni active",
+                "description": "{count, plural, =0 {Nicio sesiune} one {# sesiune} few {# sesiuni} other {# de sesiuni}} stocate pentru contul tău.",
+                "empty": "Nu s-au găsit sesiuni.",
+                "token": "Sesiune",
+                "expires": "Expiră",
+                "state": "Stare",
+                "active": "Activă",
+                "expired": "Expirată"
+            },
+            "accounts": {
+                "title": "Conturi conectate",
+                "description": "Furnizori de autentificare legați de acest cont.",
+                "empty": "Niciun furnizor OAuth conectat."
+            },
+            "tokens": {
+                "title": "Tokenuri",
+                "description": "Tokenuri de dispozitiv pentru companionii perechi și tokenuri de acces personal pentru agenți.",
+                "devices": "{count, plural, =0 {Niciun dispozitiv pereche} one {# dispozitiv pereche} few {# dispozitive pereche} other {# de dispozitive pereche}}",
+                "manageDevices": "Gestionează dispozitivele",
+                "patsEmpty": "Niciun token de acces pentru agenți.",
+                "patName": "Nume",
+                "patCreated": "Creat",
+                "patLastUsed": "Ultima folosire",
+                "patExpires": "Expiră",
+                "never": "Niciodată",
+                "noExpiry": "Fără expirare"
+            },
+            "auth": {
+                "title": "Metode de autentificare",
+                "description": "Passkeys și autentificarea în doi pași nu sunt încă disponibile. Autentificarea se face prin furnizorii conectați de mai sus.",
+                "passkeys": "Passkeys — în curând",
+                "twoFactor": "Doi factori — în curând"
+            },
+            "data": {
+                "title": "Datele tale",
+                "description": "Exportă tot ce stocăm despre tine sau șterge contul. Ambele se află pe pagina Cont.",
+                "export": "Exportă datele mele",
+                "delete": "Șterge contul"
+            }
+        },
+        "devices": {
+            "title": "Dispozitive și remote",
+            "description": "Companioni perechi, Quick Connect și calitatea streamingului remote.",
+            "list": {
+                "title": "Dispozitive pereche",
+                "description": "Companioni și TV-uri autentificate în acest cont.",
+                "empty": "Niciun dispozitiv pereche",
+                "emptyDetail": "Instalează companionul sau folosește Quick Connect de pe un TV pentru a împerechea unul."
+            },
+            "columns": {
+                "name": "Nume",
+                "platform": "Platformă",
+                "lanUrl": "Adresă LAN",
+                "lastSeen": "Văzut ultima dată",
+                "status": "Stare",
+                "actions": "Acțiuni"
+            },
+            "status": {
+                "online": "Online",
+                "offline": "Offline"
+            },
+            "never": "Niciodată",
+            "actions": {
+                "rename": "Redenumește",
+                "remove": "Elimină",
+                "renamed": "Dispozitiv redenumit.",
+                "removed": "Dispozitiv eliminat."
+            },
+            "rename": {
+                "title": "Redenumește dispozitivul",
+                "description": "Numele apare pe fiecare suprafață autentificată în acest cont.",
+                "label": "Nume",
+                "cancel": "Anulează",
+                "save": "Salvează"
+            },
+            "remove": {
+                "title": "Elimini dispozitivul?",
+                "body": "„{name}” pierde accesul imediat și trebuie împerecheat din nou. Tunelul lui, dacă există, este închis.",
+                "cancel": "Anulează",
+                "confirm": "Elimină"
+            },
+            "remote": {
+                "title": "Remote și Quick Connect",
+                "description": "Transmite audio către un telefon sau aprobă un TV.",
+                "quality": "Calitate audio remote",
+                "qualityHint": "Profilul Opus folosit de streamul remote. Se aplică la următoarea conexiune.",
+                "pair": "Quick Connect",
+                "open": "Deschide remote"
+            }
+        }
+    },
     "pair": {
         "title": "Aprobi MixAI TV pe {server}?",
         "titleNoServer": "Aprobă un TV sau un dispozitiv mobil",
@@ -505,7 +567,16 @@
         "unpin": "Elimină din Acces rapid",
         "recentProjects": "Proiecte recente",
         "noRecentProjects": "Niciun proiect recent.",
-        "searchPlaceholder": "Caută piese, artiști…"
+        "searchPlaceholder": "Caută piese, artiști…",
+        "library-import": "Import",
+        "lora-validate": "Validator LoRA",
+        "pair": "Asociază dispozitiv",
+        "settings-github": "GitHub",
+        "music-overview": "Prezentare",
+        "generate": "Generare AI",
+        "training": "Antrenare",
+        "maestro": "Maestro",
+        "settings-copilot": "AI Copilot"
     },
     "common": {
         "loading": "Se încarcă…",
@@ -603,7 +674,19 @@
         "usbWizardHint": "Rekordbox XML / Serato .crate",
         "onboarding": "Arată ghidul de pornire",
         "onboardingHint": "Reia turul de bun venit",
-        "signOut": "Deconectare"
+        "signOut": "Deconectare",
+        "pageKeywords": {
+            "dashboard": "acasă home overview statistici",
+            "library-tracks": "piese melodii muzică bibliotecă",
+            "playlists": "playlist colecții seturi",
+            "visualizations": "grafice vizualizări",
+            "scanner": "scanare import analiză folder",
+            "drives": "usb disc drive export",
+            "settings-overview": "preferințe setări configurare opțiuni",
+            "voice-wizard": "voce clonare tts wizard xtts sintetizare cântă",
+            "library-import": "import folder fișiere încărcare",
+            "duplicates": "duplicate dedupe sha amprentă exact fuzzy audio"
+        }
     },
     "usb": {
         "title": "Wizard Export USB",
@@ -1053,5 +1136,30 @@
                 "error": "Eroare"
             }
         }
+    },
+    "shortcuts": {
+        "title": "Scurtături tastatură",
+        "groups": {
+            "playback": "Redare",
+            "navigation": "Navigare",
+            "help": "Ajutor"
+        },
+        "playPause": "Redă / Pauză",
+        "seekBack": "Înapoi 5s (audio) / 10s (video)",
+        "seekForward": "Înainte 5s (audio) / 10s (video)",
+        "back10": "Înapoi 10s",
+        "forward10": "Înainte 10s",
+        "pauseResume": "Pauză / Redă",
+        "mute": "Mut / Sunet",
+        "fullscreen": "Ecran complet",
+        "pip": "Detașează video (PiP)",
+        "skipIntro": "Sari intro",
+        "nowPlaying": "Acum redă",
+        "library": "Bibliotecă",
+        "watch": "Vizionare",
+        "stats": "Statistici",
+        "search": "Caută",
+        "cheatsheet": "Acest cheatsheet",
+        "closeOverlays": "Închide overlay-uri"
     }
 }

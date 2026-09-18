@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
+import { NativeSelect as Select } from "@/components/ui/select";
 import { Plus, Trash2, Sparkles, Code2, Workflow, ListFilter, Loader2 } from "lucide-react";
 
 import {

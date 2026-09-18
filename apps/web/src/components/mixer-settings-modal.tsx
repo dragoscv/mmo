@@ -480,23 +480,23 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
 
                 <Tabs defaultValue="midi" className="flex flex-col min-h-0">
                     <TabsList className="w-full justify-start rounded-none border-b border-white/[0.06] bg-transparent px-4 h-9">
-                        <TabsTrigger value="midi" className="text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white gap-1.5">
+                        <TabsTrigger value="midi" className="text-xs data-active:bg-white/10 data-active:text-white gap-1.5">
                             <Usb className="h-3 w-3" />
                             MIDI Controllers
                         </TabsTrigger>
-                        <TabsTrigger value="mapping" className="text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white gap-1.5">
+                        <TabsTrigger value="mapping" className="text-xs data-active:bg-white/10 data-active:text-white gap-1.5">
                             <Keyboard className="h-3 w-3" />
                             Mapping
                         </TabsTrigger>
-                        <TabsTrigger value="audio" className="text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white gap-1.5">
+                        <TabsTrigger value="audio" className="text-xs data-active:bg-white/10 data-active:text-white gap-1.5">
                             <Music2 className="h-3 w-3" />
                             Audio & Mix
                         </TabsTrigger>
-                        <TabsTrigger value="personalize" className="text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white gap-1.5">
+                        <TabsTrigger value="personalize" className="text-xs data-active:bg-white/10 data-active:text-white gap-1.5">
                             <Palette className="h-3 w-3" />
                             Personalize
                         </TabsTrigger>
-                        <TabsTrigger value="console" className="text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white gap-1.5">
+                        <TabsTrigger value="console" className="text-xs data-active:bg-white/10 data-active:text-white gap-1.5">
                             <Gamepad2 className="h-3 w-3" />
                             Console
                         </TabsTrigger>
@@ -1450,7 +1450,7 @@ export function MixerSettingsModal({ open, onOpenChange, onMidiHandler }: MixerS
                                             showPermissionHint={audioPermission === "prompt"}
                                         />
                                         <p className="text-[9px] text-white/20 mt-1.5">
-                                            Select the audio output device for playback. Browser devices set the playback sink; native devices appear when the MuzicAI Companion is running and route through Live's engine.
+                                            Select the audio output device for playback. Browser devices set the playback sink; native devices appear when the MixAI Companion is running and route through Live's engine.
                                         </p>
                                     </>
                                 )}

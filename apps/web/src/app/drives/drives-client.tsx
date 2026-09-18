@@ -153,7 +153,7 @@ function DriveCard({
                 <p className="text-sm text-[var(--muted-foreground)]">{drive.path}</p>
             </CardHeader>
             <CardContent className="space-y-3">
-                <Progress value={usagePercent} className={isNearFull ? "[&>div]:bg-red-500" : ""} />
+                <Progress value={usagePercent} indicatorClassName={isNearFull ? "bg-destructive" : undefined} />
                 <div className="flex justify-between text-xs text-[var(--muted-foreground)]">
                     <span>{formatBytes(drive.usedSpace)} used</span>
                     <span>{formatBytes(drive.freeSpace)} free</span>

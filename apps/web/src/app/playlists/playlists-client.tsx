@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
+import { parseAsInteger, useQueryStates } from "nuqs";
 import { useSyncRefresh } from "@/hooks/use-sync-refresh";
 import { useRouteMemorySave } from "@/hooks/use-route-memory";
 import { useSessionDownloads, downloadTrackFile } from "@/hooks/use-session-downloads";
@@ -39,7 +40,7 @@ import { SmartPlaylistDialog } from "@/components/smart-playlist-dialog";
 import { UsbExportWizard } from "@/components/usb-export-wizard";
 import { UsbCopyDialog } from "@/components/usb-copy-dialog";
 import { RekordboxExportDialog } from "@/components/rekordbox-export-dialog";
-import { Select } from "@/components/ui/select";
+import { NativeSelect as Select } from "@/components/ui/select";
 import { formatDuration, formatNumber, ENERGY_COLORS, GENRE_COLORS, cn } from "@/lib/utils";
 import {
     Play,
@@ -115,6 +116,13 @@ export function PlaylistsClient({
     const searchParams = useSearchParams();
     const router = useRouter();
     const activeId = searchParams.get("id");
+    // WP9-03: pagination lives in the URL via nuqs (server page reads the
+    // same `page`/`pageSize` keys). `id` stays a plain param — it is set by
+    // create/delete flows through router.push and isn't a filter.
+    const [, setPaging] = useQueryStates(
+        { page: parseAsInteger.withDefault(1), pageSize: parseAsInteger.withDefault(50) },
+        { shallow: false, clearOnDefault: true, history: "push" },
+    );
     // O(1) sidebar badge lookup; one DB round-trip on the server.
     const smartIdSet = useMemo(() => new Set(smartPlaylistIds), [smartPlaylistIds]);
 
@@ -154,17 +162,8 @@ export function PlaylistsClient({
 
     const [isPending, startTransition] = useTransition();
 
-    function navigatePlaylist(params: Record<string, string>) {
-        const sp = new URLSearchParams(searchParams.toString());
-        for (const [key, value] of Object.entries(params)) {
-            if (value) sp.set(key, value);
-            else sp.delete(key);
-        }
-        router.push(`/playlists?${sp.toString()}`);
-    }
-
     function handlePageChange(newPage: number) {
-        navigatePlaylist({ page: String(newPage) });
+        void setPaging({ page: newPage });
     }
 
     function generatePageNumbers(current: number, total: number): (number | "...")[] {
@@ -531,10 +530,10 @@ export function PlaylistsClient({
                                         availableColumns={["index", "play", "artwork", "artist", "title", "album", "bpm", "key", "genre", "energy", "rating", "duration", "favorites", "tags", "remove"]}
                                     />
                                 </div>
-                                <div className="rounded-lg border border-[var(--border)] overflow-x-auto">
+                                <div className="surface rounded-xl overflow-x-auto">
                                     <Table>
                                         <TableHeader>
-                                            <TableRow className="bg-[var(--card)] hover:bg-[var(--card)]">
+                                            <TableRow className="bg-card hover:bg-card">
                                                 {orderedColumns.map((col) => {
                                                     switch (col) {
                                                         case "index": return <TableHead key={col} className="w-8 text-center">#</TableHead>;
@@ -589,9 +588,9 @@ export function PlaylistsClient({
                                                             className={cn(
                                                                 "group cursor-pointer",
                                                                 isCurrentTrack
-                                                                    ? "bg-purple-500/5 border-l-2 border-l-purple-500"
+                                                                    ? "bg-primary/5 border-l-2 border-l-primary"
                                                                     : isSavedThisSession
-                                                                        ? "bg-sky-500/[0.07] border-l-2 border-l-sky-500/60"
+                                                                        ? "bg-info/10 border-l-2 border-l-info/60"
                                                                         : "",
                                                                 isDragging && "opacity-50",
                                                             )}
@@ -744,7 +743,7 @@ export function PlaylistsClient({
                                             <Select
                                                 value={String(pageSize)}
                                                 onChange={(e) =>
-                                                    navigatePlaylist({ pageSize: e.target.value, page: "1" })
+                                                    setPaging({ pageSize: Number(e.target.value), page: null })
                                                 }
                                                 className="w-20 h-8 text-xs"
                                             >

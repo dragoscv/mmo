@@ -3,7 +3,7 @@ import { Page, PageHeader } from "@mmo/ui";
 import { LoraValidateClient } from "./lora-validate-client";
 
 export const metadata = {
-    title: "Validate LoRA Corpus — MixAI",
+    title: "Validate LoRA Corpus",
 };
 
 export default async function LoraValidatePage() {

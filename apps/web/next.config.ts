@@ -139,6 +139,11 @@ const nextConfig: NextConfig = {
         // turbopackFileSystemCacheForDev: true,
     },
 
+    // Route renames. `/downloads` became `/get` (WP2-13); keep old links alive.
+    async redirects() {
+        return [{ source: "/downloads", destination: "/get", permanent: true }];
+    },
+
     // Cross-origin / security headers applied globally. Auth.js, Server
     // Actions and the WebRTC remote bridge all benefit from a tight default.
     async headers() {
