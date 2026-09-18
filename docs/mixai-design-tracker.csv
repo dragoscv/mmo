@@ -1,4 +1,153 @@
 id,type,surface,title,status,owner,decision_or_notes
+"WP0-01","","","`packages/design-tokens` with typed OKLCH tokens + generator (CSS/JSON/Kotlin)","done","agent","4f9e671"
+"WP0-02","","","`packages/ui` on **Base UI** (D6) — 40+ primitives incl. DataTable (TanStack 9), Sidebar, BottomTabBar, AppShell, CommandDialog, shortcuts registry","done","agent","4f9e671"
+"WP0-03","","","ThemeProvider v2: prefs store `mixai:prefs:v1`, migration from legacy keys, prehydrate script, `data-*` attrs, artwork accent","done","agent","4f9e671"
+"WP0-04","","","Root scripts (`lint`, `typecheck`, `test`, `build` fan-out) + `.github/workflows/web-ci.yml` (lint/typecheck/test/build)","done","agent","e837d87"
+"WP0-05","","","Docs: `docs/design-system.md` (new canonical), `concept/ui-ux.md` marked historical, `03-stack-tehnologic.md` UI table, NAVIGARE links","done","agent","3eaede0 (README pending WP8-04)"
+"WP1-01","","","web: next 16.3.5, react 19.3, eslint-config-next, @next/bundle-analyzer","done","agent","e837d87"
+"WP1-02","","","web: tailwindcss 4.3.3 (+cli), tw-animate-css, radix-ui 1.6.7, lucide-react 1.47, tailwind-merge","done","agent","e837d87"
+"WP1-03","","","web: framer-motion 12 → motion 13 (16 import sites)","done","agent","e837d87"
+"WP1-04","","","web: vitest 2 → 5 (+vite 8, `projects`), jsdom 29, @testing-library/*, @playwright/test 1.63","done","agent","e837d87"
+"WP1-05","","","web: ai 5 → 7 + @ai-sdk/* v4 (packages/ai on LanguageModelV4)","done","agent","206652f"
+"WP1-06","","","web: @tanstack/react-query 5.103; @tanstack/react-table 9 (DataTable)","done","agent","e837d87"
+"WP1-07","","","web: typescript 7.0.2","blocked","agent","**blocked upstream** — typescript-eslint 8.70 has no TS 7 API (typescript-eslint#10940); web stays 5.9.3, packages/* on 7.0.2. Re-try when 8.71+ ships. ESLint stays 9.x: eslint-plugin-react 7.37 peer `^9.7` (no ESLint 10)."
+"WP1-08","","","web: removed `next-themes`; zod 4.6, drizzle 0.45.2, hls.js, recharts, sonner, next-intl 4.14, nuqs added","done","agent","e837d87"
+"WP1-09","","","web: `next build` on Turbopack — VERIFIED BUILD OK 126.7 s, 65 routes, static 6.7 MB; `build:webpack` escape hatch kept","done","agent","e837d87"
+"WP1-10","","","mixai: vite 6 → 8, plugin-react 6, @tauri-apps/* 2.11.x, TS 7, drop unused framer-motion","done","agent","d5052fe"
+"WP1-11","","","tv-tizen: vite 7 → 8, plugin-legacy 8, plugin-react 6, hls.js latest","done","agent","3ed6c09"
+"WP1-12","","","native: @capacitor/* 7 → 8, @tauri-apps/* 2.11.x","done","agent","19d0402"
+"WP1-13","","","server: electron 34 → 44, electron-builder 26.15, better-sqlite3 13, music-metadata, drizzle-orm 0.45, vitest 5, express 5 (evaluate)","done","agent","da3538e"
+"WP1-14","","","tv-android: AGP/Kotlin/Compose BOM/Media3/tv-material latest stable; `libs.versions.toml`","done","agent","3ed6c09"
+"WP1-15","","","packages/*: align TS 7, vitest 5, ai peers","done","agent","4ecdca0"
+"WP1-16","","","Cargo: tauri 2.11.x, plugins, mixai-core crates (cpal/symphonia/rubato)","done","agent","4ecdca0"
+"WP2-01","","","`globals.src.css` imports `@mmo/design-tokens` + `@mmo/ui/styles.css`; ThemeProvider = `@mmo/ui` binding; prehydrate.js (no flash); React dedupe for path-aliased packages","done","agent","3eaede0 — hardcoded purple sweep (26 sites) tracked under WP2-08/WP2-15"
+"WP2-02","","","Settings › Appearance on shared `ThemeSettings` + `ThemePreview` (mode/accent+custom hue+artwork/surface/density/radius/motion/feedback/locale); `settings.appearance` i18n ns; LocaleSwitcher deleted","done","agent",""
+"WP2-03","","","App shell: `AppShell` from `@mmo/ui`, sidebar rail/expanded, mobile bottom tab bar, safe-area, `Page` container with ultra-wide rules","done","agent","5d7fdf8"
+"WP2-04","","","47 `loading.tsx` (9 skeleton families in `route-skeletons.tsx`) + `not-found.tsx` + `error.tsx` on `ErrorState`","done","agent","3eaede0"
+"WP2-05","","","12 pages moved to `notSignedInFor(featureKey)` (14 new keys RO+EN); NotSignedIn/NoCompanion on `EmptyState`","done","agent","3eaede0"
+"WP2-06","","","Replace 7 settings stubs with real pages (daw, devices, live, mixer, notifications, security, sound-editor)","done","agent","5d7fdf8"
+"WP2-07","","","`/settings/companions` real table (DataTable) instead of JSON dump","done","agent","5d7fdf8"
+"WP2-08","","","Player bar + NowPlaying: tokens, `<Activity>`, mobile mini-player, motion presets","done","agent","(uncommitted) — `surface` bar, `rise`/`fade` on track change, 56px mini-player + `player-height.css`, NowPlaying in `<Activity>`, artwork-accent hue via `dominantHueFromImage`, canvas paint via `themeColor()`"
+"WP2-09","","","Route transitions with React 19.3 `<ViewTransition>`; reduced-motion guard","done","agent","(uncommitted) — `src/app/template.tsx` + `view-transitions.css` (`mixai-page` class, `--dur-page`, reduced-motion → none); watch named morphs untouched"
+"WP2-10","","","Responsive tables → `DataTable` with column priority collapsing (library, hidden, playlists, render-jobs, mixer settings, lora)","done","agent","4bd3530"
+"WP2-11","","","i18n: every hardcoded string through next-intl; nav-tree + global-search from one source; RO+EN complete","done","agent","4bd3530"
+"WP2-12","","","Storage keys: `mixai:` + `mmo:` prefixes now syncable (drift fix); prefs migrated from `theme`/`mmo-locale`/`mixai-ui`; `components.json` fixed (4bd3530)","done","agent","3eaede0 + 4bd3530 (components.json → globals.src.css)"
+"WP2-13","","","Nav discoverability: add `/voice-wizard`, `/library/import`, `/lora/validate`, `/pair`; rename `/downloads` → `/get`; metadata title format","done","agent","4bd3530"
+"WP2-14","","","Fonts: single `font-sans` source, `next/font` for Inter + Space Grotesk; `theme-color` follows mode/accent","done","agent","4bd3530"
+"WP2-15","","","Watch: replace inline-style auth fallbacks; watch skins become surface presets on shared tokens","done","agent","(uncommitted) — skins reduced to `--watch-h` + shape knobs over tokens (netflix 25 / plex 75 / disney 250 / hbo 285 / mmo `--accent-h`); inline paddings → Tailwind; `error.tsx` → `ErrorState`; brand hex out of cinematic/tv-mode CSS"
+"WP2-16","","","Perf: bundle analyze, lazy heavy widgets (dockview, recharts, hls, react-grid-layout), `""use cache""` where force-dynamic is not needed","done","agent","1d7ea4f"
+"WP2-17","","","Tests: component tests for ThemeProvider, AppShell, EmptyState, DataTable; Playwright a11y + visual smoke at 390/768/1440/3440 widths","done","agent","ee81854"
+"WP2-18","","","Docs: `docs/aplicatie/settings.md`, `dashboard.md`, `03-stack-tehnologic.md`, CHANGELOG, web version bump","done","agent","85a8bc3"
+"WP3-01","","","Tailwind v4 + `@mmo/design-tokens`; skins (neon-glass/studio-metal/flat-pro) re-expressed as `surface` presets + deck accents","done","agent","d5052fe"
+"WP3-02","","","Light mode + accent + density via shared ThemeProvider; sync with cloud prefs","done","agent","d5052fe"
+"WP3-03","","","Replace emoji glyphs with lucide; `@mmo/ui` Button/Slider/Select/Tooltip/Sheet in Settings & TopBar","done","agent","d5052fe"
+"WP3-04","","","Responsive grid: min 1100 px → fluid from 1024 px, 4-deck only ≥ 1600 px, ultra-wide side panels","done","agent","d5052fe"
+"WP3-05","","","Skeleton/loading for decks + Library; error boundary; empty states","done","agent","d5052fe"
+"WP3-06","","","i18n RO/EN (shared ui messages + app messages)","done","agent","d5052fe"
+"WP3-07","","","Version alignment (package/tauri.conf/Cargo), docs `docs/mixai/00-…` §8","done","agent","d5052fe"
+"WP4-01","","","Bootstrap page rebrand (""MixAI""), generated tokens CSS, light/dark by `prefers-color-scheme`, safe-area","done","agent","19d0402"
+"WP4-02","","","Restore `AndroidManifest.xml` (leanback per ANDROID_TV.md), Capacitor 8 sync, `dist/` build script","done","agent","19d0402"
+"WP4-03","","","Web app: safe-area utilities + `standalone` display detection (consumed by WP2-03)","done","agent","70b637f"
+"WP4-04","","","Docs/README/version alignment","done","agent","19d0402"
+"WP5-01","","","Rebuild as small Vite + React app on `@mmo/ui` (auth, main, virtual-audio, updater), same preload API","done","agent","cdff3ea"
+"WP5-02","","","Light/dark from `nativeTheme` + shared tokens; proper titlebar per OS (no double frame on Windows)","done","agent","cdff3ea"
+"WP5-03","","","Copy: ""Connect to MixAI Companion""; i18n RO/EN","done","agent","cdff3ea"
+"WP5-04","","","Electron 44 + builder; asar includes built `ui/dist`; docs `docs/companion/README.md`","done","agent","3fa73f2"
+"WP6-01","","","tizen: generated `tokens.css`; RO/EN messages; focus ring/overscan tokens","done","agent","3ed6c09"
+"WP6-02","","","tizen: skeleton rows, series grouping, resume, search screen, Quick Connect pairing","done","agent","3ed6c09"
+"WP6-03","","","android: `Tokens.kt` generated; delete ~40 literal colors; `strings.xml` EN + `values-ro`","done","agent","3ed6c09"
+"WP6-04","","","android: posters (TMDB/artwork URLs), series grouping, resume, MediaSession now-playing, settings screen","done","agent","3ed6c09"
+"WP6-05","","","Both: shimmer skeletons, empty/error states, README for tv-android, ADR-0004 correction","done","agent","3ed6c09"
+"WP7-01","","","Generated tokens CSS; popup/options/content on brand; light/dark","done","agent","19d0402"
+"WP7-02","","","Rebrand ""MMO"" → ""MixAI"" in content script/ids; popup version from manifest; `_locales` RO/EN","done","agent","19d0402"
+"WP7-03","","","Adapters for the 8 missing platforms or trim host list to match; wire `audioOnly`; docs dead links","done","agent","19d0402"
+"WP8-01","","","Matrix: typecheck/lint/test/build per app green (or pre-existing failures proven via HEAD worktree)","done","agent","matrix 22/22 green (.copilot-tmp/matrix.log)"
+"WP8-02","","","Playwright visual + axe at 4 widths, light+dark, RO+EN","done","agent","ee81854"
+"WP8-03","","","design-critic pass on web shell, mixai, companion","done","agent","docs/followups/design-critic-2026-09-18.md (42–47/60, 5 prescriptions)"
+"WP8-04","","","CHANGELOG entries (web/companion/extension/tv), version bumps, ADR-0008 design system","done","agent","85a8bc3 (CHANGELOGs, ADR-0008, versions: web 2.0.0, companion 3.0.0, extension 3.0.0, mixai/native/tv 1.0.0)"
+"WP8-05","","","Reality-check round with askQuestions","todo","agent",""
+"WP9-01","","","`/dev/ui` catalog route (dev-only) rendering every `@mmo/ui` component × mode × surface × accent","done","agent","5cdc24b"
+"WP9-02","","","Unified command palette + shortcuts registry (`@mmo/ui/command`) on web, mixai, companion","done","agent","5cdc24b"
+"WP9-03","","","`nuqs` URL state for library/playlists filters","done","agent","4bd3530"
+"WP9-04","","","Haptics (`useHaptics`) + sound cues (opt-in pref `feedback`)","done","agent","4bd3530"
+"WP9-05","","","`@serwist/next` replaces hand-rolled SW; offline shell","done","agent","95ef92c"
+"WP9-06","","","OpenAPI spec for MMO Server (`server/openapi.yaml`) + generated TS (`@mmo/sdk`) and Kotlin (tv-android) clients","done","agent",""
+"WP9-07","","","server: express 4 → 5","done","agent","da3538e"
+
+"WP0-01","","","`packages/design-tokens` with typed OKLCH tokens + generator (CSS/JSON/Kotlin)","done","agent","4f9e671"
+"WP0-02","","","`packages/ui` on **Base UI** (D6) — 40+ primitives incl. DataTable (TanStack 9), Sidebar, BottomTabBar, AppShell, CommandDialog, shortcuts registry","done","agent","4f9e671"
+"WP0-03","","","ThemeProvider v2: prefs store `mixai:prefs:v1`, migration from legacy keys, prehydrate script, `data-*` attrs, artwork accent","done","agent","4f9e671"
+"WP0-04","","","Root scripts (`lint`, `typecheck`, `test`, `build` fan-out) + `.github/workflows/web-ci.yml` (lint/typecheck/test/build)","done","agent","e837d87"
+"WP0-05","","","Docs: `docs/design-system.md` (new canonical), `concept/ui-ux.md` marked historical, `03-stack-tehnologic.md` UI table, NAVIGARE links","done","agent","3eaede0 (README pending WP8-04)"
+"WP1-01","","","web: next 16.3.5, react 19.3, eslint-config-next, @next/bundle-analyzer","done","agent","e837d87"
+"WP1-02","","","web: tailwindcss 4.3.3 (+cli), tw-animate-css, radix-ui 1.6.7, lucide-react 1.47, tailwind-merge","done","agent","e837d87"
+"WP1-03","","","web: framer-motion 12 → motion 13 (16 import sites)","done","agent","e837d87"
+"WP1-04","","","web: vitest 2 → 5 (+vite 8, `projects`), jsdom 29, @testing-library/*, @playwright/test 1.63","done","agent","e837d87"
+"WP1-05","","","web: ai 5 → 7 + @ai-sdk/* v4 (packages/ai on LanguageModelV4)","done","agent","206652f"
+"WP1-06","","","web: @tanstack/react-query 5.103; @tanstack/react-table 9 (DataTable)","done","agent","e837d87"
+"WP1-07","","","web: typescript 7.0.2","blocked","agent","**blocked upstream** — typescript-eslint 8.70 has no TS 7 API (typescript-eslint#10940); web stays 5.9.3, packages/* on 7.0.2. Re-try when 8.71+ ships. ESLint stays 9.x: eslint-plugin-react 7.37 peer `^9.7` (no ESLint 10)."
+"WP1-08","","","web: removed `next-themes`; zod 4.6, drizzle 0.45.2, hls.js, recharts, sonner, next-intl 4.14, nuqs added","done","agent","e837d87"
+"WP1-09","","","web: `next build` on Turbopack — VERIFIED BUILD OK 126.7 s, 65 routes, static 6.7 MB; `build:webpack` escape hatch kept","done","agent","e837d87"
+"WP1-10","","","mixai: vite 6 → 8, plugin-react 6, @tauri-apps/* 2.11.x, TS 7, drop unused framer-motion","done","agent","d5052fe"
+"WP1-11","","","tv-tizen: vite 7 → 8, plugin-legacy 8, plugin-react 6, hls.js latest","done","agent","3ed6c09"
+"WP1-12","","","native: @capacitor/* 7 → 8, @tauri-apps/* 2.11.x","done","agent","19d0402"
+"WP1-13","","","server: electron 34 → 44, electron-builder 26.15, better-sqlite3 13, music-metadata, drizzle-orm 0.45, vitest 5, express 5 (evaluate)","done","agent","da3538e"
+"WP1-14","","","tv-android: AGP/Kotlin/Compose BOM/Media3/tv-material latest stable; `libs.versions.toml`","done","agent","3ed6c09"
+"WP1-15","","","packages/*: align TS 7, vitest 5, ai peers","done","agent","4ecdca0"
+"WP1-16","","","Cargo: tauri 2.11.x, plugins, mixai-core crates (cpal/symphonia/rubato)","done","agent","4ecdca0"
+"WP2-01","","","`globals.src.css` imports `@mmo/design-tokens` + `@mmo/ui/styles.css`; ThemeProvider = `@mmo/ui` binding; prehydrate.js (no flash); React dedupe for path-aliased packages","done","agent","3eaede0 — hardcoded purple sweep (26 sites) tracked under WP2-08/WP2-15"
+"WP2-02","","","Settings › Appearance on shared `ThemeSettings` + `ThemePreview` (mode/accent+custom hue+artwork/surface/density/radius/motion/feedback/locale); `settings.appearance` i18n ns; LocaleSwitcher deleted","done","agent",""
+"WP2-03","","","App shell: `AppShell` from `@mmo/ui`, sidebar rail/expanded, mobile bottom tab bar, safe-area, `Page` container with ultra-wide rules","done","agent","5d7fdf8"
+"WP2-04","","","47 `loading.tsx` (9 skeleton families in `route-skeletons.tsx`) + `not-found.tsx` + `error.tsx` on `ErrorState`","done","agent","3eaede0"
+"WP2-05","","","12 pages moved to `notSignedInFor(featureKey)` (14 new keys RO+EN); NotSignedIn/NoCompanion on `EmptyState`","done","agent","3eaede0"
+"WP2-06","","","Replace 7 settings stubs with real pages (daw, devices, live, mixer, notifications, security, sound-editor)","done","agent","5d7fdf8"
+"WP2-07","","","`/settings/companions` real table (DataTable) instead of JSON dump","done","agent","5d7fdf8"
+"WP2-08","","","Player bar + NowPlaying: tokens, `<Activity>`, mobile mini-player, motion presets","done","agent","(uncommitted) — `surface` bar, `rise`/`fade` on track change, 56px mini-player + `player-height.css`, NowPlaying in `<Activity>`, artwork-accent hue via `dominantHueFromImage`, canvas paint via `themeColor()`"
+"WP2-09","","","Route transitions with React 19.3 `<ViewTransition>`; reduced-motion guard","done","agent","(uncommitted) — `src/app/template.tsx` + `view-transitions.css` (`mixai-page` class, `--dur-page`, reduced-motion → none); watch named morphs untouched"
+"WP2-10","","","Responsive tables → `DataTable` with column priority collapsing (library, hidden, playlists, render-jobs, mixer settings, lora)","done","agent","4bd3530"
+"WP2-11","","","i18n: every hardcoded string through next-intl; nav-tree + global-search from one source; RO+EN complete","done","agent","4bd3530"
+"WP2-12","","","Storage keys: `mixai:` + `mmo:` prefixes now syncable (drift fix); prefs migrated from `theme`/`mmo-locale`/`mixai-ui`; `components.json` fixed (4bd3530)","done","agent","3eaede0 + 4bd3530 (components.json → globals.src.css)"
+"WP2-13","","","Nav discoverability: add `/voice-wizard`, `/library/import`, `/lora/validate`, `/pair`; rename `/downloads` → `/get`; metadata title format","done","agent","4bd3530"
+"WP2-14","","","Fonts: single `font-sans` source, `next/font` for Inter + Space Grotesk; `theme-color` follows mode/accent","done","agent","4bd3530"
+"WP2-15","","","Watch: replace inline-style auth fallbacks; watch skins become surface presets on shared tokens","done","agent","(uncommitted) — skins reduced to `--watch-h` + shape knobs over tokens (netflix 25 / plex 75 / disney 250 / hbo 285 / mmo `--accent-h`); inline paddings → Tailwind; `error.tsx` → `ErrorState`; brand hex out of cinematic/tv-mode CSS"
+"WP2-16","","","Perf: bundle analyze, lazy heavy widgets (dockview, recharts, hls, react-grid-layout), `""use cache""` where force-dynamic is not needed","done","agent","1d7ea4f"
+"WP2-17","","","Tests: component tests for ThemeProvider, AppShell, EmptyState, DataTable; Playwright a11y + visual smoke at 390/768/1440/3440 widths","done","agent","ee81854"
+"WP2-18","","","Docs: `docs/aplicatie/settings.md`, `dashboard.md`, `03-stack-tehnologic.md`, CHANGELOG, web version bump","done","agent","85a8bc3"
+"WP3-01","","","Tailwind v4 + `@mmo/design-tokens`; skins (neon-glass/studio-metal/flat-pro) re-expressed as `surface` presets + deck accents","done","agent","d5052fe"
+"WP3-02","","","Light mode + accent + density via shared ThemeProvider; sync with cloud prefs","done","agent","d5052fe"
+"WP3-03","","","Replace emoji glyphs with lucide; `@mmo/ui` Button/Slider/Select/Tooltip/Sheet in Settings & TopBar","done","agent","d5052fe"
+"WP3-04","","","Responsive grid: min 1100 px → fluid from 1024 px, 4-deck only ≥ 1600 px, ultra-wide side panels","done","agent","d5052fe"
+"WP3-05","","","Skeleton/loading for decks + Library; error boundary; empty states","done","agent","d5052fe"
+"WP3-06","","","i18n RO/EN (shared ui messages + app messages)","done","agent","d5052fe"
+"WP3-07","","","Version alignment (package/tauri.conf/Cargo), docs `docs/mixai/00-…` §8","done","agent","d5052fe"
+"WP4-01","","","Bootstrap page rebrand (""MixAI""), generated tokens CSS, light/dark by `prefers-color-scheme`, safe-area","done","agent","19d0402"
+"WP4-02","","","Restore `AndroidManifest.xml` (leanback per ANDROID_TV.md), Capacitor 8 sync, `dist/` build script","done","agent","19d0402"
+"WP4-03","","","Web app: safe-area utilities + `standalone` display detection (consumed by WP2-03)","done","agent","70b637f"
+"WP4-04","","","Docs/README/version alignment","done","agent","19d0402"
+"WP5-01","","","Rebuild as small Vite + React app on `@mmo/ui` (auth, main, virtual-audio, updater), same preload API","done","agent","cdff3ea"
+"WP5-02","","","Light/dark from `nativeTheme` + shared tokens; proper titlebar per OS (no double frame on Windows)","done","agent","cdff3ea"
+"WP5-03","","","Copy: ""Connect to MixAI Companion""; i18n RO/EN","done","agent","cdff3ea"
+"WP5-04","","","Electron 44 + builder; asar includes built `ui/dist`; docs `docs/companion/README.md`","done","agent","3fa73f2"
+"WP6-01","","","tizen: generated `tokens.css`; RO/EN messages; focus ring/overscan tokens","done","agent","3ed6c09"
+"WP6-02","","","tizen: skeleton rows, series grouping, resume, search screen, Quick Connect pairing","done","agent","3ed6c09"
+"WP6-03","","","android: `Tokens.kt` generated; delete ~40 literal colors; `strings.xml` EN + `values-ro`","done","agent","3ed6c09"
+"WP6-04","","","android: posters (TMDB/artwork URLs), series grouping, resume, MediaSession now-playing, settings screen","done","agent","3ed6c09"
+"WP6-05","","","Both: shimmer skeletons, empty/error states, README for tv-android, ADR-0004 correction","done","agent","3ed6c09"
+"WP7-01","","","Generated tokens CSS; popup/options/content on brand; light/dark","done","agent","19d0402"
+"WP7-02","","","Rebrand ""MMO"" → ""MixAI"" in content script/ids; popup version from manifest; `_locales` RO/EN","done","agent","19d0402"
+"WP7-03","","","Adapters for the 8 missing platforms or trim host list to match; wire `audioOnly`; docs dead links","done","agent","19d0402"
+"WP8-01","","","Matrix: typecheck/lint/test/build per app green (or pre-existing failures proven via HEAD worktree)","done","agent","matrix 22/22 green (.copilot-tmp/matrix.log)"
+"WP8-02","","","Playwright visual + axe at 4 widths, light+dark, RO+EN","done","agent","ee81854"
+"WP8-03","","","design-critic pass on web shell, mixai, companion","todo","agent",""
+"WP8-04","","","CHANGELOG entries (web/companion/extension/tv), version bumps, ADR-0008 design system","todo","agent",""
+"WP8-05","","","Reality-check round with askQuestions","todo","agent",""
+"WP9-01","","","`/dev/ui` catalog route (dev-only) rendering every `@mmo/ui` component × mode × surface × accent","done","agent","5cdc24b"
+"WP9-02","","","Unified command palette + shortcuts registry (`@mmo/ui/command`) on web, mixai, companion","done","agent","5cdc24b"
+"WP9-03","","","`nuqs` URL state for library/playlists filters","done","agent","4bd3530"
+"WP9-04","","","Haptics (`useHaptics`) + sound cues (opt-in pref `feedback`)","done","agent","4bd3530"
+"WP9-05","","","`@serwist/next` replaces hand-rolled SW; offline shell","done","agent","95ef92c"
+"WP9-06","","","OpenAPI spec for MMO Server (`server/openapi.yaml`) + generated TS (`@mmo/sdk`) and Kotlin (tv-android) clients","done","agent",""
+"WP9-07","","","server: express 4 → 5","done","agent","da3538e"
 D1,decision,all,Surfaces in scope,done,user,"all six: web, mixai, native, server/ui, tv-tizen+tv-android, extension"
 D2,decision,all,Design system location,done,user,"packages/design-tokens + packages/ui"
 D3,decision,all,Dependency upgrade policy,done,user,"every stable major; one verified slice each"
@@ -13,77 +162,4 @@ D11,decision,all,Risky majors,done,user,"TS7, vitest5, electron44, ai7, express5
 D12,decision,all,Delivery order,done,user,"WP0→WP1→WP2→WP3-7 parallel→WP8"
 D13,decision,all,Extra recommendations,done,user,"all 7 in (WP9)"
 D14,decision,all,Versioning,done,user,"major bump everywhere"
-WP0-01,item,packages,design-tokens package + generator (CSS/JSON/Kotlin),done,agent,4f9e671
-WP0-02,item,packages,packages/ui on Base UI (40+ primitives),done,agent,4f9e671
-WP0-03,item,packages,ThemeProvider v2 + prefs store + prehydrate,done,agent,4f9e671
-WP0-04,item,tooling,Root scripts + web CI workflow,todo,agent,
-WP0-05,item,docs,design-system.md; replace concept/ui-ux.md; NAVIGARE/README/stack,todo,agent,
-WP1-01,item,web,next 16.3.5 + react 19.3,todo,agent,
-WP1-02,item,web,tailwind 4.3.3 + radix-ui 1.6.7 + lucide 1.47,todo,agent,
-WP1-03,item,web,framer-motion → motion 13,todo,agent,
-WP1-04,item,web,vitest 5 + testing libs + playwright 1.63,todo,agent,
-WP1-05,item,web,ai 7 + @ai-sdk,todo,agent,
-WP1-06,item,web,tanstack query latest + table 9,todo,agent,
-WP1-07,item,web,typescript 7.0.2,todo,agent,
-WP1-08,item,web,remove next-themes; minors,todo,agent,
-WP1-09,item,web,Turbopack production build,todo,agent,
-WP1-10,item,mixai,vite 8 + tauri 2.11 + TS 7,todo,agent,
-WP1-11,item,tv-tizen,vite 8 + plugin-legacy 8,todo,agent,
-WP1-12,item,native,capacitor 8 + tauri 2.11,todo,agent,
-WP1-13,item,server,electron 44 + builder + better-sqlite3 13 + vitest 5,todo,agent,
-WP1-14,item,tv-android,AGP/Kotlin/Compose/Media3 latest + libs.versions.toml,todo,agent,
-WP1-15,item,packages,TS 7 + vitest 5 + ai peers,todo,agent,
-WP1-16,item,rust,tauri + plugin + audio crates,todo,agent,
-WP2-01,item,web,tokens from package; remove hardcoded purple,todo,agent,
-WP2-02,item,web,Appearance settings: mode/accent/surface/density/radius/motion/locale,todo,agent,
-WP2-03,item,web,AppShell + bottom tab bar + safe-area + Page ultra-wide,todo,agent,
-WP2-04,item,web,loading.tsx skeletons + not-found + ErrorState,todo,agent,
-WP2-05,item,web,Unified auth/empty states (16 pages),todo,agent,
-WP2-06,item,web,7 settings stubs → real pages,todo,agent,
-WP2-07,item,web,settings/companions DataTable,todo,agent,
-WP2-08,item,web,Player bar + NowPlaying on tokens/Activity,todo,agent,
-WP2-09,item,web,ViewTransition route transitions,todo,agent,
-WP2-10,item,web,DataTable responsive tables (6 sites),todo,agent,
-WP2-11,item,web,i18n completeness RO+EN; nav single source,todo,agent,
-WP2-12,item,web,Storage key unification + migration; components.json,todo,agent,
-WP2-13,item,web,Nav discoverability; /downloads rename; title format,todo,agent,
-WP2-14,item,web,Fonts via next/font; theme-color dynamic,todo,agent,
-WP2-15,item,web,Watch fallbacks + skins as surface presets,todo,agent,
-WP2-16,item,web,Bundle analyze + lazy heavy widgets + use cache,todo,agent,
-WP2-17,item,web,Component tests + Playwright visual/axe at 4 widths,todo,agent,
-WP2-18,item,web,Docs + CHANGELOG + version bump,todo,agent,
-WP3-01,item,mixai,Tailwind v4 + tokens; skins as surface presets,todo,agent,
-WP3-02,item,mixai,Light mode + accent + density via ThemeProvider,todo,agent,
-WP3-03,item,mixai,lucide icons + @mmo/ui primitives,todo,agent,
-WP3-04,item,mixai,Fluid layout 1024→ultra-wide,todo,agent,
-WP3-05,item,mixai,Skeletons + error boundary + empty states,todo,agent,
-WP3-06,item,mixai,i18n RO/EN,todo,agent,
-WP3-07,item,mixai,Version alignment + docs,todo,agent,
-WP4-01,item,native,Bootstrap rebrand + tokens + safe-area,todo,agent,
-WP4-02,item,native,AndroidManifest + Capacitor 8 + dist build,todo,agent,
-WP4-03,item,native,Web safe-area/standalone support,todo,agent,
-WP4-04,item,native,Docs/version,todo,agent,
-WP5-01,item,server/ui,Vite+React companion UI on @mmo/ui,todo,agent,
-WP5-02,item,server/ui,nativeTheme light/dark + titlebar per OS,todo,agent,
-WP5-03,item,server/ui,Copy + i18n,todo,agent,
-WP5-04,item,server/ui,Electron 44 packaging + docs,todo,agent,
-WP6-01,item,tv-tizen,tokens.css + RO/EN + focus tokens,todo,agent,
-WP6-02,item,tv-tizen,skeletons/series/resume/search/Quick Connect,todo,agent,
-WP6-03,item,tv-android,Tokens.kt + strings.xml RO/EN,todo,agent,
-WP6-04,item,tv-android,posters/series/resume/MediaSession/settings,todo,agent,
-WP6-05,item,tv,skeletons + empty/error + README + ADR fix,todo,agent,
-WP7-01,item,extension,tokens CSS + light/dark,todo,agent,
-WP7-02,item,extension,rebrand + version + _locales,todo,agent,
-WP7-03,item,extension,adapters/audioOnly/docs,todo,agent,
-WP8-01,item,all,Verification matrix green,todo,agent,
-WP8-02,item,web,Playwright visual + axe,todo,agent,
-WP8-03,item,all,design-critic pass,todo,agent,
-WP8-04,item,all,CHANGELOG + versions + ADR-0008,todo,agent,
-WP8-05,item,all,Reality-check askQuestions round,todo,agent,
-WP9-01,item,web,/dev/ui catalog route,todo,agent,
-WP9-02,item,all,Unified command palette + shortcuts,todo,agent,
-WP9-03,item,web,nuqs URL state,todo,agent,
-WP9-04,item,web,Haptics + sound cues opt-in,todo,agent,
-WP9-05,item,web,@serwist/next SW,todo,agent,
-WP9-06,item,server,OpenAPI spec + generated TS/Kotlin clients,todo,agent,
-WP9-07,item,server,express 5,todo,agent,
+,done,agent,ee81854n-critic pass,todo,agent,

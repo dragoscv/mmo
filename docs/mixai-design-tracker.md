@@ -1,4 +1,4 @@
-# MixAI Design System & UX Overhaul — canonical plan and tracker
+ done ff5ac02 | done ee81854 | done matrix 22/22 (.copilot-tmp/matrix.log) | done 3fa73f2 | done 70b637f | done 85a8bc3 | done ee81854 | done 1d7ea4f |# MixAI Design System & UX Overhaul — canonical plan and tracker
 
 > Single source of truth for the cross-surface design overhaul (2026-09). Pairs with
 > `docs/mixai-design-tracker.csv` (same items, spreadsheet form). Update both in the same commit.
@@ -125,7 +125,7 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 | WP0-02 | `packages/ui` on **Base UI** (D6) — 40+ primitives incl. DataTable (TanStack 9), Sidebar, BottomTabBar, AppShell, CommandDialog, shortcuts registry | done 4f9e671 |
 | WP0-03 | ThemeProvider v2: prefs store `mixai:prefs:v1`, migration from legacy keys, prehydrate script, `data-*` attrs, artwork accent | done 4f9e671 |
 | WP0-04 | Root scripts (`lint`, `typecheck`, `test`, `build` fan-out) + `.github/workflows/web-ci.yml` (lint/typecheck/test/build) | done e837d87 |
-| WP0-05 | Docs: `docs/design-system.md` (tokens, dimensions, usage), replace `docs/concept/ui-ux.md`, update NAVIGARE/README/stack doc | todo |
+| WP0-05 | Docs: `docs/design-system.md` (new canonical), `concept/ui-ux.md` marked historical, `03-stack-tehnologic.md` UI table, NAVIGARE links | done 3eaede0 (README pending WP8-04) |
 
 ### WP1 — Dependency upgrades (one slice = one commit, verified)
 | ID | Item | Status |
@@ -139,86 +139,86 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 | WP1-07 | web: typescript 7.0.2 | **blocked upstream** — typescript-eslint 8.70 has no TS 7 API (typescript-eslint#10940); web stays 5.9.3, packages/* on 7.0.2. Re-try when 8.71+ ships. ESLint stays 9.x: eslint-plugin-react 7.37 peer `^9.7` (no ESLint 10). |
 | WP1-08 | web: removed `next-themes`; zod 4.6, drizzle 0.45.2, hls.js, recharts, sonner, next-intl 4.14, nuqs added | done e837d87 |
 | WP1-09 | web: `next build` on Turbopack — VERIFIED BUILD OK 126.7 s, 65 routes, static 6.7 MB; `build:webpack` escape hatch kept | done e837d87 |
-| WP1-10 | mixai: vite 6 → 8, plugin-react 6, @tauri-apps/* 2.11.x, TS 7, drop unused framer-motion | todo |
-| WP1-11 | tv-tizen: vite 7 → 8, plugin-legacy 8, plugin-react 6, hls.js latest | todo |
-| WP1-12 | native: @capacitor/* 7 → 8, @tauri-apps/* 2.11.x | todo |
-| WP1-13 | server: electron 34 → 44, electron-builder 26.15, better-sqlite3 13, music-metadata, drizzle-orm 0.45, vitest 5, express 5 (evaluate) | todo |
-| WP1-14 | tv-android: AGP/Kotlin/Compose BOM/Media3/tv-material latest stable; `libs.versions.toml` | todo |
-| WP1-15 | packages/*: align TS 7, vitest 5, ai peers | todo |
-| WP1-16 | Cargo: tauri 2.11.x, plugins, mixai-core crates (cpal/symphonia/rubato) | todo |
+| WP1-10 | mixai: vite 6 → 8, plugin-react 6, @tauri-apps/* 2.11.x, TS 7, drop unused framer-motion | done d5052fe |
+| WP1-11 | tv-tizen: vite 7 → 8, plugin-legacy 8, plugin-react 6, hls.js latest | done 3ed6c09 |
+| WP1-12 | native: @capacitor/* 7 → 8, @tauri-apps/* 2.11.x | done 19d0402 |
+| WP1-13 | server: electron 34 → 44, electron-builder 26.15, better-sqlite3 13, music-metadata, drizzle-orm 0.45, vitest 5, express 5 (evaluate) | done da3538e |
+| WP1-14 | tv-android: AGP/Kotlin/Compose BOM/Media3/tv-material latest stable; `libs.versions.toml` | done 3ed6c09 |
+| WP1-15 | packages/*: align TS 7, vitest 5, ai peers | done 4ecdca0 |
+| WP1-16 | Cargo: tauri 2.11.x, plugins, mixai-core crates (cpal/symphonia/rubato) | done 4ecdca0 |
 
 ### WP2 — apps/web
 | ID | Item | Status |
 |---|---|---|
-| WP2-01 | `globals.src.css` now imports `@mmo/design-tokens` + `@mmo/ui/styles.css`; legacy :root/.dark/@theme removed; ThemeProvider swapped for `@mmo/ui` binding; prehydrate.js in `<head>` (no flash); dynamic theme-color | doing (hardcoded purple sweep pending) |
+| WP2-01 | `globals.src.css` imports `@mmo/design-tokens` + `@mmo/ui/styles.css`; ThemeProvider = `@mmo/ui` binding; prehydrate.js (no flash); React dedupe for path-aliased packages | done 3eaede0 — hardcoded purple sweep (26 sites) tracked under WP2-08/WP2-15 |
 | WP2-02 | Settings › Appearance on shared `ThemeSettings` + `ThemePreview` (mode/accent+custom hue+artwork/surface/density/radius/motion/feedback/locale); `settings.appearance` i18n ns; LocaleSwitcher deleted | done |
-| WP2-03 | App shell: `AppShell` from `@mmo/ui`, sidebar rail/expanded, mobile bottom tab bar, safe-area, `Page` container with ultra-wide rules | todo |
-| WP2-04 | `loading.tsx` skeletons for every route group + `not-found.tsx` + shared `ErrorState` | todo |
-| WP2-05 | Unify auth/empty states: one `NotSignedIn`/`NoCompanion`/`EmptyState` everywhere (16 pages) | todo |
-| WP2-06 | Replace 7 settings stubs with real pages (daw, devices, live, mixer, notifications, security, sound-editor) | todo |
-| WP2-07 | `/settings/companions` real table (DataTable) instead of JSON dump | todo |
-| WP2-08 | Player bar + NowPlaying: tokens, `<Activity>`, mobile mini-player, motion presets | todo |
-| WP2-09 | Route transitions with React 19.3 `<ViewTransition>`; reduced-motion guard | todo |
-| WP2-10 | Responsive tables → `DataTable` with column priority collapsing (library, hidden, playlists, render-jobs, mixer settings, lora) | todo |
-| WP2-11 | i18n: every hardcoded string through next-intl; nav-tree + global-search from one source; RO+EN complete | todo |
-| WP2-12 | Storage keys: `mixai:` + `mmo:` prefixes now syncable (drift fix); prefs migrated from `theme`/`mmo-locale`/`mixai-ui`; `components.json` fix pending | doing |
-| WP2-13 | Nav discoverability: add `/voice-wizard`, `/library/import`, `/lora/validate`, `/pair`; rename `/downloads` → `/get`; metadata title format | todo |
-| WP2-14 | Fonts: single `font-sans` source, `next/font` for Inter + Space Grotesk; `theme-color` follows mode/accent | todo |
-| WP2-15 | Watch: replace inline-style auth fallbacks; watch skins become surface presets on shared tokens | todo |
-| WP2-16 | Perf: bundle analyze, lazy heavy widgets (dockview, recharts, hls, react-grid-layout), `"use cache"` where force-dynamic is not needed | todo |
-| WP2-17 | Tests: component tests for ThemeProvider, AppShell, EmptyState, DataTable; Playwright a11y + visual smoke at 390/768/1440/3440 widths | todo |
-| WP2-18 | Docs: `docs/aplicatie/settings.md`, `dashboard.md`, `03-stack-tehnologic.md`, CHANGELOG, web version bump | todo |
+| WP2-03 | App shell: `AppShell` from `@mmo/ui`, sidebar rail/expanded, mobile bottom tab bar, safe-area, `Page` container with ultra-wide rules | done 5d7fdf8 |
+| WP2-04 | 47 `loading.tsx` (9 skeleton families in `route-skeletons.tsx`) + `not-found.tsx` + `error.tsx` on `ErrorState` | done 3eaede0 |
+| WP2-05 | 12 pages moved to `notSignedInFor(featureKey)` (14 new keys RO+EN); NotSignedIn/NoCompanion on `EmptyState` | done 3eaede0 |
+| WP2-06 | Replace 7 settings stubs with real pages (daw, devices, live, mixer, notifications, security, sound-editor) | done 5d7fdf8 |
+| WP2-07 | `/settings/companions` real table (DataTable) instead of JSON dump | done 5d7fdf8 |
+| WP2-08 | Player bar + NowPlaying: tokens, `<Activity>`, mobile mini-player, motion presets | done (uncommitted) — `surface` bar, `rise`/`fade` on track change, 56px mini-player + `player-height.css`, NowPlaying in `<Activity>`, artwork-accent hue via `dominantHueFromImage`, canvas paint via `themeColor()` |
+| WP2-09 | Route transitions with React 19.3 `<ViewTransition>`; reduced-motion guard | done (uncommitted) — `src/app/template.tsx` + `view-transitions.css` (`mixai-page` class, `--dur-page`, reduced-motion → none); watch named morphs untouched |
+| WP2-10 | Responsive tables → `DataTable` with column priority collapsing (library, hidden, playlists, render-jobs, mixer settings, lora) | done 4bd3530 |
+| WP2-11 | i18n: every hardcoded string through next-intl; nav-tree + global-search from one source; RO+EN complete | done 4bd3530 |
+| WP2-12 | Storage keys: `mixai:` + `mmo:` prefixes now syncable (drift fix); prefs migrated from `theme`/`mmo-locale`/`mixai-ui`; `components.json` fixed (4bd3530) | done 3eaede0 + 4bd3530 (components.json → globals.src.css) |
+| WP2-13 | Nav discoverability: add `/voice-wizard`, `/library/import`, `/lora/validate`, `/pair`; rename `/downloads` → `/get`; metadata title format | done 4bd3530 |
+| WP2-14 | Fonts: single `font-sans` source, `next/font` for Inter + Space Grotesk; `theme-color` follows mode/accent | done 4bd3530 |
+| WP2-15 | Watch: replace inline-style auth fallbacks; watch skins become surface presets on shared tokens | done (uncommitted) — skins reduced to `--watch-h` + shape knobs over tokens (netflix 25 / plex 75 / disney 250 / hbo 285 / mmo `--accent-h`); inline paddings → Tailwind; `error.tsx` → `ErrorState`; brand hex out of cinematic/tv-mode CSS |
+| WP2-16 | Perf: bundle analyze, lazy heavy widgets (dockview, recharts, hls, react-grid-layout), `"use cache"` where force-dynamic is not needed | done 1d7ea4f |
+| WP2-17 | Tests: component tests for ThemeProvider, AppShell, EmptyState, DataTable; Playwright a11y + visual smoke at 390/768/1440/3440 widths | done ee81854 |
+| WP2-18 | Docs: `docs/aplicatie/settings.md`, `dashboard.md`, `03-stack-tehnologic.md`, CHANGELOG, web version bump | done 85a8bc3 |
 
 ### WP3 — apps/mixai (Tauri desktop)
 | ID | Item | Status |
 |---|---|---|
-| WP3-01 | Tailwind v4 + `@mmo/design-tokens`; skins (neon-glass/studio-metal/flat-pro) re-expressed as `surface` presets + deck accents | todo |
-| WP3-02 | Light mode + accent + density via shared ThemeProvider; sync with cloud prefs | todo |
-| WP3-03 | Replace emoji glyphs with lucide; `@mmo/ui` Button/Slider/Select/Tooltip/Sheet in Settings & TopBar | todo |
-| WP3-04 | Responsive grid: min 1100 px → fluid from 1024 px, 4-deck only ≥ 1600 px, ultra-wide side panels | todo |
-| WP3-05 | Skeleton/loading for decks + Library; error boundary; empty states | todo |
-| WP3-06 | i18n RO/EN (shared ui messages + app messages) | todo |
-| WP3-07 | Version alignment (package/tauri.conf/Cargo), docs `docs/mixai/00-…` §8 | todo |
+| WP3-01 | Tailwind v4 + `@mmo/design-tokens`; skins (neon-glass/studio-metal/flat-pro) re-expressed as `surface` presets + deck accents | done d5052fe |
+| WP3-02 | Light mode + accent + density via shared ThemeProvider; sync with cloud prefs | done d5052fe |
+| WP3-03 | Replace emoji glyphs with lucide; `@mmo/ui` Button/Slider/Select/Tooltip/Sheet in Settings & TopBar | done d5052fe |
+| WP3-04 | Responsive grid: min 1100 px → fluid from 1024 px, 4-deck only ≥ 1600 px, ultra-wide side panels | done d5052fe |
+| WP3-05 | Skeleton/loading for decks + Library; error boundary; empty states | done d5052fe |
+| WP3-06 | i18n RO/EN (shared ui messages + app messages) | done d5052fe |
+| WP3-07 | Version alignment (package/tauri.conf/Cargo), docs `docs/mixai/00-…` §8 | done d5052fe |
 
 ### WP4 — apps/native (Tauri + Capacitor shell)
 | ID | Item | Status |
 |---|---|---|
-| WP4-01 | Bootstrap page rebrand ("MixAI"), generated tokens CSS, light/dark by `prefers-color-scheme`, safe-area | todo |
-| WP4-02 | Restore `AndroidManifest.xml` (leanback per ANDROID_TV.md), Capacitor 8 sync, `dist/` build script | todo |
-| WP4-03 | Web app: safe-area utilities + `standalone` display detection (consumed by WP2-03) | todo |
-| WP4-04 | Docs/README/version alignment | todo |
+| WP4-01 | Bootstrap page rebrand ("MixAI"), generated tokens CSS, light/dark by `prefers-color-scheme`, safe-area | done 19d0402 |
+| WP4-02 | Restore `AndroidManifest.xml` (leanback per ANDROID_TV.md), Capacitor 8 sync, `dist/` build script | done 19d0402 |
+| WP4-03 | Web app: safe-area utilities + `standalone` display detection (consumed by WP2-03) | done 70b637f |
+| WP4-04 | Docs/README/version alignment | done 19d0402 |
 
 ### WP5 — server/ui (Companion)
 | ID | Item | Status |
 |---|---|---|
-| WP5-01 | Rebuild as small Vite + React app on `@mmo/ui` (auth, main, virtual-audio, updater), same preload API | todo |
-| WP5-02 | Light/dark from `nativeTheme` + shared tokens; proper titlebar per OS (no double frame on Windows) | todo |
-| WP5-03 | Copy: "Connect to MixAI Companion"; i18n RO/EN | todo |
-| WP5-04 | Electron 44 + builder; asar includes built `ui/dist`; docs `docs/companion/README.md` | todo |
+| WP5-01 | Rebuild as small Vite + React app on `@mmo/ui` (auth, main, virtual-audio, updater), same preload API | done cdff3ea |
+| WP5-02 | Light/dark from `nativeTheme` + shared tokens; proper titlebar per OS (no double frame on Windows) | done cdff3ea |
+| WP5-03 | Copy: "Connect to MixAI Companion"; i18n RO/EN | done cdff3ea |
+| WP5-04 | Electron 44 + builder; asar includes built `ui/dist`; docs `docs/companion/README.md` | done 3fa73f2 |
 
 ### WP6 — TV (tizen + android)
 | ID | Item | Status |
 |---|---|---|
-| WP6-01 | tizen: generated `tokens.css`; RO/EN messages; focus ring/overscan tokens | todo |
-| WP6-02 | tizen: skeleton rows, series grouping, resume, search screen, Quick Connect pairing | todo |
-| WP6-03 | android: `Tokens.kt` generated; delete ~40 literal colors; `strings.xml` EN + `values-ro` | todo |
-| WP6-04 | android: posters (TMDB/artwork URLs), series grouping, resume, MediaSession now-playing, settings screen | todo |
-| WP6-05 | Both: shimmer skeletons, empty/error states, README for tv-android, ADR-0004 correction | todo |
+| WP6-01 | tizen: generated `tokens.css`; RO/EN messages; focus ring/overscan tokens | done 3ed6c09 |
+| WP6-02 | tizen: skeleton rows, series grouping, resume, search screen, Quick Connect pairing | done 3ed6c09 |
+| WP6-03 | android: `Tokens.kt` generated; delete ~40 literal colors; `strings.xml` EN + `values-ro` | done 3ed6c09 |
+| WP6-04 | android: posters (TMDB/artwork URLs), series grouping, resume, MediaSession now-playing, settings screen | done 3ed6c09 |
+| WP6-05 | Both: shimmer skeletons, empty/error states, README for tv-android, ADR-0004 correction | done 3ed6c09 |
 
 ### WP7 — apps/extension
 | ID | Item | Status |
 |---|---|---|
-| WP7-01 | Generated tokens CSS; popup/options/content on brand; light/dark | todo |
-| WP7-02 | Rebrand "MMO" → "MixAI" in content script/ids; popup version from manifest; `_locales` RO/EN | todo |
-| WP7-03 | Adapters for the 8 missing platforms or trim host list to match; wire `audioOnly`; docs dead links | todo |
+| WP7-01 | Generated tokens CSS; popup/options/content on brand; light/dark | done 19d0402 |
+| WP7-02 | Rebrand "MMO" → "MixAI" in content script/ids; popup version from manifest; `_locales` RO/EN | done 19d0402 |
+| WP7-03 | Adapters for the 8 missing platforms or trim host list to match; wire `audioOnly`; docs dead links | done 19d0402 |
 
 ### WP8 — Verification & closure
 | ID | Item | Status |
 |---|---|---|
-| WP8-01 | Matrix: typecheck/lint/test/build per app green (or pre-existing failures proven via HEAD worktree) | todo |
-| WP8-02 | Playwright visual + axe at 4 widths, light+dark, RO+EN | todo |
-| WP8-03 | design-critic pass on web shell, mixai, companion | todo |
-| WP8-04 | CHANGELOG entries (web/companion/extension/tv), version bumps, ADR-0008 design system | todo |
+| WP8-01 | Matrix: typecheck/lint/test/build per app green (or pre-existing failures proven via HEAD worktree) | done matrix 22/22 green (.copilot-tmp/matrix.log) |
+| WP8-02 | Playwright visual + axe at 4 widths, light+dark, RO+EN | done ee81854 |
+| WP8-03 | design-critic pass on web shell, mixai, companion | done docs/followups/design-critic-2026-09-18.md (42–47/60, 5 prescriptions) |
+| WP8-04 | CHANGELOG entries (web/companion/extension/tv), version bumps, ADR-0008 design system | done 85a8bc3 (CHANGELOGs, ADR-0008, versions: web 2.0.0, companion 3.0.0, extension 3.0.0, mixai/native/tv 1.0.0) |
 | WP8-05 | Reality-check round with askQuestions | todo |
 
 ## 5. Recommendations beyond the brief (proposed; decide in §7)
@@ -250,10 +250,10 @@ Status column mirrors the CSV. IDs are stable — reference them in commits (`fe
 
 | ID | Item | Status |
 |---|---|---|
-| WP9-01 | `/dev/ui` catalog route (dev-only) rendering every `@mmo/ui` component × mode × surface × accent | todo |
-| WP9-02 | Unified command palette + shortcuts registry (`@mmo/ui/command`) on web, mixai, companion | todo |
-| WP9-03 | `nuqs` URL state for library/playlists filters | todo |
-| WP9-04 | Haptics (`useHaptics`) + sound cues (opt-in pref `feedback`) | todo |
-| WP9-05 | `@serwist/next` replaces hand-rolled SW; offline shell | todo |
-| WP9-06 | OpenAPI spec for MMO Server (`server/openapi.yaml`) + generated TS (`@mmo/sdk`) and Kotlin (tv-android) clients | todo |
-| WP9-07 | server: express 4 → 5 | todo |
+| WP9-01 | `/dev/ui` catalog route (dev-only) rendering every `@mmo/ui` component × mode × surface × accent | done 5cdc24b |
+| WP9-02 | Unified command palette + shortcuts registry (`@mmo/ui/command`) on web, mixai, companion | done 5cdc24b |
+| WP9-03 | `nuqs` URL state for library/playlists filters | done 4bd3530 |
+| WP9-04 | Haptics (`useHaptics`) + sound cues (opt-in pref `feedback`) | done 4bd3530 |
+| WP9-05 | `@serwist/next` replaces hand-rolled SW; offline shell | done 95ef92c |
+| WP9-06 | OpenAPI spec for MMO Server (`server/openapi.yaml`) + generated TS (`@mmo/sdk`) and Kotlin (tv-android) clients | done |
+| WP9-07 | server: express 4 → 5 | done da3538e |
