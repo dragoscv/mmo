@@ -1,6 +1,6 @@
 name: Companion — build & release
 
-# Cross-platform builder for the MMO Companion (Electron). Triggered by:
+# Cross-platform builder for the MixAI Companion / MMO Server (Electron). Triggered by:
 #   1. Pushing a tag like `companion-v1.2.3` (legacy / manual path).
 #   2. Pushing to `main` with changes under `server/**` or to this
 #      workflow file. We read `server/package.json#version` and only
@@ -166,14 +166,36 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
+          version: 10
           run_install: false
 
-      - name: Setup Node 24
+      - name: Setup Node 22
+        # Node 22 = the runtime the headless image (`node:22`) and
+        # `better-sqlite3` 13 N-API prebuilds target; Electron 44 bundles its
+        # own Node for the main process, so the host version only matters
+        # for tsc / Vite / electron-builder.
         uses: actions/setup-node@v6
         with:
-          node-version: "24"
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: server/pnpm-lock.yaml
+
+      - name: Cache Electron + electron-builder downloads
+        # electron (~110 MB) and the NSIS/AppImage/winCodeSign helpers are
+        # re-downloaded on every run otherwise. Keyed on the lockfile so an
+        # Electron bump invalidates it.
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-${{ runner.os }}-${{ hashFiles('server/pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
 
       - name: Install dependencies
         # The `pnpm.onlyBuiltDependencies` array in server/package.json already
@@ -190,8 +212,16 @@ jobs:
         # fails the build (we use NSIS via electron-builder, not Squirrel).
         run: pnpm rebuild audify electron better-sqlite3
 
-      - name: Build TypeScript
+      - name: Build renderer (Vite → ui/dist) + TypeScript
+        # `pnpm build` = `pnpm ui:build && tsc`. The renderer is a Vite +
+        # React app (server/ui, WP5) whose output `ui/dist/` is gitignored
+        # and packed into app.asar by electron-builder (`build.files`), so it
+        # MUST be built before the packaging steps below.
         run: pnpm build
+
+      - name: Assert renderer bundle exists
+        shell: bash
+        run: test -f ui/dist/index.html && ls -la ui/dist/assets | head -20
 
       - name: Fetch bundled virtual-audio drivers (BlackHole, VirtualAudioDriver)
         # The Windows .sys/.cat/.inf and macOS .pkg are gitignored to keep the
@@ -268,7 +298,7 @@ jobs:
       # ── macOS ──────────────────────────────────────────────────────────
       # Unsigned build (no Apple developer certificate). Users will see a
       # Gatekeeper warning on first run; right-click → Open or
-      # `xattr -dr com.apple.quarantine /Applications/MMO\ Companion.app`
+      # `xattr -dr com.apple.quarantine /Applications/MixAI\ Companion.app`
       # works around it.
       - name: Build macOS DMG (unsigned, x64 + arm64)
         if: matrix.os == 'macos-latest'

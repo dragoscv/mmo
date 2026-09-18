@@ -35,7 +35,11 @@
     "build:rbexport": "cargo build --release --manifest-path native/rbexport/Cargo.toml",
     "validate:rbexport": "cargo build --release --manifest-path native/rbexport/Cargo.toml && node native/rbexport/tools/validate-usb.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "openapi:lint": "redocly lint openapi.yaml",
+    "openapi:check": "node scripts/openapi-check.mjs",
+    "openapi:gen": "node scripts/openapi-kotlin.mjs && pnpm --dir ../packages/sdk gen:openapi",
+    "openapi:preview": "redocly preview-docs openapi.yaml"
   },
   "build": {
     "appId": "ro.mixai.companion",
@@ -59,8 +63,15 @@
       "ui/dist/**/*",
       "assets/**/*",
       "!src/**",
+      "!ui/src/**",
+      "!ui/public/**",
+      "!ui/index.html",
+      "!ui/*.ts",
+      "!ui/tsconfig.json",
       "!**/*.ts",
-      "!tsconfig.json"
+      "!**/*.map",
+      "!tsconfig.json",
+      "!vitest.config.ts"
     ],
     "extraResources": [
       {
@@ -248,6 +259,7 @@
   },
   "devDependencies": {
     "@base-ui/react": "^1.8.0",
+    "@redocly/cli": "^2.53.3",
     "@tailwindcss/vite": "^4.3.3",
     "@types/better-sqlite3": "^9.6.0",
     "@types/cors": "^2.8.19",
@@ -263,6 +275,7 @@
     "electronmon": "^2.0.4",
     "lucide-react": "^1.47.0",
     "motion": "^13.4.0",
+    "openapi-typescript": "^7.13.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tailwind-merge": "^3.7.0",
@@ -270,7 +283,8 @@
     "tsc-watch": "^7.2.1",
     "typescript": "^5.8.3",
     "vite": "^8.3.0",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "yaml": "^2.9.1"
   },
   "electronmon": {
     "patterns": [

@@ -42,8 +42,10 @@ curl http://127.0.0.1:17899/healthz
 
 | Script | Ce face |
 |--------|---------|
-| `pnpm dev` | `tsc && electron dist/main.js` |
-| `pnpm build` | `tsc` (doar compilare TS) |
+| `pnpm dev` | `pnpm ui:build` + `tsc-watch` → `electronmon .` |
+| `pnpm ui:dev` / `pnpm ui:build` / `pnpm ui:typecheck` | Renderer-ul Vite + React din `ui/` (WP5): dev server HMR, build în `ui/dist/`, `tsc -p ui/tsconfig.json` |
+| `pnpm build` | `pnpm ui:build && tsc` — produce **tot** ce intră în asar (`ui/dist/` + `dist/`) |
+| `pnpm build:headless` | Doar `tsc` (Docker/Pi nu au renderer) |
 | `pnpm start` | `electron dist/main.js` (presupune build făcut) |
 | `pnpm dist:win` | Build NSIS installer pentru Windows x64 |
 | `pnpm dist:mac` | Build DMG pentru macOS x64 + arm64 (cu ad-hoc signing) |
@@ -53,6 +55,23 @@ curl http://127.0.0.1:17899/healthz
 | `pnpm rebuild:node` | Recompilează `audify` pentru Node-ul de sistem (headless local). `better-sqlite3` 13 e N-API — același binar merge în Electron și Node, nu mai trebuie rebuild |
 
 Output build: `server/release/` (ignorat în Git).
+
+### Ce intră în `app.asar` (WP5-04)
+
+`build.files` din `package.json`: `dist/**` (main + preload + server, CJS), `ui/dist/**`
+(renderer-ul Vite, `base: "./"`, fără sourcemaps) și `assets/**`. Excluse explicit:
+`src/`, `ui/src`, `ui/public`, `ui/index.html`, `ui/*.ts`, orice `*.ts`/`*.map`,
+`tsconfig.json`, `vitest.config.ts`. Modulele native (`audify`, `better-sqlite3`,
+`ffmpeg-static`, `ffprobe-static`) stau **în afara** asar-ului (`asarUnpack`).
+`extraResources` copiază `python/`, `fpcalc`, `virtual-audio`, `cloudflared`, `bin/rbexport`.
+
+Verificare locală rapidă (fără installer, ~2–4 min):
+
+```powershell
+pnpm build
+pnpm exec electron-builder --dir --win --x64
+pnpm exec asar list release/win-unpacked/resources/app.asar | Select-String 'ui/dist/index.html'
+```
 
 ### Headless (Docker, Raspberry Pi)
 
@@ -83,9 +102,11 @@ server/
 │   ├── main.ts              Electron main process — window, tray, IPC handlers
 │   ├── preload.ts           Bridge sigur renderer ↔ main (contextBridge)
 │   ├── server.ts            Express HTTP server pe :17899
-│   ├── store.ts             Settings persistente (electron-store)
+│   ├── store.ts             Settings persistente (`SettingsStore` JSON, `<userData>/config.json`)
+│   ├── platform/            Singurul loc care atinge Electron (ADR-0002)
 │   └── audio/               Native audio (audify) — playback, recording, devices
-├── ui/                      Renderer UI (HTML/JS minimal, opțional)
+├── ui/                      Renderer Vite 8 + React 19 pe @mmo/ui (src/, vite.config.ts, tsconfig.json)
+│   └── dist/                Build renderer (gitignored) — încărcat de main.ts, împachetat în asar
 ├── assets/                  Iconuri (icon.png pentru toate platformele)
 ├── scripts/
 │   └── mac-adhoc-sign.js    Ad-hoc signing pentru macOS dist
@@ -167,14 +188,16 @@ Ghid utilizator: `docs/aplicatie/opensubsonic.md`.
 
 ## 🚢 Release flow
 
-1. Bump versiunea în `server/package.json` (`0.9.5` → `0.9.6`)
+1. Bump versiunea în `server/package.json` (`3.0.0` → `3.0.1`) + intrare în `server/CHANGELOG.md`
 2. Commit + push pe `main`
-3. Trigger workflow GitHub Actions: `.github/workflows/companion-release.yml`
-   - Build pentru toate platformele
+3. Workflow-ul `.github/workflows/companion-release.yml` pornește automat (job `detect`: build doar
+   dacă nu există deja release `v<version>`)
+   - Node 22 + pnpm 10, cache `~/.cache/electron` + `electron-builder`
+   - `pnpm build` (Vite renderer → `ui/dist` + `tsc`), apoi `electron-builder` per OS
    - Upload în GitHub Releases la `dragoscv/mmo`
 4. Utilizatorii primesc notificare auto-update la următoarea pornire (sau în 24h)
 
-> **Notă**: electron-builder folosește versiunea din `package.json` ca tag git (`v0.9.6`), nu un custom prefix.
+> **Notă**: electron-builder folosește versiunea din `package.json` ca tag git (`v3.0.0`), nu un custom prefix.
 
 ---
 

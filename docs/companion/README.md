@@ -10,13 +10,18 @@
 
 | Document | Subiect |
 |----------|---------|
-| [instalare.md](instalare.md) | Cum instalezi pe Windows / macOS / Linux |
-| [api-local.md](api-local.md) | Endpoints HTTP locale expuse pe `:17899` |
-| [ipc-protocol.md](ipc-protocol.md) | Protocol IPC main ↔ renderer |
-| [audio-pipeline.md](audio-pipeline.md) | Pipeline audio nativ (audify) |
-| [auto-update.md](auto-update.md) | Cum funcționează auto-update prin GitHub Releases |
+| [tunnel-setup.md](tunnel-setup.md) | Cloudflare Tunnel per device — acces din browser fără LAN |
+| [server/README.md § Endpoints](../../server/README.md#-endpoints-http-expuse) | Endpoints HTTP locale expuse pe `:17899` |
+| [server/README.md § OpenSubsonic](../../server/README.md#-opensubsonic-api-rest) | API OpenSubsonic (`/rest/*`) pentru Symfonium, Feishin, DSub… |
+| [server/README.md § Release flow](../../server/README.md#-release-flow) | Auto-update prin GitHub Releases |
+| [aplicatie/pairing.md](../aplicatie/pairing.md) | Quick Connect (cod 6 cifre / QR) și device-code login |
+| [aplicatie/casting.md](../aplicatie/casting.md) | Casting către Chromecast / DLNA / Home Assistant |
+| [aplicatie/opensubsonic.md](../aplicatie/opensubsonic.md) | Clienți OpenSubsonic compatibili |
+| [ADR-0002](../adr/0002-mmo-server-headless-core.md) | De ce core-ul rulează și fără Electron |
 
-> Aceste ghiduri sunt în curs de scriere. Pentru setup dev → [`server/README.md`](../../server/README.md).
+> Ghidurile `instalare.md`, `ipc-protocol.md`, `audio-pipeline.md` promise anterior nu au fost
+> scrise; setup-ul dev, structura `src/` și pipeline-ul audio (`audify`) sunt în
+> [`server/README.md`](../../server/README.md).
 
 ---
 
@@ -26,11 +31,10 @@
 # 1. Descarcă pentru OS-ul tău:
 #    https://github.com/dragoscv/mmo/releases/latest
 #
-#    - Windows:  MMO-Companion-Setup-X.Y.Z.exe
-#    - macOS:    MMO-Companion-X.Y.Z-arm64.dmg (Apple Silicon)
-#                MMO-Companion-X.Y.Z-x64.dmg   (Intel)
-#    - Linux:    MMO-Companion-X.Y.Z.AppImage
-#                mmo-companion_X.Y.Z_amd64.deb
+#    - Windows:  MixAI Companion-Setup-X.Y.Z.exe
+#    - macOS:    MixAI Companion-X.Y.Z-arm64.dmg (Apple Silicon)
+#                MixAI Companion-X.Y.Z-x64.dmg   (Intel)
+#    - Linux:    MixAI Companion-X.Y.Z-x64.AppImage / .deb / .rpm
 
 # 2. Rulează installer / mount DMG / chmod +x AppImage
 
@@ -38,6 +42,27 @@
 #    https://mixai.ro
 #    → bara laterală arată "✓ Companion connected"
 ```
+
+---
+
+## 🎨 Interfața Companion 3.0 (WP5)
+
+Fereastra desktop este un renderer **Vite 8 + React 19** construit pe
+[`@mmo/ui`](../design-system.md) (Base UI) și pe token-urile `@mmo/design-tokens`:
+aceeași paletă OKLCH, aceleași dimensiuni de temă (mod, accent, suprafață,
+densitate, rază) ca web-ul și MixAI DJ; preferințele se salvează în
+`mixai:prefs:v1` (localStorage-ul renderer-ului). Vechiul `index.html` vanilla
+de 1400 linii a dispărut — sursa e în `server/ui/src`, iar API-ul preload
+(`window.mmo`) a rămas identic.
+
+**Împachetare (WP5-04).** `pnpm build` = `vite build` (→ `server/ui/dist`,
+gitignored) + `tsc` (→ `server/dist`). electron-builder 26 pune în `app.asar`
+doar `dist/**`, `ui/dist/**` și `assets/**` (fără surse, `*.ts`, `*.map`);
+modulele native sunt dezarhivate (`asarUnpack`), iar `python/`, `fpcalc`,
+`virtual-audio`, `cloudflared` și `rbexport` ajung în `resources/` ca
+`extraResources`. CI (`companion-release.yml`): Node 22, pnpm 10, cache pentru
+descărcările Electron; release automat când `server/package.json#version`
+nu are încă un tag `v<version>`. Detalii: [`server/README.md`](../../server/README.md).
 
 ---
 
