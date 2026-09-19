@@ -99,6 +99,25 @@ Contractul serverului (`server/src/pair/router.ts`): `POST /pair/request {device
 | ⏯ ⏪ ⏩ ⏹ | play/pauză, derulare, stop |
 | Galben | schimbă pista de subtitrare (off → 1 → 2 …) |
 
+### Telecomandă de test (debug only, `lib/e2e-press.ts`)
+
+`sdb` nu poate injecta taste într-un widget web. Un build cu
+`VITE_E2E_PRESS_URL=http://<pc>:13899/press` face poll la acel URL și redă
+cheile (`down`, `enter`, `back`, …) ca `keydown` sintetic, plus comanda
+`open:<movie|tv>:<tmdbId>` care deschide direct pagina titlului; la fiecare
+secundă postează `{focused, buttons}` la `/state`. Fără variabilă, codul
+este eliminat din bundle (verificat: `rg /press dist/assets` → nimic).
+Driver PC: `.copilot-tmp/e2e-press-server.mjs` (`GET /press`, `POST /state`,
+`GET /enqueue?k=down,enter`). Nu livra niciodată un `.wgt` construit cu
+variabila setată.
+
+Rezultat pe Odyssey G8 (2026-09-19): `open:tv:236235` → butonul
+`Netflix · subscription · not installed` (Netflix nu e instalat pe monitor;
+`getAppInfo` → NotFoundError, corect) → OK → aplicația pierde focusul ~6 s
+(browserul Tizen preia ecranul cu link-ul de căutare), apoi revine. Lansarea
+către o aplicație instalată este dovedită prin mock e2e (`launchAppControl`
+cu `appId`, 22/22).
+
 ## Instalare pe Odyssey (pas cu pas)
 
 Ținta: **Samsung Odyssey OLED G8** (smart monitor, Tizen 7/8) la `192.168.100.135`; PC-ul de dezvoltare

@@ -8,6 +8,7 @@ import { MmoClient, type ProbedVideo, type SubsonicAlbum, type SubsonicSong } fr
 import { MediaClient } from "./lib/media";
 import type { MediaKind, TitleCard } from "./lib/media-types";
 import { keyFromEvent, registerTvKeys, exitApp, type TvKey } from "./lib/tv-keys";
+import { installE2ePressHook, setE2eCommandHandler } from "./lib/e2e-press";
 import { moveFocus, currentFocus, installRowMemory } from "./lib/focus";
 import type { DiscoveredServer } from "./lib/discovery";
 import type { Show } from "./lib/shows";
@@ -78,7 +79,7 @@ function AppRoutes() {
         return true;
     }, []);
 
-    useEffect(() => { registerTvKeys(); installRowMemory(); }, []);
+    useEffect(() => { registerTvKeys(); installRowMemory(); installE2ePressHook(); }, []);
 
     // Global D-pad handling. The Player owns its keys and stops propagation.
     useEffect(() => {
@@ -158,6 +159,14 @@ function AppRoutes() {
         push({ name: "player", item: { kind: "video", video: r.video, ref: r.ref, resumeSec: r.resumeSec } });
     };
     const openTitle = (c: TitleCard) => push({ name: "title", kind: c.kind, tmdbId: c.tmdbId, seed: c });
+    // Debug-only (no-op in production): `open:<kind>:<tmdbId>` from the e2e driver.
+    useEffect(() => {
+        setE2eCommandHandler((cmd) => {
+            const m = /^open:(movie|tv):(\d+)$/.exec(cmd);
+            if (m) push({ name: "title", kind: m[1] as MediaKind, tmdbId: Number(m[2]) });
+        });
+        return () => setE2eCommandHandler(null);
+    }, [push]);
 
     const playAlbum = (album: SubsonicAlbum, songs: SubsonicSong[], index: number) => {
         const queue: PlayItem[] = songs.map((s) => ({ kind: "audio", song: s, album }));

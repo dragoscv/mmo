@@ -1,6 +1,6 @@
 {
     "name": "@mmo/tv-tizen",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "private": true,
     "description": "MixAI TV for Samsung Tizen — web application (.wgt) that plays movies + music from MMO Server on Smart Hub TVs/monitors.",
     "type": "module",
