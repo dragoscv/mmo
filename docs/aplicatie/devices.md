@@ -109,7 +109,7 @@ flowchart LR
 ## ⚠️ Limitări
 
 - **LAN only**: cross-network necesită port forwarding sau VPN
-- **No auto-discovery**: trebuie să știi IP-ul (Bonjour/mDNS în roadmap)
+- **Auto-discovery**: MMO Server se anunță prin mDNS (`_mmo-companion._tcp`) din companion 1.0.6; dacă rețeaua blochează multicast, introdu IP-ul manual
 - **One-way scan**: device A scan device B, nu invers automat
 - **Latency**: streaming peste WiFi 2.4GHz poate avea hiccup-uri pe track-uri lossless
 

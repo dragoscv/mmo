@@ -1,4 +1,4 @@
-# MuzicAI Gateway — Hono control plane on Cloud Run.
+# MixAI Gateway — Hono control plane on Cloud Run.
 #
 # The bundle is built locally by deploy.ps1 (tsup bundles @mmo/db from the
 # monorepo, which isn't in this build context). The image ships the prebuilt

@@ -4,6 +4,7 @@
  */
 
 export const PROVIDER_IDS = [
+    "codai",
     "openai",
     "anthropic",
     "google",
@@ -16,6 +17,7 @@ export const PROVIDER_IDS = [
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export const PROVIDER_LABELS: Record<ProviderId, string> = {
+    codai: "codai",
     openai: "OpenAI",
     anthropic: "Anthropic",
     google: "Google Gemini",

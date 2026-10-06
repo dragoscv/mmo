@@ -13,7 +13,7 @@
  *     out of the box without opening any dialog.
  */
 
-import { app } from "electron";
+import { platform as app } from "../../platform";
 import path from "node:path";
 import os from "node:os";
 import { LinuxVirtualAudioAdapter } from "./linux";

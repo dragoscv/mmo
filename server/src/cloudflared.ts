@@ -31,7 +31,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
-import { app } from "electron";
+import { platform as app } from "./platform";
 import { pushDebugLog } from "./debug-log";
 
 let child: ChildProcess | null = null;

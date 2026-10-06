@@ -16,7 +16,7 @@
 
 ### Adresă
 - Dev: `http://localhost:3000`
-- Prod: `https://muzicai.ro`
+- Prod: `https://mixai.ro`
 
 ### Comunicare cu altele
 - ↔ **Browser**: HTTPS standard, plus EventSource pentru SSE
@@ -73,7 +73,7 @@
 
 ### Comunicare
 - Content script → background SW: `chrome.runtime.sendMessage`
-- Background SW → web app: `fetch` la `https://muzicai.ro/api/download/info` (sau `localhost:3000` în dev)
+- Background SW → web app: `fetch` la `https://mixai.ro/api/download/info` (sau `localhost:3000` în dev)
 - Storage: `chrome.storage.local` pentru config (URL web app, queue offline)
 
 → Detalii: [`extension/README.md`](../../apps/extension/README.md), [`docs/extension/`](../extension/)

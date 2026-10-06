@@ -25,6 +25,9 @@
 | 🎙️ Recordings | `/recordings` | [recordings.md](recordings.md) | ✏️ TBD |
 | 🔌 Devices | `/devices` | [devices.md](devices.md) | ✏️ TBD |
 | ⚙️ Settings | `/settings` | [settings.md](settings.md) | ✏️ TBD |
+| 🎧 OpenSubsonic (clienți externi) | MMO Server `/rest/*` | [opensubsonic.md](opensubsonic.md) | ✅ |
+| 📺 MixAI TV (Samsung Tizen) | `apps/tv-tizen` (.wgt) | [tv-tizen.md](tv-tizen.md) | ✅ |
+| 📺 MixAI TV (Android TV / Google TV) | `apps/tv-android` | [tv-android.md](tv-android.md) | ✅ v0.1.0 |
 
 > Aceste ghiduri sunt în curs de scriere (Wave 4 al rewrite-ului). Ordinea de prioritate: Bibliotecă → Mixer → Scanner → Download → Drive Manager → restul.
 

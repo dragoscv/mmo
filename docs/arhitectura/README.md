@@ -17,6 +17,9 @@
 | 3 | [03-stack-tehnologic.md](03-stack-tehnologic.md) | Framework-uri, librării, tooling — și de ce |
 | 4 | [04-fluxuri-date.md](04-fluxuri-date.md) | Fluxurile de date principale (sequence diagrams) |
 | 5 | [05-securitate-auth.md](05-securitate-auth.md) | Autentificare, autorizare, secrets, CORS, CSP |
+| 6 | [06-monitorizare-erori.md](06-monitorizare-erori.md) | Monitorizare, erori, observabilitate |
+| 7 | [ai-codai.md](ai-codai.md) | codai ca provider AI implicit — chei per utilizator, fallback, prompt caching |
+| 8 | [build-performance.md](build-performance.md) | Performanța build-urilor: măsurători înainte/după, imaginea Docker pentru Pi, cum re-măsori |
 
 ---
 

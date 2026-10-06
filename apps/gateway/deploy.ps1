@@ -1,4 +1,4 @@
-# Deploy the MuzicAI gateway to Cloud Run.
+# Deploy the MixAI gateway to Cloud Run.
 #
 # Usage:
 #   pwsh apps/gateway/deploy.ps1                 # build + deploy
@@ -49,11 +49,11 @@ $pairs = @()
 foreach ($k in $keys) {
     if ($envMap.ContainsKey($k) -and $envMap[$k]) { $pairs += "$k=$($envMap[$k])" }
 }
-$pairs += "CORS_ALLOW_ORIGINS=https://muzicai.ro"
+$pairs += "CORS_ALLOW_ORIGINS=https://mixai.ro,https://muzicai.ro"  # muzicai.ro kept during the rebrand transition
 # Web facet-cache revalidation hook (Phase 2 sync). Optional.
 if ($envMap.ContainsKey("WEB_REVALIDATE_SECRET") -and $envMap["WEB_REVALIDATE_SECRET"]) {
     $pairs += "WEB_REVALIDATE_SECRET=$($envMap['WEB_REVALIDATE_SECRET'])"
-    $pairs += "WEB_REVALIDATE_URL=https://muzicai.ro/api/internal/revalidate"
+    $pairs += "WEB_REVALIDATE_URL=https://mixai.ro/api/internal/revalidate"
 }
 $envArg = ($pairs -join "`n")
 

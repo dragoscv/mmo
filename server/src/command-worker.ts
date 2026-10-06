@@ -3,7 +3,7 @@
  *
  * Background: Vercel cannot reach the user's LAN where this companion
  * runs, and the browser is blocked by mixed-content + Private Network
- * Access from talking to http://192.168.x.x from https://muzicai.ro.
+ * Access from talking to http://192.168.x.x from https://mixai.ro.
  * So the web app enqueues commands (folder picker, audio enumeration,
  * etc.) into the cloud `device_commands` table; we drain them via the
  * existing /api/devices/announce heartbeat response and post results
@@ -14,7 +14,7 @@
  * here for execution.
  */
 
-import { BrowserWindow, dialog } from "electron";
+import { platform } from "./platform";
 import path from "node:path";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
@@ -45,16 +45,10 @@ const handlers: Record<string, Handler> = {
 
     pick_folder: async (payload) => {
         const desiredKind = pickKind(payload);
-        const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
-        const result = win
-            ? await dialog.showOpenDialog(win, {
-                title: "Pick a music folder",
-                properties: ["openDirectory", "createDirectory"],
-            })
-            : await dialog.showOpenDialog({
-                title: "Pick a music folder",
-                properties: ["openDirectory", "createDirectory"],
-            });
+        const result = await platform.showOpenDialog({
+            title: "Pick a music folder",
+            properties: ["openDirectory", "createDirectory"],
+        });
         if (result.canceled || result.filePaths.length === 0) {
             return { canceled: true, folders: await listFolders() };
         }

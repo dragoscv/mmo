@@ -2,7 +2,7 @@
   "name": "@mmo/gateway",
   "version": "0.1.0",
   "private": true,
-  "description": "MuzicAI companion control-plane gateway (Hono on Cloud Run). Owns the device heartbeat (HTTP announce + WebSocket) and command channel, off the Vercel hot path.",
+  "description": "MixAI companion control-plane gateway (Hono on Cloud Run). Owns the device heartbeat (HTTP announce + WebSocket) and command channel, off the Vercel hot path.",
   "type": "module",
   "main": "dist/server.js",
   "scripts": {

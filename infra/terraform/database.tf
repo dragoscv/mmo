@@ -148,7 +148,7 @@ resource "google_storage_bucket" "user_files" {
   }
 
   cors {
-    origin          = ["https://muzicai.ro", "http://localhost:3000", "http://localhost:13789"]
+    origin          = ["https://mixai.ro", "https://muzicai.ro", "http://localhost:3000", "http://localhost:13789"] # muzicai.ro kept during the rebrand transition
     method          = ["GET", "PUT", "POST", "DELETE", "HEAD"]
     response_header = ["*"]
     max_age_seconds = 3600

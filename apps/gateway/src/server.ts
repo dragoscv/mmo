@@ -1,5 +1,5 @@
 /**
- * MuzicAI companion gateway — Hono on Cloud Run.
+ * MixAI companion gateway — Hono on Cloud Run.
  *
  * Routes:
  *   GET  /health                      → liveness (NOT /healthz — reserved by GFE)
@@ -25,14 +25,15 @@ const app = new Hono();
 
 app.use("*", logger());
 app.use("/api/*", cors({
-    origin: (process.env.CORS_ALLOW_ORIGINS ?? "https://muzicai.ro").split(",").map((s) => s.trim()),
+    // muzicai.ro stays in the default during the rebrand transition.
+    origin: (process.env.CORS_ALLOW_ORIGINS ?? "https://mixai.ro,https://muzicai.ro").split(",").map((s) => s.trim()),
     allowMethods: ["GET", "POST", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     maxAge: 86_400,
 }));
 
-app.get("/health", (c) => c.json({ ok: true, service: "muzicai-gateway", ts: Date.now() }));
-app.get("/", (c) => c.text("muzicai-gateway"));
+app.get("/health", (c) => c.json({ ok: true, service: "mixai-gateway", ts: Date.now() }));
+app.get("/", (c) => c.text("mixai-gateway"));
 
 app.post("/api/devices/announce", handleAnnounce);
 app.get("/api/sync", handleSyncGet);

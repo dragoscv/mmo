@@ -1,18 +1,18 @@
 # Cloudflare Tunnel setup (per-device fast path)
 
-The browser at `https://muzicai.ro` cannot talk to a companion at
+The browser at `https://mixai.ro` cannot talk to a companion at
 `http://192.168.x.x:17899` directly — mixed-content + Private Network
 Access kill it. Instead we give every paired device its own named
 Cloudflare Tunnel: the companion runs `cloudflared --token …` which
 opens an outbound QUIC connection to the Cloudflare edge; the browser
-fetches `https://device-<id>.muzicai.ro` which the edge proxies
+fetches `https://device-<id>.mixai.ro` which the edge proxies
 back through the tunnel to the companion's local Express port.
 
 > **Use a flat (single-level) subdomain.** Cloudflare's free Universal
-> SSL certificate covers only `muzicai.ro` and `*.muzicai.ro` — it does
-> NOT cover `*.devices.muzicai.ro`. Two-level subdomains require a
-> paid Advanced Certificate. We therefore use `device-<id>.muzicai.ro`
-> (flat) instead of `device-<id>.devices.muzicai.ro` (nested). The
+> SSL certificate covers only `mixai.ro` and `*.mixai.ro` — it does
+> NOT cover `*.devices.mixai.ro`. Two-level subdomains require a
+> paid Advanced Certificate. We therefore use `device-<id>.mixai.ro`
+> (flat) instead of `device-<id>.devices.mixai.ro` (nested). The
 > `device-` prefix keeps these hostnames out of the way of `www`,
 > `api`, etc.
 
@@ -26,19 +26,19 @@ These steps are required ONCE on your Cloudflare account, then every
 device that pairs gets its own tunnel automatically (provisioned by the
 web app's announce route on first heartbeat).
 
-### 1 · Move `muzicai.ro` DNS to Cloudflare (free)
+### 1 · Move `mixai.ro` DNS to Cloudflare (free)
 
 Cloudflare's free plan does **not** support subdomain-only zones — that
 needs Business ($200/mo). The clean and free path is to move the whole
 domain's nameservers from Vercel to Cloudflare. Vercel hosting keeps
 working unchanged; only DNS authority moves.
 
-> **Before you start**: open Vercel → Domains → `muzicai.ro` → **DNS
+> **Before you start**: open Vercel → Domains → `mixai.ro` → **DNS
 > Records** and screenshot / export every single record (A, CNAME, MX,
 > TXT, etc.). You must recreate every one in Cloudflare before flipping
 > nameservers, or email + preview deploys break.
 
-1. <https://dash.cloudflare.com> → **Add a domain** → `muzicai.ro` →
+1. <https://dash.cloudflare.com> → **Add a domain** → `mixai.ro` →
    **Free** plan.
 2. Cloudflare auto-scans your current DNS and imports most records.
    **Cross-check the imported list against your Vercel export.** CF
@@ -50,7 +50,7 @@ working unchanged; only DNS authority moves.
    IP and does its own TLS — proxying through CF would double-proxy.
 4. CF shows you two nameservers, e.g.
    `ada.ns.cloudflare.com` + `bob.ns.cloudflare.com`. Copy them.
-5. Go to your domain registrar (where you bought `muzicai.ro` — Hostico,
+5. Go to your domain registrar (where you bought `mixai.ro` — Hostico,
    ROTLD, Namecheap, etc.). Find the nameserver setting for the domain.
    Replace Vercel's `ns1.vercel-dns.com` / `ns2.vercel-dns.com` with
    the two Cloudflare ones. Save.
@@ -58,10 +58,10 @@ working unchanged; only DNS authority moves.
    emails you when the zone status flips to **Active**.
 7. Verify nothing broke:
    ```powershell
-   nslookup muzicai.ro 1.1.1.1
-   nslookup www.muzicai.ro 1.1.1.1
+   nslookup mixai.ro 1.1.1.1
+   nslookup www.mixai.ro 1.1.1.1
    ```
-   Both should resolve to Vercel's IP. Open <https://muzicai.ro> in a
+   Both should resolve to Vercel's IP. Open <https://mixai.ro> in a
    private window — the site should load normally.
 
 **Rollback**: if anything breaks, change nameservers back to
@@ -69,8 +69,8 @@ working unchanged; only DNS authority moves.
 Propagation takes 5–60 min.
 
 > No separate zone is needed. The per-device hostnames
-> (`device-<id>.muzicai.ro`) are just CNAMEs under the apex
-> `muzicai.ro` zone, auto-created by the API on first heartbeat.
+> (`device-<id>.mixai.ro`) are just CNAMEs under the apex
+> `mixai.ro` zone, auto-created by the API on first heartbeat.
 
 ### 2 · Create a scoped API token
 
@@ -81,7 +81,7 @@ Propagation takes 5–60 min.
    - `Account` → `Cloudflare Tunnel` → **Edit**
    - `Zone` → `DNS` → **Edit**
 4. **Account Resources**: include your own account.
-5. **Zone Resources**: include **only** `muzicai.ro`.
+5. **Zone Resources**: include **only** `mixai.ro`.
 6. (Optional) TTL: leave blank for indefinite, or set 1 year.
 7. **Continue to summary** → **Create Token** → copy the token. You
    only see it once.
@@ -89,7 +89,7 @@ Propagation takes 5–60 min.
 ### 3 · Find the two IDs
 
 - **Account ID** — dashboard home → right sidebar.
-- **Zone ID** — open `muzicai.ro` zone → right sidebar.
+- **Zone ID** — open `mixai.ro` zone → right sidebar.
 
 ### 4 · Set environment variables
 
@@ -99,13 +99,13 @@ Add to **both** `app/.env.local` (for local dev) and Vercel
 ```bash
 CLOUDFLARE_API_TOKEN=...           # the token from step 2
 CLOUDFLARE_ACCOUNT_ID=...          # from step 3
-CLOUDFLARE_TUNNEL_ZONE_ID=...      # from step 3 (the muzicai.ro zone ID)
-CLOUDFLARE_TUNNEL_BASE_HOSTNAME=muzicai.ro
+CLOUDFLARE_TUNNEL_ZONE_ID=...      # from step 3 (the mixai.ro zone ID)
+CLOUDFLARE_TUNNEL_BASE_HOSTNAME=mixai.ro
 ```
 
 `CLOUDFLARE_TUNNEL_BASE_HOSTNAME` is just the suffix used to compose
-`device-<id>.muzicai.ro`. Use the apex (single-level) so the existing
-free `*.muzicai.ro` cert covers it — nesting under `devices.muzicai.ro`
+`device-<id>.mixai.ro`. Use the apex (single-level) so the existing
+free `*.mixai.ro` cert covers it — nesting under `devices.mixai.ro`
 requires a paid Advanced Certificate.
 
 Redeploy the web app.

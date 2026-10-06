@@ -23,8 +23,9 @@ import { existsSync, mkdirSync, statSync, createReadStream, createWriteStream, u
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
-let appRef: { getPath: (k: string) => string } | null = null;
-try { appRef = require("electron").app; } catch { /* not running under electron */ }
+import { platform } from "../platform";
+
+const appRef = platform;
 
 export type RenderStage = "queued" | "uploading" | "ready" | "error";
 export type RenderFormat = "wav" | "mp3";

@@ -94,7 +94,7 @@ Web app-ul are nevoi speciale care impun reguli CSP atente:
 | Audio worklets în `/worklets/` | `worker-src 'self'` |
 | Embed YouTube (preview pentru download) | `frame-src https://www.youtube.com` |
 | Imagini cover din MusicBrainz | `img-src 'self' https://coverartarchive.org data:` |
-| WebRTC ICE | `connect-src 'self' wss: https://muzicai.ro stun: turn:` |
+| WebRTC ICE | `connect-src 'self' wss: https://mixai.ro stun: turn:` |
 | Companion local | `connect-src http://127.0.0.1:17899` (DEV only; prod: doar prin postMessage iframe) |
 
 ---
@@ -103,7 +103,7 @@ Web app-ul are nevoi speciale care impun reguli CSP atente:
 
 | Sursa | Ce poate face | Configurare |
 |-------|---------------|-------------|
-| `https://muzicai.ro` (origin self) | Tot | implicit |
+| `https://mixai.ro` (origin self) | Tot | implicit |
 | `chrome-extension://<id>` | POST /api/download/* | allowlist explicit în web app |
 | `http://localhost:17899` (companion) | Doar răspunde la cereri de la web app, nu invers | proxy.ts validează `Origin` header |
 | Alți origini | Nimic | `Access-Control-Allow-Origin` nu e `*` |

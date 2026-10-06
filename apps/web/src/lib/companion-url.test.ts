@@ -9,7 +9,7 @@ describe("isLoopbackUrl", () => {
     });
     it("rejects non-loopback hosts", () => {
         expect(isLoopbackUrl("http://192.168.1.42:9876")).toBe(false);
-        expect(isLoopbackUrl("https://device-abc.muzicai.ro")).toBe(false);
+        expect(isLoopbackUrl("https://device-abc.mixai.ro")).toBe(false);
         expect(isLoopbackUrl("http://10.0.0.5:9876")).toBe(false);
     });
 });
@@ -58,18 +58,18 @@ describe("pickCompanionUrl", () => {
         it("prefers the tunnel hostname over LAN (cloud can't reach 192.168.x)", () => {
             expect(
                 pickCompanionUrl(
-                    { apiUrl: loopback, lanUrl: lan, tunnelHostname: "device-abc.muzicai.ro" },
+                    { apiUrl: loopback, lanUrl: lan, tunnelHostname: "device-abc.mixai.ro" },
                     true,
                 ),
-            ).toBe("https://device-abc.muzicai.ro");
+            ).toBe("https://device-abc.mixai.ro");
         });
         it("normalizes a tunnel hostname that already has a scheme/slash", () => {
             expect(
                 pickCompanionUrl(
-                    { apiUrl: null, lanUrl: null, tunnelHostname: "https://device-abc.muzicai.ro/" },
+                    { apiUrl: null, lanUrl: null, tunnelHostname: "https://device-abc.mixai.ro/" },
                     true,
                 ),
-            ).toBe("https://device-abc.muzicai.ro");
+            ).toBe("https://device-abc.mixai.ro");
         });
     });
 
@@ -77,7 +77,7 @@ describe("pickCompanionUrl", () => {
         it("still prefers loopback over the tunnel when co-located", () => {
             expect(
                 pickCompanionUrl(
-                    { apiUrl: loopback, lanUrl: lan, tunnelHostname: "device-abc.muzicai.ro" },
+                    { apiUrl: loopback, lanUrl: lan, tunnelHostname: "device-abc.mixai.ro" },
                     false,
                 ),
             ).toBe(loopback);
@@ -85,10 +85,10 @@ describe("pickCompanionUrl", () => {
         it("falls back to the tunnel when no api/lan url locally", () => {
             expect(
                 pickCompanionUrl(
-                    { apiUrl: null, lanUrl: null, tunnelHostname: "device-abc.muzicai.ro" },
+                    { apiUrl: null, lanUrl: null, tunnelHostname: "device-abc.mixai.ro" },
                     false,
                 ),
-            ).toBe("https://device-abc.muzicai.ro");
+            ).toBe("https://device-abc.mixai.ro");
         });
     });
 });

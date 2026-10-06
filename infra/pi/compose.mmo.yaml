@@ -1,0 +1,33 @@
+# MMO Server on the Raspberry Pi 5 (homepi). Headless Node core, no Electron.
+# Deploy: see infra/pi/README.md
+services:
+  mmo-server:
+    # Override with MMO_IMAGE=mmo-server:local when built on the Pi itself
+    # (scripts/deploy-mmo-server-pi.ps1).
+    image: ${MMO_IMAGE:-ghcr.io/dragoscv/mmo-server:latest}
+    container_name: mmo-server
+    restart: unless-stopped
+    # host networking: mDNS (_mmo-companion._tcp) and SSDP/Cast discovery need
+    # the real LAN interface, and the web app expects port 17899.
+    network_mode: host
+    environment:
+      MMO_HEADLESS: "1"
+      MMO_DATA: /data
+      MMO_PORT: "17899"
+      MMO_MEDIA: /media/Movies,/media/Music
+      TZ: Europe/Bucharest
+      # Home Assistant integration (optional). Values come from ./.env — never commit it.
+      HA_URL: ${HA_URL:-}
+      HA_TOKEN: ${HA_TOKEN:-}
+      # Optional fixed local token for TV/Subsonic clients; if empty the server
+      # generates one on first boot (see /srv/homepi/mmo/config.json).
+      MMO_DEVICE_TOKEN: ${MMO_DEVICE_TOKEN:-}
+    volumes:
+      - /srv/homepi/mmo:/data
+      - /srv/media:/media:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:17899/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

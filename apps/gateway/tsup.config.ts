@@ -10,7 +10,12 @@ export default defineConfig({
     target: "node20",
     platform: "node",
     clean: true,
-    sourcemap: true,
+    // Single-entry server bundle: no code splitting, no minify (readable
+    // stack traces on Cloud Run), sourcemaps only outside production.
+    splitting: false,
+    minify: false,
+    treeshake: true,
+    sourcemap: process.env.NODE_ENV !== "production",
     // Resolve the @mmo/db path alias (tsup/esbuild doesn't read tsconfig
     // paths) to the shared package source so it bundles in.
     esbuildOptions(options) {

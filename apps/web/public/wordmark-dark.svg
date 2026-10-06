@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 120" fill="none" role="img" aria-label="MuzicAI">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 120" fill="none" role="img" aria-label="MixAI">
   <defs>
     <linearGradient id="wmd-mark" x1="0" y1="0" x2="96" y2="96" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#7C5CFF"/>
@@ -23,6 +23,6 @@
   </g>
 
   <text x="124" y="76" font-family="'Space Grotesk', 'Segoe UI', system-ui, sans-serif" font-size="58" font-weight="700" letter-spacing="-1">
-    <tspan fill="#FFFFFF">Muzic</tspan><tspan fill="#22D3EE">AI</tspan>
+    <tspan fill="#FFFFFF">Mix</tspan><tspan fill="#22D3EE">AI</tspan>
   </text>
 </svg>

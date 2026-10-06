@@ -24,7 +24,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import https from "node:https";
-import { app } from "electron";
+import { platform as app } from "../platform";
 import { pushDebugLog } from "../debug-log";
 
 export interface EnvProgress {

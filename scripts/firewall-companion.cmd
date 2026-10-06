@@ -1,0 +1,3 @@
+@echo off
+rem Inbound rules for the MixAI Companion (TCP 17899 API + UDP 5353 mDNS). Elevates via UAC.
+powershell -NoProfile -Command "Start-Process pwsh -Verb RunAs -ArgumentList '-NoProfile','-Command','netsh advfirewall firewall delete rule name=\"mixai-companion-17899\" >nul 2>&1; netsh advfirewall firewall add rule name=\"mixai-companion-17899\" dir=in action=allow protocol=TCP localport=17899 profile=any; netsh advfirewall firewall delete rule name=\"mixai-companion-mdns\" >nul 2>&1; netsh advfirewall firewall add rule name=\"mixai-companion-mdns\" dir=in action=allow protocol=UDP localport=5353 profile=any'"

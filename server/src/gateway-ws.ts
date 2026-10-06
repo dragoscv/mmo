@@ -1,5 +1,5 @@
 /**
- * Companion WebSocket client for the MuzicAI gateway.
+ * Companion WebSocket client for the MixAI gateway.
  *
  * Replaces the 3s HTTP announce poll with a persistent connection when the
  * gateway exposes /ws. Benefits: instant online/offline (the gateway flips

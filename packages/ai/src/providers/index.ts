@@ -1,7 +1,9 @@
 export * from "./types";
+export * from "./codai";
 export * from "./copilot";
 
 import type { ProviderAdapter, ProviderId } from "./types";
+import { codaiAdapter } from "./codai";
 import { copilotAdapter } from "./copilot";
 
 /**
@@ -26,9 +28,10 @@ export class ProviderRegistry {
     }
 }
 
-/** Default registry pre-populated with copilot. Other adapters added in P1. */
+/** Default registry: codai first (ADR-0006), then copilot. Other adapters added in P1. */
 export const defaultProviderRegistry = (() => {
     const r = new ProviderRegistry();
+    r.register(codaiAdapter);
     r.register(copilotAdapter);
     return r;
 })();

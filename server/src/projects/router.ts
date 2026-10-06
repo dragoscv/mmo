@@ -25,7 +25,7 @@
  */
 
 import { Router, type RequestHandler } from "express";
-import { app as electronApp } from "electron";
+import { platform as electronApp } from "../platform";
 import { promises as fs, createReadStream, statSync } from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";

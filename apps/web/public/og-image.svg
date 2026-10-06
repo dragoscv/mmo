@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none" role="img" aria-label="MuzicAI — AI Music Suite">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none" role="img" aria-label="MixAI — AI Music Suite">
   <defs>
     <linearGradient id="og-bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#0A0A0F"/>
@@ -36,7 +36,7 @@
 
   <!-- Wordmark -->
   <text x="110" y="430" font-family="'Space Grotesk','Segoe UI',system-ui,sans-serif" font-size="120" font-weight="700" letter-spacing="-3">
-    <tspan fill="#FFFFFF">Muzic</tspan><tspan fill="#22D3EE">AI</tspan>
+    <tspan fill="#FFFFFF">Mix</tspan><tspan fill="#22D3EE">AI</tspan>
   </text>
 
   <!-- Tagline -->
@@ -46,6 +46,6 @@
 
   <!-- Domain -->
   <text x="114" y="560" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="28" font-weight="600" fill="#7C5CFF" letter-spacing="2">
-    muzicai.ro
+    mixai.ro
   </text>
 </svg>

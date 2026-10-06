@@ -44,7 +44,7 @@ import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, createReadStream, writeFileSync } from "node:fs";
 import path from "node:path";
-import { app } from "electron";
+import { platform as app } from "../platform";
 import { randomUUID, createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import {

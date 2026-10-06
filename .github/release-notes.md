@@ -1,6 +1,6 @@
-## MMO Companion v0.3.3
+## MixAI Companion (MMO Server) v0.3.3
 
-Native low-latency audio engine for the MMO web app (sub-10ms vocal autocorrect on Windows WASAPI / macOS CoreAudio).
+Native low-latency audio engine for the MixAI web app (sub-10ms vocal autocorrect on Windows WASAPI / macOS CoreAudio).
 
 ### Fixes in this release
 
@@ -21,12 +21,12 @@ This build is **ad-hoc signed** but not notarized by Apple. On first launch you 
 
 **Option A — right-click → Open**
 1. Open the DMG, drag the app to `/Applications`.
-2. **Right-click** `MMO Companion` in `/Applications` → **Open**.
+2. **Right-click** `MixAI Companion` in `/Applications` → **Open**.
 3. Click **Open** on the warning dialog. Future launches work normally.
 
 **Option B — Terminal one-liner**
 ```bash
-xattr -dr com.apple.quarantine "/Applications/MMO Companion.app"
+xattr -dr com.apple.quarantine "/Applications/MixAI Companion.app"
 ```
 Then launch normally.
 

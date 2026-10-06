@@ -1,5 +1,5 @@
-import Store from "electron-store";
-import { app } from "electron";
+import { SettingsStore } from "./platform/settings-store";
+import { platform, pinUserDataDir as pinPlatformUserDataDir } from "./platform";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -61,7 +61,7 @@ export interface CompanionSettings {
      *  Run). The device heartbeat + command channel (HTTP announce and
      *  WebSocket) target this instead of the Vercel web app, keeping the
      *  chatty control plane off the serverless hot path. Defaults to the
-    *  https://api.muzicai.ro (Cloud Run custom domain). Falls back to
+    *  https://api.mixai.ro (Cloud Run custom domain). Falls back to
     *  `webAppUrl` only if cleared. */
     gatewayUrl: string;
     /** Origins allowed to call the public /audio/native/* routes without
@@ -94,9 +94,13 @@ const DEFAULTS: CompanionSettings = {
     startMinimized: false,
     serverPort: 17899,
     scanFolders: [],
-    webAppUrl: "https://muzicai.ro",
-    gatewayUrl: "https://api.muzicai.ro",
+    webAppUrl: "https://mixai.ro",
+    gatewayUrl: "https://api.mixai.ro",
     audioOriginAllowlist: [
+        "https://mixai.ro",
+        "https://*.mixai.ro",
+        // Transition: the previous brand domain stays allowed until the
+        // muzicai.ro → mixai.ro redirect is retired.
         "https://muzicai.ro",
         "https://*.muzicai.ro",
         // Local dev: web app's `next dev` / `next start` bind to 13789
@@ -112,24 +116,47 @@ const DEFAULTS: CompanionSettings = {
 };
 
 /**
- * One-time migration across the v1 rebrand (mmo-companion → muzicai-companion).
+ * One-time migration across the rebrands
+ * (mmo-companion → muzicai-companion → mixai-companion).
  *
  * Changing the Electron app/product name moved `userData` to a new directory,
  * orphaning the previous `config.json` — users lost their scan folders, device
  * pairing, tunnel token, etc., which broke audio streaming (403 "Path not in
  * allowed folders") and analyzer pairing. If the NEW config is missing or has
  * never been populated, copy the OLD one over before electron-store loads.
+ * Legacy dirs are tried newest-first (`muzicai-companion`, then
+ * `mmo-companion`); the first one that exists wins.
  *
  * Runs synchronously at import time, guarded so it only ever happens once
  * (a present, non-empty new config short-circuits it).
  */
-function migrateLegacyConfigOnce(): void {
+const LEGACY_USER_DATA_DIRS = ["muzicai-companion", "mmo-companion"] as const;
+
+/**
+ * Electron derives `userData` from package.json `name`. The 2.0 rename to
+ * `mmo-server` would move it a third time, so pin the directory explicitly
+ * to `mixai-companion` (the brand the user sees) before anything reads it.
+ */
+const USER_DATA_DIR_NAME = "mixai-companion";
+function pinUserDataDir(): void {
     try {
-        const newDir = app.getPath("userData");
+        pinPlatformUserDataDir(USER_DATA_DIR_NAME);
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("[store] could not pin userData dir:", e instanceof Error ? e.message : String(e));
+    }
+}
+
+function migrateLegacyConfigOnce(): void {
+    if (!platform.isElectron) return; // headless: MMO_DATA is authoritative, no legacy dirs
+    try {
+        const newDir = platform.getPath("userData");
         const newCfg = path.join(newDir, "config.json");
-        // Find the legacy mmo-companion userData dir as a sibling of the new one.
-        const legacyCfg = path.join(path.dirname(newDir), "mmo-companion", "config.json");
-        if (!fs.existsSync(legacyCfg)) return;
+        // Find a legacy userData dir as a sibling of the new one.
+        const legacyCfg = LEGACY_USER_DATA_DIRS
+            .map((dir) => path.join(path.dirname(newDir), dir, "config.json"))
+            .find((p) => p !== newCfg && fs.existsSync(p));
+        if (!legacyCfg) return;
         const legacy = JSON.parse(fs.readFileSync(legacyCfg, "utf8"));
         if (!legacy || typeof legacy !== "object") return;
 
@@ -171,9 +198,10 @@ function migrateLegacyConfigOnce(): void {
     }
 }
 
+pinUserDataDir();
 migrateLegacyConfigOnce();
 
-export const store = new Store({
+export const store = new SettingsStore<Record<string, unknown>>({
     defaults: {
         ...DEFAULTS,
         deviceToken: "",
@@ -209,10 +237,10 @@ function readScanFolders(): FolderConfig[] {
     return out;
 }
 
-// Ensure the production muzicai.ro origins are always allowed, even when
+// Ensure the production mixai.ro origins are always allowed, even when
 // the user's stored allowlist was created on an older build or while
 // pointing at a different webAppUrl (e.g. local dev / brivio). Without
-// this, fresh deployments to muzicai.ro get CORS-blocked from the
+// this, fresh deployments to mixai.ro get CORS-blocked from the
 // companion until the user manually edits settings.
 function mergeAllowlistWithDefaults(stored: string[] | undefined): string[] {
     const base = stored && stored.length > 0 ? [...stored] : [];

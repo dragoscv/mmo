@@ -1,0 +1,61 @@
+name: MixAI TV (Android) release
+
+on:
+  push:
+    tags:
+      - "tv-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: apps/tv-android
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-35 build-tools;35.0.0 platform-tools"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug + release APKs
+        # Release signing only when the keystore secrets exist; otherwise the
+        # release APK is produced unsigned (app/build.gradle.kts checks TV_KEYSTORE_B64).
+        env:
+          TV_KEYSTORE_B64: ${{ secrets.TV_KEYSTORE_B64 }}
+          TV_KEYSTORE_PASSWORD: ${{ secrets.TV_KEYSTORE_PASSWORD }}
+          TV_KEY_ALIAS: ${{ secrets.TV_KEY_ALIAS }}
+          TV_KEY_PASSWORD: ${{ secrets.TV_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          if [ -z "$TV_KEYSTORE_B64" ]; then echo "::notice::TV_KEYSTORE_B64 absent — release APK will be unsigned"; fi
+          ./gradlew --no-daemon assembleDebug assembleRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mixai-tv-apks
+          path: |
+            apps/tv-android/app/build/outputs/apk/debug/*.apk
+            apps/tv-android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: GitHub release (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/tv-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            apps/tv-android/app/build/outputs/apk/debug/*.apk
+            apps/tv-android/app/build/outputs/apk/release/*.apk
+          generate_release_notes: true
