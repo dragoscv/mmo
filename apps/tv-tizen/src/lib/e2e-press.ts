@@ -64,6 +64,12 @@ export function installE2ePressHook(): void {
                 at: Date.now(),
                 focused: (document.activeElement as HTMLElement | null)?.textContent?.trim().slice(0, 120) ?? null,
                 buttons: Array.from(document.querySelectorAll<HTMLElement>("button,[data-focusable]")).map((b) => b.textContent?.trim().slice(0, 80)).filter(Boolean).slice(0, 40),
+                video: (() => {
+                    const v = document.querySelector("video");
+                    if (!v) return null;
+                    const osd = document.querySelector(".times")?.textContent ?? null;
+                    return { t: v.currentTime, paused: v.paused, ready: v.readyState, w: v.videoWidth, h: v.videoHeight, src: (v.currentSrc || "").replace(/[?&]t=[^&]+/, ""), osd, err: v.error?.code ?? null };
+                })(),
             }),
         }).catch(() => { /* ignore */ });
     }, 1000);

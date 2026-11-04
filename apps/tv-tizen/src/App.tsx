@@ -159,14 +159,21 @@ function AppRoutes() {
         push({ name: "player", item: { kind: "video", video: r.video, ref: r.ref, resumeSec: r.resumeSec } });
     };
     const openTitle = (c: TitleCard) => push({ name: "title", kind: c.kind, tmdbId: c.tmdbId, seed: c });
-    // Debug-only (no-op in production): `open:<kind>:<tmdbId>` from the e2e driver.
+    // Debug-only (no-op in production): `open:<kind>:<tmdbId>` and
+    // `play:<fileId>:<startSec>` (resume test) from the e2e driver.
     useEffect(() => {
         setE2eCommandHandler((cmd) => {
             const m = /^open:(movie|tv):(\d+)$/.exec(cmd);
             if (m) push({ name: "title", kind: m[1] as MediaKind, tmdbId: Number(m[2]) });
+            const p = /^play:([A-Za-z0-9_-]+):(\d+)$/.exec(cmd);
+            if (p && client) {
+                void client.resolveVideo(p[1]!, "")
+                    .then((video) => push({ name: "player", item: { kind: "video", video, resumeSec: Number(p[2]) } }))
+                    .catch(() => undefined);
+            }
         });
         return () => setE2eCommandHandler(null);
-    }, [push]);
+    }, [push, client]);
 
     const playAlbum = (album: SubsonicAlbum, songs: SubsonicSong[], index: number) => {
         const queue: PlayItem[] = songs.map((s) => ({ kind: "audio", song: s, album }));
