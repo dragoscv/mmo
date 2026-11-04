@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.4.0); generator: server/scripts/openapi-kotlin.mjs
+// Source: server/openapi.yaml (info.version 3.5.0); generator: server/scripts/openapi-kotlin.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 @file:Suppress("unused")
 
@@ -652,6 +652,222 @@ data class HubRoom(
     val anchor: JsonObject = JsonObject(emptyMap()),
     val hostConnId: String? = null,
     val members: List<JsonObject> = emptyList(),
+)
+
+@Serializable
+data class AlbumCard(
+    val id: String = "",
+    val name: String = "",
+    val artist: String? = null,
+    val artistId: String? = null,
+    val year: Long? = null,
+    val genre: String? = null,
+    val songCount: Long = 0L,
+    val durationSec: Double = 0.0,
+    val coverArt: String = "",
+    val coverUrlPath: String = "",
+)
+
+@Serializable
+data class TrackCard(
+    val id: String = "",
+    val title: String = "",
+    val artist: String? = null,
+    val artistId: String? = null,
+    val album: String? = null,
+    val albumId: String = "",
+    val track: Long? = null,
+    val disc: Long? = null,
+    val year: Long? = null,
+    val genre: String? = null,
+    val durationSec: Double = 0.0,
+    val format: String = "",
+    val bitrate: Long? = null,
+    val sampleRate: Long? = null,
+    val hasLyrics: Boolean = false,
+    val hasSyncedLyrics: Boolean = false,
+    val plays: Long? = null,
+    val coverArt: String = "",
+    val coverUrlPath: String = "",
+    val streamUrlPath: String = "",
+)
+
+@Serializable
+data class PlaylistCard(
+    val id: String = "",
+    val name: String = "",
+    val songCount: Long = 0L,
+    val durationSec: Double = 0.0,
+    val coverArt: String? = null,
+    val coverUrlPath: String? = null,
+)
+
+@Serializable
+data class GenreCard(
+    val name: String = "",
+    val songCount: Long = 0L,
+    val albumCount: Long = 0L,
+)
+
+@Serializable
+data class MusicHome(
+    val profileId: String = "",
+    val recent: List<AlbumCard> = emptyList(),
+    val newest: List<AlbumCard> = emptyList(),
+    val mostPlayed: List<TrackCard> = emptyList(),
+    val playlists: List<PlaylistCard> = emptyList(),
+    val genres: List<GenreCard> = emptyList(),
+    val randomAlbums: List<AlbumCard> = emptyList(),
+)
+
+@Serializable
+data class ArtistCard(
+    val id: String = "",
+    val name: String = "",
+    val albumCount: Long = 0L,
+    val songCount: Long = 0L,
+    val coverArt: String = "",
+    val coverUrlPath: String = "",
+)
+
+@Serializable
+data class ArtistPage(
+    val total: Long = 0L,
+    val offset: Long = 0L,
+    val limit: Long = 0L,
+    val items: List<ArtistCard> = emptyList(),
+)
+
+@Serializable
+data class ArtistDetail(
+    val artist: ArtistCard = ArtistCard(),
+    val albums: List<AlbumCard> = emptyList(),
+    val topTracks: List<TrackCard> = emptyList(),
+    val similar: List<ArtistCard> = emptyList(),
+)
+
+@Serializable
+data class AlbumDetail(
+    val album: AlbumCard = AlbumCard(),
+    val tracks: List<TrackCard> = emptyList(),
+)
+
+@Serializable
+data class MusicSearch(
+    val query: String = "",
+    val artists: List<ArtistCard> = emptyList(),
+    val albums: List<AlbumCard> = emptyList(),
+    val tracks: List<TrackCard> = emptyList(),
+)
+
+@Serializable
+data class MusicQueue(
+    val profileId: String = "",
+    val trackIds: List<String> = emptyList(),
+    val index: Long = 0L,
+    val positionSec: Double = 0.0,
+    val shuffle: Boolean = false,
+    val repeat: String = "",
+    val updatedAt: Long = 0L,
+)
+
+@Serializable
+data class MusicQueueInput(
+    val trackIds: List<String> = emptyList(),
+    val index: Long? = null,
+    val positionSec: Double? = null,
+    val shuffle: Boolean? = null,
+    val repeat: String? = null,
+)
+
+@Serializable
+data class LyricLine(
+    val timeMs: Long = 0L,
+    val text: String = "",
+)
+
+@Serializable
+data class Lyrics(
+    val trackId: String = "",
+    val synced: List<LyricLine>? = null,
+    val plain: String? = null,
+    val source: String = "",
+)
+
+@Serializable
+data class MediaStats(
+    val year: Long = 0L,
+    val profileId: String = "",
+    val watch: JsonObject = JsonObject(emptyMap()),
+    val listen: JsonObject = JsonObject(emptyMap()),
+)
+
+@Serializable
+data class LiveTvChannel(
+    val id: String = "",
+    val sourceId: String = "",
+    val number: String? = null,
+    val name: String = "",
+    val logo: String? = null,
+    val group: String? = null,
+    val tvgId: String? = null,
+    val archiveDays: Long = 0L,
+    val catchup: Boolean = false,
+    val hidden: Boolean = false,
+    val sort: Long? = null,
+    val favourite: Boolean = false,
+)
+
+@Serializable
+data class LiveTvProgramme(
+    val channelId: String = "",
+    val start: Long = 0L,
+    val stop: Long = 0L,
+    val title: String = "",
+    val subtitle: String? = null,
+    val description: String? = null,
+    val category: String? = null,
+    val episodeNum: String? = null,
+    val icon: String? = null,
+)
+
+@Serializable
+data class LiveTvRecording(
+    val id: String = "",
+    val channelId: String = "",
+    val channelName: String? = null,
+    val title: String = "",
+    val start: Long = 0L,
+    val stop: Long = 0L,
+    val paddingBeforeSec: Long? = null,
+    val paddingAfterSec: Long? = null,
+    val status: String = "",
+    val path: String? = null,
+    val error: String? = null,
+    val ruleId: String? = null,
+    val createdAt: Long = 0L,
+    val conflict: Boolean = false,
+)
+
+@Serializable
+data class LiveTvSource(
+    val id: String = "",
+    val kind: String = "",
+    val name: String = "",
+    val url: String = "",
+    val xmltvUrl: String? = null,
+    val username: String? = null,
+    val hasPassword: Boolean = false,
+    val enabled: Boolean = false,
+    val refreshHours: Long = 0L,
+    val lastRefresh: Long? = null,
+    val lastError: String? = null,
+    val channelCount: Long = 0L,
+    val guideRefreshedAt: Long? = null,
+    val guideError: String? = null,
+    val tunerLimit: Long = 0L,
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L,
 )
 
 @Serializable

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.5.0
+  version: 3.6.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -87,6 +87,12 @@ tags:
     description: OpenSubsonic-compatible API.
   - name: media
     description: Media Home brain — TMDB recommendations, streaming availability, watch progress, local library index.
+  - name: music
+    description: Music browse for TV/web (albums, artists, queue, lyrics) over the Subsonic library.
+  - name: hub
+    description: Device registry, remote control and Watch Together (WS /hub).
+  - name: livetv
+    description: Live TV / IPTV / DVR — user-supplied M3U/XMLTV, Xtream and HDHomeRun sources.
 security:
   - deviceToken: []
 paths:
@@ -5090,6 +5096,554 @@ paths:
                   members: { type: integer }
         '404': { $ref: '#/components/responses/ErrorJson' }
 
+  /media/music/home:
+    get:
+      operationId: musicHome
+      tags: [music]
+      summary: "Music home rows for a profile"
+      parameters:
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MusicHome' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/music/artists:
+    get:
+      operationId: musicArtists
+      tags: [music]
+      summary: "Artists A–Z (paged)"
+      parameters:
+        - { name: letter, in: query, schema: { type: string } }
+        - { name: offset, in: query, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArtistPage' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/music/artists/{id}:
+    get:
+      operationId: musicArtist
+      tags: [music]
+      summary: "Artist with albums, top tracks, similar artists"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArtistDetail' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/music/albums/{id}:
+    get:
+      operationId: musicAlbum
+      tags: [music]
+      summary: "Album with tracks"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlbumDetail' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/music/genres:
+    get:
+      operationId: musicGenres
+      tags: [music]
+      summary: "Genres with counts"
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, required: [genres], properties: { genres: { type: array, items: { $ref: '#/components/schemas/GenreCard' } } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/music/genres/{name}:
+    get:
+      operationId: musicGenre
+      tags: [music]
+      summary: "Albums of a genre (paged)"
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: offset, in: query, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GenreAlbums' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/music/search:
+    get:
+      operationId: musicSearch
+      tags: [music]
+      summary: "Search artists, albums and tracks (diacritic-insensitive)"
+      parameters:
+        - { name: q, in: query, schema: { type: string }, required: true }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MusicSearch' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/music/queue:
+    get:
+      operationId: musicGetQueue
+      tags: [music]
+      summary: "Play queue of a profile"
+      parameters:
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MusicQueue' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      operationId: musicSetQueue
+      tags: [music]
+      summary: "Replace the play queue"
+      parameters:
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MusicQueueInput' }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MusicQueue' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/music/lyrics/{trackId}:
+    get:
+      operationId: musicLyrics
+      tags: [music]
+      summary: "Synced (LRC) or plain lyrics"
+      parameters:
+        - { name: trackId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lyrics' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/stats:
+    get:
+      operationId: mediaStats
+      tags: [media]
+      summary: "Year in review for a profile"
+      parameters:
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+        - { name: year, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaStats' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /livetv/sources:
+    get:
+      operationId: liveTvSources
+      tags: [livetv]
+      summary: "IPTV / tuner sources (passwords masked)"
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, required: [sources], properties: { sources: { type: array, items: { $ref: '#/components/schemas/LiveTvSource' } } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      operationId: liveTvCreateSource
+      tags: [livetv]
+      summary: "Add a source (M3U, Xtream, HDHomeRun); first refresh runs in the background"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LiveTvSourceInput' }
+      responses:
+        '201':
+          description: "Created"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LiveTvSource' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /livetv/sources/{id}:
+    patch:
+      operationId: liveTvUpdateSource
+      tags: [livetv]
+      summary: "Update a source (password \"\" clears, omitted keeps)"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LiveTvSourceInput' }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LiveTvSource' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+    delete:
+      operationId: liveTvDeleteSource
+      tags: [livetv]
+      summary: "Delete a source and its channels"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /livetv/sources/{id}/test:
+    post:
+      operationId: liveTvTestSource
+      tags: [livetv]
+      summary: "Test a source without saving channels"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, required: [ok, channelCount], properties: { ok: { type: boolean }, channelCount: { type: integer }, error: { type: [string, 'null'] }, info: { type: object, additionalProperties: true } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /livetv/sources/{id}/refresh:
+    post:
+      operationId: liveTvRefreshSource
+      tags: [livetv]
+      summary: "Refresh channels and guide now"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /livetv/channels:
+    get:
+      operationId: liveTvChannels
+      tags: [livetv]
+      summary: "Channels (filter by group, favourites of a profile, source)"
+      parameters:
+        - { name: group, in: query, schema: { type: string } }
+        - { name: profile, in: query, schema: { type: string } }
+        - { name: favourites, in: query, schema: { type: string } }
+        - { name: hidden, in: query, schema: { type: string } }
+        - { name: source, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, required: [channels], properties: { channels: { type: array, items: { $ref: '#/components/schemas/LiveTvChannel' } } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /livetv/channels/{id}:
+    patch:
+      operationId: liveTvUpdateChannel
+      tags: [livetv]
+      summary: "Hide / reorder / renumber a channel"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { hidden: { type: boolean }, sort: { type: [integer, 'null'] }, number: { type: [string, 'null'] } } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LiveTvChannel' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /livetv/channels/{id}/favourite:
+    put:
+      operationId: liveTvFavourite
+      tags: [livetv]
+      summary: "Mark a channel favourite for a profile"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: profile, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, favourite: { type: boolean } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+    delete:
+      operationId: liveTvUnfavourite
+      tags: [livetv]
+      summary: "Remove a favourite"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: profile, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, favourite: { type: boolean } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /livetv/groups:
+    get:
+      operationId: liveTvGroups
+      tags: [livetv]
+      summary: "Channel groups with counts"
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, required: [groups], properties: { groups: { type: array, items: { type: object, required: [name, count], properties: { name: { type: string }, count: { type: integer } } } } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /livetv/guide:
+    get:
+      operationId: liveTvGuide
+      tags: [livetv]
+      summary: "EPG window (epoch ms, max 48 h; default now-1 h → +12 h)"
+      parameters:
+        - { name: from, in: query, schema: { type: integer } }
+        - { name: to, in: query, schema: { type: integer } }
+        - { name: channels, in: query, schema: { type: string }, description: Comma-separated channel ids }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, required: [from, to, programmes], properties: { from: { type: integer }, to: { type: integer }, programmes: { type: array, items: { $ref: '#/components/schemas/LiveTvProgramme' } } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /livetv/now:
+    get:
+      operationId: liveTvNow
+      tags: [livetv]
+      summary: "Now / next per channel"
+      parameters:
+        - { name: channels, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, required: [now, channels], properties: { now: { type: integer }, channels: { type: array, items: { type: object, required: [channelId], properties: { channelId: { type: string }, now: { oneOf: [{ $ref: '#/components/schemas/LiveTvProgramme' }, { type: 'null' }] }, next: { oneOf: [{ $ref: '#/components/schemas/LiveTvProgramme' }, { type: 'null' }] } } } } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /livetv/stream/{channelId}:
+    get:
+      operationId: liveTvStream
+      tags: [livetv]
+      summary: "302 to the channel stream; ?proxy=1 pipes the bytes (copy, never transcoded)"
+      parameters:
+        - { name: channelId, in: path, required: true, schema: { type: string } }
+        - { name: proxy, in: query, schema: { type: string } }
+        - { $ref: '#/components/parameters/QueryT' }
+      responses:
+        '302':
+          description: "Redirect to the upstream stream"
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '502': { $ref: '#/components/responses/ErrorJson' }
+
+  /livetv/catchup/{channelId}:
+    get:
+      operationId: liveTvCatchup
+      tags: [livetv]
+      summary: "302 to a catch-up (timeshift) URL"
+      parameters:
+        - { name: channelId, in: path, required: true, schema: { type: string } }
+        - { name: start, in: query, schema: { type: integer }, required: true }
+        - { name: duration, in: query, schema: { type: integer }, required: true }
+        - { $ref: '#/components/parameters/QueryT' }
+      responses:
+        '302':
+          description: "Redirect"
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '409': { $ref: '#/components/responses/ErrorJson' }
+
+  /livetv/recordings:
+    get:
+      operationId: liveTvRecordings
+      tags: [livetv]
+      summary: "DVR recordings (scheduled, running, done)"
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, required: [recordings], properties: { recordings: { type: array, items: { $ref: '#/components/schemas/LiveTvRecording' } } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      operationId: liveTvRecord
+      tags: [livetv]
+      summary: "Schedule a recording (times or a guide programme); conflicts flagged, never dropped"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [channelId], properties: { channelId: { type: string }, start: { type: integer }, stop: { type: integer }, title: { type: string }, programme: { oneOf: [{ type: integer }, { type: object, properties: { start: { type: integer } } }] }, paddingBeforeSec: { type: integer }, paddingAfterSec: { type: integer } } }
+      responses:
+        '201':
+          description: "Scheduled"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LiveTvRecording' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /livetv/recordings/{id}:
+    delete:
+      operationId: liveTvDeleteRecording
+      tags: [livetv]
+      summary: "Cancel a scheduled/running recording or delete a finished one"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, status: { type: string }, deleted: { type: boolean } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /livetv/rules:
+    get:
+      operationId: liveTvRules
+      tags: [livetv]
+      summary: "Series recording rules"
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, required: [rules], properties: { rules: { type: array, items: { $ref: '#/components/schemas/LiveTvRule' } } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      operationId: liveTvCreateRule
+      tags: [livetv]
+      summary: "Add a series rule (title match, optional channel)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [titleMatch], properties: { titleMatch: { type: string, minLength: 2, maxLength: 200 }, channelId: { type: [string, 'null'] }, paddingBeforeSec: { type: integer }, paddingAfterSec: { type: integer }, keepLast: { type: integer }, enabled: { type: boolean } } }
+      responses:
+        '201':
+          description: "Created"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LiveTvRule' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /livetv/rules/{id}:
+    delete:
+      operationId: liveTvDeleteRule
+      tags: [livetv]
+      summary: "Delete a series rule"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+
 components:
   securitySchemes:
     deviceToken:
@@ -6673,3 +7227,271 @@ components:
                   oneOf:
                     - { type: 'null' }
                     - { $ref: '#/components/schemas/MediaSyncResult' }
+    AlbumCard:
+      type: object
+      required: [id, name, artist, artistId, songCount, durationSec, coverArt, coverUrlPath]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        artist: { type: [string, 'null'] }
+        artistId: { type: [string, 'null'] }
+        year: { type: [integer, 'null'] }
+        genre: { type: [string, 'null'] }
+        songCount: { type: integer }
+        durationSec: { type: number }
+        coverArt: { type: string }
+        coverUrlPath: { type: string, description: 'Relative to the server origin; append the Subsonic apiKey.' }
+    TrackCard:
+      type: object
+      required: [id, title, albumId, durationSec, format, hasLyrics, hasSyncedLyrics, coverArt, coverUrlPath, streamUrlPath]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        artist: { type: [string, 'null'] }
+        artistId: { type: [string, 'null'] }
+        album: { type: [string, 'null'] }
+        albumId: { type: string }
+        track: { type: [integer, 'null'] }
+        disc: { type: [integer, 'null'] }
+        year: { type: [integer, 'null'] }
+        genre: { type: [string, 'null'] }
+        durationSec: { type: number }
+        format: { type: string }
+        bitrate: { type: [integer, 'null'] }
+        sampleRate: { type: [integer, 'null'] }
+        hasLyrics: { type: boolean }
+        hasSyncedLyrics: { type: boolean }
+        plays: { type: integer }
+        coverArt: { type: string }
+        coverUrlPath: { type: string }
+        streamUrlPath: { type: string }
+    ArtistCard:
+      type: object
+      required: [id, name, albumCount, songCount, coverArt, coverUrlPath]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        albumCount: { type: integer }
+        songCount: { type: integer }
+        coverArt: { type: string }
+        coverUrlPath: { type: string }
+    PlaylistCard:
+      type: object
+      required: [id, name, songCount, durationSec, coverArt, coverUrlPath]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        songCount: { type: integer }
+        durationSec: { type: number }
+        coverArt: { type: [string, 'null'] }
+        coverUrlPath: { type: [string, 'null'] }
+    GenreCard:
+      type: object
+      required: [name, songCount, albumCount]
+      properties:
+        name: { type: string }
+        songCount: { type: integer }
+        albumCount: { type: integer }
+    MusicHome:
+      type: object
+      required: [profileId, recent, newest, mostPlayed, playlists, genres, randomAlbums]
+      properties:
+        profileId: { type: string }
+        recent: { type: array, items: { $ref: '#/components/schemas/AlbumCard' } }
+        newest: { type: array, items: { $ref: '#/components/schemas/AlbumCard' } }
+        mostPlayed: { type: array, items: { $ref: '#/components/schemas/TrackCard' } }
+        playlists: { type: array, items: { $ref: '#/components/schemas/PlaylistCard' } }
+        genres: { type: array, items: { $ref: '#/components/schemas/GenreCard' } }
+        randomAlbums: { type: array, items: { $ref: '#/components/schemas/AlbumCard' } }
+    ArtistPage:
+      type: object
+      required: [total, offset, limit, items]
+      properties:
+        total: { type: integer }
+        offset: { type: integer }
+        limit: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/ArtistCard' } }
+    ArtistDetail:
+      type: object
+      required: [artist, albums, topTracks, similar]
+      properties:
+        artist: { $ref: '#/components/schemas/ArtistCard' }
+        albums: { type: array, items: { $ref: '#/components/schemas/AlbumCard' } }
+        topTracks: { type: array, items: { $ref: '#/components/schemas/TrackCard' } }
+        similar: { type: array, items: { $ref: '#/components/schemas/ArtistCard' } }
+    AlbumDetail:
+      type: object
+      required: [album, tracks]
+      properties:
+        album: { $ref: '#/components/schemas/AlbumCard' }
+        tracks: { type: array, items: { $ref: '#/components/schemas/TrackCard' } }
+    GenreAlbums:
+      type: object
+      required: [genre, total, offset, limit, items]
+      properties:
+        genre: { type: string }
+        total: { type: integer }
+        offset: { type: integer }
+        limit: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/AlbumCard' } }
+    MusicSearch:
+      type: object
+      required: [query, artists, albums, tracks]
+      properties:
+        query: { type: string }
+        artists: { type: array, items: { $ref: '#/components/schemas/ArtistCard' } }
+        albums: { type: array, items: { $ref: '#/components/schemas/AlbumCard' } }
+        tracks: { type: array, items: { $ref: '#/components/schemas/TrackCard' } }
+    MusicQueueInput:
+      type: object
+      required: [trackIds]
+      properties:
+        trackIds: { type: array, maxItems: 2000, items: { type: string } }
+        index: { type: integer }
+        positionSec: { type: number }
+        shuffle: { type: boolean }
+        repeat: { type: string, enum: ['off', all, one] }
+    MusicQueue:
+      type: object
+      required: [profileId, trackIds, index, positionSec, shuffle, repeat, updatedAt]
+      properties:
+        profileId: { type: string }
+        trackIds: { type: array, items: { type: string } }
+        index: { type: integer }
+        positionSec: { type: number }
+        shuffle: { type: boolean }
+        repeat: { type: string, enum: ['off', all, one] }
+        updatedAt: { type: integer }
+    LyricLine:
+      type: object
+      required: [timeMs, text]
+      properties:
+        timeMs: { type: integer }
+        text: { type: string }
+    Lyrics:
+      type: object
+      required: [trackId, synced, plain, source]
+      properties:
+        trackId: { type: string }
+        synced: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/LyricLine' } }, { type: 'null' }] }
+        plain: { type: [string, 'null'] }
+        source: { type: string, enum: [embedded, sidecar, lrclib, none] }
+    MediaStats:
+      type: object
+      required: [year, profileId, watch, listen]
+      properties:
+        year: { type: integer }
+        profileId: { type: string }
+        watch:
+          type: object
+          required: [hours, titles, movies, episodes, completed, topGenres, longestStreakDays, byMonth, topTitles]
+          properties:
+            hours: { type: number }
+            titles: { type: integer }
+            movies: { type: integer }
+            episodes: { type: integer }
+            completed: { type: integer }
+            topGenres: { type: array, items: { type: object, required: [id, name, hours], properties: { id: { type: integer }, name: { type: string }, hours: { type: number } } } }
+            longestStreakDays: { type: integer }
+            byMonth: { type: array, items: { type: number } }
+            topTitles: { type: array, items: { type: object, required: [kind, tmdbId, title, hours], properties: { kind: { type: string }, tmdbId: { type: integer }, title: { type: string }, hours: { type: number } } } }
+        listen:
+          type: object
+          required: [hours, plays, topTracks, byMonth]
+          properties:
+            hours: { type: number }
+            plays: { type: integer }
+            topTracks: { type: array, items: { type: object, required: [trackKey, plays], properties: { trackKey: { type: string }, plays: { type: integer } } } }
+            byMonth: { type: array, items: { type: number } }
+    LiveTvSourceInput:
+      type: object
+      properties:
+        kind: { type: string, enum: [m3u, xtream, hdhomerun] }
+        name: { type: string }
+        url: { type: string, description: 'M3U URL or local path, Xtream host, or HDHomeRun base URL.' }
+        xmltvUrl: { type: [string, 'null'] }
+        username: { type: [string, 'null'] }
+        password: { type: [string, 'null'] }
+        enabled: { type: boolean }
+        refreshHours: { type: integer, minimum: 1, maximum: 720 }
+        tunerLimit: { type: integer, minimum: 1, maximum: 64 }
+    LiveTvSource:
+      type: object
+      required: [id, kind, name, url, hasPassword, enabled, refreshHours, channelCount, tunerLimit, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [m3u, xtream, hdhomerun] }
+        name: { type: string }
+        url: { type: string, description: Credentials masked. }
+        xmltvUrl: { type: [string, 'null'] }
+        username: { type: [string, 'null'] }
+        hasPassword: { type: boolean }
+        enabled: { type: boolean }
+        refreshHours: { type: integer }
+        lastRefresh: { type: [integer, 'null'] }
+        lastError: { type: [string, 'null'] }
+        channelCount: { type: integer }
+        guideRefreshedAt: { type: [integer, 'null'] }
+        guideError: { type: [string, 'null'] }
+        tunerLimit: { type: integer }
+        createdAt: { type: integer }
+        updatedAt: { type: integer }
+    LiveTvChannel:
+      type: object
+      required: [id, sourceId, name, archiveDays, catchup, hidden, favourite]
+      properties:
+        id: { type: string }
+        sourceId: { type: string }
+        number: { type: [string, 'null'] }
+        name: { type: string }
+        logo: { type: [string, 'null'] }
+        group: { type: [string, 'null'] }
+        tvgId: { type: [string, 'null'] }
+        archiveDays: { type: integer }
+        catchup: { type: boolean }
+        hidden: { type: boolean }
+        sort: { type: [integer, 'null'] }
+        favourite: { type: boolean }
+    LiveTvProgramme:
+      type: object
+      required: [channelId, start, stop, title]
+      properties:
+        channelId: { type: string }
+        start: { type: integer }
+        stop: { type: integer }
+        title: { type: string }
+        subtitle: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        category: { type: [string, 'null'] }
+        episodeNum: { type: [string, 'null'] }
+        icon: { type: [string, 'null'] }
+    LiveTvRecording:
+      type: object
+      required: [id, channelId, title, start, stop, status, createdAt, conflict]
+      properties:
+        id: { type: string }
+        channelId: { type: string }
+        channelName: { type: [string, 'null'] }
+        title: { type: string }
+        start: { type: integer }
+        stop: { type: integer }
+        paddingBeforeSec: { type: integer }
+        paddingAfterSec: { type: integer }
+        status: { type: string, enum: [scheduled, recording, done, failed, cancelled] }
+        path: { type: [string, 'null'] }
+        error: { type: [string, 'null'] }
+        ruleId: { type: [string, 'null'] }
+        createdAt: { type: integer }
+        conflict: { type: boolean }
+    LiveTvRule:
+      type: object
+      required: [id, titleMatch, paddingBeforeSec, paddingAfterSec, keepLast, enabled, createdAt]
+      properties:
+        id: { type: string }
+        titleMatch: { type: string }
+        channelId: { type: [string, 'null'] }
+        paddingBeforeSec: { type: integer }
+        paddingAfterSec: { type: integer }
+        keepLast: { type: integer }
+        enabled: { type: boolean }
+        createdAt: { type: integer }

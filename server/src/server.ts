@@ -39,6 +39,7 @@ import { createCastRouter } from "./cast/router";
 import { createPairRouter } from "./pair/router";
 import { createMediaModule, type MediaModule } from "./media";
 import { createHub, type Hub } from "./hub";
+import { createLiveTvModule, type LiveTvModule } from "./livetv";
 import { getMeta as getMediaMeta, setMeta as setMediaMeta } from "./media/db";
 import { createMediaLibraryHooks, setMediaLibraryHooks } from "./media/library-hooks";
 import { buildCompanionMetrics } from "./metrics";
@@ -98,6 +99,7 @@ function splatParam(value: unknown): string {
 let httpServer: http.Server | null = null;
 let mediaModule: MediaModule | null = null;
 let hub: Hub | null = null;
+let liveTv: LiveTvModule | null = null;
 let wss: WebSocketServer | null = null;
 let serverPort = 17899;
 const wsClients = new Set<WebSocket>();
@@ -1238,6 +1240,26 @@ export async function startServer(): Promise<void> {
         });
     }
     app.use("/hub", hub.router);
+
+    // ─── Live TV / IPTV / DVR (WP16-12..16) ──────────────────────────────
+    //
+    // `server/src/livetv/`: user-added M3U/XMLTV, Xtream and HDHomeRun
+    // sources, EPG, catch-up, DVR (`-c copy` only). Recordings land in
+    // the first "recordings" scan folder, else <userData>/recordings.
+    if (!liveTv) {
+        const recFolder = getSettings().scanFolders.find((f) => f.kind === "recordings")?.path;
+        liveTv = createLiveTvModule({
+            userDataDir: platform.getPath("userData"),
+            recordingsDir: recFolder ? path.join(recFolder, "Live TV") : path.join(platform.getPath("userData"), "recordings"),
+            log: {
+                debug: () => undefined,
+                info: (msg: string, fields?: Record<string, unknown>) => log("info", msg, fields ?? ""),
+                warn: (msg: string, fields?: Record<string, unknown>, err?: unknown) => log("warn", msg, fields ?? "", err ?? ""),
+                error: (msg: string, err: unknown, fields?: Record<string, unknown>) => log("error", msg, err, fields ?? ""),
+            },
+        });
+    }
+    app.use("/livetv", authMiddleware, liveTv.router);
 
     // ─── Native low-latency audio engine ─────────────────────────────────
     //

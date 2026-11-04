@@ -14,6 +14,7 @@ import { MediaSyncClient } from "./sync-client";
 import { createMediaRouter } from "./routes";
 import { ProfileStore } from "./profiles";
 import { WatchlistStore } from "./watchlist";
+import { MusicService } from "./music";
 import type { MediaLogger } from "./types";
 
 export interface MediaModuleOptions {
@@ -57,6 +58,7 @@ export function createMediaModule(opts: MediaModuleOptions): MediaModule {
     const library = new LibraryIndex(db, tmdb, opts.log);
     const profiles = new ProfileStore(db);
     const watchlist = new WatchlistStore(db, progress);
+    const music = new MusicService({ mediaDb: db });
     const sync = opts.sync
         ? new MediaSyncClient({
             db, progress, log: opts.log,
@@ -66,7 +68,7 @@ export function createMediaModule(opts: MediaModuleOptions): MediaModule {
         })
         : null;
     const router = createMediaRouter({
-        db, tmdb, registry, availability, progress, library, profiles, watchlist, sync: sync ?? undefined, region, log: opts.log,
+        db, tmdb, registry, availability, progress, library, profiles, watchlist, music, sync: sync ?? undefined, region, log: opts.log,
         getServerId: opts.getServerId, getServerName: opts.getServerName,
     });
 

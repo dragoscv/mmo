@@ -3403,6 +3403,454 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/music/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Music home rows for a profile */
+        get: operations["musicHome"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/artists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Artists A–Z (paged) */
+        get: operations["musicArtists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/artists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Artist with albums, top tracks, similar artists */
+        get: operations["musicArtist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/albums/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Album with tracks */
+        get: operations["musicAlbum"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/genres": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Genres with counts */
+        get: operations["musicGenres"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/genres/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Albums of a genre (paged) */
+        get: operations["musicGenre"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search artists, albums and tracks (diacritic-insensitive) */
+        get: operations["musicSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Play queue of a profile */
+        get: operations["musicGetQueue"];
+        /** Replace the play queue */
+        put: operations["musicSetQueue"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/lyrics/{trackId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Synced (LRC) or plain lyrics */
+        get: operations["musicLyrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Year in review for a profile */
+        get: operations["mediaStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** IPTV / tuner sources (passwords masked) */
+        get: operations["liveTvSources"];
+        put?: never;
+        /** Add a source (M3U, Xtream, HDHomeRun); first refresh runs in the background */
+        post: operations["liveTvCreateSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/sources/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a source and its channels */
+        delete: operations["liveTvDeleteSource"];
+        options?: never;
+        head?: never;
+        /** Update a source (password "" clears, omitted keeps) */
+        patch: operations["liveTvUpdateSource"];
+        trace?: never;
+    };
+    "/livetv/sources/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test a source without saving channels */
+        post: operations["liveTvTestSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/sources/{id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh channels and guide now */
+        post: operations["liveTvRefreshSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Channels (filter by group, favourites of a profile, source) */
+        get: operations["liveTvChannels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/channels/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Hide / reorder / renumber a channel */
+        patch: operations["liveTvUpdateChannel"];
+        trace?: never;
+    };
+    "/livetv/channels/{id}/favourite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Mark a channel favourite for a profile */
+        put: operations["liveTvFavourite"];
+        post?: never;
+        /** Remove a favourite */
+        delete: operations["liveTvUnfavourite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Channel groups with counts */
+        get: operations["liveTvGroups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/guide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** EPG window (epoch ms, max 48 h; default now-1 h → +12 h) */
+        get: operations["liveTvGuide"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Now / next per channel */
+        get: operations["liveTvNow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/stream/{channelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 302 to the channel stream; ?proxy=1 pipes the bytes (copy, never transcoded) */
+        get: operations["liveTvStream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/catchup/{channelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 302 to a catch-up (timeshift) URL */
+        get: operations["liveTvCatchup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/recordings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** DVR recordings (scheduled, running, done) */
+        get: operations["liveTvRecordings"];
+        put?: never;
+        /** Schedule a recording (times or a guide programme); conflicts flagged, never dropped */
+        post: operations["liveTvRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/recordings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Cancel a scheduled/running recording or delete a finished one */
+        delete: operations["liveTvDeleteRecording"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Series recording rules */
+        get: operations["liveTvRules"];
+        put?: never;
+        /** Add a series rule (title match, optional channel) */
+        post: operations["liveTvCreateRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a series rule */
+        delete: operations["liveTvDeleteRule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4677,6 +5125,248 @@ export interface components {
                 lastPushedRevision: number;
                 last: null | components["schemas"]["MediaSyncResult"];
             };
+        };
+        AlbumCard: {
+            id: string;
+            name: string;
+            artist: string | null;
+            artistId: string | null;
+            year?: number | null;
+            genre?: string | null;
+            songCount: number;
+            durationSec: number;
+            coverArt: string;
+            /** @description Relative to the server origin; append the Subsonic apiKey. */
+            coverUrlPath: string;
+        };
+        TrackCard: {
+            id: string;
+            title: string;
+            artist?: string | null;
+            artistId?: string | null;
+            album?: string | null;
+            albumId: string;
+            track?: number | null;
+            disc?: number | null;
+            year?: number | null;
+            genre?: string | null;
+            durationSec: number;
+            format: string;
+            bitrate?: number | null;
+            sampleRate?: number | null;
+            hasLyrics: boolean;
+            hasSyncedLyrics: boolean;
+            plays?: number;
+            coverArt: string;
+            coverUrlPath: string;
+            streamUrlPath: string;
+        };
+        ArtistCard: {
+            id: string;
+            name: string;
+            albumCount: number;
+            songCount: number;
+            coverArt: string;
+            coverUrlPath: string;
+        };
+        PlaylistCard: {
+            id: string;
+            name: string;
+            songCount: number;
+            durationSec: number;
+            coverArt: string | null;
+            coverUrlPath: string | null;
+        };
+        GenreCard: {
+            name: string;
+            songCount: number;
+            albumCount: number;
+        };
+        MusicHome: {
+            profileId: string;
+            recent: components["schemas"]["AlbumCard"][];
+            newest: components["schemas"]["AlbumCard"][];
+            mostPlayed: components["schemas"]["TrackCard"][];
+            playlists: components["schemas"]["PlaylistCard"][];
+            genres: components["schemas"]["GenreCard"][];
+            randomAlbums: components["schemas"]["AlbumCard"][];
+        };
+        ArtistPage: {
+            total: number;
+            offset: number;
+            limit: number;
+            items: components["schemas"]["ArtistCard"][];
+        };
+        ArtistDetail: {
+            artist: components["schemas"]["ArtistCard"];
+            albums: components["schemas"]["AlbumCard"][];
+            topTracks: components["schemas"]["TrackCard"][];
+            similar: components["schemas"]["ArtistCard"][];
+        };
+        AlbumDetail: {
+            album: components["schemas"]["AlbumCard"];
+            tracks: components["schemas"]["TrackCard"][];
+        };
+        GenreAlbums: {
+            genre: string;
+            total: number;
+            offset: number;
+            limit: number;
+            items: components["schemas"]["AlbumCard"][];
+        };
+        MusicSearch: {
+            query: string;
+            artists: components["schemas"]["ArtistCard"][];
+            albums: components["schemas"]["AlbumCard"][];
+            tracks: components["schemas"]["TrackCard"][];
+        };
+        MusicQueueInput: {
+            trackIds: string[];
+            index?: number;
+            positionSec?: number;
+            shuffle?: boolean;
+            /** @enum {string} */
+            repeat?: "off" | "all" | "one";
+        };
+        MusicQueue: {
+            profileId: string;
+            trackIds: string[];
+            index: number;
+            positionSec: number;
+            shuffle: boolean;
+            /** @enum {string} */
+            repeat: "off" | "all" | "one";
+            updatedAt: number;
+        };
+        LyricLine: {
+            timeMs: number;
+            text: string;
+        };
+        Lyrics: {
+            trackId: string;
+            synced: components["schemas"]["LyricLine"][] | null;
+            plain: string | null;
+            /** @enum {string} */
+            source: "embedded" | "sidecar" | "lrclib" | "none";
+        };
+        MediaStats: {
+            year: number;
+            profileId: string;
+            watch: {
+                hours: number;
+                titles: number;
+                movies: number;
+                episodes: number;
+                completed: number;
+                topGenres: {
+                    id: number;
+                    name: string;
+                    hours: number;
+                }[];
+                longestStreakDays: number;
+                byMonth: number[];
+                topTitles: {
+                    kind: string;
+                    tmdbId: number;
+                    title: string;
+                    hours: number;
+                }[];
+            };
+            listen: {
+                hours: number;
+                plays: number;
+                topTracks: {
+                    trackKey: string;
+                    plays: number;
+                }[];
+                byMonth: number[];
+            };
+        };
+        LiveTvSourceInput: {
+            /** @enum {string} */
+            kind?: "m3u" | "xtream" | "hdhomerun";
+            name?: string;
+            /** @description M3U URL or local path, Xtream host, or HDHomeRun base URL. */
+            url?: string;
+            xmltvUrl?: string | null;
+            username?: string | null;
+            password?: string | null;
+            enabled?: boolean;
+            refreshHours?: number;
+            tunerLimit?: number;
+        };
+        LiveTvSource: {
+            id: string;
+            /** @enum {string} */
+            kind: "m3u" | "xtream" | "hdhomerun";
+            name: string;
+            /** @description Credentials masked. */
+            url: string;
+            xmltvUrl?: string | null;
+            username?: string | null;
+            hasPassword: boolean;
+            enabled: boolean;
+            refreshHours: number;
+            lastRefresh?: number | null;
+            lastError?: string | null;
+            channelCount: number;
+            guideRefreshedAt?: number | null;
+            guideError?: string | null;
+            tunerLimit: number;
+            createdAt: number;
+            updatedAt: number;
+        };
+        LiveTvChannel: {
+            id: string;
+            sourceId: string;
+            number?: string | null;
+            name: string;
+            logo?: string | null;
+            group?: string | null;
+            tvgId?: string | null;
+            archiveDays: number;
+            catchup: boolean;
+            hidden: boolean;
+            sort?: number | null;
+            favourite: boolean;
+        };
+        LiveTvProgramme: {
+            channelId: string;
+            start: number;
+            stop: number;
+            title: string;
+            subtitle?: string | null;
+            description?: string | null;
+            category?: string | null;
+            episodeNum?: string | null;
+            icon?: string | null;
+        };
+        LiveTvRecording: {
+            id: string;
+            channelId: string;
+            channelName?: string | null;
+            title: string;
+            start: number;
+            stop: number;
+            paddingBeforeSec?: number;
+            paddingAfterSec?: number;
+            /** @enum {string} */
+            status: "scheduled" | "recording" | "done" | "failed" | "cancelled";
+            path?: string | null;
+            error?: string | null;
+            ruleId?: string | null;
+            createdAt: number;
+            conflict: boolean;
+        };
+        LiveTvRule: {
+            id: string;
+            titleMatch: string;
+            channelId?: string | null;
+            paddingBeforeSec: number;
+            paddingAfterSec: number;
+            keepLast: number;
+            enabled: boolean;
+            createdAt: number;
         };
     };
     responses: {
@@ -11275,6 +11965,903 @@ export interface operations {
                     };
                 };
             };
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    musicHome: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MusicHome"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicArtists: {
+        parameters: {
+            query?: {
+                letter?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtistPage"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicArtist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtistDetail"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    musicAlbum: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumDetail"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    musicGenres: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        genres: components["schemas"]["GenreCard"][];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicGenre: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenreAlbums"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicSearch: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MusicSearch"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicGetQueue: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MusicQueue"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicSetQueue: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MusicQueueInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MusicQueue"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicLyrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trackId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Lyrics"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaStats: {
+        parameters: {
+            query?: {
+                profile?: string;
+                year?: number;
+            };
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaStats"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveTvSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sources: components["schemas"]["LiveTvSource"][];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveTvCreateSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LiveTvSourceInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveTvSource"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveTvDeleteSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok?: boolean;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvUpdateSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LiveTvSourceInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveTvSource"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvTestSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok: boolean;
+                        channelCount: number;
+                        error?: string | null;
+                        info?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvRefreshSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvChannels: {
+        parameters: {
+            query?: {
+                group?: string;
+                profile?: string;
+                favourites?: string;
+                hidden?: string;
+                source?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        channels: components["schemas"]["LiveTvChannel"][];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveTvUpdateChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    hidden?: boolean;
+                    sort?: number | null;
+                    number?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveTvChannel"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvFavourite: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok?: boolean;
+                        favourite?: boolean;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvUnfavourite: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok?: boolean;
+                        favourite?: boolean;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        groups: {
+                            name: string;
+                            count: number;
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveTvGuide: {
+        parameters: {
+            query?: {
+                from?: number;
+                to?: number;
+                /** @description Comma-separated channel ids */
+                channels?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        from: number;
+                        to: number;
+                        programmes: components["schemas"]["LiveTvProgramme"][];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveTvNow: {
+        parameters: {
+            query?: {
+                channels?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        now: number;
+                        channels: {
+                            channelId: string;
+                            now?: components["schemas"]["LiveTvProgramme"] | null;
+                            next?: components["schemas"]["LiveTvProgramme"] | null;
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveTvStream: {
+        parameters: {
+            query?: {
+                proxy?: string;
+                /** @description Device token (alternative to the `x-device-token` header). */
+                t?: components["parameters"]["QueryT"];
+            };
+            header?: never;
+            path: {
+                channelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the upstream stream */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+            502: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvCatchup: {
+        parameters: {
+            query: {
+                start: number;
+                duration: number;
+                /** @description Device token (alternative to the `x-device-token` header). */
+                t?: components["parameters"]["QueryT"];
+            };
+            header?: never;
+            path: {
+                channelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+            409: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvRecordings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        recordings: components["schemas"]["LiveTvRecording"][];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveTvRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    channelId: string;
+                    start?: number;
+                    stop?: number;
+                    title?: string;
+                    programme?: number | {
+                        start?: number;
+                    };
+                    paddingBeforeSec?: number;
+                    paddingAfterSec?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Scheduled */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveTvRecording"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvDeleteRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok?: boolean;
+                        status?: string;
+                        deleted?: boolean;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rules: components["schemas"]["LiveTvRule"][];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveTvCreateRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    titleMatch: string;
+                    channelId?: string | null;
+                    paddingBeforeSec?: number;
+                    paddingAfterSec?: number;
+                    keepLast?: number;
+                    enabled?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveTvRule"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveTvDeleteRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ok?: boolean;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["ErrorJson"];
         };
     };

@@ -2,6 +2,25 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.6.0 — Live TV / IPTV / DVR, music browse, year in review (WP16-09/10/12–16)
+
+- Live TV (`server/src/livetv/`, `livetv.sqlite`): user-added M3U(+XMLTV), Xtream Codes and HDHomeRun
+	sources (we ship no channel lists). Streaming M3U parser (5k entries < 200 ms), chunked XMLTV parser
+	(gzip, timezones), Xtream client (base64 EPG, timeshift), HDHomeRun discover/lineup (DRM skipped),
+	EPG matching by tvg-id then normalised name, refresh loop. `/livetv/*`: sources CRUD + test/refresh
+	(passwords never returned), channels (groups, hide, sort, number, per-profile favourites), guide
+	window (≤ 48 h), now/next, `stream/{id}` (302, or `?proxy=1` byte pipe), `catchup/{id}` (Xtream
+	timeshift, M3U catchup-source / shift / flussonic), DVR recordings + series rules with tuner-limit
+	conflict flags, restart recovery. Recording is `ffmpeg -c copy` to TS, remux to MKV `-c copy` in the
+	idle analysis queue — never re-encoded. Recordings go to the first "recordings" folder/Live TV.
+- `/media/music/*`: home rows (recent albums from plays, newest, most played, playlists, genres,
+	random), artists A–Z, artist (albums, top tracks, similar), album, genres, diacritic-insensitive
+	search, per-profile play queue, synced/plain lyrics (tags or sidecar `.lrc`). Ids = Subsonic ids;
+	`coverUrlPath` / `streamUrlPath` ready for TV clients.
+- `GET /media/stats?profile=&year=`: year in review (watch hours, titles, genres, streak, months, top
+	titles; listen hours, plays, top tracks).
+- Music + stats honour the profile PIN token. OpenAPI 241 routes; Models.kt (72 classes) + SDK.
+
 ## 3.5.0 — Hub: remote control + Watch Together (WP16-07/08)
 
 - Hub (`server/src/hub/`): authenticated `WS /hub` + `GET /hub/devices`, `POST /hub/command` (remote

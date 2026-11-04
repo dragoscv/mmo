@@ -39,6 +39,9 @@ import { ProfileError, ProfileStore, type ProfileInput } from "./profiles";
 import { WatchlistStore } from "./watchlist";
 import { allowedForAge, filterCardsForAge } from "./ratings";
 import { parseVersion } from "./versions";
+import { MusicService } from "./music";
+import { createMusicRouter } from "./music-routes";
+import { createStatsHandler } from "./stats";
 import type { HistoryEntry, LibraryIndexRow, MediaKind, MediaLogger, ProgressEntry, TitleCard, TitleDetails } from "./types";
 
 export interface MediaRouterDeps {
@@ -50,6 +53,8 @@ export interface MediaRouterDeps {
     library?: LibraryIndex;
     profiles?: ProfileStore;
     watchlist?: WatchlistStore;
+    /** Music browse (`/media/music/*`); omitted in tests that don't need it. */
+    music?: MusicService;
     /** When present, every progress/plays write schedules a debounced push. */
     sync?: Pick<MediaSyncClient, "schedule" | "lastResult" | "getLastPushedRevision">;
     region: string;
@@ -179,6 +184,11 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
         const a = c.age !== undefined ? c.age : ageOf(c);
         return a === undefined ? c : { ...c, age: a };
     };
+    const profileIdOf = (req: express.Request, res: express.Response) => profileOf(req, res)?.id ?? null;
+
+    if (deps.music) router.use("/music", createMusicRouter({ music: deps.music, resolveProfile: profileIdOf, log }));
+    const statsHandler = createStatsHandler({ db, lookupTitle: (k, id) => tmdb.getCachedTitle(k, id), resolveProfile: profileIdOf, log });
+    router.get("/stats", statsHandler);
 
     const wrap = (fn: (req: express.Request, res: express.Response) => Promise<void>): express.RequestHandler =>
         (req, res) => {
