@@ -4,79 +4,92 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import ro.mixai.tv.data.AccountSession
-import ro.mixai.tv.data.Album
 import ro.mixai.tv.data.Connection
 import ro.mixai.tv.data.DiscoveredServer
+import ro.mixai.tv.data.HubClient
+import ro.mixai.tv.data.HubCommand
+import ro.mixai.tv.data.LiveTvRepository
 import ro.mixai.tv.data.MediaRef
 import ro.mixai.tv.data.MediaRepository
 import ro.mixai.tv.data.MmoApi
+import ro.mixai.tv.data.MusicPlayback
+import ro.mixai.tv.data.MusicRepository
+import ro.mixai.tv.data.PlayerBus
+import ro.mixai.tv.data.PlayerCommand
+import ro.mixai.tv.data.ProfileRepository
 import ro.mixai.tv.data.Progress
 import ro.mixai.tv.data.ProgressSync
 import ro.mixai.tv.data.Settings
-import ro.mixai.tv.data.Show
-import ro.mixai.tv.data.Song
-import ro.mixai.tv.data.VideoFile
+import ro.mixai.tv.data.TmdbSize
 import ro.mixai.tv.data.WatchNext
+import ro.mixai.tv.data.argDouble
+import ro.mixai.tv.data.argLong
+import ro.mixai.tv.data.argString
 import ro.mixai.tv.player.PlayRequest
 import ro.mixai.tv.player.PlayerScreen
-import ro.mixai.tv.ui.AlbumScreen
-import ro.mixai.tv.ui.LocalSqueeze
-import ro.mixai.tv.ui.ScreenFormat
-import ro.mixai.tv.ui.SqueezeBox
-import ro.mixai.tv.ui.detectPanelAspect
-import ro.mixai.tv.ui.squeezeFor
 import ro.mixai.tv.ui.ConnectScreen
 import ro.mixai.tv.ui.DiscoverScreen
-import ro.mixai.tv.ui.HomeScreen
-import ro.mixai.tv.ui.MovieScreen
+import ro.mixai.tv.ui.LocalSqueeze
 import ro.mixai.tv.ui.PairScreen
-import ro.mixai.tv.ui.SettingsScreen
-import ro.mixai.tv.ui.ShowScreen
+import ro.mixai.tv.ui.ScreenFormat
 import ro.mixai.tv.ui.SignInScreen
-import ro.mixai.tv.ui.TitleScreen
+import ro.mixai.tv.ui.SqueezeBox
 import ro.mixai.tv.ui.WelcomeScreen
+import ro.mixai.tv.ui.components.BackdropHost
+import ro.mixai.tv.ui.components.LoadingState
+import ro.mixai.tv.ui.detectPanelAspect
+import ro.mixai.tv.ui.home.HomeScreen
+import ro.mixai.tv.ui.library.LibraryScreen
+import ro.mixai.tv.ui.livetv.GuideScreen
+import ro.mixai.tv.ui.livetv.LiveTvPlayerScreen
+import ro.mixai.tv.ui.livetv.LiveTvScreen
+import ro.mixai.tv.ui.livetv.RecordingsScreen
+import ro.mixai.tv.ui.music.ArtistScreen
+import ro.mixai.tv.ui.music.MusicAlbumScreen
+import ro.mixai.tv.ui.music.MusicScreen
+import ro.mixai.tv.ui.music.NowPlayingScreen
+import ro.mixai.tv.ui.nav.AppShell
+import ro.mixai.tv.ui.nav.LocalScreenDeps
+import ro.mixai.tv.ui.nav.NavHost
+import ro.mixai.tv.ui.nav.Navigator
+import ro.mixai.tv.ui.nav.Route
+import ro.mixai.tv.ui.nav.ScreenDeps
+import ro.mixai.tv.ui.profiles.ProfilePickerScreen
+import ro.mixai.tv.ui.search.SearchScreen
+import ro.mixai.tv.ui.settings.SettingsScreen
+import ro.mixai.tv.ui.settings.StatsScreen
+import ro.mixai.tv.ui.squeezeFor
 import ro.mixai.tv.ui.theme.MixaiTheme
+import ro.mixai.tv.ui.title.SeasonScreen
+import ro.mixai.tv.ui.title.TitleScreen
+import ro.mixai.tv.ui.together.WatchTogetherScreen
 import java.net.URI
 import java.util.Locale
 
-sealed interface Screen {
-    /** First run: MixAI account vs. local server. */
-    data object Welcome : Screen
-    /** Device-code sign-in on mixai.ro. */
-    data object SignIn : Screen
-    /** LAN autodiscovery; `preselected` = the saved server whose health check failed. */
-    data class Discover(val preselected: DiscoveredServer? = null) : Screen
-    data class Pair(val server: DiscoveredServer) : Screen
-    /** Manual host + token fallback. */
-    data object Connect : Screen
-    data object Home : Screen
-    data object Settings : Screen
-    data class Movie(val file: VideoFile) : Screen
-    data class ShowDetail(val show: Show) : Screen
-    data class AlbumDetail(val album: Album) : Screen
-    /** `resumeMs` > 0 overrides the local DataStore position (server progress from the title page). */
-    data class Play(val request: PlayRequest, val resumeMs: Long = -1L) : Screen
-    /** Unified TMDB title page (`/media/title/:kind/:tmdbId`). */
-    data class Title(val kind: String, val tmdbId: Long) : Screen
-}
+private const val TAG = "MainActivity"
 
 class MainActivity : ComponentActivity() {
     /** Pending `mixai://title/<kind>/<tmdbId>` from Watch Next; consumed by `App`. */
@@ -93,25 +106,16 @@ class MainActivity : ComponentActivity() {
             val squeeze = squeezeFor(ScreenFormat.of(formatKey), detectedAspect)
             LocalizedContent(localeTag) {
                 MixaiTheme {
-                  CompositionLocalProvider(LocalSqueeze provides squeeze) {
-                  SqueezeBox(squeeze) {
-                    val conn by settings.connection.collectAsState(initial = null)
-                    val session by settings.session.collectAsState(initial = null)
-                    val progress by settings.progress.collectAsState(initial = emptyMap())
-                    val c = conn ?: return@SqueezeBox
-                    val s = session ?: return@SqueezeBox
-                    val link by deepLink
-                    App(
-                        c, s, progress, settings, localeTag,
-                        deepLink = link,
-                        onDeepLinkConsumed = { deepLink.value = null },
-                        onSave = { host, token, userId -> settings.save(host, token, userId) },
-                        onSaveSession = { tok, user -> settings.saveSession(tok, user) },
-                        onForget = { settings.clear() },
-                        onSignOut = { settings.clearAll() },
-                    )
-                  }
-                  }
+                    CompositionLocalProvider(LocalSqueeze provides squeeze) {
+                        SqueezeBox(squeeze) {
+                            val conn by settings.connection.collectAsState(initial = null)
+                            val session by settings.session.collectAsState(initial = null)
+                            val c = conn ?: return@SqueezeBox
+                            val s = session ?: return@SqueezeBox
+                            val link by deepLink
+                            App(c, s, settings, localeTag, deepLink = link, onDeepLinkConsumed = { deepLink.value = null })
+                        }
+                    }
                 }
             }
         }
@@ -149,174 +153,288 @@ private fun LocalizedContent(tag: String, content: @Composable () -> Unit) {
     }
 }
 
+/** Long-lived objects of one server connection (rebuilt when base URL / token change). */
+private class ConnectionGraph(
+    val api: MmoApi,
+    val profiles: ProfileRepository,
+    val media: MediaRepository,
+    val music: MusicRepository,
+    val musicPlayback: MusicPlayback,
+    val liveTv: LiveTvRepository,
+    val hub: HubClient,
+    val progressSync: ProgressSync,
+)
+
+private fun buildGraph(context: Context, conn: Connection, settings: Settings): ConnectionGraph {
+    val api = MmoApi(conn.baseUrl, conn.token)
+    val profiles = ProfileRepository(api, settings)
+    val profileId = { profiles.activeId }
+    val media = MediaRepository(api, profileId, context.cacheDir)
+    val music = MusicRepository(api, profileId)
+    return ConnectionGraph(
+        api = api,
+        profiles = profiles,
+        media = media,
+        music = music,
+        musicPlayback = MusicPlayback(context.applicationContext, music, media),
+        liveTv = LiveTvRepository(api, profileId),
+        hub = HubClient(api, settings) { profiles.activeProfile.value?.id },
+        progressSync = ProgressSync(media, settings),
+    )
+}
+
 @Composable
 private fun App(
     conn: Connection,
     session: AccountSession,
-    progress: Map<String, Progress>,
     settings: Settings,
     localeTag: String,
     deepLink: Pair<String, Long>?,
     onDeepLinkConsumed: () -> Unit,
-    onSave: suspend (String, String, String) -> Unit,
-    onSaveSession: suspend (String, ro.mixai.tv.data.SessionUser) -> Unit,
-    onForget: suspend () -> Unit,
-    onSignOut: suspend () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val stack = remember { mutableStateListOf<Screen>(if (conn.isComplete) Screen.Home else Screen.Welcome) }
-    val api = remember(conn.baseUrl, conn.token) { if (conn.isComplete) MmoApi(conn.baseUrl, conn.token) else null }
-    // Same profile rule as tv-tizen: the paired user id, else the server default — so progress
-    // written from one TV shows up in "Continue watching" on the other.
-    val media = remember(api, conn.userId) { api?.let { MediaRepository(it, conn.userId.ifBlank { "default" }) } }
-    val progressSync = remember(media) { media?.let { ProgressSync(it, settings) } }
     val context = LocalContext.current
+    val nav = remember { Navigator(if (conn.isComplete) Route.Splash else Route.Welcome) }
+    val progress by settings.progress.collectAsState(initial = emptyMap())
 
-    fun push(s: Screen) = stack.add(s)
-    fun pop() { if (stack.size > 1) stack.removeAt(stack.lastIndex) }
-    fun goHome() { stack.clear(); stack.add(Screen.Home) }
-    fun goWelcome() { stack.clear(); stack.add(Screen.Welcome) }
-    fun changeServer() { scope.launch { onForget(); stack.clear(); stack.add(Screen.Welcome); stack.add(Screen.Discover()) } }
-    fun signOut() { scope.launch { onSignOut(); goWelcome() } }
+    val graph = remember(conn.baseUrl, conn.token) { if (conn.isComplete) buildGraph(context, conn, settings) else null }
+    DisposableEffect(graph) {
+        graph?.hub?.start()
+        onDispose { graph?.hub?.stop(); graph?.musicPlayback?.release() }
+    }
 
-    BackHandler(enabled = stack.size > 1) { pop() }
+    fun changeServer() { scope.launch { settings.clear(); nav.resetTo(Route.Welcome, Route.Discover()) } }
+    fun signOut() { scope.launch { settings.clearAll(); nav.resetTo(Route.Welcome) } }
+    val signedIn = session.isSignedIn
 
-    // Watch Next deep link → title page on top of Home.
-    LaunchedEffect(deepLink, api) {
+    val deps = remember(graph, localeTag, session) {
+        graph?.let { g ->
+            ScreenDeps(
+                api = g.api, media = g.media, profiles = g.profiles, music = g.music, musicPlayback = g.musicPlayback,
+                liveTv = g.liveTv, hub = g.hub, settings = settings, progressSync = g.progressSync,
+                localeTag = localeTag, session = session, scope = scope,
+                onChangeServer = { changeServer() },
+                onSignOut = if (signedIn) ({ signOut() }) else null,
+            )
+        }
+    }
+
+    // Splash: health check → legacy migration → profile picker or Home. A saved server that no
+    // longer answers /health falls back to discovery with that server preselected.
+    LaunchedEffect(deps, nav.current is Route.Splash) {
+        val d = deps ?: return@LaunchedEffect
+        if (nav.current !is Route.Splash) return@LaunchedEffect
+        try { d.api.health() } catch (_: Exception) {
+            val u = runCatching { URI(d.api.baseUrl) }.getOrNull()
+            val saved = u?.host?.let { DiscoveredServer(it, if (u.port > 0) u.port else 17899, "") }
+            nav.resetTo(Route.Discover(saved))
+            return@LaunchedEffect
+        }
+        launch { runCatching { if (d.media.status() != null) d.progressSync.migrateLegacyOnce() } }
+        val picker = runCatching { d.profiles.needsPicker() }.getOrElse { Log.w(TAG, "profiles: ${it.message}"); false }
+        d.hub.refreshHello()
+        nav.resetTo(if (picker) Route.ProfilePicker else Route.Home)
+    }
+
+    // Watch Next deep link → title page on top of Home (once startup has settled).
+    LaunchedEffect(deepLink, deps, nav.current) {
         val l = deepLink ?: return@LaunchedEffect
-        if (api == null) return@LaunchedEffect
-        if (stack.lastOrNull() != Screen.Home) { stack.clear(); stack.add(Screen.Home) }
-        stack.add(Screen.Title(l.first, l.second))
+        if (deps == null) return@LaunchedEffect
+        val cur = nav.current
+        if (cur is Route.Splash || cur is Route.ProfilePicker || cur.hidesOnboarding()) return@LaunchedEffect
+        nav.resetTo(Route.Home, Route.Title(l.first, l.second))
         onDeepLinkConsumed()
     }
 
-    // One-shot legacy progress migration + queued writes flush, once a media-capable server answers.
-    LaunchedEffect(progressSync) {
-        val ps = progressSync ?: return@LaunchedEffect
-        val m = media ?: return@LaunchedEffect
-        runCatching { if (m.status() != null) ps.migrateLegacyOnce() }
+    // Publish the server `continue` row into the Android TV Watch Next channel (per active profile).
+    val activeId = graph?.profiles?.activeProfile?.collectAsState()?.value?.id
+    LaunchedEffect(graph, activeId) {
+        val g = graph ?: return@LaunchedEffect
+        if (activeId == null) return@LaunchedEffect
+        runCatching {
+            g.media.homeFlow().map { h -> h.rows.firstOrNull { it.id == MediaRepository.ROW_CONTINUE }?.items.orEmpty() }
+                .distinctUntilChanged()
+                .collect { cont -> WatchNext.publish(context, cont) { c -> g.api.tmdbImageUrl(TmdbSize.poster(342), c.posterPath) } }
+        }.onFailure { Log.w(TAG, "watch next: ${it.message}") }
     }
 
-    // Saved server: skip to Home, but if it no longer answers /health fall back
-    // to discovery with that server preselected.
-    LaunchedEffect(api) {
-        val a = api ?: return@LaunchedEffect
-        if (stack.lastOrNull() != Screen.Home) return@LaunchedEffect
-        try { a.health() } catch (_: Exception) {
-            val u = runCatching { URI(a.baseUrl) }.getOrNull()
-            val saved = u?.host?.let { DiscoveredServer(it, if (u.port > 0) u.port else 17899, "") }
-            stack.clear(); stack.add(Screen.Discover(saved))
+    // Remote control from the hub (phone/web → this TV).
+    LaunchedEffect(deps) {
+        val d = deps ?: return@LaunchedEffect
+        d.hub.incomingCommands.collect { cmd -> handleHubCommand(d, nav, cmd, scope) }
+    }
+
+    CompositionLocalProvider(LocalScreenDeps provides deps) {
+        BackdropHost {
+            AppShell(
+                nav = nav,
+                settings = settings,
+                activeProfile = graph?.profiles?.activeProfile?.collectAsState()?.value,
+                musicPlayback = graph?.musicPlayback,
+                music = graph?.music,
+            ) {
+                NavHost(nav, Modifier.fillMaxSize()) { route ->
+                    Screen(route, nav, deps, conn, settings, progress, scope)
+                }
+            }
         }
     }
+}
 
-    when (val top = stack.last()) {
-        Screen.Welcome -> WelcomeScreen(
-            onSignIn = { push(Screen.SignIn) },
-            onLocal = { push(Screen.Discover()) },
-        )
-        Screen.SignIn -> SignInScreen(
+private fun Route.hidesOnboarding(): Boolean =
+    this is Route.Welcome || this is Route.SignIn || this is Route.Discover || this is Route.Pair || this is Route.Connect
+
+/** Route → screen. Onboarding routes work without a connection; the rest need [deps]. */
+@Composable
+private fun Screen(
+    route: Route,
+    nav: Navigator,
+    deps: ScreenDeps?,
+    conn: Connection,
+    settings: Settings,
+    progress: Map<String, Progress>,
+    scope: CoroutineScope,
+) {
+    when (route) {
+        Route.Welcome -> WelcomeScreen(onSignIn = { nav.push(Route.SignIn) }, onLocal = { nav.push(Route.Discover()) })
+        Route.SignIn -> SignInScreen(
             onSignedIn = { body, picked ->
                 scope.launch {
-                    onSaveSession(body.session_token, body.user)
-                    if (picked != null) { onSave(picked.second, picked.first.token, body.user.id); goHome() }
-                    else { stack.clear(); stack.add(Screen.Welcome); stack.add(Screen.Discover()) }
+                    settings.saveSession(body.session_token, body.user)
+                    if (picked != null) { settings.save(picked.second, picked.first.token, body.user.id); nav.resetTo(Route.Splash) }
+                    else nav.resetTo(Route.Welcome, Route.Discover())
                 }
             },
-            onBack = { pop() },
+            onBack = { nav.pop() },
         )
-        is Screen.Discover -> DiscoverScreen(
-            preselected = top.preselected,
-            onSelect = { push(Screen.Pair(it)) },
-            onManual = { push(Screen.Connect) },
+        is Route.Discover -> DiscoverScreen(preselected = route.preselected, onSelect = { nav.push(Route.Pair(it)) }, onManual = { nav.push(Route.Connect) })
+        is Route.Pair -> PairScreen(
+            server = route.server,
+            onPaired = { base, token, userId -> scope.launch { settings.save(base, token, userId); nav.resetTo(Route.Splash) } },
+            onBack = { nav.pop() },
         )
-        is Screen.Pair -> PairScreen(
-            server = top.server,
-            onPaired = { base, token, userId -> scope.launch { onSave(base, token, userId); goHome() } },
-            onBack = { pop() },
-        )
-        Screen.Connect -> ConnectScreen(
+        Route.Connect -> ConnectScreen(
             initialHost = conn.baseUrl,
             initialToken = conn.token,
-            onConnected = { host, token ->
-                scope.launch { onSave(host, token, ""); goHome() }
-            },
-            onQuickConnect = { push(Screen.Pair(it)) },
+            onConnected = { host, token -> scope.launch { settings.save(host, token, ""); nav.resetTo(Route.Splash) } },
+            onQuickConnect = { nav.push(Route.Pair(it)) },
         )
-        Screen.Home -> {
-            val a = api ?: run { goWelcome(); return }
-            HomeScreen(
-                api = a,
-                media = media!!,
-                progress = progress,
-                userName = if (session.isSignedIn) session.displayName else null,
-                onMovie = { push(Screen.Movie(it)) },
-                onShow = { push(Screen.ShowDetail(it)) },
-                onAlbum = { push(Screen.AlbumDetail(it)) },
-                onTitle = { push(Screen.Title(it.kind, it.tmdbId)) },
-                onSettings = { push(Screen.Settings) },
-                onMediaHome = { home ->
-                    val cont = home.rows.firstOrNull { it.id == MediaRepository.ROW_CONTINUE }?.items.orEmpty()
-                    scope.launch { WatchNext.publish(context, cont) { c -> a.tmdbImageUrl("w342", c.posterPath) } }
-                },
-            )
+        else -> {
+            val d = deps
+            if (d == null) {
+                // Connection forgotten (change server / sign out) or not loaded yet.
+                LaunchedEffect(route) { if (!conn.isComplete) nav.resetTo(Route.Welcome) }
+                Box(Modifier.fillMaxSize()) { LoadingState(rows = 1) }
+                return
+            }
+            ConnectedScreen(route, nav, d, progress)
         }
-        is Screen.Title -> TitleScreen(
-            api = api!!,
-            media = media!!,
-            progressSync = progressSync!!,
-            kind = top.kind,
-            tmdbId = top.tmdbId,
-            onPlay = { req, ref, resumeMs ->
-                val r = (req as PlayRequest.Video).copy(ref = ref)
-                push(Screen.Play(r, resumeMs))
-            },
-            onOpenTitle = { k, id -> push(Screen.Title(k, id)) },
-            onBack = { pop() },
-        )
-        Screen.Settings -> SettingsScreen(
-            api = api!!,
-            localeTag = localeTag,
-            signedInAs = if (session.isSignedIn) session.displayName else null,
-            onLocale = { tag -> scope.launch { settings.setLocale(tag) } },
-            settings = settings,
-            onClearProgress = { scope.launch { settings.clearProgress() } },
-            onChangeServer = { changeServer() },
-            onSignOut = if (session.isSignedIn) ({ signOut() }) else null,
-            onBack = { pop() },
-        )
-        is Screen.Movie -> MovieScreen(
-            api = api!!,
-            file = top.file,
-            progress = progress[top.file.fileId],
-            onPlay = { push(Screen.Play(it)) },
-            onBack = { pop() },
-        )
-        is Screen.ShowDetail -> ShowScreen(
-            api = api!!,
-            show = top.show,
-            progress = progress,
-            onPlay = { push(Screen.Play(it)) },
-            onBack = { pop() },
-        )
-        is Screen.AlbumDetail -> AlbumScreen(
-            api = api!!,
-            album = top.album,
-            onPlay = { songs: List<Song>, start: Int -> push(Screen.Play(PlayRequest.Music(songs, start))) },
-            onBack = { pop() },
-        )
-        is Screen.Play -> PlayerScreen(
-            api = api!!,
-            request = top.request,
-            resumeMs = (top.request as? PlayRequest.Video)?.let { r ->
+    }
+}
+
+@Composable
+private fun ConnectedScreen(route: Route, nav: Navigator, d: ScreenDeps, progress: Map<String, Progress>) {
+    when (route) {
+        Route.Splash -> Box(Modifier.fillMaxSize()) { LoadingState(rows = 2) }
+        Route.ProfilePicker -> ProfilePickerScreen(d, nav)
+        Route.Home -> HomeScreen(d, nav)
+        is Route.Search -> SearchScreen(d, nav, route.initial)
+        is Route.Library -> LibraryScreen(d, nav, route.kind)
+        Route.Music -> MusicScreen(d, nav)
+        Route.LiveTv -> LiveTvScreen(d, nav)
+        is Route.Settings -> SettingsScreen(d, nav, route.section)
+        is Route.Title -> TitleScreen(d, nav, route.kind, route.tmdbId)
+        is Route.Season -> SeasonScreen(d, nav, route.tmdbId, route.season)
+        is Route.Artist -> ArtistScreen(d, nav, route.id)
+        is Route.Album -> MusicAlbumScreen(d, nav, route.id)
+        Route.NowPlaying -> NowPlayingScreen(d, nav)
+        Route.Guide -> GuideScreen(d, nav)
+        Route.Recordings -> RecordingsScreen(d, nav)
+        Route.Stats -> StatsScreen(d, nav)
+        is Route.WatchTogether -> WatchTogetherScreen(d, nav, route.roomId)
+        is Route.LivePlay -> LiveTvPlayerScreen(d, nav, route.channelId)
+        is Route.Play -> {
+            val resumeMs = (route.request as? PlayRequest.Video)?.let { r ->
                 when {
                     r.fromStart -> 0L
-                    top.resumeMs >= 0 -> top.resumeMs
+                    route.resumeMs >= 0 -> route.resumeMs
                     else -> progress[r.file.fileId]?.pos ?: 0L
                 }
-            } ?: 0L,
-            onProgress = { fileId, pos, dur -> scope.launch { settings.saveProgress(fileId, pos, dur) } },
-            onServerProgress = { ref: MediaRef, pos, dur -> progressSync?.let { ps -> scope.launch { ps.save(ref, pos, dur) } } },
-            onExit = { pop() },
-        )
+            } ?: 0L
+            PlayerScreen(d, nav, route.request, resumeMs)
+        }
+        // Onboarding routes are handled by Screen().
+        Route.Welcome, Route.SignIn, Route.Connect, is Route.Discover, is Route.Pair -> Unit
+    }
+}
+
+/**
+ * Hub `cmd` actions (server/openapi.yaml `/hub/command`): play, pause, resume, seek, stop, next,
+ * previous, text, navigate. Transport goes to the on-screen player (PlayerBus) or, when only
+ * music is playing, to background music. Every command is acked.
+ */
+private fun handleHubCommand(d: ScreenDeps, nav: Navigator, cmd: HubCommand, scope: CoroutineScope) {
+    val hub = d.hub
+    val music = d.musicPlayback
+    val musicActive = music.state.value.isActive
+    fun transport(player: PlayerCommand, onMusic: () -> Unit) {
+        when {
+            PlayerBus.hasPlayer -> { PlayerBus.send(player); hub.ack(cmd.seq, true) }
+            musicActive -> { onMusic(); hub.ack(cmd.seq, true) }
+            else -> hub.ack(cmd.seq, false, "no_player")
+        }
+    }
+    when (cmd.action) {
+        "play" -> {
+            val fileId = cmd.args.argString("fileId")
+            if (fileId == null) { transport(PlayerCommand.Resume) { music.resume() }; return }
+            scope.launch {
+                try {
+                    val f = d.api.fileInfo(fileId)
+                    val kind = cmd.args.argString("kind")
+                    val tmdbId = cmd.args.argLong("tmdbId")
+                    val ref = if (kind != null && tmdbId != null) MediaRef(kind, tmdbId, cmd.args.argLong("season"), cmd.args.argLong("episode")) else null
+                    val startMs = cmd.args.argDouble("startSec")?.let { (it * 1000).toLong() } ?: -1L
+                    val r = Route.Play(PlayRequest.Video(f, hls = !f.directPlayable, ref = ref), resumeMs = startMs, from = nav.current)
+                    if (nav.current is Route.Play || nav.current is Route.LivePlay) nav.replace(r) else nav.push(r)
+                    hub.ack(cmd.seq, true)
+                } catch (e: Exception) {
+                    hub.ack(cmd.seq, false, e.message ?: "play_failed")
+                }
+            }
+        }
+        "pause" -> transport(PlayerCommand.Pause) { music.pause() }
+        "resume" -> transport(PlayerCommand.Resume) { music.resume() }
+        "seek" -> {
+            val pos = cmd.args.argDouble("positionSec")
+            if (pos == null) hub.ack(cmd.seq, false, "positionSec required")
+            else transport(PlayerCommand.Seek(pos)) { music.seek((pos * 1000).toLong()) }
+        }
+        "stop" -> transport(PlayerCommand.Stop) { music.stop() }
+        "next" -> transport(PlayerCommand.Next) { music.next() }
+        "previous" -> transport(PlayerCommand.Previous) { music.prev() }
+        "text" -> {
+            val v = cmd.args.argString("value") ?: ""
+            if (nav.current is Route.Search) nav.replace(Route.Search(v)) else nav.push(Route.Search(v))
+            hub.ack(cmd.seq, true)
+        }
+        "navigate" -> {
+            val target = when (cmd.args.argString("to")) {
+                "home" -> Route.Home
+                "music" -> Route.Music
+                "livetv" -> Route.LiveTv
+                "settings" -> Route.Settings()
+                "search" -> Route.Search()
+                "movies" -> Route.Library("movie")
+                "shows" -> Route.Library("tv")
+                else -> null
+            }
+            if (target == null) hub.ack(cmd.seq, false, "unknown_target")
+            else {
+                if (target == Route.Home) nav.resetTo(Route.Home) else nav.resetTo(Route.Home, target)
+                hub.ack(cmd.seq, true)
+            }
+        }
+        else -> hub.ack(cmd.seq, false, "unsupported")
     }
 }

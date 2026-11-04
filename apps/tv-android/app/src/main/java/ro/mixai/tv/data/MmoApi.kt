@@ -3,24 +3,42 @@ package ro.mixai.tv.data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.TimeUnit
 
 /** Codecs Media3 plays on Google TV (DD/DD+ decoded or passed through to HDMI). */
 private const val TV_CAPS = "h264,hevc,vp9,av1,aac,ac3,eac3,opus,mp3,flac"
 
 class ApiException(val status: Int, message: String) : IOException("HTTP $status: $message")
 
-// Thin HTTP client for one MMO Server. Plain `HttpURLConnection` +
-// kotlinx.serialization — no Retrofit/OkHttp on the API path.
+// Thin HTTP client for one MMO Server: OkHttp (shared [Http.client], also used by the hub
+// WebSocket and Coil) + kotlinx.serialization — no Retrofit.
 //
 // Auth: `x-device-token` header on JSON calls; `?t=<token>` on media URLs
 // (Media3 loads those itself and cannot set custom headers per item).
 // `u` (userId) is optional for the video routes — `queryAuth` only copies it to
 // `x-user-id` when present and `authMiddleware` never reads it.
 class MmoApi(val baseUrl: String, private val token: String) {
+    /** Extra request headers on every authenticated JSON call (WP16: `x-profile-token` of the active profile). */
+    @Volatile var extraHeaders: () -> Map<String, String> = { emptyMap() }
+
+    /** Headers a media loader must send where `?t=` is not accepted (e.g. `/livetv/stream`). */
+    fun authHeaders(): Map<String, String> = mapOf("x-device-token" to token)
+
+    /** `ws(s)://host:port/hub?t=<token>` for [HubClient]. */
+    fun hubUrl(): String = baseUrl.replaceFirst("https://", "wss://").replaceFirst("http://", "ws://") + "/hub?t=${enc(token)}"
+
+    /** Server-relative Subsonic path (`/rest/...`, e.g. `coverUrlPath`) → absolute URL with client params + `apiKey`. */
+    fun withApiKey(path: String): String = baseUrl + path + (if (path.contains('?')) "&" else "?") + "v=1.16.1&c=mixaitv&apiKey=${enc(token)}"
+
+    /** Server-relative path → absolute URL with `t=<token>` (routes behind `queryAuth`). */
+    fun withToken(path: String): String = baseUrl + path + (if (path.contains('?')) "&" else "?") + "t=${enc(token)}"
+
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
     private val subsonicBase = "$baseUrl/rest"
     private val subsonicQuery = "f=json&v=1.16.1&c=mixaitv&apiKey=${enc(token)}"
@@ -82,6 +100,8 @@ class MmoApi(val baseUrl: String, private val token: String) {
     suspend fun getJson(path: String): String = get("$baseUrl$path", auth = true)
     suspend fun putJson(path: String, body: String): String = request("PUT", "$baseUrl$path", body, auth = true)
     suspend fun postJson(path: String, body: String): String = request("POST", "$baseUrl$path", body, auth = true)
+    suspend fun patchJson(path: String, body: String): String = request("PATCH", "$baseUrl$path", body, auth = true)
+    suspend fun deleteJson(path: String): String = request("DELETE", "$baseUrl$path", null, auth = true)
     fun encode(s: String) = enc(s)
 
     // ─── OpenSubsonic ─────────────────────────────────────────────────────
@@ -111,28 +131,42 @@ class MmoApi(val baseUrl: String, private val token: String) {
     private suspend fun post(url: String, body: String): String = request("POST", url, body, auth = true)
 
     private suspend fun request(method: String, url: String, body: String?, auth: Boolean): String = withContext(Dispatchers.IO) {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = method
-            connectTimeout = 8_000
-            readTimeout = if (method == "POST" && url.endsWith("/video/scan")) 180_000 else 20_000 // scan can take a while
-            setRequestProperty("Accept", "application/json")
-            if (auth) setRequestProperty("x-device-token", token)
-            if (body != null) {
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-            }
+        val rb = when {
+            body != null -> body.toRequestBody(JSON_TYPE)
+            method == "POST" || method == "PUT" || method == "PATCH" -> "".toRequestBody(JSON_TYPE)
+            else -> null
         }
-        try {
-            if (body != null) conn.outputStream.use { it.write(body.toByteArray()) }
-            val code = conn.responseCode
-            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-            val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
-            if (code !in 200..299) throw ApiException(code, text.take(200))
+        val req = Request.Builder().url(url).method(method, rb).header("Accept", "application/json").apply {
+            if (auth) {
+                header("x-device-token", token)
+                runCatching { extraHeaders() }.getOrNull()?.forEach { (k, v) -> if (v.isNotBlank()) header(k, v) }
+            }
+        }.build()
+        // `/video/scan` walks every root and can take minutes.
+        val client = if (method == "POST" && url.endsWith("/video/scan")) Http.slow else Http.client
+        client.newCall(req).execute().use { res ->
+            val text = res.body.string()
+            if (!res.isSuccessful) throw ApiException(res.code, text.take(200))
             text
-        } finally {
-            conn.disconnect()
         }
     }
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
+
+    private companion object {
+        val JSON_TYPE = "application/json".toMediaType()
+    }
+}
+
+/** One OkHttp connection pool for the app (API, hub WebSocket, Coil). */
+object Http {
+    val client: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .build()
+    }
+    val slow: OkHttpClient by lazy { client.newBuilder().readTimeout(180, TimeUnit.SECONDS).build() }
+    /** WebSocket client: no read timeout, protocol pings every 20 s. */
+    val ws: OkHttpClient by lazy { client.newBuilder().readTimeout(0, TimeUnit.SECONDS).pingInterval(20, TimeUnit.SECONDS).build() }
 }

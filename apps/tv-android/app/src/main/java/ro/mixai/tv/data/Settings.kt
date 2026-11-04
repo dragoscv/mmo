@@ -36,6 +36,11 @@ data class Progress(val pos: Long, val dur: Long, val at: Long) {
 @Serializable
 data class MediaRef(val kind: String, val tmdbId: Long, val season: Long? = null, val episode: Long? = null)
 
+/** Persisted active profile: id + `x-profile-token` (epoch-ms expiry; 0 = none). */
+data class ActiveProfile(val id: String, val token: String, val expiresAt: Long) {
+    fun tokenValid(now: Long = System.currentTimeMillis()): Boolean = token.isNotBlank() && expiresAt > now + 60_000
+}
+
 /** Persisted server connection: normalised base URL + device token. */
 class Settings(private val context: Context) {
     private val keyBase = stringPreferencesKey("base_url")
@@ -50,6 +55,12 @@ class Settings(private val context: Context) {
     private val keyMediaMigrated = stringPreferencesKey("media_progress_migrated")
     private val keyLocale = stringPreferencesKey("ui_locale")
     private val keyScreenFormat = stringPreferencesKey("screen_format")
+    private val keyNavOrder = stringPreferencesKey("nav_order")
+    private val keyDeviceId = stringPreferencesKey("hub_device_id")
+    private val keyDeviceName = stringPreferencesKey("hub_device_name")
+    private val keyProfileId = stringPreferencesKey("active_profile_id")
+    private val keyProfileToken = stringPreferencesKey("active_profile_token")
+    private val keyProfileTokenExp = stringPreferencesKey("active_profile_token_exp")
     private val json = Json { ignoreUnknownKeys = true }
     private val queueSerializer = ListSerializer(ProgressInput.serializer())
 
@@ -69,6 +80,45 @@ class Settings(private val context: Context) {
 
     suspend fun setScreenFormat(key: String) {
         context.dataStore.edit { p -> p[keyScreenFormat] = key }
+    }
+
+    // ─── WP16: app shell, hub identity, active profile ──────────────────────
+
+    /** Rail item ids in display order; ids missing from the list are hidden. Default = [DEFAULT_NAV_ORDER]. */
+    val navOrder: Flow<List<String>> = context.dataStore.data.map { p ->
+        p[keyNavOrder]?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() } ?: DEFAULT_NAV_ORDER
+    }
+
+    suspend fun setNavOrder(ids: List<String>) {
+        context.dataStore.edit { p -> p[keyNavOrder] = ids.joinToString(",") }
+    }
+
+    /** Stable hub device id (UUID), created on first use. */
+    suspend fun deviceId(): String {
+        context.dataStore.data.first()[keyDeviceId]?.takeIf { it.isNotBlank() }?.let { return it }
+        val id = java.util.UUID.randomUUID().toString()
+        context.dataStore.edit { p -> if (p[keyDeviceId].isNullOrBlank()) p[keyDeviceId] = id }
+        return context.dataStore.data.first()[keyDeviceId] ?: id
+    }
+
+    /** User-chosen device name for the hub; `""` = `Build.MODEL`. */
+    val deviceName: Flow<String> = context.dataStore.data.map { p -> p[keyDeviceName] ?: "" }
+
+    suspend fun setDeviceName(name: String) {
+        context.dataStore.edit { p -> if (name.isBlank()) p.remove(keyDeviceName) else p[keyDeviceName] = name.trim() }
+    }
+
+    /** Active viewer profile (`""` = none chosen yet) + its unlock token. */
+    val activeProfile: Flow<ActiveProfile> = context.dataStore.data.map { p ->
+        ActiveProfile(p[keyProfileId] ?: "", p[keyProfileToken] ?: "", p[keyProfileTokenExp]?.toLongOrNull() ?: 0L)
+    }
+
+    suspend fun saveActiveProfile(id: String, token: String = "", expiresAt: Long = 0L) {
+        context.dataStore.edit { p ->
+            p[keyProfileId] = id
+            if (token.isBlank()) { p.remove(keyProfileToken); p.remove(keyProfileTokenExp) }
+            else { p[keyProfileToken] = token; p[keyProfileTokenExp] = expiresAt.toString() }
+        }
     }
 
     val progress: Flow<Map<String, Progress>> = context.dataStore.data.map { p -> decodeProgress(p[keyProgress]) }
@@ -142,7 +192,10 @@ class Settings(private val context: Context) {
 
     /** "Change server": forget the connection but keep the account session. */
     suspend fun clear() {
-        context.dataStore.edit { p -> p.remove(keyBase); p.remove(keyToken); p.remove(keyUser) }
+        context.dataStore.edit { p ->
+            p.remove(keyBase); p.remove(keyToken); p.remove(keyUser)
+            p.remove(keyProfileId); p.remove(keyProfileToken); p.remove(keyProfileTokenExp)
+        }
     }
 
     /** "Sign out": forget everything. */
@@ -151,6 +204,9 @@ class Settings(private val context: Context) {
     }
 
     companion object {
+        /** Rail ids understood by `AppShell`. */
+        val DEFAULT_NAV_ORDER = listOf("home", "search", "movies", "shows", "music", "livetv", "settings")
+
         /** `192.168.1.5` → `http://192.168.1.5:17899`; keeps an explicit scheme/port if given. */
         fun normalizeBaseUrl(raw: String): String {
             var s = raw.trim().trimEnd('/')

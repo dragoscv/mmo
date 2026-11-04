@@ -13,6 +13,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.darkColorScheme
+import ro.mixai.tv.ui.components.TvType
 
 /** Material colour scheme mapped from the generated design tokens (WP6-03). */
 @Composable
@@ -43,6 +44,7 @@ fun MixaiTheme(content: @Composable () -> Unit) {
             borderVariant = Tokens.input,
             scrim = Tokens.background,
         ),
+        typography = TvType.material,
     ) {
         Surface(colors = SurfaceDefaults.colors(containerColor = Tokens.background, contentColor = Tokens.foreground)) {
             content()
@@ -55,6 +57,13 @@ object MixaiFocus {
     val ringWidth = Tokens.FOCUS_RING_DP.dp
     val scale = Tokens.CARD_SCALE_FOCUSED
     val cardShape = RoundedCornerShape(12.dp)
+    /** Soft accent glow behind a focused card. */
+    val glowElevation = 18.dp
+    val glowColor get() = Tokens.ring.copy(alpha = 0.45f)
+    /** TV-safe horizontal overscan padding used by rows and screen edges. */
+    val overscan = 56.dp
+    /** Vertical safe padding. */
+    val overscanTop = 32.dp
 }
 
 @Composable

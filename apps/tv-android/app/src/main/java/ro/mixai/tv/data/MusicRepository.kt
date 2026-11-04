@@ -1,0 +1,73 @@
+package ro.mixai.tv.data
+
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import ro.mixai.tv.data.generated.AlbumCard
+import ro.mixai.tv.data.generated.AlbumDetail
+import ro.mixai.tv.data.generated.ArtistCard
+import ro.mixai.tv.data.generated.ArtistDetail
+import ro.mixai.tv.data.generated.ArtistPage
+import ro.mixai.tv.data.generated.GenreCard
+import ro.mixai.tv.data.generated.Lyrics
+import ro.mixai.tv.data.generated.MusicHome
+import ro.mixai.tv.data.generated.MusicQueue
+import ro.mixai.tv.data.generated.MusicQueueInput
+import ro.mixai.tv.data.generated.MusicSearch
+import ro.mixai.tv.data.generated.PlaylistCard
+import ro.mixai.tv.data.generated.TrackCard
+
+// Music JSON API (`/media/music/*`, WP16-11). Covers + streams are Subsonic URLs that need the
+// device token as `apiKey` (`MmoApi.withApiKey`) because Coil/Media3 cannot send headers per item.
+class MusicRepository(private val api: MmoApi, private val profileId: () -> String = { "default" }) {
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true; explicitNulls = false }
+    private val profile: String get() = profileId().ifBlank { "default" }
+
+    suspend fun home(): MusicHome = json.decodeFromString(api.getJson("/media/music/home?profile=${api.encode(profile)}"))
+
+    /** Artists A–Z; `letter` = initial (`#` for non-letters as the server defines it). */
+    suspend fun artists(letter: String? = null, offset: Int = 0, limit: Int = 200): ArtistPage {
+        val qs = buildString {
+            append("/media/music/artists?offset=").append(offset).append("&limit=").append(limit)
+            if (!letter.isNullOrBlank()) append("&letter=").append(api.encode(letter))
+        }
+        return json.decodeFromString(api.getJson(qs))
+    }
+
+    suspend fun artist(id: String): ArtistDetail = json.decodeFromString(api.getJson("/media/music/artists/${api.encode(id)}"))
+
+    suspend fun album(id: String): AlbumDetail = json.decodeFromString(api.getJson("/media/music/albums/${api.encode(id)}"))
+
+    suspend fun genres(): List<GenreCard> =
+        json.parseToJsonElement(api.getJson("/media/music/genres")).jsonObject["genres"]?.jsonArray
+            ?.map { json.decodeFromJsonElement(GenreCard.serializer(), it) } ?: emptyList()
+
+    suspend fun genre(name: String, offset: Int = 0, limit: Int = 100): GenreAlbums =
+        json.decodeFromString(api.getJson("/media/music/genres/${api.encode(name)}?offset=$offset&limit=$limit"))
+
+    suspend fun search(q: String): MusicSearch = json.decodeFromString(api.getJson("/media/music/search?q=${api.encode(q)}"))
+
+    suspend fun queue(): MusicQueue = json.decodeFromString(api.getJson("/media/music/queue?profile=${api.encode(profile)}"))
+
+    suspend fun putQueue(input: MusicQueueInput): MusicQueue =
+        json.decodeFromString(api.putJson("/media/music/queue?profile=${api.encode(profile)}", json.encodeToString(MusicQueueInput.serializer(), input)))
+
+    /** 404 → null (no lyrics). */
+    suspend fun lyrics(trackId: String): Lyrics? = try {
+        json.decodeFromString<Lyrics>(api.getJson("/media/music/lyrics/${api.encode(trackId)}"))
+    } catch (e: ApiException) {
+        if (e.status == 404) null else throw e
+    }
+
+    // ─── URLs ─────────────────────────────────────────────────────────────
+
+    fun coverUrl(card: AlbumCard): String? = card.coverUrlPath.takeIf { it.isNotBlank() }?.let(api::withApiKey)
+    fun coverUrl(card: TrackCard): String? = card.coverUrlPath.takeIf { it.isNotBlank() }?.let(api::withApiKey)
+    fun coverUrl(card: ArtistCard): String? = card.coverUrlPath.takeIf { it.isNotBlank() }?.let(api::withApiKey)
+    fun coverUrl(card: PlaylistCard): String? = card.coverUrlPath?.takeIf { it.isNotBlank() }?.let(api::withApiKey)
+    /** Cover by Subsonic cover-art id at a given size (px). */
+    fun coverUrl(coverArt: String?, size: Int = 400): String? = api.coverArtUrl(coverArt?.takeIf { it.isNotBlank() }, size)
+
+    fun streamUrl(track: TrackCard): String =
+        track.streamUrlPath.takeIf { it.isNotBlank() }?.let(api::withApiKey) ?: api.streamUrl(track.id)
+}

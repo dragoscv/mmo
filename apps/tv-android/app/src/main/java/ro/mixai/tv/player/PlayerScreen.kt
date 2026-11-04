@@ -55,11 +55,16 @@ import ro.mixai.tv.BuildConfig
 import ro.mixai.tv.R
 import ro.mixai.tv.data.MediaRef
 import ro.mixai.tv.data.MmoApi
+import ro.mixai.tv.data.NowPlaying
+import ro.mixai.tv.data.PlayerBus
+import ro.mixai.tv.data.PlayerCommand
 import ro.mixai.tv.data.Song
 import ro.mixai.tv.data.VideoFile
-import ro.mixai.tv.ui.EmptyState
-import ro.mixai.tv.ui.EmptyTone
+import ro.mixai.tv.data.generated.HubMedia
 import ro.mixai.tv.ui.LocalSqueeze
+import ro.mixai.tv.ui.components.ErrorState
+import ro.mixai.tv.ui.nav.Navigator
+import ro.mixai.tv.ui.nav.ScreenDeps
 import ro.mixai.tv.ui.squeezeSuspended
 import ro.mixai.tv.ui.videoBoxFraction
 import ro.mixai.tv.ui.theme.Tokens
@@ -74,9 +79,28 @@ private const val SEEK_MS = 10_000L
 private const val PROGRESS_EVERY_MS = 5_000L
 private const val SERVER_PROGRESS_EVERY_MS = 10_000L
 
+/**
+ * Full-screen player (video + legacy Subsonic music). `resumeMs` is the ABSOLUTE start position
+ * (0 = from the beginning) already resolved by the caller from the route / local progress.
+ * Progress goes through [ScreenDeps.saveLocalProgress] / [ScreenDeps.saveServerProgress]; remote
+ * commands arrive through [PlayerBus] and the state is published back to it (hub now-playing).
+ */
 @OptIn(UnstableApi::class)
 @Composable
-fun PlayerScreen(
+fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeMs: Long) {
+    PlayerScreen(
+        api = deps.api,
+        request = request,
+        resumeMs = resumeMs,
+        onProgress = { fileId, pos, dur -> deps.saveLocalProgress(fileId, pos, dur) },
+        onServerProgress = { ref, pos, dur -> deps.saveServerProgress(ref, pos, dur) },
+        onExit = { nav.pop() },
+    )
+}
+
+@OptIn(UnstableApi::class)
+@Composable
+private fun PlayerScreen(
     api: MmoApi,
     request: PlayRequest,
     resumeMs: Long = 0L,
@@ -188,6 +212,38 @@ fun PlayerScreen(
         while (playing) { delay(SERVER_PROGRESS_EVERY_MS); reportServer() }
     }
 
+    // Remote control (hub / Watch Together) → this player.
+    LaunchedEffect(player) {
+        PlayerBus.commands.collect { cmd ->
+            when (cmd) {
+                PlayerCommand.Pause -> player.pause()
+                PlayerCommand.Resume -> player.play()
+                PlayerCommand.Toggle -> if (player.isPlaying) player.pause() else player.play()
+                is PlayerCommand.Seek -> player.seekTo(((cmd.positionSec * 1000).toLong() - hlsOffsetMs).coerceAtLeast(0))
+                is PlayerCommand.SeekBy -> player.seekTo((player.currentPosition + (cmd.deltaSec * 1000).toLong()).coerceAtLeast(0))
+                PlayerCommand.Stop -> { player.stop(); onExit() }
+                PlayerCommand.Next -> if (player.hasNextMediaItem()) player.seekToNextMediaItem()
+                PlayerCommand.Previous -> player.seekToPreviousMediaItem()
+                is PlayerCommand.Rate -> player.setPlaybackSpeed(cmd.rate.toFloat())
+            }
+        }
+    }
+    // Now-playing for the hub: on every play/pause change and every 5 s while playing.
+    fun publishNowPlaying() {
+        val v = request as? PlayRequest.Video
+        val dur = absDur().takeIf { it > 0 && it != C.TIME_UNSET }?.let { it / 1000.0 }
+        val media = if (v != null) HubMedia(
+            fileId = v.file.fileId, kind = v.ref?.kind, tmdbId = v.ref?.tmdbId, season = v.ref?.season, episode = v.ref?.episode,
+            title = v.file.title, durationSec = dur,
+        ) else HubMedia(title = nowPlaying?.title?.toString(), kind = "music", durationSec = dur)
+        PlayerBus.update(NowPlaying(player.isPlaying, absPos().coerceAtLeast(0) / 1000.0, dur, media))
+    }
+    LaunchedEffect(playing) {
+        publishNowPlaying()
+        while (playing) { delay(PROGRESS_EVERY_MS); publishNowPlaying() }
+    }
+    DisposableEffect(Unit) { onDispose { PlayerBus.clear() } }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -246,8 +302,8 @@ fun PlayerScreen(
         }
 
         error?.let {
-            EmptyState(
-                icon = "⚠", title = stringResource(R.string.player_error), message = it, tone = EmptyTone.Error,
+            ErrorState(
+                message = it, onRetry = null, title = stringResource(R.string.player_error),
                 modifier = Modifier.align(Alignment.Center).background(Tokens.card).padding(16.dp),
             )
         }

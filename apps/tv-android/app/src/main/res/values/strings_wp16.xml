@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16 foundation: shell, navigation, shared components, profiles. Screen areas use their own strings_<area>.xml. -->
+<resources>
+    <!-- Common -->
+    <string name="wp16_cancel">Cancel</string>
+    <string name="wp16_error_title">Something went wrong</string>
+    <string name="wp16_rating">★ %1$.1f</string>
+    <string name="wp16_runtime_min">%1$d min</string>
+    <string name="wp16_runtime_h">%1$d h</string>
+    <string name="wp16_runtime_hm">%1$d h %2$d min</string>
+    <string name="wp16_now_playing">Now playing</string>
+
+    <!-- Navigation rail -->
+    <string name="wp16_nav_home">Home</string>
+    <string name="wp16_nav_search">Search</string>
+    <string name="wp16_nav_movies">Movies</string>
+    <string name="wp16_nav_shows">TV shows</string>
+    <string name="wp16_nav_music">Music</string>
+    <string name="wp16_nav_livetv">Live TV</string>
+    <string name="wp16_nav_settings">Settings</string>
+
+    <!-- Exit -->
+    <string name="wp16_exit_title">Exit MixAI TV?</string>
+    <string name="wp16_exit_message">Background music keeps playing until you stop it.</string>
+    <string name="wp16_exit_confirm">Exit</string>
+
+    <!-- On-screen keyboard / PIN pad -->
+    <string name="wp16_key_backspace">Delete</string>
+    <string name="wp16_key_clear">Clear</string>
+    <string name="wp16_key_space">Space</string>
+    <string name="wp16_key_diacritics">ăîș</string>
+
+    <!-- Profiles -->
+    <string name="wp16_profiles_title">Who\'s watching?</string>
+    <string name="wp16_profiles_manage">Manage profiles</string>
+    <string name="wp16_profiles_empty">No profiles yet</string>
+    <string name="wp16_profiles_empty_hint">Create a profile for everyone in the house in Settings.</string>
+    <string name="wp16_profile_switch">Switch profile</string>
+    <string name="wp16_profile_none">No profile selected</string>
+    <string name="wp16_profile_locked">PIN protected</string>
+    <string name="wp16_profile_kids">Kids</string>
+    <string name="wp16_pin_title">Enter the PIN for %1$s</string>
+    <string name="wp16_pin_wrong">Wrong PIN</string>
+    <string name="wp16_pin_wrong_left">Wrong PIN — %1$d tries left</string>
+    <string name="wp16_pin_locked">Too many attempts. Try again in %1$d min.</string>
+    <string name="wp16_settings_profiles">Profiles</string>
+
+    <!-- Screen placeholders (replaced by the screen implementations) -->
+    <string name="wp16_stub_message">This screen is being rebuilt.</string>
+    <string name="wp16_stub_title">Title</string>
+    <string name="wp16_stub_season">Season</string>
+    <string name="wp16_stub_library">Library</string>
+    <string name="wp16_stub_stats">Year in review</string>
+    <string name="wp16_stub_artist">Artist</string>
+    <string name="wp16_stub_album">Album</string>
+    <string name="wp16_stub_guide">TV guide</string>
+    <string name="wp16_stub_recordings">Recordings</string>
+    <string name="wp16_stub_liveplayer">Live TV</string>
+    <string name="wp16_stub_together">Watch Together</string>
+</resources>

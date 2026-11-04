@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16 foundation: shell, navigation, shared components, profiles. Screen areas use their own strings_<area>.xml. -->
+<resources>
+    <!-- Common -->
+    <string name="wp16_cancel">Anulează</string>
+    <string name="wp16_error_title">Ceva n-a mers bine</string>
+    <string name="wp16_rating">★ %1$.1f</string>
+    <string name="wp16_runtime_min">%1$d min</string>
+    <string name="wp16_runtime_h">%1$d h</string>
+    <string name="wp16_runtime_hm">%1$d h %2$d min</string>
+    <string name="wp16_now_playing">Se redă acum</string>
+
+    <!-- Navigation rail -->
+    <string name="wp16_nav_home">Acasă</string>
+    <string name="wp16_nav_search">Căutare</string>
+    <string name="wp16_nav_movies">Filme</string>
+    <string name="wp16_nav_shows">Seriale</string>
+    <string name="wp16_nav_music">Muzică</string>
+    <string name="wp16_nav_livetv">TV live</string>
+    <string name="wp16_nav_settings">Setări</string>
+
+    <!-- Exit -->
+    <string name="wp16_exit_title">Ieși din MixAI TV?</string>
+    <string name="wp16_exit_message">Muzica din fundal continuă până o oprești.</string>
+    <string name="wp16_exit_confirm">Ieși</string>
+
+    <!-- On-screen keyboard / PIN pad -->
+    <string name="wp16_key_backspace">Șterge</string>
+    <string name="wp16_key_clear">Golește</string>
+    <string name="wp16_key_space">Spațiu</string>
+    <string name="wp16_key_diacritics">ăîș</string>
+
+    <!-- Profiles -->
+    <string name="wp16_profiles_title">Cine se uită?</string>
+    <string name="wp16_profiles_manage">Gestionează profilurile</string>
+    <string name="wp16_profiles_empty">Niciun profil încă</string>
+    <string name="wp16_profiles_empty_hint">Creează câte un profil pentru fiecare membru al casei din Setări.</string>
+    <string name="wp16_profile_switch">Schimbă profilul</string>
+    <string name="wp16_profile_none">Niciun profil ales</string>
+    <string name="wp16_profile_locked">Protejat cu PIN</string>
+    <string name="wp16_profile_kids">Copii</string>
+    <string name="wp16_pin_title">Introdu PIN-ul pentru %1$s</string>
+    <string name="wp16_pin_wrong">PIN greșit</string>
+    <string name="wp16_pin_wrong_left">PIN greșit — mai ai %1$d încercări</string>
+    <string name="wp16_pin_locked">Prea multe încercări. Încearcă din nou peste %1$d min.</string>
+    <string name="wp16_settings_profiles">Profiluri</string>
+
+    <!-- Screen placeholders (replaced by the screen implementations) -->
+    <string name="wp16_stub_message">Acest ecran este în reconstrucție.</string>
+    <string name="wp16_stub_title">Titlu</string>
+    <string name="wp16_stub_season">Sezon</string>
+    <string name="wp16_stub_library">Bibliotecă</string>
+    <string name="wp16_stub_stats">Anul în revistă</string>
+    <string name="wp16_stub_artist">Artist</string>
+    <string name="wp16_stub_album">Album</string>
+    <string name="wp16_stub_guide">Ghid TV</string>
+    <string name="wp16_stub_recordings">Înregistrări</string>
+    <string name="wp16_stub_liveplayer">TV live</string>
+    <string name="wp16_stub_together">Vizionare împreună</string>
+</resources>

@@ -29,8 +29,8 @@ android {
         applicationId = "ro.mixai.tv"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 6
-        versionName = "1.3.0"
+        versionCode = 7
+        versionName = "2.0.0"
         buildConfigField("String", "MIXAI_ORIGIN", "\"$mixaiOrigin\"")
     }
 
@@ -95,4 +95,11 @@ dependencies {
 
     // Watch Next channel (WP12-01)
     implementation(libs.tvprovider)
+
+    // WP16: hub WebSocket + vector icons
+    implementation(libs.okhttp)
+    implementation(libs.compose.material.icons.core)
+
+    // Pure-JVM unit tests (sync math, parsers)
+    testImplementation(libs.junit)
 }
