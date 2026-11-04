@@ -38,6 +38,8 @@ import { createVideoRouter, shutdownVideoSubsystem } from "./library/video-route
 import { createCastRouter } from "./cast/router";
 import { createPairRouter } from "./pair/router";
 import { createMediaModule, type MediaModule } from "./media";
+import { createHub, type Hub } from "./hub";
+import { getMeta as getMediaMeta, setMeta as setMediaMeta } from "./media/db";
 import { createMediaLibraryHooks, setMediaLibraryHooks } from "./media/library-hooks";
 import { buildCompanionMetrics } from "./metrics";
 import {
@@ -95,6 +97,7 @@ function splatParam(value: unknown): string {
 
 let httpServer: http.Server | null = null;
 let mediaModule: MediaModule | null = null;
+let hub: Hub | null = null;
 let wss: WebSocketServer | null = null;
 let serverPort = 17899;
 const wsClients = new Set<WebSocket>();
@@ -1151,6 +1154,21 @@ export async function startServer(): Promise<void> {
     // are served by these routes from the user's local library. See
     // `server/src/library/video-routes.ts` for the route shape.
 
+    // Watch Together guests (invite link, WP16-08) may read ONLY the room's current file:
+    // stream/direct/subs/thumbs/intro/credits for that fileId. Anything else stays 401.
+    app.use("/video", (req, _res, next) => {
+        const inv = typeof req.query.inv === "string" ? req.query.inv : undefined;
+        if (!inv || req.headers["x-device-token"] || req.query.t) { next(); return; }
+        const m = /^\/(stream|direct|subs|thumbs|intro|credits|recap|chapters|file)\/([^/]+)/.exec(req.path);
+        const fileId = m?.[2];
+        const token = store.get("deviceToken") as string | undefined;
+        if (fileId && token && hub?.core.inviteAllowsFile(inv, fileId)) {
+            req.headers["x-device-token"] = token;
+            // Marks the request so the HLS playlist forwards `inv=` (never the device token) on segment URLs.
+            req.headers["x-mmo-guest-invite"] = inv;
+        }
+        next();
+    });
     app.use("/video", createVideoRouter(authMiddleware));
     app.use("/video", createWatchPartyRouter(authMiddleware));
 
@@ -1200,6 +1218,26 @@ export async function startServer(): Promise<void> {
         }));
     }
     app.use("/media", authMiddleware, mediaModule.router);
+
+    // ─── Hub: device registry, remote control, Watch Together (WP16-07/08) ─
+    //
+    // `server/src/hub/`. WS `/hub` (device token or a Watch Together invite)
+    // + HTTP `/hub/*`. The invite secret lives in media.sqlite so links
+    // survive restarts.
+    if (!hub) {
+        const mm = mediaModule;
+        hub = createHub({
+            getDeviceToken: () => (store.get("deviceToken") as string | undefined) || undefined,
+            isAllowedOrigin,
+            getSecret: () => {
+                let s = getMediaMeta(mm.db, "hub_secret");
+                if (!s) { s = crypto.randomBytes(32).toString("base64url"); setMediaMeta(mm.db, "hub_secret", s); }
+                return s;
+            },
+            log: { info: (m, f) => log("info", m, f ?? ""), warn: (m, f) => log("warn", m, f ?? "") },
+        });
+    }
+    app.use("/hub", hub.router);
 
     // ─── Native low-latency audio engine ─────────────────────────────────
     //
@@ -1581,14 +1619,21 @@ export async function startServer(): Promise<void> {
     // WebSockets — only the Origin header arrives, and we have to gate
     // on it ourselves. Returning false from `verifyClient` cleanly
     // rejects the upgrade with 401.
-    wss = new WebSocketServer({
-        server: httpServer,
-        path: "/ws",
-        verifyClient: (info, cb) => {
-            const origin = info.req.headers.origin as string | undefined;
-            if (!isAllowedOrigin(origin)) return cb(false, 401, "origin not allowed");
-            cb(true);
-        },
+    // `noServer` + explicit dispatch: a `{server, path}` WebSocketServer answers 400 to
+    // EVERY other upgrade path (ws `shouldHandle` → abortHandshake), which killed
+    // /party/*, /hub and the Yjs bridge sharing this HTTP server.
+    wss = new WebSocketServer({ noServer: true });
+    const statusWss = wss;
+    httpServer.on("upgrade", (req, socket, head) => {
+        const pathname = (req.url ?? "").split("?")[0];
+        if (pathname !== "/ws") return;
+        const origin = req.headers.origin as string | undefined;
+        if (!isAllowedOrigin(origin)) {
+            socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+            socket.destroy();
+            return;
+        }
+        statusWss.handleUpgrade(req, socket, head, (ws) => statusWss.emit("connection", ws, req));
     });
     wss.on("connection", (ws) => {
         wsClients.add(ws);
@@ -1613,6 +1658,7 @@ export async function startServer(): Promise<void> {
 
     // Watch Party — co-watch rooms over WebSocket.
     attachWatchPartyWs(httpServer, isAllowedOrigin, () => store.get("deviceToken") as string | undefined);
+    hub?.attach(httpServer);
 
     // Heartbeat
     setInterval(() => {

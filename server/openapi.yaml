@@ -4976,6 +4976,120 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/ErrorJson' }
 
+  /hub/devices:
+    get:
+      operationId: hubDevices
+      tags: [hub]
+      summary: Devices connected to the hub (WS /hub) with what they are playing
+      description: |
+        Devices connect over `WS /hub?t=<deviceToken>` and send `hello {deviceId,name,platform,caps,profileId}`.
+        Watch Together guests (`WS /hub?inv=<invite>&name=`) are not listed.
+      responses:
+        '200':
+          description: Devices
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [devices, serverTime]
+                properties:
+                  devices: { type: array, items: { $ref: '#/components/schemas/HubDevice' } }
+                  serverTime: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /hub/command:
+    post:
+      operationId: hubCommand
+      tags: [hub]
+      summary: Remote control — send a command to a device and wait for its ack (4 s)
+      description: 'Actions: play {fileId,startSec,kind,tmdbId,season,episode,title} | pause | resume | seek {positionSec} | stop | next | previous | volume {level} | text {value} (search input) | navigate {to}.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target, action]
+              properties:
+                target: { type: string, description: deviceId }
+                action: { type: string }
+                args: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Ack from the device
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HubAck' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No such device
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HubAck' }
+        '504':
+          description: Device did not ack in time
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HubAck' }
+
+  /hub/rooms:
+    post:
+      operationId: hubCreateRoom
+      tags: [hub]
+      summary: Create a Watch Together room; returns a 24 h invite usable by guests
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { name: { type: string, maxLength: 60 } } }
+      responses:
+        '201':
+          description: Room
+          content:
+            application/json:
+              schema: { type: object, required: [roomId, invite], properties: { roomId: { type: string }, invite: { type: string } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /hub/rooms/{id}:
+    get:
+      operationId: hubRoom
+      tags: [hub]
+      summary: Room snapshot (phase, media, anchor, members)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Room
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HubRoom' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /hub/invite/{invite}:
+    get:
+      operationId: hubInvite
+      tags: [hub]
+      summary: Public — what a Watch Together invite points to (join page)
+      security: []
+      parameters:
+        - { name: invite, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Invite target
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [roomId, name, phase, members]
+                properties:
+                  roomId: { type: string }
+                  name: { type: string }
+                  phase: { type: string, enum: [idle, waiting, playing, paused] }
+                  media: { oneOf: [{ $ref: '#/components/schemas/HubMedia' }, { type: 'null' }] }
+                  members: { type: integer }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
 components:
   securitySchemes:
     deviceToken:
@@ -6370,6 +6484,75 @@ components:
         tmdbId: { type: integer }
         addedAt: { type: integer }
         rev: { type: integer }
+    HubMedia:
+      type: object
+      properties:
+        fileId: { type: string }
+        kind: { type: string }
+        tmdbId: { type: integer }
+        season: { type: integer }
+        episode: { type: integer }
+        title: { type: string }
+        posterPath: { type: [string, 'null'] }
+        durationSec: { type: number }
+        channelId: { type: string }
+    HubNowPlaying:
+      type: object
+      required: [playing, positionSec, at]
+      properties:
+        playing: { type: boolean }
+        positionSec: { type: number }
+        durationSec: { type: number }
+        media: { $ref: '#/components/schemas/HubMedia' }
+        at: { type: integer }
+    HubDevice:
+      type: object
+      required: [deviceId, name, platform, caps, profileId, app, connectedAt, guest, nowPlaying]
+      properties:
+        deviceId: { type: string }
+        name: { type: string }
+        platform: { type: string }
+        caps: { type: array, items: { type: string } }
+        profileId: { type: [string, 'null'] }
+        app: { type: [string, 'null'] }
+        connectedAt: { type: integer }
+        guest: { type: boolean }
+        nowPlaying: { oneOf: [{ $ref: '#/components/schemas/HubNowPlaying' }, { type: 'null' }] }
+    HubAck:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        seq: { type: string }
+        error: { type: string }
+        from: { type: string }
+        state: { type: object, additionalProperties: true }
+    HubRoom:
+      type: object
+      required: [id, name, phase, media, anchor, hostConnId, members]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        phase: { type: string, enum: [idle, waiting, playing, paused] }
+        media: { oneOf: [{ $ref: '#/components/schemas/HubMedia' }, { type: 'null' }] }
+        anchor:
+          type: object
+          required: [playing, positionSec, atServerMs]
+          properties:
+            playing: { type: boolean }
+            positionSec: { type: number }
+            atServerMs: { type: integer }
+        hostConnId: { type: [string, 'null'] }
+        members:
+          type: array
+          items:
+            type: object
+            required: [connId, name, ready, guest]
+            properties:
+              connId: { type: string }
+              name: { type: string }
+              ready: { type: boolean }
+              guest: { type: boolean }
     MediaSearchPage:
       type: object
       required: [page, totalPages, results]

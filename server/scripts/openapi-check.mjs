@@ -36,6 +36,7 @@ const MOUNTS = {
     "cast/router.ts": "/cast",
     "pair/router.ts": "/pair",
     "media/routes.ts": "/media",
+    "hub/index.ts": "/hub",
 };
 
 const ROUTE_RE = /\b(?:app|router|r)\.(get|post|put|patch|delete|all)\(\s*"(\/[^"]*)"/g;

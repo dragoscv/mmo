@@ -60,6 +60,9 @@ const ROOTS = [
     "Profile",
     "ProfileInput",
     "WatchlistEntry",
+    "HubDevice",
+    "HubAck",
+    "HubRoom",
     "Error",
 ];
 

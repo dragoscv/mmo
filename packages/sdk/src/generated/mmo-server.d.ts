@@ -3311,6 +3311,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/hub/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Devices connected to the hub (WS /hub) with what they are playing
+         * @description Devices connect over `WS /hub?t=<deviceToken>` and send `hello {deviceId,name,platform,caps,profileId}`.
+         *     Watch Together guests (`WS /hub?inv=<invite>&name=`) are not listed.
+         */
+        get: operations["hubDevices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hub/command": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remote control — send a command to a device and wait for its ack (4 s)
+         * @description Actions: play {fileId,startSec,kind,tmdbId,season,episode,title} | pause | resume | seek {positionSec} | stop | next | previous | volume {level} | text {value} (search input) | navigate {to}.
+         */
+        post: operations["hubCommand"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hub/rooms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a Watch Together room; returns a 24 h invite usable by guests */
+        post: operations["hubCreateRoom"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hub/rooms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Room snapshot (phase, media, anchor, members) */
+        get: operations["hubRoom"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hub/invite/{invite}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Public — what a Watch Together invite points to (join page) */
+        get: operations["hubInvite"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4432,6 +4524,63 @@ export interface components {
             tmdbId: number;
             addedAt: number;
             rev?: number;
+        };
+        HubMedia: {
+            fileId?: string;
+            kind?: string;
+            tmdbId?: number;
+            season?: number;
+            episode?: number;
+            title?: string;
+            posterPath?: string | null;
+            durationSec?: number;
+            channelId?: string;
+        };
+        HubNowPlaying: {
+            playing: boolean;
+            positionSec: number;
+            durationSec?: number;
+            media?: components["schemas"]["HubMedia"];
+            at: number;
+        };
+        HubDevice: {
+            deviceId: string;
+            name: string;
+            platform: string;
+            caps: string[];
+            profileId: string | null;
+            app: string | null;
+            connectedAt: number;
+            guest: boolean;
+            nowPlaying: components["schemas"]["HubNowPlaying"] | null;
+        };
+        HubAck: {
+            ok: boolean;
+            seq?: string;
+            error?: string;
+            from?: string;
+            state?: {
+                [key: string]: unknown;
+            };
+        };
+        HubRoom: {
+            id: string;
+            name: string;
+            /** @enum {string} */
+            phase: "idle" | "waiting" | "playing" | "paused";
+            media: components["schemas"]["HubMedia"] | null;
+            anchor: {
+                playing: boolean;
+                positionSec: number;
+                atServerMs: number;
+            };
+            hostConnId: string | null;
+            members: {
+                connId: string;
+                name: string;
+                ready: boolean;
+                guest: boolean;
+            }[];
         };
         MediaSearchPage: {
             page: number;
@@ -10968,6 +11117,165 @@ export interface operations {
             400: components["responses"]["ErrorJson"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["ErrorJson"];
+        };
+    };
+    hubDevices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Devices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        devices: components["schemas"]["HubDevice"][];
+                        serverTime: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    hubCommand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description deviceId */
+                    target: string;
+                    action: string;
+                    args?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Ack from the device */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HubAck"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            /** @description No such device */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HubAck"];
+                };
+            };
+            /** @description Device did not ack in time */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HubAck"];
+                };
+            };
+        };
+    };
+    hubCreateRoom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Room */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        roomId: string;
+                        invite: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    hubRoom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Room */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HubRoom"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    hubInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invite target */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        roomId: string;
+                        name: string;
+                        /** @enum {string} */
+                        phase: "idle" | "waiting" | "playing" | "paused";
+                        media?: components["schemas"]["HubMedia"] | null;
+                        members: number;
+                    };
+                };
+            };
+            404: components["responses"]["ErrorJson"];
         };
     };
 }

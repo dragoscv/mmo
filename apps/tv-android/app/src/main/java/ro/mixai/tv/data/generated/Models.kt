@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.3.1); generator: server/scripts/openapi-kotlin.mjs
+// Source: server/openapi.yaml (info.version 3.4.0); generator: server/scripts/openapi-kotlin.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 @file:Suppress("unused")
 
@@ -597,6 +597,61 @@ data class WatchlistEntry(
     val tmdbId: Long = 0L,
     val addedAt: Long = 0L,
     val rev: Long? = null,
+)
+
+@Serializable
+data class HubMedia(
+    val fileId: String? = null,
+    val kind: String? = null,
+    val tmdbId: Long? = null,
+    val season: Long? = null,
+    val episode: Long? = null,
+    val title: String? = null,
+    val posterPath: String? = null,
+    val durationSec: Double? = null,
+    val channelId: String? = null,
+)
+
+@Serializable
+data class HubNowPlaying(
+    val playing: Boolean = false,
+    val positionSec: Double = 0.0,
+    val durationSec: Double? = null,
+    val media: HubMedia? = null,
+    val at: Long = 0L,
+)
+
+@Serializable
+data class HubDevice(
+    val deviceId: String = "",
+    val name: String = "",
+    val platform: String = "",
+    val caps: List<String> = emptyList(),
+    val profileId: String? = null,
+    val app: String? = null,
+    val connectedAt: Long = 0L,
+    val guest: Boolean = false,
+    val nowPlaying: HubNowPlaying? = null,
+)
+
+@Serializable
+data class HubAck(
+    val ok: Boolean = false,
+    val seq: String? = null,
+    val error: String? = null,
+    val from: String? = null,
+    val state: Map<String, JsonElement>? = null,
+)
+
+@Serializable
+data class HubRoom(
+    val id: String = "",
+    val name: String = "",
+    val phase: String = "",
+    val media: HubMedia? = null,
+    val anchor: JsonObject = JsonObject(emptyMap()),
+    val hostConnId: String? = null,
+    val members: List<JsonObject> = emptyList(),
 )
 
 @Serializable

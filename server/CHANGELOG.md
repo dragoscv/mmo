@@ -18,6 +18,16 @@ All notable changes to the companion (Electron desktop app + local Express serve
 - Title `files[]` carry a parsed `version` (4K/1080p, DV/HDR, edition, remux) for the versions picker.
 - OpenAPI 204 routes; Models.kt (+ Profile, MediaSeasonResponse, NextEpisode, VersionedFile…) and SDK
 	types regenerated.
+- Hub (`server/src/hub/`): authenticated `WS /hub` + `GET /hub/devices`, `POST /hub/command` (remote
+	control / play on TV with ack), `POST /hub/rooms`, `GET /hub/rooms/{id}`, public `GET
+	/hub/invite/{invite}`. Watch Together rooms: SyncPlay-style clock sync (`time` ping, lowest-RTT
+	sample + EMA), server state machine idle → waiting → playing ⇄ paused, play scheduled at
+	`now + max RTT + 150 ms`, drift correction rules shared with clients (rate ±5 % above 120 ms,
+	stop under 40 ms, seek above 1.5 s), chat + reactions with media time. Signed 24 h invites let
+	guests join one room and stream only its current file (`/video/*?inv=`); guest HLS playlists
+	carry the invite, never the device token. OpenAPI 209 routes.
+- `/ws` status socket switched to `noServer` + path dispatch: the old `{server, path}` form answered
+	400 to every other WebSocket path on the same port.
 
 ## 3.3.1 — Deleted files no longer break the TV
 

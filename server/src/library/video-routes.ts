@@ -253,8 +253,10 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
             const m3u8 = await fs.promises.readFile(sess.playlistPath, "utf8");
             // Forward the same auth params on every segment URL so hls.js
             // (which can't set custom headers) can fetch them.
-            const t = encodeURIComponent((req.query.t as string) || (req.headers["x-device-token"] as string) || "");
-            const u = encodeURIComponent((req.query.u as string) || (req.headers["x-user-id"] as string) || "");
+            // Watch Together guests: forward the invite instead — the device token must never reach them.
+            const guestInv = req.headers["x-mmo-guest-invite"] as string | undefined;
+            const t = guestInv ? "" : encodeURIComponent((req.query.t as string) || (req.headers["x-device-token"] as string) || "");
+            const u = guestInv ? `&inv=${encodeURIComponent(guestInv)}` : encodeURIComponent((req.query.u as string) || (req.headers["x-user-id"] as string) || "");
             const baseUrl = `${req.protocol}://${req.get("host")}/video/stream/${req.params.fileId}/seg/${encodeURIComponent(sess.key)}`;
             res.setHeader("X-MMO-Mode", sess.mode);
             const rewritten = m3u8
