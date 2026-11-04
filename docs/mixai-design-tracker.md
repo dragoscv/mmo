@@ -32,6 +32,15 @@
 | D22 | Listen half | full: `track_plays` table + actions, Continue listening / New albums / Favourites / Playlists aggregated, `AlbumCard` | 2026-09-18 |
 | D23 | Agent config & gates | AGENTS.md + copilot-instructions + 11 instructions + 11 skills; lint-staged path-scoped gates; CI bundle/LHCI/axe/knip/lychee/actionlint; commitlint; weekly `pnpm outdated` issue | 2026-09-18 |
 | D24 | Keys | user authenticates in browser (MOTN developer portal) and provides key out-of-band; all integrations no-op without key | 2026-09-18 |
+| D25 | WP16 order + look | TV Android → Tizen → web; **cinematic backdrop-first** (Apple TV / Infuse): full-bleed backdrop follows focus, logo treatment, glass OSD; own library before recommendations | 2026-11-04 |
+| D26 | Profiles | "Who's watching" on every surface, optional 4-digit PIN (scrypt hash), kids profile with max age (0/12/14/15/18) mapped from TMDB certifications (RO CNC → age); **owned by MMO Server** (`media.sqlite`), web mirrors `/media/profiles` — no PROD migration | 2026-11-04 |
+| D27 | Music on TV | full: library (albums/artists/playlists/genres), artist + album pages, queue, synced lyrics (LRCLIB cached on server), background playback (Android `MediaSessionService`) | 2026-11-04 |
+| D28 | Live TV | **native server module `server/src/livetv`**: M3U(+XMLTV), Xtream Codes, HDHomeRun sources added by the user; EPG grid, fast zapping, catch-up (Xtream archive), DVR with `-c copy` (never re-encode). We ship no channel lists. RO channels from our own IPTV server = separate repo, out of WP16 | 2026-11-04 |
+| D29 | Sync + hub | progress + watchlist + profile prefs on MMO Server, TV profile id unified; **authenticated WS hub `/hub`** (LAN + tunnel): device registry, remote control / play-on-TV from web, Watch Together with SyncPlay-style clock sync (lowest-RTT + EMA, scheduled commands, rate/seek drift correction), chat + reactions | 2026-11-04 |
+| D30 | TV Android nav | own stack + `SaveableStateHolder` + `AnimatedContent` + `SharedTransitionLayout` (no Navigation Compose) | 2026-11-04 |
+| D31 | Web | unify on `/media`: search, browse, season/episode, profile gate, now playing, live TV; `/watch/*` redirects; legacy player features (skip, party, cast, bookmarks) kept, restyled with tokens | 2026-11-04 |
+| D32 | Extra ideas (all in) | hero muted trailer after 3 s focus; ambient screensaver; auto collections/franchises + "Surprise me"; voice search (Android) + phone keyboard via remote; versions picker; sleep timer + "still watching?"; global Continue (video+episodes+music+recordings) + customisable nav; year-in-review stats; PWA offline downloads | 2026-11-04 |
+| D33 | Cadence | small vertical slices, each committed with version bump + CHANGELOG and device-verified | 2026-11-04 |
 
 ## 1. Research summary (verified 2026-09-17)
 
@@ -395,3 +404,84 @@ analyses cheap (audio-only / keyframes, 1 at a time, idle priority, disk cache).
 | WP15-17 | Deleted files: `/video/stream` → 404 `file_missing`; `/video/scan` + `/media` library prune entries whose file is gone (root online); TV errors say "file no longer on disk" | done — live: 404 `file_missing`, scan 75 files 0 missing, media library 74 items 0 missing |
 | WP15-18 | Web player forced 16:9/4:3/21:9 = largest centred box (container query units) | done — 12 viewport×ratio combos (3440×1440, 1920×1080, 390×844, 844×390) ratio exact, inside=true |
 | WP15-19 | Tizen on Odyssey still pillarboxed (black bars L/R): app ran in a 16:9 window. `config.xml` `base_screen_resolution=extensive` + `viewport width=device-width` → native 21:9 surface; squeeze now only a fallback when the engine stays 16:9 | done (tv-tizen 1.3.1) — live: viewport 2580×1080, squeeze 1, no overflow, rows use full width (screenshot); 2.39:1 4K film `<video>` 2580×1080 = full screen; `screen-format.test.mjs` 4/4 |
+
+### WP16 — Better than Plex: cinematic UI/UX on every surface (2026-11-04)
+Decisions D25–D33. Must not regress WP15 (original-quality playback, `?start=` resume, ultrawide box, still.jpg, analysis queue).
+
+**Research summary (2026-11-04, 5 parallel inventories).**
+- *Plex 2024–25 redesign complaints*: slow/buggy focus (no up from library to nav), un-hideable Discover/Live/Rentals, Continue split per library, own library buried under promos. Premium feel (Infuse 8 / Apple TV) = restraint, huge artwork, logo treatment, honest format badges, fast thumbnail scrub, minimal OSD.
+- *tv-android 1.3.0*: hand-rolled `mutableStateListOf<Screen>` stack, only top screen composed → focus + scroll lost on Back; no transitions; stock media3 controller unreachable by D-pad (no tracks/skip/up-next); Coil defaults, no prefetch; `/media/home` memory-only 5 min cache; no search UI (API exists); music = one row, no background service; settings minimal; emoji icons; two detail designs (Movie/Show file pages + TMDB Title).
+- *tv-tizen 1.3.1*: union-state router remounts screens (Home re-POSTs `/video/scan` on every Back); `focus.ts` O(n) rect reads, no virtualisation; OSD buttons not focusable; no audio tracks/skip/up-next; `data-motion=reduced` forces all durations to 0; no settings screen; cache memory only; posters w500 for 220 px.
+- *web 2.2.1*: two video UIs (`/` + `/media` on servers vs legacy `/watch` on Postgres); `<ViewTransition>` already wraps pages + `media-${kind}-${id}` names; player has skip/up-next/party/cast but inline rgba + English labels; no media search page, no season pages, no artist/album pages, no profile gate; `watch_profiles` lacks PIN/max rating.
+- *server 3.3.1*: `/media/*` (home/title/search/progress/plays/library), profile = opaque string, certification cached (one region); no series/season model (flat season/episode on files); watch party WS on LAN only, `/ws` broadcast-only without auth; Subsonic has artists/albums/playlists/lyrics (LRCLIB lane) but no play queue; **no live TV at all**; single shared device token.
+- *Tech*: Compose `SharedTransitionLayout` (no `AndroidView` sharing → morph poster, crossfade into player); Media3 1.11 `DefaultPreloadManager` for zapping/episodes; tv-material 1.1 (Carousel, NavigationDrawer, Surface glow); React `<ViewTransition>` only inside transitions; Tizen ≤8 lacks View Transitions → FLIP with transform/opacity; SyncPlay clock sync (4-timestamp, lowest RTT, scheduled `When`), Xtream `player_api.php` (base64 EPG, `tv_archive`), HDHomeRun `discover.json`/`lineup.json`, LRCLIB `/api/get` cached server-side.
+
+**Design language (all surfaces).** Full-bleed backdrop layer under the UI that crossfades (300 ms, transform/opacity only) to the focused item's backdrop; scrim from tokens; title logo instead of text when TMDB has one; metadata chips (year · age rating · runtime · 4K/HDR/DV/Atmos/5.1); one primary action (Play / Resume S2E4 · 12 min left); left rail nav (Home, Search, Movies, Shows, Music, Live TV, Settings; reorder/hide) collapsing to icons; focused card scale 1.06 + ring + lift, rows remember focus; Back = one level, Home Back = rail, rail Back = exit confirm. Icons = lucide (web) / Material Symbols vector (Android) / inline SVG sprite (Tizen), no emoji.
+
+#### WP16-A — Server foundations
+| ID | Item | Status |
+|---|---|---|
+| WP16-01 | Profiles: `media.sqlite` v3 `profiles` (id, name, avatar, color, kind adult/kid, max_age, pin_hash scrypt, prefs JSON, sort); `/media/profiles` CRUD + `POST /media/profiles/:id/unlock` (PIN, 5 tries/5 min lock) → short-lived profile token; `default` profile seeded; legacy `profile_id` strings mapped | todo |
+| WP16-02 | Age ratings: `pickCertification` → `ageFor(cert, country)` table (RO CNC AG/AP-12/I.C.-14/N-15/IM-18, US, GB, DE); `age` on TitleCard/TitleDetails/library rows; `/media/home|search|title|library` filter by profile max_age (unrated blocked for kids) | todo |
+| WP16-03 | Series model: TMDB `/tv/{id}/season/{n}` cached 7 d; `GET /media/title/tv/:id/season/:n` → episodes with still, overview, runtime, air date, local file + progress per episode; next-up episode in title + continue | todo |
+| WP16-04 | Watchlist per profile on server (`watchlist` table, `/media/watchlist` GET/PUT/DELETE, row on home) + push to web sync | todo |
+| WP16-05 | Global Continue: episodes (next-up), movies, music albums, recordings in one `continue` row with `kind`; "Surprise me" + TMDB collections (franchise rows) | todo |
+| WP16-06 | Versions: title `files[]` grouped into versions (resolution/HDR/edition label from probe + filename) | todo |
+| WP16-07 | Hub `/hub` WS: auth (device token or profile token), device registry (`hello {deviceId,name,platform,caps,profileId}`), presence, `GET /hub/devices`; remote commands (`play {fileId,startSec}`, pause/seek/stop/next, `text` input for search), state snapshots 1 Hz; SSE fallback | todo |
+| WP16-08 | Watch Together on the hub: rooms with invite link (works over tunnel), clock sync (4-timestamp, lowest-RTT window 8 + EMA), server state machine idle→waiting→playing⇄paused, commands scheduled at `now+maxRTT+150ms`, drift: rate 0.95–1.05 above 120 ms (stop < 40 ms), seek > 1.5 s; chat + reactions with media timestamp; old `/video/party` kept as alias | todo |
+| WP16-09 | Music API for TV: `/media/music/home` (recent, newest, most played, playlists, genres), artists/albums/tracks pages via Subsonic store; play queue per profile `/media/music/queue` GET/PUT; lyrics `/media/music/lyrics/:trackId` (synced LRC → JSON lines; sidecar `.lrc` read; LRCLIB fallback via existing lane, cached) | todo |
+| WP16-10 | Stats: `/media/stats?profile&year` (hours, titles, top genres/artists, streaks) | todo |
+| WP16-11 | OpenAPI + `openapi:check` + Models.kt + SDK regen; tests for profiles/PIN lockout/age filter/season/watchlist/hub clock+drift/queue/lyrics; server minor bump | todo |
+
+#### WP16-B — Live TV / IPTV / DVR (server)
+| ID | Item | Status |
+|---|---|---|
+| WP16-12 | `server/src/livetv/` module + `livetv.sqlite`: sources (m3u url/file + xmltv url, xtream host/user/pass, hdhomerun ip), refresh schedule, channels (number, name, logo, group, tvg-id, source, stream url, archive days), favourites, hidden groups per profile | todo |
+| WP16-13 | Parsers: streaming M3U/M3U8 (`#EXTINF` attrs, `tvg-*`, `group-title`, `catchup*`), XMLTV (streaming SAX, gz), Xtream `player_api.php` (categories, live streams, short EPG base64, archive), HDHomeRun discover/lineup; EPG matching tvg-id → name fuzzy | todo |
+| WP16-14 | API `/livetv/*`: sources CRUD + test, channels (filter group/fav), `guide?from&to&channels` window, now/next, `stream/:channelId` (redirect or copy-proxy HLS/TS with `-c copy`, never transcode unless allowed), catch-up URL builder | todo |
+| WP16-15 | DVR: recordings (one-off from guide, series rule by title, padding), scheduler, tuner limit per source, `ffmpeg -c copy` to TS then remux MKV at IDLE (ffmpeg-jobs), recordings appear in library + Continue; conflicts reported | todo |
+| WP16-16 | Tests (parsers with fixtures, guide window, scheduler conflicts) + OpenAPI | todo |
+
+#### WP16-C — TV Android (2.0.0)
+| ID | Item | Status |
+|---|---|---|
+| WP16-17 | Navigation shell: stack + `SaveableStateHolder` (state/scroll/focus kept on Back), `AnimatedContent` + `SharedTransitionLayout`, left rail (icons → labels on focus), Back semantics, exit confirm | todo |
+| WP16-18 | Image pipeline: Coil `SingletonImageLoader.Factory` (memory 20 %, disk 256 MB, crossfade, exact sizes, RGB_565 for posters on low-RAM), prefetch next row + focused title backdrop; `/media/home` disk cache (stale-while-revalidate, etag) → Home < 1 s cold | todo |
+| WP16-19 | Profile picker + PIN pad (D-pad + number keys) + kids badge; profile switch in rail | todo |
+| WP16-20 | Home: backdrop layer follows focus, hero with logo/chips/Play-Resume, muted trailer link, rows (Continue global, watchlist, collections, recs), row focus memory | todo |
+| WP16-21 | Library browse: Movies/Shows grids (`LazyVerticalGrid`, 1000+ items, filters genre/year/rating/resolution, sort, A–Z jump) | todo |
+| WP16-22 | Title page redesign (single design; old Movie/Show screens removed): backdrop, logo, chips, Play/Resume, versions, trailer, watchlist, watched, cast row, seasons tabs + episode list with stills/progress, similar; shared element poster→title | todo |
+| WP16-23 | Search: on-screen keyboard grid + voice (SpeechRecognizer) + recent; results library/TMDB/music/channels | todo |
+| WP16-24 | Player OSD (Compose over SurfaceView): scrub bar with sprite thumbnails, ±10 s with hold acceleration, audio/subtitle picker, subtitle size/delay, speed, screen format, info panel, skip intro/recap/credits buttons, up-next card with countdown, still-watching prompt, sleep timer; Back hides OSD first; keeps WP15 HLS/resume/ultrawide | todo |
+| WP16-25 | Music: `MediaSessionService` background playback, Music home, artists/albums/playlists, album + artist pages, now playing (artwork backdrop, synced lyrics, queue panel), mini-player in rail | todo |
+| WP16-26 | Live TV: channel list + EPG grid (virtualised both axes, now line, ±day), zapping with `DefaultPreloadManager` (N±1) + last-channel toggle, number entry, now/next overlay, catch-up, record button, recordings | todo |
+| WP16-27 | Hub client: register, remote commands (play-on-TV from web), Watch Together join/sync/reactions overlay | todo |
+| WP16-28 | Settings: server, account, profiles, playback (autoplay, skip intro auto, preferred audio/subs language), subtitles style, screen format, language, nav customise, cache clear/size, about/diagnostics; ambient screensaver (DreamService) | todo |
+| WP16-29 | Strings RO/EN parity, no emoji/hardcoded, device verification (uiautomator + logcat + frame stats `dumpsys gfxinfo`), design-critic ≥ 52 | todo |
+
+#### WP16-D — TV Tizen (2.0.0)
+| ID | Item | Status |
+|---|---|---|
+| WP16-30 | Shell: keep-alive route stack (screens hidden, not unmounted → focus + scroll restored), left rail, exit confirm; `focus.ts` v2 (scoped containers, cached rects per row, wrap, overlay traps); motion re-enabled with transform/opacity (reduced only by user pref) | todo |
+| WP16-31 | Data: localStorage/IndexedDB cache of `/media/home` + title (SWR, etag), virtualised rows/grids (windowed), poster sizes w342/w185, `decoding=async`, backdrop preload of focused + next | todo |
+| WP16-32 | Profiles + PIN; Home backdrop-follows-focus + hero; library grids + filters; title page with seasons/episodes/versions/cast; FLIP card→title transition (View Transitions when available) | todo |
+| WP16-33 | Search (TMDB + library + music + channels, on-screen keyboard grid); player OSD focusable (scrub thumbs, tracks, subtitles, speed, skip, up-next, still-watching); settings screen | todo |
+| WP16-34 | Music (library, artist/album, now playing + lyrics + queue, mini-player); Live TV (EPG grid, zapping with 2 `<video>` elements, catch-up, record); hub client (remote + Watch Together) | todo |
+| WP16-35 | i18n parity, SVG icons, device verification Odyssey (CDP frame timing, screenshots 2580×1080), design-critic ≥ 52 | todo |
+
+#### WP16-E — Web (3.0.0)
+| ID | Item | Status |
+|---|---|---|
+| WP16-36 | Profile gate ("Who's watching", PIN, kids) on `/media` + `/profiles` rewrite on server profiles (i18n) | todo |
+| WP16-37 | Media shell: rail/top nav (Home, Search, Movies, Shows, Music, Live TV), backdrop-follows-hover/focus, hero muted trailer after 3 s, keyboard roving focus in rows | todo |
+| WP16-38 | Pages: `/media/search`, `/media/browse/[kind]` (filters, virtualised grid), season/episode `/media/tv/[id]/season/[n]`, collections, watchlist, stats (year in review); `/watch/*` → `/media` redirects | todo |
+| WP16-39 | Player restyle with tokens + i18n: OSD, tracks, speed, versions, skip, up-next, still watching, sleep; Watch Together on hub; "Play on TV" device picker (hub remote) + phone-as-remote page | todo |
+| WP16-40 | Music: artist/album pages, full-screen now playing with synced lyrics + queue | todo |
+| WP16-41 | Live TV: channels + EPG grid + player (hls.js) + recordings; settings › Live TV sources | todo |
+| WP16-42 | PWA offline downloads (Serwist + IndexedDB, per profile) | todo |
+| WP16-43 | Verification: vitest, typecheck, lint baseline, cloud e2e 390/1440/3440 light/dark + axe, View Transition long-task measure, design-critic ≥ 52 | todo |
+
+#### WP16-F — Closure
+| ID | Item | Status |
+|---|---|---|
+| WP16-44 | CHANGELOGs, versions (server 3.4.0, tv 2.0.0, web 3.0.0, sdk), docs (`docs/aplicatie/media-home.md`, live TV guide, ADR-0011 hub + ADR-0012 live TV), design-critic report | todo |
