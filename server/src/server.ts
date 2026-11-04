@@ -1259,7 +1259,11 @@ export async function startServer(): Promise<void> {
             },
         });
     }
-    app.use("/livetv", authMiddleware, liveTv.router);
+    // `?t=` → header for players that cannot send headers (hls.js / <video> / Media3 per-segment).
+    app.use("/livetv", (req, _res, next) => {
+        if (typeof req.query.t === "string" && !req.headers["x-device-token"]) req.headers["x-device-token"] = req.query.t;
+        next();
+    }, authMiddleware, liveTv.router);
 
     // ─── Native low-latency audio engine ─────────────────────────────────
     //

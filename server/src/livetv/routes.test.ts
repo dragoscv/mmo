@@ -8,6 +8,7 @@ import { openMemoryLiveTvDb } from "./db";
 import { LiveTvService } from "./service";
 import { DvrScheduler, type SpawnFfmpeg } from "./recorder";
 import { createLiveTvRouter } from "./routes";
+import { rewritePlaylist } from "./routes";
 import { silentLogger, type FetchLike } from "./util";
 
 const H = 3_600_000;
@@ -20,6 +21,8 @@ const PLAYLIST = [
     "http://stream.test/news.ts",
     '#EXTINF:-1 tvg-id="film" group-title="Movies",Film Box',
     "http://stream.test/film.ts",
+    '#EXTINF:-1 tvg-id="hls" group-title="Live",HLS Chan',
+    "http://hls.test/live/master.m3u8",
 ].join("\n");
 const GUIDE = `<tv>
   <programme start="${xt(NOW - H)}" stop="${xt(NOW + H)}" channel="news"><title>Live News</title></programme>
@@ -30,8 +33,22 @@ const upstreamFetch: FetchLike = async (url) => {
     if (url.includes("list.m3u")) return new Response(PLAYLIST);
     if (url.includes("guide.xml")) return new Response(GUIDE);
     if (url.startsWith("http://stream.test/")) return new Response("TSDATA", { status: 200, headers: { "content-type": "video/mp2t" } });
+    if (url === "http://hls.test/live/master.m3u8") {
+        return new Response("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=800000\nlow/index.m3u8\n", { headers: { "content-type": "application/vnd.apple.mpegurl" } });
+    }
+    if (url === "http://hls.test/live/low/index.m3u8") {
+        return new Response('#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="key.bin"\n#EXTINF:6,\nseg1.ts\n', { headers: { "content-type": "application/x-mpegURL" } });
+    }
+    if (url === "http://hls.test/live/low/seg1.ts") return new Response("SEG1", { headers: { "content-type": "video/mp2t" } });
     return new Response("nope", { status: 404 });
 };
+
+describe("rewritePlaylist", () => {
+    it("resolves relative URIs and rewrites plain lines + URI attributes", () => {
+        const out = rewritePlaylist('#EXTM3U\n#EXT-X-MAP:URI="init.mp4"\n#EXTINF:4,\n../a/s1.m4s\n', "http://h.test/x/y/p.m3u8", (u) => `P(${u})`);
+        expect(out).toBe('#EXTM3U\n#EXT-X-MAP:URI="P(http://h.test/x/y/init.mp4)"\n#EXTINF:4,\nP(http://h.test/x/a/s1.m4s)\n');
+    });
+});
 
 const neverSpawn: SpawnFfmpeg = () => { throw new Error("ffmpeg must not run in route tests"); };
 
@@ -97,15 +114,15 @@ describe("livetv router", () => {
 
     it("test + refresh imports channels and guide", async () => {
         const t = await post(`/sources/${sourceId}/test`, {});
-        expect(t.body).toMatchObject({ ok: true, channelCount: 2, error: null });
+        expect(t.body).toMatchObject({ ok: true, channelCount: 3, error: null });
         const r = await post(`/sources/${sourceId}/refresh`, {});
         expect(r.status).toBe(200);
-        expect(r.body.source).toMatchObject({ ok: true, channelCount: 2 });
+        expect(r.body.source).toMatchObject({ ok: true, channelCount: 3 });
         expect(r.body.guide).toMatchObject({ ok: true, programmes: 2 });
         const ch = (await j("/channels")).body.channels as Array<{ id: string; name: string; favourite: boolean }>;
         newsId = ch.find((c) => c.name === "News One")!.id;
         filmId = ch.find((c) => c.name === "Film Box")!.id;
-        expect((await j("/groups")).body.groups).toEqual([{ name: "News", count: 1 }, { name: "Movies", count: 1 }]);
+        expect((await j("/groups")).body.groups).toEqual([{ name: "News", count: 1 }, { name: "Movies", count: 1 }, { name: "Live", count: 1 }]);
         expect(((await j("/channels?group=Movies")).body.channels as unknown[]).length).toBe(1);
     });
 
@@ -117,8 +134,8 @@ describe("livetv router", () => {
         expect(favs).toEqual([expect.objectContaining({ id: newsId, favourite: true })]);
         expect((await post(`/channels/${filmId}`, { hidden: "yes" }, "PATCH")).status).toBe(400);
         expect((await post(`/channels/${filmId}`, { hidden: true, number: "9" }, "PATCH")).body).toMatchObject({ hidden: true, number: "9" });
-        expect(((await j("/channels")).body.channels as unknown[]).length).toBe(1);
-        expect(((await j("/channels?hidden=1")).body.channels as unknown[]).length).toBe(2);
+        expect(((await j("/channels")).body.channels as unknown[]).length).toBe(2);
+        expect(((await j("/channels?hidden=1")).body.channels as unknown[]).length).toBe(3);
         await post(`/channels/${filmId}`, { hidden: false }, "PATCH");
         await j(`/channels/${newsId}/favourite?profile=kid`, { method: "DELETE" });
         expect(((await j("/channels?profile=kid&favourites=1")).body.channels as unknown[]).length).toBe(0);
@@ -145,6 +162,23 @@ describe("livetv router", () => {
         expect(p.headers.get("content-type")).toBe("video/mp2t");
         expect(p.text).toBe("TSDATA");
         expect((await j("/stream/missing")).status).toBe(404);
+    });
+
+    it("proxies HLS: master → variant → key/segment through signed /proxy URLs, rejects forged ones", async () => {
+        const chans = (await j("/channels")).body.channels as { id: string; name: string }[];
+        const hlsId = chans.find((c) => c.name === "HLS Chan")!.id;
+        const master = await fetch(`${base}/stream/${hlsId}?proxy=1&t=tok`);
+        expect(master.headers.get("content-type")).toMatch(/^application\/vnd\.apple\.mpegurl/);
+        const mText = await master.text();
+        const variantLine = mText.split("\n").find((l) => l.startsWith("/livetv/proxy/"))!;
+        expect(variantLine).toContain("&t=tok");
+        const variant = await (await fetch(`http://127.0.0.1:${new URL(base).port}${variantLine}`)).text();
+        expect(variant).toMatch(/URI="\/livetv\/proxy\/[^"]+"/);
+        const segLine = variant.split("\n").find((l) => l.startsWith("/livetv/proxy/"))!;
+        expect(await (await fetch(`http://127.0.0.1:${new URL(base).port}${segLine}`)).text()).toBe("SEG1");
+        // forged target / tampered signature → 403
+        const forged = `${base}/proxy/${hlsId}?u=${Buffer.from("http://169.254.169.254/").toString("base64url")}&s=${"A".repeat(32)}`;
+        expect((await fetch(forged)).status).toBe(403);
     });
 
     it("catch-up needs params and an archive", async () => {

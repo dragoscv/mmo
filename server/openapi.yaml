@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.6.0
+  version: 3.7.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -2568,6 +2568,7 @@ paths:
         - { name: start, in: query, schema: { type: number, default: 0 }, description: Start offset in seconds. }
         - { name: caps, in: query, schema: { type: string }, description: Comma-separated client capability list. }
         - { name: mode, in: query, schema: { type: string, enum: [remux, audio-transcode, full-transcode] } }
+        - { name: audio, in: query, schema: { type: integer, minimum: 0, default: 0 }, description: 'Audio track ordinal (ffmpeg 0:a:N = audioTracks[N]); non-zero bypasses the single-track pre-remux sidecar.' }
       responses:
         '200':
           description: HLS playlist
@@ -5212,6 +5213,85 @@ paths:
               schema: { $ref: '#/components/schemas/MusicSearch' }
         '400': { $ref: '#/components/responses/ErrorJson' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/music/albums:
+    get:
+      operationId: musicAlbums
+      tags: [music]
+      summary: Albums A–Z (paged, optional first letter)
+      parameters:
+        - { name: letter, in: query, schema: { type: string } }
+        - { name: offset, in: query, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: Page of albums
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, offset, limit, items]
+                properties:
+                  total: { type: integer }
+                  offset: { type: integer }
+                  limit: { type: integer }
+                  items: { type: array, items: { $ref: '#/components/schemas/AlbumCard' } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/music/playlists/{id}:
+    get:
+      operationId: musicPlaylist
+      tags: [music]
+      summary: Playlist with its tracks in order
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Playlist
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [playlist, tracks]
+                properties:
+                  playlist: { $ref: '#/components/schemas/PlaylistCard' }
+                  tracks: { type: array, items: { $ref: '#/components/schemas/TrackCard' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/music/random:
+    get:
+      operationId: musicRandom
+      tags: [music]
+      summary: Random tracks for shuffle-all / Mix (1..500)
+      parameters:
+        - { name: size, in: query, schema: { type: integer, default: 50 } }
+      responses:
+        '200':
+          description: Tracks
+          content:
+            application/json:
+              schema: { type: object, required: [tracks], properties: { tracks: { type: array, items: { $ref: '#/components/schemas/TrackCard' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /livetv/proxy/{channelId}:
+    get:
+      operationId: liveTvProxy
+      tags: [livetv]
+      summary: Signed pass-through of one URL from a proxied HLS playlist (variants, segments, keys)
+      description: 'Only URLs that appeared in a playlist served by `/livetv/stream/{id}?proxy=1` are accepted (HMAC `s`); nested playlists are rewritten again. Never transcoded.'
+      parameters:
+        - { name: channelId, in: path, required: true, schema: { type: string } }
+        - { name: u, in: query, required: true, schema: { type: string }, description: base64url target URL }
+        - { name: s, in: query, required: true, schema: { type: string }, description: HMAC signature }
+        - { $ref: '#/components/parameters/QueryT' }
+      responses:
+        '200': { description: Upstream bytes or a rewritten playlist }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+        '502': { $ref: '#/components/responses/ErrorJson' }
 
   /media/music/queue:
     get:

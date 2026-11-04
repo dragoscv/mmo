@@ -3522,6 +3522,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/music/albums": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Albums A–Z (paged, optional first letter) */
+        get: operations["musicAlbums"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/playlists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Playlist with its tracks in order */
+        get: operations["musicPlaylist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/random": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Random tracks for shuffle-all / Mix (1..500) */
+        get: operations["musicRandom"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/livetv/proxy/{channelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Signed pass-through of one URL from a proxied HLS playlist (variants, segments, keys)
+         * @description Only URLs that appeared in a playlist served by `/livetv/stream/{id}?proxy=1` are accepted (HMAC `s`); nested playlists are rewritten again. Never transcoded.
+         */
+        get: operations["liveTvProxy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/media/music/queue": {
         parameters: {
             query?: never;
@@ -8591,6 +8662,8 @@ export interface operations {
                 /** @description Comma-separated client capability list. */
                 caps?: string;
                 mode?: "remux" | "audio-transcode" | "full-transcode";
+                /** @description Audio track ordinal (ffmpeg 0:a:N = audioTracks[N]); non-zero bypasses the single-track pre-remux sidecar. */
+                audio?: number;
             };
             header?: never;
             path: {
@@ -12144,6 +12217,120 @@ export interface operations {
             };
             400: components["responses"]["ErrorJson"];
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicAlbums: {
+        parameters: {
+            query?: {
+                letter?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page of albums */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        total: number;
+                        offset: number;
+                        limit: number;
+                        items: components["schemas"]["AlbumCard"][];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicPlaylist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Playlist */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        playlist: components["schemas"]["PlaylistCard"];
+                        tracks: components["schemas"]["TrackCard"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    musicRandom: {
+        parameters: {
+            query?: {
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tracks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        tracks: components["schemas"]["TrackCard"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    liveTvProxy: {
+        parameters: {
+            query: {
+                /** @description base64url target URL */
+                u: string;
+                /** @description HMAC signature */
+                s: string;
+                /** @description Device token (alternative to the `x-device-token` header). */
+                t?: components["parameters"]["QueryT"];
+            };
+            header?: never;
+            path: {
+                channelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Upstream bytes or a rewritten playlist */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
+            502: components["responses"]["ErrorJson"];
         };
     };
     musicGetQueue: {

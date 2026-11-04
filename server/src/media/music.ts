@@ -25,7 +25,7 @@ import {
     getTrack, getTracks, indexLetter, listAlbums, listArtists, resolveUserId, songsOfAlbum, suffixOf, tracksForId,
     type AlbumAgg, type ArtistAgg, type TrackRow,
 } from "../subsonic/browse";
-import { listPlaylists } from "../subsonic/playlists";
+import { getPlaylist, listPlaylists } from "../subsonic/playlists";
 import { albumId, artistId, decodeId, playlistId, trackId } from "../subsonic/ids";
 
 // ─── Public shapes ───────────────────────────────────────────────────────────
@@ -473,6 +473,41 @@ export class MusicService {
         const uid = this.userId();
         if (!uid) return [];
         return subsonicGenres(uid).map((g) => ({ name: g.value, songCount: g.songCount, albumCount: g.albumCount }));
+    }
+
+    /** Tracks of one playlist, in playlist order (404 when it is not this library owner's). */
+    playlist(id: string): { playlist: PlaylistCard; tracks: TrackCard[] } {
+        const uid = this.userId();
+        if (!uid) throw new MusicError(404, "playlist not found");
+        let res: ReturnType<typeof getPlaylist>;
+        try { res = getPlaylist(uid, id); } catch { throw new MusicError(404, "playlist not found"); }
+        const card = this.playlists(uid).find((p) => p.id === playlistId(res.row.id));
+        if (!card) throw new MusicError(404, "playlist not found");
+        return { playlist: card, tracks: res.songs.map((t) => trackCard(t)) };
+    }
+
+    /** Random tracks for "Mix" / shuffle-all (1..500). */
+    randomTracks(size?: number): TrackCard[] {
+        const uid = this.userId();
+        if (!uid) return [];
+        const n = clampInt(size, 1, 500, 50);
+        const ids = (this.lib()
+            .prepare("SELECT id FROM tracks WHERE user_id = ? AND COALESCE(is_hidden, 0) = 0 ORDER BY RANDOM() LIMIT ?")
+            .all(uid, n) as { id: number }[]).map((r) => r.id);
+        const byId = new Map(getTracks(uid, ids).map((t) => [t.id, t]));
+        return ids.map((i) => byId.get(i)).filter((t): t is TrackRow => !!t).map((t) => trackCard(t));
+    }
+
+    /** Albums A–Z (optionally by first letter), paged. */
+    albums(opts: { letter?: string; offset?: number; limit?: number } = {}): Page<AlbumCard> {
+        const offset = clampInt(opts.offset, 0, 1_000_000, 0);
+        const limit = clampInt(opts.limit, 1, 500, 100);
+        const uid = this.userId();
+        if (!uid) return { total: 0, offset, limit, items: [] };
+        let all = listAlbums(uid).sort((x, y) => (x.album ?? "").localeCompare(y.album ?? "", undefined, { sensitivity: "base" }));
+        const letter = opts.letter?.trim().toUpperCase();
+        if (letter) all = all.filter((a) => fold(indexLetter(a.album)).toUpperCase() === fold(letter).toUpperCase());
+        return { total: all.length, offset, limit, items: all.slice(offset, offset + limit).map(albumCard) };
     }
 
     genre(name: string, offset?: number, limit?: number): Page<AlbumCard> & { genre: string } {

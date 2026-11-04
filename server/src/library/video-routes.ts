@@ -27,7 +27,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { platform } from "../platform";
 import { walkVideos, ffprobe, parseFilename } from "./video-scanner";
-import { ensureHlsSession, touchSession, canDirectPlay, destroySessionsForFile, sessionForSegment, type VideoQuality, type TranscodeMode, destroyAllSessions } from "./transcode-video";
+import { ensureHlsSession, touchSession, canDirectPlay, destroySessionsForFile, sessionForSegment, SESSION_KEY_RE, type VideoQuality, type TranscodeMode, destroyAllSessions } from "./transcode-video";
 import { FFMPEG_BIN } from "./ffmpeg-paths";
 import { withAnalysisSlot, runFfmpeg, createLimiter, analysisQueueStats } from "./ffmpeg-jobs";
 import { subtitleVttPath } from "./video-subs";
@@ -248,8 +248,10 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
         const capsParam = (req.query.caps as string | undefined) ?? "";
         const caps = capsParam ? capsParam.split(",").map((s) => s.trim()).filter(Boolean) : [];
         const modeParam = req.query.mode as TranscodeMode | undefined;
+        // `audio=<n>` = ffmpeg `0:a:<n>` (ordinal among audio streams, same as `audioTracks[n]`).
+        const audioIdx = Math.max(0, Math.min(31, parseInt((req.query.audio as string) || "0", 10) || 0));
         try {
-            const sess = await ensureHlsSession(req.params.fileId, abs, q, start, caps, modeParam);
+            const sess = await ensureHlsSession(req.params.fileId, abs, q, start, caps, modeParam, audioIdx);
             const m3u8 = await fs.promises.readFile(sess.playlistPath, "utf8");
             // Forward the same auth params on every segment URL so hls.js
             // (which can't set custom headers) can fetch them.
@@ -293,7 +295,7 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
             if (abs) fileEntry = fileRegistry.get(req.params.fileId);
         }
         if (!fileEntry) { res.status(404).end(); return; }
-        const m = sessionKey.match(/^[^:]+:(original|1080p|720p|480p):(remux|audio-transcode|full-transcode)$/);
+        const m = sessionKey.match(SESSION_KEY_RE);
         if (!m) { res.status(400).end(); return; }
         try {
             // Live session as-is; restart only if it was idle-killed, and then at

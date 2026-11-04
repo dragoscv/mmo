@@ -82,6 +82,18 @@ export function createMusicRouter(deps: MusicRouterDeps): express.Router {
         res.json(music.genre(String(req.params.name), qint(req.query.offset), qint(req.query.limit)));
     }));
 
+    router.get("/albums", wrap((req, res) => {
+        res.json(music.albums({ letter: qs(req.query.letter), offset: qint(req.query.offset), limit: qint(req.query.limit) }));
+    }));
+
+    router.get("/playlists/:id", wrap((req, res) => {
+        res.json(music.playlist(String(req.params.id)));
+    }));
+
+    router.get("/random", wrap((req, res) => {
+        res.json({ tracks: music.randomTracks(qint(req.query.size)) });
+    }));
+
     router.get("/search", wrap((req, res) => {
         const q = qs(req.query.q);
         if (!q) { res.status(400).json({ error: "q required" }); return; }

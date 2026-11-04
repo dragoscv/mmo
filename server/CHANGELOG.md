@@ -2,6 +2,18 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.7.0 — Audio track switching on HLS, Live TV HLS through the proxy, more music endpoints
+
+- `GET /video/stream/{fileId}?audio=<n>` picks the audio track (`0:a:<n>`, same ordinal as
+	`audioTracks[n]`); the mode is chosen from THAT track's codec (e.g. a TrueHD main track converts,
+	an AAC commentary copies) and a non-default track bypasses the single-track pre-remux sidecar.
+	Session keys gain `:a<n>`. Video still never re-encoded.
+- Live TV `?proxy=1` now understands HLS: playlists are rewritten so every variant, segment, init map
+	and key goes through `GET /livetv/proxy/{channelId}?u=&s=` (HMAC-signed per process, so it is not an
+	open proxy). `/livetv` accepts `?t=` for players that cannot send headers (hls.js, `<video>`).
+- `/media/music/albums` (A–Z paged), `/media/music/playlists/{id}` (tracks in order),
+	`/media/music/random` (shuffle-all). OpenAPI 245 routes; Models.kt + SDK regenerated.
+
 ## 3.6.0 — Live TV / IPTV / DVR, music browse, year in review (WP16-09/10/12–16)
 
 - Live TV (`server/src/livetv/`, `livetv.sqlite`): user-added M3U(+XMLTV), Xtream Codes and HDHomeRun

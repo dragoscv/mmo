@@ -14,6 +14,8 @@
  *   GET    /livetv/guide?from=&to=&channels=a,b      (epoch ms, ≤ 48 h)
  *   GET    /livetv/now?channels=a,b
  *   GET    /livetv/stream/:channelId[?proxy=1]       302 upstream | piped bytes
+ *          (HLS playlists are rewritten so every variant/segment/key goes through /livetv/proxy)
+ *   GET    /livetv/proxy/:channelId?u=&s=            signed pass-through of one URL seen in a proxied playlist
  *   GET    /livetv/catchup/:channelId?start=&duration=   302
  *   GET    /livetv/recordings  POST /livetv/recordings  DELETE /livetv/recordings/:id
  *   GET    /livetv/rules       POST /livetv/rules       DELETE /livetv/rules/:id
@@ -22,6 +24,7 @@
  */
 
 import express from "express";
+import crypto from "node:crypto";
 import { Readable } from "node:stream";
 import type { LiveTvService } from "./service";
 import type { DvrScheduler } from "./recorder";
@@ -69,11 +72,32 @@ function pick<T extends object>(body: Record<string, unknown>, keys: readonly (k
 const SOURCE_KEYS = ["kind", "name", "url", "xmltvUrl", "username", "password", "enabled", "refreshHours", "tunerLimit"] as const;
 const HOP_HEADERS = ["content-type", "content-length", "cache-control", "last-modified", "etag", "accept-ranges", "content-range"];
 
+const isPlaylist = (url: string, contentType: string | null) =>
+    /mpegurl/i.test(contentType ?? "") || /\.m3u8?(\?|$)/i.test(url);
+
+/**
+ * Rewrites every URI of an HLS playlist (plain lines + `URI="…"` attributes) to [toProxy](absolute URL).
+ * Relative URIs resolve against the playlist URL after redirects (`base`).
+ */
+export function rewritePlaylist(text: string, base: string, toProxy: (abs: string) => string): string {
+    const abs = (u: string) => { try { return new URL(u, base).toString(); } catch { return u; } };
+    return text.split(/\r?\n/).map((line) => {
+        const t = line.trim();
+        if (!t) return line;
+        if (t.startsWith("#")) return line.replace(/URI="([^"]+)"/g, (_m, u: string) => `URI="${toProxy(abs(u))}"`);
+        return toProxy(abs(t));
+    }).join("\n");
+}
+
 export function createLiveTvRouter(deps: LiveTvRouterDeps): express.Router {
     const { service, dvr, log } = deps;
     const fetchImpl = deps.fetch ?? defaultFetch;
     const router = express.Router();
     router.use(express.json({ limit: "256kb" }));
+    // Signs proxied URLs so /livetv/proxy only fetches URLs that appeared in a playlist we served
+    // (no open proxy / SSRF). Per process: after a restart the player simply refetches the master.
+    const proxySecret = crypto.randomBytes(32);
+    const sign = (channelId: string, u: string) => crypto.createHmac("sha256", proxySecret).update(`${channelId}\n${u}`).digest("base64url").slice(0, 32);
 
     const fail = (res: express.Response, err: unknown, path: string) => {
         if (err instanceof LiveTvError) { res.status(err.status).json({ error: err.message }); return; }
@@ -175,14 +199,8 @@ export function createLiveTvRouter(deps: LiveTvRouterDeps): express.Router {
     }));
 
     // ── playback ─────────────────────────────────────────────────────────
-    router.get("/stream/:channelId", wrap(async (req, res) => {
-        const url = service.streamUrlFor(param(req, "channelId"));
-        if (!url) throw new LiveTvError(404, "channel not found");
-        if (!truthy(req.query.proxy)) {
-            res.setHeader("cache-control", "no-store");
-            res.redirect(302, url);
-            return;
-        }
+    /** Fetch [url] and pipe it; HLS playlists are rewritten to signed proxy URLs. */
+    const pipeUpstream = async (req: express.Request, res: express.Response, channelId: string, url: string) => {
         const ac = new AbortController();
         const abort = () => ac.abort();
         req.on("close", abort);
@@ -198,6 +216,17 @@ export function createLiveTvRouter(deps: LiveTvRouterDeps): express.Router {
             res.status(502).json({ error: "upstream unreachable" });
             return;
         }
+        const finalUrl = (upstream as { url?: string }).url || url;
+        if (upstream.ok && isPlaylist(finalUrl, upstream.headers.get("content-type"))) {
+            const text = await upstream.text();
+            const t = typeof req.query.t === "string" ? `&t=${encodeURIComponent(req.query.t)}` : "";
+            const prefix = `${req.baseUrl}/proxy/${encodeURIComponent(channelId)}`;
+            const body = rewritePlaylist(text, finalUrl, (abs) => `${prefix}?u=${Buffer.from(abs).toString("base64url")}&s=${sign(channelId, abs)}${t}`);
+            res.status(200).setHeader("content-type", "application/vnd.apple.mpegurl");
+            res.setHeader("cache-control", "no-store");
+            res.send(body);
+            return;
+        }
         res.status(upstream.status);
         for (const h of HOP_HEADERS) {
             const v = upstream.headers.get(h);
@@ -208,6 +237,32 @@ export function createLiveTvRouter(deps: LiveTvRouterDeps): express.Router {
         const stream = Readable.fromWeb(upstream.body as unknown as import("node:stream/web").ReadableStream<Uint8Array>);
         stream.on("error", () => { abort(); res.destroy(); });
         stream.pipe(res);
+    };
+
+    router.get("/stream/:channelId", wrap(async (req, res) => {
+        const channelId = param(req, "channelId");
+        const url = service.streamUrlFor(channelId);
+        if (!url) throw new LiveTvError(404, "channel not found");
+        if (!truthy(req.query.proxy)) {
+            res.setHeader("cache-control", "no-store");
+            res.redirect(302, url);
+            return;
+        }
+        await pipeUpstream(req, res, channelId, url);
+    }));
+
+    router.get("/proxy/:channelId", wrap(async (req, res) => {
+        const channelId = param(req, "channelId");
+        const u = qs(req.query.u);
+        const s = qs(req.query.s);
+        if (!u || !s) throw new LiveTvError(400, "u and s required");
+        let abs: string;
+        try { abs = Buffer.from(u, "base64url").toString("utf8"); } catch { throw new LiveTvError(400, "bad u"); }
+        const want = Buffer.from(sign(channelId, abs));
+        const got = Buffer.from(s);
+        if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) throw new LiveTvError(403, "bad signature");
+        if (!/^https?:\/\//i.test(abs)) throw new LiveTvError(400, "unsupported scheme");
+        await pipeUpstream(req, res, channelId, abs);
     }));
 
     router.get("/catchup/:channelId", wrap((req, res) => {

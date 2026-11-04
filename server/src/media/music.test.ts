@@ -199,6 +199,22 @@ describe("MusicService home", () => {
         const none = new MusicService({ mediaDb: media, getLibraryDb: () => lib, getUserId: () => null });
         expect(none.home("p1")).toMatchObject({ recent: [], newest: [], mostPlayed: [], playlists: [], genres: [], randomAlbums: [] });
     });
+
+    it("playlist tracks in order, random tracks, albums A–Z", () => {
+        const pl = music.playlist("pl_1");
+        expect(pl.playlist).toMatchObject({ id: "pl_1", name: "Party", songCount: 2 });
+        expect(pl.tracks.map((t) => t.id)).toEqual([`tr_${ids.galv}`, `tr_${ids.omt}`]);
+        expect(() => music.playlist("pl_99")).toThrow(/not found/);
+        expect(() => music.playlist("al_x")).toThrow(/not found/);
+        const rnd = music.randomTracks(3);
+        expect(rnd).toHaveLength(3);
+        expect(new Set(rnd.map((t) => t.id)).size).toBe(3);
+        expect(rnd.every((t) => t.title !== "Hidden")).toBe(true);
+        const all = music.albums({ limit: 2 });
+        expect(all.total).toBe(4);
+        expect(all.items).toHaveLength(2);
+        expect(music.albums({ letter: "d" }).items.map((a) => a.name)).toEqual(["Discovery"]);
+    });
 });
 
 describe("MusicService queue", () => {

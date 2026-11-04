@@ -100,7 +100,26 @@ export function destroyAllSessions(): void {
     for (const key of [...sessions.keys()]) destroySession(key);
 }
 
-export interface StreamCodecs { video: string | null; audio: string | null; audioChannels: number | null }
+export interface StreamCodecs {
+    video: string | null;
+    audio: string | null;
+    audioChannels: number | null;
+    /** Every audio stream in order (index n = ffmpeg `0:a:n`). */
+    audioStreams?: { codec: string | null; channels: number | null }[];
+}
+
+/** Codec info of audio track [n] (falls back to the first). */
+export function audioOf(c: StreamCodecs, n: number): { audio: string | null; audioChannels: number | null } {
+    const s = c.audioStreams?.[n];
+    return s ? { audio: s.codec, audioChannels: s.channels } : { audio: c.audio, audioChannels: c.audioChannels };
+}
+
+/** Session key: `<fileId>:<quality>:<mode>` plus `:a<n>` for a non-default audio track. */
+export function sessionKeyFor(fileId: string, quality: string, mode: string, audioIndex = 0): string {
+    return `${fileId}:${quality}:${mode}${audioIndex > 0 ? `:a${audioIndex}` : ""}`;
+}
+
+export const SESSION_KEY_RE = /^[^:]+:(original|1080p|720p|480p):(remux|audio-transcode|full-transcode)(?::a(\d{1,2}))?$/;
 
 /** One ffprobe per (path, mtime, size), cached. It used to run twice on
  *  EVERY playlist and segment request (~600 ms each, measured). */
@@ -121,8 +140,12 @@ export async function probeStreamCodecs(filePath: string): Promise<StreamCodecs>
             try {
                 const j = JSON.parse(out) as { streams?: Array<{ codec_type?: string; codec_name?: string; channels?: number }> };
                 const v = j.streams?.find((s) => s.codec_type === "video" && s.codec_name !== "mjpeg" && s.codec_name !== "png");
-                const a = j.streams?.find((s) => s.codec_type === "audio");
-                resolve({ video: v?.codec_name?.toLowerCase() ?? null, audio: a?.codec_name?.toLowerCase() ?? null, audioChannels: a?.channels ?? null });
+                const audios = (j.streams ?? []).filter((s) => s.codec_type === "audio");
+                const a = audios[0];
+                resolve({
+                    video: v?.codec_name?.toLowerCase() ?? null, audio: a?.codec_name?.toLowerCase() ?? null, audioChannels: a?.channels ?? null,
+                    audioStreams: audios.map((s) => ({ codec: s.codec_name?.toLowerCase() ?? null, channels: s.channels ?? null })),
+                });
             } catch {
                 resolve({ video: null, audio: null, audioChannels: null });
             }
@@ -191,10 +214,10 @@ export async function sessionForSegment(
         s.lastTouch = Date.now();
         return { segmentDir: s.dir };
     }
-    const m = key.match(/^[^:]+:(original|1080p|720p|480p):(remux|audio-transcode|full-transcode)$/);
+    const m = key.match(SESSION_KEY_RE);
     if (!m) return null;
     const startSec = lastStartByKey.get(key) ?? 0;
-    const sess = await ensureHlsSession(fileId, sourcePath, m[1] as VideoQuality, startSec, lastCapsByKey.get(key) ?? [], m[2] as TranscodeMode);
+    const sess = await ensureHlsSession(fileId, sourcePath, m[1] as VideoQuality, startSec, lastCapsByKey.get(key) ?? [], m[2] as TranscodeMode, Number(m[3] ?? 0));
     return { segmentDir: sess.segmentDir };
 }
 
@@ -218,22 +241,27 @@ export async function ensureHlsSession(
     startSec: number = 0,
     caps: string[] = [],
     requestedMode?: TranscodeMode,
+    audioIndex = 0,
 ): Promise<{ key: string; playlistPath: string; segmentDir: string; mode: TranscodeMode; segExt: "ts" | "m4s" }> {
     // If a pre-remuxed sidecar exists, transcode from THAT instead of
     // the (often DTS / TrueHD / TS-muxed) original. The sidecar is
     // already h264/hevc + AAC stereo in a fragment-friendly MP4, so
     // even the "remux" path becomes essentially free.
-    const effectiveSource = sidecarIfExists(sourcePath) ?? sourcePath;
+    // The sidecar carries only the first audio track; another track must come from the original.
+    const effectiveSource = (audioIndex > 0 ? null : sidecarIfExists(sourcePath)) ?? sourcePath;
     const probed = await probeStreamCodecs(effectiveSource);
     const probedV = probed.video;
+    // A sidecar keeps only one audio track: a non-default track must come from the original.
+    const aIdx = Math.max(0, Math.min(audioIndex, Math.max(0, (probed.audioStreams?.length ?? 1) - 1)));
+    const audioSel = audioOf(probed, aIdx);
     const allowVideoTranscode = getSettings().allowVideoTranscode;
-    let mode = requestedMode ?? pickTranscodeMode(quality, probedV, probed.audio, caps, allowVideoTranscode);
+    let mode = requestedMode ?? pickTranscodeMode(quality, probedV, audioSel.audio, caps, allowVideoTranscode);
     // An explicit `?mode=full-transcode` is refused while video transcoding is off.
     if (mode === "full-transcode" && !allowVideoTranscode) {
-        mode = pickTranscodeMode("original", probedV, probed.audio, caps, false);
+        mode = pickTranscodeMode("original", probedV, audioSel.audio, caps, false);
     }
     if (!allowVideoTranscode) quality = "original";
-    const key = `${fileId}:${quality}:${mode}`;
+    const key = sessionKeyFor(fileId, quality, mode, aIdx);
     const existing = sessions.get(key);
     if (existing) {
         if (!fs.existsSync(existing.dir)) {
@@ -278,7 +306,7 @@ export async function ensureHlsSession(
     }
     if (startSec > 0) args.push("-ss", String(startSec));
     args.push("-i", effectiveSource);
-    args.push("-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-map_chapters", "-1");
+    args.push("-map", "0:v:0", "-map", `0:a:${aIdx}?`, "-sn", "-dn", "-map_chapters", "-1");
 
     if (mode === "remux") {
         args.push("-c:v", "copy");
@@ -290,7 +318,7 @@ export async function ensureHlsSession(
     } else if (mode === "audio-transcode") {
         args.push("-c:v", "copy");
         if (probedV === "hevc" || probedV === "h265") args.push("-tag:v", "hvc1");
-        args.push("-threads", "2", ...audioTranscodeArgs(caps, probed.audioChannels));
+        args.push("-threads", "2", ...audioTranscodeArgs(caps, audioSel.audioChannels));
     } else if (quality === "original") {
         const vCodec = probedV;
         const copyable = vCodec === "h264" || vCodec === "avc1" || vCodec === "vp9" || vCodec === "av1";
