@@ -290,11 +290,13 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
     fun exit() { report(); reportServer(); nav.pop() }
 
     // ─── seeking (keeps the hlsOffset math of WP15) ──────────────────────
+    /** HLS audio track (server `?audio=<n>`, server 3.7+): the stream carries one track at a time. */
+    var hlsAudio by remember { mutableIntStateOf(0) }
     fun restartHls(targetAbs: Long) {
         val v = video ?: return
         val startSec = (targetAbs / 1000).coerceAtLeast(0)
         hlsOffset = startSec * 1000
-        player.setMediaItem(buildVideoItem(context, api, v.file, hls = true, hlsStartSec = startSec))
+        player.setMediaItem(buildVideoItem(context, api, v.file, hls = true, hlsStartSec = startSec, audio = hlsAudio))
         player.prepare()
     }
     fun seekAbsLocal(targetAbs: Long) {
@@ -412,7 +414,14 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
         // HLS resumes server-side (`?start=`): ffmpeg starts AT the resume point, so the
         // player starts at 0 of that stream. Direct play seeks over HTTP range as before.
         val hlsStartSec = hlsOffset / 1000
-        val items = buildItems(context, api, request, hlsStartSec)
+        // Profile's preferred audio language picks the HLS track up front (the stream carries one).
+        if (video != null && video.hls && prefAudioLang.isNotBlank()) {
+            val want = prefAudioLang.lowercase()
+            val idx = video.file.audioTracks.indexOfFirst { t -> t.lang?.lowercase()?.let { it == want || it.startsWith(want) || want.startsWith(it) } == true }
+            if (idx > 0) hlsAudio = idx
+        }
+        val items = if (video != null) listOf(buildVideoItem(context, api, video.file, video.hls, hlsStartSec, hlsAudio))
+            else buildItems(context, api, request, hlsStartSec)
         val startIndex = (request as? PlayRequest.Music)?.startIndex ?: 0
         val startPos = if (video != null && resumeMs > 0 && hlsStartSec == 0L) resumeMs else C.TIME_UNSET
         player.setMediaItems(items, startIndex, startPos)
@@ -950,8 +959,10 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
                 val aGroups = audioGroups(tracks)
                 val selAudio = aGroups.indexOfFirst { it.isSelected }.takeIf { it >= 0 }
                 val directOnly = stringResource(R.string.player_audio_direct_only)
-                // HLS maps only the first audio stream (`0:a:0`); the others need direct play.
-                fun audioAvailable(i: Int) = f.audioTracks.isEmpty() || aGroups.size == f.audioTracks.size || i == 0
+                // HLS carries one audio stream: another track restarts the stream with `?audio=<n>` at the
+                // current position (server 3.7+). Direct play switches in place.
+                fun audioAvailable(@Suppress("UNUSED_PARAMETER") i: Int) = true
+                val isHls = video?.hls == true
                 val audioOpts = if (f.audioTracks.isNotEmpty()) f.audioTracks.mapIndexed { i, t ->
                     Choice(i, audioLabel(t.lang, t.codec, t.channels, t.title), if (audioAvailable(i)) null else directOnly)
                 } else aGroups.mapIndexed { i, g ->
@@ -960,9 +971,11 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
                 }
                 PanelDialog(
                     title = stringResource(R.string.player_audio), options = audioOpts,
-                    selected = audioPick ?: selAudio ?: 0,
+                    selected = if (isHls) hlsAudio else (audioPick ?: selAudio ?: 0),
                     onPick = { i ->
-                        if (!audioAvailable(i)) toast(directOnly) else { audioPick = i; applyTracks(player.currentTracks) }
+                        if (isHls && f.audioTracks.size > 1) {
+                            if (i != hlsAudio) { hlsAudio = i; restartHls(absPos()) }
+                        } else { audioPick = i; applyTracks(player.currentTracks) }
                         closePanel()
                     },
                     onDismiss = { closePanel() }, visible = panel == Panel.Audio,
@@ -1140,7 +1153,7 @@ private fun audioLabel(lang: String?, codec: String, channels: Int, title: Strin
 /** PGS/VobSub/DVB are bitmaps — the server cannot turn them into WebVTT. */
 private val BITMAP_SUBS = setOf("hdmv_pgs_subtitle", "pgssub", "dvd_subtitle", "dvdsub", "dvb_subtitle", "dvbsub", "xsub")
 
-private fun buildVideoItem(context: Context, api: MmoApi, f: VideoFile, hls: Boolean, hlsStartSec: Long): MediaItem {
+private fun buildVideoItem(context: Context, api: MmoApi, f: VideoFile, hls: Boolean, hlsStartSec: Long, audio: Int = 0): MediaItem {
     // The server extracts every text track in ONE pass and caches it, so registering
     // all of them costs one read of the file, once. (Was: one ffmpeg per track.)
     val subs = f.subtitleTracks.mapIndexedNotNull { ordinal, t ->
@@ -1158,7 +1171,7 @@ private fun buildVideoItem(context: Context, api: MmoApi, f: VideoFile, hls: Boo
         .setMediaId(f.fileId)
         .setSubtitleConfigurations(subs)
         .setMediaMetadata(MediaMetadata.Builder().setTitle(f.title).build())
-    if (hls) b.setUri(api.hlsUrl(f.fileId, hlsStartSec)).setMimeType(MimeTypes.APPLICATION_M3U8)
+    if (hls) b.setUri(api.hlsUrl(f.fileId, hlsStartSec, audio)).setMimeType(MimeTypes.APPLICATION_M3U8)
     else b.setUri(api.directUrl(f.fileId))
     return b.build()
 }

@@ -83,8 +83,9 @@ class MmoApi(val baseUrl: String, private val token: String) {
     fun directUrl(fileId: String) = "$baseUrl/video/direct/$fileId?t=${enc(token)}"
     /** Always the original video; `caps` lets the server copy audio it can and convert only the rest
      *  (E-AC3 5.1). `startSec` makes the server start AT the resume point — instant resume. */
-    fun hlsUrl(fileId: String, startSec: Long = 0L) =
-        "$baseUrl/video/stream/$fileId?q=original&caps=$TV_CAPS" + (if (startSec > 0) "&start=$startSec" else "") + "&t=${enc(token)}"
+    fun hlsUrl(fileId: String, startSec: Long = 0L, audio: Int = 0) =
+        "$baseUrl/video/stream/$fileId?q=original&caps=$TV_CAPS" + (if (startSec > 0) "&start=$startSec" else "") +
+            (if (audio > 0) "&audio=$audio" else "") + "&t=${enc(token)}"
     fun subtitleUrl(fileId: String, ordinal: Int) = "$baseUrl/video/subs/$fileId/$ordinal?t=${enc(token)}"
     /** Scrubber sprite: 12×12 grid of 160×90 tiles, generated lazily by ffmpeg (503 until ready). */
     fun spriteUrl(fileId: String) = "$baseUrl/video/thumbs/$fileId/sprite.jpg?t=${enc(token)}"
