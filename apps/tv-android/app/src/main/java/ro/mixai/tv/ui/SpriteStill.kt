@@ -23,32 +23,29 @@ import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import ro.mixai.tv.ui.theme.Tokens
 
-private const val GRID = 12
-
 /**
- * Shows ONE tile of the server's scrubber sprite (`/video/thumbs/:fileId/sprite.jpg`,
- * a 12×12 grid of 160×90 tiles) as a 16:9 still. The whole sprite is loaded with Coil and
- * scaled ×12 with a graphics layer, translated so the wanted tile fills the clipped box.
- * Tile 14 (col 2, row 1 ≈ 10 % into the film) avoids black intros. On loading/error/503
- * the title is shown on the card colour instead.
+ * 16:9 still for cards. Default (`grid = 1`) shows the server's `still.jpg` — one keyframe
+ * ≈10 % into the film, cheap to make. With `grid = 12` it shows one tile of the scrubber
+ * sprite (`sprite.jpg`, 12×12 grid of 160×90), scaled ×grid and translated so the tile fills
+ * the clipped box. On loading/error/503 the title is shown on the card colour instead.
  */
 @Composable
-fun SpriteStill(url: String, title: String, modifier: Modifier = Modifier, tileIndex: Int = 14) {
+fun SpriteStill(url: String, title: String, modifier: Modifier = Modifier, tileIndex: Int = 14, grid: Int = 1) {
     var ok by remember(url) { mutableStateOf(false) }
-    val col = tileIndex % GRID
-    val row = tileIndex / GRID
+    val col = if (grid > 1) tileIndex % grid else 0
+    val row = if (grid > 1) tileIndex / grid else 0
     Box(modifier.clipToBounds().background(Tokens.card)) {
         AsyncImage(
             model = url,
             contentDescription = null,
-            contentScale = ContentScale.FillBounds,
+            contentScale = if (grid > 1) ContentScale.FillBounds else ContentScale.Crop,
             onState = { s -> ok = s is AsyncImagePainter.State.Success },
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     transformOrigin = TransformOrigin(0f, 0f)
-                    scaleX = GRID.toFloat()
-                    scaleY = GRID.toFloat()
+                    scaleX = grid.toFloat()
+                    scaleY = grid.toFloat()
                     translationX = -col * size.width
                     translationY = -row * size.height
                 },

@@ -27,8 +27,10 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { platform } from "../platform";
 import { walkVideos, ffprobe, parseFilename } from "./video-scanner";
-import { ensureHlsSession, touchSession, canDirectPlay, destroySessionsForFile, type VideoQuality, type TranscodeMode, destroyAllSessions } from "./transcode-video";
+import { ensureHlsSession, touchSession, canDirectPlay, destroySessionsForFile, sessionForSegment, type VideoQuality, type TranscodeMode, destroyAllSessions } from "./transcode-video";
 import { FFMPEG_BIN } from "./ffmpeg-paths";
+import { withAnalysisSlot, runFfmpeg, createLimiter, analysisQueueStats } from "./ffmpeg-jobs";
+import { subtitleVttPath } from "./video-subs";
 import { enqueuePreRemux, getPreRemuxJob, listPreRemuxJobs, cancelPreRemux, sidecarIfExists, preRemuxBus } from "./pre-remux";
 import { getCachedTmdbImage } from "./tmdb-cache";
 import { initDiscordRpc, setPresence, shutdownDiscordRpc, rpcBus } from "../plugins/discord-rpc";
@@ -111,14 +113,19 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
     r.get("/flags", authMiddleware, (_req, res) => {
         res.json({
             preRemuxAutoOnScan: getSettings().preRemuxAutoOnScan,
+            allowVideoTranscode: getSettings().allowVideoTranscode,
+            analysisQueue: analysisQueueStats(),
         });
     });
 
     r.post("/flags", authMiddleware, express.json(), (req, res) => {
-        const body = req.body as { preRemuxAutoOnScan?: boolean };
+        const body = req.body as { preRemuxAutoOnScan?: boolean; allowVideoTranscode?: boolean };
         if (typeof body.preRemuxAutoOnScan === "boolean") updateSettings({ preRemuxAutoOnScan: body.preRemuxAutoOnScan });
+        if (typeof body.allowVideoTranscode === "boolean") updateSettings({ allowVideoTranscode: body.allowVideoTranscode });
         res.json({
             preRemuxAutoOnScan: getSettings().preRemuxAutoOnScan,
+            allowVideoTranscode: getSettings().allowVideoTranscode,
+            analysisQueue: analysisQueueStats(),
         });
     });
 
@@ -232,7 +239,9 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
     r.get("/stream/:fileId", queryAuth, authMiddleware, async (req, res) => {
         const abs = await resolveOrRecoverFileId(req.params.fileId);
         if (!abs) { res.status(404).json({ error: "unknown fileId" }); return; }
-        const q = ((req.query.q as string) || "720p") as VideoQuality;
+        // Default is the original: video is never downscaled unless the owner
+        // enabled `allowVideoTranscode` AND the client explicitly asks.
+        const q = ((req.query.q as string) || "original") as VideoQuality;
         const start = parseFloat((req.query.start as string) || "0") || 0;
         const capsParam = (req.query.caps as string | undefined) ?? "";
         const caps = capsParam ? capsParam.split(",").map((s) => s.trim()).filter(Boolean) : [];
@@ -283,7 +292,11 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
         const m = sessionKey.match(/^[^:]+:(original|1080p|720p|480p):(remux|audio-transcode|full-transcode)$/);
         if (!m) { res.status(400).end(); return; }
         try {
-            const sess = await ensureHlsSession(req.params.fileId, fileEntry.absPath, m[1] as VideoQuality, 0, [], m[2] as TranscodeMode);
+            // Live session as-is; restart only if it was idle-killed, and then at
+            // its own start offset. (Was: ensureHlsSession(start=0) on every
+            // segment, which killed every resumed session + 2 ffprobes/segment.)
+            const sess = await sessionForSegment(req.params.fileId, fileEntry.absPath, sessionKey);
+            if (!sess) { res.status(400).end(); return; }
             const segPath = path.join(sess.segmentDir, path.basename(seg));
             if (!fs.existsSync(segPath)) {
                 // Segment may still be writing — wait briefly
@@ -316,37 +329,18 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
         }
     });
 
-    r.get("/subs/:fileId/:track", queryAuth, authMiddleware, (req, res) => {
-        const abs = resolveFileId(req.params.fileId);
+    r.get("/subs/:fileId/:track", queryAuth, authMiddleware, async (req, res) => {
+        const abs = await resolveOrRecoverFileId(req.params.fileId);
         if (!abs) { res.status(404).end(); return; }
         const track = parseInt(req.params.track, 10);
-        if (!Number.isFinite(track)) { res.status(400).end(); return; }
-        // Extract sub stream → WebVTT on stdout
-        const args = [
-            "-y", "-loglevel", "error",
-            "-i", abs,
-            "-map", `0:s:${track}`,
-            "-f", "webvtt",
-            "-",
-        ];
-        const child = spawn(FFMPEG_BIN, args, { windowsHide: true });
-        res.set("Content-Type", "text/vtt; charset=utf-8");
-        child.stdout.pipe(res);
-        child.on("error", () => { try { res.end(); } catch { /* ignore */ } });
-        // If the client aborts (tab close, network hiccup, picker
-        // re-render) make sure the ffmpeg subprocess and any worker
-        // children are torn down so they don't keep the source MKV
-        // open and starve later playback / scans.
-        const killChild = () => {
-            try {
-                if (process.platform === "win32" && child.pid) {
-                    spawn("taskkill", ["/F", "/T", "/PID", String(child.pid)], { windowsHide: true, stdio: "ignore" });
-                } else {
-                    child.kill("SIGKILL");
-                }
-            } catch { /* ignore */ }
-        };
-        req.on("close", () => { if (!child.killed) killChild(); });
+        if (!Number.isFinite(track) || track < 0) { res.status(400).end(); return; }
+        // All text tracks are extracted in ONE pass and cached on disk, so a
+        // client that registers every track costs one read, once per file.
+        const meta = fileRegistry.get(req.params.fileId)?.meta as { subtitleTracks?: Array<{ codec: string }> } | undefined;
+        const vtt = await subtitleVttPath(req.params.fileId, abs, track, meta?.subtitleTracks ?? []);
+        if (!vtt) { res.status(404).end(); return; }
+        res.set("Cache-Control", "private, max-age=86400");
+        res.sendFile(vtt, { headers: { "Content-Type": "text/vtt; charset=utf-8" } });
     });
 
     r.get("/tmdb-image/:size/*rest", queryAuth, authMiddleware, async (req, res) => {
@@ -498,19 +492,24 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
             }
         }
         if (!FFMPEG_BIN) { res.json({}); return; }
-        // Run ffmpeg silencedetect on first 300s, noise threshold -35dB, min 1.5s
+        // silencedetect on the first 300 s of AUDIO only (-vn: without it ffmpeg
+        // decoded 4K video for nothing — 11.5 cores → 0.34 cores measured).
         const args = [
-            "-hide_banner", "-nostats",
-            "-i", abs,
-            "-t", "300",
+            "-hide_banner", "-nostats", "-nostdin", "-threads", "1",
+            "-t", "300", "-i", abs,
+            "-map", "0:a:0?", "-vn", "-sn", "-dn",
             "-af", "silencedetect=noise=-35dB:d=1.5",
             "-f", "null", "-",
         ];
-        await new Promise<void>((resolve) => {
-            const child = spawn(FFMPEG_BIN, args, { windowsHide: true });
-            let stderr = "";
-            child.stderr.on("data", (d) => { stderr += d.toString(); });
-            child.on("close", () => {
+        {
+            const r = await withAnalysisSlot(() => runFfmpeg(args, { timeoutMs: 120_000 }));
+            if (r.code === -1) {
+                introCache.set(cacheKey, null);
+                res.json({});
+                return;
+            }
+            const stderr = r.stderr;
+            {
                 // Parse silence_start / silence_end pairs
                 const ends: number[] = [];
                 const starts: number[] = [];
@@ -533,14 +532,8 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
                 }
                 introCache.set(cacheKey, best);
                 res.json(best ?? {});
-                resolve();
-            });
-            child.on("error", () => {
-                introCache.set(cacheKey, null);
-                res.json({});
-                resolve();
-            });
-        });
+            }
+        }
     });
 
     /** GET /video/chapters/:fileId — read embedded MKV/MP4 chapter markers via
@@ -629,36 +622,21 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
         const duration = await probeDurationSec(FFPROBE_BIN, abs);
         if (!duration || duration < 300) { creditsCache.set(key, null); res.json({}); return; }
         const startScan = Math.max(0, duration - 300);
-        const args = ["-hide_banner", "-loglevel", "info", "-ss", String(startScan), "-i", abs,
-            "-af", "silencedetect=noise=-45dB:d=3", "-f", "null", "-"];
+        const args = ["-hide_banner", "-loglevel", "info", "-nostdin", "-threads", "1", "-ss", String(startScan), "-i", abs,
+            "-map", "0:a:0?", "-vn", "-sn", "-dn", "-af", "silencedetect=noise=-45dB:d=3", "-f", "null", "-"];
         try {
-            const start = await new Promise<number | null>((resolve) => {
-                const child = spawn(FFMPEG_BIN, args, { windowsHide: true });
-                let stderr = "";
-                child.stderr.on("data", (b) => { stderr += b.toString(); });
-                child.on("close", () => {
-                    const m = /silence_start:\s*([\d.]+)/.exec(stderr);
-                    if (!m) { resolve(null); return; }
-                    resolve(startScan + parseFloat(m[1]));
-                });
-                child.on("error", () => resolve(null));
-            });
-            // Black-frame fallback: scan last 5min for ≥2s of near-black frames.
+            const r1 = await withAnalysisSlot(() => runFfmpeg(args, { timeoutMs: 120_000 }));
+            const m1 = /silence_start:\s*([\d.]+)/.exec(r1.stderr);
+            const start = m1 ? startScan + parseFloat(m1[1]) : null;
+            // Black-frame fallback: last 5 min, KEYFRAMES ONLY at 480p-equivalent
+            // cost (skip_frame nokey) — a full 4K decode here was ~11 cores.
             let finalStart = start;
             if (finalStart == null) {
-                const blackArgs = ["-hide_banner", "-loglevel", "info", "-ss", String(startScan), "-i", abs,
-                    "-vf", "blackdetect=d=2:pic_th=0.95:pix_th=0.10", "-an", "-f", "null", "-"];
-                finalStart = await new Promise<number | null>((resolve) => {
-                    const child = spawn(FFMPEG_BIN, blackArgs, { windowsHide: true });
-                    let stderr = "";
-                    child.stderr.on("data", (b) => { stderr += b.toString(); });
-                    child.on("close", () => {
-                        const m = /black_start:\s*([\d.]+)/.exec(stderr);
-                        if (!m) { resolve(null); return; }
-                        resolve(startScan + parseFloat(m[1]));
-                    });
-                    child.on("error", () => resolve(null));
-                });
+                const blackArgs = ["-hide_banner", "-loglevel", "info", "-nostdin", "-threads", "1", "-skip_frame", "nokey", "-ss", String(startScan), "-i", abs,
+                    "-map", "0:v:0", "-vf", "scale=320:-2,blackdetect=d=2:pic_th=0.95:pix_th=0.10", "-an", "-sn", "-dn", "-f", "null", "-"];
+                const r2 = await withAnalysisSlot(() => runFfmpeg(blackArgs, { timeoutMs: 120_000 }));
+                const m2 = /black_start:\s*([\d.]+)/.exec(r2.stderr);
+                finalStart = m2 ? startScan + parseFloat(m2[1]) : null;
             }
             creditsCache.set(key, finalStart);
             res.json(finalStart == null ? {} : { start: finalStart });
@@ -679,27 +657,8 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
             return;
         }
         if (!FFMPEG_BIN) { res.json({}); return; }
-        const args = ["-hide_banner", "-i", abs,
-            "-af", "loudnorm=I=-23:LRA=7:TP=-2:print_format=json",
-            "-f", "null", "-"];
         try {
-            const result = await new Promise<{ integrated: number; gainDb: number } | null>((resolve) => {
-                const child = spawn(FFMPEG_BIN, args, { windowsHide: true });
-                let stderr = "";
-                child.stderr.on("data", (b) => { stderr += b.toString(); });
-                child.on("close", () => {
-                    const jsonMatch = stderr.match(/\{[\s\S]*"input_i"[\s\S]*?\}/);
-                    if (!jsonMatch) { resolve(null); return; }
-                    try {
-                        const parsed = JSON.parse(jsonMatch[0]) as { input_i?: string };
-                        const integrated = parseFloat(parsed.input_i ?? "");
-                        if (!isFinite(integrated)) { resolve(null); return; }
-                        const gainDb = -23 - integrated;
-                        resolve({ integrated, gainDb });
-                    } catch { resolve(null); }
-                });
-                child.on("error", () => resolve(null));
-            });
+            const result = await withAnalysisSlot(() => measureLoudnessSampled(abs));
             loudnessCache.set(key, result);
             res.json(result ?? {});
         } catch {
@@ -729,25 +688,19 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
         const samples = [0.2, 0.4, 0.6, 0.8].map((p) => Math.floor(duration * p));
         const counts = new Map<string, number>();
         try {
-            for (const ss of samples) {
-                const args = ["-hide_banner", "-loglevel", "info", "-ss", String(ss), "-i", abs,
-                    "-t", "2", "-vf", "cropdetect=24:16:0", "-an", "-f", "null", "-"];
-                await new Promise<void>((resolve) => {
-                    const child = spawn(FFMPEG_BIN, args, { windowsHide: true });
-                    let stderr = "";
-                    child.stderr.on("data", (b) => { stderr += b.toString(); });
-                    child.on("close", () => {
-                        const re = /crop=(\d+):(\d+):(\d+):(\d+)/g;
-                        let m: RegExpExecArray | null;
-                        while ((m = re.exec(stderr)) != null) {
-                            const k = `${m[1]}x${m[2]}+${m[3]}+${m[4]}`;
-                            counts.set(k, (counts.get(k) ?? 0) + 1);
-                        }
-                        resolve();
-                    });
-                    child.on("error", () => resolve());
-                });
-            }
+            await withAnalysisSlot(async () => {
+                for (const ss of samples) {
+                    const args = ["-hide_banner", "-loglevel", "info", "-nostdin", "-threads", "1", "-ss", String(ss), "-i", abs,
+                        "-t", "2", "-map", "0:v:0", "-vf", "cropdetect=24:16:0", "-an", "-sn", "-dn", "-f", "null", "-"];
+                    const r = await runFfmpeg(args, { timeoutMs: 60_000 });
+                    const re = /crop=(\d+):(\d+):(\d+):(\d+)/g;
+                    let m: RegExpExecArray | null;
+                    while ((m = re.exec(r.stderr)) != null) {
+                        const k = `${m[1]}x${m[2]}+${m[3]}+${m[4]}`;
+                        counts.set(k, (counts.get(k) ?? 0) + 1);
+                    }
+                }
+            });
             let best: { key: string; n: number } | null = null;
             for (const [k, n] of counts) if (!best || n > best.n) best = { key: k, n };
             if (!best) { cropCache.set(key, null); res.json({}); return; }
@@ -768,6 +721,8 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
     const THUMB_TILE_H = 90;
     const THUMB_GRID = 12; // 12x12 = 144 cells per sprite
     const thumbInflight = new Map<string, Promise<void>>();
+    const stillLimiter = createLimiter(2);
+    const stillInflight = new Map<string, Promise<string | null>>();
 
     async function ensureSprite(fileId: string, abs: string): Promise<{ dir: string; intervalSec: number; cells: number } | null> {
         if (!FFMPEG_BIN) return null;
@@ -799,19 +754,24 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
             const targetCells = THUMB_GRID * THUMB_GRID;
             const intervalSec = Math.max(2, Math.ceil(duration / targetCells));
             const cells = Math.min(targetCells, Math.ceil(duration / intervalSec));
-            const args = [
-                "-y", "-hide_banner", "-loglevel", "error",
-                "-i", abs,
-                "-vf", `fps=1/${intervalSec},scale=${THUMB_TILE_W}:${THUMB_TILE_H}:force_original_aspect_ratio=decrease,pad=${THUMB_TILE_W}:${THUMB_TILE_H}:(ow-iw)/2:(oh-ih)/2,tile=${THUMB_GRID}x${THUMB_GRID}`,
-                "-frames:v", "1",
-                "-qscale:v", "5",
-                spritePath,
-            ];
-            await new Promise<void>((resolve) => {
-                const child = spawn(FFMPEG_BIN, args, { windowsHide: true });
-                child.on("close", () => resolve());
-                child.on("error", () => resolve());
+            // One keyframe per cell via input seek (decodes 1 frame each, ~0 CPU,
+            // ~1 s wall) instead of decoding the whole 4K film (11.6 cores,
+            // minutes). Runs in the global idle-priority analysis queue.
+            const tilesDir = path.join(dir, "tiles");
+            fs.mkdirSync(tilesDir, { recursive: true });
+            await withAnalysisSlot(async () => {
+                for (let i = 0; i < cells; i++) {
+                    const t = Math.min(duration - 1, i * intervalSec + intervalSec / 2);
+                    await runFfmpeg(keyframeArgs(abs, t, THUMB_TILE_W, THUMB_TILE_H, path.join(tilesDir, `t${String(i).padStart(4, "0")}.jpg`), true), { timeoutMs: 30_000 });
+                }
+                await runFfmpeg([
+                    "-y", "-hide_banner", "-loglevel", "error", "-nostdin", "-threads", "1",
+                    "-framerate", "1", "-start_number", "0", "-i", path.join(tilesDir, "t%04d.jpg"),
+                    "-vf", `tile=${THUMB_GRID}x${THUMB_GRID}:padding=0:color=black`,
+                    "-frames:v", "1", "-qscale:v", "5", spritePath,
+                ], { timeoutMs: 60_000 });
             });
+            fs.rmSync(tilesDir, { recursive: true, force: true });
             if (!fs.existsSync(spritePath)) return;
             fs.writeFileSync(metaPath, JSON.stringify({ intervalSec, cells, duration }), "utf8");
         })();
@@ -821,6 +781,44 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
         const meta = JSON.parse(fs.readFileSync(metaPath, "utf8")) as { intervalSec: number; cells: number };
         return { dir, intervalSec: meta.intervalSec, cells: meta.cells };
     }
+
+    /** One keyframe ~10 % into the film, 640 px wide, cached on disk. This is
+     *  what TV cards show — it used to be "tile 14 of the sprite", which meant
+     *  every browsed card triggered a full-film sprite decode. */
+    async function ensureStill(fileId: string, abs: string): Promise<string | null> {
+        if (!FFMPEG_BIN) return null;
+        const dir = path.join(await getThumbsBaseDir(), fileId);
+        const stillPath = path.join(dir, "still.jpg");
+        if (fs.existsSync(stillPath)) return stillPath;
+        const running = stillInflight.get(fileId);
+        if (running) return running;
+        const work = stillLimiter(async () => {
+            fs.mkdirSync(dir, { recursive: true });
+            const meta = fileRegistry.get(fileId)?.meta as { durationSec?: number | null } | undefined;
+            let duration = meta?.durationSec ?? null;
+            if (!duration) {
+                const { FFPROBE_BIN } = await import("./ffmpeg-paths");
+                duration = await probeDurationSec(FFPROBE_BIN, abs);
+            }
+            const t = duration && duration > 60 ? Math.floor(duration * 0.1) : 5;
+            const tmp = `${stillPath}.partial.jpg`;
+            await runFfmpeg(keyframeArgs(abs, t, 640, 360, tmp, false), { timeoutMs: 30_000, priority: "below-normal" });
+            if (!fs.existsSync(tmp)) return null;
+            fs.renameSync(tmp, stillPath);
+            return stillPath;
+        }).finally(() => stillInflight.delete(fileId));
+        stillInflight.set(fileId, work);
+        return work;
+    }
+
+    r.get("/thumbs/:fileId/still.jpg", queryAuth, authMiddleware, async (req, res) => {
+        const abs = await resolveOrRecoverFileId(req.params.fileId);
+        if (!abs || !fs.existsSync(abs)) { res.status(404).end(); return; }
+        const p = await ensureStill(req.params.fileId, abs);
+        if (!p) { res.status(503).end(); return; }
+        res.setHeader("Cache-Control", "private, max-age=604800");
+        res.sendFile(p, { headers: { "Content-Type": "image/jpeg" } });
+    });
 
     r.get("/thumbs/:fileId/sprite.jpg", queryAuth, authMiddleware, async (req, res) => {
         const abs = await resolveOrRecoverFileId(req.params.fileId);
@@ -1043,6 +1041,46 @@ function vttTime(sec: number): string {
     const s = Math.floor(sec % 60);
     const ms = Math.floor((sec - Math.floor(sec)) * 1000);
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
+}
+
+/** Seek to the keyframe before `t` and decode ONLY that frame. `pad` letterboxes
+ *  into an exact WxH cell (sprite); otherwise keeps aspect at width W. */
+function keyframeArgs(abs: string, t: number, w: number, h: number, out: string, pad: boolean): string[] {
+    const vf = pad
+        ? `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,format=yuvj420p`
+        : `scale=${w}:-2,format=yuvj420p`;
+    return [
+        "-y", "-hide_banner", "-loglevel", "error", "-nostdin", "-threads", "1",
+        "-skip_frame", "nokey", "-ss", String(Math.max(0, t)), "-i", abs,
+        "-map", "0:v:0", "-an", "-sn", "-dn", "-frames:v", "1", "-vf", vf, "-qscale:v", "4", out,
+    ];
+}
+
+/** EBU R128 on 12 x 20 s audio-only windows spread over the film, instead of
+ *  decoding the full soundtrack + video (measured 1.3 s vs 14.6 s / 2.45 cores,
+ *  integrated loudness within ±0.5 LU on the test library). */
+async function measureLoudnessSampled(abs: string): Promise<{ integrated: number; gainDb: number } | null> {
+    const { FFPROBE_BIN } = await import("./ffmpeg-paths");
+    const duration = await probeDurationSec(FFPROBE_BIN, abs);
+    if (!duration || duration < 10) return null;
+    const windows = duration > 600 ? 12 : 1;
+    const winLen = windows === 1 ? Math.min(duration, 600) : 20;
+    let energy = 0;
+    let n = 0;
+    for (let i = 0; i < windows; i++) {
+        const ss = windows === 1 ? 0 : Math.floor(((i + 0.5) / windows) * duration);
+        const r = await runFfmpeg(["-hide_banner", "-nostats", "-nostdin", "-threads", "1", "-ss", String(ss), "-t", String(winLen), "-i", abs,
+            "-map", "0:a:0?", "-vn", "-sn", "-dn", "-af", "ebur128=framelog=quiet", "-f", "null", "-"], { timeoutMs: 60_000 });
+        const m = /Integrated loudness:\s*\n\s*I:\s*(-?[\d.]+)\s*LUFS/.exec(r.stderr);
+        if (!m) continue;
+        const lufs = parseFloat(m[1]);
+        if (!Number.isFinite(lufs) || lufs < -69) continue;
+        energy += Math.pow(10, lufs / 10);
+        n++;
+    }
+    if (n === 0) return null;
+    const integrated = Math.round(10 * Math.log10(energy / n) * 10) / 10;
+    return { integrated, gainDb: Math.round((-23 - integrated) * 10) / 10 };
 }
 
 async function probeDurationSec(ffprobeBin: string, abs: string): Promise<number | null> {

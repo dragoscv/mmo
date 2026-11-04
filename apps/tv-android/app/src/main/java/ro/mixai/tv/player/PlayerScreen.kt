@@ -101,17 +101,28 @@ fun PlayerScreen(
     }
     // In-activity MediaSession: the remote's transport keys + system now-playing (WP6-04d).
     val session = remember(player) { MediaSession.Builder(context, player).build() }
+    /** HLS started server-side at the resume point: player time is relative to it. */
+    val hlsOffsetMs = remember(request) {
+        if (request is PlayRequest.Video && request.hls && resumeMs > 0) (resumeMs / 1000) * 1000 else 0L
+    }
+    fun absPos() = player.currentPosition + hlsOffsetMs
+    fun absDur(): Long {
+        val d = player.duration
+        if (hlsOffsetMs == 0L) return d
+        val src = (request as? PlayRequest.Video)?.file?.durationSec
+        return if (src != null && src > 0) (src * 1000).toLong() else if (d > 0 && d != C.TIME_UNSET) d + hlsOffsetMs else d
+    }
 
     fun report() {
         val v = request as? PlayRequest.Video ?: return
-        val dur = player.duration
-        if (dur > 0 && dur != C.TIME_UNSET) onProgress(v.file.fileId, player.currentPosition, dur)
+        val dur = absDur()
+        if (dur > 0 && dur != C.TIME_UNSET) onProgress(v.file.fileId, absPos(), dur)
     }
     fun reportServer() {
         val v = request as? PlayRequest.Video ?: return
         val ref = v.ref ?: return
-        val dur = player.duration
-        if (dur > 0 && dur != C.TIME_UNSET) onServerProgress(ref, player.currentPosition, dur)
+        val dur = absDur()
+        if (dur > 0 && dur != C.TIME_UNSET) onServerProgress(ref, absPos(), dur)
     }
 
     DisposableEffect(player) {
@@ -131,9 +142,12 @@ fun PlayerScreen(
     }
 
     LaunchedEffect(request) {
-        val items = buildItems(context, api, request)
+        // HLS resumes server-side (`?start=`): ffmpeg starts AT the resume point, so the
+        // player starts at 0 of that stream. Direct play seeks over HTTP range as before.
+        val hlsStartSec = if (request is PlayRequest.Video && request.hls && resumeMs > 0) resumeMs / 1000 else 0L
+        val items = buildItems(context, api, request, hlsStartSec)
         val startIndex = (request as? PlayRequest.Music)?.startIndex ?: 0
-        val startPos = if (request is PlayRequest.Video && resumeMs > 0) resumeMs else C.TIME_UNSET
+        val startPos = if (request is PlayRequest.Video && resumeMs > 0 && hlsStartSec == 0L) resumeMs else C.TIME_UNSET
         player.setMediaItems(items, startIndex, startPos)
         player.prepare()
         player.playWhenReady = true
@@ -208,10 +222,16 @@ fun PlayerScreen(
     }
 }
 
-private fun buildItems(context: Context, api: MmoApi, request: PlayRequest): List<MediaItem> = when (request) {
+/** PGS/VobSub/DVB are bitmaps — the server cannot turn them into WebVTT. */
+private val BITMAP_SUBS = setOf("hdmv_pgs_subtitle", "pgssub", "dvd_subtitle", "dvdsub", "dvb_subtitle", "dvbsub", "xsub")
+
+private fun buildItems(context: Context, api: MmoApi, request: PlayRequest, hlsStartSec: Long = 0L): List<MediaItem> = when (request) {
     is PlayRequest.Video -> {
         val f = request.file
-        val subs = f.subtitleTracks.mapIndexed { ordinal, t ->
+        // The server extracts every text track in ONE pass and caches it, so registering
+        // all of them costs one read of the file, once. (Was: one ffmpeg per track.)
+        val subs = f.subtitleTracks.mapIndexedNotNull { ordinal, t ->
+            if (t.codec.lowercase() in BITMAP_SUBS) return@mapIndexedNotNull null
             // `/video/subs/:fileId/:track` maps to ffmpeg `0:s:<ordinal>`, so the ordinal among
             // subtitle streams is what the server expects — not the absolute stream index.
             MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(api.subtitleUrl(f.fileId, ordinal)))
@@ -225,7 +245,7 @@ private fun buildItems(context: Context, api: MmoApi, request: PlayRequest): Lis
             .setMediaId(f.fileId)
             .setSubtitleConfigurations(subs)
             .setMediaMetadata(MediaMetadata.Builder().setTitle(f.title).build())
-        if (request.hls) b.setUri(api.hlsUrl(f.fileId)).setMimeType(MimeTypes.APPLICATION_M3U8)
+        if (request.hls) b.setUri(api.hlsUrl(f.fileId, hlsStartSec)).setMimeType(MimeTypes.APPLICATION_M3U8)
         else b.setUri(api.directUrl(f.fileId))
         listOf(b.build())
     }

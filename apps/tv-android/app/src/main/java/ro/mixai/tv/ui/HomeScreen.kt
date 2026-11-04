@@ -185,7 +185,7 @@ fun HomeScreen(
                     StillCard(
                         title = if (code.isBlank()) f.title else "${f.parsed.title.trim()} · $code",
                         subtitle = remainingLabel(p),
-                        imageUrl = api.spriteUrl(f.fileId), progress = p.fraction, modifier = mod,
+                        imageUrl = api.stillUrl(f.fileId), progress = p.fraction, modifier = mod,
                         onClick = { onMovie(f) },
                     )
                 }
@@ -204,7 +204,7 @@ fun HomeScreen(
                         StillCard(
                             title = f.title,
                             subtitle = listOfNotNull(f.parsed.year?.toString(), f.height?.let { "${it}p" }).joinToString(" · "),
-                            imageUrl = api.spriteUrl(f.fileId), progress = progress[f.fileId]?.fraction, modifier = mod,
+                            imageUrl = api.stillUrl(f.fileId), progress = progress[f.fileId]?.fraction, modifier = mod,
                             onClick = { onMovie(f) },
                         )
                     }
@@ -223,7 +223,7 @@ fun HomeScreen(
                         StillCard(
                             title = s.title,
                             subtitle = stringResource(R.string.home_episodes, s.episodes.size) + " · " + stringResource(R.string.home_seasons, s.seasons),
-                            imageUrl = api.spriteUrl(s.episodes.first().fileId), progress = inProgress?.fraction, modifier = mod,
+                            imageUrl = api.stillUrl(s.episodes.first().fileId), progress = inProgress?.fraction, modifier = mod,
                             onClick = { onShow(s) },
                         )
                     }

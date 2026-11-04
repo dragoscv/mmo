@@ -48,7 +48,7 @@ fun MovieScreen(api: MmoApi, file: VideoFile, progress: Progress?, onPlay: (Play
 
     Row(Modifier.fillMaxSize().padding(horizontal = 64.dp, vertical = 56.dp), horizontalArrangement = Arrangement.spacedBy(48.dp)) {
         Column(Modifier.width(480.dp)) {
-            SpriteStill(url = api.spriteUrl(file.fileId), title = file.title, modifier = Modifier.size(480.dp, 270.dp).clip(RoundedCornerShape(12.dp)))
+            SpriteStill(url = api.stillUrl(file.fileId), title = file.title, modifier = Modifier.size(480.dp, 270.dp).clip(RoundedCornerShape(12.dp)))
             if (resumeAt != null) { Spacer(Modifier.height(8.dp)); ProgressBar(resumeAt.fraction) }
         }
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {

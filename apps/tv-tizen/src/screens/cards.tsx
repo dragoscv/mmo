@@ -8,9 +8,9 @@ import { t } from "../i18n/messages";
 
 export type Load<T> = { state: "loading" } | { state: "ok"; data: T } | { state: "error"; message: string };
 
-/** Poster (2/3) when the server matched artwork, else a landscape still from the scrubber sprite. */
+/** Poster (2/3) when the server matched artwork, else a landscape keyframe still. */
 export function VideoArt({ v, client }: { v: ProbedVideo; client: MmoClient }) {
-    const still = useStill(v.posterPath ? null : client.spriteUrl(v.fileId));
+    const still = useStill(v.posterPath ? null : client.stillUrl(v.fileId));
     if (v.posterPath) return <img className="art" src={client.posterUrl(v.posterPath)} alt="" loading="lazy" />;
     if (still) return <div className="art still" style={{ backgroundImage: `url("${still}")` }} />;
     return <div className="art placeholder">🎬</div>;

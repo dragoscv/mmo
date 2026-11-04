@@ -2,6 +2,39 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.3.0 — Video playback without eating the PC
+
+Measured on a 4K Dolby Vision HDR HEVC MKV with E-AC3 5.1 (ffmpeg 7.1.1, Windows 11).
+
+- **The video stream is never re-encoded by default.** New setting `allowVideoTranscode`
+	(`GET/POST /video/flags`, default **off**): playback always copies the original video,
+	`q` now defaults to `original`, and `q=720p` or `?mode=full-transcode` fall back to a copy
+	while the setting is off. Audio a client cannot decode is converted to E-AC3 5.1 640k
+	(then AC3 5.1, then AAC stereo, picked from `caps`). With no `caps`, the video is still
+	copied and non-AAC audio becomes AAC stereo.
+- **Resume works.** Segment requests used to re-enter session setup with `start=0`, which killed
+	every session started at a resume point and ran 2 ffprobes (~1.2 s) per segment. Segments
+	now hit the live session (same ffmpeg pid across playlist + segments); an idle-killed
+	session restarts at its own offset and caps.
+- **Copy sessions read at 2x realtime** after a 60 s burst (`-readrate 2
+	-readrate_initial_burst 60`) at BelowNormal priority: 0.02 cores and ~6 MB/s steady
+	(was ~100 MB/s, 3 GB of temp files per 30 s, 1.25 cores). One cached ffprobe per file.
+- **fMP4 `init.mp4` lands in the session dir** (ffmpeg runs with `cwd` = session dir). It used to
+	be written to the server working directory, shared by all sessions, and the init route 404'd.
+- **Full transcode (opt-in) works on 10-bit sources**: `format=yuv420p` before the h264 encoder
+	(NVENC rejected p010, so every 4K HDR transcode died in under 1 s).
+- **Subtitles: all text tracks in one pass, cached on disk** (`<userData>/subs-cache/<fileId>`).
+	A TV that registers every track used to start one full-file read per track; now cold
+	5.4 s for all tracks, warm 26 ms. Bitmap tracks (PGS/VobSub/DVB) answer 404.
+- **New `GET /video/thumbs/{fileId}/still.jpg`**: one keyframe ~10 % into the film, 640 px,
+	cached (cold 273 ms, warm 3 ms, ~0 CPU). TV cards used the sprite, which decoded the
+	whole 4K film per card (11.6 cores).
+- **Sprite** = 144 keyframe seeks instead of a full decode. **Intro / credits / loudness /
+	crop** run audio-only or on keyframes with `-threads 1`, through one global FIFO queue
+	(concurrency 1, `MMO_ANALYSIS_CONCURRENCY`) at IDLE priority. Loudness samples 12 x 20 s
+	windows (8 s, ~0 CPU; was 6.9 cores for the full file). Queue state in `/video/flags`.
+- Pre-remux jobs run at IDLE priority.
+
 ## 3.2.0 — ffmpeg/ffprobe only ever run inside explicit jobs
 
 - **`POST /video/scan` no longer runs ffprobe inline.** It answers from the persisted

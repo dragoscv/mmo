@@ -52,7 +52,7 @@ fun ShowScreen(api: MmoApi, show: Show, progress: Map<String, Progress>, onPlay:
 
     Row(Modifier.fillMaxSize().padding(56.dp), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
         Column(Modifier.width(400.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            SpriteStill(url = api.spriteUrl(show.episodes.first().fileId), title = show.title, modifier = Modifier.size(400.dp, 225.dp).clip(RoundedCornerShape(12.dp)))
+            SpriteStill(url = api.stillUrl(show.episodes.first().fileId), title = show.title, modifier = Modifier.size(400.dp, 225.dp).clip(RoundedCornerShape(12.dp)))
             Text(show.title, style = MaterialTheme.typography.headlineSmall, color = Tokens.foreground, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
                 stringResource(R.string.show_episodes, show.episodes.size) + " · " + stringResource(R.string.home_seasons, show.seasons),

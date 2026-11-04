@@ -38,6 +38,9 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
     const [mode, setMode] = useState<"direct" | "hls" | "audio">("direct");
     const [subIdx, setSubIdx] = useState<number>(-1);
     const osdTimer = useRef<number | null>(null);
+    /** HLS sessions start at `?start=<sec>`; the element's time is relative to it. */
+    const offsetRef = useRef(0);
+    const [reloadAt, setReloadAt] = useState<number | null>(null);
 
     const showOsd = useCallback(() => {
         setOsd(true);
@@ -49,9 +52,14 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
     const song = cur.kind === "audio" ? cur.song : null;
     const subs = video?.subtitleTracks ?? [];
     const titleRef = cur.kind === "video" ? cur.ref ?? null : null;
+    const absTime = (el: HTMLMediaElement) => offsetRef.current + el.currentTime;
+    const absDuration = (el: HTMLMediaElement) =>
+        offsetRef.current > 0 || mode === "hls"
+            ? (video?.durationSec ?? (Number.isFinite(el.duration) ? offsetRef.current + el.duration : 0))
+            : (Number.isFinite(el.duration) ? el.duration : (video?.durationSec ?? 0));
     const save = (el: HTMLMediaElement, force: boolean) => {
         if (!video) return;
-        reportProgress(media, video.fileId, titleRef, el.currentTime, Number.isFinite(el.duration) ? el.duration : (video.durationSec ?? 0), force);
+        reportProgress(media, video.fileId, titleRef, absTime(el), absDuration(el), force);
     };
 
     // ─── Source setup ───────────────────────────────────────────────────
@@ -63,10 +71,14 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
         setTime(0);
         setDuration(0);
         setSubIdx(subs.findIndex((s) => s.forced) >= 0 ? subs.findIndex((s) => s.forced) : -1);
+        offsetRef.current = 0;
 
         // Resume: server position when the Title screen passed one, else the local
-        // store (≥ 10 s). Direct + native HLS seek on loadedmetadata; hls.js gets `startPosition`.
-        const resumeAt = cur.kind === "video" ? (cur.resumeSec && cur.resumeSec > 10 ? cur.resumeSec : (getProgress(cur.video.fileId)?.pos ?? 0)) : 0;
+        // store (≥ 10 s). Direct seeks on loadedmetadata; HLS asks the server to
+        // start AT that position (`?start=`), so resume is instant and never
+        // waits for ffmpeg to produce everything before it.
+        const savedAt = cur.kind === "video" ? (cur.resumeSec && cur.resumeSec > 10 ? cur.resumeSec : (getProgress(cur.video.fileId)?.pos ?? 0)) : 0;
+        const resumeAt = reloadAt ?? savedAt;
         const onMeta = () => {
             if (resumeAt > 0 && Number.isFinite(el.duration) && resumeAt < el.duration - 5) el.currentTime = resumeAt;
         };
@@ -94,7 +106,10 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
                 return;
             }
             setMode("hls");
-            const url = client.hlsUrl(v.fileId, { caps: TIZEN_CAPS, quality: "original" });
+            el.removeEventListener("loadedmetadata", onMeta);
+            const startSec = resumeAt > 0 ? Math.floor(resumeAt) : 0;
+            offsetRef.current = startSec;
+            const url = client.hlsUrl(v.fileId, { caps: TIZEN_CAPS, quality: "original", startSec });
             if (isHlsNative(el)) {
                 el.src = url;
                 await el.play().catch(() => undefined);
@@ -103,14 +118,13 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
             const { default: HlsCtor } = await import("hls.js");
             if (cancelled) return;
             if (!HlsCtor.isSupported()) { setError(t("player.errMse")); return; }
-            el.removeEventListener("loadedmetadata", onMeta);
             const hls = new HlsCtor({
                 // The server playlist is EVENT while ffmpeg is still writing; keep polling.
                 liveDurationInfinity: false,
                 maxBufferLength: 60,
                 backBufferLength: 30,
                 enableWorker: false, // Tizen workers + blob URLs are flaky on older firmware
-                startPosition: resumeAt > 0 ? resumeAt : -1,
+                startPosition: 0,
             });
             hlsRef.current = hls;
             hls.on(HlsCtor.Events.ERROR, (_e, data) => {
@@ -130,17 +144,17 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
             teardown();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cur, client]);
+    }, [cur, client, reloadAt]);
 
     // ─── Media events ───────────────────────────────────────────────────
     useEffect(() => {
         const el = mediaRef.current;
         if (!el) return;
         const onTime = () => {
-            setTime(el.currentTime);
+            setTime(absTime(el));
             save(el, false);
         };
-        const onDur = () => setDuration(Number.isFinite(el.duration) ? el.duration : (video?.durationSec ?? 0));
+        const onDur = () => setDuration(absDuration(el));
         const onPlay = () => setPaused(false);
         const onPause = () => {
             setPaused(true);
@@ -168,7 +182,7 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
             el.removeEventListener("error", onErr);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cur]);
+    }, [cur, mode]);
 
     // Subtitle track selection → toggle `mode` on the <track> elements.
     useEffect(() => {
@@ -186,6 +200,7 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
         if (queue && qIndex + 1 < queue.length) {
             const n = qIndex + 1;
             setQIndex(n);
+            setReloadAt(null);
             setCur(queue[n]!);
         } else {
             onExit();
@@ -197,9 +212,11 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
         if (queue && qIndex > 0 && el && el.currentTime < 3) {
             const n = qIndex - 1;
             setQIndex(n);
+            setReloadAt(null);
             setCur(queue[n]!);
         } else if (el) {
-            el.currentTime = 0;
+            if (offsetRef.current > 0) setReloadAt(0);
+            else el.currentTime = 0;
         }
     }, [queue, qIndex]);
 
@@ -213,9 +230,21 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
     const seekBy = useCallback((delta: number) => {
         const el = mediaRef.current;
         if (!el) return;
-        const max = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : Infinity;
-        el.currentTime = Math.max(0, Math.min(max - 0.5, el.currentTime + delta));
-    }, []);
+        const total = absDuration(el);
+        const target = Math.max(0, Math.min((total > 0 ? total : Infinity) - 0.5, absTime(el) + delta));
+        if (mode === "hls") {
+            // The server reads at 2x realtime, so far seeks may land past what it
+            // has produced: restart the session at the target instead of stalling.
+            const local = target - offsetRef.current;
+            const s = el.seekable;
+            const end = s.length > 0 ? s.end(s.length - 1) : 0;
+            if (local < 0 || local > end - 1) { client.pauseStream(video!.fileId); setReloadAt(Math.floor(target)); return; }
+            el.currentTime = local;
+            return;
+        }
+        el.currentTime = target;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mode, client, video]);
 
     const cycleSubs = useCallback(() => {
         if (subs.length === 0) return;

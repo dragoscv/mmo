@@ -19,6 +19,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { FFMPEG_BIN, FFPROBE_BIN, detectHwAccel, videoEncoderFor, qualityArgsFor } from "./ffmpeg-paths";
 import { sidecarIfExists } from "./pre-remux";
+import { lowerPriority, killTree, supportsReadrateBurst } from "./ffmpeg-jobs";
+import { getSettings } from "../store";
 
 export type VideoQuality = "original" | "1080p" | "720p" | "480p";
 
@@ -53,6 +55,11 @@ interface Session {
 }
 
 const sessions = new Map<string, Session>();
+/** Last start offset per session key, kept after teardown so a segment
+ *  request for an idle-killed session restarts at the right place instead
+ *  of at 0 (which used to kill every resumed session). */
+const lastStartByKey = new Map<string, number>();
+const lastCapsByKey = new Map<string, string[]>();
 // When the web app stops requesting segments (paused, tab closed,
 // browser crashed, Wi-Fi died) we want the ffmpeg process gone fast so
 // it stops holding the source file open and burning GPU. The 3s
@@ -71,16 +78,8 @@ setInterval(() => {
 function destroySession(key: string): void {
     const s = sessions.get(key);
     if (!s) return;
-    // On Windows, child.kill() only terminates the immediate child and
-    // can leave ffmpeg worker processes alive. Use taskkill /F /T for a
-    // full tree teardown.
-    try {
-        if (process.platform === "win32" && s.proc.pid) {
-            spawn("taskkill", ["/F", "/T", "/PID", String(s.proc.pid)], { windowsHide: true, stdio: "ignore" });
-        } else {
-            s.proc.kill("SIGKILL");
-        }
-    } catch { /* ignore */ }
+    // Full tree teardown (child.kill() can leave workers alive on Windows).
+    killTree(s.proc.pid);
     sessions.delete(key);
     fsp.rm(s.dir, { recursive: true, force: true }).catch(() => undefined);
 }
@@ -101,55 +100,102 @@ export function destroyAllSessions(): void {
     for (const key of [...sessions.keys()]) destroySession(key);
 }
 
-async function probeVideoCodec(filePath: string): Promise<string | null> {
-    return new Promise((resolve) => {
-        const args = ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "default=nw=1:nk=1", filePath];
+export interface StreamCodecs { video: string | null; audio: string | null; audioChannels: number | null }
+
+/** One ffprobe per (path, mtime, size), cached. It used to run twice on
+ *  EVERY playlist and segment request (~600 ms each, measured). */
+const codecCache = new Map<string, { sig: string; codecs: StreamCodecs }>();
+
+export async function probeStreamCodecs(filePath: string): Promise<StreamCodecs> {
+    let sig = "";
+    try { const st = fs.statSync(filePath); sig = `${st.size}:${st.mtimeMs}`; } catch { /* missing */ }
+    const hit = codecCache.get(filePath);
+    if (hit && hit.sig === sig) return hit.codecs;
+    const codecs = await new Promise<StreamCodecs>((resolve) => {
+        const args = ["-v", "error", "-show_entries", "stream=codec_type,codec_name,channels", "-of", "json", filePath];
         const child = spawn(FFPROBE_BIN, args, { windowsHide: true });
         let out = "";
         child.stdout?.on("data", (b) => { out += b.toString("utf8"); });
-        child.on("error", () => resolve(null));
-        child.on("exit", () => resolve(out.trim().toLowerCase() || null));
+        child.on("error", () => resolve({ video: null, audio: null, audioChannels: null }));
+        child.on("exit", () => {
+            try {
+                const j = JSON.parse(out) as { streams?: Array<{ codec_type?: string; codec_name?: string; channels?: number }> };
+                const v = j.streams?.find((s) => s.codec_type === "video" && s.codec_name !== "mjpeg" && s.codec_name !== "png");
+                const a = j.streams?.find((s) => s.codec_type === "audio");
+                resolve({ video: v?.codec_name?.toLowerCase() ?? null, audio: a?.codec_name?.toLowerCase() ?? null, audioChannels: a?.channels ?? null });
+            } catch {
+                resolve({ video: null, audio: null, audioChannels: null });
+            }
+        });
     });
+    if (codecs.video) codecCache.set(filePath, { sig, codecs });
+    return codecs;
 }
 
-async function probeFirstAudioCodec(filePath: string): Promise<string | null> {
-    return new Promise((resolve) => {
-        const args = ["-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nw=1:nk=1", filePath];
-        const child = spawn(FFPROBE_BIN, args, { windowsHide: true });
-        let out = "";
-        child.stdout?.on("data", (b) => { out += b.toString("utf8"); });
-        child.on("error", () => resolve(null));
-        child.on("exit", () => resolve(out.trim().toLowerCase() || null));
-    });
-}
+const VIDEO_COPY_OK = ["h264", "hevc", "vp9", "av1"];
+const AUDIO_COPY_OK = ["aac", "ac3", "eac3", "opus", "mp3", "flac"];
 
 /** Decide the cheapest playback mode that the given client can handle.
- *  `caps` is the comma-separated list reported by the browser (e.g.
- *  "h264,hevc,aac,ac3,eac3"). When `quality` is anything other than
- *  "original", we always full-transcode (the caller asked us to rescale). */
+ *  `caps` is the comma-separated list reported by the client (e.g.
+ *  "h264,hevc,aac,ac3,eac3"). The video stream is NEVER re-encoded unless
+ *  the owner enabled `allowVideoTranscode` (default off): quality is always
+ *  the original, and a lower quality request is treated as "original". */
 export function pickTranscodeMode(
     quality: VideoQuality,
     videoCodec: string | null,
     audioCodec: string | null,
     caps: string[],
+    allowVideoTranscode = false,
 ): TranscodeMode {
-    if (quality !== "original") return "full-transcode";
+    if (quality !== "original" && allowVideoTranscode) return "full-transcode";
     const v = (videoCodec ?? "").toLowerCase();
     const a = (audioCodec ?? "").toLowerCase();
     // Normalize codec aliases to the names clients report.
     const vKey = v === "avc1" ? "h264" : v === "h265" ? "hevc" : v;
     const aKey = a === "mp4a" ? "aac" : a;
     const cap = new Set(caps.map((c) => c.toLowerCase()));
-    const videoOk = cap.has(vKey) && ["h264", "hevc", "vp9", "av1"].includes(vKey);
-    const audioOk = cap.has(aKey) && ["aac", "ac3", "eac3", "opus", "mp3"].includes(aKey);
-    if (!videoOk) return "full-transcode";
+    // No caps reported (unknown client): copy the video, keep only AAC/MP3 audio
+    // as-is — every player decodes those; anything else is converted.
+    const videoOk = VIDEO_COPY_OK.includes(vKey) && (cap.size === 0 || cap.has(vKey));
+    const audioOk = !aKey || (cap.size === 0 ? ["aac", "mp3"].includes(aKey) : (AUDIO_COPY_OK.includes(aKey) && cap.has(aKey)));
+    if (!videoOk && allowVideoTranscode) return "full-transcode";
     if (!audioOk) return "audio-transcode";
     return "remux";
+}
+
+/** Best audio the client takes when the source audio must be converted:
+ *  E-AC3 5.1 640k (Dolby Digital Plus, every Samsung/Android TV + soundbar),
+ *  then AC3 5.1 640k, then AAC (stereo when the client is a plain browser). */
+export function audioTranscodeArgs(caps: string[], sourceChannels: number | null): string[] {
+    const cap = new Set(caps.map((c) => c.toLowerCase()));
+    const ch = Math.max(1, Math.min(6, sourceChannels ?? 6));
+    if (cap.has("eac3")) return ["-c:a", "eac3", "-ac", String(ch), "-ar", "48000", "-b:a", ch > 2 ? "640k" : "256k"];
+    if (cap.has("ac3")) return ["-c:a", "ac3", "-ac", String(ch), "-ar", "48000", "-b:a", ch > 2 ? "640k" : "256k"];
+    return ["-af", "aformat=channel_layouts=stereo:sample_rates=48000", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "256k"];
 }
 
 export function touchSession(key: string): void {
     const s = sessions.get(key);
     if (s) s.lastTouch = Date.now();
+}
+
+/** Segment-route lookup: the live session for `key`, or a restart at the
+ *  offset it was last started from (never a silent restart at 0). */
+export async function sessionForSegment(
+    fileId: string,
+    sourcePath: string,
+    key: string,
+): Promise<{ segmentDir: string } | null> {
+    const s = sessions.get(key);
+    if (s && fs.existsSync(s.dir)) {
+        s.lastTouch = Date.now();
+        return { segmentDir: s.dir };
+    }
+    const m = key.match(/^[^:]+:(original|1080p|720p|480p):(remux|audio-transcode|full-transcode)$/);
+    if (!m) return null;
+    const startSec = lastStartByKey.get(key) ?? 0;
+    const sess = await ensureHlsSession(fileId, sourcePath, m[1] as VideoQuality, startSec, lastCapsByKey.get(key) ?? [], m[2] as TranscodeMode);
+    return { segmentDir: sess.segmentDir };
 }
 
 /** Tear down every active session for the given fileId. Called when
@@ -178,9 +224,15 @@ export async function ensureHlsSession(
     // already h264/hevc + AAC stereo in a fragment-friendly MP4, so
     // even the "remux" path becomes essentially free.
     const effectiveSource = sidecarIfExists(sourcePath) ?? sourcePath;
-    const probedV = await probeVideoCodec(effectiveSource);
-    const probedA = await probeFirstAudioCodec(effectiveSource);
-    const mode = requestedMode ?? pickTranscodeMode(quality, probedV, probedA, caps);
+    const probed = await probeStreamCodecs(effectiveSource);
+    const probedV = probed.video;
+    const allowVideoTranscode = getSettings().allowVideoTranscode;
+    let mode = requestedMode ?? pickTranscodeMode(quality, probedV, probed.audio, caps, allowVideoTranscode);
+    // An explicit `?mode=full-transcode` is refused while video transcoding is off.
+    if (mode === "full-transcode" && !allowVideoTranscode) {
+        mode = pickTranscodeMode("original", probedV, probed.audio, caps, false);
+    }
+    if (!allowVideoTranscode) quality = "original";
     const key = `${fileId}:${quality}:${mode}`;
     const existing = sessions.get(key);
     if (existing) {
@@ -196,6 +248,8 @@ export async function ensureHlsSession(
     }
 
     evictOldestIfOverCap();
+    lastStartByKey.set(key, startSec);
+    lastCapsByKey.set(key, caps);
 
     const dir = await fsp.mkdtemp(path.join(os.tmpdir(), `mmo-hls-${fileId}-${quality}-${mode}-`));
     const playlistPath = path.join(dir, "stream.m3u8");
@@ -214,10 +268,17 @@ export async function ensureHlsSession(
         if (accel === "nvenc") args.push("-hwaccel", "cuda");
         else if (accel === "qsv") args.push("-hwaccel", "qsv");
         else if (accel === "videotoolbox") args.push("-hwaccel", "videotoolbox");
+    } else {
+        // Copy paths: pace the read at 2x realtime after a 60 s burst. Without
+        // this ffmpeg copied the whole film to %TEMP% at ~100 MB/s (3 GB per
+        // 30 s measured); paced it is ~5 MB/s and ~0.03 cores. Seeking past
+        // the produced range restarts the session at `?start=`.
+        args.push("-readrate", "2");
+        if (supportsReadrateBurst()) args.push("-readrate_initial_burst", "60");
     }
     if (startSec > 0) args.push("-ss", String(startSec));
     args.push("-i", effectiveSource);
-    args.push("-map", "0:v:0", "-map", "0:a:0?", "-sn");
+    args.push("-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-map_chapters", "-1");
 
     if (mode === "remux") {
         args.push("-c:v", "copy");
@@ -229,8 +290,7 @@ export async function ensureHlsSession(
     } else if (mode === "audio-transcode") {
         args.push("-c:v", "copy");
         if (probedV === "hevc" || probedV === "h265") args.push("-tag:v", "hvc1");
-        args.push("-af", "aformat=channel_layouts=stereo:sample_rates=48000");
-        args.push("-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "192k");
+        args.push("-threads", "2", ...audioTranscodeArgs(caps, probed.audioChannels));
     } else if (quality === "original") {
         const vCodec = probedV;
         const copyable = vCodec === "h264" || vCodec === "avc1" || vCodec === "vp9" || vCodec === "av1";
@@ -238,7 +298,9 @@ export async function ensureHlsSession(
             args.push("-c:v", "copy");
         } else {
             args.push("-c:v", encoder, ...qualityArgsFor(accel, 22));
-            args.push("-vf", "scale=w=1920:h=1080:force_original_aspect_ratio=decrease");
+            // format=yuv420p: h264 encoders reject 10-bit (p010) input — the
+            // reason every 4K HDR full transcode died in under a second.
+            args.push("-vf", "scale=w=1920:h=1080:force_original_aspect_ratio=decrease,format=yuv420p");
         }
         args.push("-af", "aformat=channel_layouts=stereo:sample_rates=48000");
         args.push("-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "192k");
@@ -246,7 +308,7 @@ export async function ensureHlsSession(
         const l = LADDER[quality];
         args.push("-c:v", encoder, ...qualityArgsFor(accel, 23));
         args.push("-b:v", l.vBitrate, "-maxrate", l.vBitrate, "-bufsize", l.vBitrate);
-        args.push("-vf", `scale=w=${l.w}:h=${l.h}:force_original_aspect_ratio=decrease`);
+        args.push("-vf", `scale=w=${l.w}:h=${l.h}:force_original_aspect_ratio=decrease,format=yuv420p`);
         args.push("-af", "aformat=channel_layouts=stereo:sample_rates=48000");
         args.push("-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", l.aBitrate);
     }
@@ -260,7 +322,12 @@ export async function ensureHlsSession(
         playlistPath,
     );
 
-    const proc = spawn(FFMPEG_BIN, args, { windowsHide: true });
+    // cwd = session dir: ffmpeg writes the fMP4 `init.mp4` relative to its
+    // working directory, not next to the segments. Without this every session
+    // wrote (and overwrote) `<server cwd>/init.mp4` and the init route 404'd.
+    const proc = spawn(FFMPEG_BIN, args, { windowsHide: true, cwd: dir });
+    // Live playback beats everything else on the box except the desktop.
+    lowerPriority(proc.pid, "below-normal");
     const emitter = new EventEmitter();
     const logPath = path.join(dir, "ffmpeg.log");
     const logStream = fs.createWriteStream(logPath, { flags: "a" });

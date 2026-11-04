@@ -8,6 +8,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
+/** Codecs Media3 plays on Google TV (DD/DD+ decoded or passed through to HDMI). */
+private const val TV_CAPS = "h264,hevc,vp9,av1,aac,ac3,eac3,opus,mp3,flac"
+
 class ApiException(val status: Int, message: String) : IOException("HTTP $status: $message")
 
 // Thin HTTP client for one MMO Server. Plain `HttpURLConnection` +
@@ -60,10 +63,15 @@ class MmoApi(val baseUrl: String, private val token: String) {
     suspend fun fileInfo(fileId: String): VideoFile = json.decodeFromString(get("$baseUrl/video/file/${enc(fileId)}/info", auth = true))
 
     fun directUrl(fileId: String) = "$baseUrl/video/direct/$fileId?t=${enc(token)}"
-    fun hlsUrl(fileId: String, quality: String = "720p") = "$baseUrl/video/stream/$fileId?q=$quality&t=${enc(token)}"
+    /** Always the original video; `caps` lets the server copy audio it can and convert only the rest
+     *  (E-AC3 5.1). `startSec` makes the server start AT the resume point — instant resume. */
+    fun hlsUrl(fileId: String, startSec: Long = 0L) =
+        "$baseUrl/video/stream/$fileId?q=original&caps=$TV_CAPS" + (if (startSec > 0) "&start=$startSec" else "") + "&t=${enc(token)}"
     fun subtitleUrl(fileId: String, ordinal: Int) = "$baseUrl/video/subs/$fileId/$ordinal?t=${enc(token)}"
     /** Scrubber sprite: 12×12 grid of 160×90 tiles, generated lazily by ffmpeg (503 until ready). */
     fun spriteUrl(fileId: String) = "$baseUrl/video/thumbs/$fileId/sprite.jpg?t=${enc(token)}"
+    /** Card still: one keyframe ≈10 % into the film, 640 px, cached server-side (~1 s, ~0 CPU). */
+    fun stillUrl(fileId: String) = "$baseUrl/video/thumbs/$fileId/still.jpg?t=${enc(token)}"
     /** Cached TMDB image proxy (`/video/tmdb-image/{size}/{path}`); `path` is the TMDB path incl. its leading `/`. */
     fun tmdbImageUrl(size: String, path: String?): String? =
         path?.takeIf { it.isNotBlank() }?.let { "$baseUrl/video/tmdb-image/$size${if (it.startsWith("/")) it else "/$it"}?t=${enc(token)}" }

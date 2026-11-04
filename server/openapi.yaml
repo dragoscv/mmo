@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.2.0
+  version: 3.3.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -2399,6 +2399,9 @@ paths:
               type: object
               properties:
                 preRemuxAutoOnScan: { type: boolean }
+                allowVideoTranscode:
+                  type: boolean
+                  description: Re-encode the video stream for clients that cannot decode it. Off by default (original quality only).
       responses:
         '200':
           description: Flags after update
@@ -2543,6 +2546,11 @@ paths:
         Spawns or reuses a transcode session. Segment URIs are rewritten to
         absolute `/video/stream/{fileId}/seg/{sessionKey}/...` URLs carrying
         `?t=` and `?u=`. While encoding, `#EXT-X-PLAYLIST-TYPE:EVENT` is injected.
+        The video stream is always copied (original quality) unless the
+        `allowVideoTranscode` flag is on; incompatible audio is converted to
+        E-AC3 5.1 (then AC3, then AAC stereo, per `caps`). Copy sessions read
+        the source at 2x realtime after a 60 s burst; `start` begins the
+        session at the resume point.
       security:
         - deviceToken: []
         - queryToken: []
@@ -2550,7 +2558,7 @@ paths:
         - { $ref: '#/components/parameters/FileId' }
         - { $ref: '#/components/parameters/QueryT' }
         - { $ref: '#/components/parameters/QueryU' }
-        - { name: q, in: query, schema: { type: string, enum: [original, 1080p, 720p, 480p], default: 720p } }
+        - { name: q, in: query, schema: { type: string, enum: [original, 1080p, 720p, 480p], default: original }, description: Lower values only apply when allowVideoTranscode is on. }
         - { name: start, in: query, schema: { type: number, default: 0 }, description: Start offset in seconds. }
         - { name: caps, in: query, schema: { type: string }, description: Comma-separated client capability list. }
         - { name: mode, in: query, schema: { type: string, enum: [remux, audio-transcode, full-transcode] } }
@@ -2952,6 +2960,29 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { description: Unknown file id or missing file (empty body) }
         '503': { description: ffmpeg unavailable or sprite generation failed (empty body) }
+
+  /video/thumbs/{fileId}/still.jpg:
+    get:
+      operationId: videoThumbsStill
+      tags: [video]
+      summary: Card still (one keyframe)
+      description: One keyframe about 10 % into the file, 640 px wide, decoded with a single keyframe seek and cached on disk. Used by TV cards instead of the sprite.
+      security:
+        - deviceToken: []
+        - queryToken: []
+      parameters:
+        - { $ref: '#/components/parameters/FileId' }
+        - { $ref: '#/components/parameters/QueryT' }
+        - { $ref: '#/components/parameters/QueryU' }
+      responses:
+        '200':
+          description: Still
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Unknown file id or missing file (empty body) }
+        '503': { description: ffmpeg unavailable or extraction failed (empty body) }
 
   /video/thumbs/{fileId}/thumbs.vtt:
     get:
@@ -5532,9 +5563,20 @@ components:
     # ---- video --------------------------------------------------------------
     VideoFlags:
       type: object
-      required: [preRemuxAutoOnScan]
+      required: [preRemuxAutoOnScan, allowVideoTranscode]
       properties:
         preRemuxAutoOnScan: { type: boolean }
+        allowVideoTranscode:
+          type: boolean
+          description: Re-encode the video stream for clients that cannot decode it. Off by default (original quality only).
+        analysisQueue:
+          type: object
+          description: Background ffmpeg analyses (sprite, intro, credits, loudness, crop) run one at a time at idle priority.
+          required: [active, queued, concurrency]
+          properties:
+            active: { type: integer }
+            queued: { type: integer }
+            concurrency: { type: integer }
     ParsedFilename:
       type: object
       required: [title, year, season, episode]

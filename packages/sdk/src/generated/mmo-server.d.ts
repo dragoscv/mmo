@@ -1684,6 +1684,11 @@ export interface paths {
          * @description Spawns or reuses a transcode session. Segment URIs are rewritten to
          *     absolute `/video/stream/{fileId}/seg/{sessionKey}/...` URLs carrying
          *     `?t=` and `?u=`. While encoding, `#EXT-X-PLAYLIST-TYPE:EVENT` is injected.
+         *     The video stream is always copied (original quality) unless the
+         *     `allowVideoTranscode` flag is on; incompatible audio is converted to
+         *     E-AC3 5.1 (then AC3, then AAC stereo, per `caps`). Copy sessions read
+         *     the source at 2x realtime after a 60 s burst; `start` begins the
+         *     session at the resume point.
          */
         get: operations["videoStreamPlaylist"];
         put?: never;
@@ -1993,6 +1998,26 @@ export interface paths {
          * @description A 12x12 grid of 160x90 tiles, generated lazily and cached on disk.
          */
         get: operations["videoThumbsSprite"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/video/thumbs/{fileId}/still.jpg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Card still (one keyframe)
+         * @description One keyframe about 10 % into the file, 640 px wide, decoded with a single keyframe seek and cached on disk. Used by TV cards instead of the sprite.
+         */
+        get: operations["videoThumbsStill"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3770,6 +3795,14 @@ export interface components {
         };
         VideoFlags: {
             preRemuxAutoOnScan: boolean;
+            /** @description Re-encode the video stream for clients that cannot decode it. Off by default (original quality only). */
+            allowVideoTranscode: boolean;
+            /** @description Background ffmpeg analyses (sprite, intro, credits, loudness, crop) run one at a time at idle priority. */
+            analysisQueue?: {
+                active: number;
+                queued: number;
+                concurrency: number;
+            };
         };
         ParsedFilename: {
             title: string;
@@ -7301,6 +7334,8 @@ export interface operations {
             content: {
                 "application/json": {
                     preRemuxAutoOnScan?: boolean;
+                    /** @description Re-encode the video stream for clients that cannot decode it. Off by default (original quality only). */
+                    allowVideoTranscode?: boolean;
                 };
             };
         };
@@ -7499,6 +7534,7 @@ export interface operations {
                 t?: components["parameters"]["QueryT"];
                 /** @description User id, copied into the `x-user-id` header. */
                 u?: components["parameters"]["QueryU"];
+                /** @description Lower values only apply when allowVideoTranscode is on. */
                 q?: "original" | "1080p" | "720p" | "480p";
                 /** @description Start offset in seconds. */
                 start?: number;
@@ -8046,6 +8082,49 @@ export interface operations {
                 content?: never;
             };
             /** @description ffmpeg unavailable or sprite generation failed (empty body) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    videoThumbsStill: {
+        parameters: {
+            query?: {
+                /** @description Device token (alternative to the `x-device-token` header). */
+                t?: components["parameters"]["QueryT"];
+                /** @description User id, copied into the `x-user-id` header. */
+                u?: components["parameters"]["QueryU"];
+            };
+            header?: never;
+            path: {
+                /** @description Opaque id returned by `/video/scan` or `/video/lookup`. */
+                fileId: components["parameters"]["FileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Still */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Unknown file id or missing file (empty body) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description ffmpeg unavailable or extraction failed (empty body) */
             503: {
                 headers: {
                     [name: string]: unknown;

@@ -103,11 +103,10 @@ a { color: inherit; }
 .card .art { width: 100%; aspect-ratio: 1 / 1; background: var(--muted); object-fit: cover; display: block; }
 .card.poster .art { aspect-ratio: 2 / 3; }
 .card.wide .art { aspect-ratio: 16 / 9; }
-/* Scrubber sprite as a still: 12×12 grid, tile 14 = row 1, col 2 (≈10 % into the film).
-   background-position % maps col/(cols-1): 2/11 = 18.1818 %, row 1/11 = 9.0909 %. */
+/* Card still: one 640 px keyframe (`/video/thumbs/:id/still.jpg`), ≈10 % into the film. */
 .card .art.still {
-    background-size: 1200% 1200%;
-    background-position: 18.1818% 9.0909%;
+    background-size: cover;
+    background-position: center;
     background-repeat: no-repeat;
     aspect-ratio: 16 / 9;
 }

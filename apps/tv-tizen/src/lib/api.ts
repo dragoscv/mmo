@@ -165,6 +165,12 @@ export class MmoClient {
         return `${this.cfg.baseUrl}/video/thumbs/${encodeURIComponent(fileId)}/sprite.jpg?${this.authQuery()}`;
     }
 
+    /** Card still: ONE keyframe ~10 % into the film, 640 px, cached by the server.
+     *  Cheap (~1 s, ~0 CPU) — unlike the sprite, which reads the whole film. */
+    stillUrl(fileId: string): string {
+        return `${this.cfg.baseUrl}/video/thumbs/${encodeURIComponent(fileId)}/still.jpg?${this.authQuery()}`;
+    }
+
     /** Best-effort: tell the server to tear down the ffmpeg session when we pause/leave. */
     pauseStream(fileId: string): void {
         fetch(`${this.cfg.baseUrl}/video/stream/${encodeURIComponent(fileId)}/pause?${this.authQuery()}`, {

@@ -23,6 +23,7 @@ import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { FFMPEG_BIN } from "./ffmpeg-paths";
+import { lowerPriority } from "./ffmpeg-jobs";
 
 export type PreRemuxStatus = "queued" | "running" | "done" | "failed" | "skipped";
 
@@ -227,6 +228,7 @@ async function runOne(job: PreRemuxJob): Promise<void> {
 
     activeFileId = job.fileId;
     activeProc = spawn(FFMPEG_BIN, args, { windowsHide: true });
+    lowerPriority(activeProc.pid, "idle");
 
     let lastStderr = "";
     activeProc.stderr?.on("data", (b) => {
