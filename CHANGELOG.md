@@ -10,7 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
-## 2026-11-04 — Playback without eating the PC + ultrawide screens (MMO Server 3.3.1 · TV Android 1.3.0 · TV Tizen 1.3.0 · web 2.2.1 · `@mmo/sdk` 0.2.0)
+## 2026-11-04 — Playback without eating the PC + ultrawide screens (MMO Server 3.3.1 · TV Android 1.3.0 · TV Tizen 1.3.1 · web 2.2.1 · `@mmo/sdk` 0.2.0)
+
+- **TV Tizen 1.3.1 — real full screen on Samsung ultrawide monitors**: the app ran in a 16:9 window (black bars
+  left/right on the Odyssey G8). `config.xml` now declares `base_screen_resolution=extensive` and the viewport is
+  `device-width`, so the app gets the native 2580×1080 (21:9) surface: the UI uses the full width and a 2.39:1 film
+  fills the screen. The horizontal squeeze from 1.3.0 is now only a fallback when the engine still renders 16:9.
 
 - **Server**: original video always (no re-encode unless `allowVideoTranscode`), audio → E-AC3 5.1 only when the
   client can't decode it, paced remux, cheap analyses in an idle queue, one-pass cached subtitles, `still.jpg`

@@ -6,7 +6,9 @@
          shared prehydrate applies them to <html>. Classic scripts: file:// on Tizen. -->
     <script>try{var K="mixai:prefs:v1";if(!localStorage.getItem(K))localStorage.setItem(K,JSON.stringify({mode:"dark",accent:"violet",surface:"solid",density:"comfortable",radius:"md",motion:"reduced",locale:"ro",feedback:false}))}catch(e){}</script>
     <script src="./prehydrate.js"></script>
-    <meta name="viewport" content="width=1920, height=1080, user-scalable=no" />
+        <!-- device-width: 1920×1080 on 16:9 TVs, 2560×1080 / 3840×1080 on 21:9 / 32:9 monitors
+            (config.xml base_screen_resolution=extensive). Layout is responsive in width. -->
+        <meta name="viewport" content="width=device-width, user-scalable=no" />
     <title>MixAI TV</title>
     <script src="$WEBAPIS/webapis/webapis.js"></script>
 </head>

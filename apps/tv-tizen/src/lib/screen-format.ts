@@ -1,19 +1,27 @@
 /**
  * Ultrawide compensation for Samsung Odyssey / ViewFinity monitors running Tizen.
  *
- * The web engine always renders a 16:9 surface (1920×1080, measured on the Odyssey OLED G8
- * LS34DG850SUXDU), and the 3440×1440 panel stretches it to 21:9: circles become ovals. We lay
- * the UI out on a wider canvas and squeeze it horizontally by 1/k (k = panel/16:9); the panel
- * stretch then restores the proportions and the whole screen is used. Video uses
- * `object-fit: fill` inside a box sized for the film's aspect on the real panel.
+ * Primary fix is in config.xml: `base_screen_resolution=extensive` gives the app the real panel
+ * shape (measured on the Odyssey OLED G8 LS34DG850SUXDU: viewport 2580×1080 = 3440×1440), so the
+ * layout simply uses the full width and nothing is distorted — no compensation needed.
+ *
+ * Fallback (firmware that ignores the key, or a 16:9 picture mode that stretches): the engine
+ * stays 16:9 while the panel is wider. Then we lay the UI out on a wider canvas and squeeze it by
+ * 1/k (k = panel / viewport); the panel stretch restores proportions. The user can force this via
+ * the Screen format setting.
  */
 import { useEffect, useState } from "react";
 
 export type ScreenFormatKey = "auto" | "16:9" | "21:9" | "32:9";
 const KEY = "mixai-tv:screen-format";
 const EVENT = "mixai:screen-format";
-const SIGNAL = 16 / 9;
 const PANELS: Record<Exclude<ScreenFormatKey, "auto">, number> = { "16:9": 16 / 9, "21:9": 3440 / 1440, "32:9": 32 / 9 };
+
+function viewportAspect(): number {
+    const w = typeof window !== "undefined" ? window.innerWidth : 0;
+    const h = typeof window !== "undefined" ? window.innerHeight : 0;
+    return w > 0 && h > 0 ? w / h : 16 / 9;
+}
 
 /** Samsung monitor model → panel aspect. `LS34…`/`LC34…` = 34" ultrawide (21:9),
  *  `LS49…`/`LC49…`/`LS57…` = 49"/57" super-ultrawide (32:9). TVs (`QE…`, `UE…`) stay 16:9. */
@@ -48,10 +56,11 @@ export function setScreenFormat(v: ScreenFormatKey): void {
     window.dispatchEvent(new Event(EVENT));
 }
 
-/** Horizontal squeeze factor for the current setting (1 = none). */
-export function squeezeFactor(format = getScreenFormat(), model = modelName()): number {
-    const panel = format === "auto" ? aspectFromModel(model) ?? SIGNAL : PANELS[format];
-    const k = panel / SIGNAL;
+/** Horizontal squeeze factor (1 = none): panel aspect over the aspect the engine renders. In
+ *  auto mode a wide viewport means the panel shape is already native → 1. */
+export function squeezeFactor(format = getScreenFormat(), model = modelName(), viewport = viewportAspect()): number {
+    const panel = format === "auto" ? aspectFromModel(model) ?? viewport : PANELS[format];
+    const k = panel / viewport;
     return Math.abs(k - 1) < 0.02 ? 1 : k;
 }
 
@@ -74,10 +83,10 @@ export function useScreenFormat(): [ScreenFormatKey, (v: ScreenFormatKey) => voi
     return [fmt, setScreenFormat, squeezeFactor(fmt)];
 }
 
-/** Box (fractions of the 16:9 viewport, in UNSQUEEZED layout units) for a film of
- *  `videoAspect` so it appears undistorted and maximal on a panel squeezed by `k`. */
-export function videoBox(videoAspect: number, k: number): { w: number; h: number } {
+/** Box (fractions of the viewport, in UNSQUEEZED layout units) for a film of `videoAspect` so it
+ *  appears undistorted and maximal on a panel squeezed by `k`. */
+export function videoBox(videoAspect: number, k: number, viewport = viewportAspect()): { w: number; h: number } {
     if (!(videoAspect > 0)) return { w: 1, h: 1 };
-    const panel = SIGNAL * k;
+    const panel = viewport * k;
     return videoAspect >= panel ? { w: 1, h: panel / videoAspect } : { w: videoAspect / panel, h: 1 };
 }

@@ -96,6 +96,11 @@ Full RO walkthrough: [docs/aplicatie/tv-tizen.md](../../docs/aplicatie/tv-tizen.
 
 ## Limitations
 
+- **Ultrawide monitors (Odyssey 21:9 / 32:9):** `config.xml` declares
+  `base_screen_resolution=extensive` and `index.html` uses `width=device-width`, so the app gets the
+  native surface (Odyssey G8: 2580×1080) instead of a pillarboxed 16:9 window. Layout must stay
+  responsive in width — never hardcode 1920. `lib/screen-format.ts` squeezes the UI only as a fallback
+  when the engine still renders 16:9 on a wider panel (Settings → Screen format overrides).
 - **HTTP only on the LAN.** `access origin="*"` + `use.network` allow plain http to the
   server's IP; there is no TLS on MMO Server.
 - **HEVC** plays only from MP4/MKV/TS containers via the server remux (`caps` includes
@@ -107,6 +112,6 @@ Full RO walkthrough: [docs/aplicatie/tv-tizen.md](../../docs/aplicatie/tv-tizen.
 - **Tizen Chromium < 111 has no `oklch()`** — `styles.css` carries sRGB fallbacks (in a
   `@supports not (color: oklch(0 0 0))` block) mirrored from the generated `Tokens.kt`; re-copy
   them when tokens change.
-- **Posters:** the server scan exposes no artwork; cards use frame 14 of the scrubber sprite,
-  generated lazily by ffmpeg on first request (503 until then → 🎬 placeholder).
+- **Posters:** TMDB artwork when the server matched the title; otherwise `/video/thumbs/:id/still.jpg`
+  (one keyframe ≈10 % in, cached by the server; 503 until ffmpeg is available → 🎬 placeholder).
 - **Resume positions are per-TV** (localStorage), not synced to the server or other devices.
