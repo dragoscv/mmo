@@ -46,7 +46,8 @@ fun MixaiTheme(content: @Composable () -> Unit) {
         ),
         typography = TvType.material,
     ) {
-        Surface(colors = SurfaceDefaults.colors(containerColor = Tokens.background, contentColor = Tokens.foreground)) {
+        // Transparent container: BackdropHost paints the single opaque base layer (overdraw budget).
+        Surface(colors = SurfaceDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent, contentColor = Tokens.foreground)) {
             content()
         }
     }

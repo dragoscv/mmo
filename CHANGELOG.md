@@ -10,6 +10,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-05 — Better than Plex, part 1 (MMO Server 3.6.0 · TV Android 2.0.0 · `@mmo/sdk` 0.5.0)
+
+- **MMO Server 3.4 → 3.6** (WP16-A/B, details in `server/CHANGELOG.md`): viewer profiles with optional PIN
+  and kids age limits, age ratings mapped from TMDB certifications (RO CNC scale), seasons + episodes with
+  per-episode files/progress, per-profile watchlist, versions (4K/DV/edition), a `/hub` WebSocket for
+  remote control ("play on TV") and Watch Together with SyncPlay-style clock sync and signed guest invites,
+  Live TV / IPTV / DVR from user-added M3U/XMLTV, Xtream and HDHomeRun sources (recording is `-c copy`,
+  never re-encoded), a music browse API (artists, albums, queue, synced lyrics) and a year-in-review.
+- **TV Android 2.0.0** — cinematic redesign (WP16-C): own navigation stack that keeps scroll + focus on
+  Back, left rail (hide/reorder), full-bleed backdrop that follows focus, hero with logo + chips + one
+  primary action, library grids with sort/filters/A–Z for 1000+ titles, unified title page (seasons,
+  episodes, versions, cast, trailer, where to watch), on-screen keyboard + voice search, "Who's watching"
+  with PIN pad, a custom player OSD (scrub thumbnails, audio/subtitles + style, speed, screen format, info,
+  skip intro/recap/credits, Up Next, still watching?, sleep timer), Watch Together + remote control via
+  the hub, full music (background playback service, artists, albums, now playing with synced lyrics and
+  queue), Live TV (channel list with live preview, EPG grid, zapping with preload, catch-up, DVR),
+  two-pane settings (profiles, playback, subtitles, navigation, cache, diagnostics), year in review and
+  an ambient screensaver. Measured on the Chromecast (release build): Home from cache in 0.80 s; D-pad on
+  Home p50 frame 93 → 38 ms (janky 83 → 17 %) after removing stacked full-screen fills; zap 350–460 ms.
+
 ## 2026-11-04 — Playback without eating the PC + ultrawide screens (MMO Server 3.3.1 · TV Android 1.3.0 · TV Tizen 1.3.1 · web 2.2.1 · `@mmo/sdk` 0.2.0)
 
 - **TV Tizen 1.3.1 — real full screen on Samsung ultrawide monitors**: the app ran in a 16:9 window (black bars

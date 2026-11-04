@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16-27/28 Setări, editor de profil, Anul tău (ui/settings, ui/profiles). Aceleași chei ca values/strings_settings.xml. -->
+<resources>
+    <!-- Secțiuni -->
+    <string name="set_sec_profiles">Profiluri</string>
+    <string name="set_sec_playback">Redare</string>
+    <string name="set_sec_subtitles">Stil subtitrări</string>
+    <string name="set_sec_language">Limbă</string>
+    <string name="set_sec_navigation">Navigare</string>
+    <string name="set_sec_server">Server</string>
+    <string name="set_sec_account">Cont</string>
+    <string name="set_sec_cache">Stocare și cache</string>
+    <string name="set_sec_together">Vizionare împreună</string>
+    <string name="set_sec_stats">Anul tău</string>
+    <string name="set_sec_about">Despre și diagnostic</string>
+
+    <!-- Comune -->
+    <string name="set_on">Pornit</string>
+    <string name="set_off">Oprit</string>
+    <string name="set_yes">Da</string>
+    <string name="set_no">Nu</string>
+    <string name="set_unknown">Necunoscut</string>
+    <string name="set_done">Gata</string>
+    <string name="set_text_placeholder">Scrie un nume</string>
+
+    <!-- Profiluri -->
+    <string name="set_profiles_hint">Fiecare profil își păstrează progresul, lista de urmărit și preferințele.</string>
+    <string name="set_profile_active">Activ acum</string>
+    <string name="set_profile_max_age_value">Până la %1$d+</string>
+    <string name="profile_add">Adaugă profil</string>
+    <string name="profile_new_title">Profil nou</string>
+    <string name="profile_edit_title">Editează profilul</string>
+    <string name="profile_name">Nume</string>
+    <string name="profile_name_missing">Fără nume deocamdată</string>
+    <string name="profile_color">Culoare</string>
+    <string name="profile_kind">Tip</string>
+    <string name="profile_kind_adult">Adult</string>
+    <string name="profile_kind_kid">Copii</string>
+    <string name="profile_max_age">Limită de vârstă</string>
+    <string name="profile_max_age_none">Fără limită</string>
+    <string name="profile_max_age_hint">Titlurile clasificate peste această vârstă sunt ascunse pentru profil.</string>
+    <string name="profile_pin">PIN</string>
+    <string name="profile_pin_set">Setează PIN</string>
+    <string name="profile_pin_change">Schimbă PIN-ul</string>
+    <string name="profile_pin_remove">Elimină PIN-ul</string>
+    <string name="profile_pin_on">Profilul cere un PIN din 4 cifre.</string>
+    <string name="profile_pin_off">Oricine poate deschide acest profil.</string>
+    <string name="profile_pin_pending_set">PIN-ul nou se aplică la salvare.</string>
+    <string name="profile_pin_pending_remove">PIN-ul se elimină la salvare.</string>
+    <string name="profile_pin_enter_new">Introdu un PIN nou din 4 cifre</string>
+    <string name="profile_pin_confirm">Introdu din nou același PIN</string>
+    <string name="profile_pin_mismatch">PIN-urile nu coincid. Încearcă din nou.</string>
+    <string name="profile_pin_locked_countdown">Prea multe încercări. Încearcă din nou în %1$d:%2$02d.</string>
+    <string name="profile_unlock_to_edit">Introdu PIN-ul lui %1$s ca să-l editezi</string>
+    <string name="profile_save">Salvează</string>
+    <string name="profile_save_failed">Nu s-a putut salva: %1$s</string>
+    <string name="profile_delete">Șterge profilul</string>
+    <string name="profile_delete_confirm_title">Ștergi %1$s?</string>
+    <string name="profile_delete_confirm_body">Progresul, lista de urmărit și preferințele acestui profil se șterg definitiv.</string>
+
+    <!-- Redare -->
+    <string name="set_playback_for">Salvat pentru profilul %1$s.</string>
+    <string name="set_autoplay_next">Redă automat episodul următor</string>
+    <string name="set_skip_intro">Sari automat peste generic</string>
+    <string name="set_skip_intro_hint">Când genericul episodului este cunoscut.</string>
+    <string name="set_languages">Limbi</string>
+    <string name="set_audio_lang">Limba audio preferată</string>
+    <string name="set_sub_lang">Limba subtitrărilor preferată</string>
+    <string name="set_lang_auto">Automat</string>
+    <string name="set_lang_auto_hint">Urmează audio original și limba aplicației.</string>
+    <string name="set_sub_off">Oprite</string>
+    <string name="set_sub_forced_only">Doar subtitrări forțate</string>
+    <string name="set_sub_forced_hint">Afișează doar părțile în limbi străine și inscripțiile.</string>
+
+    <!-- Stil subtitrări -->
+    <string name="set_sub_size">Mărime</string>
+    <string name="set_sub_size_small">Mică</string>
+    <string name="set_sub_size_medium">Medie</string>
+    <string name="set_sub_size_large">Mare</string>
+    <string name="set_sub_size_xlarge">Foarte mare</string>
+    <string name="set_sub_bg">Fundal</string>
+    <string name="set_sub_bg_none">Fără</string>
+    <string name="set_sub_bg_shadow">Umbră</string>
+    <string name="set_sub_bg_box">Casetă</string>
+    <string name="set_sub_preview">Previzualizare</string>
+    <string name="set_sub_sample">Așa vor arăta subtitrările.</string>
+
+    <!-- Limbă -->
+    <string name="set_language_hint">Limba aplicației. Titlurile și descrierile o urmează când serverul le are.</string>
+
+    <!-- Navigare -->
+    <string name="set_nav_hint">Alege ce elemente apar în meniul lateral și în ce ordine. Setările rămân mereu.</string>
+    <string name="set_nav_visible">Afișat</string>
+    <string name="set_nav_hidden">Ascuns</string>
+    <string name="set_nav_up">Mută în sus</string>
+    <string name="set_nav_down">Mută în jos</string>
+    <string name="set_nav_reset">Revino la ordinea implicită</string>
+
+    <!-- Server -->
+    <string name="set_server_url">Adresă</string>
+    <string name="set_server_status">Stare</string>
+    <string name="set_server_recheck">Verifică din nou</string>
+    <string name="set_change_server_title">Schimbi serverul?</string>
+    <string name="set_change_server_body">Televizorul se deconectează de la MMO Server-ul curent. Contul rămâne conectat.</string>
+    <string name="set_livetv_sources">Surse TV live</string>
+    <string name="set_livetv_sources_hint">Sursele M3U, Xtream și HDHomeRun sunt pe server.</string>
+
+    <!-- Cont -->
+    <string name="set_account_signed_in">Conectat ca</string>
+    <string name="set_account_none">Televizorul este asociat cu serverul fără un cont MixAI.</string>
+    <string name="set_sign_out_title">Te deconectezi?</string>
+    <string name="set_sign_out_body">Conexiunea la server și toate setările de pe acest televizor se șterg.</string>
+
+    <!-- Cache -->
+    <string name="set_cache_memory">Cache imagini în memorie</string>
+    <string name="set_cache_disk">Cache imagini pe disc</string>
+    <string name="set_cache_home">Ecrane principale salvate</string>
+    <string name="set_cache_clear_images">Golește cache-ul de imagini</string>
+    <string name="set_cache_clear_home">Șterge ecranele principale salvate</string>
+    <string name="set_cache_resume_hint">Pozițiile de reluare salvate doar pe acest televizor.</string>
+    <string name="set_cache_images_cleared">Cache-ul de imagini a fost golit.</string>
+    <string name="set_cache_home_cleared">Ecranele principale salvate au fost șterse.</string>
+
+    <!-- Vizionare împreună -->
+    <string name="set_together_hint">Numele pe care celelalte dispozitive îl văd pentru acest televizor la telecomandă și la vizionarea împreună.</string>
+    <string name="set_device_name">Numele dispozitivului</string>
+    <string name="set_device_name_reset">Folosește numele modelului</string>
+
+    <!-- Anul tău -->
+    <string name="set_stats_hint">Ore vizionate, titluri și genuri preferate și ce ai ascultat anul acesta.</string>
+
+    <!-- Despre -->
+    <string name="set_about_app">Versiunea aplicației</string>
+    <string name="set_about_server">Versiunea serverului</string>
+    <string name="set_about_hub">Hub telecomandă</string>
+    <string name="set_hub_connected">Conectat</string>
+    <string name="set_hub_connecting">Se conectează…</string>
+    <string name="set_hub_disconnected">Deconectat</string>
+    <string name="set_about_device_id">ID dispozitiv</string>
+    <string name="set_about_device">Dispozitiv</string>
+    <string name="set_about_panel">Forma ecranului detectată</string>
+    <string name="set_about_tmdb">TMDB configurat</string>
+    <string name="set_about_library">Titluri în bibliotecă</string>
+    <string name="set_about_region">Regiune · limbă</string>
+
+    <!-- Anul tău (statistici) -->
+    <string name="stats_title">Anul tău</string>
+    <string name="stats_open">Anul tău în revistă</string>
+    <string name="stats_hours">ore vizionate</string>
+    <string name="stats_titles">titluri</string>
+    <string name="stats_episodes">episoade</string>
+    <string name="stats_streak">zile la rând</string>
+    <string name="stats_listen_hours">ore de muzică</string>
+    <string name="stats_by_month">Lună de lună</string>
+    <string name="stats_watch_legend">Vizionare</string>
+    <string name="stats_listen_legend">Ascultare</string>
+    <string name="stats_top_genres">Genuri preferate</string>
+    <string name="stats_top_titles">Cele mai vizionate</string>
+    <string name="stats_top_tracks">Cele mai ascultate (%1$d redări)</string>
+    <string name="stats_hours_short">%1$s h</string>
+    <string name="stats_plays">%1$d redări</string>
+    <string name="stats_track_unknown">Melodie necunoscută</string>
+    <string name="stats_empty">Nimic încă pentru %1$d</string>
+    <string name="stats_empty_hint">Vizionează sau ascultă ceva și rezumatul anului se completează aici.</string>
+</resources>

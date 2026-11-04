@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16 Titlu + Sezon (ui/title). Același set de chei ca în values. -->
+<resources>
+    <string name="wp16_title_play">Redă</string>
+    <string name="wp16_title_play_ep">Redă S%1$d E%2$d</string>
+    <string name="wp16_title_resume">Continuă</string>
+    <string name="wp16_title_resume_left">Continuă · au rămas %1$d min</string>
+    <string name="wp16_title_resume_ep">Continuă S%1$d E%2$d</string>
+    <string name="wp16_title_resume_ep_left">Continuă S%1$d E%2$d · au rămas %3$d min</string>
+    <string name="wp16_title_start_over">De la început</string>
+    <string name="wp16_title_trailer">Trailer</string>
+    <string name="wp16_title_trailer_failed">Nicio aplicație nu poate reda trailerul.</string>
+    <string name="wp16_title_where_short">Unde îl vezi</string>
+    <string name="wp16_title_where">Unde îl poți vedea</string>
+    <string name="wp16_title_attribution">Date: %1$s</string>
+    <string name="wp16_title_versions">Versiuni</string>
+    <string name="wp16_title_list_add">Adaugă în Lista mea</string>
+    <string name="wp16_title_list_remove">Scoate din Lista mea</string>
+    <string name="wp16_title_list_added">Adăugat în Lista mea</string>
+    <string name="wp16_title_list_removed">Scos din Lista mea</string>
+    <string name="wp16_title_action_failed">Nu s-a putut salva. Încearcă din nou.</string>
+    <string name="wp16_title_mark_watched">Marchează ca văzut</string>
+    <string name="wp16_title_marked">Marcat ca văzut</string>
+    <string name="wp16_title_watched">Văzut</string>
+    <string name="wp16_title_play_failed">Redarea nu a putut porni: %1$s</string>
+    <string name="wp16_title_back">Înapoi</string>
+    <string name="wp16_title_error">Titlul nu s-a putut încărca</string>
+    <string name="wp16_title_tmdb_missing">TMDB nu este configurat pe server. Adaugă o cheie TMDB în setările MMO Server.</string>
+    <string name="wp16_title_age_title">Acesta nu e pentru profilul tău</string>
+    <string name="wp16_title_age_message">Este pentru spectatori mai mari. Alege altceva sau roagă un adult să schimbe profilul.</string>
+    <string name="wp16_title_seasons">%1$d sezoane</string>
+    <string name="wp16_title_episodes">Episoade</string>
+    <string name="wp16_title_season_n">Sezonul %1$d</string>
+    <string name="wp16_title_specials">Episoade speciale</string>
+    <string name="wp16_title_season_failed">Sezonul nu s-a putut încărca.</string>
+    <string name="wp16_title_no_episodes">Încă nu sunt episoade în acest sezon.</string>
+    <string name="wp16_title_episode_name">%1$d. %2$s</string>
+    <string name="wp16_title_episode_fallback">Episodul %1$d</string>
+    <string name="wp16_title_episode_code">S%1$d E%2$d</string>
+    <string name="wp16_title_on_server">Pe server</string>
+    <string name="wp16_title_not_on_server">Acest episod nu este pe serverul tău.</string>
+    <string name="wp16_title_open_show">Detalii serial</string>
+    <string name="wp16_title_cast">Distribuție</string>
+    <string name="wp16_title_more">Asemănătoare</string>
+    <string name="wp16_title_badge_library">În bibliotecă</string>
+    <string name="wp16_title_offer_subscription">Abonament</string>
+    <string name="wp16_title_offer_rent">Închiriere</string>
+    <string name="wp16_title_offer_buy">Cumpărare</string>
+    <string name="wp16_title_offer_free">Gratuit</string>
+    <string name="wp16_title_offer_ads">Gratuit cu reclame</string>
+    <string name="wp16_title_offer_install">Instalează</string>
+    <string name="wp16_age_all">AG</string>
+</resources>

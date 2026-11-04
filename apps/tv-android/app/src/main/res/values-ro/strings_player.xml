@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16-21/27: player OSD + Watch Together. Aceleași chei ca values/strings_player.xml. -->
+<resources>
+    <!-- OSD -->
+    <string name="player_play">Redă</string>
+    <string name="player_pause">Pauză</string>
+    <string name="player_back10">Înapoi 10 secunde</string>
+    <string name="player_fwd10">Înainte 10 secunde</string>
+    <string name="player_audio">Audio</string>
+    <string name="player_audio_direct_only">Necesită redare directă (acest flux conține doar prima pistă audio)</string>
+    <string name="player_subtitles">Subtitrări</string>
+    <string name="player_subs_off">Dezactivate</string>
+    <string name="player_subs_forced">forțate</string>
+    <string name="player_subs_style">Stil subtitrări</string>
+    <string name="player_subs_style_hint">Mărime și fundal</string>
+    <string name="player_subs_size">Mărime</string>
+    <string name="player_subs_background">Fundal</string>
+    <string name="player_on">Activat</string>
+    <string name="player_off">Dezactivat</string>
+    <string name="player_speed">Viteză</string>
+    <string name="player_speed_normal">Normală</string>
+    <string name="player_screen_format">Format ecran</string>
+    <string name="player_format_auto">Automat (detectare)</string>
+    <string name="player_sleep">Temporizator oprire</string>
+    <string name="player_sleep_min">%1$d minute</string>
+    <string name="player_sleep_end">La finalul episodului</string>
+    <string name="player_sleep_set">Redarea se oprește în %1$d min</string>
+    <string name="player_info">Informații</string>
+    <string name="player_info_mode">Mod</string>
+    <string name="player_info_video">Video</string>
+    <string name="player_info_hdr">HDR</string>
+    <string name="player_info_audio">Audio</string>
+    <string name="player_info_bitrate">Bitrate</string>
+    <string name="player_info_container">Container</string>
+    <string name="player_info_server">Server</string>
+    <string name="player_mode_hls">HLS (video original, remux pe server)</string>
+    <string name="player_mode_direct">Redare directă</string>
+    <string name="player_kbps">%1$d kbps</string>
+    <string name="player_unknown">Necunoscut</string>
+    <string name="player_close">Închide</string>
+    <string name="player_next_episode">Episodul următor</string>
+    <string name="player_next_failed">Nu am putut deschide episodul următor</string>
+    <string name="player_watch_together">Vizionare împreună</string>
+    <string name="player_episode_line">S%1$d · E%2$d</string>
+    <string name="player_ends_at">Se termină la %1$s</string>
+    <string name="player_buffering">Se încarcă…</string>
+    <string name="player_room_chip">Vizionare împreună · %1$d</string>
+    <string name="player_chat_line">%1$s: %2$s</string>
+    <!-- Skip / Up Next / still watching -->
+    <string name="player_skip_intro">Sari peste intro</string>
+    <string name="player_skip_recap">Sari peste rezumat</string>
+    <string name="player_up_next">Urmează</string>
+    <string name="player_play_now">Redă acum</string>
+    <string name="player_more_like_this">Titluri similare</string>
+    <string name="player_more_like_this_hint">Vezi titluri asemănătoare și recomandări.</string>
+    <string name="player_back_to_title">Înapoi la titlu</string>
+    <string name="player_keep_watching">Continuă vizionarea</string>
+    <string name="player_still_watching">Încă te uiți?</string>
+    <string name="player_still_watching_hint">Redarea s-a oprit după mai multe episoade la rând.</string>
+    <string name="player_continue">Continuă vizionarea</string>
+    <string name="player_exit">Ieși</string>
+
+    <!-- Watch Together -->
+    <string name="together_title">Vizionare împreună</string>
+    <string name="together_subtitle">Priviți sincronizat cu prietenii, oriunde ați fi</string>
+    <string name="together_intro">Creează o cameră și trimite linkul sau intră într-o cameră cu codul ei. Toți văd același moment; mesajele și reacțiile apar pe ecran.</string>
+    <string name="together_create">Creează cameră</string>
+    <string name="together_create_name">Numele camerei (opțional)</string>
+    <string name="together_join">Intră în cameră</string>
+    <string name="together_join_code">Codul camerei</string>
+    <string name="together_code_hint">Codurile țin cont de majuscule.</string>
+    <string name="together_leave">Părăsește camera</string>
+    <string name="together_choose">Alege ce vizionați</string>
+    <string name="together_code">Cod: %1$s</string>
+    <string name="together_now">Acum: %1$s</string>
+    <string name="together_nothing">Nu rulează nimic încă — alege un titlu și apasă Redă.</string>
+    <string name="together_members">Membri (%1$d)</string>
+    <string name="together_host">gazdă</string>
+    <string name="together_you">tu</string>
+    <string name="together_guest">invitat</string>
+    <string name="together_ready">pregătit</string>
+    <string name="together_not_ready">se încarcă</string>
+    <string name="together_invite">Invitație</string>
+    <string name="together_invite_code_only">Trimite codul %1$s unui alt dispozitiv MixAI.</string>
+    <string name="together_chat">Chat</string>
+    <string name="together_chat_empty">Niciun mesaj încă.</string>
+    <string name="together_hub_connected">Conectat</string>
+    <string name="together_hub_connecting">Se reconectează…</string>
+    <string name="together_hub_disconnected">Deconectat</string>
+    <string name="together_waiting_hub">Se așteaptă MMO Server…</string>
+    <string name="together_update_title">Serverul trebuie actualizat</string>
+    <string name="together_update_server">Actualizează MMO Server la 3.5+ pentru Vizionare împreună (acest server rulează %1$s).</string>
+    <string name="together_err_not_found">Nu există o cameră cu acest cod.</string>
+    <string name="together_err_full">Camera este plină.</string>
+    <string name="together_err_not_in_room">Nu mai ești în cameră.</string>
+    <string name="together_err_generic">Eroare la vizionarea împreună: %1$s</string>
+</resources>

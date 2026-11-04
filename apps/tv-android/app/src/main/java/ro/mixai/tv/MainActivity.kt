@@ -114,6 +114,12 @@ class MainActivity : ComponentActivity() {
                             val s = session ?: return@SqueezeBox
                             val link by deepLink
                             App(c, s, settings, localeTag, deepLink = link, onDeepLinkConsumed = { deepLink.value = null })
+                            // BackdropHost now paints an opaque base: the window background is one
+                            // extra full-screen fill per frame on the TV GPU, so drop it once we draw.
+                            androidx.compose.runtime.LaunchedEffect(Unit) {
+                                androidx.compose.runtime.withFrameNanos { }
+                                window.setBackgroundDrawable(null)
+                            }
                         }
                     }
                 }

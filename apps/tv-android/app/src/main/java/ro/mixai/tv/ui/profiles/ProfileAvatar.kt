@@ -32,9 +32,21 @@ import ro.mixai.tv.ui.theme.Tokens
  * Profile colour from the server `color` field. Named colours map onto design tokens; anything
  * else (or null) picks a stable token colour from the profile id — never a hand-typed colour.
  */
-fun profileColor(p: Profile?): Color {
+fun profileColor(p: Profile?): Color = profileColorOf(p?.color, p?.id)
+
+/** Colour names the profile editor offers (token palette). */
+val PROFILE_COLOR_NAMES = listOf("chart1", "chart2", "chart3", "chart4", "chart5", "brand")
+
+/** Token colour for a profile `color` name; unknown/null → stable pick from [seed]. */
+fun profileColorOf(name: String?, seed: String?): Color {
     val palette = listOf(Tokens.chart1, Tokens.chart2, Tokens.chart3, Tokens.chart4, Tokens.chart5, Tokens.brandDeckB, Tokens.brandDeckD)
-    return when (p?.color?.lowercase()) {
+    return when (name?.lowercase()) {
+        "chart1" -> Tokens.chart1
+        "chart2" -> Tokens.chart2
+        "chart3" -> Tokens.chart3
+        "chart4" -> Tokens.chart4
+        "chart5" -> Tokens.chart5
+        "brand" -> Tokens.brandMagenta
         "violet", "purple" -> Tokens.brandViolet
         "magenta", "pink" -> Tokens.brandMagenta
         "cyan", "teal" -> Tokens.brandCyan
@@ -42,7 +54,7 @@ fun profileColor(p: Profile?): Color {
         "amber", "orange", "yellow" -> Tokens.warning
         "rose", "red" -> Tokens.destructive
         "blue" -> Tokens.info
-        else -> palette[((p?.id ?: "").hashCode() and 0x7fffffff) % palette.size]
+        else -> palette[((seed ?: "").hashCode() and 0x7fffffff) % palette.size]
     }
 }
 

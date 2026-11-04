@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Live TV / Ghid / DVR (WP16-24..27). Aceleași chei ca în values/strings_livetv.xml. -->
+    <string name="livetv_guide">Ghid TV</string>
+    <string name="livetv_recordings">Înregistrări</string>
+    <string name="livetv_sources">Surse</string>
+    <string name="livetv_sources_hint">Listele tale IPTV și tunerele proprii. Canalele se actualizează în fundal.</string>
+    <string name="livetv_add_source">Adaugă sursă</string>
+    <string name="livetv_empty_title">Încă nu ai canale</string>
+    <string name="livetv_empty_message">Adaugă propria sursă IPTV/M3U sau HDHomeRun; MixAI nu include canale.</string>
+    <string name="livetv_error_load">Live TV nu s-a putut încărca.</string>
+    <string name="livetv_group_all">Toate</string>
+    <string name="livetv_group_favourites">Favorite</string>
+    <string name="livetv_no_channels">Niciun canal aici</string>
+    <string name="livetv_no_channels_hint">Grupul e gol sau toate canalele din el sunt ascunse.</string>
+    <string name="livetv_no_favourites">Încă nu ai favorite</string>
+    <string name="livetv_no_favourites_hint">Ține apăsat pe un canal sau apasă Meniu, apoi alege Adaugă la favorite.</string>
+    <string name="livetv_no_guide">Fără informații de program</string>
+    <string name="livetv_no_info">Fără informații</string>
+    <string name="livetv_next">Urmează</string>
+    <string name="livetv_live">LIVE</string>
+    <string name="livetv_badge_catchup">RELUARE</string>
+    <string name="livetv_preview_loading">Se pornește previzualizarea…</string>
+    <string name="livetv_preview_failed">Previzualizare indisponibilă</string>
+    <string name="livetv_hint_menu">OK pentru vizionare · ține apăsat sau Meniu pentru opțiuni</string>
+    <string name="livetv_action_watch">Vizionează</string>
+    <string name="livetv_action_favourite">Adaugă la favorite</string>
+    <string name="livetv_action_unfavourite">Scoate din favorite</string>
+    <string name="livetv_action_hide">Ascunde canalul</string>
+    <string name="livetv_action_hide_hint">Canalele ascunse dispar din liste și din ghid.</string>
+    <string name="livetv_fav_added">Adăugat la favorite</string>
+    <string name="livetv_fav_removed">Scos din favorite</string>
+    <string name="livetv_hidden_done">Canal ascuns</string>
+
+    <!-- surse -->
+    <string name="livetv_source_channels">%1$d canale</string>
+    <string name="livetv_source_refreshed">actualizat %1$s</string>
+    <string name="livetv_source_disabled">dezactivat</string>
+    <string name="livetv_source_error">Eroare: %1$s</string>
+    <string name="livetv_source_pending">Se încarcă canalele…</string>
+    <string name="livetv_guide_error">Ghid: %1$s</string>
+    <string name="livetv_working">Se lucrează…</string>
+    <string name="livetv_test">Testează</string>
+    <string name="livetv_test_ok">Funcționează: %1$d canale găsite</string>
+    <string name="livetv_refresh">Actualizează</string>
+    <string name="livetv_refresh_done">Canalele și ghidul au fost actualizate</string>
+    <string name="livetv_delete">Șterge</string>
+    <string name="livetv_delete_source_title">Ștergi „%1$s”?</string>
+    <string name="livetv_delete_source_message">Canalele, ghidul și favoritele ei se șterg. Înregistrările făcute rămân.</string>
+    <string name="livetv_kind_m3u">Listă M3U</string>
+    <string name="livetv_kind_m3u_hint">URL-ul listei (.m3u / .m3u8) de la furnizor</string>
+    <string name="livetv_kind_xtream">Xtream Codes</string>
+    <string name="livetv_kind_xtream_hint">URL-ul serverului, cu utilizator și parolă</string>
+    <string name="livetv_kind_hdhomerun">HDHomeRun</string>
+    <string name="livetv_kind_hdhomerun_hint">Un tuner TV de rețea din LAN</string>
+    <string name="livetv_form_kind">Tip sursă</string>
+    <string name="livetv_form_name">Nume</string>
+    <string name="livetv_form_url_m3u">URL listă</string>
+    <string name="livetv_form_url_xtream">URL server</string>
+    <string name="livetv_form_url_hdhr">Adresă tuner</string>
+    <string name="livetv_form_xmltv">URL ghid (XMLTV)</string>
+    <string name="livetv_form_username">Utilizator</string>
+    <string name="livetv_form_password">Parolă</string>
+    <string name="livetv_form_optional">opțional</string>
+    <string name="livetv_form_empty">gol</string>
+    <string name="livetv_form_need_url">Introdu mai întâi URL-ul.</string>
+    <string name="livetv_form_done">Gata</string>
+    <string name="livetv_form_pick_field">Alege un câmp din stânga ca să scrii cu tastatura de pe ecran.</string>
+    <string name="livetv_form_keyboard_hint">Poți scrie și de la o tastatură sau de pe telecomanda din telefon.</string>
+    <string name="livetv_form_legal">Adaugă doar surse pe care ai dreptul să le vizionezi. MixAI nu furnizează canale.</string>
+    <string name="livetv_save">Salvează</string>
+
+    <!-- ghid -->
+    <string name="livetv_now">Acum</string>
+    <string name="livetv_day_prev">− Zi</string>
+    <string name="livetv_day_next">+ Zi</string>
+    <string name="livetv_watch_live">Vizionează live</string>
+    <string name="livetv_watch_catchup">Vizionează de la început</string>
+    <string name="livetv_catchup_unavailable">Reluare indisponibilă</string>
+    <string name="livetv_starts_at">Începe la %1$s</string>
+    <string name="livetv_record">Înregistrează</string>
+    <string name="livetv_record_series">Înregistrează serialul</string>
+    <string name="livetv_record_scheduled">Înregistrare programată</string>
+    <string name="livetv_record_conflict">Programată, dar se suprapune cu altă înregistrare (limită de tunere)</string>
+    <string name="livetv_series_created">Regulă de serial creată</string>
+    <string name="livetv_close">Închide</string>
+
+    <!-- player -->
+    <string name="livetv_tuning">Se acordă…</string>
+    <string name="livetv_record_now">Înregistrează acum</string>
+    <string name="livetv_last_channel">Canalul anterior</string>
+    <string name="livetv_channel_list">Lista de canale</string>
+    <string name="livetv_next_channel">Canalul următor</string>
+    <string name="livetv_no_such_channel">Nu există canalul %1$s</string>
+    <string name="livetv_err_title">Canal indisponibil</string>
+    <string name="livetv_err_404">Canalul nu mai există în sursă.</string>
+    <string name="livetv_err_upstream">Furnizorul nu răspunde (HTTP %1$d).</string>
+    <string name="livetv_err_http">Fluxul a eșuat (HTTP %1$d).</string>
+    <string name="livetv_err_generic">Fluxul nu a putut fi redat. %1$s</string>
+
+    <!-- înregistrări -->
+    <string name="livetv_tab_scheduled">Programate</string>
+    <string name="livetv_tab_recorded">Înregistrate</string>
+    <string name="livetv_tab_rules">Reguli de serial</string>
+    <string name="livetv_status_scheduled">Programată</string>
+    <string name="livetv_status_recording">Se înregistrează</string>
+    <string name="livetv_status_done">Gata</string>
+    <string name="livetv_status_failed">Eșuată</string>
+    <string name="livetv_status_cancelled">Anulată</string>
+    <string name="livetv_status_conflict">Conflict</string>
+    <string name="livetv_conflict_hint">Se suprapune cu altă înregistrare; poate eșua dacă se atinge limita de tunere.</string>
+    <string name="livetv_from_rule">regulă de serial</string>
+    <string name="livetv_no_scheduled">Nimic programat</string>
+    <string name="livetv_no_recorded">Încă nu ai înregistrări</string>
+    <string name="livetv_no_scheduled_hint">Deschide Ghidul, alege o emisiune și apasă Înregistrează.</string>
+    <string name="livetv_no_rules">Nicio regulă de serial</string>
+    <string name="livetv_no_rules_hint">În Ghid alege Înregistrează serialul ca să prinzi automat fiecare episod.</string>
+    <string name="livetv_play">Redă</string>
+    <string name="livetv_play_recording_failed">Înregistrarea nu s-a putut deschide. %1$s</string>
+    <string name="livetv_cancel_recording">Anulează înregistrarea</string>
+    <string name="livetv_cancel_recording_title">Anulezi „%1$s”?</string>
+    <string name="livetv_cancel_recording_message">Înregistrarea nu va mai porni (sau se oprește acum, dacă rulează).</string>
+    <string name="livetv_delete_recording_title">Ștergi „%1$s”?</string>
+    <string name="livetv_delete_recording_message">Fișierul înregistrat se șterge de pe server.</string>
+    <string name="livetv_delete_rule_title">Ștergi regula „%1$s”?</string>
+    <string name="livetv_delete_rule_message">Episoadele viitoare nu se mai înregistrează. Înregistrările existente rămân.</string>
+    <string name="livetv_rule_any_channel">orice canal</string>
+    <string name="livetv_rule_one_channel">un singur canal</string>
+    <string name="livetv_rule_keep">păstrează ultimele %1$d</string>
+</resources>

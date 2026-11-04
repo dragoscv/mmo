@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16 Home + Library screens (ui/home, ui/library). Keep the key set identical in values-ro. -->
+<resources>
+    <!-- Home -->
+    <string name="wp16_home_error">Could not load Home</string>
+    <string name="wp16_home_empty_title">Nothing to watch yet</string>
+    <string name="wp16_home_empty_message">Add movie and TV folders on your MMO Server, then scan the library.</string>
+    <string name="wp16_home_open_settings">Open settings</string>
+    <string name="wp16_home_play_failed">Could not start playback: %1$s</string>
+    <string name="wp16_home_more_info">More info</string>
+    <string name="wp16_home_list_add">Add to My list</string>
+    <string name="wp16_home_list_remove">Remove from My list</string>
+    <string name="wp16_home_list_added">Added to My list</string>
+    <string name="wp16_home_list_removed">Removed from My list</string>
+    <string name="wp16_home_list_failed">Could not update My list</string>
+    <string name="wp16_home_badge_library">In library</string>
+    <string name="wp16_home_episode">S%1$d E%2$d</string>
+    <string name="wp16_home_up_next">Up next · S%1$d E%2$d</string>
+    <string name="wp16_home_row_movies">Movies</string>
+    <string name="wp16_home_row_shows">TV shows</string>
+    <string name="wp16_home_episodes_count">%1$d episodes</string>
+    <string name="wp16_home_episodes_seasons">%1$d episodes · %2$d seasons</string>
+    <string name="wp16_home_episodes_button">Episodes</string>
+    <string name="wp16_home_min_left">%1$d min left</string>
+    <string name="wp16_home_resume_local">Resume · %1$d min left</string>
+    <string name="wp16_home_resume_code">Resume %1$s · %2$d min left</string>
+    <string name="wp16_home_play_code">Play %1$s</string>
+
+    <!-- Library -->
+    <string name="wp16_lib_title_movies">Movies</string>
+    <string name="wp16_lib_title_tv">TV shows</string>
+    <string name="wp16_lib_count">%1$d of %2$d titles</string>
+    <string name="wp16_lib_empty_movies">No movies in your library</string>
+    <string name="wp16_lib_empty_tv">No TV shows in your library</string>
+    <string name="wp16_lib_empty_hint">Add a folder on your MMO Server and scan it; titles appear here once matched with TMDB.</string>
+    <string name="wp16_lib_unmatched">%1$d files are not matched with TMDB yet. Check the file names or TMDB settings on the server.</string>
+    <string name="wp16_lib_old_server">This MMO Server is too old for the library view. Update it to 3.4 or later.</string>
+    <string name="wp16_lib_sort">Sort by</string>
+    <string name="wp16_lib_sort_label">Sort: %1$s</string>
+    <string name="wp16_lib_sort_added">Recently added</string>
+    <string name="wp16_lib_sort_az">A–Z</string>
+    <string name="wp16_lib_sort_year">Year</string>
+    <string name="wp16_lib_sort_rating">Rating</string>
+    <string name="wp16_lib_genre">Genre</string>
+    <string name="wp16_lib_genre_partial">Genres from %1$d of %2$d titles (loading the rest)</string>
+    <string name="wp16_lib_decade">Decade</string>
+    <string name="wp16_lib_decade_n">%1$ds</string>
+    <string name="wp16_lib_resolution">Resolution</string>
+    <string name="wp16_lib_res_1080">1080p or better</string>
+    <string name="wp16_lib_unwatched">Unwatched</string>
+    <string name="wp16_lib_jump">Jump to letter</string>
+    <string name="wp16_lib_clear">Clear filters</string>
+    <string name="wp16_lib_all">All</string>
+    <string name="wp16_lib_no_match">No titles match these filters</string>
+    <string name="wp16_lib_no_match_hint">Change or clear the filters above.</string>
+</resources>

@@ -91,6 +91,9 @@ fun <T> ChoiceDialog(
     onDismiss: () -> Unit,
     visible: Boolean = true,
 ) {
+    // Leave composition at once when hidden: an exit animation kept the focused items alive and
+    // focus fell back to the screen root instead of the button that opened the panel.
+    if (!visible) return
     BackHandler(enabled = visible, onBack = onDismiss)
     AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut()) {
         Box(Modifier.fillMaxSize().background(Tokens.background.copy(alpha = 0.55f))) {

@@ -76,7 +76,7 @@ fun CardProgress(fraction: Float, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun cardGlow() = CardDefaults.glow(focusedGlow = Glow(MixaiFocus.glowColor, MixaiFocus.glowElevation))
+private fun cardGlow() = if (PerfFlags.noGlow) CardDefaults.glow() else CardDefaults.glow(focusedGlow = Glow(MixaiFocus.glowColor, MixaiFocus.glowElevation))
 
 /**
  * 2:3 poster card with the MixAI focus treatment (scale + ring + accent glow). Title shows under the

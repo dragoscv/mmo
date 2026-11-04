@@ -75,7 +75,7 @@ fun squeezeFor(format: ScreenFormat, detected: Float?, signalAspect: Float = 16f
 @Composable
 fun SqueezeBox(squeeze: Float, content: @Composable () -> Unit) {
     // Same node structure for every factor, so toggling never recreates the content.
-    val k = if (squeezeSuspended.value) 1f else squeeze
+    val k = if (squeezeSuspended.value || ro.mixai.tv.ui.components.PerfFlags.noSqueeze) 1f else squeeze
     Box(
         Modifier
             .fillMaxSize()

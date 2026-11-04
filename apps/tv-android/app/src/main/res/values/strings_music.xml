@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- WP16 music screens (ui/music). Keep keys identical in values-ro/strings_music.xml. -->
+    <string name="music_title">Music</string>
+    <string name="music_tab_home">Home</string>
+    <string name="music_tab_artists">Artists</string>
+    <string name="music_tab_albums">Albums</string>
+    <string name="music_tab_playlists">Playlists</string>
+    <string name="music_tab_search">Search</string>
+
+    <string name="music_row_recent">Recently played</string>
+    <string name="music_row_new">New albums</string>
+    <string name="music_row_most_played">Most played</string>
+    <string name="music_row_playlists">Playlists</string>
+    <string name="music_row_genres">Genres</string>
+    <string name="music_row_random">Random albums</string>
+    <string name="music_shuffle_all">Shuffle all</string>
+
+    <string name="music_empty_title">No music library yet</string>
+    <string name="music_empty_message">On the computer running MixAI Server, add a music folder to the library and run a scan. Your albums appear here when it finishes.</string>
+    <string name="music_load_error">Could not load music</string>
+    <string name="music_all">All</string>
+    <string name="music_no_artists">No artists for this letter</string>
+    <string name="music_no_albums">No albums</string>
+    <string name="music_no_playlists">No playlists yet</string>
+    <string name="music_unknown_artist">Unknown artist</string>
+
+    <string name="music_search_hint">Type to search artists, albums and songs</string>
+    <string name="music_search_empty">No results for “%1$s”</string>
+    <string name="music_search_artists">Artists</string>
+    <string name="music_search_albums">Albums</string>
+    <string name="music_search_tracks">Songs</string>
+
+    <string name="music_play">Play</string>
+    <string name="music_shuffle">Shuffle</string>
+    <string name="music_add_queue">Add to queue</string>
+    <string name="music_added_queue">Added to queue</string>
+    <string name="music_top_tracks">Top tracks</string>
+    <string name="music_albums">Albums</string>
+    <string name="music_similar">Similar artists</string>
+    <string name="music_has_lyrics">Has lyrics</string>
+
+    <string name="music_lyrics">Lyrics</string>
+    <string name="music_queue">Queue</string>
+    <string name="music_no_lyrics">No lyrics for this song</string>
+    <string name="music_lyrics_error">Lyrics are unavailable right now</string>
+    <string name="music_nothing_playing">Nothing playing</string>
+    <string name="music_nothing_playing_message">Pick an album or a song to start listening.</string>
+    <string name="music_browse">Browse music</string>
+    <string name="music_prev">Previous</string>
+    <string name="music_next">Next</string>
+    <string name="music_pause">Pause</string>
+    <string name="music_resume">Play</string>
+    <string name="music_repeat_off">Repeat off</string>
+    <string name="music_repeat_all">Repeat all</string>
+    <string name="music_repeat_one">Repeat one</string>
+    <string name="music_seek_hint">Left/Right to seek</string>
+
+    <plurals name="music_albums_count">
+        <item quantity="one">%d album</item>
+        <item quantity="other">%d albums</item>
+    </plurals>
+    <plurals name="music_songs_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
+</resources>

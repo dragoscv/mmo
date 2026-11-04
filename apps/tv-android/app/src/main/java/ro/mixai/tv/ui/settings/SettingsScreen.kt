@@ -1,165 +1,175 @@
 package ro.mixai.tv.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
+import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import ro.mixai.tv.BuildConfig
 import ro.mixai.tv.R
-import ro.mixai.tv.data.Health
-import ro.mixai.tv.data.isKid
-import ro.mixai.tv.ui.ScreenFormat
 import ro.mixai.tv.ui.components.MixaiIcons
 import ro.mixai.tv.ui.components.NoBackdrop
-import ro.mixai.tv.ui.components.SecondaryButton
 import ro.mixai.tv.ui.nav.Navigator
-import ro.mixai.tv.ui.nav.Route
 import ro.mixai.tv.ui.nav.ScreenDeps
-import ro.mixai.tv.ui.profiles.ProfileAvatar
 import ro.mixai.tv.ui.theme.MixaiFocus
 import ro.mixai.tv.ui.theme.Tokens
 
-private sealed interface ServerState {
-    data object Checking : ServerState
-    data class Ok(val health: Health) : ServerState
-    data object Unreachable : ServerState
+/** Settings sections; `id` is what `Route.Settings(section)` / deep links use. */
+enum class SettingsSection(val id: String, val labelRes: Int) {
+    Profiles("profiles", R.string.set_sec_profiles),
+    Playback("playback", R.string.set_sec_playback),
+    Subtitles("subtitles", R.string.set_sec_subtitles),
+    Language("language", R.string.set_sec_language),
+    Navigation("navigation", R.string.set_sec_navigation),
+    Server("server", R.string.set_sec_server),
+    Account("account", R.string.set_sec_account),
+    Cache("cache", R.string.set_sec_cache),
+    Together("together", R.string.set_sec_together),
+    Stats("stats", R.string.set_sec_stats),
+    About("about", R.string.set_sec_about),
+    ;
+
+    companion object {
+        fun of(id: String): SettingsSection = entries.firstOrNull { it.id == id.lowercase() } ?: Profiles
+    }
+}
+
+private fun SettingsSection.icon(): ImageVector = when (this) {
+    SettingsSection.Profiles -> Icons.Filled.Person
+    SettingsSection.Playback -> Icons.Filled.PlayArrow
+    SettingsSection.Subtitles -> MixaiIcons.Subtitles
+    SettingsSection.Language -> MixaiIcons.Lyrics
+    SettingsSection.Navigation -> Icons.Filled.Menu
+    SettingsSection.Server -> MixaiIcons.Cast
+    SettingsSection.Account -> Icons.Filled.AccountCircle
+    SettingsSection.Cache -> Icons.Filled.Refresh
+    SettingsSection.Together -> MixaiIcons.Group
+    SettingsSection.Stats -> MixaiIcons.Speed
+    SettingsSection.About -> Icons.Filled.Info
 }
 
 /**
- * Settings (moved from the legacy `ui/SettingsScreen.kt`): server, profiles, language, screen
- * format, resume data, account, version. [section] scrolls focus to a part (`profiles`, `server`);
- * the settings screen agent extends this (nav order, Live TV sources, playback, hub name).
+ * Settings (WP16-27): two panes — sections on the left, details on the right. Moving focus on the
+ * left switches the details; Right enters them. [section] pre-selects (`profiles`, `playback`, …).
+ * Every pre-WP16 setting (server, language, screen format, resume data, account) is kept.
  */
 @Composable
 fun SettingsScreen(deps: ScreenDeps, nav: Navigator, section: String) {
     NoBackdrop()
-    val api = deps.api
-    val settings = deps.settings
-    var server by remember { mutableStateOf<ServerState>(ServerState.Checking) }
-    var cleared by remember { mutableStateOf(false) }
-    val first = remember { FocusRequester() }
-    val profilesFocus = remember { FocusRequester() }
-    val scope = rememberCoroutineScope()
-    val formatKey by settings.screenFormat.collectAsState(initial = "auto")
-    val active by deps.profiles.activeProfile.collectAsState()
-    val signedInAs = if (deps.session.isSignedIn) deps.session.displayName else null
+    var current by rememberSaveable { mutableStateOf(SettingsSection.of(section).id) }
+    val sel = SettingsSection.of(current)
+    val requesters = remember { SettingsSection.entries.associateWith { FocusRequester() } }
+    LaunchedEffect(section) {
+        if (section.isNotBlank()) current = SettingsSection.of(section).id
+        delay(60)
+        runCatching { requesters.getValue(SettingsSection.of(current)).requestFocus() }
+    }
 
-    LaunchedEffect(api) { server = try { ServerState.Ok(api.health()) } catch (_: Exception) { ServerState.Unreachable } }
-    LaunchedEffect(section) { delay(50); runCatching { (if (section == "profiles") profilesFocus else first).requestFocus() } }
-
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = MixaiFocus.overscan, vertical = 40.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineLarge, color = Tokens.foreground)
-
-        Section(stringResource(R.string.settings_server)) {
-            Text(api.baseUrl, color = Tokens.foreground, style = MaterialTheme.typography.titleMedium)
-            Text(
-                when (val s = server) {
-                    ServerState.Checking -> stringResource(R.string.settings_server_checking)
-                    is ServerState.Ok -> stringResource(R.string.settings_server_info, s.health.hostname, s.health.version)
-                    ServerState.Unreachable -> stringResource(R.string.settings_server_unreachable)
-                },
-                color = if (server is ServerState.Unreachable) Tokens.destructive else Tokens.mutedForeground,
-            )
-            Spacer(Modifier.height(4.dp))
-            OutlinedButton(onClick = deps.onChangeServer, modifier = Modifier.focusRequester(first)) { Text(stringResource(R.string.home_change_server)) }
-        }
-
-        Section(stringResource(R.string.wp16_settings_profiles)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                ProfileAvatar(active, size = 56.dp, showKidBadge = active?.isKid == true)
-                Column {
-                    Text(active?.name ?: stringResource(R.string.wp16_profile_none), color = Tokens.foreground, style = MaterialTheme.typography.titleMedium)
-                    if (active?.hasPin == true) Text(stringResource(R.string.wp16_profile_locked), color = Tokens.mutedForeground, style = MaterialTheme.typography.bodySmall)
+    Row(Modifier.fillMaxSize().padding(start = MixaiFocus.overscan, end = MixaiFocus.overscan, top = MixaiFocus.overscanTop)) {
+        Column(Modifier.width(300.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineLarge, color = Tokens.foreground)
+            LazyColumn(Modifier.focusRestorer().focusGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                itemsIndexed(SettingsSection.entries) { _, s ->
+                    SectionItem(
+                        label = stringResource(s.labelRes),
+                        icon = s.icon(),
+                        selected = s == sel,
+                        modifier = Modifier.focusRequester(requesters.getValue(s)),
+                        onFocus = { current = s.id },
+                        onClick = { current = s.id },
+                    )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SecondaryButton(stringResource(R.string.wp16_profile_switch), { nav.push(Route.ProfilePicker) }, Modifier.focusRequester(profilesFocus), icon = Icons.Filled.Person)
-                SecondaryButton(stringResource(R.string.wp16_stub_stats), { nav.push(Route.Stats) }, icon = MixaiIcons.Speed)
+        }
+        Spacer(Modifier.width(40.dp))
+        Box(
+            Modifier.weight(1f).fillMaxHeight().background(Tokens.foreground.copy(alpha = 0.03f), RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
+        ) {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 36.dp, vertical = 28.dp).focusGroup(),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                Text(stringResource(sel.labelRes), style = MaterialTheme.typography.headlineSmall, color = Tokens.foreground)
+                when (sel) {
+                    SettingsSection.Profiles -> ProfilesPane(deps, nav)
+                    SettingsSection.Playback -> PlaybackPane(deps)
+                    SettingsSection.Subtitles -> SubtitlesPane(deps)
+                    SettingsSection.Language -> LanguagePane(deps)
+                    SettingsSection.Navigation -> NavigationPane(deps)
+                    SettingsSection.Server -> ServerPane(deps, nav)
+                    SettingsSection.Account -> AccountPane(deps)
+                    SettingsSection.Cache -> CachePane(deps)
+                    SettingsSection.Together -> TogetherPane(deps)
+                    SettingsSection.Stats -> StatsPane(nav)
+                    SettingsSection.About -> AboutPane(deps)
+                }
+                Spacer(Modifier.height(24.dp))
             }
-        }
-
-        Section(stringResource(R.string.settings_language)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                val set: (String) -> Unit = { tag -> scope.launch { settings.setLocale(tag) } }
-                ChoiceButton("", deps.localeTag, stringResource(R.string.settings_lang_system), set)
-                ChoiceButton("ro", deps.localeTag, stringResource(R.string.settings_lang_ro), set)
-                ChoiceButton("en", deps.localeTag, stringResource(R.string.settings_lang_en), set)
-            }
-        }
-
-        Section(stringResource(R.string.settings_screen_format)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                val set: (String) -> Unit = { k -> scope.launch { settings.setScreenFormat(k) } }
-                ChoiceButton(ScreenFormat.Auto.key, formatKey, stringResource(R.string.settings_screen_auto), set)
-                ChoiceButton(ScreenFormat.Wide16x9.key, formatKey, "16:9", set)
-                ChoiceButton(ScreenFormat.Ultra21x9.key, formatKey, "21:9", set)
-                ChoiceButton(ScreenFormat.Super32x9.key, formatKey, "32:9", set)
-            }
-            Text(stringResource(R.string.settings_screen_hint), color = Tokens.mutedForeground, style = MaterialTheme.typography.bodySmall)
-        }
-
-        Section(stringResource(R.string.home_continue)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedButton(onClick = { scope.launch { settings.clearProgress() }; cleared = true }) { Text(stringResource(R.string.settings_clear_progress)) }
-                if (cleared) Text(stringResource(R.string.settings_cleared), color = Tokens.success, modifier = Modifier.padding(top = 12.dp))
-            }
-        }
-
-        val signOut = deps.onSignOut
-        if (signedInAs != null && signOut != null) Section(stringResource(R.string.settings_account)) {
-            Text(signedInAs, color = Tokens.foreground)
-            OutlinedButton(onClick = signOut) { Text(stringResource(R.string.home_sign_out)) }
-        }
-
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            if (nav.canPop) Button(onClick = { nav.pop() }) { Text(stringResource(R.string.action_back)) }
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.settings_app_version, BuildConfig.VERSION_NAME), color = Tokens.mutedForeground, modifier = Modifier.padding(top = 12.dp))
         }
     }
 }
 
 @Composable
-internal fun Section(title: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.labelLarge, color = Tokens.brandCyanDark)
-        content()
+private fun SectionItem(label: String, icon: ImageVector, selected: Boolean, modifier: Modifier, onFocus: () -> Unit, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onFocus() },
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(12.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (selected) Tokens.foreground.copy(alpha = 0.10f) else Color.Transparent,
+            contentColor = if (selected) Tokens.foreground else Tokens.mutedForeground,
+            focusedContainerColor = Tokens.foreground,
+            focusedContentColor = Tokens.background,
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
+    ) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(14.dp))
+            Text(label, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+        }
     }
-}
-
-@Composable
-internal fun ChoiceButton(tag: String, current: String, label: String, onPick: (String) -> Unit) {
-    if (tag == current) Button(onClick = { onPick(tag) }) { Text(label) }
-    else OutlinedButton(onClick = { onPick(tag) }) { Text(label) }
 }

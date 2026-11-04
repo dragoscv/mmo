@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16-27/28 Settings, profile editor, Year in review (ui/settings, ui/profiles). Keys mirrored in values-ro. -->
+<resources>
+    <!-- Sections -->
+    <string name="set_sec_profiles">Profiles</string>
+    <string name="set_sec_playback">Playback</string>
+    <string name="set_sec_subtitles">Subtitle style</string>
+    <string name="set_sec_language">Language</string>
+    <string name="set_sec_navigation">Navigation</string>
+    <string name="set_sec_server">Server</string>
+    <string name="set_sec_account">Account</string>
+    <string name="set_sec_cache">Storage &amp; cache</string>
+    <string name="set_sec_together">Watch Together</string>
+    <string name="set_sec_stats">Your year</string>
+    <string name="set_sec_about">About &amp; diagnostics</string>
+
+    <!-- Common -->
+    <string name="set_on">On</string>
+    <string name="set_off">Off</string>
+    <string name="set_yes">Yes</string>
+    <string name="set_no">No</string>
+    <string name="set_unknown">Unknown</string>
+    <string name="set_done">Done</string>
+    <string name="set_text_placeholder">Type a name</string>
+
+    <!-- Profiles -->
+    <string name="set_profiles_hint">Each profile keeps its own progress, watchlist and preferences.</string>
+    <string name="set_profile_active">Watching now</string>
+    <string name="set_profile_max_age_value">Up to %1$d+</string>
+    <string name="profile_add">Add profile</string>
+    <string name="profile_new_title">New profile</string>
+    <string name="profile_edit_title">Edit profile</string>
+    <string name="profile_name">Name</string>
+    <string name="profile_name_missing">No name yet</string>
+    <string name="profile_color">Colour</string>
+    <string name="profile_kind">Type</string>
+    <string name="profile_kind_adult">Adult</string>
+    <string name="profile_kind_kid">Kids</string>
+    <string name="profile_max_age">Age rating limit</string>
+    <string name="profile_max_age_none">No limit</string>
+    <string name="profile_max_age_hint">Titles rated above this age are hidden from the profile.</string>
+    <string name="profile_pin">PIN</string>
+    <string name="profile_pin_set">Set PIN</string>
+    <string name="profile_pin_change">Change PIN</string>
+    <string name="profile_pin_remove">Remove PIN</string>
+    <string name="profile_pin_on">This profile asks for a 4-digit PIN.</string>
+    <string name="profile_pin_off">Anyone can open this profile.</string>
+    <string name="profile_pin_pending_set">The new PIN is applied when you save.</string>
+    <string name="profile_pin_pending_remove">The PIN is removed when you save.</string>
+    <string name="profile_pin_enter_new">Enter a new 4-digit PIN</string>
+    <string name="profile_pin_confirm">Enter the same PIN again</string>
+    <string name="profile_pin_mismatch">The PINs do not match. Try again.</string>
+    <string name="profile_pin_locked_countdown">Too many attempts. Try again in %1$d:%2$02d.</string>
+    <string name="profile_unlock_to_edit">Enter the PIN of %1$s to edit it</string>
+    <string name="profile_save">Save</string>
+    <string name="profile_save_failed">Could not save: %1$s</string>
+    <string name="profile_delete">Delete profile</string>
+    <string name="profile_delete_confirm_title">Delete %1$s?</string>
+    <string name="profile_delete_confirm_body">Progress, watchlist and preferences of this profile are removed for good.</string>
+
+    <!-- Playback -->
+    <string name="set_playback_for">Saved for the profile %1$s.</string>
+    <string name="set_autoplay_next">Play the next episode automatically</string>
+    <string name="set_skip_intro">Skip intros automatically</string>
+    <string name="set_skip_intro_hint">When the intro is known for an episode.</string>
+    <string name="set_languages">Languages</string>
+    <string name="set_audio_lang">Preferred audio language</string>
+    <string name="set_sub_lang">Preferred subtitle language</string>
+    <string name="set_lang_auto">Automatic</string>
+    <string name="set_lang_auto_hint">Follows the original audio and the app language.</string>
+    <string name="set_sub_off">Off</string>
+    <string name="set_sub_forced_only">Forced subtitles only</string>
+    <string name="set_sub_forced_hint">Shows only foreign-language parts and signs.</string>
+
+    <!-- Subtitle style -->
+    <string name="set_sub_size">Size</string>
+    <string name="set_sub_size_small">Small</string>
+    <string name="set_sub_size_medium">Medium</string>
+    <string name="set_sub_size_large">Large</string>
+    <string name="set_sub_size_xlarge">Extra large</string>
+    <string name="set_sub_bg">Background</string>
+    <string name="set_sub_bg_none">None</string>
+    <string name="set_sub_bg_shadow">Shadow</string>
+    <string name="set_sub_bg_box">Box</string>
+    <string name="set_sub_preview">Preview</string>
+    <string name="set_sub_sample">This is how subtitles will look.</string>
+
+    <!-- Language -->
+    <string name="set_language_hint">Language of the app. Titles and descriptions follow it when the server has them.</string>
+
+    <!-- Navigation -->
+    <string name="set_nav_hint">Choose which items appear in the side menu and in what order. Settings always stays.</string>
+    <string name="set_nav_visible">Shown</string>
+    <string name="set_nav_hidden">Hidden</string>
+    <string name="set_nav_up">Move up</string>
+    <string name="set_nav_down">Move down</string>
+    <string name="set_nav_reset">Restore the default order</string>
+
+    <!-- Server -->
+    <string name="set_server_url">Address</string>
+    <string name="set_server_status">Status</string>
+    <string name="set_server_recheck">Check again</string>
+    <string name="set_change_server_title">Change server?</string>
+    <string name="set_change_server_body">This TV disconnects from the current MMO Server. Your account stays signed in.</string>
+    <string name="set_livetv_sources">Live TV sources</string>
+    <string name="set_livetv_sources_hint">M3U, Xtream and HDHomeRun sources live on the server.</string>
+
+    <!-- Account -->
+    <string name="set_account_signed_in">Signed in as</string>
+    <string name="set_account_none">This TV is paired with the server without a MixAI account.</string>
+    <string name="set_sign_out_title">Sign out?</string>
+    <string name="set_sign_out_body">The server connection and all settings on this TV are removed.</string>
+
+    <!-- Cache -->
+    <string name="set_cache_memory">Image memory cache</string>
+    <string name="set_cache_disk">Image disk cache</string>
+    <string name="set_cache_home">Saved home screens</string>
+    <string name="set_cache_clear_images">Clear image cache</string>
+    <string name="set_cache_clear_home">Clear saved home screens</string>
+    <string name="set_cache_resume_hint">Resume positions stored only on this TV.</string>
+    <string name="set_cache_images_cleared">Image cache cleared.</string>
+    <string name="set_cache_home_cleared">Saved home screens cleared.</string>
+
+    <!-- Watch Together -->
+    <string name="set_together_hint">The name other devices see for this TV in remote control and Watch Together.</string>
+    <string name="set_device_name">Device name</string>
+    <string name="set_device_name_reset">Use the model name</string>
+
+    <!-- Your year -->
+    <string name="set_stats_hint">Hours watched, favourite titles and genres, and what you listened to this year.</string>
+
+    <!-- About -->
+    <string name="set_about_app">App version</string>
+    <string name="set_about_server">Server version</string>
+    <string name="set_about_hub">Remote control hub</string>
+    <string name="set_hub_connected">Connected</string>
+    <string name="set_hub_connecting">Connecting…</string>
+    <string name="set_hub_disconnected">Disconnected</string>
+    <string name="set_about_device_id">Device ID</string>
+    <string name="set_about_device">Device</string>
+    <string name="set_about_panel">Detected panel shape</string>
+    <string name="set_about_tmdb">TMDB configured</string>
+    <string name="set_about_library">Titles in the library</string>
+    <string name="set_about_region">Region · language</string>
+
+    <!-- Year in review -->
+    <string name="stats_title">Your year</string>
+    <string name="stats_open">Your year in review</string>
+    <string name="stats_hours">hours watched</string>
+    <string name="stats_titles">titles</string>
+    <string name="stats_episodes">episodes</string>
+    <string name="stats_streak">days in a row</string>
+    <string name="stats_listen_hours">hours of music</string>
+    <string name="stats_by_month">Month by month</string>
+    <string name="stats_watch_legend">Watching</string>
+    <string name="stats_listen_legend">Listening</string>
+    <string name="stats_top_genres">Top genres</string>
+    <string name="stats_top_titles">Most watched</string>
+    <string name="stats_top_tracks">Most played (%1$d plays)</string>
+    <string name="stats_hours_short">%1$s h</string>
+    <string name="stats_plays">%1$d plays</string>
+    <string name="stats_track_unknown">Unknown song</string>
+    <string name="stats_empty">Nothing yet for %1$d</string>
+    <string name="stats_empty_hint">Watch or listen to something and your year in review fills in here.</string>
+</resources>

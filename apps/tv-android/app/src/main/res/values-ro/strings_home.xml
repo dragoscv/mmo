@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16 Acasă + Bibliotecă (ui/home, ui/library). Același set de chei ca în values. -->
+<resources>
+    <!-- Acasă -->
+    <string name="wp16_home_error">Pagina Acasă nu s-a putut încărca</string>
+    <string name="wp16_home_empty_title">Încă nu ai nimic de văzut</string>
+    <string name="wp16_home_empty_message">Adaugă dosare cu filme și seriale pe MMO Server, apoi scanează biblioteca.</string>
+    <string name="wp16_home_open_settings">Deschide setările</string>
+    <string name="wp16_home_play_failed">Redarea nu a putut porni: %1$s</string>
+    <string name="wp16_home_more_info">Mai multe detalii</string>
+    <string name="wp16_home_list_add">Adaugă în Lista mea</string>
+    <string name="wp16_home_list_remove">Scoate din Lista mea</string>
+    <string name="wp16_home_list_added">Adăugat în Lista mea</string>
+    <string name="wp16_home_list_removed">Scos din Lista mea</string>
+    <string name="wp16_home_list_failed">Lista mea nu a putut fi actualizată</string>
+    <string name="wp16_home_badge_library">În bibliotecă</string>
+    <string name="wp16_home_episode">S%1$d E%2$d</string>
+    <string name="wp16_home_up_next">Urmează · S%1$d E%2$d</string>
+    <string name="wp16_home_row_movies">Filme</string>
+    <string name="wp16_home_row_shows">Seriale</string>
+    <string name="wp16_home_episodes_count">%1$d episoade</string>
+    <string name="wp16_home_episodes_seasons">%1$d episoade · %2$d sezoane</string>
+    <string name="wp16_home_episodes_button">Episoade</string>
+    <string name="wp16_home_min_left">au rămas %1$d min</string>
+    <string name="wp16_home_resume_local">Continuă · au rămas %1$d min</string>
+    <string name="wp16_home_resume_code">Continuă %1$s · au rămas %2$d min</string>
+    <string name="wp16_home_play_code">Redă %1$s</string>
+
+    <!-- Bibliotecă -->
+    <string name="wp16_lib_title_movies">Filme</string>
+    <string name="wp16_lib_title_tv">Seriale</string>
+    <string name="wp16_lib_count">%1$d din %2$d titluri</string>
+    <string name="wp16_lib_empty_movies">Nu ai filme în bibliotecă</string>
+    <string name="wp16_lib_empty_tv">Nu ai seriale în bibliotecă</string>
+    <string name="wp16_lib_empty_hint">Adaugă un dosar pe MMO Server și scanează-l; titlurile apar aici după ce sunt potrivite cu TMDB.</string>
+    <string name="wp16_lib_unmatched">%1$d fișiere nu sunt încă potrivite cu TMDB. Verifică numele fișierelor sau setările TMDB de pe server.</string>
+    <string name="wp16_lib_old_server">Acest MMO Server este prea vechi pentru bibliotecă. Actualizează-l la 3.4 sau mai nou.</string>
+    <string name="wp16_lib_sort">Sortează după</string>
+    <string name="wp16_lib_sort_label">Sortare: %1$s</string>
+    <string name="wp16_lib_sort_added">Adăugate recent</string>
+    <string name="wp16_lib_sort_az">A–Z</string>
+    <string name="wp16_lib_sort_year">An</string>
+    <string name="wp16_lib_sort_rating">Notă</string>
+    <string name="wp16_lib_genre">Gen</string>
+    <string name="wp16_lib_genre_partial">Genuri din %1$d din %2$d titluri (restul se încarcă)</string>
+    <string name="wp16_lib_decade">Deceniu</string>
+    <string name="wp16_lib_decade_n">anii %1$d</string>
+    <string name="wp16_lib_resolution">Rezoluție</string>
+    <string name="wp16_lib_res_1080">1080p sau mai bună</string>
+    <string name="wp16_lib_unwatched">Nevăzute</string>
+    <string name="wp16_lib_jump">Salt la literă</string>
+    <string name="wp16_lib_clear">Șterge filtrele</string>
+    <string name="wp16_lib_all">Toate</string>
+    <string name="wp16_lib_no_match">Niciun titlu nu corespunde filtrelor</string>
+    <string name="wp16_lib_no_match_hint">Schimbă sau șterge filtrele de mai sus.</string>
+</resources>

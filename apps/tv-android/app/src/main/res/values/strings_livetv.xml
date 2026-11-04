@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Live TV / Guide / DVR (WP16-24..27). Keep keys identical in values-ro/strings_livetv.xml. -->
+    <string name="livetv_guide">Guide</string>
+    <string name="livetv_recordings">Recordings</string>
+    <string name="livetv_sources">Manage sources</string>
+    <string name="livetv_sources_hint">Your own IPTV playlists and tuners. Channels refresh in the background.</string>
+    <string name="livetv_add_source">Add source</string>
+    <string name="livetv_empty_title">No channels yet</string>
+    <string name="livetv_empty_message">Add your own IPTV/M3U or HDHomeRun source; MixAI ships no channels.</string>
+    <string name="livetv_error_load">Could not load Live TV.</string>
+    <string name="livetv_group_all">All</string>
+    <string name="livetv_group_favourites">Favourites</string>
+    <string name="livetv_no_channels">No channels here</string>
+    <string name="livetv_no_channels_hint">This group is empty or every channel in it is hidden.</string>
+    <string name="livetv_no_favourites">No favourites yet</string>
+    <string name="livetv_no_favourites_hint">Long-press a channel or press Menu, then choose Add to favourites.</string>
+    <string name="livetv_no_guide">No guide information</string>
+    <string name="livetv_no_info">No information</string>
+    <string name="livetv_next">Next</string>
+    <string name="livetv_live">LIVE</string>
+    <string name="livetv_badge_catchup">CATCH-UP</string>
+    <string name="livetv_preview_loading">Preview starting…</string>
+    <string name="livetv_preview_failed">Preview unavailable</string>
+    <string name="livetv_hint_menu">OK to watch · long-press or Menu for options</string>
+    <string name="livetv_action_watch">Watch</string>
+    <string name="livetv_action_favourite">Add to favourites</string>
+    <string name="livetv_action_unfavourite">Remove from favourites</string>
+    <string name="livetv_action_hide">Hide channel</string>
+    <string name="livetv_action_hide_hint">Hidden channels disappear from lists and the guide.</string>
+    <string name="livetv_fav_added">Added to favourites</string>
+    <string name="livetv_fav_removed">Removed from favourites</string>
+    <string name="livetv_hidden_done">Channel hidden</string>
+
+    <!-- sources -->
+    <string name="livetv_source_channels">%1$d channels</string>
+    <string name="livetv_source_refreshed">refreshed %1$s</string>
+    <string name="livetv_source_disabled">disabled</string>
+    <string name="livetv_source_error">Error: %1$s</string>
+    <string name="livetv_source_pending">Loading channels…</string>
+    <string name="livetv_guide_error">Guide: %1$s</string>
+    <string name="livetv_working">Working…</string>
+    <string name="livetv_test">Test</string>
+    <string name="livetv_test_ok">Works: %1$d channels found</string>
+    <string name="livetv_refresh">Refresh</string>
+    <string name="livetv_refresh_done">Channels and guide refreshed</string>
+    <string name="livetv_delete">Delete</string>
+    <string name="livetv_delete_source_title">Delete “%1$s”?</string>
+    <string name="livetv_delete_source_message">Its channels, guide and favourites are removed. Recordings already made stay.</string>
+    <string name="livetv_kind_m3u">M3U playlist</string>
+    <string name="livetv_kind_m3u_hint">A playlist URL (.m3u / .m3u8) from your provider</string>
+    <string name="livetv_kind_xtream">Xtream Codes</string>
+    <string name="livetv_kind_xtream_hint">Server URL with your username and password</string>
+    <string name="livetv_kind_hdhomerun">HDHomeRun</string>
+    <string name="livetv_kind_hdhomerun_hint">A network TV tuner on your LAN</string>
+    <string name="livetv_form_kind">Source type</string>
+    <string name="livetv_form_name">Name</string>
+    <string name="livetv_form_url_m3u">Playlist URL</string>
+    <string name="livetv_form_url_xtream">Server URL</string>
+    <string name="livetv_form_url_hdhr">Tuner address</string>
+    <string name="livetv_form_xmltv">Guide (XMLTV) URL</string>
+    <string name="livetv_form_username">Username</string>
+    <string name="livetv_form_password">Password</string>
+    <string name="livetv_form_optional">optional</string>
+    <string name="livetv_form_empty">empty</string>
+    <string name="livetv_form_need_url">Enter the URL first.</string>
+    <string name="livetv_form_done">Done</string>
+    <string name="livetv_form_pick_field">Select a field on the left to type with the on-screen keyboard.</string>
+    <string name="livetv_form_keyboard_hint">A keyboard or the phone remote also types here.</string>
+    <string name="livetv_form_legal">Only add sources you are entitled to watch. MixAI does not provide channels.</string>
+    <string name="livetv_save">Save</string>
+
+    <!-- guide -->
+    <string name="livetv_now">Now</string>
+    <string name="livetv_day_prev">− Day</string>
+    <string name="livetv_day_next">+ Day</string>
+    <string name="livetv_watch_live">Watch live</string>
+    <string name="livetv_watch_catchup">Watch from the start</string>
+    <string name="livetv_catchup_unavailable">Catch-up not available</string>
+    <string name="livetv_starts_at">Starts at %1$s</string>
+    <string name="livetv_record">Record</string>
+    <string name="livetv_record_series">Record series</string>
+    <string name="livetv_record_scheduled">Recording scheduled</string>
+    <string name="livetv_record_conflict">Scheduled, but it overlaps another recording (tuner limit)</string>
+    <string name="livetv_series_created">Series rule created</string>
+    <string name="livetv_close">Close</string>
+
+    <!-- player -->
+    <string name="livetv_tuning">Tuning…</string>
+    <string name="livetv_record_now">Record now</string>
+    <string name="livetv_last_channel">Last channel</string>
+    <string name="livetv_channel_list">Channel list</string>
+    <string name="livetv_next_channel">Next channel</string>
+    <string name="livetv_no_such_channel">No channel %1$s</string>
+    <string name="livetv_err_title">Channel unavailable</string>
+    <string name="livetv_err_404">This channel no longer exists in the source.</string>
+    <string name="livetv_err_upstream">The provider is not answering (HTTP %1$d).</string>
+    <string name="livetv_err_http">The stream failed (HTTP %1$d).</string>
+    <string name="livetv_err_generic">The stream could not be played. %1$s</string>
+
+    <!-- recordings -->
+    <string name="livetv_tab_scheduled">Scheduled</string>
+    <string name="livetv_tab_recorded">Recorded</string>
+    <string name="livetv_tab_rules">Series rules</string>
+    <string name="livetv_status_scheduled">Scheduled</string>
+    <string name="livetv_status_recording">Recording</string>
+    <string name="livetv_status_done">Done</string>
+    <string name="livetv_status_failed">Failed</string>
+    <string name="livetv_status_cancelled">Cancelled</string>
+    <string name="livetv_status_conflict">Conflict</string>
+    <string name="livetv_conflict_hint">Overlaps another recording; it may fail if the tuner limit is reached.</string>
+    <string name="livetv_from_rule">series rule</string>
+    <string name="livetv_no_scheduled">Nothing scheduled</string>
+    <string name="livetv_no_recorded">No recordings yet</string>
+    <string name="livetv_no_scheduled_hint">Open the Guide, select a programme and choose Record.</string>
+    <string name="livetv_no_rules">No series rules</string>
+    <string name="livetv_no_rules_hint">In the Guide choose Record series to record every episode automatically.</string>
+    <string name="livetv_play">Play</string>
+    <string name="livetv_play_recording_failed">Could not open the recording. %1$s</string>
+    <string name="livetv_cancel_recording">Cancel recording</string>
+    <string name="livetv_cancel_recording_title">Cancel “%1$s”?</string>
+    <string name="livetv_cancel_recording_message">The recording will not run (or stops now if it is running).</string>
+    <string name="livetv_delete_recording_title">Delete “%1$s”?</string>
+    <string name="livetv_delete_recording_message">The recorded file is deleted from the server.</string>
+    <string name="livetv_delete_rule_title">Delete the rule “%1$s”?</string>
+    <string name="livetv_delete_rule_message">Future episodes are no longer recorded. Existing recordings stay.</string>
+    <string name="livetv_rule_any_channel">any channel</string>
+    <string name="livetv_rule_one_channel">one channel</string>
+    <string name="livetv_rule_keep">keep last %1$d</string>
+</resources>

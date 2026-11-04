@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16-21/27: video player OSD + Watch Together. Keys must match values-ro/strings_player.xml. -->
+<resources>
+    <!-- OSD -->
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_back10">Back 10 seconds</string>
+    <string name="player_fwd10">Forward 10 seconds</string>
+    <string name="player_audio">Audio</string>
+    <string name="player_audio_direct_only">Needs direct play (this stream carries only the first audio track)</string>
+    <string name="player_subtitles">Subtitles</string>
+    <string name="player_subs_off">Off</string>
+    <string name="player_subs_forced">forced</string>
+    <string name="player_subs_style">Subtitle style</string>
+    <string name="player_subs_style_hint">Size and background</string>
+    <string name="player_subs_size">Size</string>
+    <string name="player_subs_background">Background</string>
+    <string name="player_on">On</string>
+    <string name="player_off">Off</string>
+    <string name="player_speed">Speed</string>
+    <string name="player_speed_normal">Normal</string>
+    <string name="player_screen_format">Screen format</string>
+    <string name="player_format_auto">Auto (detect)</string>
+    <string name="player_sleep">Sleep timer</string>
+    <string name="player_sleep_min">%1$d minutes</string>
+    <string name="player_sleep_end">End of episode</string>
+    <string name="player_sleep_set">Playback stops in %1$d min</string>
+    <string name="player_info">Info</string>
+    <string name="player_info_mode">Mode</string>
+    <string name="player_info_video">Video</string>
+    <string name="player_info_hdr">HDR</string>
+    <string name="player_info_audio">Audio</string>
+    <string name="player_info_bitrate">Bitrate</string>
+    <string name="player_info_container">Container</string>
+    <string name="player_info_server">Server</string>
+    <string name="player_mode_hls">HLS (original video, server remux)</string>
+    <string name="player_mode_direct">Direct play</string>
+    <string name="player_kbps">%1$d kbps</string>
+    <string name="player_unknown">Unknown</string>
+    <string name="player_close">Close</string>
+    <string name="player_next_episode">Next episode</string>
+    <string name="player_next_failed">Could not open the next episode</string>
+    <string name="player_watch_together">Watch Together</string>
+    <string name="player_episode_line">S%1$d · E%2$d</string>
+    <string name="player_ends_at">Ends at %1$s</string>
+    <string name="player_buffering">Buffering…</string>
+    <string name="player_room_chip">Watching together · %1$d</string>
+    <string name="player_chat_line">%1$s: %2$s</string>
+    <!-- Skip / Up Next / still watching -->
+    <string name="player_skip_intro">Skip intro</string>
+    <string name="player_skip_recap">Skip recap</string>
+    <string name="player_up_next">Up next</string>
+    <string name="player_play_now">Play now</string>
+    <string name="player_more_like_this">More like this</string>
+    <string name="player_more_like_this_hint">See similar titles and recommendations.</string>
+    <string name="player_back_to_title">Back to title</string>
+    <string name="player_keep_watching">Keep watching</string>
+    <string name="player_still_watching">Are you still watching?</string>
+    <string name="player_still_watching_hint">Playback paused after several episodes in a row.</string>
+    <string name="player_continue">Continue watching</string>
+    <string name="player_exit">Exit</string>
+
+    <!-- Watch Together -->
+    <string name="together_title">Watch Together</string>
+    <string name="together_subtitle">Watch in sync with friends, anywhere</string>
+    <string name="together_intro">Create a room and share the link, or join a room with its code. Everyone sees the same moment; chat and reactions show up on screen.</string>
+    <string name="together_create">Create room</string>
+    <string name="together_create_name">Room name (optional)</string>
+    <string name="together_join">Join room</string>
+    <string name="together_join_code">Room code</string>
+    <string name="together_code_hint">Codes are case-sensitive.</string>
+    <string name="together_leave">Leave room</string>
+    <string name="together_choose">Choose what to watch</string>
+    <string name="together_code">Code: %1$s</string>
+    <string name="together_now">Now: %1$s</string>
+    <string name="together_nothing">Nothing playing yet — pick a title and press Play.</string>
+    <string name="together_members">Members (%1$d)</string>
+    <string name="together_host">host</string>
+    <string name="together_you">you</string>
+    <string name="together_guest">guest</string>
+    <string name="together_ready">ready</string>
+    <string name="together_not_ready">loading</string>
+    <string name="together_invite">Invite</string>
+    <string name="together_invite_code_only">Share the code %1$s with another MixAI device.</string>
+    <string name="together_chat">Chat</string>
+    <string name="together_chat_empty">No messages yet.</string>
+    <string name="together_hub_connected">Connected</string>
+    <string name="together_hub_connecting">Reconnecting…</string>
+    <string name="together_hub_disconnected">Offline</string>
+    <string name="together_waiting_hub">Waiting for MMO Server…</string>
+    <string name="together_update_title">Server update needed</string>
+    <string name="together_update_server">Update MMO Server to 3.5+ to use Watch Together (this server runs %1$s).</string>
+    <string name="together_err_not_found">No room with this code.</string>
+    <string name="together_err_full">The room is full.</string>
+    <string name="together_err_not_in_room">You are no longer in the room.</string>
+    <string name="together_err_generic">Watch Together error: %1$s</string>
+</resources>

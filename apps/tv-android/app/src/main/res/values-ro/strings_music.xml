@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- WP16 ecrane muzică (ui/music). Chei identice cu values/strings_music.xml. -->
+    <string name="music_title">Muzică</string>
+    <string name="music_tab_home">Acasă</string>
+    <string name="music_tab_artists">Artiști</string>
+    <string name="music_tab_albums">Albume</string>
+    <string name="music_tab_playlists">Liste de redare</string>
+    <string name="music_tab_search">Căutare</string>
+
+    <string name="music_row_recent">Ascultate recent</string>
+    <string name="music_row_new">Albume noi</string>
+    <string name="music_row_most_played">Cele mai ascultate</string>
+    <string name="music_row_playlists">Liste de redare</string>
+    <string name="music_row_genres">Genuri</string>
+    <string name="music_row_random">Albume la întâmplare</string>
+    <string name="music_shuffle_all">Amestecă tot</string>
+
+    <string name="music_empty_title">Nu există încă o bibliotecă muzicală</string>
+    <string name="music_empty_message">Pe calculatorul care rulează MixAI Server, adaugă un folder de muzică în bibliotecă și pornește o scanare. Albumele apar aici după ce se termină.</string>
+    <string name="music_load_error">Muzica nu a putut fi încărcată</string>
+    <string name="music_all">Toate</string>
+    <string name="music_no_artists">Niciun artist pentru această literă</string>
+    <string name="music_no_albums">Niciun album</string>
+    <string name="music_no_playlists">Nicio listă de redare încă</string>
+    <string name="music_unknown_artist">Artist necunoscut</string>
+
+    <string name="music_search_hint">Scrie pentru a căuta artiști, albume și melodii</string>
+    <string name="music_search_empty">Niciun rezultat pentru „%1$s”</string>
+    <string name="music_search_artists">Artiști</string>
+    <string name="music_search_albums">Albume</string>
+    <string name="music_search_tracks">Melodii</string>
+
+    <string name="music_play">Redă</string>
+    <string name="music_shuffle">Amestecă</string>
+    <string name="music_add_queue">Adaugă în coadă</string>
+    <string name="music_added_queue">Adăugat în coadă</string>
+    <string name="music_top_tracks">Melodii de top</string>
+    <string name="music_albums">Albume</string>
+    <string name="music_similar">Artiști similari</string>
+    <string name="music_has_lyrics">Are versuri</string>
+
+    <string name="music_lyrics">Versuri</string>
+    <string name="music_queue">Coadă</string>
+    <string name="music_no_lyrics">Nu există versuri pentru această melodie</string>
+    <string name="music_lyrics_error">Versurile nu sunt disponibile acum</string>
+    <string name="music_nothing_playing">Nu se redă nimic</string>
+    <string name="music_nothing_playing_message">Alege un album sau o melodie ca să începi să asculți.</string>
+    <string name="music_browse">Răsfoiește muzica</string>
+    <string name="music_prev">Anterior</string>
+    <string name="music_next">Următorul</string>
+    <string name="music_pause">Pauză</string>
+    <string name="music_resume">Redă</string>
+    <string name="music_repeat_off">Repetare oprită</string>
+    <string name="music_repeat_all">Repetă tot</string>
+    <string name="music_repeat_one">Repetă melodia</string>
+    <string name="music_seek_hint">Stânga/Dreapta pentru derulare</string>
+
+    <plurals name="music_albums_count">
+        <item quantity="one">%d album</item>
+        <item quantity="few">%d albume</item>
+        <item quantity="other">%d de albume</item>
+    </plurals>
+    <plurals name="music_songs_count">
+        <item quantity="one">%d melodie</item>
+        <item quantity="few">%d melodii</item>
+        <item quantity="other">%d de melodii</item>
+    </plurals>
+</resources>

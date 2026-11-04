@@ -55,6 +55,15 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (hasReleaseKeystore) signingConfig = signingConfigs.getByName("release")
         }
+        // Release code (R8, not debuggable) signed with the debug key — for on-device perf
+        // measurements; debuggable builds run with reduced ART optimisation and lie about timings.
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+            applicationIdSuffix = ""
+        }
     }
 
     compileOptions {

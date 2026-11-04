@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16-26 Căutare (ui/search). Aceleași chei ca values/strings_search.xml. -->
+<resources>
+    <string name="search_title">Căutare</string>
+    <string name="search_hint">Filme, seriale, artiști, albume, melodii și canale.</string>
+    <string name="search_placeholder">Scrie ca să cauți</string>
+    <string name="search_voice">Căutare vocală</string>
+    <string name="search_voice_prompt">Ce vrei să vezi sau să asculți?</string>
+    <string name="search_recent">Căutări recente</string>
+    <string name="search_recent_clear">Șterge istoricul</string>
+    <string name="search_sec_library">În biblioteca ta (%1$d)</string>
+    <string name="search_sec_titles">Filme și seriale</string>
+    <string name="search_sec_music">Muzică</string>
+    <string name="search_sec_channels">Canale</string>
+    <string name="search_badge_library">În bibliotecă</string>
+    <string name="search_kind_movie">Film</string>
+    <string name="search_kind_show">Serial</string>
+    <string name="search_kind_artist">Artist</string>
+    <string name="search_kind_album">Album</string>
+    <string name="search_kind_track">Melodie</string>
+    <string name="search_no_results">Niciun rezultat pentru \u201e%1$s\u201d</string>
+    <string name="search_no_results_hint">Verifică ortografia sau încearcă mai puține cuvinte.</string>
+    <string name="search_failed">Căutarea a eșuat</string>
+</resources>

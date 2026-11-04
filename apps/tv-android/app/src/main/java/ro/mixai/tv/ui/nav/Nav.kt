@@ -181,6 +181,20 @@ fun NavHost(nav: Navigator, modifier: Modifier = Modifier, content: @Composable 
         gone.forEach { holder.removeState(it) }
         known -= gone
     }
+    if (ro.mixai.tv.ui.components.PerfFlags.noShared) {
+        AnimatedContent(
+            targetState = nav.top,
+            contentKey = { it.key },
+            transitionSpec = { navTransition(initialState.route, targetState.route, nav.lastWasPop) },
+            label = "nav",
+            modifier = modifier,
+        ) { entry ->
+            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this, LocalNavEntry provides entry) {
+                holder.SaveableStateProvider(entry.key) { content(entry.route) }
+            }
+        }
+        return
+    }
     SharedTransitionLayout(modifier) {
         val shared = this
         AnimatedContent(

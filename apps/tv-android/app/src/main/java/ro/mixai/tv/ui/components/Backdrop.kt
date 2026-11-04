@@ -15,7 +15,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -68,43 +73,53 @@ fun BackdropHost(state: BackdropState = remember { BackdropState() }, modifier: 
     }
 }
 
-/** The image + scrims (left→transparent, bottom→background). */
+/**
+ * The image + scrims (left→transparent, bottom→background).
+ *
+ * Fill-rate matters on TV GPUs (Chromecast measured: 6 stacked full-screen fills → p50 frame 120 ms,
+ * GPU-bound). The image is drawn opaque and each scrim only covers the band where it is not fully
+ * transparent (left 70 %, bottom 55 %), so most pixels are written ≤ 3×.
+ */
 @Composable
 fun BackdropLayer(state: BackdropState, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize()) {
-        Crossfade(targetState = state.url, animationSpec = tween(300), label = "backdrop") { u ->
+    val dim = Tokens.background.copy(alpha = 1f - 0.85f * state.intensity)
+    // Offscreen layer: HWUI keeps the rasterised backdrop + scrims as a texture and only redraws it
+    // when the image/crossfade changes, so focus moves elsewhere cost one textured quad, not two
+    // full-screen gradient passes (Chromecast: scrims alone were p50 73 → 38 ms).
+    Box(modifier.fillMaxSize().graphicsLayer { compositingStrategy = if (PerfFlags.noLayerCache) CompositingStrategy.Auto else CompositingStrategy.Offscreen }.drawWithCache {
+        val left = Brush.horizontalGradient(
+            0f to Tokens.background,
+            0.5f to Tokens.background.copy(alpha = 0.85f),
+            1f to Color.Transparent,
+            startX = 0f, endX = size.width * 0.7f,
+        )
+        val bottomTop = size.height * 0.45f
+        val bottom = Brush.verticalGradient(
+            0f to Color.Transparent,
+            0.25f to Tokens.background.copy(alpha = 0.3f),
+            0.65f to Tokens.background.copy(alpha = 0.85f),
+            1f to Tokens.background,
+            startY = bottomTop, endY = size.height,
+        )
+        onDrawWithContent {
+            drawContent()
+            if (PerfFlags.noScrim) return@onDrawWithContent
+            drawRect(left, size = Size(size.width * 0.7f, size.height))
+            drawRect(bottom, topLeft = Offset(0f, bottomTop), size = Size(size.width, size.height - bottomTop))
+        }
+    }) {
+        Crossfade(targetState = if (PerfFlags.noBackdrop) null else state.url, animationSpec = tween(if (PerfFlags.noCrossfade) 0 else 300), label = "backdrop") { u ->
             if (u != null) {
                 AsyncImage(
                     model = u,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    alpha = 0.85f * state.intensity,
                     modifier = Modifier.fillMaxSize(),
                 )
+                // Dimming as part of the image layer instead of an extra translucent full-screen pass.
+                if (state.intensity < 0.999f) Box(Modifier.fillMaxSize().background(dim))
             }
         }
-        // Left scrim keeps text readable over any image.
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.horizontalGradient(
-                    0f to Tokens.background,
-                    0.35f to Tokens.background.copy(alpha = 0.85f),
-                    0.7f to Tokens.background.copy(alpha = 0.25f),
-                    1f to Color.Transparent,
-                ),
-            ),
-        )
-        // Bottom scrim blends rows into the background.
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.45f to Tokens.background.copy(alpha = 0.15f),
-                    0.8f to Tokens.background.copy(alpha = 0.85f),
-                    1f to Tokens.background,
-                ),
-            ),
-        )
     }
 }
 

@@ -106,14 +106,29 @@ class MediaRepository(
 
     private fun diskFile(p: String): File? = cacheDir?.let { File(it, "home-${p.replace(Regex("[^A-Za-z0-9_-]"), "_")}.json") }
 
-    private suspend fun readDisk(p: String): MediaHome? = withContext(Dispatchers.IO) {
+    /** One decode per profile per process: Home and the Watch Next publisher both collect [homeFlow]. */
+    private val diskLock = Mutex()
+    @Volatile private var diskMemo: Pair<String, MediaHome>? = null
+
+    private suspend fun readDisk(p: String): MediaHome? = diskLock.withLock {
+        diskMemo?.takeIf { it.first == p }?.let { return@withLock it.second }
+        readDiskUncached(p)?.also { diskMemo = p to it }
+    }
+
+    private suspend fun readDiskUncached(p: String): MediaHome? = withContext(Dispatchers.IO) {
         val f = diskFile(p) ?: return@withContext null
         if (!f.exists()) return@withContext null
-        runCatching { json.decodeFromString<MediaHome>(f.readText()) }.getOrNull()
+        val t0 = android.os.SystemClock.elapsedRealtime()
+        val text = runCatching { f.readText() }.getOrNull() ?: return@withContext null
+        val t1 = android.os.SystemClock.elapsedRealtime()
+        val home = runCatching { json.decodeFromString<MediaHome>(text) }.getOrNull()
+        Log.i("MixaiPerf", "home disk read=${t1 - t0}ms decode=${android.os.SystemClock.elapsedRealtime() - t1}ms bytes=${text.length}")
+        home
     }
 
     private suspend fun writeDisk(p: String, raw: String) = withContext(Dispatchers.IO) {
         val f = diskFile(p) ?: return@withContext
+        diskMemo = null
         runCatching {
             val tmp = File(f.parentFile, f.name + ".tmp")
             tmp.writeText(raw)
