@@ -546,12 +546,20 @@ export function VideoPlayer(props: VideoPlayerProps) {
     };
 
     const aspectStyle = (): React.CSSProperties => {
+        // Forced ratios (user override for mis-flagged files): the largest centred box of that
+        // ratio that fits the player — container units, so it never overflows on mobile,
+        // portrait or 21:9 — and the picture fills it exactly.
         const base: React.CSSProperties = { transform: `scale(${zoom})`, transformOrigin: "center" };
+        const boxed = (r: number): React.CSSProperties => ({
+            ...base, objectFit: "fill", position: "absolute", left: "50%", top: "50%",
+            width: `min(100cqw, ${r} * 100cqh)`, height: `min(100cqh, 100cqw / ${r})`,
+            transform: `translate(-50%, -50%) scale(${zoom})`,
+        });
         switch (aspect) {
             case "fill": return { ...base, objectFit: "cover", width: "100%", height: "100%" };
-            case "16:9": return { ...base, aspectRatio: "16/9", objectFit: "contain", width: "100%", height: "auto" };
-            case "4:3": return { ...base, aspectRatio: "4/3", objectFit: "contain", width: "auto", height: "100%" };
-            case "21:9": return { ...base, aspectRatio: "21/9", objectFit: "contain", width: "100%", height: "auto" };
+            case "16:9": return boxed(16 / 9);
+            case "4:3": return boxed(4 / 3);
+            case "21:9": return boxed(64 / 27);
             case "fit":
             default: return { ...base, objectFit: "contain", width: "100%", height: "100%" };
         }
@@ -802,7 +810,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
             </div>
 
             <style>{`
-                .vp-root { position: relative; width: 100%; height: 100%; background: #000; overflow: hidden; }
+                .vp-root { position: relative; width: 100%; height: 100%; background: #000; overflow: hidden; container-type: size; }
                 .vp-root video { width: 100%; height: 100%; display: block; }
 
                 .vp-controls {

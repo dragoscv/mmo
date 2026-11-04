@@ -10,6 +10,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-04 — Playback without eating the PC + ultrawide screens (MMO Server 3.3.1 · TV Android 1.3.0 · TV Tizen 1.3.0 · web 2.2.1 · `@mmo/sdk` 0.2.0)
+
+- **Server**: original video always (no re-encode unless `allowVideoTranscode`), audio → E-AC3 5.1 only when the
+  client can't decode it, paced remux, cheap analyses in an idle queue, one-pass cached subtitles, `still.jpg`
+  card stills, resume via `?start=` actually works. Files deleted from disk drop out of `/video/scan` and the
+  `/media` library (TV "Continue watching") instead of failing with a 404/format error. Details: `server/CHANGELOG.md` 3.3.0.
+- **Ultrawide (21:9 / 32:9) screens fed a 16:9 signal** — measured on the Odyssey OLED G8 (3440×1440) via Chromecast
+  (3840×2160 at 120×157 dpi) and natively on Tizen (web engine fixed at 1920×1080): the panel stretched everything
+  1.34× horizontally. Both TV apps now detect the panel (Android: display dpi ratio; Tizen: monitor model
+  `LS34…`/`LS49…`), lay the UI out wider and squeeze it back, so proportions are correct and the full width is used.
+  Video is sized for the film's aspect on the real panel (a 2.39:1 film fills a 21:9 screen edge to edge).
+  New setting **Screen format: Auto / 16:9 / 21:9 / 32:9** on both TVs (RO + EN).
+- **TV error messages**: "file no longer on disk" / server error instead of a generic "format not supported".
+- **Web player**: forced 16:9 / 4:3 / 21:9 modes are now the largest centred box that fits (container query units)
+  — no overflow on mobile, portrait or ultrawide (verified at 3440×1440, 1920×1080, 390×844, 844×390).
+
 ## 2026-09-18 — Media Home (web 2.2.0 · MMO Server 3.1.0 · TV Android 1.1.0 · TV Tizen 1.1.0 · `@mmo/sdk` 0.1.0 · extension 3.0.1) and design system overhaul (web 2.0.0 · companion 3.0.0 · extension 3.0.0 · MixAI DJ / native / TV 1.0.0)
 
 Every surface now renders from one token source. Decisions and rationale:

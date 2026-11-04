@@ -7,6 +7,8 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -36,6 +38,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -56,6 +59,9 @@ import ro.mixai.tv.data.Song
 import ro.mixai.tv.data.VideoFile
 import ro.mixai.tv.ui.EmptyState
 import ro.mixai.tv.ui.EmptyTone
+import ro.mixai.tv.ui.LocalSqueeze
+import ro.mixai.tv.ui.squeezeSuspended
+import ro.mixai.tv.ui.videoBoxFraction
 import ro.mixai.tv.ui.theme.Tokens
 
 sealed interface PlayRequest {
@@ -101,6 +107,14 @@ fun PlayerScreen(
     }
     // In-activity MediaSession: the remote's transport keys + system now-playing (WP6-04d).
     val session = remember(player) { MediaSession.Builder(context, player).build() }
+    // Ultrawide compensation: the global UI squeeze steps aside (SurfaceView ignores layer
+    // transforms) and the video surface itself is sized so the film is undistorted on the panel.
+    val squeeze = LocalSqueeze.current
+    var videoAspect by remember { mutableStateOf(0f) }
+    DisposableEffect(Unit) {
+        squeezeSuspended.value = true
+        onDispose { squeezeSuspended.value = false }
+    }
     /** HLS started server-side at the resume point: player time is relative to it. */
     val hlsOffsetMs = remember(request) {
         if (request is PlayRequest.Video && request.hls && resumeMs > 0) (resumeMs / 1000) * 1000 else 0L
@@ -127,9 +141,19 @@ fun PlayerScreen(
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
-            override fun onPlayerError(e: PlaybackException) { error = "${e.errorCodeName}: ${e.message}" }
+            override fun onPlayerError(e: PlaybackException) {
+                val http = (e.cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.responseCode
+                error = when (http) {
+                    404 -> context.getString(R.string.player_err_missing)
+                    null -> "${e.errorCodeName}: ${e.message}"
+                    else -> context.getString(R.string.player_err_server, http)
+                }
+            }
             override fun onMediaMetadataChanged(m: MediaMetadata) { nowPlaying = m }
             override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying; if (!isPlaying) { report(); reportServer() } }
+            override fun onVideoSizeChanged(v: VideoSize) {
+                if (v.width > 0 && v.height > 0) videoAspect = v.width * v.pixelWidthHeightRatio / v.height
+            }
         }
         player.addListener(listener)
         onDispose {
@@ -187,6 +211,7 @@ fun PlayerScreen(
                 }
             },
     ) {
+        val (fw, fh) = if (squeeze != 1f) videoBoxFraction(videoAspect, squeeze) else 1f to 1f
         AndroidView(
             factory = { ctx ->
                 PlayerView(ctx).apply {
@@ -196,12 +221,19 @@ fun PlayerScreen(
                     controllerShowTimeoutMs = 3000
                     setShowNextButton(request is PlayRequest.Music)
                     setShowPreviousButton(request is PlayRequest.Music)
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    resizeMode = if (squeeze != 1f) AspectRatioFrameLayout.RESIZE_MODE_FILL else AspectRatioFrameLayout.RESIZE_MODE_FIT
                     keepScreenOn = true
                     isFocusable = false // key events handled by the Compose box
                 }
             },
-            modifier = Modifier.fillMaxSize(),
+            update = { view ->
+                view.resizeMode = if (squeeze != 1f) AspectRatioFrameLayout.RESIZE_MODE_FILL else AspectRatioFrameLayout.RESIZE_MODE_FIT
+                // Controller is a plain View: undo the panel stretch on it (centred).
+                view.findViewById<android.view.View>(androidx.media3.ui.R.id.exo_controller)?.let { c ->
+                    c.post { c.pivotX = c.width / 2f; c.scaleX = 1f / squeeze }
+                }
+            },
+            modifier = Modifier.align(Alignment.Center).fillMaxWidth(fw).fillMaxHeight(fh),
         )
 
         if (request is PlayRequest.Music) {

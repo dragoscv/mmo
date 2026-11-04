@@ -239,6 +239,8 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
     r.get("/stream/:fileId", queryAuth, authMiddleware, async (req, res) => {
         const abs = await resolveOrRecoverFileId(req.params.fileId);
         if (!abs) { res.status(404).json({ error: "unknown fileId" }); return; }
+        // Registry can outlive the file (deleted/moved, drive unplugged): say so instead of a 500 from ffmpeg.
+        if (!fs.existsSync(abs)) { res.status(404).json({ error: "file missing on disk", code: "file_missing" }); return; }
         // Default is the original: video is never downscaled unless the owner
         // enabled `allowVideoTranscode` AND the client explicitly asks.
         const q = ((req.query.q as string) || "original") as VideoQuality;

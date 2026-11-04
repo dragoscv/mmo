@@ -38,6 +38,11 @@ import ro.mixai.tv.data.WatchNext
 import ro.mixai.tv.player.PlayRequest
 import ro.mixai.tv.player.PlayerScreen
 import ro.mixai.tv.ui.AlbumScreen
+import ro.mixai.tv.ui.LocalSqueeze
+import ro.mixai.tv.ui.ScreenFormat
+import ro.mixai.tv.ui.SqueezeBox
+import ro.mixai.tv.ui.detectPanelAspect
+import ro.mixai.tv.ui.squeezeFor
 import ro.mixai.tv.ui.ConnectScreen
 import ro.mixai.tv.ui.DiscoverScreen
 import ro.mixai.tv.ui.HomeScreen
@@ -81,15 +86,20 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         deepLink.value = WatchNext.parseDeepLink(intent)
         val settings = (application as MixaiApp).settings
+        val detectedAspect = detectPanelAspect(this)
         setContent {
             val localeTag by settings.locale.collectAsState(initial = "")
+            val formatKey by settings.screenFormat.collectAsState(initial = "auto")
+            val squeeze = squeezeFor(ScreenFormat.of(formatKey), detectedAspect)
             LocalizedContent(localeTag) {
                 MixaiTheme {
+                  CompositionLocalProvider(LocalSqueeze provides squeeze) {
+                  SqueezeBox(squeeze) {
                     val conn by settings.connection.collectAsState(initial = null)
                     val session by settings.session.collectAsState(initial = null)
                     val progress by settings.progress.collectAsState(initial = emptyMap())
-                    val c = conn ?: return@MixaiTheme
-                    val s = session ?: return@MixaiTheme
+                    val c = conn ?: return@SqueezeBox
+                    val s = session ?: return@SqueezeBox
                     val link by deepLink
                     App(
                         c, s, progress, settings, localeTag,
@@ -100,6 +110,8 @@ class MainActivity : ComponentActivity() {
                         onForget = { settings.clear() },
                         onSignOut = { settings.clearAll() },
                     )
+                  }
+                  }
                 }
             }
         }
@@ -266,6 +278,7 @@ private fun App(
             localeTag = localeTag,
             signedInAs = if (session.isSignedIn) session.displayName else null,
             onLocale = { tag -> scope.launch { settings.setLocale(tag) } },
+            settings = settings,
             onClearProgress = { scope.launch { settings.clearProgress() } },
             onChangeServer = { changeServer() },
             onSignOut = if (session.isSignedIn) ({ signOut() }) else null,

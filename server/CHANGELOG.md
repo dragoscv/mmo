@@ -2,6 +2,14 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.3.1 — Deleted files no longer break the TV
+
+- `GET /video/stream/{fileId}` answers 404 `{"code":"file_missing"}` instead of a 500 from ffmpeg when the
+	file was deleted or moved. `POST /video/scan` drops registry entries whose file is gone (only when
+	the library root itself is reachable — an unplugged drive keeps its entries) and removes the same
+	paths from the `/media` library index, so TV "Continue watching" never offers a 404. Verified live:
+	404 `file_missing`; scan 75 files / 0 missing; media library 74 items / 0 missing.
+
 ## 3.3.0 — Video playback without eating the PC
 
 Measured on a 4K Dolby Vision HDR HEVC MKV with E-AC3 5.1 (ffmpeg 7.1.1, Windows 11).

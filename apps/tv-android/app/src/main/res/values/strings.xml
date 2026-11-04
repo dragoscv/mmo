@@ -109,6 +109,8 @@
 
     <!-- Player -->
     <string name="player_error">Playback error</string>
+    <string name="player_err_missing">The file is no longer on disk. Rescan the library in MMO Server.</string>
+    <string name="player_err_server">The server could not start playback (HTTP %1$d).</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -120,6 +122,9 @@
     <string name="settings_lang_system">System</string>
     <string name="settings_lang_ro">Română</string>
     <string name="settings_lang_en">English</string>
+    <string name="settings_screen_format">Screen format</string>
+    <string name="settings_screen_auto">Auto</string>
+    <string name="settings_screen_hint">For ultrawide monitors that stretch the 16:9 picture. Auto detects the panel; pick 21:9 or 32:9 if circles look oval.</string>
     <string name="settings_clear_progress">Clear resume data</string>
     <string name="settings_cleared">Resume data cleared.</string>
     <string name="settings_app_version">App version %1$s</string>

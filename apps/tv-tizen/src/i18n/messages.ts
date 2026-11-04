@@ -94,6 +94,8 @@ const ro = {
     "home.signOut": "Deconectare din cont",
     "home.language": "Limbă: Română",
     "home.clearProgress": "Șterge progresul",
+    "home.screenFormat": "Format ecran: {v}",
+    "home.screenAuto": "Automat",
     "home.episodes": "{n} episoade",
     "home.songs": "{n} piese",
     "home.play": "Redă",
@@ -160,6 +162,9 @@ const ro = {
     "player.errMse": "MSE indisponibil pe acest dispozitiv.",
     "player.errFormat": "Format nesuportat de TV (MEDIA_ERR_SRC_NOT_SUPPORTED).",
     "player.errMedia": "Eroare media ({code}).",
+    "player.errMissing": "Fișierul nu mai există pe disc. Rescanează biblioteca în MMO Server.",
+    "player.errServer": "Serverul nu a putut porni redarea: {msg}",
+    "player.errNetwork": "Serverul nu răspunde. Verifică că MMO Server rulează.",
 } as const;
 
 export type MessageKey = keyof typeof ro;
@@ -243,6 +248,8 @@ const en: Record<MessageKey, string> = {
     "home.signOut": "Sign out",
     "home.language": "Language: English",
     "home.clearProgress": "Clear resume data",
+    "home.screenFormat": "Screen format: {v}",
+    "home.screenAuto": "Auto",
     "home.episodes": "{n} episodes",
     "home.songs": "{n} songs",
     "home.play": "Play",
@@ -304,6 +311,9 @@ const en: Record<MessageKey, string> = {
     "player.errMse": "MSE unavailable on this device.",
     "player.errFormat": "Format not supported by the TV (MEDIA_ERR_SRC_NOT_SUPPORTED).",
     "player.errMedia": "Media error ({code}).",
+    "player.errMissing": "The file is no longer on disk. Rescan the library in MMO Server.",
+    "player.errServer": "The server could not start playback: {msg}",
+    "player.errNetwork": "The server is not responding. Check that MMO Server is running.",
 };
 
 export const messages: Record<Locale, Record<string, string>> = { ro, en };

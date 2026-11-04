@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,10 +26,12 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import ro.mixai.tv.BuildConfig
 import ro.mixai.tv.R
 import ro.mixai.tv.data.Health
 import ro.mixai.tv.data.MmoApi
+import ro.mixai.tv.data.Settings
 import ro.mixai.tv.ui.theme.Tokens
 
 private sealed interface ServerState {
@@ -42,6 +46,7 @@ fun SettingsScreen(
     localeTag: String,
     signedInAs: String?,
     onLocale: (String) -> Unit,
+    settings: Settings,
     onClearProgress: () -> Unit,
     onChangeServer: () -> Unit,
     onSignOut: (() -> Unit)?,
@@ -50,6 +55,8 @@ fun SettingsScreen(
     var server by remember { mutableStateOf<ServerState>(ServerState.Checking) }
     var cleared by remember { mutableStateOf(false) }
     val first = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+    val formatKey by settings.screenFormat.collectAsState(initial = "auto")
 
     LaunchedEffect(api) { server = try { ServerState.Ok(api.health()) } catch (_: Exception) { ServerState.Unreachable } }
     LaunchedEffect(Unit) { delay(50); runCatching { first.requestFocus() } }
@@ -77,6 +84,17 @@ fun SettingsScreen(
                 LangButton("ro", localeTag, stringResource(R.string.settings_lang_ro), onLocale)
                 LangButton("en", localeTag, stringResource(R.string.settings_lang_en), onLocale)
             }
+        }
+
+        Section(stringResource(R.string.settings_screen_format)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val set: (String) -> Unit = { k -> scope.launch { settings.setScreenFormat(k) } }
+                LangButton(ScreenFormat.Auto.key, formatKey, stringResource(R.string.settings_screen_auto), set)
+                LangButton(ScreenFormat.Wide16x9.key, formatKey, "16:9", set)
+                LangButton(ScreenFormat.Ultra21x9.key, formatKey, "21:9", set)
+                LangButton(ScreenFormat.Super32x9.key, formatKey, "32:9", set)
+            }
+            Text(stringResource(R.string.settings_screen_hint), color = Tokens.mutedForeground, style = MaterialTheme.typography.bodySmall)
         }
 
         Section(stringResource(R.string.home_continue)) {

@@ -6,6 +6,7 @@ import { keyFromEvent } from "../lib/tv-keys";
 import { canDirectPlayOnTizen, isHlsNative, TIZEN_CAPS } from "../lib/playback";
 import { fmtClock } from "../lib/format";
 import { getProgress } from "../lib/progress";
+import { squeezeFactor, videoBox } from "../lib/screen-format";
 import { t } from "../i18n/messages";
 import type Hls from "hls.js";
 
@@ -37,6 +38,8 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
     const [error, setError] = useState<string | null>(null);
     const [mode, setMode] = useState<"direct" | "hls" | "audio">("direct");
     const [subIdx, setSubIdx] = useState<number>(-1);
+    const [videoAspect, setVideoAspect] = useState(0);
+    const squeeze = squeezeFactor();
     const osdTimer = useRef<number | null>(null);
     /** HLS sessions start at `?start=<sec>`; the element's time is relative to it. */
     const offsetRef = useRef(0);
@@ -155,6 +158,7 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
             save(el, false);
         };
         const onDur = () => setDuration(absDuration(el));
+        const onSize = () => { if (el.videoWidth > 0 && el.videoHeight > 0) setVideoAspect(el.videoWidth / el.videoHeight); };
         const onPlay = () => setPaused(false);
         const onPause = () => {
             setPaused(true);
@@ -164,10 +168,21 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
         const onErr = () => {
             const code = el.error?.code;
             setError(code === 4 ? t("player.errFormat") : t("player.errMedia", { code: code ?? "?" }));
+            // Native HLS reports any HTTP failure as "format error": ask the server for the real cause.
+            const src = el.currentSrc;
+            if (code === 4 && src) {
+                fetch(src, { cache: "no-store" }).then(async (r) => {
+                    if (r.ok) return;
+                    const j = (await r.json().catch(() => null)) as { code?: string; error?: string } | null;
+                    setError(j?.code === "file_missing" ? t("player.errMissing") : t("player.errServer", { msg: j?.error ?? String(r.status) }));
+                }).catch(() => setError(t("player.errNetwork")));
+            }
         };
         el.addEventListener("timeupdate", onTime);
         el.addEventListener("durationchange", onDur);
         el.addEventListener("loadedmetadata", onDur);
+        el.addEventListener("loadedmetadata", onSize);
+        el.addEventListener("resize", onSize);
         el.addEventListener("play", onPlay);
         el.addEventListener("pause", onPause);
         el.addEventListener("ended", onEnded);
@@ -176,6 +191,8 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
             el.removeEventListener("timeupdate", onTime);
             el.removeEventListener("durationchange", onDur);
             el.removeEventListener("loadedmetadata", onDur);
+            el.removeEventListener("loadedmetadata", onSize);
+            el.removeEventListener("resize", onSize);
             el.removeEventListener("play", onPlay);
             el.removeEventListener("pause", onPause);
             el.removeEventListener("ended", onEnded);
@@ -286,11 +303,16 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
         : [song?.artist, song?.album].filter(Boolean).join(" · ");
     const pct = duration > 0 ? Math.min(100, (time / duration) * 100) : 0;
     const coverId = song?.coverArt ?? (cur.kind === "audio" ? cur.album.coverArt : undefined);
+    // Ultrawide: in layout units #root is k×100vw wide; the film box is computed for the real panel.
+    const box = squeeze !== 1 && cur.kind === "video" ? videoBox(videoAspect, squeeze) : null;
+    const videoStyle = cur.kind === "audio"
+        ? { opacity: 0 }
+        : box ? { width: `${box.w * 100}%`, height: `${box.h * 100}%` } : undefined;
 
     return (
         <div className="player" onMouseMove={showOsd}>
             {cur.kind === "audio" && coverId && <div className="art-bg" style={{ backgroundImage: `url(${client.coverArtUrl(coverId, 600)})` }} />}
-            <video ref={mediaRef} autoPlay playsInline crossOrigin="anonymous" style={cur.kind === "audio" ? { opacity: 0 } : undefined}>
+            <video ref={mediaRef} autoPlay playsInline crossOrigin="anonymous" className={box ? "fit-box" : undefined} style={videoStyle}>
                 {video && subs.map((s, i) => (
                     <track key={`${video.fileId}-${i}`} kind="subtitles" src={client.subtitleUrl(video.fileId, i)}
                         srcLang={s.lang ?? undefined} label={s.title ?? s.lang ?? t("player.sub", { n: i + 1 })} default={i === subIdx} />

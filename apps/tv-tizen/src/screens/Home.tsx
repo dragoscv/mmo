@@ -9,8 +9,11 @@ import { allProgress, clearProgress } from "../lib/progress";
 import { groupShows, isEpisode, type Show } from "../lib/shows";
 import { t } from "../i18n/messages";
 import { useLocale } from "../i18n/useLocale";
+import { useScreenFormat, type ScreenFormatKey } from "../lib/screen-format";
 import { AlbumCard, Row, ShowCard, VideoCard, type Load } from "./cards";
 import { HeroBillboard, MediaRow, SkeletonRows } from "./media-cards";
+
+const NEXT_FORMAT: Record<ScreenFormatKey, ScreenFormatKey> = { auto: "16:9", "16:9": "21:9", "21:9": "32:9", "32:9": "auto" };
 
 interface Props {
     client: MmoClient;
@@ -33,6 +36,7 @@ export function HomeScreen({ client, media, cfg, user, onPlayVideo, onOpenTitle,
     // `null` data = server without `/media` (404) → scan-based rows only.
     const [home, setHome] = useState<Load<MediaHome | null>>({ state: "loading" });
     const [locale, setLocale] = useLocale();
+    const [format, setFormat] = useScreenFormat();
     // Bumped when resume data changes so cards/rows re-read localStorage.
     const [progressRev, setProgressRev] = useState(0);
 
@@ -132,6 +136,10 @@ export function HomeScreen({ client, media, cfg, user, onPlayVideo, onOpenTitle,
                     <div className="row-track">
                         <button className="btn secondary" data-focusable data-testid="toggle-locale" onClick={() => setLocale(locale === "ro" ? "en" : "ro")}>
                             {t("home.language")}
+                        </button>
+                        <button className="btn secondary" data-focusable data-testid="screen-format"
+                            onClick={() => setFormat(NEXT_FORMAT[format])}>
+                            {t("home.screenFormat", { v: format === "auto" ? t("home.screenAuto") : format })}
                         </button>
                         <button className="btn secondary" data-focusable data-testid="clear-progress" onClick={() => { clearProgress(); setProgressRev((r) => r + 1); }}>
                             {t("home.clearProgress")}

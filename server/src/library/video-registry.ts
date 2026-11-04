@@ -8,6 +8,8 @@
  */
 
 import { SettingsStore as Store } from "../platform/settings-store";
+import fs from "node:fs";
+import { mediaLibraryHooks } from "../media/library-hooks";
 
 export type RegistryEntry = { absPath: string; meta: Record<string, unknown> };
 
@@ -61,12 +63,29 @@ function underRoot(absPath: string, root: string): boolean {
     return a === r || a.startsWith(r + "/");
 }
 
-/** Cached entries under the given roots, in `/video/scan` response shape. No I/O. */
+/** Cached entries under the given roots, in `/video/scan` response shape. One `stat` per entry
+ *  (cheap, metadata only): files deleted/moved since the scan are dropped from the registry so
+ *  TVs never offer a title that 404s. When the ROOT itself is unreachable (drive unplugged,
+ *  NAS offline) entries are kept — they come back with the drive. */
 export function listRegistered(roots: string[]): Array<Record<string, unknown>> {
     const out: Array<Record<string, unknown>> = [];
+    const rootOnline = new Map<string, boolean>();
+    const prunedPaths: string[] = [];
     for (const [fileId, e] of fileRegistry.entries()) {
-        if (!roots.some((r) => underRoot(e.absPath, r))) continue;
+        const root = roots.find((r) => underRoot(e.absPath, r));
+        if (!root) continue;
+        if (!fs.existsSync(e.absPath)) {
+            let online = rootOnline.get(root);
+            if (online === undefined) { online = fs.existsSync(root); rootOnline.set(root, online); }
+            if (online) { fileRegistry.delete(fileId); prunedPaths.push(e.absPath); }
+            continue;
+        }
         out.push({ fileId, ...e.meta });
+    }
+    if (prunedPaths.length > 0) {
+        persistRegistry();
+        // Same paths leave the /media library index (TV Home "Continue watching", title files).
+        void mediaLibraryHooks().onFilesChanged([], prunedPaths).catch(() => undefined);
     }
     return out;
 }

@@ -49,6 +49,7 @@ class Settings(private val context: Context) {
     private val keyProgressQueue = stringPreferencesKey("progress_queue_json")
     private val keyMediaMigrated = stringPreferencesKey("media_progress_migrated")
     private val keyLocale = stringPreferencesKey("ui_locale")
+    private val keyScreenFormat = stringPreferencesKey("screen_format")
     private val json = Json { ignoreUnknownKeys = true }
     private val queueSerializer = ListSerializer(ProgressInput.serializer())
 
@@ -62,6 +63,13 @@ class Settings(private val context: Context) {
 
     /** `""` = follow the system, else `"ro"` / `"en"`. */
     val locale: Flow<String> = context.dataStore.data.map { p -> p[keyLocale] ?: "" }
+
+    /** `auto` (detect ultrawide panels) · `16:9` · `21:9` · `32:9`. */
+    val screenFormat: Flow<String> = context.dataStore.data.map { p -> p[keyScreenFormat] ?: "auto" }
+
+    suspend fun setScreenFormat(key: String) {
+        context.dataStore.edit { p -> p[keyScreenFormat] = key }
+    }
 
     val progress: Flow<Map<String, Progress>> = context.dataStore.data.map { p -> decodeProgress(p[keyProgress]) }
 

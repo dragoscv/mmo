@@ -109,6 +109,8 @@
 
     <!-- Player -->
     <string name="player_error">Eroare la redare</string>
+    <string name="player_err_missing">Fișierul nu mai există pe disc. Rescanează biblioteca în MMO Server.</string>
+    <string name="player_err_server">Serverul nu a putut porni redarea (HTTP %1$d).</string>
 
     <!-- Settings -->
     <string name="settings_title">Setări</string>
@@ -120,6 +122,9 @@
     <string name="settings_lang_system">Sistem</string>
     <string name="settings_lang_ro">Română</string>
     <string name="settings_lang_en">English</string>
+    <string name="settings_screen_format">Format ecran</string>
+    <string name="settings_screen_auto">Automat</string>
+    <string name="settings_screen_hint">Pentru monitoare ultrawide care întind imaginea 16:9. Automat detectează ecranul; alege 21:9 sau 32:9 dacă cercurile par ovale.</string>
     <string name="settings_clear_progress">Șterge progresul</string>
     <string name="settings_cleared">Progresul a fost șters.</string>
     <string name="settings_app_version">Versiune aplicație %1$s</string>
