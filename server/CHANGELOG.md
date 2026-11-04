@@ -2,6 +2,23 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.4.0 — Profiles, age ratings, seasons, watchlist (WP16-A)
+
+- Viewer profiles owned by the server (`media.sqlite` v3): `GET/POST /media/profiles`, `PATCH/DELETE
+	/media/profiles/{id}`, `POST /media/profiles/{id}/unlock`. Optional 4-digit PIN stored as a scrypt
+	hash; 5 wrong PINs lock the profile for 5 min (429 + Retry-After); unlock returns a 12 h HMAC token
+	sent as `x-profile-token`. A `default` adult profile always exists, so older clients keep working.
+- Kids profiles: `maxAge` (default 12). Certifications per country are cached on titles (`ratings`) and
+	mapped to one age scale (RO CNC AG/AP-12/I.C.-14/N-15/IM-18, US, GB, DE, FR); home rows, search,
+	title recommendations and the watchlist are filtered, and a restricted title answers 403.
+- `GET /media/title/tv/{id}/season/{n}`: episodes (TMDB, cached 7 d) with local files and progress per
+	episode; `nextUp` on the title, and "up next" episodes join the Continue row.
+- Per-profile watchlist (`GET /media/watchlist`, `PUT/DELETE /media/watchlist/{kind}/{id}`) plus a "My
+	list" row; a franchise row from the latest watched movie's TMDB collection.
+- Title `files[]` carry a parsed `version` (4K/1080p, DV/HDR, edition, remux) for the versions picker.
+- OpenAPI 204 routes; Models.kt (+ Profile, MediaSeasonResponse, NextEpisode, VersionedFile…) and SDK
+	types regenerated.
+
 ## 3.3.1 — Deleted files no longer break the TV
 
 - `GET /video/stream/{fileId}` answers 404 `{"code":"file_missing"}` instead of a 500 from ffmpeg when the

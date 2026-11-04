@@ -11,12 +11,14 @@
 
 import type { MediaDb } from "./db";
 import { cacheGet, cacheSet } from "./db";
+import { ageForRatings, extractRatings } from "./ratings";
 import type {
-    MediaKind, MediaLogger, Person, TitleCard, TitleDetails, TmdbProviderRef, TmdbRegionProviders,
+    Episode, MediaKind, MediaLogger, Person, SeasonDetails, SeasonSummary, TitleCard, TitleDetails, TmdbProviderRef, TmdbRegionProviders,
 } from "./types";
 
 export const TMDB_BASE = "https://api.themoviedb.org/3";
 export const TITLE_TTL_MS = 30 * 24 * 3600_000;
+export const SEASON_TTL_MS = 7 * 24 * 3600_000;
 export const LIST_TTL_MS = 6 * 3600_000;
 export const PROVIDER_CATALOG_TTL_MS = 24 * 3600_000;
 
@@ -147,6 +149,18 @@ export function toDetails(raw: Raw, kind: MediaKind, lang: string, region: strin
     const crewRaw = Array.isArray(credits.crew) ? (credits.crew as Raw[]) : [];
     const directors = crewRaw.filter((c) => c.job === "Director" || c.job === "Creator" || c.department === "Directing");
     const creators = Array.isArray(raw.created_by) ? (raw.created_by as Raw[]).map((c) => ({ ...c, job: "Creator" })) : [];
+    const ratings = extractRatings(raw, kind);
+    const seasons: SeasonSummary[] | undefined = kind === "tv" && Array.isArray(raw.seasons)
+        ? (raw.seasons as Raw[])
+            .map((s) => ({
+                seasonNumber: num(s.season_number) ?? -1,
+                name: str(s.name) ?? "",
+                episodeCount: num(s.episode_count) ?? 0,
+                airDate: str(s.air_date),
+                posterPath: strOrNull(s.poster_path),
+            }))
+            .filter((s) => s.seasonNumber >= 0)
+        : undefined;
     return {
         ...card,
         kind,
@@ -169,6 +183,9 @@ export function toDetails(raw: Raw, kind: MediaKind, lang: string, region: strin
             .filter((v) => v.key),
         logoPath: pickLogo(raw.images, lang),
         certification: pickCertification(raw, kind, region),
+        ratings,
+        age: ageForRatings(ratings, region),
+        seasons,
         recommendations: recs.map((r) => toCard(r, kind)).filter((c): c is TitleCard => c !== null),
         similar: sim.map((r) => toCard(r, kind)).filter((c): c is TitleCard => c !== null),
         watchProviders: wp,
@@ -283,6 +300,49 @@ export class TmdbClient {
         const row = this.db.prepare("SELECT json FROM titles WHERE kind = ? AND tmdb_id = ?").get(kind, tmdbId) as { json: string } | undefined;
         if (!row) return null;
         try { return JSON.parse(row.json) as TitleDetails; } catch { return null; }
+    }
+
+    /** TV season with episodes (7 d cache in recs_cache). */
+    async getSeason(tmdbId: number, seasonNumber: number): Promise<SeasonDetails | null> {
+        const key = `tmdb:season:${tmdbId}:${seasonNumber}:${this.language}`;
+        const hit = cacheGet<SeasonDetails>(this.db, key, SEASON_TTL_MS, this.now());
+        if (hit) return hit;
+        const raw = await this.getJson<Raw>(`/tv/${tmdbId}/season/${seasonNumber}`);
+        if (!raw) return cacheGet<SeasonDetails>(this.db, key, Number.MAX_SAFE_INTEGER, this.now());
+        const episodes: Episode[] = (Array.isArray(raw.episodes) ? (raw.episodes as Raw[]) : [])
+            .map((e) => ({
+                seasonNumber: num(e.season_number) ?? seasonNumber,
+                episodeNumber: num(e.episode_number) ?? 0,
+                name: str(e.name) ?? "",
+                overview: str(e.overview),
+                stillPath: strOrNull(e.still_path),
+                airDate: str(e.air_date),
+                runtime: num(e.runtime),
+                voteAverage: num(e.vote_average),
+            }))
+            .filter((e) => e.episodeNumber > 0);
+        const season: SeasonDetails = {
+            tmdbId, seasonNumber, name: str(raw.name) ?? "", overview: str(raw.overview),
+            posterPath: strOrNull(raw.poster_path), airDate: str(raw.air_date), episodes,
+        };
+        cacheSet(this.db, key, season, this.now());
+        return season;
+    }
+
+    /** TMDB collection (franchise) parts, 7 d cache. */
+    async getCollection(collectionId: number): Promise<{ id: number; name: string; backdropPath: string | null; parts: TitleCard[] } | null> {
+        const key = `tmdb:collection:${collectionId}:${this.language}`;
+        const hit = cacheGet<{ id: number; name: string; backdropPath: string | null; parts: TitleCard[] }>(this.db, key, SEASON_TTL_MS, this.now());
+        if (hit) return hit;
+        const raw = await this.getJson<Raw>(`/collection/${collectionId}`);
+        if (!raw) return null;
+        const parts = (Array.isArray(raw.parts) ? (raw.parts as Raw[]) : [])
+            .map((p) => toCard(p, "movie"))
+            .filter((c): c is TitleCard => c !== null)
+            .sort((a, b) => (a.releaseDate ?? "9999").localeCompare(b.releaseDate ?? "9999"));
+        const out = { id: collectionId, name: str(raw.name) ?? "", backdropPath: strOrNull(raw.backdrop_path), parts };
+        cacheSet(this.db, key, out, this.now());
+        return out;
     }
 
     trending(kind: MediaKind | "all", window: TrendingWindow = "week", page = 1): Promise<TmdbPage> {

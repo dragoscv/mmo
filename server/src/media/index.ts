@@ -12,6 +12,8 @@ import { ProgressStore } from "./progress";
 import { LibraryIndex } from "./library";
 import { MediaSyncClient } from "./sync-client";
 import { createMediaRouter } from "./routes";
+import { ProfileStore } from "./profiles";
+import { WatchlistStore } from "./watchlist";
 import type { MediaLogger } from "./types";
 
 export interface MediaModuleOptions {
@@ -34,6 +36,8 @@ export interface MediaModule {
     availability: AvailabilityResolver;
     progress: ProgressStore;
     library: LibraryIndex;
+    profiles: ProfileStore;
+    watchlist: WatchlistStore;
     sync: MediaSyncClient | null;
     router: express.Router;
     region: string;
@@ -51,6 +55,8 @@ export function createMediaModule(opts: MediaModuleOptions): MediaModule {
     const availability = new AvailabilityResolver({ db, tmdb, registry, motnApiKey: opts.env.MOTN_API_KEY, log: opts.log });
     const progress = new ProgressStore(db);
     const library = new LibraryIndex(db, tmdb, opts.log);
+    const profiles = new ProfileStore(db);
+    const watchlist = new WatchlistStore(db, progress);
     const sync = opts.sync
         ? new MediaSyncClient({
             db, progress, log: opts.log,
@@ -60,7 +66,7 @@ export function createMediaModule(opts: MediaModuleOptions): MediaModule {
         })
         : null;
     const router = createMediaRouter({
-        db, tmdb, registry, availability, progress, library, sync: sync ?? undefined, region, log: opts.log,
+        db, tmdb, registry, availability, progress, library, profiles, watchlist, sync: sync ?? undefined, region, log: opts.log,
         getServerId: opts.getServerId, getServerName: opts.getServerName,
     });
 
@@ -70,7 +76,7 @@ export function createMediaModule(opts: MediaModuleOptions): MediaModule {
     sync?.start();
 
     return {
-        db, tmdb, registry, availability, progress, library, sync, router, region, language,
+        db, tmdb, registry, availability, progress, library, profiles, watchlist, sync, router, region, language,
         configured: { tmdb: tmdb.configured, motn: availability.motnConfigured },
         close: () => { sync?.stop(); try { db.close(); } catch { /* ignore */ } },
     };
@@ -82,6 +88,8 @@ export { TmdbClient } from "./tmdb";
 export { ProviderRegistry } from "./providers";
 export { AvailabilityResolver } from "./availability";
 export { ProgressStore } from "./progress";
+export { ProfileStore } from "./profiles";
+export { WatchlistStore } from "./watchlist";
 export { LibraryIndex, makeServerFileId } from "./library";
 export { MediaSyncClient } from "./sync-client";
 export * from "./types";

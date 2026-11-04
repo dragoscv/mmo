@@ -56,6 +56,10 @@ const ROOTS = [
     "TrackPlayInput",
     "TrackPlay",
     "ProviderCatalog",
+    "MediaSeasonResponse",
+    "Profile",
+    "ProfileInput",
+    "WatchlistEntry",
     "Error",
 ];
 

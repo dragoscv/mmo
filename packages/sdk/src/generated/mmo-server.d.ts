@@ -3197,6 +3197,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/title/tv/{tmdbId}/season/{n}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One TV season with episodes, local files (versions) and progress per episode
+         * @description Episodes only present as local files (no TMDB data) are included with an empty name.
+         */
+        get: operations["mediaSeason"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Viewer profiles ("Who's watching")
+         * @description A `default` adult profile always exists. PIN hashes are never returned (`hasPin` only).
+         */
+        get: operations["mediaListProfiles"];
+        put?: never;
+        /** Create a profile (max 12) */
+        post: operations["mediaCreateProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/profiles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a profile and its watchlist (not the last one) */
+        delete: operations["mediaDeleteProfile"];
+        options?: never;
+        head?: never;
+        /** Update a profile (needs `x-profile-token` when it has a PIN) */
+        patch: operations["mediaUpdateProfile"];
+        trace?: never;
+    };
+    "/media/profiles/{id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange a PIN for a 12 h profile token
+         * @description Profiles without a PIN unlock with any body. 5 wrong PINs lock the profile for 5 minutes (429 + Retry-After).
+         */
+        post: operations["mediaUnlockProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Watchlist of a profile (cards filtered by the profile's max age) */
+        get: operations["mediaGetWatchlist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/watchlist/{kind}/{tmdbId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Add a title to the profile's watchlist */
+        put: operations["mediaAddWatchlist"];
+        post?: never;
+        /** Remove a title from the profile's watchlist */
+        delete: operations["mediaRemoveWatchlist"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4125,6 +4239,14 @@ export interface components {
             /** @description Watched fraction (continue rows). */
             progress?: number;
             reason?: string;
+            /** @description Minimum viewer age from certifications (RO CNC scale; 19 = adult-only). Null = unrated. */
+            age?: number | null;
+            nextEpisode?: components["schemas"]["NextEpisode"];
+        };
+        NextEpisode: {
+            season: number;
+            episode: number;
+            positionSec: number;
         };
         Person: {
             id: number;
@@ -4160,6 +4282,11 @@ export interface components {
             }[];
             logoPath: string | null;
             certification?: string;
+            /** @description Certification per country code. */
+            ratings?: {
+                [key: string]: string;
+            };
+            seasons?: components["schemas"]["SeasonSummary"][];
             recommendations: components["schemas"]["TitleCard"][];
             similar: components["schemas"]["TitleCard"][];
             /** @description Raw TMDB watch/providers.results keyed by region. */
@@ -4219,10 +4346,92 @@ export interface components {
         MediaTitleResponse: {
             title: components["schemas"]["TitleDetails"];
             availability: components["schemas"]["Availability"];
-            files: components["schemas"]["LibraryIndexRow"][];
+            files: components["schemas"]["VersionedFile"][];
             progress: components["schemas"]["ProgressEntry"][];
+            nextUp?: components["schemas"]["NextEpisode"] | null;
+            inWatchlist?: boolean;
             serverId: string | null;
             serverName: string;
+        };
+        VersionInfo: {
+            /** @enum {string|null} */
+            resolution: "2160p" | "1080p" | "720p" | "480p" | null;
+            /** @enum {string|null} */
+            hdr: "DV" | "HDR10+" | "HDR" | null;
+            edition: string | null;
+            remux: boolean;
+            label: string;
+            rank: number;
+        };
+        VersionedFile: components["schemas"]["LibraryIndexRow"] & {
+            version: components["schemas"]["VersionInfo"];
+        };
+        SeasonSummary: {
+            seasonNumber: number;
+            name: string;
+            episodeCount: number;
+            airDate?: string;
+            posterPath: string | null;
+        };
+        SeasonEpisode: {
+            seasonNumber: number;
+            episodeNumber: number;
+            name: string;
+            overview?: string;
+            stillPath: string | null;
+            airDate?: string;
+            runtime?: number;
+            voteAverage?: number;
+            files: components["schemas"]["VersionedFile"][];
+            progress: components["schemas"]["ProgressEntry"] | null;
+        };
+        MediaSeasonResponse: {
+            tmdbId: number;
+            seasonNumber: number;
+            name: string;
+            overview?: string;
+            posterPath: string | null;
+            episodes: components["schemas"]["SeasonEpisode"][];
+            serverId: string | null;
+        };
+        Profile: {
+            id: string;
+            name: string;
+            avatar: string | null;
+            color: string | null;
+            /** @enum {string} */
+            kind: "adult" | "kid";
+            /** @description Max viewer age allowed (null = unrestricted). */
+            maxAge: number | null;
+            hasPin: boolean;
+            prefs: {
+                [key: string]: unknown;
+            };
+            sort: number;
+            createdAt: number;
+            updatedAt: number;
+        };
+        ProfileInput: {
+            name?: string;
+            avatar?: string | null;
+            color?: string | null;
+            /** @enum {string} */
+            kind?: "adult" | "kid";
+            maxAge?: number | null;
+            /** @description Set a 4-digit PIN; null clears it. */
+            pin?: string | null;
+            /** @description Merged into stored prefs. */
+            prefs?: {
+                [key: string]: unknown;
+            };
+            sort?: number;
+        };
+        WatchlistEntry: {
+            profileId: string;
+            kind: components["schemas"]["MediaKind"];
+            tmdbId: number;
+            addedAt: number;
+            rev?: number;
         };
         MediaSearchPage: {
             page: number;
@@ -4388,6 +4597,8 @@ export interface components {
         };
     };
     parameters: {
+        /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+        ProfileToken: string;
         /** @description Device token (alternative to the `x-device-token` header). */
         QueryT: string;
         /** @description User id, copied into the `x-user-id` header. */
@@ -10444,6 +10655,319 @@ export interface operations {
             };
             400: components["responses"]["ErrorJson"];
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaSeason: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: never;
+            path: {
+                tmdbId: number;
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Season */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaSeasonResponse"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
+            404: components["responses"]["ErrorJson"];
+            /** @description TMDB not configured and no local files */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    mediaListProfiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Profiles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        profiles: components["schemas"]["Profile"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaCreateProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        profile: components["schemas"]["Profile"];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaDeleteProfile: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mediaUpdateProfile: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileInput"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        profile: components["schemas"]["Profile"];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaUnlockProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    pin?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Token */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        token: string;
+                        expiresAt: number;
+                    };
+                };
+            };
+            /** @description Wrong PIN */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        triesLeft?: number;
+                    };
+                };
+            };
+            404: components["responses"]["ErrorJson"];
+            /** @description Locked after too many wrong PINs */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        retryAfterMs?: number;
+                    };
+                };
+            };
+        };
+    };
+    mediaGetWatchlist: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Watchlist */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        revision: number;
+                        entries: components["schemas"]["WatchlistEntry"][];
+                        items: components["schemas"]["TitleCard"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaAddWatchlist: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path: {
+                kind: components["schemas"]["MediaKind"];
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stored */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        entry: components["schemas"]["WatchlistEntry"];
+                        revision: number;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaRemoveWatchlist: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path: {
+                kind: components["schemas"]["MediaKind"];
+                tmdbId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        removed: boolean;
+                        revision: number;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
         };
     };
 }

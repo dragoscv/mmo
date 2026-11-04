@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.2.0); generator: server/scripts/openapi-kotlin.mjs
+// Source: server/openapi.yaml (info.version 3.3.1); generator: server/scripts/openapi-kotlin.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 @file:Suppress("unused")
 
@@ -278,6 +278,13 @@ data class MediaEtag(
 )
 
 @Serializable
+data class NextEpisode(
+    val season: Long = 0L,
+    val episode: Long = 0L,
+    val positionSec: Double = 0.0,
+)
+
+@Serializable
 data class TitleCard(
     val kind: String = "",
     val tmdbId: Long = 0L,
@@ -294,6 +301,8 @@ data class TitleCard(
     val inLibrary: Boolean? = null,
     val progress: Double? = null,
     val reason: String? = null,
+    val age: Long? = null,
+    val nextEpisode: NextEpisode? = null,
 )
 
 @Serializable
@@ -326,6 +335,15 @@ data class Person(
 )
 
 @Serializable
+data class SeasonSummary(
+    val seasonNumber: Long = 0L,
+    val name: String = "",
+    val episodeCount: Long = 0L,
+    val airDate: String? = null,
+    val posterPath: String? = null,
+)
+
+@Serializable
 data class TitleDetails(
     val kind: String = "",
     val tmdbId: Long = 0L,
@@ -342,6 +360,8 @@ data class TitleDetails(
     val inLibrary: Boolean? = null,
     val progress: Double? = null,
     val reason: String? = null,
+    val age: Long? = null,
+    val nextEpisode: NextEpisode? = null,
     val runtime: Long? = null,
     val status: String? = null,
     val tagline: String? = null,
@@ -356,6 +376,8 @@ data class TitleDetails(
     val videos: List<JsonObject> = emptyList(),
     val logoPath: String? = null,
     val certification: String? = null,
+    val ratings: Map<String, String>? = null,
+    val seasons: List<SeasonSummary>? = null,
     val recommendations: List<TitleCard> = emptyList(),
     val similar: List<TitleCard> = emptyList(),
     val watchProviders: Map<String, JsonElement> = emptyMap(),
@@ -389,7 +411,17 @@ data class Availability(
 )
 
 @Serializable
-data class LibraryIndexRow(
+data class VersionInfo(
+    val resolution: String? = null,
+    val hdr: String? = null,
+    val edition: String? = null,
+    val remux: Boolean = false,
+    val label: String = "",
+    val rank: Long = 0L,
+)
+
+@Serializable
+data class VersionedFile(
     val serverFileId: String = "",
     val kind: String = "",
     val tmdbId: Long? = null,
@@ -400,6 +432,7 @@ data class LibraryIndexRow(
     val mtime: Long = 0L,
     val updatedAt: Long = 0L,
     val rev: Long? = null,
+    val version: VersionInfo = VersionInfo(),
 )
 
 @Serializable
@@ -420,8 +453,10 @@ data class ProgressEntry(
 data class MediaTitleResponse(
     val title: TitleDetails = TitleDetails(),
     val availability: Availability = Availability(),
-    val files: List<LibraryIndexRow> = emptyList(),
+    val files: List<VersionedFile> = emptyList(),
     val progress: List<ProgressEntry> = emptyList(),
+    val nextUp: NextEpisode? = null,
+    val inWatchlist: Boolean? = null,
     val serverId: String? = null,
     val serverName: String = "",
 )
@@ -431,6 +466,20 @@ data class MediaSearchPage(
     val page: Long = 0L,
     val totalPages: Long = 0L,
     val results: List<TitleCard> = emptyList(),
+)
+
+@Serializable
+data class LibraryIndexRow(
+    val serverFileId: String = "",
+    val kind: String = "",
+    val tmdbId: Long? = null,
+    val season: Long? = null,
+    val episode: Long? = null,
+    val path: String = "",
+    val size: Long = 0L,
+    val mtime: Long = 0L,
+    val updatedAt: Long = 0L,
+    val rev: Long? = null,
 )
 
 @Serializable
@@ -487,6 +536,67 @@ data class ProviderCatalog(
     val region: String = "",
     val fetchedAt: Long = 0L,
     val providers: List<JsonObject> = emptyList(),
+)
+
+@Serializable
+data class SeasonEpisode(
+    val seasonNumber: Long = 0L,
+    val episodeNumber: Long = 0L,
+    val name: String = "",
+    val overview: String? = null,
+    val stillPath: String? = null,
+    val airDate: String? = null,
+    val runtime: Long? = null,
+    val voteAverage: Double? = null,
+    val files: List<VersionedFile> = emptyList(),
+    val progress: ProgressEntry? = null,
+)
+
+@Serializable
+data class MediaSeasonResponse(
+    val tmdbId: Long = 0L,
+    val seasonNumber: Long = 0L,
+    val name: String = "",
+    val overview: String? = null,
+    val posterPath: String? = null,
+    val episodes: List<SeasonEpisode> = emptyList(),
+    val serverId: String? = null,
+)
+
+@Serializable
+data class Profile(
+    val id: String = "",
+    val name: String = "",
+    val avatar: String? = null,
+    val color: String? = null,
+    val kind: String = "",
+    val maxAge: Long? = null,
+    val hasPin: Boolean = false,
+    val prefs: Map<String, JsonElement> = emptyMap(),
+    val sort: Long = 0L,
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L,
+)
+
+@Serializable
+data class ProfileInput(
+    val name: String? = null,
+    val avatar: String? = null,
+    val color: String? = null,
+    val kind: String? = null,
+    val maxAge: Long? = null,
+    val pin: String? = null,
+    val prefs: Map<String, JsonElement>? = null,
+    val sort: Long? = null,
+)
+
+@Serializable
+data class WatchlistEntry(
+    val profileId: String = "",
+    val kind: String = "",
+    val tmdbId: Long = 0L,
+    val addedAt: Long = 0L,
+    val rev: Long? = null,
 )
 
 @Serializable

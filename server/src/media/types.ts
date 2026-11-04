@@ -59,6 +59,10 @@ export interface TitleCard {
     progress?: number;
     /** Optional per-row explanation. */
     reason?: string;
+    /** Minimum viewer age resolved from certifications (null = unrated). */
+    age?: number | null;
+    /** TV in `continue`: the episode to resume or play next. */
+    nextEpisode?: { season: number; episode: number; positionSec: number };
 }
 
 export interface TitleDetails extends TitleCard {
@@ -76,6 +80,10 @@ export interface TitleDetails extends TitleCard {
     videos: { key: string; site: string; type: string; name: string }[];
     logoPath: string | null;
     certification?: string;
+    /** Certification per country (`RO` → `N-15`). */
+    ratings?: Record<string, string>;
+    /** TV only: season list (no episodes). */
+    seasons?: SeasonSummary[];
     recommendations: TitleCard[];
     similar: TitleCard[];
     /** Raw TMDB `watch/providers.results[region]` for the availability resolver. */
@@ -154,6 +162,60 @@ export interface HomeRow {
     kind: "mixed" | MediaKind;
     items: TitleCard[];
     reason?: string;
+}
+
+export interface SeasonSummary {
+    seasonNumber: number;
+    name: string;
+    episodeCount: number;
+    airDate?: string;
+    posterPath: string | null;
+}
+
+export interface Episode {
+    seasonNumber: number;
+    episodeNumber: number;
+    name: string;
+    overview?: string;
+    stillPath: string | null;
+    airDate?: string;
+    runtime?: number;
+    voteAverage?: number;
+}
+
+export interface SeasonDetails {
+    tmdbId: number;
+    seasonNumber: number;
+    name: string;
+    overview?: string;
+    posterPath: string | null;
+    airDate?: string;
+    episodes: Episode[];
+}
+
+export type ProfileKind = "adult" | "kid";
+
+export interface Profile {
+    id: string;
+    name: string;
+    avatar: string | null;
+    color: string | null;
+    kind: ProfileKind;
+    /** Max allowed viewer age (null = unrestricted). */
+    maxAge: number | null;
+    hasPin: boolean;
+    prefs: Record<string, unknown>;
+    sort: number;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export interface WatchlistEntry {
+    profileId: string;
+    kind: MediaKind;
+    tmdbId: number;
+    addedAt: number;
+    rev?: number;
 }
 
 export interface MediaLogger {

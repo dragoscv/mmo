@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.3.1
+  version: 3.4.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -4781,6 +4781,201 @@ paths:
         '400': { $ref: '#/components/responses/ErrorJson' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /media/title/tv/{tmdbId}/season/{n}:
+    get:
+      operationId: mediaSeason
+      tags: [media]
+      summary: One TV season with episodes, local files (versions) and progress per episode
+      description: Episodes only present as local files (no TMDB data) are included with an empty name.
+      parameters:
+        - { name: tmdbId, in: path, required: true, schema: { type: integer } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 0 } }
+        - { name: profile, in: query, schema: { type: string, default: default } }
+      responses:
+        '200':
+          description: Season
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaSeasonResponse' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '503':
+          description: TMDB not configured and no local files
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /media/profiles:
+    get:
+      operationId: mediaListProfiles
+      tags: [media]
+      summary: Viewer profiles ("Who's watching")
+      description: A `default` adult profile always exists. PIN hashes are never returned (`hasPin` only).
+      responses:
+        '200':
+          description: Profiles
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revision, profiles]
+                properties:
+                  revision: { type: integer }
+                  profiles: { type: array, items: { $ref: '#/components/schemas/Profile' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      operationId: mediaCreateProfile
+      tags: [media]
+      summary: Create a profile (max 12)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { type: object, required: [profile], properties: { profile: { $ref: '#/components/schemas/Profile' } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/profiles/{id}:
+    patch:
+      operationId: mediaUpdateProfile
+      tags: [media]
+      summary: Update a profile (needs `x-profile-token` when it has a PIN)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileInput' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { type: object, required: [profile], properties: { profile: { $ref: '#/components/schemas/Profile' } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+    delete:
+      operationId: mediaDeleteProfile
+      tags: [media]
+      summary: Delete a profile and its watchlist (not the last one)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+        '404': { description: Not found }
+
+  /media/profiles/{id}/unlock:
+    post:
+      operationId: mediaUnlockProfile
+      tags: [media]
+      summary: Exchange a PIN for a 12 h profile token
+      description: Profiles without a PIN unlock with any body. 5 wrong PINs lock the profile for 5 minutes (429 + Retry-After).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { pin: { type: string, pattern: '^[0-9]{4}$' } } }
+      responses:
+        '200':
+          description: Token
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, expiresAt]
+                properties:
+                  token: { type: string }
+                  expiresAt: { type: integer }
+        '401':
+          description: Wrong PIN
+          content:
+            application/json:
+              schema: { type: object, required: [error], properties: { error: { type: string }, triesLeft: { type: integer } } }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '429':
+          description: Locked after too many wrong PINs
+          content:
+            application/json:
+              schema: { type: object, required: [error], properties: { error: { type: string }, retryAfterMs: { type: integer } } }
+
+  /media/watchlist:
+    get:
+      operationId: mediaGetWatchlist
+      tags: [media]
+      summary: Watchlist of a profile (cards filtered by the profile's max age)
+      parameters:
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+      responses:
+        '200':
+          description: Watchlist
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revision, entries, items]
+                properties:
+                  revision: { type: integer }
+                  entries: { type: array, items: { $ref: '#/components/schemas/WatchlistEntry' } }
+                  items: { type: array, items: { $ref: '#/components/schemas/TitleCard' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/watchlist/{kind}/{tmdbId}:
+    put:
+      operationId: mediaAddWatchlist
+      tags: [media]
+      summary: Add a title to the profile's watchlist
+      parameters:
+        - { name: kind, in: path, required: true, schema: { $ref: '#/components/schemas/MediaKind' } }
+        - { name: tmdbId, in: path, required: true, schema: { type: integer } }
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+      responses:
+        '200':
+          description: Stored
+          content:
+            application/json:
+              schema: { type: object, required: [entry, revision], properties: { entry: { $ref: '#/components/schemas/WatchlistEntry' }, revision: { type: integer } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+    delete:
+      operationId: mediaRemoveWatchlist
+      tags: [media]
+      summary: Remove a title from the profile's watchlist
+      parameters:
+        - { name: kind, in: path, required: true, schema: { $ref: '#/components/schemas/MediaKind' } }
+        - { name: tmdbId, in: path, required: true, schema: { type: integer } }
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema: { type: object, required: [removed, revision], properties: { removed: { type: boolean }, revision: { type: integer } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+
 components:
   securitySchemes:
     deviceToken:
@@ -4794,6 +4989,11 @@ components:
       name: t
       description: Same device token as a query parameter; accepted only on routes that declare it.
   parameters:
+    ProfileToken:
+      name: x-profile-token
+      in: header
+      schema: { type: string }
+      description: Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise).
     QueryT:
       name: t
       in: query
@@ -5965,6 +6165,15 @@ components:
         inLibrary: { type: boolean, description: "Present in this server's library_index." }
         progress: { type: number, minimum: 0, maximum: 1, description: Watched fraction (continue rows). }
         reason: { type: string }
+        age: { type: [integer, 'null'], description: 'Minimum viewer age from certifications (RO CNC scale; 19 = adult-only). Null = unrated.' }
+        nextEpisode: { $ref: '#/components/schemas/NextEpisode' }
+    NextEpisode:
+      type: object
+      required: [season, episode, positionSec]
+      properties:
+        season: { type: integer }
+        episode: { type: integer }
+        positionSec: { type: number }
     Person:
       type: object
       required: [id, name, role, profilePath]
@@ -6002,6 +6211,8 @@ components:
                   name: { type: string }
             logoPath: { type: [string, 'null'] }
             certification: { type: string }
+            ratings: { type: object, additionalProperties: { type: string }, description: Certification per country code. }
+            seasons: { type: array, items: { $ref: '#/components/schemas/SeasonSummary' } }
             recommendations: { type: array, items: { $ref: '#/components/schemas/TitleCard' } }
             similar: { type: array, items: { $ref: '#/components/schemas/TitleCard' } }
             watchProviders: { type: object, additionalProperties: true, description: 'Raw TMDB watch/providers.results keyed by region.' }
@@ -6061,10 +6272,104 @@ components:
       properties:
         title: { $ref: '#/components/schemas/TitleDetails' }
         availability: { $ref: '#/components/schemas/Availability' }
-        files: { type: array, items: { $ref: '#/components/schemas/LibraryIndexRow' } }
+        files: { type: array, items: { $ref: '#/components/schemas/VersionedFile' } }
         progress: { type: array, items: { $ref: '#/components/schemas/ProgressEntry' } }
+        nextUp:
+          oneOf:
+            - { $ref: '#/components/schemas/NextEpisode' }
+            - { type: 'null' }
+        inWatchlist: { type: boolean }
         serverId: { type: [string, 'null'] }
         serverName: { type: string }
+    VersionInfo:
+      type: object
+      required: [resolution, hdr, edition, remux, label, rank]
+      properties:
+        resolution: { type: [string, 'null'], enum: ['2160p', '1080p', '720p', '480p', null] }
+        hdr: { type: [string, 'null'], enum: [DV, 'HDR10+', HDR, null] }
+        edition: { type: [string, 'null'] }
+        remux: { type: boolean }
+        label: { type: string }
+        rank: { type: integer }
+    VersionedFile:
+      allOf:
+        - { $ref: '#/components/schemas/LibraryIndexRow' }
+        - type: object
+          required: [version]
+          properties:
+            version: { $ref: '#/components/schemas/VersionInfo' }
+    SeasonSummary:
+      type: object
+      required: [seasonNumber, name, episodeCount, posterPath]
+      properties:
+        seasonNumber: { type: integer }
+        name: { type: string }
+        episodeCount: { type: integer }
+        airDate: { type: string }
+        posterPath: { type: [string, 'null'] }
+    SeasonEpisode:
+      type: object
+      required: [seasonNumber, episodeNumber, name, stillPath, files, progress]
+      properties:
+        seasonNumber: { type: integer }
+        episodeNumber: { type: integer }
+        name: { type: string }
+        overview: { type: string }
+        stillPath: { type: [string, 'null'] }
+        airDate: { type: string }
+        runtime: { type: integer }
+        voteAverage: { type: number }
+        files: { type: array, items: { $ref: '#/components/schemas/VersionedFile' } }
+        progress:
+          oneOf:
+            - { $ref: '#/components/schemas/ProgressEntry' }
+            - { type: 'null' }
+    MediaSeasonResponse:
+      type: object
+      required: [tmdbId, seasonNumber, name, posterPath, episodes, serverId]
+      properties:
+        tmdbId: { type: integer }
+        seasonNumber: { type: integer }
+        name: { type: string }
+        overview: { type: string }
+        posterPath: { type: [string, 'null'] }
+        episodes: { type: array, items: { $ref: '#/components/schemas/SeasonEpisode' } }
+        serverId: { type: [string, 'null'] }
+    Profile:
+      type: object
+      required: [id, name, avatar, color, kind, maxAge, hasPin, prefs, sort, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        avatar: { type: [string, 'null'] }
+        color: { type: [string, 'null'] }
+        kind: { type: string, enum: [adult, kid] }
+        maxAge: { type: [integer, 'null'], description: Max viewer age allowed (null = unrestricted). }
+        hasPin: { type: boolean }
+        prefs: { type: object, additionalProperties: true }
+        sort: { type: integer }
+        createdAt: { type: integer }
+        updatedAt: { type: integer }
+    ProfileInput:
+      type: object
+      properties:
+        name: { type: string, maxLength: 40 }
+        avatar: { type: [string, 'null'] }
+        color: { type: [string, 'null'] }
+        kind: { type: string, enum: [adult, kid] }
+        maxAge: { type: [integer, 'null'], minimum: 0, maximum: 18 }
+        pin: { type: [string, 'null'], pattern: '^[0-9]{4}$', description: 'Set a 4-digit PIN; null clears it.' }
+        prefs: { type: object, additionalProperties: true, description: Merged into stored prefs. }
+        sort: { type: integer }
+    WatchlistEntry:
+      type: object
+      required: [profileId, kind, tmdbId, addedAt]
+      properties:
+        profileId: { type: string }
+        kind: { $ref: '#/components/schemas/MediaKind' }
+        tmdbId: { type: integer }
+        addedAt: { type: integer }
+        rev: { type: integer }
     MediaSearchPage:
       type: object
       required: [page, totalPages, results]

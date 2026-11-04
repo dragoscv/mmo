@@ -92,6 +92,31 @@ const MIGRATIONS: string[] = [
     );
     INSERT OR IGNORE INTO meta (key, value) VALUES ('last_pushed_revision', '0');
     `,
+    // v3 — profiles (PIN, kids max age) + per-profile watchlist (WP16-01/04)
+    `
+    CREATE TABLE IF NOT EXISTS profiles (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        avatar TEXT,
+        color TEXT,
+        kind TEXT NOT NULL DEFAULT 'adult',
+        max_age INTEGER,
+        pin_hash TEXT,
+        prefs TEXT NOT NULL DEFAULT '{}',
+        sort INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS watchlist (
+        profile_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        tmdb_id INTEGER NOT NULL,
+        added_at INTEGER NOT NULL,
+        rev INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (profile_id, kind, tmdb_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_watchlist_profile ON watchlist(profile_id, added_at DESC);
+    `,
 ];
 
 export const MEDIA_SCHEMA_VERSION = MIGRATIONS.length;
