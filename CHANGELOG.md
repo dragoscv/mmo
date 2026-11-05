@@ -10,6 +10,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-05 — TV Android 2.1.1
+
+- Crash fix: a hub `play` (phone / web "Play on TV") while a video was already playing killed the app with
+  `IllegalStateException: Session ID must be unique`. The replaced player entry was still composed during the nav
+  swap, so a second MediaSession with the same default id was built before the first was released. The player now
+  reuses its ExoPlayer + MediaSession for a remote `play`, next episode and Watch Together file switch (same back-stack
+  entry, new media), each player instance gets a unique session id (`video-<uuid>`), and release runs in a fixed
+  order (progress report → session → player).
+
 ## 2026-11-05 — Web 3.1.1
 
 - `/account/delete` rendered only the app shell for signed-out visitors: the server page called `buttonVariants()`

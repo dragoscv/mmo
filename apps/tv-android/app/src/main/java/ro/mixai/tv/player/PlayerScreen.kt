@@ -31,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -108,6 +109,7 @@ import ro.mixai.tv.ui.components.ErrorState
 import ro.mixai.tv.ui.components.MixaiIcons
 import ro.mixai.tv.ui.components.PrimaryButton
 import ro.mixai.tv.ui.components.SecondaryButton
+import ro.mixai.tv.ui.nav.LocalNavEntry
 import ro.mixai.tv.ui.nav.Navigator
 import ro.mixai.tv.ui.nav.Route
 import ro.mixai.tv.ui.nav.ScreenDeps
@@ -117,6 +119,7 @@ import ro.mixai.tv.ui.videoBoxFraction
 import ro.mixai.tv.ui.profiles.ProfilePrefKeys
 import ro.mixai.tv.ui.profiles.prefBool
 import ro.mixai.tv.ui.profiles.prefString
+import java.util.UUID
 import kotlin.math.abs
 
 sealed interface PlayRequest {
@@ -154,10 +157,65 @@ private fun scrubStep(repeat: Int): Long = when {
  * HLS resumes/seeks far server-side (`?start=` → `hlsOffset`); direct play seeks over HTTP range.
  * Progress: local every 5 s, server every 10 s and on pause/exit. Remote commands arrive through
  * [PlayerBus]; inside a Watch Together room this player follows the room's schedule.
+ *
+ * The ExoPlayer + MediaSession live here, once per back-stack entry, and are reused when the entry's
+ * request changes in place ([Navigator.replaceInPlace]: remote `play`, next episode, room switch);
+ * all per-media state lives in [PlayerContent], keyed by the request.
  */
 @OptIn(UnstableApi::class)
 @Composable
 fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeMs: Long) {
+    val context = LocalContext.current
+    val prof = deps.profiles.activeProfile.value
+    val prefAudioLang = prof?.prefString(ProfilePrefKeys.AUDIO_LANG, "").orEmpty()
+    val prefSubLang = prof?.prefString(ProfilePrefKeys.SUB_LANG, "").orEmpty()
+    val prefForcedOnly = prof?.prefBool(ProfilePrefKeys.SUB_FORCED_ONLY, false) ?: false
+    val player = remember {
+        val http = DefaultHttpDataSource.Factory()
+            .setUserAgent("MixAI-TV/${BuildConfig.VERSION_NAME}")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(30_000)
+        ExoPlayer.Builder(context)
+            .setRenderersFactory(
+                DefaultRenderersFactory(context).setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER),
+            )
+            .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(http))
+            .setHandleAudioBecomingNoisy(true)
+            .build().apply {
+                // Preferred languages from the profile (ISO 639-1/2 as stored); Media3 matches normalised tags.
+                val b = trackSelectionParameters.buildUpon()
+                if (prefAudioLang.isNotBlank()) b.setPreferredAudioLanguage(prefAudioLang)
+                if (prefSubLang.isNotBlank() && !prefForcedOnly) b.setPreferredTextLanguage(prefSubLang)
+                if (prefForcedOnly) b.setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                trackSelectionParameters = b.build()
+            }
+    }
+    // In-activity MediaSession: the remote's transport keys + system now-playing (WP6-04d).
+    // Unique id per player instance: Media3 rejects a second session with the same id while the
+    // previous one is alive (a replaced entry stays composed during the nav transition).
+    val session = remember(player) { MediaSession.Builder(context, player).setId("video-${UUID.randomUUID()}").build() }
+    // Registered before PlayerContent's effects → disposed after them (reverse order): progress is
+    // reported first, then the session and player are released, always in this order.
+    DisposableEffect(player) {
+        onDispose {
+            session.release()
+            player.release()
+        }
+    }
+    // Ultrawide: the global UI squeeze steps aside while a player is on screen (SurfaceView ignores layer transforms).
+    DisposableEffect(Unit) {
+        squeezeSuspended.value = true
+        onDispose { squeezeSuspended.value = false }
+    }
+    DisposableEffect(Unit) { onDispose { PlayerBus.clear() } }
+    // rev: a remote `play` of the same file/position still restarts it.
+    key(LocalNavEntry.current?.rev, request, resumeMs) { PlayerContent(deps, nav, request, resumeMs, player) }
+}
+
+@OptIn(UnstableApi::class)
+@Composable
+private fun PlayerContent(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeMs: Long, player: ExoPlayer) {
     val context = LocalContext.current
     val api = deps.api
     val hub = deps.hub
@@ -194,8 +252,6 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
     val prefAutoplay = prof?.prefBool(ProfilePrefKeys.AUTOPLAY_NEXT, true) ?: true
     val prefSkipIntro = prof?.prefBool(ProfilePrefKeys.SKIP_INTRO, false) ?: false
     val prefAudioLang = prof?.prefString(ProfilePrefKeys.AUDIO_LANG, "").orEmpty()
-    val prefSubLang = prof?.prefString(ProfilePrefKeys.SUB_LANG, "").orEmpty()
-    val prefForcedOnly = prof?.prefBool(ProfilePrefKeys.SUB_FORCED_ONLY, false) ?: false
     val prefSubSize = when (prof?.prefString(ProfilePrefKeys.SUB_SIZE, "medium")) {
         "small" -> 0.75f; "large" -> 1.3f; "xlarge" -> 1.65f; else -> 1f
     }
@@ -229,37 +285,9 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
         (prof?.prefs?.get("autoplay") as? JsonPrimitive)?.booleanOrNull?.takeIf { prof.prefs[ProfilePrefKeys.AUTOPLAY_NEXT] == null } ?: prefAutoplay
     }
 
-    val player = remember {
-        val http = DefaultHttpDataSource.Factory()
-            .setUserAgent("MixAI-TV/${BuildConfig.VERSION_NAME}")
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(30_000)
-        ExoPlayer.Builder(context)
-            .setRenderersFactory(
-                DefaultRenderersFactory(context).setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER),
-            )
-            .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(http))
-            .setHandleAudioBecomingNoisy(true)
-            .build().apply {
-                // Preferred languages from the profile (ISO 639-1/2 as stored); Media3 matches normalised tags.
-                val b = trackSelectionParameters.buildUpon()
-                if (prefAudioLang.isNotBlank()) b.setPreferredAudioLanguage(prefAudioLang)
-                if (prefSubLang.isNotBlank() && !prefForcedOnly) b.setPreferredTextLanguage(prefSubLang)
-                if (prefForcedOnly) b.setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-                trackSelectionParameters = b.build()
-            }
-    }
-    // In-activity MediaSession: the remote's transport keys + system now-playing (WP6-04d).
-    val session = remember(player) { MediaSession.Builder(context, player).build() }
-    // Ultrawide compensation: the global UI squeeze steps aside (SurfaceView ignores layer
-    // transforms) and the video surface itself is sized so the film is undistorted on the panel.
+    // Ultrawide compensation: the video surface itself is sized so the film is undistorted on the panel.
     val squeeze = LocalSqueeze.current
     var videoAspect by remember { mutableFloatStateOf(0f) }
-    DisposableEffect(Unit) {
-        squeezeSuspended.value = true
-        onDispose { squeezeSuspended.value = false }
-    }
 
     /** HLS started server-side at this ABSOLUTE position: player time is relative to it. */
     var hlsOffset by remember {
@@ -405,12 +433,14 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
             report()
             reportServer()
             player.removeListener(listener)
-            session.release()
-            player.release()
         }
     }
 
     LaunchedEffect(request) {
+        // Reused player (in-place replace): drop the previous media's track overrides / speed.
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverrides().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).build()
+        player.setPlaybackSpeed(1f)
         // HLS resumes server-side (`?start=`): ffmpeg starts AT the resume point, so the
         // player starts at 0 of that stream. Direct play seeks over HTTP range as before.
         val hlsStartSec = hlsOffset / 1000
@@ -498,7 +528,6 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
             delay(1_000)
         }
     }
-    DisposableEffect(Unit) { onDispose { PlayerBus.clear() } }
 
     // Room: load this title once when it is played while in a room.
     LaunchedEffect(room?.roomId, fileId) {
@@ -517,7 +546,7 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
         val kind = m?.kind
         val tmdb = m?.tmdbId
         val ref = if (kind != null && tmdb != null) MediaRef(kind, tmdb, m.season, m.episode) else null
-        nav.replace(Route.Play(PlayRequest.Video(f, hls = !f.directPlayable, ref = ref), resumeMs = 0L, from = selfRoute?.from))
+        nav.replaceInPlace(Route.Play(PlayRequest.Video(f, hls = !f.directPlayable, ref = ref), resumeMs = 0L, from = selfRoute?.from))
     }
     // Room schedule: play/pause/seek at anchor.atServerMs.
     LaunchedEffect(following, room?.anchor, room?.phase) {
@@ -636,7 +665,7 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
             report(); reportServer()
             PlaybackSession.pendingAuto = auto
             PlaybackSession.autoplayStreak = if (auto) PlaybackSession.autoplayStreak + 1 else 0
-            nav.replace(
+            nav.replaceInPlace(
                 Route.Play(
                     PlayRequest.Video(f, hls = !f.directPlayable, ref = MediaRef("tv", ref.tmdbId, n.season, n.episode)),
                     resumeMs = -1L, from = selfRoute?.from,
@@ -801,6 +830,8 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
                     sv.post { sv.pivotX = sv.width / 2f; sv.scaleX = 1f / squeeze }
                 }
             },
+            // The player outlives this view when the media changes in place: hand the surface over cleanly.
+            onRelease = { view -> view.player = null },
             modifier = Modifier.align(Alignment.Center).fillMaxWidth(fw).fillMaxHeight(fh),
         )
 

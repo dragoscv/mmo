@@ -96,9 +96,12 @@ val Route.hidesRail: Boolean
     get() = isFullScreen || this is Route.Splash || this is Route.Welcome || this is Route.SignIn || this is Route.Discover ||
         this is Route.Pair || this is Route.Connect || this is Route.ProfilePicker || this is Route.NowPlaying
 
-/** One entry of the back stack. `key` is unique per push so the same route twice keeps separate state. */
+/**
+ * One entry of the back stack. `key` is unique per push so the same route twice keeps separate state;
+ * `rev` grows on every [Navigator.replaceInPlace] of this entry.
+ */
 @Stable
-data class NavEntry(val key: Int, val route: Route)
+data class NavEntry(val key: Int, val route: Route, val rev: Int = 0)
 
 /** Own back stack (WP16): push/pop/replace/resetTo over a snapshot list, observed by [NavHost]. */
 @Stable
@@ -141,6 +144,16 @@ class Navigator(initial: Route) {
     fun replace(route: Route) {
         lastWasPop = false
         entries[entries.lastIndex] = NavEntry(nextKey++, route)
+    }
+
+    /**
+     * Swaps the top entry's route but KEEPS its key: the same screen instance stays composed and
+     * sees the new route (players reuse their ExoPlayer/MediaSession instead of building a second one).
+     */
+    fun replaceInPlace(route: Route) {
+        lastWasPop = false
+        val top = entries.last()
+        entries[entries.lastIndex] = top.copy(route = route, rev = top.rev + 1)
     }
 
     /** Clears the stack and pushes [routes] (bottom → top). */
@@ -191,8 +204,9 @@ fun NavHost(nav: Navigator, modifier: Modifier = Modifier, content: @Composable 
             label = "nav",
             modifier = modifier,
         ) { entry ->
-            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this, LocalNavEntry provides entry) {
-                holder.SaveableStateProvider(entry.key) { content(entry.route) }
+                    val live = nav.entries.firstOrNull { it.key == entry.key } ?: entry
+                    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this, LocalNavEntry provides live) {
+                        holder.SaveableStateProvider(entry.key) { content(live.route) }
             }
         }
         return
@@ -205,12 +219,14 @@ fun NavHost(nav: Navigator, modifier: Modifier = Modifier, content: @Composable 
             transitionSpec = { navTransition(initialState.route, targetState.route, nav.lastWasPop, reduced) },
             label = "nav",
         ) { entry ->
+            // Same key = same content; read the live entry so an in-place replace reaches the screen.
+            val live = nav.entries.firstOrNull { it.key == entry.key } ?: entry
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides shared,
                 LocalAnimatedVisibilityScope provides this,
-                LocalNavEntry provides entry,
+                LocalNavEntry provides live,
             ) {
-                holder.SaveableStateProvider(entry.key) { content(entry.route) }
+                holder.SaveableStateProvider(entry.key) { content(live.route) }
             }
         }
     }

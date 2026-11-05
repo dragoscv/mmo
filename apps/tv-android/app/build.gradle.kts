@@ -21,6 +21,10 @@ if (hasReleaseKeystore && !releaseKeystoreFile.exists()) {
 val mixaiOrigin: String = (project.findProperty("mixaiOrigin") as String?)?.trim()?.trimEnd('/')
     ?.takeIf { it.isNotEmpty() } ?: "https://mixai.ro"
 
+// Test installs over a newer scratch build on a device (no uninstall = pairing kept):
+//   gradlew assembleDebug -PversionCodeOverride=15
+val versionCodeOverride: Int? = (project.findProperty("versionCodeOverride") as String?)?.trim()?.toIntOrNull()
+
 android {
     namespace = "ro.mixai.tv"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -29,8 +33,8 @@ android {
         applicationId = "ro.mixai.tv"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 10
-        versionName = "2.1.0"
+        versionCode = versionCodeOverride ?: 11
+        versionName = "2.1.1"
         buildConfigField("String", "MIXAI_ORIGIN", "\"$mixaiOrigin\"")
     }
 

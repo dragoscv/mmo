@@ -413,8 +413,13 @@ private fun handleHubCommand(d: ScreenDeps, nav: Navigator, cmd: HubCommand, sco
                     val tmdbId = cmd.args.argLong("tmdbId")
                     val ref = if (kind != null && tmdbId != null) MediaRef(kind, tmdbId, cmd.args.argLong("season"), cmd.args.argLong("episode")) else null
                     val startMs = cmd.args.argDouble("startSec")?.let { (it * 1000).toLong() } ?: -1L
-                    val r = Route.Play(PlayRequest.Video(f, hls = !f.directPlayable, ref = ref), resumeMs = startMs, from = nav.current)
-                    if (nav.current is Route.Play || nav.current is Route.LivePlay) nav.replace(r) else nav.push(r)
+                    val video = PlayRequest.Video(f, hls = !f.directPlayable, ref = ref)
+                    when (val cur = nav.current) {
+                        // Already playing: same player entry, new media (reuses ExoPlayer + MediaSession).
+                        is Route.Play -> nav.replaceInPlace(Route.Play(video, resumeMs = startMs, from = cur.from))
+                        is Route.LivePlay -> nav.replace(Route.Play(video, resumeMs = startMs, from = cur))
+                        else -> nav.push(Route.Play(video, resumeMs = startMs, from = cur))
+                    }
                     hub.ack(cmd.seq, true)
                 } catch (e: Exception) {
                     hub.ack(cmd.seq, false, e.message ?: "play_failed")
