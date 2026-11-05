@@ -188,6 +188,15 @@ screen". It fails if `.mx-row-title` does not compute to a Grotesk family, if th
 axe 0 on 13 routes, `__DESIGN__ {"family":"spaceGrotesk, \"spaceGrotesk Fallback\", …","loaded":true,
 "backdrop":true,"isolated":true}`. Home cached paint 13–17 ms. VM deleted, `deleted sessions: 1`.
 
+### Live
+
+Commit `dedd76c7` deployed with `deploy-clean.ps1` (clean worktree) and `apps/web/scripts/deploy-cloud-run.ps1`.
+Revision **`mixai-web-00009-qrb`** serves 100 % of traffic, and `/api/health` reports `3.1.6` with commitSha
+`dedd76c7…`. An authenticated `GET /media?critic-452afa6e5f` with a minted 2 h session (deleted right after:
+`deleted sessions: 1`) returned 200. Its Cloud Run log line names revision `mixai-web-00009-qrb`. The page's CSS
+chunk contains `mx-backdrop-stage` and `isolation:isolate`, and `<body>` carries the next/font variable classes
+(`<html class="font-sans">`). There were 0 responses with status 5xx in the 20 minutes after the deploy.
+
 ### User-intent gap (after)
 
 **Mostly met.** The D25 backdrop-first look is now actually on screen on every `/media` route, in light and dark, at
