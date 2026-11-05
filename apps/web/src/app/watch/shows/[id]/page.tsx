@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { tvShows, tvEpisodes, videoFiles } from "@/db/schema";
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { PlayHereButton } from "@/components/video/play-here-button";
 import { PlayNextButton, AddToQueueButton } from "@/components/video/queue-buttons";
@@ -31,6 +31,8 @@ export default async function ShowDetail({ params }: { params: Promise<{ id: str
         .where(and(eq(tvShows.userId, userId), eq(tvShows.id, showId)))
         .limit(1).then(r => r[0]);
     if (!show) return notFound();
+    // WP16 D31: the unified title page lives on /media (falls through for shows without TMDB match).
+    if (show.tmdbId) redirect(`/media/tv/${show.tmdbId}`);
 
     const episodes = await db.select().from(tvEpisodes)
         .where(eq(tvEpisodes.showId, showId))

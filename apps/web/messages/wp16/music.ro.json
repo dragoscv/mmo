@@ -1,0 +1,114 @@
+{
+    "title": "Muzică",
+    "tabs": {
+        "label": "Secțiuni muzică",
+        "home": "Acasă",
+        "artists": "Artiști",
+        "albums": "Albume"
+    },
+    "search": {
+        "title": "Caută muzică",
+        "label": "Caută artiști, albume și melodii",
+        "placeholder": "Artiști, albume, melodii…",
+        "hint": "Scrie ca să cauți în biblioteca ta de muzică.",
+        "none": "Nimic nu se potrivește cu „{q}”.",
+        "tracks": "Melodii",
+        "artists": "Artiști",
+        "albums": "Albume"
+    },
+    "home": {
+        "surprise": "Surprinde-mă",
+        "recent": "Ascultate recent",
+        "newest": "Adăugate recent",
+        "genres": "Genuri",
+        "mostPlayed": "Cele mai ascultate",
+        "playlists": "Playlisturi",
+        "random": "Redescoperă"
+    },
+    "letters": {
+        "label": "Filtrează după prima literă",
+        "all": "Toate",
+        "other": "Cifre și simboluri",
+        "none": "Nimic nu începe cu {letter}.",
+        "more": "Încarcă mai multe ({shown} din {total})"
+    },
+    "count": {
+        "albums": "{count, plural, =0 {Niciun album} one {# album} few {# albume} other {# de albume}}",
+        "tracks": "{count, plural, =0 {Nicio melodie} one {# melodie} few {# melodii} other {# de melodii}}",
+        "artists": "{count, plural, =0 {Niciun artist} one {# artist} few {# artiști} other {# de artiști}}"
+    },
+    "state": {
+        "loading": "Se încarcă muzica…",
+        "error": "Muzica nu s-a putut încărca",
+        "errorBody": "MMO Server nu a răspuns. Verifică dacă rulează, apoi încearcă din nou.",
+        "retry": "Reîncearcă",
+        "emptyLibrary": "Biblioteca de muzică e goală",
+        "emptyLibraryBody": "Adaugă un folder de muzică pe server și scanează-l. Albumele și artiștii apar aici imediat.",
+        "notFound": "Nu a fost găsit",
+        "notFoundBody": "Elementul nu mai este în bibliotecă. Poate a fost mutat sau șters.",
+        "backToMusic": "Înapoi la Muzică"
+    },
+    "track": {
+        "playLabel": "Redă {title}, {duration}",
+        "lyrics": "Are versuri"
+    },
+    "album": {
+        "kicker": "Album",
+        "disc": "Discul {n}",
+        "tracklist": "Lista de piese",
+        "empty": "Albumul nu are melodii care pot fi redate."
+    },
+    "artist": {
+        "kicker": "Artist",
+        "top": "Melodii de top",
+        "albums": "Albume",
+        "similar": "Artiști similari"
+    },
+    "playlist": {
+        "kicker": "Playlist",
+        "empty": "Playlistul este gol."
+    },
+    "genre": {
+        "kicker": "Gen"
+    },
+    "actions": {
+        "playAll": "Redă",
+        "shuffle": "Amestecă",
+        "addToQueue": "Adaugă în coadă"
+    },
+    "player": {
+        "nowPlaying": "Se redă acum",
+        "nothing": "Nu se redă nimic",
+        "nothingBody": "Alege un album, un playlist sau apasă Surprinde-mă ca să începi.",
+        "controls": "Comenzi de redare",
+        "panel": "Versuri și coadă",
+        "play": "Redă",
+        "pause": "Pauză",
+        "prev": "Anterioara",
+        "next": "Următoarea",
+        "shuffle": "Amestecă",
+        "repeatOff": "Repetare: oprită",
+        "repeatAll": "Repetare: toate",
+        "repeatOne": "Repetare: melodia curentă",
+        "seek": "Poziție",
+        "volume": "Volum",
+        "mute": "Fără sonor",
+        "unmute": "Cu sonor",
+        "error": "Melodia nu poate fi redată",
+        "buffering": "Se încarcă…",
+        "lyrics": "Versuri",
+        "lyricsLoading": "Se încarcă versurile…",
+        "lyricsRetry": "Încarcă din nou versurile",
+        "noLyrics": "Melodia nu are versuri.",
+        "seekToLine": "Sari la {time}: {text}",
+        "queue": "{count, plural, one {Coadă (#)} few {Coadă (#)} other {Coadă (#)}}",
+        "queueLabel": "Coada de redare",
+        "queueEmpty": "Coada este goală.",
+        "playItem": "Redă {title}",
+        "moveUp": "Mută {title} mai sus",
+        "moveDown": "Mută {title} mai jos",
+        "remove": "Scoate {title} din coadă",
+        "mini": "Player muzică",
+        "openNowPlaying": "Deschide Se redă acum: {title}"
+    }
+}

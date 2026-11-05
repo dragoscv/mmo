@@ -1,6 +1,7 @@
 import "./media/media-home.css";
 import { Suspense } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Clapperboard } from "lucide-react";
 import { Button, EmptyState, Page, PageHeader, Skeleton } from "@mmo/ui";
@@ -24,9 +25,12 @@ export const dynamic = "force-dynamic";
  * (WP11-05). Rows span the full width; the hero clamps at 1600 px on
  * ultrawide screens (`.media-hero` max-width). Old dashboard: `/dashboard`.
  */
-export default async function MediaHome() {
+export default async function MediaHome({ searchParams }: { searchParams?: Promise<{ classic?: string }> }) {
     const session = await auth();
     if (!session?.user?.id) return <LandingPage />;
+    // WP16 (D31, owner 2026-11-06): one home on every surface — the cinematic, cache-first `/media`.
+    // `?classic=1` keeps the multi-server fan-out page reachable while `/media` covers one server.
+    if (!(await searchParams)?.classic) redirect("/media");
     const t = await getTranslations("home");
     return (
         <Page width="full" className="media-home">

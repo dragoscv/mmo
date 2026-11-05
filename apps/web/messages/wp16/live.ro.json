@@ -1,0 +1,278 @@
+{
+    "nav": {
+        "label": "Secțiuni TV live",
+        "channels": "Canale",
+        "guide": "Ghid TV",
+        "recordings": "Înregistrări",
+        "sources": "Surse"
+    },
+    "common": {
+        "loading": "Se încarcă…"
+    },
+    "channels": {
+        "title": "TV live",
+        "favAdded": "{name} a fost adăugat la favorite",
+        "favRemoved": "{name} a fost scos din favorite",
+        "favFailed": "Favoritele nu au putut fi actualizate: {msg}",
+        "noSources": {
+            "title": "Nicio sursă TV live încă",
+            "body": "Adaugă un playlist M3U, un cont Xtream Codes sau un tuner HDHomeRun pe serverul MMO și canalele apar aici.",
+            "cta": "Adaugă o sursă M3U / Xtream / HDHomeRun"
+        },
+        "noChannels": {
+            "title": "Niciun canal încă",
+            "body": "Sursele tale nu au canale vizibile. Poate încă se actualizează sau toate canalele sunt ascunse.",
+            "cta": "Gestionează sursele"
+        },
+        "search": "Caută canale",
+        "searchPlaceholder": "Caută după nume, număr sau grup",
+        "favFirst": "Favoritele primele",
+        "count": "{count, plural, =0 {Niciun canal} one {# canal} few {# canale} other {# de canale}}",
+        "groups": "Grupuri de canale",
+        "allGroups": "Toate",
+        "favourites": "Favorite",
+        "ungrouped": "Altele",
+        "noMatch": {
+            "title": "Niciun canal nu se potrivește",
+            "body": "Încearcă alt nume sau număr ori renunță la filtrul de grup.",
+            "reset": "Șterge filtrele"
+        },
+        "listLabel": "Canale",
+        "playChannel": "Urmărește {name}, acum: {now}",
+        "noInfo": "Fără informații despre program",
+        "next": "Urmează {time} · {title}",
+        "favourite": "Adaugă {name} la favorite",
+        "unfavourite": "Scoate {name} din favorite",
+        "preview": "Previzualizare {name}",
+        "previewLoading": "Se acordă…",
+        "previewError": "Previzualizarea nu e disponibilă",
+        "live": "Live",
+        "progress": "Progresul emisiunii",
+        "watch": "Urmărește"
+    },
+    "guide": {
+        "title": "Ghid TV",
+        "days": "Ziua",
+        "today": "Azi",
+        "now": "Acum",
+        "empty": {
+            "noSources": "Nicio sursă TV live încă",
+            "noChannels": "Niciun canal de afișat",
+            "body": "Adaugă o sursă M3U / Xtream / HDHomeRun cu ghid XMLTV și grila de programe se completează.",
+            "cta": "Gestionează sursele"
+        },
+        "help": "Folosește săgețile pentru a te muta între emisiuni: stânga și dreapta schimbă ora, sus și jos schimbă canalul. Page Up și Page Down sar câte zece canale. Apasă Enter pentru detalii.",
+        "gridLabel": "Ghidul programelor",
+        "watchChannel": "Urmărește {name}",
+        "hasCatchup": "Arhivă disponibilă",
+        "airing": "rulează acum",
+        "noData": "Fără informații",
+        "sheet": {
+            "minutes": "{count, plural, one {# min} few {# min} other {# min}}",
+            "airing": "Rulează acum",
+            "noDescription": "Fără descriere.",
+            "watchLive": "Urmărește live",
+            "watchFromStart": "Urmărește de la început",
+            "record": "Înregistrează",
+            "recordSeries": "Înregistrează serialul",
+            "recordScheduled": "„{title}” va fi înregistrat",
+            "recordConflict": "„{title}” este programat, dar se suprapune cu alte înregistrări (limita de tunere)",
+            "recordFailed": "Programarea a eșuat: {msg}",
+            "seriesCreated": "Fiecare „{title}” va fi înregistrat",
+            "notAvailable": "Emisiunea s-a încheiat, iar canalul nu are arhivă pentru ea.",
+            "startsAt": "Începe {time}"
+        }
+    },
+    "player": {
+        "title": "Player TV live",
+        "label": "Player TV live: {name}",
+        "roleDescription": "player TV",
+        "loading": "Se încarcă fluxul",
+        "live": "Live",
+        "catchup": "Din arhivă · {time}",
+        "backToLive": "Înapoi la live",
+        "back": "Înapoi",
+        "progress": "Progresul emisiunii",
+        "noInfo": "Fără informații despre program",
+        "next": "Urmează {time} · {title}",
+        "controls": "Comenzi player",
+        "prev": "Canalul anterior",
+        "nextChannel": "Canalul următor",
+        "play": "Redă",
+        "pause": "Pauză",
+        "mute": "Fără sunet",
+        "unmute": "Cu sunet",
+        "record": "Înregistrează",
+        "guide": "Ghid",
+        "fullscreen": "Ecran complet",
+        "exitFullscreen": "Ieși din ecran complet",
+        "stripLabel": "Canale apropiate",
+        "typedNumber": "Canalul {n}",
+        "noLastChannel": "Nu există încă un canal anterior",
+        "noChannelNumber": "Nu există canalul {n}",
+        "recordScheduled": "„{title}” va fi înregistrat",
+        "recordFailed": "Înregistrarea a eșuat: {msg}",
+        "unsupported": "Acest browser nu poate reda acest format de flux (MPEG-TS brut). Încearcă aplicația TV sau Safari."
+    },
+    "recordings": {
+        "title": "Înregistrări",
+        "sections": {
+            "active": "{count, plural, one {Se înregistrează acum} few {Se înregistrează acum (#)} other {Se înregistrează acum (#)}}",
+            "scheduled": "{count, plural, =0 {Programate} one {Programate (#)} few {Programate (#)} other {Programate (#)}}",
+            "done": "{count, plural, =0 {Finalizate} one {Finalizate (#)} few {Finalizate (#)} other {Finalizate (#)}}",
+            "rules": "{count, plural, =0 {Reguli pentru seriale} one {Reguli pentru seriale (#)} few {Reguli pentru seriale (#)} other {Reguli pentru seriale (#)}}"
+        },
+        "status": {
+            "scheduled": "Programată",
+            "recording": "Se înregistrează",
+            "done": "Gata",
+            "failed": "Eșuată",
+            "cancelled": "Anulată"
+        },
+        "conflict": "Conflict de tuner",
+        "fromRule": "Serial",
+        "play": "Redă",
+        "playTitle": "Redă {title}",
+        "cancel": "Anulează",
+        "delete": "Șterge",
+        "noneScheduled": "Nimic programat. Deschide ghidul și alege o emisiune de înregistrat.",
+        "noneDone": "Nicio înregistrare finalizată încă.",
+        "noRules": "Nicio regulă pentru seriale. Folosește „Înregistrează serialul” din ghid.",
+        "ruleChannel": "Pe un singur canal",
+        "ruleAnyChannel": "Pe orice canal",
+        "keepLast": "{count, plural, one {Păstrează ultimul episod} few {Păstrează ultimele # episoade} other {Păstrează ultimele # de episoade}}",
+        "keepAll": "Păstrează toate episoadele",
+        "ruleDisabled": "În pauză",
+        "empty": {
+            "title": "Nicio înregistrare",
+            "body": "Înregistrează o emisiune din ghid sau din player. Înregistrările se salvează pe serverul MMO exact cum au fost difuzate.",
+            "cta": "Deschide ghidul"
+        },
+        "deleted": "„{title}” a fost șters",
+        "cancelled": "„{title}” a fost anulat",
+        "ruleDeleted": "Regula „{title}” a fost ștearsă",
+        "actionFailed": "Nu a funcționat: {msg}",
+        "confirm": {
+            "cancelTitle": "Anulezi această înregistrare?",
+            "cancelBody": "„{title}” nu va fi înregistrat. Ce s-a capturat deja rămâne ca fișier parțial.",
+            "deleteTitle": "Ștergi această înregistrare?",
+            "deleteBody": "„{title}” și fișierul de pe serverul MMO se șterg definitiv.",
+            "ruleTitle": "Ștergi această regulă?",
+            "ruleBody": "Episoadele noi din „{title}” nu se mai înregistrează. Înregistrările existente rămân.",
+            "keep": "Păstrează",
+            "confirm": "Da, continuă"
+        },
+        "playerLabel": "Înregistrare: {title}",
+        "notInLibrary": "Folderul de înregistrări nu este un folder de bibliotecă pe serverul MMO, așa că fișierul nu poate fi redat. Adaugă un folder de tip „înregistrări” în setările serverului.",
+        "unsupported": "Acest browser nu poate reda această înregistrare."
+    },
+    "sources": {
+        "title": "Surse TV live",
+        "add": "Adaugă sursă",
+        "listLabel": "Surse",
+        "kinds": {
+            "m3u": "Playlist M3U",
+            "xtream": "Xtream Codes",
+            "hdhomerun": "HDHomeRun"
+        },
+        "enabled": "Activă",
+        "disabled": "Dezactivată",
+        "channelCount": "{count, plural, =0 {Niciun canal} one {# canal} few {# canale} other {# de canale}}",
+        "noXmltv": "Fără ghid (XMLTV)",
+        "lastRefresh": "Actualizată {time}",
+        "guideRefresh": "ghid {time}",
+        "refreshing": "Prima actualizare e în curs…",
+        "never": "Niciodată actualizată",
+        "lastError": "Ultima actualizare a eșuat: {msg}",
+        "guideError": "Ghidul a eșuat: {msg}",
+        "test": "Testează",
+        "refresh": "Actualizează",
+        "edit": "Editează",
+        "delete": "Șterge",
+        "testOk": "{count, plural, =0 {Conectat, dar fără canale} one {Funcționează: # canal} few {Funcționează: # canale} other {Funcționează: # de canale}}",
+        "testFailed": "Testul a eșuat: {msg}",
+        "refreshed": "{name} a fost actualizată",
+        "refreshFailed": "Actualizarea a eșuat: {msg}",
+        "deleted": "{name} a fost ștearsă",
+        "deleteFailed": "Nu s-a putut șterge: {msg}",
+        "empty": {
+            "title": "Nicio sursă încă",
+            "body": "Adaugă o sursă M3U / Xtream / HDHomeRun. Serverul MMO încarcă canalele și ghidul, apoi toate dispozitivele le văd."
+        },
+        "confirmDelete": {
+            "title": "Ștergi această sursă?",
+            "body": "{name}, canalele, favoritele și ghidul ei se elimină. Înregistrările deja salvate rămân.",
+            "keep": "Păstrează"
+        },
+        "form": {
+            "addTitle": "Adaugă o sursă",
+            "editTitle": "Editează sursa",
+            "kind": "Tipul sursei",
+            "kinds": {
+                "m3u": { "name": "Playlist M3U", "desc": "Un URL sau o cale către o listă .m3u / .m3u8 de la furnizor" },
+                "xtream": { "name": "Xtream Codes", "desc": "Adresa serverului, cu utilizator și parolă" },
+                "hdhomerun": { "name": "HDHomeRun", "desc": "Un tuner TV de rețea din LAN-ul tău" }
+            },
+            "name": "Nume",
+            "url": {
+                "m3u": "URL-ul sau calea playlistului",
+                "xtream": "Adresa serverului",
+                "hdhomerun": "IP-ul sau URL-ul tunerului"
+            },
+            "urlPlaceholder": {
+                "m3u": "https://furnizor.exemplu/playlist.m3u",
+                "xtream": "http://furnizor.exemplu:8080",
+                "hdhomerun": "192.168.1.50"
+            },
+            "urlHint": {
+                "m3u": "Este citit de serverul MMO, deci merge și o cale locală de pe server.",
+                "xtream": "Doar adresa și portul, fără /player_api.php.",
+                "hdhomerun": "Adresa tunerului; discover.json și lineup.json sunt găsite automat."
+            },
+            "username": "Utilizator",
+            "password": "Parolă",
+            "passwordKeep": "Lasă gol ca să păstrezi parola salvată.",
+            "xmltv": "URL ghid (XMLTV, opțional)",
+            "xmltvHint": "Folosește linkul EPG de la furnizor sau lasă gol dacă playlistul are url-tvg.",
+            "xmltvHintXtream": "Lasă gol ca să folosești ghidul furnizorului (xmltv.php).",
+            "refreshHours": "Actualizează la fiecare (ore)",
+            "tunerLimit": "Fluxuri simultane (opțional)",
+            "tunerHint": "Câte canale pot rula sau înregistra în același timp. Gol = valoarea furnizorului.",
+            "enabled": "Activă",
+            "cancel": "Renunță",
+            "save": "Salvează",
+            "create": "Adaugă sursa",
+            "created": "{name} a fost adăugată. Se încarcă canalele…",
+            "updated": "{name} a fost salvată",
+            "serverError": "Serverul MMO a refuzat sursa: {msg}",
+            "errors": {
+                "name": "Dă un nume sursei.",
+                "url": "Introdu adresa.",
+                "username": "Sursele Xtream au nevoie de utilizator.",
+                "password": "Sursele Xtream au nevoie de parolă.",
+                "refreshHours": "Folosește un număr întreg între 1 și 720.",
+                "tunerLimit": "Folosește un număr întreg între 1 și 64."
+            }
+        },
+        "channels": {
+            "title": "Canale",
+            "body": "Ascunde canalele pe care nu le urmărești și schimbă-le numerele. Modificările se aplică pe toate dispozitivele.",
+            "search": "Filtrează canalele",
+            "source": "Sursa",
+            "allSources": "Toate sursele",
+            "onlyHidden": "Doar ascunse",
+            "count": "{count, plural, =0 {Niciun canal} one {# canal} few {# canale} other {# de canale}}",
+            "none": "Niciun canal nu se potrivește.",
+            "number": "Nr.",
+            "name": "Canal",
+            "group": "Grup",
+            "visible": "Vizibilitate",
+            "numberFor": "Numărul pentru {name}",
+            "hide": "Ascunde {name}",
+            "unhide": "Afișează {name}",
+            "hidden": "Ascuns",
+            "shown": "Afișat",
+            "more": "{count, plural, one {Arată încă #} few {Arată încă #} other {Arată încă #}}"
+        }
+    }
+}

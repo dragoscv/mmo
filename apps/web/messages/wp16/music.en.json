@@ -1,0 +1,114 @@
+{
+    "title": "Music",
+    "tabs": {
+        "label": "Music sections",
+        "home": "Home",
+        "artists": "Artists",
+        "albums": "Albums"
+    },
+    "search": {
+        "title": "Search music",
+        "label": "Search artists, albums and songs",
+        "placeholder": "Artists, albums, songs…",
+        "hint": "Type to search your music library.",
+        "none": "Nothing matches “{q}”.",
+        "tracks": "Songs",
+        "artists": "Artists",
+        "albums": "Albums"
+    },
+    "home": {
+        "surprise": "Surprise me",
+        "recent": "Recently played",
+        "newest": "Recently added",
+        "genres": "Genres",
+        "mostPlayed": "Most played",
+        "playlists": "Playlists",
+        "random": "Rediscover"
+    },
+    "letters": {
+        "label": "Filter by first letter",
+        "all": "All",
+        "other": "Numbers and symbols",
+        "none": "Nothing starts with {letter}.",
+        "more": "Load more ({shown} of {total})"
+    },
+    "count": {
+        "albums": "{count, plural, =0 {No albums} one {# album} other {# albums}}",
+        "tracks": "{count, plural, =0 {No songs} one {# song} other {# songs}}",
+        "artists": "{count, plural, =0 {No artists} one {# artist} other {# artists}}"
+    },
+    "state": {
+        "loading": "Loading music…",
+        "error": "Could not load music",
+        "errorBody": "The MMO Server did not answer. Check that it is running, then try again.",
+        "retry": "Retry",
+        "emptyLibrary": "Your music library is empty",
+        "emptyLibraryBody": "Add a music folder on the server and scan it. Albums and artists show up here right away.",
+        "notFound": "Not found",
+        "notFoundBody": "This item is no longer in the library. It may have been moved or removed.",
+        "backToMusic": "Back to Music"
+    },
+    "track": {
+        "playLabel": "Play {title}, {duration}",
+        "lyrics": "Has lyrics"
+    },
+    "album": {
+        "kicker": "Album",
+        "disc": "Disc {n}",
+        "tracklist": "Track list",
+        "empty": "This album has no playable songs."
+    },
+    "artist": {
+        "kicker": "Artist",
+        "top": "Top songs",
+        "albums": "Albums",
+        "similar": "Similar artists"
+    },
+    "playlist": {
+        "kicker": "Playlist",
+        "empty": "This playlist is empty."
+    },
+    "genre": {
+        "kicker": "Genre"
+    },
+    "actions": {
+        "playAll": "Play",
+        "shuffle": "Shuffle",
+        "addToQueue": "Add to queue"
+    },
+    "player": {
+        "nowPlaying": "Now playing",
+        "nothing": "Nothing is playing",
+        "nothingBody": "Pick an album, a playlist or press Surprise me to start listening.",
+        "controls": "Playback controls",
+        "panel": "Lyrics and queue",
+        "play": "Play",
+        "pause": "Pause",
+        "prev": "Previous",
+        "next": "Next",
+        "shuffle": "Shuffle",
+        "repeatOff": "Repeat: off",
+        "repeatAll": "Repeat: all",
+        "repeatOne": "Repeat: this song",
+        "seek": "Position",
+        "volume": "Volume",
+        "mute": "Mute",
+        "unmute": "Unmute",
+        "error": "This song cannot be played",
+        "buffering": "Buffering…",
+        "lyrics": "Lyrics",
+        "lyricsLoading": "Loading lyrics…",
+        "lyricsRetry": "Load lyrics again",
+        "noLyrics": "No lyrics for this song.",
+        "seekToLine": "Jump to {time}: {text}",
+        "queue": "{count, plural, one {Queue (#)} other {Queue (#)}}",
+        "queueLabel": "Play queue",
+        "queueEmpty": "The queue is empty.",
+        "playItem": "Play {title}",
+        "moveUp": "Move {title} up",
+        "moveDown": "Move {title} down",
+        "remove": "Remove {title} from the queue",
+        "mini": "Music player",
+        "openNowPlaying": "Open Now playing: {title}"
+    }
+}

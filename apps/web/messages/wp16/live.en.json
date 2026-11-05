@@ -1,0 +1,278 @@
+{
+    "nav": {
+        "label": "Live TV sections",
+        "channels": "Channels",
+        "guide": "Guide",
+        "recordings": "Recordings",
+        "sources": "Sources"
+    },
+    "common": {
+        "loading": "Loading…"
+    },
+    "channels": {
+        "title": "Live TV",
+        "favAdded": "{name} added to favourites",
+        "favRemoved": "{name} removed from favourites",
+        "favFailed": "Could not update favourites: {msg}",
+        "noSources": {
+            "title": "No Live TV sources yet",
+            "body": "Add an M3U playlist, an Xtream Codes account or an HDHomeRun tuner on your MMO Server and your channels show up here.",
+            "cta": "Add an M3U / Xtream / HDHomeRun source"
+        },
+        "noChannels": {
+            "title": "No channels yet",
+            "body": "Your sources have no visible channels. They may still be refreshing, or every channel is hidden.",
+            "cta": "Manage sources"
+        },
+        "search": "Search channels",
+        "searchPlaceholder": "Search by name, number or group",
+        "favFirst": "Favourites first",
+        "count": "{count, plural, =0 {No channels} one {# channel} other {# channels}}",
+        "groups": "Channel groups",
+        "allGroups": "All",
+        "favourites": "Favourites",
+        "ungrouped": "Other",
+        "noMatch": {
+            "title": "No channel matches",
+            "body": "Try another name or number, or clear the group filter.",
+            "reset": "Clear filters"
+        },
+        "listLabel": "Channels",
+        "playChannel": "Watch {name}, now: {now}",
+        "noInfo": "No programme information",
+        "next": "Next {time} · {title}",
+        "favourite": "Add {name} to favourites",
+        "unfavourite": "Remove {name} from favourites",
+        "preview": "Preview of {name}",
+        "previewLoading": "Tuning in…",
+        "previewError": "Preview not available",
+        "live": "Live",
+        "progress": "Programme progress",
+        "watch": "Watch"
+    },
+    "guide": {
+        "title": "TV guide",
+        "days": "Day",
+        "today": "Today",
+        "now": "Now",
+        "empty": {
+            "noSources": "No Live TV sources yet",
+            "noChannels": "No channels to show",
+            "body": "Add an M3U / Xtream / HDHomeRun source with an XMLTV guide and the programme grid fills in.",
+            "cta": "Manage sources"
+        },
+        "help": "Use the arrow keys to move between programmes: left and right change the time, up and down change the channel. Page Up and Page Down jump ten channels. Press Enter for details.",
+        "gridLabel": "Programme guide",
+        "watchChannel": "Watch {name}",
+        "hasCatchup": "Catch-up available",
+        "airing": "on now",
+        "noData": "No information",
+        "sheet": {
+            "minutes": "{count, plural, one {# min} other {# min}}",
+            "airing": "On now",
+            "noDescription": "No description.",
+            "watchLive": "Watch live",
+            "watchFromStart": "Watch from the start",
+            "record": "Record",
+            "recordSeries": "Record series",
+            "recordScheduled": "“{title}” will be recorded",
+            "recordConflict": "“{title}” is scheduled, but it overlaps other recordings (tuner limit)",
+            "recordFailed": "Could not schedule: {msg}",
+            "seriesCreated": "Every “{title}” will be recorded",
+            "notAvailable": "This programme has ended and the channel has no catch-up archive for it.",
+            "startsAt": "Starts {time}"
+        }
+    },
+    "player": {
+        "title": "Live TV player",
+        "label": "Live TV player: {name}",
+        "roleDescription": "TV player",
+        "loading": "Loading the stream",
+        "live": "Live",
+        "catchup": "Catch-up · {time}",
+        "backToLive": "Back to live",
+        "back": "Back",
+        "progress": "Programme progress",
+        "noInfo": "No programme information",
+        "next": "Next {time} · {title}",
+        "controls": "Player controls",
+        "prev": "Previous channel",
+        "nextChannel": "Next channel",
+        "play": "Play",
+        "pause": "Pause",
+        "mute": "Mute",
+        "unmute": "Unmute",
+        "record": "Record",
+        "guide": "Guide",
+        "fullscreen": "Full screen",
+        "exitFullscreen": "Exit full screen",
+        "stripLabel": "Nearby channels",
+        "typedNumber": "Channel {n}",
+        "noLastChannel": "No previous channel yet",
+        "noChannelNumber": "There is no channel {n}",
+        "recordScheduled": "“{title}” will be recorded",
+        "recordFailed": "Could not record: {msg}",
+        "unsupported": "This browser cannot play this stream format (raw MPEG-TS). Try the TV app or Safari."
+    },
+    "recordings": {
+        "title": "Recordings",
+        "sections": {
+            "active": "{count, plural, one {Recording now} other {Recording now (#)}}",
+            "scheduled": "{count, plural, =0 {Scheduled} other {Scheduled (#)}}",
+            "done": "{count, plural, =0 {Completed} other {Completed (#)}}",
+            "rules": "{count, plural, =0 {Series rules} other {Series rules (#)}}"
+        },
+        "status": {
+            "scheduled": "Scheduled",
+            "recording": "Recording",
+            "done": "Done",
+            "failed": "Failed",
+            "cancelled": "Cancelled"
+        },
+        "conflict": "Tuner conflict",
+        "fromRule": "Series",
+        "play": "Play",
+        "playTitle": "Play {title}",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "noneScheduled": "Nothing scheduled. Open the guide and pick a programme to record.",
+        "noneDone": "No finished recordings yet.",
+        "noRules": "No series rules. Use “Record series” in the guide.",
+        "ruleChannel": "On one channel",
+        "ruleAnyChannel": "On any channel",
+        "keepLast": "{count, plural, one {Keeps the last episode} other {Keeps the last # episodes}}",
+        "keepAll": "Keeps every episode",
+        "ruleDisabled": "Paused",
+        "empty": {
+            "title": "No recordings",
+            "body": "Record a programme from the guide or the player. Recordings are saved on your MMO Server exactly as broadcast.",
+            "cta": "Open the guide"
+        },
+        "deleted": "“{title}” deleted",
+        "cancelled": "“{title}” cancelled",
+        "ruleDeleted": "Series rule “{title}” deleted",
+        "actionFailed": "That did not work: {msg}",
+        "confirm": {
+            "cancelTitle": "Cancel this recording?",
+            "cancelBody": "“{title}” will not be recorded. Anything already captured is kept as a partial file.",
+            "deleteTitle": "Delete this recording?",
+            "deleteBody": "“{title}” and its file on the MMO Server are deleted for good.",
+            "ruleTitle": "Delete this series rule?",
+            "ruleBody": "New episodes of “{title}” stop being recorded. Existing recordings stay.",
+            "keep": "Keep",
+            "confirm": "Yes, continue"
+        },
+        "playerLabel": "Recording: {title}",
+        "notInLibrary": "The recordings folder is not a library folder on the MMO Server, so the file cannot be streamed. Add a “recordings” folder in the server settings.",
+        "unsupported": "This browser cannot play this recording."
+    },
+    "sources": {
+        "title": "Live TV sources",
+        "add": "Add source",
+        "listLabel": "Sources",
+        "kinds": {
+            "m3u": "M3U playlist",
+            "xtream": "Xtream Codes",
+            "hdhomerun": "HDHomeRun"
+        },
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "channelCount": "{count, plural, =0 {No channels} one {# channel} other {# channels}}",
+        "noXmltv": "No guide (XMLTV)",
+        "lastRefresh": "Refreshed {time}",
+        "guideRefresh": "guide {time}",
+        "refreshing": "Refreshing for the first time…",
+        "never": "Never refreshed",
+        "lastError": "Last refresh failed: {msg}",
+        "guideError": "Guide failed: {msg}",
+        "test": "Test",
+        "refresh": "Refresh",
+        "edit": "Edit",
+        "delete": "Delete",
+        "testOk": "{count, plural, =0 {Connected, but no channels found} one {Works: # channel} other {Works: # channels}}",
+        "testFailed": "Test failed: {msg}",
+        "refreshed": "{name} refreshed",
+        "refreshFailed": "Refresh failed: {msg}",
+        "deleted": "{name} deleted",
+        "deleteFailed": "Could not delete: {msg}",
+        "empty": {
+            "title": "No sources yet",
+            "body": "Add an M3U / Xtream / HDHomeRun source. The MMO Server loads the channels and the guide; every device then sees them."
+        },
+        "confirmDelete": {
+            "title": "Delete this source?",
+            "body": "{name}, its channels, favourites and guide are removed. Recordings already on disk stay.",
+            "keep": "Keep"
+        },
+        "form": {
+            "addTitle": "Add a source",
+            "editTitle": "Edit source",
+            "kind": "Source type",
+            "kinds": {
+                "m3u": { "name": "M3U playlist", "desc": "A URL or file path to an .m3u / .m3u8 list from your provider" },
+                "xtream": { "name": "Xtream Codes", "desc": "Server address with your username and password" },
+                "hdhomerun": { "name": "HDHomeRun", "desc": "A network TV tuner on your LAN" }
+            },
+            "name": "Name",
+            "url": {
+                "m3u": "Playlist URL or path",
+                "xtream": "Server address",
+                "hdhomerun": "Tuner IP or URL"
+            },
+            "urlPlaceholder": {
+                "m3u": "https://provider.example/playlist.m3u",
+                "xtream": "http://provider.example:8080",
+                "hdhomerun": "192.168.1.50"
+            },
+            "urlHint": {
+                "m3u": "Read by the MMO Server, so a local path on the server works too.",
+                "xtream": "Only the address and port, without /player_api.php.",
+                "hdhomerun": "The tuner’s address; discover.json and lineup.json are found automatically."
+            },
+            "username": "Username",
+            "password": "Password",
+            "passwordKeep": "Leave empty to keep the saved password.",
+            "xmltv": "Guide URL (XMLTV, optional)",
+            "xmltvHint": "Use the EPG link from your provider, or leave empty if the playlist has url-tvg.",
+            "xmltvHintXtream": "Leave empty to use the provider’s own guide (xmltv.php).",
+            "refreshHours": "Refresh every (hours)",
+            "tunerLimit": "Simultaneous streams (optional)",
+            "tunerHint": "How many channels can play or record at once. Empty = provider default.",
+            "enabled": "Enabled",
+            "cancel": "Cancel",
+            "save": "Save",
+            "create": "Add source",
+            "created": "{name} added. Loading channels…",
+            "updated": "{name} saved",
+            "serverError": "The MMO Server refused the source: {msg}",
+            "errors": {
+                "name": "Give the source a name.",
+                "url": "Enter the address.",
+                "username": "Xtream sources need a username.",
+                "password": "Xtream sources need a password.",
+                "refreshHours": "Use a whole number between 1 and 720.",
+                "tunerLimit": "Use a whole number between 1 and 64."
+            }
+        },
+        "channels": {
+            "title": "Channels",
+            "body": "Hide channels you never watch and change their numbers. Changes apply on every device.",
+            "search": "Filter channels",
+            "source": "Source",
+            "allSources": "All sources",
+            "onlyHidden": "Only hidden",
+            "count": "{count, plural, =0 {No channels} one {# channel} other {# channels}}",
+            "none": "No channels match.",
+            "number": "No.",
+            "name": "Channel",
+            "group": "Group",
+            "visible": "Visibility",
+            "numberFor": "Number for {name}",
+            "hide": "Hide {name}",
+            "unhide": "Show {name}",
+            "hidden": "Hidden",
+            "shown": "Shown",
+            "more": "{count, plural, one {Show # more} other {Show # more}}"
+        }
+    }
+}

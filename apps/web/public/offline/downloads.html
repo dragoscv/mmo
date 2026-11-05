@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>MixAI</title>
+<!--
+  Static offline shell for /media/downloads (WP16-42). The service worker serves this file for
+  /media/downloads* navigations ONLY when the network is down; it is user-agnostic (no data in the HTML),
+  everything comes from IndexedDB `mixai-offline` + Cache Storage `mixai-offline-v1` via /__offline/*.
+  Colours come from the design tokens in /globals.css; theme/lang from /prehydrate.js (mixai:prefs:v1).
+-->
+<script src="/prehydrate.js"></script>
+<link rel="stylesheet" href="/globals.css">
+<link rel="icon" href="/icon-192.png">
+<style>
+  body { margin: 0; min-height: 100dvh; background: var(--background); color: var(--foreground); font-family: var(--font-sans, system-ui, sans-serif); }
+  .od-wrap { box-sizing: border-box; width: 100%; max-width: 1600px; margin: 0 auto; padding: 1.25rem clamp(1rem, 3vw, 3rem) 3rem; }
+  .od-banner { display: flex; gap: .5rem; align-items: center; padding: .6rem .9rem; border-radius: var(--radius, .75rem); border: 1px solid var(--border); background: var(--muted); color: var(--muted-foreground); font-size: .9rem; }
+  .od-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 1rem; padding: 1.25rem 0 1rem; }
+  .od-title { margin: 0; font-size: clamp(1.6rem, 2.6vw, 2.6rem); font-weight: 800; letter-spacing: -.02em; }
+  .od-meta { color: var(--muted-foreground); font-size: .9rem; }
+  .od-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .75rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+  .od-item { display: flex; gap: .9rem; align-items: center; padding: .75rem; border-radius: var(--radius, .75rem); border: 1px solid var(--border); background: var(--card); color: var(--card-foreground); }
+  .od-poster { flex: none; width: 4rem; aspect-ratio: 2 / 3; border-radius: calc(var(--radius, .75rem) * .6); object-fit: cover; background: var(--muted); }
+  .od-poster[data-kind="track"] { aspect-ratio: 1; }
+  .od-body { flex: 1; min-width: 0; }
+  .od-name { margin: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .od-sub { margin: .15rem 0 0; color: var(--muted-foreground); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .od-btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 2.5rem; padding: 0 1rem; border-radius: var(--radius, .75rem); border: 1px solid var(--border); background: var(--primary); color: var(--primary-foreground); font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+  .od-btn[data-variant="ghost"] { background: transparent; color: var(--foreground); }
+  .od-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .od-empty { padding: 3rem 1rem; text-align: center; color: var(--muted-foreground); }
+  .od-player { display: grid; gap: 1rem; }
+  .od-player video { width: 100%; max-height: 80dvh; background: var(--foreground); border-radius: var(--radius, .75rem); }
+  .od-player audio { width: 100%; }
+  .od-art { width: min(100%, 22rem); aspect-ratio: 1; object-fit: cover; border-radius: var(--radius, .75rem); background: var(--muted); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+  <div class="od-wrap">
+    <p class="od-banner" role="status" id="od-banner"></p>
+    <main id="od-main" aria-live="polite"></main>
+  </div>
+  <script src="/offline/downloads.js"></script>
+</body>
+</html>

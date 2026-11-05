@@ -1,0 +1,95 @@
+{
+    "page": {
+        "title": "Descărcări",
+        "subtitle": "Salvate pe acest dispozitiv pentru {profile}. Se redau și fără conexiune.",
+        "count": "{count, plural, =0 {Niciun fișier} one {# fișier} few {# fișiere} other {# de fișiere}}",
+        "loading": "Se încarcă descărcările…",
+        "deleteAll": "Șterge tot",
+        "unsupported": "Browserul acesta nu poate păstra descărcări pentru redare offline.",
+        "error": "Descărcările nu au putut fi citite de pe acest dispozitiv.",
+        "retry": "Reîncearcă",
+        "offlineBanner": "Ești offline. Titlurile descărcate se redau în continuare."
+    },
+    "empty": {
+        "title": "Nimic descărcat încă",
+        "body": "Apasă Descarcă la un film, un episod sau o piesă și apare aici, gata de redat offline.",
+        "cta": "Răsfoiește media"
+    },
+    "storage": {
+        "label": "Spațiu pe acest dispozitiv",
+        "used": "{used} folosiți de descărcări",
+        "available": "{free} disponibili",
+        "unknown": "Spațiul disponibil nu este cunoscut",
+        "persisted": "Protejate de curățarea automată",
+        "notPersisted": "Browserul poate șterge descărcările când rămâne fără spațiu"
+    },
+    "status": {
+        "queued": "În așteptare",
+        "downloading": "Se descarcă {percent}%",
+        "downloadingUnknown": "Se descarcă… {bytes}",
+        "paused": "Pe pauză",
+        "done": "Descărcat",
+        "error": "Eșuat"
+    },
+    "errors": {
+        "network": "Conexiunea s-a pierdut. Reîncearcă după ce revii online.",
+        "quota": "Nu este destul spațiu pe acest dispozitiv ({free} liberi).",
+        "http": "Serverul a răspuns cu o eroare ({status}).",
+        "auth": "Serverul a refuzat descărcarea. Reconectează serverul și reîncearcă.",
+        "missing": "Fișierul nu mai este disponibil.",
+        "storage": "Browserul nu a putut salva fișierul.",
+        "unknown": "Ceva n-a mers bine."
+    },
+    "item": {
+        "play": "Redă",
+        "playNamed": "Redă {title} offline",
+        "pause": "Pauză",
+        "pauseNamed": "Pune pe pauză descărcarea pentru {title}",
+        "resume": "Continuă",
+        "resumeNamed": "Continuă descărcarea pentru {title}",
+        "retry": "Reîncearcă",
+        "retryNamed": "Reîncearcă descărcarea pentru {title}",
+        "delete": "Șterge",
+        "deleteNamed": "Șterge descărcarea pentru {title}",
+        "progressLabel": "Progresul descărcării pentru {title}",
+        "size": "{done} din {total}",
+        "kind": {
+            "movie": "Film",
+            "episode": "Episod",
+            "track": "Piesă"
+        }
+    },
+    "confirm": {
+        "title": "Ștergi toate descărcările?",
+        "body": "{count, plural, one {# fișier} few {# fișiere} other {# de fișiere}} ({size}) vor fi șterse de pe acest dispozitiv pentru {profile}. Le poți descărca din nou oricând.",
+        "cancel": "Anulează",
+        "confirm": "Șterge tot"
+    },
+    "player": {
+        "back": "Înapoi la descărcări",
+        "loading": "Se încarcă…",
+        "missing": "Descărcarea aceasta nu mai este pe acest dispozitiv.",
+        "error": "Fișierul nu a putut fi redat.",
+        "offline": "Se redă de pe acest dispozitiv"
+    },
+    "button": {
+        "download": "Descarcă",
+        "downloadNamed": "Descarcă {title} pentru offline",
+        "queued": "În așteptare",
+        "progress": "{percent}%",
+        "progressNamed": "Se descarcă {title}, {percent}%. Apasă pentru pauză.",
+        "paused": "Pe pauză",
+        "pausedNamed": "Descărcarea pentru {title} e pe pauză. Apasă pentru a continua.",
+        "done": "Descărcat",
+        "doneNamed": "{title} este descărcat. Deschide descărcările.",
+        "error": "Reîncearcă",
+        "errorNamed": "Descărcarea pentru {title} a eșuat. Apasă pentru a reîncerca.",
+        "unavailable": "Descărcările offline nu sunt disponibile în acest browser",
+        "live": {
+            "queued": "{title} a fost adăugat la descărcări",
+            "progress": "{title}: {percent}% descărcat",
+            "done": "{title} a fost descărcat",
+            "error": "Descărcarea pentru {title} a eșuat"
+        }
+    }
+}

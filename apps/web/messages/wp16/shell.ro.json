@@ -1,0 +1,49 @@
+{
+    "nav": {
+        "label": "Media",
+        "home": "Acasă",
+        "search": "Caută",
+        "movies": "Filme",
+        "shows": "Seriale",
+        "music": "Muzică",
+        "live": "TV live",
+        "list": "Lista mea",
+        "stats": "Anul tău",
+        "collections": "Colecții",
+        "downloads": "Descărcări"
+    },
+    "hub": {
+        "connected": "Conectat la {server}",
+        "connecting": "Se conectează la {server}…",
+        "disconnected": "{server} nu răspunde",
+        "devices": "{count, plural, =0 {Niciun alt dispozitiv} one {# dispozitiv online} few {# dispozitive online} other {# de dispozitive online}}"
+    },
+    "profile": {
+        "switch": "Schimbă profilul",
+        "manage": "Gestionează profilurile",
+        "kid": "Copii",
+        "menu": "Meniul profilului {name}"
+    },
+    "noServer": {
+        "title": "Asociază mai întâi un MMO Server",
+        "body": "Filmele, serialele, muzica și TV-ul live vin de pe propriul tău MMO Server. Asociază unul și apare aici.",
+        "cta": "Asociază un server"
+    },
+    "offline": {
+        "title": "{server} este offline",
+        "body": "Vezi ce s-a salvat pe acest dispozitiv. Pornește serverul ca să răsfoiești și să redai."
+    },
+    "home": {
+        "empty": "Încă nimic aici",
+        "emptyBody": "Adaugă un folder de filme sau seriale pe server și scanează-l. Titlurile noi apar aici imediat.",
+        "loading": "Se încarcă pagina principală…",
+        "retry": "Reîncearcă",
+        "error": "Pagina principală nu s-a putut încărca",
+        "seeAll": "Vezi tot",
+        "play": "Redă",
+        "info": "Detalii",
+        "myList": "Lista mea",
+        "inList": "În lista mea",
+        "surprise": "Surprinde-mă"
+    }
+}

@@ -153,7 +153,19 @@ const nextConfig: NextConfig = {
 
     // Route renames. `/downloads` became `/get` (WP2-13); keep old links alive.
     async redirects() {
-        return [{ source: "/downloads", destination: "/get", permanent: true }];
+        // WP16 D31: the cinematic `/media` surface replaces `/watch/*` sections. Temporary (307) while
+        // the legacy pages still exist for deep links (detail pages redirect themselves when a TMDB id
+        // is known; `/watch/play/*` and `/watch/settings` stay).
+        const media = (source: string, destination: string) => ({ source, destination, permanent: false });
+        return [
+            { source: "/downloads", destination: "/get", permanent: true },
+            media("/watch", "/media"),
+            media("/watch/movies", "/media/browse/movie"),
+            media("/watch/shows", "/media/browse/tv"),
+            media("/watch/continue", "/media"),
+            media("/watch/stats", "/media/stats"),
+            media("/watch/collections", "/media/collections"),
+        ];
     },
 
     // Cross-origin / security headers applied globally. Auth.js, Server

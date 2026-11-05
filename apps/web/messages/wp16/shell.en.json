@@ -1,0 +1,49 @@
+{
+    "nav": {
+        "label": "Media",
+        "home": "Home",
+        "search": "Search",
+        "movies": "Movies",
+        "shows": "TV shows",
+        "music": "Music",
+        "live": "Live TV",
+        "list": "My list",
+        "stats": "Year in review",
+        "collections": "Collections",
+        "downloads": "Downloads"
+    },
+    "hub": {
+        "connected": "Connected to {server}",
+        "connecting": "Connecting to {server}…",
+        "disconnected": "{server} is not reachable",
+        "devices": "{count, plural, =0 {No other devices} one {# device online} other {# devices online}}"
+    },
+    "profile": {
+        "switch": "Switch profile",
+        "manage": "Manage profiles",
+        "kid": "Kids",
+        "menu": "Profile menu for {name}"
+    },
+    "noServer": {
+        "title": "Pair an MMO Server first",
+        "body": "Movies, shows, music and Live TV come from your own MMO Server. Pair one and it shows up here.",
+        "cta": "Pair a server"
+    },
+    "offline": {
+        "title": "{server} is offline",
+        "body": "Showing what was cached on this device. Start the server to browse and play."
+    },
+    "home": {
+        "empty": "Nothing here yet",
+        "emptyBody": "Add a movie or TV folder on the server and scan it. New titles show up here right away.",
+        "loading": "Loading your home…",
+        "retry": "Retry",
+        "error": "Could not load Home",
+        "seeAll": "See all",
+        "play": "Play",
+        "info": "More info",
+        "myList": "My list",
+        "inList": "In my list",
+        "surprise": "Surprise me"
+    }
+}

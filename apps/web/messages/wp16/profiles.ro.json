@@ -1,0 +1,19 @@
+{
+    "gate": {
+        "title": "Cine se uită?",
+        "manage": "Gestionează profilurile",
+        "locked": "Blocat cu PIN",
+        "kid": "Copii",
+        "loading": "Se încarcă profilurile…"
+    },
+    "pin": {
+        "title": "Introdu PIN-ul pentru {name}",
+        "digit": "Cifra {n}",
+        "wrong": "PIN greșit. {tries, plural, =0 {} one {Mai ai # încercare.} few {Mai ai # încercări.} other {Mai ai # de încercări.}}",
+        "locked": "Prea multe încercări. Reîncearcă peste {minutes, plural, one {# minut} few {# minute} other {# de minute}}.",
+        "error": "PIN-ul nu a putut fi verificat: {message}",
+        "back": "Înapoi",
+        "clear": "Șterge",
+        "hint": "Tastează cele 4 cifre sau folosește tastatura"
+    }
+}

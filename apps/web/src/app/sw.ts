@@ -17,11 +17,19 @@
  *      which falls back to the IndexedDB `mmo-offline` blob store.
  *   3. `purge-caches` message from `lib/auth-client.ts` (sign-out) wipes
  *      every cache so the next user can't see the previous user's assets.
+ *   4. Offline downloads (WP16-42, `lib/mmo/offline/*`): `/__offline/<key>`
+ *      is answered from Cache Storage `mixai-offline-v1` (Range → 206 for
+ *      `<video>` seeking). Keys are synthetic, never a server URL, so no
+ *      token is ever part of a cache key. The only document served offline
+ *      is the static, user-agnostic `public/offline/downloads.html` (for
+ *      `/media/downloads*` navigations when the network is down); online
+ *      those navigations stay network-only like every other page.
  */
 
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, RuntimeCaching, SerwistGlobalConfig } from "serwist";
 import { NetworkOnly, Serwist } from "serwist";
+import { deleteOfflineDb, handleOfflineRequest, handleShellRequest, isOfflinePath, isShellRequest } from "../lib/mmo/offline/sw-handlers";
 import { AUDIO_ROUTE, handleAudioRequest } from "./sw-offline-audio";
 
 declare global {
@@ -40,6 +48,24 @@ const networkOnly = new NetworkOnly();
  * see a document, an RSC payload or an API call.
  */
 const mixaiRuntimeCaching: RuntimeCaching[] = [
+    {
+        // Offline downloads: stitched from `mixai-offline-v1` parts, with Range support.
+        matcher: ({ url, sameOrigin }) => sameOrigin && isOfflinePath(url.pathname),
+        handler: handleOfflineRequest,
+    },
+    {
+        // `/media/downloads*` + its static shell files: network (nothing cached),
+        // offline → the static downloads shell from `mixai-offline-shell-v1`.
+        matcher: ({ url, request, sameOrigin }) => sameOrigin && isShellRequest(url, request),
+        handler: handleShellRequest,
+    },
+    {
+        // Download-manager fetches of original media files (cross-origin MMO
+        // Server, token in the query): never let the "cross-origin" runtime
+        // cache keep a tokenised multi-GB copy.
+        matcher: ({ request, sameOrigin }) => !sameOrigin && request.cache === "no-store",
+        handler: networkOnly,
+    },
     {
         // HTML documents + Next.js RSC / server-action requests → never cached (PII rule above).
         matcher: ({ request, sameOrigin }) =>
@@ -106,6 +132,8 @@ self.addEventListener("message", (event) => {
             try {
                 const keys = await caches.keys();
                 await Promise.all(keys.map((k) => caches.delete(k)));
+                // Offline download records are per user too (their bytes went with the caches above).
+                await deleteOfflineDb();
             } finally {
                 port?.postMessage({ ok: true });
             }

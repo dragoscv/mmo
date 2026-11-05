@@ -1,0 +1,19 @@
+{
+    "gate": {
+        "title": "Who's watching?",
+        "manage": "Manage profiles",
+        "locked": "Locked with a PIN",
+        "kid": "Kids",
+        "loading": "Loading profiles…"
+    },
+    "pin": {
+        "title": "Enter the PIN for {name}",
+        "digit": "Digit {n}",
+        "wrong": "Wrong PIN. {tries, plural, =0 {} one {# try left.} other {# tries left.}}",
+        "locked": "Too many tries. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+        "error": "Could not check the PIN: {message}",
+        "back": "Back",
+        "clear": "Delete",
+        "hint": "Type the 4 digits or use the keypad"
+    }
+}

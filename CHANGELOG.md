@@ -10,6 +10,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — Better than Plex, part 3 (web 3.0.0 · MMO Server 3.8.0 · `@mmo/sdk` 0.6.1)
+
+- **Web 3.0.0 — one cinematic media surface at `/media`** (WP16-36..42). `/` now opens it (the
+  multi-server fan-out home stays at `/?classic=1`); `/watch`, `/watch/movies|shows|continue|stats|collections`
+  redirect to it and legacy title pages forward to `/media/<kind>/<tmdbId>` when the TMDB id is known.
+  The browser talks to your MMO Server directly (same token the player already used):
+  - "Who's watching" with PIN pad and kids profiles (profiles live on the server, shared with both TVs).
+  - Home from cache in one frame (localStorage per profile, revalidated against `/media/etag`), backdrop that
+    follows hover/focus, hero with logo + muted trailer after 3 s, keyboard roving focus across rows.
+  - Search, library grids with sort/genres/unwatched/A–Z for 1000+ titles, unified title page (versions,
+    seasons + episodes, cast, where to watch, My list, trailer), season pages, My list, collections, year in review.
+  - New player: custom OSD, audio tracks (server `audio=<n>`), subtitles + style, speed, screen fit, skip
+    intro/credits, Up Next, still watching, sleep timer, PiP; Watch Together with sync + chat + reactions;
+    "Play on TV" to any TV on the hub, then remote control from the page. Public guest page `/together`
+    (what the TV QR codes open).
+  - Music: artists, albums, playlists, genres, search, full-screen now playing with synced lyrics and queue,
+    mini-player; plays and the queue sync with the TVs.
+  - Live TV: channels with live preview, EPG grid, zapping with a preloaded second player, catch-up,
+    recordings + series rules, sources (M3U / Xtream / HDHomeRun).
+  - Offline downloads per profile (original files, Range-capable service worker, static offline shell).
+- **MMO Server 3.8.0**: `GET /livetv/recordings/{id}/file` plays finished recordings as recorded (Range).
+
 ## 2026-11-06 — Better than Plex, part 2 (TV Tizen 2.1.0)
 
 - **TV Tizen 2.1.0** — cinematic screens on the 2.0 foundation (WP16-31..34): Home with backdrop that follows

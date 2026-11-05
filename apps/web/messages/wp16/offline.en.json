@@ -1,0 +1,95 @@
+{
+    "page": {
+        "title": "Downloads",
+        "subtitle": "Saved on this device for {profile}. They play without a connection.",
+        "count": "{count, plural, =0 {No files} one {# file} other {# files}}",
+        "loading": "Loading downloads…",
+        "deleteAll": "Delete all",
+        "unsupported": "This browser can't store downloads for offline use.",
+        "error": "Downloads could not be read from this device.",
+        "retry": "Try again",
+        "offlineBanner": "You're offline. Downloaded titles still play."
+    },
+    "empty": {
+        "title": "Nothing downloaded yet",
+        "body": "Use Download on a movie, an episode or a track and it shows up here, ready to play offline.",
+        "cta": "Browse media"
+    },
+    "storage": {
+        "label": "Storage on this device",
+        "used": "{used} used by downloads",
+        "available": "{free} available",
+        "unknown": "Available space unknown",
+        "persisted": "Protected from automatic cleanup",
+        "notPersisted": "The browser may clear downloads when space runs low"
+    },
+    "status": {
+        "queued": "Queued",
+        "downloading": "Downloading {percent}%",
+        "downloadingUnknown": "Downloading… {bytes}",
+        "paused": "Paused",
+        "done": "Downloaded",
+        "error": "Failed"
+    },
+    "errors": {
+        "network": "Connection lost. Try again when you're back online.",
+        "quota": "Not enough space on this device ({free} free).",
+        "http": "The server answered with an error ({status}).",
+        "auth": "The server refused the download. Reconnect the server and retry.",
+        "missing": "The file is no longer available.",
+        "storage": "The browser could not save the file.",
+        "unknown": "Something went wrong."
+    },
+    "item": {
+        "play": "Play",
+        "playNamed": "Play {title} offline",
+        "pause": "Pause",
+        "pauseNamed": "Pause downloading {title}",
+        "resume": "Resume",
+        "resumeNamed": "Resume downloading {title}",
+        "retry": "Retry",
+        "retryNamed": "Retry downloading {title}",
+        "delete": "Delete",
+        "deleteNamed": "Delete the download of {title}",
+        "progressLabel": "Download progress for {title}",
+        "size": "{done} of {total}",
+        "kind": {
+            "movie": "Movie",
+            "episode": "Episode",
+            "track": "Track"
+        }
+    },
+    "confirm": {
+        "title": "Delete all downloads?",
+        "body": "{count, plural, one {# file} other {# files}} ({size}) will be removed from this device for {profile}. You can download them again later.",
+        "cancel": "Cancel",
+        "confirm": "Delete all"
+    },
+    "player": {
+        "back": "Back to downloads",
+        "loading": "Loading…",
+        "missing": "This download is not on this device any more.",
+        "error": "The file could not be played.",
+        "offline": "Playing from this device"
+    },
+    "button": {
+        "download": "Download",
+        "downloadNamed": "Download {title} for offline",
+        "queued": "Queued",
+        "progress": "{percent}%",
+        "progressNamed": "Downloading {title}, {percent}%. Press to pause.",
+        "paused": "Paused",
+        "pausedNamed": "Download of {title} paused. Press to resume.",
+        "done": "Downloaded",
+        "doneNamed": "{title} is downloaded. Open downloads.",
+        "error": "Retry",
+        "errorNamed": "Download of {title} failed. Press to retry.",
+        "unavailable": "Offline downloads aren't supported in this browser",
+        "live": {
+            "queued": "{title} added to downloads",
+            "progress": "{title}: {percent}% downloaded",
+            "done": "{title} downloaded",
+            "error": "Download of {title} failed"
+        }
+    }
+}

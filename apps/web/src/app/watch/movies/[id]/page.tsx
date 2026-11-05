@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { movies, videoCollectionItems, videoCollections, videoFiles, watchProfiles } from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { tmdbWatchProvidersMulti, tmdbMovieSimilar, tmdbMovieRecommendations } from "@/lib/tmdb";
 import { WishlistButton } from "@/components/video/wishlist-button";
 import { PlayHereMenu } from "@/components/video/play-here-menu";
@@ -34,6 +34,8 @@ export default async function MovieDetail({ params }: { params: Promise<{ id: st
         .where(and(eq(movies.userId, userId), eq(movies.id, movieId)))
         .limit(1).then(r => r[0]);
     if (!movie) return notFound();
+    // WP16 D31: the unified title page lives on /media (falls through for titles without TMDB match).
+    if (movie.tmdbId) redirect(`/media/movie/${movie.tmdbId}`);
 
     const files = await db.select().from(videoFiles)
         .where(and(eq(videoFiles.userId, userId), eq(videoFiles.movieId, movieId)));

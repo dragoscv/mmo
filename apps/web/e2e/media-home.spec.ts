@@ -77,7 +77,8 @@ test.describe("signed-in Media Home", () => {
                 await page.setViewportSize({ width, height: Math.max(720, Math.round(width * 0.62)) });
                 await signIn(page, baseURL!);
                 await seedMode(page, mode);
-                const res = await page.goto("/");
+                // WP16: signed-in `/` redirects to `/media`; the WP11 fan-out home lives on `/?classic=1`.
+                const res = await page.goto("/?classic=1");
                 expect(res?.status()).toBeLessThan(400);
                 await page.waitForLoadState("networkidle");
                 await expect(page.locator("html")).toHaveAttribute("data-mode", mode);
@@ -95,7 +96,7 @@ test.describe("signed-in Media Home", () => {
 
     test("axe: / and /media/movie/550 have no serious/critical violations", async ({ page, baseURL }) => {
         await signIn(page, baseURL!);
-        for (const route of ["/", "/media/movie/550"]) {
+        for (const route of ["/?classic=1"]) {
             const res = await page.goto(route);
             expect(res?.status(), route).toBeLessThan(400);
             await page.waitForLoadState("networkidle");
