@@ -224,7 +224,8 @@ export async function buildHomeRows(deps: RecsDeps, input: BuildHomeInput): Prom
     const region = input.region.toUpperCase();
     const libKeys = new Set(input.library.map((l) => `${l.kind}:${l.tmdbId}`));
     const providers = [...(input.providersPreferred ?? [])].sort((a, b) => a - b);
-    const cacheKey = `home:${input.profileId}:${region}:${historyHash(input.history, [providers.join("."), String(libKeys.size)])}`;
+    // `home2:` — row order changed (own library before recommendations, D25); old cached order must not be served.
+    const cacheKey = `home2:${input.profileId}:${region}:${historyHash(input.history, [providers.join("."), String(libKeys.size)])}`;
 
     const rows: HomeRow[] = [];
     const cont = (input.continueItems ?? []).slice(0, ROW_LIMIT);
@@ -269,6 +270,18 @@ export async function buildHomeRows(deps: RecsDeps, input: BuildHomeInput): Prom
     const collectionOf = (c: TitleCard) => deps.tmdb.getCachedTitle(c.kind, c.tmdbId)?.collectionId ?? null;
 
     const computed: HomeRow[] = [];
+
+    // New in library — newest indexed titles with a TMDB id. Own library comes before recommendations (D25).
+    const newest = [...input.library].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, ROW_LIMIT);
+    const libCards: TitleCard[] = [];
+    for (const l of newest) {
+        const t = deps.tmdb.getCachedTitle(l.kind, l.tmdbId) ?? (await deps.tmdb.getTitle(l.kind, l.tmdbId));
+        if (t) libCards.push(stripToCard(t));
+        else libCards.push({ kind: l.kind, tmdbId: l.tmdbId, title: `#${l.tmdbId}`, posterPath: null, backdropPath: null, genreIds: [] });
+    }
+    if (libCards.length > 0) {
+        computed.push({ id: "new_in_library", title: { ro: "Nou în bibliotecă", en: "New in your library" }, kind: "mixed", items: libCards });
+    }
 
     // Top picks — RRF of every source, re-ranked by profile similarity.
     const fused = rrfMerge([
@@ -328,18 +341,6 @@ export async function buildHomeRows(deps: RecsDeps, input: BuildHomeInput): Prom
         .slice(0, ROW_LIMIT);
     if (up.length > 0) {
         computed.push({ id: "upcoming", title: { ro: "În curând", en: "Coming soon" }, kind: "mixed", items: up });
-    }
-
-    // New in library — newest indexed titles with a TMDB id.
-    const newest = [...input.library].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, ROW_LIMIT);
-    const libCards: TitleCard[] = [];
-    for (const l of newest) {
-        const t = deps.tmdb.getCachedTitle(l.kind, l.tmdbId) ?? (await deps.tmdb.getTitle(l.kind, l.tmdbId));
-        if (t) libCards.push(stripToCard(t));
-        else libCards.push({ kind: l.kind, tmdbId: l.tmdbId, title: `#${l.tmdbId}`, posterPath: null, backdropPath: null, genreIds: [] });
-    }
-    if (libCards.length > 0) {
-        computed.push({ id: "new_in_library", title: { ro: "Nou în bibliotecă", en: "New in your library" }, kind: "mixed", items: libCards });
     }
 
     const marked = computed.map((r) => ({ ...r, items: markLibrary(r.items, libKeys) }));

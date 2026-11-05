@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
     buildProfile, cosine, decay, diversify, excludeSeen, rrfMerge, scoreCandidates, watchWeight, weightedRating,
-    historyHash, HALF_LIFE_MS,
+    historyHash, HALF_LIFE_MS, buildHomeRows,
 } from "./recs";
+import { openMemoryMediaDb } from "./db";
+import type { TmdbClient } from "./tmdb";
 import type { HistoryEntry, TitleCard, TitleDetails } from "./types";
 
 const card = (id: number, genreIds: number[] = [], extra: Partial<TitleCard> = {}): TitleCard => ({
@@ -120,5 +122,34 @@ describe("diversify / exclude", () => {
         const h2 = [...h1].reverse();
         expect(historyHash(h1)).toBe(historyHash(h2));
         expect(historyHash(h1, ["a"])).not.toBe(historyHash(h1, ["b"]));
+    });
+});
+
+describe("buildHomeRows order (D25)", () => {
+    it("puts the own library right after continue, before every recommendation row", async () => {
+        const titles = new Map<number, TitleDetails>();
+        for (let i = 1; i <= 40; i++) titles.set(i, { ...details(i, [i % 5]), recommendations: [card(100 + i)], similar: [] });
+        const page = (from: number) => ({ results: Array.from({ length: 10 }, (_, k) => card(from + k, [k % 3])) });
+        const tmdb = {
+            getCachedTitle: (_k: string, id: number) => titles.get(id) ?? null,
+            getTitle: async (_k: string, id: number) => titles.get(id) ?? null,
+            trending: async () => page(200),
+            upcoming: async () => ({ results: [card(300, [], { releaseDate: "2099-01-01" })] }),
+            onTheAir: async () => ({ results: [] }),
+            discover: async () => page(400),
+        } as unknown as TmdbClient;
+        const rows = await buildHomeRows({ db: openMemoryMediaDb(), tmdb }, {
+            profileId: "p1",
+            history: [{ kind: "movie", tmdbId: 1, watchedAt: NOW - 1000, completion: 1 }],
+            library: [{ kind: "movie", tmdbId: 2, updatedAt: NOW }, { kind: "movie", tmdbId: 3, updatedAt: NOW - 5 }],
+            continueItems: [{ ...card(4), progress: 0.3 }],
+            region: "ro",
+            now: NOW,
+        });
+        const ids = rows.map((r) => r.id);
+        expect(ids[0]).toBe("continue");
+        expect(ids[1]).toBe("new_in_library");
+        expect(ids).toContain("top_picks");
+        expect(rows[1]!.items.map((c) => c.tmdbId)).toEqual([2, 3]);
     });
 });

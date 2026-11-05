@@ -2,6 +2,13 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.9.1 — Own library first, commit missing modules
+
+- Home: "New in your library" comes right after Continue watching / My list, before recommendations (D25,
+  design-critic P1); home cache key bumped so old orders are not served.
+- Commit `src/pair`, `src/cast`, `src/subsonic` (imported by `server.ts` since 3.0 but never tracked) and the
+  `nativeAudioAvailability` export, so a clean checkout builds again (tsc 0, 159 tests in media/pair/cast/subsonic).
+
 ## 3.9.0 — Server features for the phone apps (WP16-50)
 
 - Client platforms `android-phone` and `ios` (aliases folded, e.g. `iphone` → `ios`) on pairing and hub `hello`.

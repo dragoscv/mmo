@@ -1,7 +1,7 @@
 /**
  * native-engine.ts
  *
- * Cross-platform low-latency audio engine for the MMO Companion.
+ * Cross-platform low-latency audio engine for the MixAI Companion.
  * Uses RtAudio (via `audify`) for direct OS audio backend access:
  *   - Windows: WASAPI (shared/exclusive auto), ASIO if present
  *   - macOS:   Core Audio
@@ -18,17 +18,56 @@
  * On Windows ASIO with a Focusrite/UMC interface ≈ 3-5 ms.
  */
 
-import {
+// Type-only imports are erased by tsc, so the native module is NOT loaded at
+// import time. The runtime module is required lazily via `audify()` below so
+// a headless build (Docker / arm64 without the prebuilt binary) still boots.
+import type {
     RtAudio,
     RtAudioApi,
     RtAudioFormat,
     RtAudioStreamFlags,
-    type RtAudioDeviceInfo,
+    RtAudioDeviceInfo,
 } from "audify";
 import { PitchDsp, type DspStatus, type PitchInfo, type ScaleConfig } from "./pitch-dsp";
 import { acquireRealtimeHost, releaseRealtimeHost } from "./realtime-host";
 import { NativeFxChain, type NativeFxChainItem } from "./native-fx";
 import { log } from "../lib/logger";
+
+type AudifyModule = {
+    RtAudio: typeof RtAudio;
+    RtAudioApi: typeof RtAudioApi;
+    RtAudioFormat: typeof RtAudioFormat;
+    RtAudioStreamFlags: typeof RtAudioStreamFlags;
+};
+
+let audifyMod: AudifyModule | null = null;
+let audifyError: string | null = null;
+
+/** Lazily load `audify`. Disabled when MMO_HEADLESS=1; throws with the
+ *  captured reason if the native module is missing so callers surface it. */
+function audify(): AudifyModule {
+    if (audifyMod) return audifyMod;
+    if (audifyError) throw new Error(audifyError);
+    if (process.env.MMO_HEADLESS === "1") {
+        audifyError = "native audio disabled (MMO_HEADLESS=1)";
+        throw new Error(audifyError);
+    }
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        audifyMod = require("audify") as AudifyModule;
+        return audifyMod;
+    } catch (e) {
+        audifyError = `audify native module unavailable: ${e instanceof Error ? e.message : String(e)}`;
+        throw new Error(audifyError);
+    }
+}
+
+/** Whether the native audio engine can be used in this process. */
+export function nativeAudioAvailability(): { available: boolean; reason?: string } {
+    try { audify(); return { available: true }; } catch (e) {
+        return { available: false, reason: e instanceof Error ? e.message : String(e) };
+    }
+}
 
 export type AudioBackend = "auto" | "asio" | "wasapi" | "coreaudio" | "alsa" | "jack" | "pulse";
 
@@ -110,10 +149,11 @@ export interface EngineMetrics {
     outRms: number;
 }
 
-const FORMAT = RtAudioFormat.RTAUDIO_FLOAT32;
+const FORMAT = 0x10 as RtAudioFormat; // RtAudioFormat.RTAUDIO_FLOAT32 (audify/index.d.ts)
 const SAMPLE_BYTES = 4;
 
 function backendToApi(b: AudioBackend): RtAudioApi {
+    const { RtAudioApi } = audify();
     switch (b) {
         case "asio": return RtAudioApi.WINDOWS_ASIO;
         case "wasapi": return RtAudioApi.WINDOWS_WASAPI;
@@ -176,9 +216,12 @@ function enumerateBackends(): BackendInfo[] {
             : ["alsa", "jack", "pulse"];
 
     const out: BackendInfo[] = [];
+    if (!nativeAudioAvailability().available) {
+        return candidates.map((b) => ({ backend: b, apiName: b, available: false }));
+    }
     for (const b of candidates) {
         try {
-            const r = new RtAudio(backendToApi(b));
+            const r = new (audify().RtAudio)(backendToApi(b));
             const apiName = r.getApi();
             const devices = r.getDevices();
             r.closeStream?.();
@@ -216,7 +259,7 @@ export function listDevices(backend: AudioBackend = "auto"): { backend: string; 
     const now = Date.now();
     const hit = devicesCache.get(backend);
     if (hit && hit.expires > now) return hit.value;
-    const r = new RtAudio(backendToApi(backend));
+    const r = new (audify().RtAudio)(backendToApi(backend));
     const devices = r.getDevices().map(mapDevice);
     const value = { backend: r.getApi(), devices };
     devicesCache.set(backend, { value, expires: now + CACHE_TTL_MS });
@@ -241,7 +284,7 @@ export function resolveDeviceId(
     name: string,
 ): number | null {
     try {
-        const r = new RtAudio(backendToApi(backend));
+        const r = new (audify().RtAudio)(backendToApi(backend));
         const devices = r.getDevices();
         // Exact match first, then case-insensitive contains as a fallback so
         // minor enumeration differences ("Microphone (USB Audio Device)" vs
@@ -403,6 +446,7 @@ export class NativeAudioEngine {
             this.cfg.frameSize = pick;
         }
 
+        const { RtAudio, RtAudioStreamFlags } = audify();
         const rt = new RtAudio(backendToApi(this.cfg.backend));
         this.rt = rt;
 
