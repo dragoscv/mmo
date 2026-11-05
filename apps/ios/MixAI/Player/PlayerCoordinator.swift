@@ -52,6 +52,7 @@ final class PlayerCoordinator {
     private var timeObserver: Any?
     private var tick = 0
     private var endObserver: NSObjectProtocol?
+    private var statusObservation: NSKeyValueObservation?
 
     var avPlayer: AVPlayer? { engine.avPlayer }
 
@@ -128,6 +129,15 @@ final class PlayerCoordinator {
         if let o = timeObserver { p.removeTimeObserver(o) }
         timeObserver = p.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.onTick() }
+        }
+        // A failed item (server 500, unsupported stream) never moves the clock, so the periodic observer stays silent.
+        statusObservation = p.currentItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
+            guard item.status == .failed else { return }
+            let msg = item.error?.localizedDescription ?? String(localized: "player.error.title")
+            Task { @MainActor in
+                self?.error = msg
+                self?.buffering = false
+            }
         }
         endObserver.map(NotificationCenter.default.removeObserver)
         endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] _ in
@@ -217,6 +227,7 @@ final class PlayerCoordinator {
         timeObserver = nil
         endObserver.map(NotificationCenter.default.removeObserver)
         endObserver = nil
+        statusObservation = nil
         engine.stop()
         playing = false
         request = nil
