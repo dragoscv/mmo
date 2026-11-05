@@ -14,7 +14,7 @@ apps without owning a server. Owner-approved always-on VM: it has **no** server-
 | Labels | `purpose=store-review-demo,owner=mixai` |
 | Service account | `mixai-demo@mmo-mw-prod` — AR reader on `mixai`, log + metric writer |
 | Image | `europe-west1-docker.pkg.dev/mmo-mw-prod/mixai/mmo-server:<server version>-<sha>` (amd64) |
-| Hostnames | `demo.mixai.ro` (Cloudflare A, DNS-only) and `34-118-46-71.sslip.io` (works before mixai.ro DNS) |
+| Hostnames | `demo.mixai.ro` (Cloudflare A, DNS-only), `34-118-46-71.sslip.io` and `34-118-46-71.nip.io` (both work before mixai.ro DNS; the owner's home router rewrites `*.sslip.io` to 81.196.9.130, so the Live TV channels use the nip.io name since 2026-11-05) |
 
 **Live state (verified 2026-11-05 ~15:20Z, image `mmo-server:3.9.4-31fb136b`)**: `https://34-118-46-71.sslip.io`
 answers with a Let's Encrypt cert; `demo.mixai.ro` has its A record in Cloudflare but the zone is not yet

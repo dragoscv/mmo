@@ -220,7 +220,8 @@ final class WebAuthAnchor: NSObject, ASWebAuthenticationPresentationContextProvi
         MainActor.assumeIsolated {
             let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
             if let w = scenes.flatMap(\.windows).first(where: \.isKeyWindow) ?? scenes.first?.windows.first { return w }
-            return ASPresentationAnchor()
+            if let scene = scenes.first { return ASPresentationAnchor(windowScene: scene) }
+            preconditionFailure("web sign-in started without a window scene")
         }
     }
 }

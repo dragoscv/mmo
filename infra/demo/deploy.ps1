@@ -3,7 +3,8 @@
   Ship the demo stack to the VM: compose.yaml, Caddyfile, loop.sh, gen-epg.mjs, content script, .env and
   demo.env (TMDB_API_KEY straight from Secret Manager into a 0600 file — never printed), then `compose up`.
 .PARAMETER Image  full Artifact Registry ref, e.g. europe-west1-docker.pkg.dev/mmo-mw-prod/mixai/mmo-server:3.9.2-abc1234
-.PARAMETER Hosts  Caddy site addresses (comma list). Default: demo.mixai.ro + <ip>.sslip.io (works before DNS).
+.PARAMETER Hosts  Caddy site addresses (comma list). Default: demo.mixai.ro + <ip>.sslip.io + <ip>.nip.io (both work
+                  before DNS; some home routers rewrite *.sslip.io, so nip.io is the public channel host until then).
 #>
 param(
     [Parameter(Mandatory)][string]$Image,
@@ -20,11 +21,12 @@ New-Item -ItemType Directory -Force $tmp | Out-Null
 try {
     $ip = (& gcloud compute instances describe $Name --zone $Zone --project $Project --format='value(networkInterfaces[0].accessConfigs[0].natIP)').Trim()
     $sslip = "$($ip -replace '\.', '-').sslip.io"
-    if (-not $Hosts) { $Hosts = "demo.mixai.ro, $sslip" }
+    $nip = "$($ip -replace '\.', '-').nip.io"
+    if (-not $Hosts) { $Hosts = "demo.mixai.ro, $sslip, $nip" }
     # Public name written into the M3U/XMLTV and the Live TV source: demo.mixai.ro once it resolves to this VM
-    # (checked over DoH), the sslip.io name until then. Re-run deploy.ps1 + setup after the DNS switch.
+    # (checked over DoH), the nip.io name until then. Re-run deploy.ps1 + setup after the DNS switch.
     $doh = curl.exe -s -H 'accept: application/dns-json' 'https://cloudflare-dns.com/dns-query?name=demo.mixai.ro&type=A' | ConvertFrom-Json
-    $publicHost = if (@($doh.Answer | Where-Object { $_.data -eq $ip }).Count -gt 0) { 'demo.mixai.ro' } else { $sslip }
+    $publicHost = if (@($doh.Answer | Where-Object { $_.data -eq $ip }).Count -gt 0) { 'demo.mixai.ro' } else { $nip }
     $lf = { param($p, $s) [IO.File]::WriteAllText($p, ($s -replace "`r`n", "`n"), [Text.UTF8Encoding]::new($false)) }
     foreach ($f in 'compose.yaml', 'Caddyfile', 'loop.sh', 'gen-epg.mjs', 'content.sh', 'setup.mjs', 'ATTRIBUTION.md') {
         & $lf (Join-Path $tmp $f) (Get-Content (Join-Path $here $f) -Raw)
