@@ -1,0 +1,140 @@
+/* Player OSD / overlays (WP16-32). Tokens only, and only tokens that have an sRGB value in styles.css
+   `@supports not (color: oklch(0 0 0))` (no --chart-*). Chromium 76 safe: no inset/aspect-ratio/clamp().
+   Per-frame changes are transform/opacity only. */
+
+.player { overflow: hidden; }
+.player video { position: absolute; top: 0; left: 0; }
+.player video.fit-box { top: 50%; left: 50%; }
+
+/* ─── OSD frame ──────────────────────────────────────────────────────────── */
+.pl-osd { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: var(--z-player); pointer-events: none; }
+.pl-osd button, .pl-osd [data-focusable] { pointer-events: auto; }
+.pl-osd-top, .pl-osd-bottom {
+    position: absolute; left: 0; right: 0; padding: var(--overscan-y) var(--overscan-x);
+    opacity: 0; visibility: hidden;
+    transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out), visibility 0s linear var(--dur-base);
+}
+.pl-osd-top { top: 0; transform: translateY(-1rem); }
+.pl-osd-bottom { bottom: 0; transform: translateY(1rem); padding-top: 4rem; }
+.pl-osd.is-visible .pl-osd-top, .pl-osd.is-visible .pl-osd-bottom {
+    opacity: 1; visibility: visible; transform: none;
+    transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out), visibility 0s;
+}
+/* Partial scrims (one layer each, no full-screen translucent fill). */
+.pl-osd-top::before, .pl-osd-bottom::before { content: ""; position: absolute; left: 0; right: 0; z-index: -1; opacity: 0.85; }
+.pl-osd-top::before { top: 0; height: 160%; background: linear-gradient(to bottom, var(--background), transparent); }
+.pl-osd-bottom::before { bottom: 0; height: 100%; background: linear-gradient(to top, var(--background), transparent); }
+
+.pl-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; }
+.pl-line { color: var(--muted-foreground); font-size: 0.85rem; margin-top: 0.3rem; }
+.pl-badges { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+
+/* ─── Scrub bar ──────────────────────────────────────────────────────────── */
+.pl-scrub { position: relative; height: 1.6rem; display: flex; align-items: center; outline: none; border-radius: 999px; }
+.pl-track { position: relative; width: 100%; height: 0.32rem; border-radius: 999px; background: var(--muted); overflow: hidden; transition: transform var(--dur-fast) var(--ease-out); }
+.pl-scrub:focus .pl-track { transform: scaleY(1.8); }
+.pl-fill { position: absolute; top: 0; bottom: 0; left: 0; width: 100%; transform-origin: 0 50%; transform: scaleX(0); }
+.pl-fill-buf { background: var(--secondary-foreground); opacity: 0.28; }
+.pl-fill-pos { background: var(--primary); }
+.pl-mark { position: absolute; top: 0; bottom: 0; opacity: 0.55; }
+.pl-mark-intro { background: var(--warning); }
+.pl-mark-credits { background: var(--info); }
+.pl-tick { position: absolute; top: 0; bottom: 0; width: 0.12rem; margin-left: -0.06rem; background: var(--background); opacity: 0.8; }
+.pl-knob-rail { position: absolute; top: 0; bottom: 0; left: 0; width: 100%; pointer-events: none; }
+.pl-knob {
+    position: absolute; top: 50%; left: 0; width: 1rem; height: 1rem; margin: -0.5rem 0 0 -0.5rem; border-radius: 50%;
+    background: var(--foreground); opacity: 0; transform: scale(0.6); transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.pl-scrub:focus .pl-knob { opacity: 1; transform: scale(1); box-shadow: 0 0 0 var(--focus-ring-w) var(--ring); }
+.pl-preview { position: absolute; bottom: 1.6rem; left: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+/* Sprite tile: 160×90 cell of a 12×12 grid → background-size 1200% and percent positions (model.tilePosition). */
+.pl-thumb {
+    width: 12rem; height: 6.75rem; border-radius: var(--radius); background-color: var(--card);
+    background-size: 1200% 1200%; background-repeat: no-repeat; box-shadow: 0 0 0 0.12rem var(--foreground), var(--surface-shadow);
+}
+.pl-preview-time {
+    margin-top: 0.4rem; padding: 0.15rem 0.6rem; border-radius: var(--radius); background: var(--popover); color: var(--popover-foreground);
+    font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.pl-times { display: flex; justify-content: space-between; margin-top: 0.4rem; color: var(--muted-foreground); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.pl-ends { color: var(--foreground); opacity: 0.85; }
+
+/* ─── Controls ───────────────────────────────────────────────────────────── */
+.pl-controls { display: flex; gap: 1rem; margin-top: 1rem; padding-bottom: 1.4rem; }
+.pl-btn {
+    position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.8rem; height: 2.8rem;
+    border: 0; border-radius: 50%; background: var(--secondary); color: var(--secondary-foreground); font-size: 1.2rem; outline: none;
+    transition: transform var(--dur-fast) var(--ease-out);
+}
+.pl-btn.is-active { background: var(--accent); color: var(--accent-foreground); }
+.pl-btn:disabled { opacity: 0.4; }
+.pl-btn:focus { transform: scale(1.12); background: var(--primary); color: var(--primary-foreground); box-shadow: var(--focus-glow); }
+.pl-btn-cap {
+    position: absolute; top: calc(100% + 0.4rem); left: 50%; transform: translateX(-50%); white-space: nowrap;
+    font-size: 0.6rem; color: var(--foreground); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none;
+}
+.pl-btn:focus .pl-btn-cap { opacity: 1; }
+
+/* ─── Skip pill (visible with the OSD hidden) ────────────────────────────── */
+.pl-skip-wrap { position: absolute; right: var(--overscan-x); bottom: 9.5rem; }
+.pl-skip {
+    display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.4rem; border: 0; border-radius: 999px;
+    background: var(--popover); color: var(--popover-foreground); font-size: 0.85rem; font-weight: 700; outline: none;
+    box-shadow: 0 0 0 0.1rem var(--border); animation: pl-in var(--dur-base) var(--ease-out);
+    transition: transform var(--dur-fast) var(--ease-out);
+}
+.pl-skip:focus { transform: scale(1.06); background: var(--primary); color: var(--primary-foreground); box-shadow: 0 0 0 var(--focus-ring-w) var(--ring), var(--focus-glow); }
+@keyframes pl-in { from { opacity: 0; transform: translateY(0.6rem); } to { opacity: 1; transform: none; } }
+
+/* ─── Subtitles (custom renderer, see player/vtt.ts) ────────────────────── */
+.pl-subs {
+    position: absolute; left: 8%; right: 8%; bottom: 7%; z-index: var(--z-raised); display: flex; flex-direction: column; align-items: center;
+    gap: 0.2rem; pointer-events: none; text-align: center; transition: transform var(--dur-base) var(--ease-out);
+}
+.pl-subs.is-raised { transform: translateY(-9rem); }
+.pl-cue span { position: relative; display: inline-block; padding: 0.05em 0.4em; color: var(--foreground); line-height: 1.3; white-space: pre-line; font-weight: 600; }
+.pl-subs-small { font-size: 1.05rem; }
+.pl-subs-medium { font-size: 1.35rem; }
+.pl-subs-large { font-size: 1.75rem; }
+.pl-subs-xlarge { font-size: 2.2rem; }
+.pl-subs-bg-shadow .pl-cue span { text-shadow: 0 0 0.25em var(--background), 0.06em 0.06em 0.1em var(--background), -0.06em -0.06em 0.1em var(--background); }
+/* Box: background on a pseudo element so its opacity does not need colour-alpha syntax (old Chromium). */
+.pl-subs-bg-box .pl-cue span::before { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: -1; background: var(--background); opacity: 0.72; border-radius: 0.2em; }
+.pl-subs-bg-box .pl-cue span { z-index: 0; }
+
+/* ─── Toasts / waiting / reactions / chat ───────────────────────────────── */
+.pl-toast, .pl-waiting {
+    position: absolute; top: var(--overscan-y); left: 50%; transform: translateX(-50%); z-index: var(--z-toast);
+    padding: 0.6rem 1.2rem; border-radius: var(--radius); background: var(--popover); color: var(--popover-foreground);
+    font-size: 0.8rem; box-shadow: var(--surface-shadow); animation: pl-in var(--dur-base) var(--ease-out);
+}
+.pl-waiting { top: auto; bottom: 45%; }
+.pl-reacts { position: absolute; left: 0; right: 0; bottom: 0; height: 60%; z-index: var(--z-toast); pointer-events: none; overflow: hidden; }
+.pl-react { position: absolute; bottom: 0; font-size: 2.6rem; animation: pl-float 3s var(--ease-out) forwards; }
+@keyframes pl-float { 0% { opacity: 0; transform: translateY(0) scale(0.6); } 15% { opacity: 1; transform: translateY(-3rem) scale(1); } 100% { opacity: 0; transform: translateY(-22rem) scale(1.1); } }
+:root[data-motion="reduced"] .pl-react { animation: pl-fade 3s linear forwards; }
+@keyframes pl-fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+.pl-chats { position: absolute; left: var(--overscan-x); top: 30%; z-index: var(--z-toast); display: flex; flex-direction: column; gap: 0.4rem; pointer-events: none; max-width: 30rem; }
+.pl-chat { padding: 0.45rem 0.9rem; border-radius: var(--radius); background: var(--popover); color: var(--popover-foreground); font-size: 0.75rem; animation: pl-in var(--dur-base) var(--ease-out); }
+
+/* ─── Up Next card ───────────────────────────────────────────────────────── */
+.pl-upnext {
+    position: absolute; right: var(--overscan-x); bottom: var(--overscan-y); z-index: var(--z-overlay); width: 34rem; display: flex; gap: 1rem;
+    padding: 1rem; border-radius: calc(var(--radius) * 1.6); background: var(--popover); color: var(--popover-foreground);
+    box-shadow: var(--surface-shadow); overflow: hidden; animation: pl-in var(--dur-base) var(--ease-out);
+}
+.pl-upnext-still { flex: 0 0 12rem; height: 6.75rem; border-radius: var(--radius); background-color: var(--card); background-size: cover; background-position: center; }
+.pl-upnext-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.pl-upnext-kicker { color: var(--muted-foreground); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.pl-upnext-title { font-size: 0.95rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-upnext-actions { display: flex; gap: 0.8rem; margin-top: auto; }
+.pl-upnext-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 0.2rem; background: var(--primary); transform-origin: 0 50%; animation: pl-count linear forwards; }
+@keyframes pl-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* ─── Info sheet / panels ───────────────────────────────────────────────── */
+.pl-info-list { flex: 1; margin: 0 0 1rem; overflow-y: auto; }
+.pl-info-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; }
+.pl-info-row dt { color: var(--muted-foreground); }
+.pl-info-row dd { margin: 0; text-align: right; word-break: break-word; }
+.pl-panel-note { color: var(--muted-foreground); font-size: 0.65rem; padding: 0.8rem 0.3rem 0; }
+.pl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

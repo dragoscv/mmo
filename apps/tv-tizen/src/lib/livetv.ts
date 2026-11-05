@@ -97,8 +97,8 @@ export class LiveTvClient {
         return this.http.url(`/livetv/stream/${enc(channelId)}?proxy=1&${this.http.authQuery()}`);
     }
     /** Catch-up (timeshift) for a past programme: start epoch ms, duration seconds. */
-    catchupUrl(channelId: string, startMs: number, durationSec: number): string {
-        return this.http.url(`/livetv/catchup/${enc(channelId)}?start=${Math.floor(startMs)}&duration=${Math.floor(durationSec)}&${this.http.authQuery()}`);
+    catchupUrl(channelId: string, startMs: number, durationMin: number): string {
+        return this.http.url(`/livetv/catchup/${enc(channelId)}?start=${Math.floor(startMs)}&duration=${Math.ceil(durationMin)}&${this.http.authQuery()}`);
     }
     /** Channel logos are absolute upstream URLs; returned as-is (null when missing). */
     logoUrl(ch: Pick<LiveTvChannel, "logo">): string | null {

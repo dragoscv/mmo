@@ -1,0 +1,85 @@
+/* WP16-32/33 Home · Title · Season · Library · Search. Tokens only (var(--…)); every token used here already has an
+   sRGB fallback in styles.css. rem/vw layout (Odyssey 2580×1080, root 24 px). Animate transform/opacity only. */
+
+/* ─── Home: fixed hero + scrolling rows ─────────────────────────────────── */
+.wh-home { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; }
+.wh-hero { position: relative; flex: 0 0 auto; height: 19rem; padding: var(--tv-pad-y) var(--tv-pad-x) 0 calc(var(--tv-pad-x) * 0.6); display: flex; flex-direction: column; justify-content: flex-end; }
+.wh-hero-inner { max-width: 42rem; transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+.wh-hero-inner.is-swapping { opacity: 0; transform: translateY(0.4rem); }
+.wh-rows { position: relative; flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 1rem var(--tv-pad-x) 3rem calc(var(--tv-pad-x) * 0.6); scrollbar-width: none; }
+.wh-rows::-webkit-scrollbar { display: none; }
+
+/* Hero / title shared typography */
+.wh-logo { display: block; max-height: 5.2rem; max-width: 26rem; object-fit: contain; object-position: left bottom; margin-bottom: 0.7rem; }
+.wh-logo-lg { max-height: 7rem; max-width: 32rem; }
+.wh-name { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 0.6rem; line-height: 1.1; }
+.wh-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 0.6rem; color: var(--muted-foreground); font-size: 0.72rem; font-weight: 600; }
+.wh-chip { padding: 0.12rem 0.5rem; border-radius: 0.3rem; border: 1px solid var(--border); color: var(--foreground); }
+.wh-chip-tech { background: var(--secondary); color: var(--secondary-foreground); border-color: transparent; }
+.wh-dot { opacity: 0.6; }
+.wh-overview { font-size: 0.78rem; line-height: 1.45; color: var(--foreground); opacity: 0.88; margin: 0 0 0.9rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; max-width: 40rem; }
+.wh-tagline { font-style: italic; color: var(--muted-foreground); font-size: 0.8rem; margin: 0 0 0.5rem; }
+.wh-genres { color: var(--muted-foreground); font-size: 0.7rem; margin: 0 0 0.9rem; }
+.wh-actions { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: center; }
+.wh-status { margin-top: 0.7rem; color: var(--muted-foreground); font-size: 0.7rem; min-height: 1em; }
+.wh-status.is-error { color: var(--destructive); }
+
+/* ─── Title ─────────────────────────────────────────────────────────────── */
+.wt-head { display: flex; gap: 2.2rem; align-items: flex-end; min-height: 26rem; padding-top: 2rem; margin-bottom: 1.6rem; }
+.wt-poster { position: relative; flex: 0 0 auto; width: 12rem; border-radius: var(--radius); overflow: hidden; background: var(--card); box-shadow: var(--surface-shadow); }
+.wt-poster::before { content: ""; display: block; padding-top: 150%; }
+.wt-poster img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+.wt-poster.is-hidden { opacity: 0; }
+.wt-info { flex: 1 1 auto; min-width: 0; max-width: 48rem; }
+.wt-info .wh-overview { -webkit-line-clamp: 4; }
+.wt-section { margin: 0 0 1.6rem; }
+.wt-section-title { font-size: 0.95rem; font-weight: 600; margin: 0 0 0.6rem; }
+.wt-offers { display: flex; flex-wrap: wrap; gap: 0.8rem; }
+.wt-offer { display: flex; align-items: center; gap: 0.7rem; padding: 0.55rem 0.9rem; border-radius: var(--radius); background: var(--secondary); color: var(--secondary-foreground); border: 0; font: inherit; transition: transform var(--dur-fast) var(--ease-out); }
+.wt-offer:focus { transform: scale(1.05); box-shadow: 0 0 0 var(--focus-ring-w) var(--ring), var(--focus-glow); outline: none; }
+.wt-offer.is-missing { opacity: 0.65; }
+.wt-offer img { width: 1.8rem; height: 1.8rem; border-radius: 0.35rem; object-fit: cover; }
+.wt-offer-text { display: flex; flex-direction: column; text-align: left; }
+.wt-offer-name { font-size: 0.75rem; font-weight: 700; }
+.wt-offer-sub { font-size: 0.58rem; opacity: 0.8; }
+.wt-attrib { color: var(--muted-foreground); font-size: 0.58rem; margin-top: 0.5rem; }
+.wt-cast { display: flex; flex-direction: column; align-items: center; width: 6.5rem; border: 0; background: transparent; color: var(--foreground); font: inherit; padding: 0; }
+.wt-cast-img { position: relative; width: 5.2rem; height: 5.2rem; border-radius: 50%; overflow: hidden; background: var(--accent); color: var(--accent-foreground); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.6rem; transition: transform var(--dur-fast) var(--ease-out); }
+.wt-cast-img img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+.wt-cast:focus { outline: none; }
+.wt-cast:focus .wt-cast-img { transform: scale(1.08); box-shadow: 0 0 0 var(--focus-ring-w) var(--ring), var(--focus-glow); }
+.wt-cast-name { font-size: 0.62rem; font-weight: 600; margin-top: 0.45rem; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wt-cast-role { font-size: 0.55rem; color: var(--muted-foreground); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wt-seasons { margin-bottom: 0.6rem; }
+.wt-qr { display: flex; justify-content: center; margin: 0 0 1.2rem; }
+.wt-qr canvas { width: 11rem; height: 11rem; border-radius: var(--radius); background: var(--foreground); }
+
+/* FLIP clone (shared-element-like poster transition) */
+.wt-flip { position: fixed; top: 0; left: 0; z-index: var(--z-overlay); border-radius: var(--radius); overflow: hidden; pointer-events: none; transform-origin: 0 0; will-change: transform, opacity; }
+.wt-flip img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* ─── Season ────────────────────────────────────────────────────────────── */
+.ws-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem; margin-bottom: 0.8rem; }
+.ws-overview { color: var(--muted-foreground); font-size: 0.72rem; line-height: 1.4; max-width: 50rem; margin: 0.3rem 0 0.8rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ─── Library ───────────────────────────────────────────────────────────── */
+.wl-root { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+.wl-grid { padding-right: 4.2rem; }
+.wl-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-bottom: 1rem; }
+.wl-tools { display: flex; gap: 0.8rem; align-items: center; }
+.wl-count { color: var(--muted-foreground); font-size: 0.7rem; }
+.wl-az { position: absolute; top: var(--tv-pad-y); right: 0.8rem; bottom: 1rem; width: 2.6rem; display: flex; flex-direction: column; align-items: center; justify-content: space-between; z-index: var(--z-raised); }
+.wl-az button { width: 2rem; height: 1.3rem; border: 0; border-radius: 0.3rem; background: transparent; color: var(--muted-foreground); font: inherit; font-size: 0.6rem; font-weight: 700; padding: 0; transition: transform var(--dur-fast) var(--ease-out); }
+.wl-az button.is-active { color: var(--primary); }
+.wl-az button:focus { outline: none; background: var(--primary); color: var(--primary-foreground); transform: scale(1.25); }
+
+/* ─── Search ────────────────────────────────────────────────────────────── */
+.wsr { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; }
+.wsr-side { flex: 0 0 auto; width: 24rem; padding: var(--tv-pad-y) 1.4rem 1rem calc(var(--tv-pad-x) * 0.6); display: flex; flex-direction: column; gap: 0.9rem; }
+.wsr-input { width: 100%; font: inherit; font-size: 1rem; font-weight: 600; padding: 0.55rem 0.8rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--foreground); }
+.wsr-input:focus { outline: var(--focus-ring-w) solid var(--ring); outline-offset: 2px; }
+.wsr-hint { color: var(--muted-foreground); font-size: 0.6rem; }
+.wsr-main { position: relative; flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: var(--tv-pad-y) var(--tv-pad-x) 3rem 0.6rem; scrollbar-width: none; }
+.wsr-main::-webkit-scrollbar { display: none; }
+.wsr-recent-title { font-size: 0.85rem; font-weight: 600; margin: 0 0 0.5rem; color: var(--muted-foreground); }
+.wsr-channel-num { font-size: 0.6rem; }

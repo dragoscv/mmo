@@ -1,0 +1,110 @@
+/* ─── Music screens (WP16-33). Tokens only; transform/opacity animations; no CSS filters (Tizen GPU). ─── */
+
+.mcard-round .mcard-frame { border-radius: 50%; }
+.mcard-round .mcard-frame::after { border-radius: 50%; }
+
+/* Tabs header */
+.mu-tabs { margin-bottom: 1.2rem; }
+.mu-section { margin-top: 0.4rem; }
+.mu-letters { margin: 0 0 0.6rem; }
+.mu-letters .chip { min-width: 2.2rem; justify-content: center; padding: 0.35rem 0.6rem; }
+.mu-grid-host { position: relative; height: 72vh; }
+.mu-grid-host .vgrid { padding-top: 0.4rem; padding-left: 0.2rem; }
+
+/* Hero (album / artist / playlist) */
+.mu-hero { display: flex; gap: 2.4rem; align-items: flex-end; margin: 0.6rem 0 1.6rem; }
+.mu-hero-cover {
+    position: relative; flex: 0 0 auto; width: 15rem; height: 15rem; border-radius: calc(var(--radius) * 1.4); overflow: hidden;
+    background: var(--muted); box-shadow: var(--surface-shadow);
+}
+.mu-hero-cover.is-round { border-radius: 50%; }
+.mu-hero-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mu-hero-ph { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; font-size: 4rem; color: var(--muted-foreground); }
+.mu-hero-body { flex: 1; min-width: 0; }
+.mu-hero-kicker { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.mu-hero-title { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em; margin: 0.3rem 0 0.4rem; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-hero-meta { color: var(--muted-foreground); font-size: 0.85rem; }
+.mu-hero-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.7rem; }
+.mu-hero-actions { display: flex; gap: 0.9rem; margin-top: 1.2rem; align-items: center; }
+
+/* Track list */
+.mu-tracks { display: flex; flex-direction: column; gap: 0.25rem; max-width: 70rem; }
+.mu-disc { font-size: 0.7rem; font-weight: 700; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.1em; margin: 0.9rem 0 0.3rem 0.8rem; }
+.mu-track {
+    display: flex; align-items: center; gap: 1.1rem; min-height: 2.9rem; padding: 0.35rem 1.1rem; border: 0; border-radius: var(--radius);
+    background: transparent; color: var(--foreground); text-align: left; font-size: 0.8rem; outline: none; width: 100%;
+    transition: transform var(--dur-fast) var(--ease-out);
+}
+.mu-track:focus { background: var(--accent); color: var(--accent-foreground); box-shadow: 0 0 0 var(--focus-ring-w) var(--ring); transform: scale(1.01); }
+.mu-track.is-current .mu-track-title { color: var(--primary); }
+.mu-track:focus.is-current .mu-track-title { color: var(--accent-foreground); }
+.mu-track-num { flex: 0 0 2rem; text-align: right; color: var(--muted-foreground); font-variant-numeric: tabular-nums; display: flex; justify-content: flex-end; }
+.mu-track-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mu-track-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mu-track-sub { font-size: 0.65rem; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mu-track:focus .mu-track-sub, .mu-track:focus .mu-track-num, .mu-track:focus .mu-track-dur, .mu-track:focus .mu-track-fmt { color: var(--accent-foreground); }
+.mu-track-badge { flex: 0 0 auto; }
+.mu-track-fmt { flex: 0 0 auto; font-size: 0.55rem; font-weight: 700; color: var(--muted-foreground); letter-spacing: 0.05em; }
+.mu-track-dur { flex: 0 0 3.5rem; text-align: right; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+
+/* Equaliser bars */
+.mu-bars { display: inline-flex; align-items: flex-end; gap: 0.12rem; height: 0.9rem; }
+.mu-bars i { display: block; width: 0.18rem; height: 100%; background: var(--primary); transform-origin: bottom; transform: scaleY(0.35); }
+.mu-bars.is-on i { animation: mu-eq 0.9s ease-in-out infinite; }
+.mu-bars.is-on i:nth-child(2) { animation-delay: -0.3s; }
+.mu-bars.is-on i:nth-child(3) { animation-delay: -0.6s; }
+:root[data-motion="reduced"] .mu-bars.is-on i { animation: none; transform: scaleY(0.8); }
+@keyframes mu-eq { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+
+/* Search */
+.mu-search { display: flex; gap: 2rem; align-items: flex-start; }
+.mu-search-kb { flex: 0 0 auto; }
+.mu-search-field {
+    min-height: 2.6rem; padding: 0.5rem 1rem; margin-bottom: 0.8rem; border-radius: var(--radius); background: var(--card);
+    border: 1px solid var(--border); font-size: 1rem; color: var(--card-foreground); min-width: 22rem;
+}
+.mu-search-field .ph { color: var(--muted-foreground); }
+.mu-search-results { flex: 1; min-width: 0; }
+
+/* ─── Now Playing ─── */
+.np { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; gap: 3rem; padding: var(--tv-pad-y) var(--tv-pad-x); align-items: center; }
+.np-left { flex: 0 0 auto; width: 34%; max-width: 30rem; display: flex; flex-direction: column; gap: 1rem; }
+.np-art { position: relative; width: 100%; padding-top: 100%; border-radius: calc(var(--radius) * 1.6); overflow: hidden; background: var(--muted); box-shadow: var(--surface-shadow); }
+.np-art img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+.np-art .mu-hero-ph { font-size: 6rem; }
+.np-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.01em; margin: 0.6rem 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-sub { color: var(--muted-foreground); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-progress { margin-top: 0.4rem; }
+.np-bar { height: 0.3rem; border-radius: 0.15rem; background: var(--muted); overflow: hidden; }
+.np-bar > span { display: block; height: 100%; background: var(--brand-accent); transform-origin: left center; }
+.np-times { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--muted-foreground); margin-top: 0.35rem; font-variant-numeric: tabular-nums; }
+.np-controls { display: flex; gap: 0.9rem; align-items: center; justify-content: center; margin-top: 0.6rem; padding-bottom: 1.4rem; }
+.np-controls .np-main { width: 3.6rem; height: 3.6rem; font-size: 1.6rem; background: var(--primary); color: var(--primary-foreground); }
+.np-right { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; }
+.np-tabs { margin-bottom: 0.8rem; }
+.np-panel { position: relative; flex: 1; overflow: hidden; }
+.np-status { color: var(--muted-foreground); font-size: 0.75rem; }
+
+.ly { position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; }
+.ly-track { position: absolute; left: 0; right: 0; top: 0; transition: transform var(--dur-base) var(--ease-out); }
+.ly-line { font-size: 1.35rem; font-weight: 700; line-height: 1.3; padding: 0.35rem 0; opacity: 0.5; transform-origin: left center; transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+.ly-line.is-past { opacity: 0.28; }
+.ly-line.is-now { opacity: 1; transform: scale(1.04); color: var(--foreground); }
+.ly-plain { white-space: pre-wrap; font-size: 1rem; line-height: 1.55; color: var(--foreground); overflow-y: auto; height: 100%; padding-right: 1rem; scrollbar-width: none; }
+
+.np-queue { height: 100%; overflow-y: auto; scrollbar-width: none; padding: 0.3rem; }
+.np-queue::-webkit-scrollbar, .ly-plain::-webkit-scrollbar { display: none; }
+.np-qitem { display: flex; align-items: center; gap: 0.9rem; width: 100%; padding: 0.35rem 0.8rem; border: 0; border-radius: var(--radius); background: transparent; color: var(--foreground); text-align: left; outline: none; font-size: 0.75rem; }
+.np-qitem img, .np-qitem .np-qph { width: 2.6rem; height: 2.6rem; border-radius: calc(var(--radius) * 0.6); object-fit: cover; background: var(--muted); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; color: var(--muted-foreground); }
+.np-qitem:focus { background: var(--accent); color: var(--accent-foreground); box-shadow: 0 0 0 var(--focus-ring-w) var(--ring); }
+.np-qitem.is-current .mu-track-title { color: var(--primary); }
+.np-qitem.is-past { opacity: 0.55; }
+
+/* Ambient (idle 60 s): artwork + current lyric + clock */
+.np-ambient { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: var(--z-modal); background: var(--background); display: flex; align-items: center; justify-content: center; gap: 4rem; padding: var(--tv-pad-y) var(--tv-pad-x); animation: tv-fade var(--dur-base) var(--ease-out); }
+.np-ambient-art { width: 24rem; height: 24rem; border-radius: calc(var(--radius) * 1.6); overflow: hidden; background: var(--muted); flex: 0 0 auto; }
+.np-ambient-art img { width: 100%; height: 100%; object-fit: cover; }
+.np-ambient-body { flex: 1; min-width: 0; max-width: 60rem; }
+.np-ambient-clock { font-size: 4.5rem; font-weight: 200; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.np-ambient-line { font-size: 2rem; font-weight: 700; margin-top: 1.4rem; line-height: 1.25; }
+.np-ambient-meta { color: var(--muted-foreground); font-size: 1rem; margin-top: 1rem; }

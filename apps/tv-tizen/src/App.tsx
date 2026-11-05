@@ -40,6 +40,7 @@ import { DiscoverScreen } from "./screens/Discover";
 import { PairScreen } from "./screens/Pair";
 import { ShowScreen } from "./screens/Show";
 import { PlayerScreen } from "./screens/Player";
+import { musicPlayer } from "./lib/music-player";
 import { Profiles } from "./screens/Profiles";
 import { Home } from "./screens/Home";
 import { Title } from "./screens/Title";
@@ -129,6 +130,8 @@ function AppRoot({ lang }: { lang: Locale }) {
         clients.hub.start();
         return () => clients.hub.stop();
     }, [clients]);
+    // Background music engine: restore the server queue + receive remote commands before Music is opened.
+    useEffect(() => { if (clients) musicPlayer.attach(clients.music, clients.media); }, [clients]);
 
     // Boot: reachable? → profiles → picker or Home.
     useEffect(() => {
@@ -393,7 +396,7 @@ function Shell({ clients, cfg, lang, app, onboarding }: {
 function PlayerRoute({ ctx, r, nav }: { ctx: ScreenCtx; r: Extract<Route, { name: "player" }>; nav: NavApi }) {
     const active = useScreenActive();
     return (
-        <PlayerScreen client={ctx.client} media={ctx.media} item={r.item} queue={r.queue} index={r.index} active={active}
+        <PlayerScreen client={ctx.client} media={ctx.media} item={r.item} queue={r.queue} index={r.index} active={active} ctx={ctx}
             onExit={() => { if (!nav.pop()) nav.resetTo({ name: "home" }); }} />
     );
 }

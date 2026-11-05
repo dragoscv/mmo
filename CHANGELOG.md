@@ -10,6 +10,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — Better than Plex, part 2 (TV Tizen 2.1.0)
+
+- **TV Tizen 2.1.0** — cinematic screens on the 2.0 foundation (WP16-31..34): Home with backdrop that follows
+  focus and a hero row, library grids with sort/filters/A–Z, unified title + season pages, search with
+  on-screen keyboard; custom player OSD (audio/subtitles + style, speed, screen format, skip intro/credits,
+  Up Next) with Watch Together and remote control through the hub; full music (background engine that
+  restores the server queue at start, artists, albums, now playing with synced lyrics); Live TV (channels with
+  live preview, EPG grid, preloaded zapping, catch-up, recordings); two-pane settings (profiles, playback,
+  subtitles, navigation, screen format, Watch Together device name, cache, about) and a year in review.
+  Measured on the Odyssey G8: Home first paint from cache 372 ms after mount; preloaded zap 23–80 ms.
+
 ## 2026-11-05 — Better than Plex, part 1 (MMO Server 3.6.0 · TV Android 2.0.0 · `@mmo/sdk` 0.5.0)
 
 - **MMO Server 3.4 → 3.6** (WP16-A/B, details in `server/CHANGELOG.md`): viewer profiles with optional PIN

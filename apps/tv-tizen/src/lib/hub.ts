@@ -69,6 +69,16 @@ export function deviceId(): string {
     }
 }
 
+/** Name shown to other devices: Settings › Watch Together override (prefs `tvDeviceName`), else hardware name. */
+export function displayDeviceName(): string {
+    try {
+        const raw = localStorage.getItem("mixai:prefs:v1");
+        const v = raw ? (JSON.parse(raw) as Record<string, unknown>).tvDeviceName : undefined;
+        if (typeof v === "string" && v.trim()) return v.trim().slice(0, 40);
+    } catch { /* no storage */ }
+    return hubDeviceName();
+}
+
 /** "Samsung <model>" via tizen.systeminfo / webapis.productinfo, else "Samsung TV". */
 export function hubDeviceName(): string {
     try {
@@ -214,7 +224,7 @@ export class HubClient {
         this.send({
             type: "hello",
             deviceId: deviceId(),
-            name: hubDeviceName(),
+            name: displayDeviceName(),
             platform: "tizen",
             caps: HUB_CAPS,
             ...(pid ? { profileId: pid } : {}),

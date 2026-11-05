@@ -51,6 +51,11 @@ export function markLoaded(url: string | null | undefined): void {
     if (url) touch(url);
 }
 
+/** Forget every "already loaded" URL (Settings › Cache). */
+export function clearLoaded(): void {
+    loaded.clear();
+}
+
 const inflight = new Map<string, Promise<void>>();
 
 /** Preload + decode off the main thread where supported. Resolves (never rejects) when done or failed. */
