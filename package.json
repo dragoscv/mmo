@@ -24,6 +24,7 @@
         "typecheck:web": "pnpm -C apps/web typecheck",
         "test:web": "pnpm -C apps/web test",
         "test:ui": "pnpm -C packages/ui test && pnpm -C packages/design-tokens test",
+        "e2e:cloud": "node scripts/e2e-cloud/run.mjs",
         "changeset": "changeset",
         "version": "changeset version",
         "release:changelog": "changeset version"
