@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-05 — Web 3.1.3
+
+- `/.well-known/assetlinks.json`: real `ro.mixai.app` fingerprints (Play App Signing key + upload key) replace the
+  placeholder, so `https://mixai.ro/media/*` App Links verify once the domain is live.
+
 ## 2026-11-05 — Web 3.1.2
 
 - Public privacy policy at `/privacy` (RO/EN, `?lang=en|ro` override) for the Google Play and App Store
