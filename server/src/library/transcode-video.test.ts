@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { pickTranscodeMode, audioTranscodeArgs, audioOf, sessionKeyFor, SESSION_KEY_RE } from "./transcode-video";
+import { pickTranscodeMode, audioTranscodeArgs, audioOf, sessionKeyFor, SESSION_KEY_RE, streamMapArgs } from "./transcode-video";
 
 vi.mock("../store", () => ({ getSettings: () => ({ allowVideoTranscode: false }) }));
 vi.mock("./pre-remux", () => ({ sidecarIfExists: () => null }));
@@ -45,6 +45,23 @@ describe("pickTranscodeMode", () => {
         expect(pickTranscodeMode("original", "hevc", "aac", [])).toBe("remux");
         expect(pickTranscodeMode("original", "hevc", "eac3", [])).toBe("audio-transcode");
         expect(pickTranscodeMode("original", "hevc", "dts", [])).toBe("audio-transcode");
+    });
+
+    it("never full-transcodes an audio-only source, even when video transcoding is allowed", () => {
+        expect(pickTranscodeMode("720p", null, "aac", ["h264", "aac"], true)).toBe("remux");
+        expect(pickTranscodeMode("original", null, "flac", ["h264", "aac"], true)).toBe("audio-transcode");
+        expect(pickTranscodeMode("original", null, "opus", [])).toBe("audio-transcode");
+        expect(pickTranscodeMode("original", null, "mp3", [])).toBe("remux");
+    });
+});
+
+describe("streamMapArgs", () => {
+    it("maps the first video stream hard when the source has video", () => {
+        expect(streamMapArgs("h264", 0).slice(0, 4)).toEqual(["-map", "0:v:0", "-map", "0:a:0?"]);
+    });
+
+    it("makes the video map optional for an audio-only source (was: ffmpeg 'matches no streams' -> HTTP 500)", () => {
+        expect(streamMapArgs(null, 2).slice(0, 4)).toEqual(["-map", "0:v:0?", "-map", "0:a:2?"]);
     });
 });
 

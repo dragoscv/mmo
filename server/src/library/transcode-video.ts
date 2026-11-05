@@ -158,6 +158,13 @@ export async function probeStreamCodecs(filePath: string): Promise<StreamCodecs>
 const VIDEO_COPY_OK = ["h264", "hevc", "vp9", "av1"];
 const AUDIO_COPY_OK = ["aac", "ac3", "eac3", "opus", "mp3", "flac"];
 
+/** Stream selection for the HLS session. An audio-only file (music video rip, radio recording in mkv) has no
+ *  `0:v:0`: a hard map made ffmpeg exit with "Stream map '' matches no streams" and the route answered 500.
+ *  With no probed video the video map is optional, so the session is audio-only HLS. */
+export function streamMapArgs(videoCodec: string | null, audioIndex: number): string[] {
+    return ["-map", videoCodec ? "0:v:0" : "0:v:0?", "-map", `0:a:${audioIndex}?`, "-sn", "-dn", "-map_chapters", "-1"];
+}
+
 /** Decide the cheapest playback mode that the given client can handle.
  *  `caps` is the comma-separated list reported by the client (e.g.
  *  "h264,hevc,aac,ac3,eac3"). The video stream is NEVER re-encoded unless
@@ -170,9 +177,16 @@ export function pickTranscodeMode(
     caps: string[],
     allowVideoTranscode = false,
 ): TranscodeMode {
-    if (quality !== "original" && allowVideoTranscode) return "full-transcode";
     const v = (videoCodec ?? "").toLowerCase();
     const a = (audioCodec ?? "").toLowerCase();
+    const aKeyEarly = a === "mp4a" ? "aac" : a;
+    // Audio-only source: nothing to encode on the video side.
+    if (!v && aKeyEarly) {
+        const capSet = new Set(caps.map((c) => c.toLowerCase()));
+        const ok = capSet.size === 0 ? ["aac", "mp3"].includes(aKeyEarly) : (AUDIO_COPY_OK.includes(aKeyEarly) && capSet.has(aKeyEarly));
+        return ok ? "remux" : "audio-transcode";
+    }
+    if (quality !== "original" && allowVideoTranscode) return "full-transcode";
     // Normalize codec aliases to the names clients report.
     const vKey = v === "avc1" ? "h264" : v === "h265" ? "hevc" : v;
     const aKey = a === "mp4a" ? "aac" : a;
@@ -306,7 +320,7 @@ export async function ensureHlsSession(
     }
     if (startSec > 0) args.push("-ss", String(startSec));
     args.push("-i", effectiveSource);
-    args.push("-map", "0:v:0", "-map", `0:a:${aIdx}?`, "-sn", "-dn", "-map_chapters", "-1");
+    args.push(...streamMapArgs(probedV, aIdx));
 
     if (mode === "remux") {
         args.push("-c:v", "copy");

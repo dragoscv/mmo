@@ -2,6 +2,13 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.9.5 — Audio-only files play instead of HTTP 500
+
+- `/video/stream/:fileId` on an audio-only container (e.g. an mkv with only FLAC/AAC) answered 500: the HLS
+  session hard-mapped `0:v:0` and ffmpeg exited "Stream map '' matches no streams". With no probed video the map
+  is optional (`streamMapArgs`) and the mode is never `full-transcode` → audio-only HLS (verified with real ffmpeg:
+  old args rc=-22 / 0 segments, new args rc=0 / 3 segments).
+
 ## 3.9.4 — Headless core really runs without Electron
 
 - Commit the ADR-0002 platform swap that stayed uncommitted since 2026-09: 14 modules (library db, analyzer,
