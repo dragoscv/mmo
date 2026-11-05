@@ -31,7 +31,7 @@
 .set-row-icon { font-size: 1.1rem; }
 .set-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .set-row-label { font-weight: 600; }
-.set-row-sub { font-size: 0.62rem; color: var(--muted-foreground); margin-top: 0.1rem; }
+.set-row-sub { font-size: 0.75rem; color: var(--muted-foreground); margin-top: 0.1rem; }
 .set-row:focus .set-row-sub { color: inherit; opacity: 0.85; }
 .set-row-value { color: var(--muted-foreground); font-size: 0.75rem; white-space: nowrap; }
 .set-row:focus .set-row-value { color: inherit; }
@@ -42,7 +42,7 @@
 .set-switch.is-on span { transform: translateX(1rem); background: var(--primary-foreground); }
 .set-chiprow { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.5rem 0.2rem; }
 .set-chiprow .set-row-label { font-size: 0.8rem; }
-.set-note { font-size: 0.7rem; padding: 0.4rem 0.2rem; }
+.set-note { font-size: 0.75rem; padding: 0.4rem 0.2rem; }
 .set-note-muted { color: var(--muted-foreground); }
 .set-note-error { color: var(--destructive); }
 .set-note-success { color: var(--success); }
@@ -85,7 +85,7 @@
 .st-nums { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0 1.6rem; }
 .st-num { flex: 1 1 10rem; padding: 1rem 1.2rem; border-radius: calc(var(--radius) * 1.4); background: var(--card); }
 .st-num-v { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.st-num-l { color: var(--muted-foreground); font-size: 0.7rem; margin-top: 0.2rem; }
+.st-num-l { color: var(--muted-foreground); font-size: 0.75rem; margin-top: 0.2rem; }
 .st-num-hero { flex-basis: 18rem; background: var(--accent); color: var(--accent-foreground); }
 .st-num-hero .st-num-l { color: inherit; opacity: 0.8; }
 .st-cols { display: flex; gap: 2rem; align-items: flex-start; }
@@ -98,7 +98,7 @@
     transform-origin: 50% 100%; transform: scaleY(0); transition: transform var(--dur-slow) var(--ease-out);
 }
 .st-bar-fill.is-listen { background: var(--deck-a); }
-.st-bar-m { font-size: 0.55rem; color: var(--muted-foreground); margin-top: 0.3rem; }
+.st-bar-m { font-size: 0.75rem; color: var(--muted-foreground); margin-top: 0.3rem; }
 .st-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
 .st-li { display: flex; align-items: center; gap: 0.8rem; font-size: 0.75rem; padding: 0.4rem 0.2rem; }
 .st-li-n { width: 1.4rem; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
@@ -130,10 +130,10 @@
 }
 .tg-react:focus { transform: scale(1.2); box-shadow: 0 0 0 var(--focus-ring-w) var(--ring), var(--focus-glow); }
 .tg-qr { display: block; width: 11rem; height: 11rem; border-radius: var(--radius); }
-.tg-codebox { margin-top: 0.8rem; padding: 0.5rem 0.8rem; border-radius: var(--radius); background: var(--input); font-family: var(--font-mono); font-size: 0.7rem; word-break: break-all; }
+.tg-codebox { margin-top: 0.8rem; padding: 0.5rem 0.8rem; border-radius: var(--radius); background: var(--input); font-family: var(--font-mono); font-size: 0.75rem; word-break: break-all; }
 .tg-chat { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.75rem; }
 .tg-chat li.is-react { font-size: 1rem; }
 .tg-dim { color: var(--muted-foreground); }
-.tg-small { font-size: 0.7rem; margin-top: 0.5rem; }
+.tg-small { font-size: 0.75rem; margin-top: 0.5rem; }
 .tg-join { width: 52rem; max-width: 90vw; }
 .tg-code { font-size: 1.1rem; font-weight: 700; padding: 0.4rem 0.6rem; border-radius: var(--radius); background: var(--input); margin-bottom: 0.6rem; min-height: 1.6rem; word-break: break-all; }

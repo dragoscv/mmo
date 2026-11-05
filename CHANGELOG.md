@@ -10,6 +10,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — TV Tizen design pass (TV Tizen 2.2.0)
+
+- **TV Tizen 2.2.0** — design-critic Tizen items (docs/design-critic/wp16-tv.md, WP16-35):
+  - Staged Home entrance: backdrop first, then logo + chips, then rows staggered 70 ms (transform/opacity only,
+    680 ms total); skipped with the user's reduced-motion setting.
+  - Space Grotesk headings + Inter body bundled as local variable woff2 (OFL, latin + latin-ext incl. ș/ț; same
+    files as the web); SamsungOne stays as fallback.
+  - 10-foot type floor: no text below 0.75 rem (18 px), card titles 0.85 rem (68 sizes raised).
+  - Library: files directly in a library root no longer form a fake show named after the folder
+    ("TV Shows · 1 episodes"); opening a show without a TMDB match opens its episode list instead of the player.
+  - Living backdrop (36 s Ken Burns 1.0→1.06, off with reduced motion), placeholder cards with a blurred
+    still + title lockup, profile picker over the last backdrop, glass strip behind the player controls,
+    OSD times 0.85 rem.
+- **MMO Server**: Home puts "New in your library" right after Continue watching / My list, before every
+  recommendation row (D25); the home rows cache key changed so the old order is not served.
+
 ## 2026-11-06 — Web on Cloud Run (web 3.0.1 · 3.0.2)
 
 - **Web 3.0.2** — `/api/health` reports the real app version under the standalone server (was `0.0.0`).

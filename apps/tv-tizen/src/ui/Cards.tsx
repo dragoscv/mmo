@@ -27,6 +27,8 @@ export interface BaseCardProps {
     badges?: CardBadge[];
     /** Placeholder icon when there is no image. */
     placeholderIcon?: IconName;
+    /** Fallback frame (e.g. `/video/thumbs/:id/still.jpg`) used blurred under a title lockup when `image` is missing. */
+    still?: string | null;
     onSelect?: () => void;
     /** Fires when the card receives focus (backdrop / preload). */
     onFocus?: () => void;
@@ -38,8 +40,19 @@ export interface BaseCardProps {
     testId?: string;
 }
 
-function Art({ image, placeholderIcon, alt }: { image?: string | null; placeholderIcon: IconName; alt: string }) {
-    if (!image) return <div className="card-art card-art-ph"><Icon name={placeholderIcon} size="2.2rem" /></div>;
+function Art({ image, placeholderIcon, alt, still, title }: { image?: string | null; placeholderIcon: IconName; alt: string; still?: string | null; title: string }) {
+    if (!image) {
+        return (
+            <span className="card-art card-art-ph" aria-hidden="true">
+                <span className="card-ph-grad" />
+                {still && <img className="card-art card-art-still" src={still} alt="" loading="lazy" decoding="async"
+                    onLoad={(e) => e.currentTarget.classList.add("loaded")} onError={(e) => { e.currentTarget.style.display = "none"; }} />}
+                <span className="card-ph-scrim" />
+                <span className="card-ph-icon"><Icon name={placeholderIcon} size="1.2rem" /></span>
+                <span className="card-ph-title">{title}</span>
+            </span>
+        );
+    }
     const warm = isLoaded(image);
     return (
         <img className={`card-art${warm ? " loaded" : ""}`} src={image} alt={alt} loading="lazy" decoding="async"
@@ -60,7 +73,7 @@ function CardBody(p: BaseCardProps & { shape: "poster" | "landscape" | "square" 
             onFocus={p.onFocus}
         >
             <span className="mcard-frame">
-                <Art image={p.image} placeholderIcon={p.placeholderIcon ?? (p.shape === "landscape" ? "tv" : "movie")} alt="" />
+                <Art image={p.image} still={p.still} title={p.title} placeholderIcon={p.placeholderIcon ?? (p.shape === "landscape" ? "tv" : "movie")} alt="" />
                 {p.badges && p.badges.length > 0 && (
                     <span className="mcard-badges">
                         {p.badges.map((b, i) => (

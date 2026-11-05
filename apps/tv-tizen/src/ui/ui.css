@@ -43,6 +43,11 @@
 :root[data-motion="reduced"] .backdrop-img { transition: none; }
 .backdrop.is-fading .backdrop-img { will-change: opacity; }
 .backdrop-img.on { opacity: 1; }
+/* Living background: slow Ken Burns on the visible layer only (transform, compositor-only), 36 s each way. */
+@keyframes tv-kenburns { from { transform: scale(1); } to { transform: scale(1.06); } }
+.backdrop-img.on { transform-origin: 70% 30%; animation: tv-kenburns 36s ease-in-out 1.2s infinite alternate; }
+:root[data-motion="reduced"] .backdrop-img.on { animation: none; }
+@media (prefers-reduced-motion: reduce) { .backdrop-img.on { animation: none; } }
 .backdrop-scrim-left, .backdrop-scrim-bottom { position: absolute; opacity: 0; transition: opacity 300ms var(--ease-out); }
 .backdrop.has-image .backdrop-scrim-left, .backdrop.has-image .backdrop-scrim-bottom { opacity: 1; }
 .backdrop-scrim-left { top: 0; bottom: 0; left: 22%; width: 48%; background: linear-gradient(to right, var(--background) 0%, transparent 100%); }
@@ -86,10 +91,10 @@
 .rail-mini { height: 4rem; padding-left: 0.4rem; margin-top: auto; }
 .rail-mini-art { position: relative; width: 3rem; height: 3rem; border-radius: calc(var(--radius) * 0.8); overflow: hidden; background: var(--muted); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 .rail-mini-art img { width: 100%; height: 100%; object-fit: cover; }
-.rail-mini-state { position: absolute; right: 0.15rem; bottom: 0.15rem; width: 1.2rem; height: 1.2rem; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); display: flex; align-items: center; justify-content: center; font-size: 0.6rem; }
+.rail-mini-state { position: absolute; right: 0.15rem; bottom: 0.15rem; width: 1.2rem; height: 1.2rem; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; }
 .rail-mini-text { display: flex; flex-direction: column; min-width: 0; }
 .rail-mini-title { font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; }
-.rail-mini-sub { font-size: 0.65rem; font-weight: 400; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; }
+.rail-mini-sub { font-size: 0.75rem; font-weight: 400; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; }
 
 .avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; flex: 0 0 auto; background: var(--accent); color: var(--accent-foreground); font-weight: 700; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -119,9 +124,21 @@
 .card-art { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
 .card-art.loaded { opacity: 1; }
 .card-art-ph { opacity: 1; display: flex; align-items: center; justify-content: center; color: var(--muted-foreground); background: var(--muted); }
+/* Placeholder art: blurred still frame (or a token gradient) + bottom scrim + title lockup in the heading face. */
+.card-art-still { filter: blur(0.15rem) brightness(0.72) saturate(1.1); transform: scale(1.08); }
+.card-ph-grad { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(160deg, var(--accent) 0%, var(--card) 70%); }
+.card-ph-scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 62%; background: linear-gradient(to top, var(--background) 0%, transparent 100%); }
+.card-ph-icon { position: absolute; top: 0.6rem; right: 0.6rem; color: var(--muted-foreground); opacity: 0.8; }
+.card-ph-title {
+    position: absolute; left: 0.6rem; right: 0.6rem; bottom: 0.7rem; font-family: "Space Grotesk", "Inter", "SamsungOne", system-ui, sans-serif;
+    font-size: 1rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; color: var(--foreground);
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-align: left;
+}
+.mcard-landscape .card-ph-title { font-size: 0.95rem; -webkit-line-clamp: 2; }
+.mcard-titled .card-ph-title { display: none; }
 .mcard-badges { position: absolute; top: 0.45rem; left: 0.45rem; display: flex; gap: 0.3rem; flex-wrap: wrap; }
 .mcard-overlay { position: absolute; top: 0.45rem; right: 0.45rem; }
-.badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.45rem; border-radius: 999px; font-size: 0.55rem; font-weight: 700; background: var(--primary); color: var(--primary-foreground); }
+.badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.45rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: var(--primary); color: var(--primary-foreground); }
 .badge-neutral { background: var(--secondary); color: var(--secondary-foreground); }
 .badge-warning { background: var(--warning); color: var(--background); }
 .badge-destructive { background: var(--destructive); color: var(--destructive-foreground); }
@@ -130,8 +147,8 @@
 .mcard-progress > span { display: block; height: 100%; background: var(--brand-accent); transform-origin: left center; }
 .mcard-meta { display: flex; flex-direction: column; padding: 0.45rem 0.1rem 0; min-height: 2.6rem; opacity: 0; transform: translateY(-0.3rem); transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
 .mcard:focus .mcard-meta, .mcard-titled .mcard-meta { opacity: 1; transform: none; }
-.mcard-title { font-size: 0.72rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mcard-sub { font-size: 0.6rem; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.1rem; }
+.mcard-title { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mcard-sub { font-size: 0.75rem; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.1rem; }
 
 /* ─── Row / Grid (virtualised; cells translate, never relayout) ─────────── */
 .vrow { position: relative; margin: 0 0 1.4rem; }
@@ -159,7 +176,7 @@
 .tbtn:disabled { opacity: 0.5; }
 .tbtn-icon { font-size: 1.1rem; }
 .tbtn-text { display: flex; flex-direction: column; }
-.tbtn-sub { font-weight: 400; font-size: 0.6rem; opacity: 0.8; margin-top: 0.1rem; }
+.tbtn-sub { font-weight: 400; font-size: 0.75rem; opacity: 0.8; margin-top: 0.1rem; }
 .ibtn {
     position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.8rem; height: 2.8rem;
     border: 0; border-radius: 50%; background: var(--secondary); color: var(--secondary-foreground); font-size: 1.2rem; outline: none;
@@ -169,13 +186,13 @@
 .ibtn:focus { transform: scale(1.1); background: var(--primary); color: var(--primary-foreground); box-shadow: var(--focus-glow); }
 .ibtn-caption {
     position: absolute; top: calc(100% + 0.4rem); left: 50%; transform: translateX(-50%); white-space: nowrap;
-    font-size: 0.6rem; color: var(--foreground); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none;
+    font-size: 0.75rem; color: var(--foreground); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none;
 }
 .ibtn:focus .ibtn-caption { opacity: 1; }
 .chips { display: flex; gap: 0.6rem; flex-wrap: wrap; padding: 0.3rem 0.2rem; }
 .chip {
     display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 1rem; border-radius: 999px; border: 0;
-    background: var(--secondary); color: var(--secondary-foreground); font-size: 0.7rem; font-weight: 600; outline: none;
+    background: var(--secondary); color: var(--secondary-foreground); font-size: 0.75rem; font-weight: 600; outline: none;
     transition: transform var(--dur-fast) var(--ease-out);
 }
 .chip.is-active { background: var(--accent); color: var(--accent-foreground); }
@@ -227,7 +244,7 @@
 .sp-item.is-checked { color: var(--primary); }
 .sp-item:focus { background: var(--accent); color: var(--accent-foreground); box-shadow: 0 0 0 var(--focus-ring-w) var(--ring); }
 .sp-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.sp-sub { font-size: 0.62rem; color: var(--muted-foreground); }
+.sp-sub { font-size: 0.75rem; color: var(--muted-foreground); }
 .sp-icon, .sp-check { font-size: 1.1rem; }
 
 .pinpad { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; padding: 2rem 2.4rem; border-radius: calc(var(--radius) * 1.6); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); }
@@ -248,7 +265,7 @@
 }
 .pin-key:focus { background: var(--primary); color: var(--primary-foreground); transform: scale(1.08); }
 .pin-key-aux { font-size: 1rem; }
-.pin-hint { color: var(--muted-foreground); font-size: 0.62rem; max-width: 18rem; text-align: center; }
+.pin-hint { color: var(--muted-foreground); font-size: 0.75rem; max-width: 18rem; text-align: center; }
 
 /* ─── Keyboard ──────────────────────────────────────────────────────────── */
 .kb { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -258,7 +275,7 @@
     background: var(--secondary); color: var(--secondary-foreground); font-size: 0.85rem; font-weight: 600; outline: none;
     display: inline-flex; align-items: center; justify-content: center; transition: transform var(--dur-fast) var(--ease-out);
 }
-.kb-wide { min-width: 5rem; font-size: 0.7rem; }
+.kb-wide { min-width: 5rem; font-size: 0.75rem; }
 .kb-key.is-active { background: var(--accent); color: var(--accent-foreground); }
 .kb-done { background: var(--primary); color: var(--primary-foreground); }
 .kb-key:focus { background: var(--primary); color: var(--primary-foreground); transform: scale(1.1); z-index: var(--z-raised); }
@@ -266,6 +283,16 @@
 /* ─── Profiles ──────────────────────────────────────────────────────────── */
 .profiles { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2rem; padding: var(--tv-pad-y) var(--tv-pad-x); }
 .profiles-title { font-size: 2rem; font-weight: 700; margin: 0; }
+/* Atmosphere: last-watched backdrop (Profiles.tsx → useBackdrop) under a stronger scrim + an accent glow band. */
+.profiles::before {
+    content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: -1; pointer-events: none;
+    background: radial-gradient(ellipse 60% 55% at 50% 42%, var(--accent) 0%, transparent 70%), linear-gradient(to top, var(--background) 0%, transparent 60%);
+    opacity: 0.85;
+}
+.profiles.has-backdrop::after {
+    content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: -2; pointer-events: none; background: var(--background); opacity: 0.55;
+}
+.profiles { isolation: isolate; }
 .profiles-grid { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; max-width: 90vw; }
 .profile-tile {
     display: flex; flex-direction: column; align-items: center; gap: 0.7rem; padding: 0.6rem; border: 0; background: transparent;
@@ -277,5 +304,5 @@
 .profile-tile:focus .avatar { box-shadow: 0 0 0 var(--focus-ring-w) var(--ring), var(--focus-glow); }
 .profile-name { font-size: 0.85rem; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-tags { display: flex; gap: 0.3rem; min-height: 1.1rem; }
-.profile-locked { font-size: 0.6rem; color: var(--warning); }
+.profile-locked { font-size: 0.75rem; color: var(--warning); }
 .profiles-actions { display: flex; gap: 1rem; }

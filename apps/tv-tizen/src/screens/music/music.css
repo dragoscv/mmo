@@ -21,7 +21,7 @@
 .mu-hero-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .mu-hero-ph { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; font-size: 4rem; color: var(--muted-foreground); }
 .mu-hero-body { flex: 1; min-width: 0; }
-.mu-hero-kicker { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.mu-hero-kicker { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
 .mu-hero-title { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em; margin: 0.3rem 0 0.4rem; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mu-hero-meta { color: var(--muted-foreground); font-size: 0.85rem; }
 .mu-hero-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.7rem; }
@@ -29,7 +29,7 @@
 
 /* Track list */
 .mu-tracks { display: flex; flex-direction: column; gap: 0.25rem; max-width: 70rem; }
-.mu-disc { font-size: 0.7rem; font-weight: 700; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.1em; margin: 0.9rem 0 0.3rem 0.8rem; }
+.mu-disc { font-size: 0.75rem; font-weight: 700; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.1em; margin: 0.9rem 0 0.3rem 0.8rem; }
 .mu-track {
     display: flex; align-items: center; gap: 1.1rem; min-height: 2.9rem; padding: 0.35rem 1.1rem; border: 0; border-radius: var(--radius);
     background: transparent; color: var(--foreground); text-align: left; font-size: 0.8rem; outline: none; width: 100%;
@@ -41,10 +41,10 @@
 .mu-track-num { flex: 0 0 2rem; text-align: right; color: var(--muted-foreground); font-variant-numeric: tabular-nums; display: flex; justify-content: flex-end; }
 .mu-track-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .mu-track-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mu-track-sub { font-size: 0.65rem; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mu-track-sub { font-size: 0.75rem; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mu-track:focus .mu-track-sub, .mu-track:focus .mu-track-num, .mu-track:focus .mu-track-dur, .mu-track:focus .mu-track-fmt { color: var(--accent-foreground); }
 .mu-track-badge { flex: 0 0 auto; }
-.mu-track-fmt { flex: 0 0 auto; font-size: 0.55rem; font-weight: 700; color: var(--muted-foreground); letter-spacing: 0.05em; }
+.mu-track-fmt { flex: 0 0 auto; font-size: 0.75rem; font-weight: 700; color: var(--muted-foreground); letter-spacing: 0.05em; }
 .mu-track-dur { flex: 0 0 3.5rem; text-align: right; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
 
 /* Equaliser bars */
@@ -77,7 +77,7 @@
 .np-progress { margin-top: 0.4rem; }
 .np-bar { height: 0.3rem; border-radius: 0.15rem; background: var(--muted); overflow: hidden; }
 .np-bar > span { display: block; height: 100%; background: var(--brand-accent); transform-origin: left center; }
-.np-times { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--muted-foreground); margin-top: 0.35rem; font-variant-numeric: tabular-nums; }
+.np-times { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted-foreground); margin-top: 0.35rem; font-variant-numeric: tabular-nums; }
 .np-controls { display: flex; gap: 0.9rem; align-items: center; justify-content: center; margin-top: 0.6rem; padding-bottom: 1.4rem; }
 .np-controls .np-main { width: 3.6rem; height: 3.6rem; font-size: 1.6rem; background: var(--primary); color: var(--primary-foreground); }
 .np-right { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; }

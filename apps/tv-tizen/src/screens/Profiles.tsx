@@ -10,7 +10,7 @@ import { fmtClock } from "../lib/format";
 import type { Profile } from "../lib/media-types";
 import type { ScreenProps } from "../nav/ctx";
 import { ProfileAvatar } from "../nav/Rail";
-import { Empty, ErrorState, Icon, LoadingBlock, PinPad, SecondaryButton } from "../ui";
+import { Empty, ErrorState, Icon, LoadingBlock, PinPad, SecondaryButton, useBackdrop } from "../ui";
 
 type Load = { s: "loading" } | { s: "ok"; list: Profile[] } | { s: "error"; message: string };
 
@@ -35,6 +35,16 @@ export function Profiles({ ctx, params }: ScreenProps<"profiles">) {
     const [resetKey, setResetKey] = useState(0);
     const anyLocked = load.s === "ok" && load.list.some((p) => (lockedUntil.get(p.id) ?? 0) > Date.now());
     const now = useNow(anyLocked || pinFor !== null);
+    const backdrop = useBackdrop();
+    const [atmo] = useState<string | null>(() => {
+        // Atmosphere: the last Home backdrop this TV cached (continue first), dimmed by `.profiles.has-backdrop`.
+        try {
+            const rows = ctx.media.homeCached()?.rows ?? [];
+            for (const r of rows) for (const c of r.items) if (c.backdropPath) return ctx.media.image(c.backdropPath, "w1280");
+        } catch { /* no cache yet */ }
+        return null;
+    });
+    useEffect(() => { backdrop.show(atmo); }, [backdrop, atmo]);
 
     const fetchList = useCallback(() => {
         setLoad({ s: "loading" });
@@ -84,7 +94,7 @@ export function Profiles({ ctx, params }: ScreenProps<"profiles">) {
     const padError = padUntil > now ? t("profiles.tooMany", { time: fmtClock((padUntil - now) / 1000) }) : pinError;
 
     return (
-        <div className="profiles" data-testid="profiles">
+        <div className={`profiles${atmo ? " has-backdrop" : ""}`} data-testid="profiles">
             <h1 className="profiles-title">{t("profiles.title")}</h1>
             {load.s === "loading" && <div style={{ width: "30rem" }}><LoadingBlock lines={2} /></div>}
             {load.s === "error" && <ErrorState message={load.message} onRetry={fetchList} />}

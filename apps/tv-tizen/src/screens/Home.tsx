@@ -6,7 +6,7 @@
  * Server without `/media` (or empty) → rows from the `/video/scan` list (movies + shows).
  * Perf: `console.info('[perf] home first paint', ms, 'cached', bool)` + `window.__mixaiPerf`.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ProbedVideo } from "../lib/api";
 import { focusByKey, currentFocus } from "../lib/focus";
 import { preload, remPx } from "../lib/image";
@@ -19,6 +19,7 @@ import { CARD_REM, Empty, ErrorState, LandscapeCard, LoadingRows, PosterCard, Ro
 import { HomeHero } from "./home/HomeHero";
 import { cardKey, fileBase, playTitle } from "./home/media-ui";
 import { cardBadges, cardSubtitle, rememberFlipSource } from "./home/widgets";
+import { motionReduced } from "../lib/prefs";
 import "./home/home.css";
 
 type Scan = { s: "idle" } | { s: "loading" } | { s: "ok"; videos: ProbedVideo[] } | { s: "error"; message: string };
@@ -27,6 +28,8 @@ type Remote = { s: "loading" } | { s: "ok" } | { s: "error"; message: string };
 declare global { interface Window { __mixaiPerf?: Record<string, unknown> } }
 
 const HERO_DEBOUNCE_MS = 150;
+/** Staged entrance length (home.css `.is-entering`: last row delay 410 + 270 ms) + slack. */
+const ENTRANCE_MS = 760;
 const mountedAt = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
 function epLabel(c: TitleCard): string | undefined {
@@ -46,6 +49,7 @@ export function Home({ ctx }: ScreenProps<"home">) {
     const heroTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const painted = useRef(false);
     const focusedOnce = useRef(false);
+    const rootRef = useRef<HTMLDivElement>(null);
     const backdrop = useBackdrop();
     const active = useScreenActive();
 
@@ -85,6 +89,21 @@ export function Home({ ctx }: ScreenProps<"home">) {
 
     // ─── Perf: first paint with real rows ────────────────────────────────
     const hasContent = mediaMode || scan.s === "ok";
+    const entered = useRef(false);
+    useLayoutEffect(() => {
+        if (!hasContent || entered.current) return;
+        entered.current = true;
+        const root = rootRef.current;
+        if (root && !motionReduced()) {
+            // Before the first content paint, on the DOM (not state): no flash, no extra render.
+            root.classList.add("is-entering");
+            try { performance.mark("mixai:home-enter-start"); } catch { /* old engines */ }
+            setTimeout(() => {
+                root.classList.remove("is-entering");
+                try { performance.mark("mixai:home-enter-end"); performance.measure("mixai:home-enter", "mixai:home-enter-start", "mixai:home-enter-end"); } catch { /* ignore */ }
+            }, ENTRANCE_MS);
+        }
+    }, [hasContent]);
     useEffect(() => {
         if (!hasContent || painted.current) return;
         painted.current = true;
@@ -180,7 +199,7 @@ export function Home({ ctx }: ScreenProps<"home">) {
     };
 
     return (
-        <div className="wh-home" data-testid="screen-home">
+        <div ref={rootRef} className="wh-home" data-testid="screen-home">
             <div className="wh-hero">
                 <div className="wh-hero-inner">
                     {mediaMode

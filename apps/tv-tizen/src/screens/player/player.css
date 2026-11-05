@@ -56,11 +56,23 @@
     margin-top: 0.4rem; padding: 0.15rem 0.6rem; border-radius: var(--radius); background: var(--popover); color: var(--popover-foreground);
     font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums;
 }
-.pl-times { display: flex; justify-content: space-between; margin-top: 0.4rem; color: var(--muted-foreground); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.pl-times { display: flex; justify-content: space-between; margin-top: 0.4rem; color: var(--muted-foreground); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .pl-ends { color: var(--foreground); opacity: 0.85; }
 
 /* ─── Controls ───────────────────────────────────────────────────────────── */
-.pl-controls { display: flex; gap: 1rem; margin-top: 1rem; padding-bottom: 1.4rem; }
+.pl-controls {
+    position: relative; display: inline-flex; gap: 1rem; margin-top: 1rem; margin-bottom: 1.8rem; padding: 0.7rem 1.1rem 0.7rem;
+    border-radius: calc(var(--radius) * 2); isolation: isolate;
+}
+/* Glass strip: semi-opaque popover token (the HW video plane sits under the web layer, so a blur would have
+   nothing to sample on Tizen; backdrop-filter is added only where the engine supports it). */
+.pl-controls::before {
+    content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: -1; border-radius: inherit;
+    background: var(--popover); opacity: 0.72; box-shadow: inset 0 0 0 1px var(--border), var(--surface-shadow);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .pl-controls { -webkit-backdrop-filter: blur(var(--surface-blur)) saturate(1.2); backdrop-filter: blur(var(--surface-blur)) saturate(1.2); }
+}
 .pl-btn {
     position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.8rem; height: 2.8rem;
     border: 0; border-radius: 50%; background: var(--secondary); color: var(--secondary-foreground); font-size: 1.2rem; outline: none;
@@ -71,7 +83,7 @@
 .pl-btn:focus { transform: scale(1.12); background: var(--primary); color: var(--primary-foreground); box-shadow: var(--focus-glow); }
 .pl-btn-cap {
     position: absolute; top: calc(100% + 0.4rem); left: 50%; transform: translateX(-50%); white-space: nowrap;
-    font-size: 0.6rem; color: var(--foreground); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none;
+    font-size: 0.75rem; color: var(--foreground); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none;
 }
 .pl-btn:focus .pl-btn-cap { opacity: 1; }
 
@@ -125,7 +137,7 @@
 }
 .pl-upnext-still { flex: 0 0 12rem; height: 6.75rem; border-radius: var(--radius); background-color: var(--card); background-size: cover; background-position: center; }
 .pl-upnext-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
-.pl-upnext-kicker { color: var(--muted-foreground); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.pl-upnext-kicker { color: var(--muted-foreground); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
 .pl-upnext-title { font-size: 0.95rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pl-upnext-actions { display: flex; gap: 0.8rem; margin-top: auto; }
 .pl-upnext-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 0.2rem; background: var(--primary); transform-origin: 0 50%; animation: pl-count linear forwards; }
@@ -136,5 +148,5 @@
 .pl-info-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.75rem; }
 .pl-info-row dt { color: var(--muted-foreground); }
 .pl-info-row dd { margin: 0; text-align: right; word-break: break-word; }
-.pl-panel-note { color: var(--muted-foreground); font-size: 0.65rem; padding: 0.8rem 0.3rem 0; }
+.pl-panel-note { color: var(--muted-foreground); font-size: 0.75rem; padding: 0.8rem 0.3rem 0; }
 .pl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

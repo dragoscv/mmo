@@ -5,6 +5,8 @@
  */
 import type { LibraryIndexRow, MediaKind, ProgressEntry } from "../../lib/media-types";
 import type { MediaClient } from "../../lib/media";
+import type { ProbedVideo } from "../../lib/api";
+import { sortEpisodes, type Show } from "../../lib/shows";
 import { ApiError } from "../../lib/api";
 import { fileBase, fold, yearOf } from "./media-ui";
 
@@ -48,12 +50,18 @@ export function resFromPath(p: string): string {
     return "SD";
 }
 
-function showFolder(path: string): string {
+/** Folder names that are library roots, never a show ("D:\TV Shows\Show.S01E01.mkv" must not become show "TV Shows"). */
+const ROOT_NAME = /^(tv ?shows?|shows?|series|seriale|tv|video|videos|media|movies|filme|downloads?)$/i;
+
+export function showFolder(path: string): string {
     const parts = path.split(/[\\/]/).filter(Boolean);
     parts.pop();
     let i = parts.length - 1;
     if (i >= 0 && /^(season|sezon|series|s)\s*\d+$/i.test(parts[i]!)) i--;
-    return i >= 0 ? parts[i]! : fileBase(path);
+    const dir = i >= 0 ? parts[i]! : "";
+    // Root-level file (parent is a drive, a share root or a generic library folder) → show title from the file name.
+    if (!dir || i === 0 || /:$/.test(dir) || ROOT_NAME.test(dir)) return cleanName(fileBase(path));
+    return dir;
 }
 
 export function groupLibrary(rows: LibraryIndexRow[], kind: MediaKind): LibEntry[] {
@@ -79,6 +87,16 @@ export function groupLibrary(rows: LibraryIndexRow[], kind: MediaKind): LibEntry
 
 export function rankRes(r: string | null): number {
     return r === "4K" ? 3 : r === "1080p" ? 2 : r === "720p" ? 1 : 0;
+}
+
+/** An unmatched tv entry as a local `Show` (route `show`). Rows carry no probe data → the show route resolves on play. */
+export function libEntryToShow(e: LibEntry): Show {
+    const episodes: ProbedVideo[] = e.files.map((f) => ({
+        fileId: f.serverFileId, path: f.path, sizeBytes: f.size, container: null, videoCodec: null, audioCodec: null,
+        width: null, height: null, durationSec: null, hdr: null, audioTracks: [], subtitleTracks: [],
+        parsed: { title: e.guess, year: null, season: f.season ?? 0, episode: f.episode ?? 0 },
+    }));
+    return { title: e.guess, key: e.guess.trim().toLowerCase(), episodes: sortEpisodes(episodes) };
 }
 
 /** Watched = movie with a completed entry; show whose every local episode is completed. */

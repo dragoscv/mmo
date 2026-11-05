@@ -430,7 +430,13 @@ function renderRoute(r: Route, ctx: ScreenCtx | null, nav: NavApi, ob: Onboardin
         case "settings": return <Settings ctx={ctx} params={r} />;
         case "title": return <Title ctx={ctx} params={r} />;
         case "season": return <Season ctx={ctx} params={r} />;
-        case "show": return <ShowScreen client={ctx.client} show={r.show} onPlay={(video) => nav.push({ name: "player", item: { kind: "video", video } })} />;
+        case "show": return <ShowScreen client={ctx.client} show={r.show} onPlay={(video) => {
+            // Library-built shows carry no probe data (container/duration null) → resolve first.
+            if (video.container != null || video.durationSec != null) { nav.push({ name: "player", item: { kind: "video", video } }); return; }
+            void ctx.client.resolveVideo(video.fileId, video.path)
+                .then((v) => nav.push({ name: "player", item: { kind: "video", video: v } }))
+                .catch(() => nav.push({ name: "player", item: { kind: "video", video } }));
+        }} />;
         case "artist": return <Artist ctx={ctx} params={r} />;
         case "album": return <MusicAlbum ctx={ctx} params={r} />;
         case "guide": return <Guide ctx={ctx} params={r} />;

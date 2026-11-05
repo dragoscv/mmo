@@ -139,3 +139,54 @@ Then fix Android #4 and #5, and Tizen #7.
 - Android, scrims on (shipping look): `atv-21-home`, `atv-22-rows`, `atv-23-title-movie`, `atv-31-profiles`, `atv-32-search`, `atv-33-osd`; uiautomator text in the matching `.xml` files and `a6.log`/`a7.log`.
 - Android, captured with `noscrim` (layout and text evidence only): `atv-01-start`, `atv-02-rows`, `atv-04-rail`, `atv-05-library`, `atv-06-shows`, `atv-07-music`, `atv-08-live`, `atv-09-settings`, `atv-10-movie`, `atv-11-show`, `atv-11c-episodes`.
 - Tizen: `tz-01-start`, `tz-02-rows`, `tz-04-rail`, `tz-05-library`, `tz-08-search`, `tz-09-music`, `tz-10-live`, `tz-11-settings`, `tz-12-profiles`, `tz-21-title-movie`, `tz-22-shows-grid`, `tz-23b-title-show-episodes` (player OSD); CDP text and focus keys in `tz-out.json` and `tz-out2.json`.
+
+---
+
+## After fixes 2026-11-05 — Tizen (2.2.0)
+
+Implemented: P1 #1 (server row order), #2 (staged entrance), #3 (heading face), #6 (10-foot floor), #7 (library
+fake show + dead-end open), and the Tizen P2 items #8 (Ken Burns), #9 (placeholder art), #11 (profile picker), #13
+(glass control strip, `.pl-times` 0.85 rem). Evidence = CDP on the Odyssey G8 (`mXa1TvApp0`, 2.2.0 installed via
+`tz-build.ps1 -Install`), step files `.copilot-tmp/tzd/steps*.json`, results `out1.json`, `out-final.json`,
+`cold-*.log`; screenshots `.copilot-tmp/critic/tizen-after/*-640.jpg`.
+
+| Check | Result (device) |
+|---|---|
+| Fonts | `document.fonts`: `Space Grotesk:loaded`, `Inter:loaded`; computed `.vrow-title` / `.mcard-title` = `"Space Grotesk"`, body = `Inter`; `ș ț ă` renders in Space Grotesk (canvas width 83 px vs serif 76 px, not the fallback) |
+| Type floor | visible text nodes on Home (156): min 18 px = **0.75 rem** at root 24 px (`SPAN 2026`); Shows grid min 18 px; 68 rem sizes raised, card titles 0.85 rem |
+| Entrance | `document.getAnimations()` under `.is-entering`: 9 animations, logo/chips `wh-rise` delay 80 + 260 ms, actions `wh-fade` 160 + 240 ms, rows 200/270/340/410 ms + 270 ms → **total 680 ms**, transform/opacity only. Reduced motion: 0 animations, no `mixai:home-enter` measure |
+| Living backdrop | `tv-kenburns` 36 000 ms on the visible backdrop layer, starts after 1.2 s (after the entrance); off with reduced motion |
+| Home first paint (cached, cold launch, since mount) | full motion **343 / 365 / 409 / 415 ms**; reduced motion 349 / 370 / 395 ms; WP16 baseline 372–472 ms → still < 500 ms. (A first build that added the entrance class from React state measured 413–602 ms; the class is now set on the DOM in a layout effect.) |
+| Row order (D25) | Home row titles on device before the server change was deployed: `Continue watching, Top picks…, New in your library` (local server .61 still runs the old build). Server unit test `buildHomeRows order (D25)` asserts `continue → new_in_library → …`; the device order changes when the server with this commit runs there |
+| Library | Shows grid: 6 cards, **0 fake "TV Shows" entries** (was "TV Shows · 1 episodes"). Opening the unmatched "Tulsa King" opens the episode list (`episode-list` present, player OSD absent) |
+| Placeholders | Movies: 45 of 48 cards without a poster show a blurred still frame + scrim (16 stills already decoded at capture) instead of an icon on grey |
+
+```
+DESIGN REVIEW — Tizen 2.2.0 (Odyssey G8, native 2580×1080 web surface)
+SCORES
+  Craft (25):     22/25
+    1. Subject presence   5/5  E   — unchanged: backdrop + logo hero (tizen-after/01-home)
+    2. Composition        5/5  E   — fake show folder gone, unmatched shows land on an episode page; placeholder grid has real frames (05-movies)
+    3. Three layers       4/5  E   — unchanged
+    4. Palette discipline 4/5  E+C — tokens only (hex-gate 0), sRGB block current
+    5. Typography         4/5  E+C — Space Grotesk display + Inter body loaded locally, 10-foot floor met; heading weights could be sculpted more
+  Game feel (25): 19/25
+    6. Choreographed entrance 4/5  E   — 3 acts (backdrop 300 ms → logo/chips → staggered rows), 680 ms
+    7. Tactile interactions   4/5  E+C — unchanged
+    8. Living background      4/5  E+C — slow Ken Burns + focus-following crossfade
+    9. Route morphing         3/5  C   — unchanged (FLIP only from cards)
+    10. Subject artistry      4/5  E   — blurred-still placeholders, glass control strip, profile picker over the last backdrop
+  Discipline (10): 10/10
+    11. Shell (TV-adapted)    5/5  E+C — first paint 343–415 ms cached, keep-alive stack
+    12. A11y + reduced motion 5/5  C+E — 10-foot floor met; entrance + Ken Burns off under the user pref (0 animations measured)
+TOTAL: 51/60 → with the D25 server order live on the TV's server: 52/60
+
+VERDICT
+  ☑ Ship it (≥48)
+```
+
+The score is **51/60 verified on device, 52/60 expected** once server 3.8.x+ with the row-order commit runs on
+`.61`. That last point is composition (#2): own library sits directly under Continue. It is proven by the server
+test, not yet on the TV, because the local server still runs its old build.
+Remaining Tizen gaps: route morphing (#9) only covers cards → title, and the three-layer depth on the title page
+is unchanged.

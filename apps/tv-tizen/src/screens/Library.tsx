@@ -15,7 +15,7 @@ import { useScreenActive } from "../nav/Nav";
 import { CARD_REM, Empty, ErrorState, Grid, LoadingRows, PosterCard, ScreenHeader, SecondaryButton, SidePanel, useBackdrop, type SidePanelItem } from "../ui";
 import { fold } from "./home/media-ui";
 import {
-    DetailResolver, detailsOf, groupLibrary, PAGE, rankRes, watchedKeys, type LibDetails, type LibEntry,
+    DetailResolver, detailsOf, groupLibrary, libEntryToShow, PAGE, rankRes, watchedKeys, type LibDetails, type LibEntry,
 } from "./home/library-data";
 import { rememberFlipSource } from "./home/widgets";
 import "./home/home.css";
@@ -144,6 +144,11 @@ export function Library({ ctx, params }: ScreenProps<"library">) {
             ctx.nav.push({ name: "title", kind: e.kind, tmdbId: e.tmdbId });
             return;
         }
+        if (e.kind === "tv") {
+            // Unmatched show → the local show page (episode list), never straight into the player.
+            ctx.nav.push({ name: "show", show: libEntryToShow(e) });
+            return;
+        }
         const f = e.files.slice().sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0))[0];
         if (!f) return;
         try {
@@ -233,6 +238,7 @@ export function Library({ ctx, params }: ScreenProps<"library">) {
                         <PosterCard focusKey={fk} title={d?.title ?? e.guess} alwaysShowTitle testId="lib-card"
                             subtitle={[d?.year, kind === "tv" ? t("title.episodesCount", { n: e.files.length }) : null].filter(Boolean).join(" · ") || undefined}
                             image={d?.posterPath ? ctx.media.imageFor(d.posterPath, px) : null} badges={badges.length ? badges : undefined}
+                            still={!d?.posterPath && e.files[0] ? ctx.client.stillUrl(e.files[0].serverFileId) : null}
                             placeholderIcon={kind === "tv" ? "tv" : "movie"} onSelect={() => { void open(e, fk); }} />
                     );
                 }} />
