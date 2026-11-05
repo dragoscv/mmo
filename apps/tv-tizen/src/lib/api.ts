@@ -59,7 +59,7 @@ interface SubsonicEnvelope<T> {
 }
 
 export class ApiError extends Error {
-    constructor(message: string, public readonly status: number) {
+    constructor(message: string, public readonly status: number, public readonly body: unknown = null) {
         super(message);
     }
 }

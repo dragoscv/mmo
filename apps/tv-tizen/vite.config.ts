@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import legacy from "@vitejs/plugin-legacy";
+import pkg from "./package.json" with { type: "json" };
 
 // Tizen 6–8 ship Chromium ~76–94 → es2017 output. `base: './'` because the
 // widget is served from file:// inside the .wgt — and on file:// Chromium
@@ -8,6 +9,7 @@ import legacy from "@vitejs/plugin-legacy";
 // classic SystemJS scripts only (renderModernChunks=false). Dynamic imports
 // (hls.js) still stay in their own lazily-loaded chunk.
 export default defineConfig({
+    define: { __APP_VERSION__: JSON.stringify(pkg.version) },
     plugins: [
         react(),
         legacy({

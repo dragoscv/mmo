@@ -26,9 +26,10 @@ a { color: inherit; }
 .screen-title { font-size: 1.6rem; font-weight: 700; margin: 0 0 8px; letter-spacing: -0.01em; }
 .screen-sub { color: var(--muted-foreground); margin: 0 0 32px; }
 
-/* Focus ring — the only thing the user sees from the couch. */
+/* Focus ring — the only thing the user sees from the couch. Legacy screens only: the WP16 UI kit
+   (ui/ui.css) draws its own focus (ring overlay + scale) on these classes. */
 [data-focusable] { outline: none; transition: transform var(--dur-fast) var(--ease-out), outline-color var(--dur-fast) var(--ease-out); }
-[data-focusable]:focus {
+[data-focusable]:focus:not(.mcard):not(.rail-item):not(.tbtn):not(.ibtn):not(.chip):not(.sp-item):not(.pin-key):not(.kb-key):not(.profile-tile) {
     outline: var(--focus-ring-w) solid var(--ring);
     outline-offset: 2px;
     transform: scale(var(--card-scale-focused));
@@ -128,10 +129,8 @@ a { color: inherit; }
 .progress > div { height: 100%; background: var(--brand-accent); }
 .list-item .progress { position: static; flex: 0 0 120px; height: 6px; border-radius: 3px; overflow: hidden; }
 
-/* Skeletons. TV runs data-motion="reduced" (zeroed --dur-*), but the shimmer is
-   the only loading affordance on a 10-foot UI, so its duration is set
-   explicitly and deliberately NOT disabled under reduced motion — it is slow
-   and low-contrast. */
+/* Skeletons (legacy screens). The shimmer is the only loading affordance on a 10-foot UI, so its
+    duration is set explicitly and deliberately NOT disabled under reduced motion — slow, low-contrast. */
 .skeleton {
     background: linear-gradient(90deg, var(--muted) 25%, var(--secondary) 50%, var(--muted) 75%);
     background-size: 200% 100%;
@@ -282,5 +281,21 @@ video::cue { font-size: 1.4rem; background: var(--background); color: var(--fore
         --border: rgba(255,255,255,0.10);
         --input: rgba(255,255,255,0.15);
         --ring: #9588FF;
+        --popover: #11101A;
+        --popover-foreground: #F5F1EA;
+        --sidebar: #0C0C16;
+        --sidebar-foreground: #F5F1EA;
+        --sidebar-primary: #9588FF;
+        --sidebar-accent: #1E1D2D;
+        --sidebar-border: rgba(255,255,255,0.10);
+        --sidebar-ring: #9588FF;
+    }
+    /* Shadows/glow embed oklch() → invalid (dropped) on old Chromium; same values in sRGB per surface. */
+    :root, :root[data-surface="glass"] {
+        --surface-shadow: 0 8px 32px -12px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04) inset;
+        --surface-glow: 0 0 40px -10px rgba(149,136,255,0.35);
+    }
+    :root[data-surface="solid"] {
+        --surface-shadow: 0 4px 16px -8px rgba(0,0,0,0.35);
     }
 }

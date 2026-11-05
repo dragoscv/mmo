@@ -10,7 +10,8 @@ import { mixaiOrigin, mixaiHost, type Session } from "./config";
 import { deviceName } from "./pair";
 import { t } from "../i18n/messages";
 
-export const APP_VERSION = "1.0.0";
+/** package.json version, injected by vite `define` (see vite.config.ts). */
+export const APP_VERSION: string = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "0.0.0";
 
 export interface DeviceCode {
     deviceCode: string;

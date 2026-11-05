@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { MmoClient, ProbedVideo, SubsonicAlbum, SubsonicSong } from "../lib/api";
+import type { MmoClient } from "../lib/api";
 import type { MediaClient } from "../lib/media";
 import { reportProgress, type TitleRef } from "../lib/progress-sync";
 import { keyFromEvent } from "../lib/tv-keys";
@@ -7,12 +7,14 @@ import { canDirectPlayOnTizen, isHlsNative, TIZEN_CAPS } from "../lib/playback";
 import { fmtClock } from "../lib/format";
 import { getProgress } from "../lib/progress";
 import { squeezeFactor, videoBox } from "../lib/screen-format";
+import { playerBus } from "../lib/player-bus";
+import { consumeBack } from "../nav/back";
+import type { PlayItem } from "../nav/routes";
 import { t } from "../i18n/messages";
+import { Icon } from "../ui/icons";
 import type Hls from "hls.js";
 
-export type PlayItem =
-    | { kind: "video"; video: ProbedVideo; ref?: TitleRef; resumeSec?: number }
-    | { kind: "audio"; song: SubsonicSong; album: SubsonicAlbum };
+export type { PlayItem };
 
 interface Props {
     client: MmoClient;
@@ -21,12 +23,14 @@ interface Props {
     queue?: PlayItem[];
     index?: number;
     onExit: () => void;
+    /** False while a keep-alive screen above covers the player (keys go elsewhere). Default true. */
+    active?: boolean;
 }
 
 const SEEK_STEP = 10;
 const OSD_TIMEOUT = 4000;
 
-export function PlayerScreen({ client, media = null, item, queue, index, onExit }: Props) {
+export function PlayerScreen({ client, media = null, item, queue, index, onExit, active = true }: Props) {
     const mediaRef = useRef<HTMLVideoElement>(null);
     const hlsRef = useRef<Hls | null>(null);
     const [cur, setCur] = useState<PlayItem>(item);
@@ -54,7 +58,7 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
     const video = cur.kind === "video" ? cur.video : null;
     const song = cur.kind === "audio" ? cur.song : null;
     const subs = video?.subtitleTracks ?? [];
-    const titleRef = cur.kind === "video" ? cur.ref ?? null : null;
+    const titleRef: TitleRef | null = cur.kind === "video" ? cur.ref ?? null : null;
     const absTime = (el: HTMLMediaElement) => offsetRef.current + el.currentTime;
     const absDuration = (el: HTMLMediaElement) =>
         offsetRef.current > 0 || mode === "hls"
@@ -271,8 +275,10 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
 
     // ─── Keys — the player owns the remote while mounted ─────────────────
     useEffect(() => {
+        if (!active) return;
         const onKey = (e: KeyboardEvent) => {
             const k = keyFromEvent(e);
+            if (k === "back" && consumeBack()) { e.preventDefault(); e.stopImmediatePropagation(); return; }
             switch (k) {
                 case "playpause": case "enter": togglePlay(); showOsd(); break;
                 case "play": mediaRef.current?.play().catch(() => undefined); showOsd(); break;
@@ -291,7 +297,48 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
         // capture=true so App's global handler never sees these.
         window.addEventListener("keydown", onKey, true);
         return () => window.removeEventListener("keydown", onKey, true);
-    }, [togglePlay, seekBy, next, prev, cycleSubs, onExit, showOsd, queue]);
+    }, [togglePlay, seekBy, next, prev, cycleSubs, onExit, showOsd, queue, active]);
+
+    // ─── Player bus: remote commands in, now-playing out ─────────────────
+    useEffect(() => playerBus.subscribe((cmd) => {
+        const el = mediaRef.current;
+        if (!el) return false;
+        switch (cmd.type) {
+            case "pause": el.pause(); break;
+            case "resume": el.play().catch(() => undefined); break;
+            case "toggle": togglePlay(); break;
+            case "seek": seekBy(cmd.positionSec - absTime(el)); break;
+            case "seekBy": seekBy(cmd.deltaSec); break;
+            case "stop": onExit(); break;
+            case "next": next(); break;
+            case "previous": prev(); break;
+            case "rate": el.playbackRate = cmd.rate; break;
+            case "volume": el.volume = Math.max(0, Math.min(1, cmd.level > 1 ? cmd.level / 100 : cmd.level)); break;
+        }
+        showOsd();
+        return true;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [togglePlay, seekBy, next, prev, onExit, showOsd]);
+
+    useEffect(() => {
+        const v = cur.kind === "video" ? cur.video : null;
+        const s = cur.kind === "audio" ? cur.song : null;
+        playerBus.setNowPlaying({
+            kind: cur.kind,
+            playing: !paused,
+            positionSec: time,
+            durationSec: duration > 0 ? duration : undefined,
+            media: v
+                ? { fileId: v.fileId, kind: titleRef?.kind ?? "movie", tmdbId: titleRef?.tmdbId, season: titleRef?.season ?? v.parsed.season ?? undefined, episode: titleRef?.episode ?? v.parsed.episode ?? undefined, title: v.parsed.title, durationSec: v.durationSec ?? undefined }
+                : { kind: "track", title: s?.title, durationSec: s?.duration },
+            title: v ? v.parsed.title : s?.title ?? "",
+            subtitle: v ? undefined : [s?.artist, s?.album].filter(Boolean).join(" · "),
+            artUrl: s?.coverArt ? client.coverArtUrl(s.coverArt, 200) : null,
+            updatedAt: Date.now(),
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cur, paused, Math.floor(time)]);
+    useEffect(() => () => playerBus.setNowPlaying(null), []);
 
     useEffect(() => { showOsd(); }, [showOsd, cur]);
 
@@ -334,9 +381,9 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit 
                 <div className="bar"><div style={{ width: `${pct}%` }} /></div>
                 <div className="times"><span>{fmtClock(time)}</span><span>{fmtClock(duration)}</span></div>
                 <div className="controls">
-                    <button className="btn" onClick={() => seekBy(-SEEK_STEP)}>⟲ 10s</button>
+                    <button className="btn" onClick={() => seekBy(-SEEK_STEP)} aria-label="-10s"><Icon name="back10" /></button>
                     <button className={`btn ${paused ? "" : "active"}`} onClick={togglePlay}>{paused ? t("player.play") : t("player.pause")}</button>
-                    <button className="btn" onClick={() => seekBy(SEEK_STEP)}>10s ⟳</button>
+                    <button className="btn" onClick={() => seekBy(SEEK_STEP)} aria-label="+10s"><Icon name="fwd10" /></button>
                     {subs.length > 0 && (
                         <button className={`btn ${subIdx >= 0 ? "active" : ""}`} onClick={cycleSubs}>
                             {t("player.subtitles", { track: subIdx >= 0 ? (subs[subIdx]?.title ?? subs[subIdx]?.lang ?? subIdx + 1) : t("player.subOff") })}

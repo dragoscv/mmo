@@ -57,3 +57,6 @@ interface WebApisNamespace { productinfo?: WebApisProductInfo; network?: WebApis
 
 declare const tizen: TizenNamespace | undefined;
 declare const webapis: WebApisNamespace | undefined;
+
+/** `package.json` version, injected by vite `define` at build/dev time. */
+declare const __APP_VERSION__: string;

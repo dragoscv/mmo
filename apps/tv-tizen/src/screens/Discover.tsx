@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { sweep, localNetwork, scanHostsOverride, fetchPairInfo, type DiscoveredServer } from "../lib/discovery";
 import { focusFirst } from "../lib/focus";
 import { t } from "../i18n/messages";
+import { Icon } from "../ui/icons";
 
 interface Props {
     /** Previously saved server whose health check failed — shown first, preselected. */
@@ -64,7 +65,7 @@ export function DiscoverScreen({ preselected, onSelect, onManual }: Props) {
                         data-testid="server-card"
                         onClick={() => onSelect(s)}
                     >
-                        <div className="server-icon">🖥</div>
+                        <div className="server-icon"><Icon name="server" /></div>
                         <div className="server-name">{s.info?.name ?? s.host}</div>
                         <div className="server-sub">{s.baseUrl}{s.info?.version ? ` · v${s.info.version}` : ""}</div>
                         {s === preselected && <div className="server-tag">{t("discover.savedBefore")}</div>}

@@ -100,11 +100,19 @@ if ($Install) {
         exit 0
     }
     Write-Host "sdb connect $TvIp ..."
-    $out = & $sdbExe connect $TvIp 2>&1
+    $out = (& $sdbExe connect $TvIp 2>&1 | Out-String)
     Write-Host $out
-    if ($out -match "connected to") {
-        & $sdbExe install $installTarget
-        Write-Host "sdb install exit: $LASTEXITCODE"
+    # "connected to <ip>" on a fresh link, "<ip>:26101 is already connected" when the link exists.
+    if ($out -match "connected to|already connected") {
+        $serial = "${TvIp}:26101"
+        if ($tizenExe) {
+            # Verified form (skill tv-tizen-package-install): -s <serial> -n <file> -- <dir>.
+            & $tizenExe install -s $serial -n $wgtName -- $dist
+            Write-Host "tizen install exit: $LASTEXITCODE"
+        } else {
+            & $sdbExe -s $serial install $installTarget
+            Write-Host "sdb install exit: $LASTEXITCODE"
+        }
     } else {
         Write-Warning "sdb connect failed. On the monitor: Apps -> type 1 2 3 4 5 on the remote -> Developer mode ON, Host PC IP = your PC IP (e.g. 192.168.100.61) -> reboot the monitor, then retry."
     }

@@ -5,6 +5,7 @@ import { progressPct } from "../lib/progress";
 import { useStill } from "../lib/useStill";
 import { episodeCode, type Show } from "../lib/shows";
 import { t } from "../i18n/messages";
+import { Icon } from "../ui/icons";
 
 export type Load<T> = { state: "loading" } | { state: "ok"; data: T } | { state: "error"; message: string };
 
@@ -13,7 +14,7 @@ export function VideoArt({ v, client }: { v: ProbedVideo; client: MmoClient }) {
     const still = useStill(v.posterPath ? null : client.stillUrl(v.fileId));
     if (v.posterPath) return <img className="art" src={client.posterUrl(v.posterPath)} alt="" loading="lazy" />;
     if (still) return <div className="art still" style={{ backgroundImage: `url("${still}")` }} />;
-    return <div className="art placeholder">🎬</div>;
+    return <div className="art placeholder"><Icon name="movie" /></div>;
 }
 
 export function ResumeBar({ fileId, dur }: { fileId: string; dur: number | null }) {
@@ -56,7 +57,7 @@ export function AlbumCard({ a, client, onClick }: { a: SubsonicAlbum; client: Mm
         <button className="card" data-focusable onClick={onClick}>
             {a.coverArt
                 ? <img className="art" src={client.coverArtUrl(a.coverArt, 300)} alt="" loading="lazy" />
-                : <div className="art placeholder">♪</div>}
+                : <div className="art placeholder"><Icon name="music" /></div>}
             <div className="meta">
                 <div className="title">{a.name}</div>
                 <div className="sub">{[a.artist, a.year, a.songCount ? t("home.songs", { n: a.songCount }) : null].filter(Boolean).join(" · ")}</div>

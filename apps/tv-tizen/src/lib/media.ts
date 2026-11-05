@@ -1,37 +1,57 @@
 /**
- * `/media/*` client (Media Home brain on MMO Server, WP10) with an etag-keyed
- * 5-minute cache. Every read returns `null` on 404 so the Home screen can fall
- * back to the scan-based rows against an older server.
+ * `/media/*` client (Media Home brain on MMO Server, WP10/WP16).
+ *  - Profile-scoped: `?profile=<active>` + `x-profile-token` from `ProfilesClient`.
+ *  - `/media/home` is cached PERSISTENTLY per profile in localStorage (`mixai-tv:home:<profile>`, size-checked,
+ *    memory fallback on quota) → `homeCached()` returns instantly, `revalidateHome()` refetches only when
+ *    `/media/etag` moved (stale-while-revalidate).
+ *  - Title responses are cached in memory per profile (etag-keyed, 5 min).
+ * Reads return `null` on 404 so screens can fall back against an older server.
  */
 import { ApiError, type MmoClient } from "./api";
 import type { ServerConfig } from "./config";
 import type {
-    LibraryIndex, MediaEtag, MediaHome, MediaKind, MediaSearchPage, MediaStatus, MediaTitleResponse,
-    ProgressEntry, ProgressInput,
+    LibraryIndex, MediaEtag, MediaHome, MediaKind, MediaSearchPage, MediaSeasonResponse, MediaStats, MediaStatus,
+    MediaTitleResponse, ProgressEntry, ProgressInput, TrackPlayInput, WatchlistEntry, WatchlistResponse,
 } from "./media-types";
+import type { ProfilesClient } from "./profiles";
+import { tmdbSize, type TmdbSize } from "./image";
 
 export const CACHE_TTL_MS = 5 * 60_000;
 export const PROFILE_FALLBACK = "default";
+export const HOME_CACHE_PREFIX = "mixai-tv:home:";
+/** Never write more than this to localStorage for one home blob (TV quota is ~5 MB per origin). */
+export const HOME_CACHE_MAX_CHARS = 1_500_000;
 
 interface CacheEntry<T> { etag: string; at: number; value: T }
+interface HomeBlob { tag: string; at: number; home: MediaHome }
+
+const tagOf = (e: MediaEtag): string => `${e.revision}:${e.libraryEtag ?? ""}`;
 
 export class MediaClient {
     private cache = new Map<string, CacheEntry<unknown>>();
+    private homeMem = new Map<string, HomeBlob>();
     private etag: MediaEtag | null = null;
     private etagAt = 0;
-    /** `null` once a 404 proves the server predates `/media`. */
+    /** `false` once a 404 proves the server predates `/media`. */
     private supported: boolean | null = null;
 
-    constructor(private readonly cfg: ServerConfig, private readonly api: MmoClient) {}
+    constructor(
+        private readonly cfg: ServerConfig,
+        private readonly api: MmoClient,
+        private readonly profiles: ProfilesClient | null = null,
+    ) {}
 
-    get profile(): string { return this.cfg.userId || PROFILE_FALLBACK; }
+    /** Active profile id used for `?profile=`. */
+    get profile(): string { return this.profiles?.profileId ?? (this.cfg.userId || PROFILE_FALLBACK); }
 
     private headers(json = false): Record<string, string> {
-        const h: Record<string, string> = { "x-device-token": this.cfg.token };
+        const h: Record<string, string> = { "x-device-token": this.cfg.token, ...(this.profiles?.headers() ?? {}) };
         if (this.cfg.userId) h["x-user-id"] = this.cfg.userId;
         if (json) h["content-type"] = "application/json";
         return h;
     }
+
+    private pq(): string { return `profile=${encodeURIComponent(this.profile)}`; }
 
     /** GET → parsed JSON; 404 → null (marks the whole module unsupported). */
     private async get<T>(path: string): Promise<T | null> {
@@ -43,14 +63,26 @@ export class MediaClient {
         return (await res.json()) as T;
     }
 
+    /** Write (PUT/DELETE/POST) → JSON; 404 → null. Invalidates caches. */
+    private async write<T>(method: string, path: string, body?: unknown): Promise<T | null> {
+        const res = await fetch(this.cfg.baseUrl + path, {
+            method, headers: this.headers(body !== undefined), body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        if (res.status === 404) return null;
+        if (!res.ok) throw new ApiError(`${res.status} ${res.statusText}`, res.status);
+        this.invalidate();
+        return res.status === 204 ? null : ((await res.json()) as T);
+    }
+
     private async cached<T>(key: string, path: string): Promise<T | null> {
         const etag = await this.mediaEtag();
         if (etag === null) return null;
-        const tag = `${etag.revision}:${etag.libraryEtag ?? ""}`;
-        const hit = this.cache.get(key) as CacheEntry<T> | undefined;
+        const tag = tagOf(etag);
+        const k = `${this.profile}|${key}`;
+        const hit = this.cache.get(k) as CacheEntry<T> | undefined;
         if (hit && hit.etag === tag && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
         const value = await this.get<T>(path);
-        if (value !== null) this.cache.set(key, { etag: tag, at: Date.now(), value });
+        if (value !== null) this.cache.set(k, { etag: tag, at: Date.now(), value });
         return value;
     }
 
@@ -63,28 +95,115 @@ export class MediaClient {
         return e;
     }
 
+    /** Drops the in-memory caches (the persistent home blob stays; its tag no longer matches). */
     invalidate(): void { this.etag = null; this.cache.clear(); }
 
     mediaStatus(): Promise<MediaStatus | null> {
         return this.get<MediaStatus>("/media/status");
     }
 
-    mediaHome(): Promise<MediaHome | null> {
-        return this.cached<MediaHome>("home", `/media/home?profile=${encodeURIComponent(this.profile)}`);
+    // ─── Home (persistent stale-while-revalidate) ────────────────────────
+
+    private homeKey(): string { return HOME_CACHE_PREFIX + this.profile; }
+
+    /** Last known `/media/home` for the active profile, synchronously (memory, then localStorage). */
+    homeCached(): MediaHome | null {
+        const mem = this.homeMem.get(this.profile);
+        if (mem) return mem.home;
+        try {
+            const raw = localStorage.getItem(this.homeKey());
+            if (!raw) return null;
+            const blob = JSON.parse(raw) as HomeBlob;
+            if (!blob || !blob.home || !Array.isArray(blob.home.rows)) return null;
+            this.homeMem.set(this.profile, blob);
+            return blob.home;
+        } catch {
+            return null;
+        }
     }
 
+    private storeHome(tag: string, home: MediaHome): void {
+        const blob: HomeBlob = { tag, at: Date.now(), home };
+        this.homeMem.set(this.profile, blob);
+        try {
+            const s = JSON.stringify(blob);
+            if (s.length > HOME_CACHE_MAX_CHARS) { localStorage.removeItem(this.homeKey()); return; }
+            localStorage.setItem(this.homeKey(), s);
+        } catch {
+            // Quota exceeded → keep the memory copy only.
+            try { localStorage.removeItem(this.homeKey()); } catch { /* ignore */ }
+        }
+    }
+
+    /**
+     * Refetches `/media/home` when the etag moved (or nothing is cached, or `force`). Resolves to the
+     * fresh home, or `null` when the cached copy is still current / the server has no `/media`.
+     */
+    async revalidateHome(force = false): Promise<MediaHome | null> {
+        const etag = await this.mediaEtag(true);
+        if (etag === null) return null;
+        const tag = tagOf(etag);
+        const cur = this.homeMem.get(this.profile) ?? (this.homeCached() ? this.homeMem.get(this.profile) : undefined);
+        if (!force && cur && cur.tag === tag) return null;
+        const home = await this.get<MediaHome>(`/media/home?${this.pq()}`);
+        if (home) this.storeHome(tag, home);
+        return home;
+    }
+
+    /** Cached home if present, else network (back-compat for older screens). */
+    async mediaHome(): Promise<MediaHome | null> {
+        const c = this.homeCached();
+        if (c) { void this.revalidateHome().catch(() => undefined); return c; }
+        return this.revalidateHome(true);
+    }
+
+    // ─── Titles / seasons / search ───────────────────────────────────────
+
     mediaTitle(kind: MediaKind, tmdbId: number): Promise<MediaTitleResponse | null> {
-        return this.cached<MediaTitleResponse>(`title:${kind}:${tmdbId}`, `/media/title/${kind}/${tmdbId}?profile=${encodeURIComponent(this.profile)}`);
+        return this.cached<MediaTitleResponse>(`title:${kind}:${tmdbId}`, `/media/title/${kind}/${tmdbId}?${this.pq()}`);
+    }
+
+    /** `GET /media/title/tv/{id}/season/{n}` — episodes + local versions + progress per episode. */
+    season(tmdbId: number, season: number): Promise<MediaSeasonResponse | null> {
+        return this.cached<MediaSeasonResponse>(`season:${tmdbId}:${season}`, `/media/title/tv/${tmdbId}/season/${season}?${this.pq()}`);
     }
 
     mediaSearch(q: string): Promise<MediaSearchPage | null> {
-        return this.get<MediaSearchPage>(`/media/search?q=${encodeURIComponent(q)}`);
+        return this.get<MediaSearchPage>(`/media/search?q=${encodeURIComponent(q)}&${this.pq()}`);
     }
 
-    /** Full video index (serverFileId ↔ tmdbId), used for resume + migration. */
+    /** Full video index (serverFileId ↔ tmdbId), used for resume + migration + library grids. */
     mediaLibrary(): Promise<LibraryIndex | null> {
         return this.cached<LibraryIndex>("library", "/media/library");
     }
+
+    // ─── Watchlist ───────────────────────────────────────────────────────
+
+    watchlist(): Promise<WatchlistResponse | null> {
+        return this.cached<WatchlistResponse>("watchlist", `/media/watchlist?${this.pq()}`);
+    }
+
+    watchlistAdd(kind: MediaKind, tmdbId: number): Promise<{ entry: WatchlistEntry; revision: number } | null> {
+        return this.write("PUT", `/media/watchlist/${kind}/${tmdbId}?${this.pq()}`);
+    }
+
+    watchlistRemove(kind: MediaKind, tmdbId: number): Promise<{ removed: boolean; revision: number } | null> {
+        return this.write("DELETE", `/media/watchlist/${kind}/${tmdbId}?${this.pq()}`);
+    }
+
+    // ─── Stats / plays ───────────────────────────────────────────────────
+
+    /** Year in review (default: current year on the server). */
+    stats(year?: number): Promise<MediaStats | null> {
+        return this.get<MediaStats>(`/media/stats?${this.pq()}${year ? `&year=${year}` : ""}`);
+    }
+
+    /** Record a music play (`POST /media/plays`). */
+    recordPlay(input: TrackPlayInput): Promise<unknown> {
+        return this.write("POST", `/media/plays?${this.pq()}`, { profileId: this.profile, ...input });
+    }
+
+    // ─── Progress ────────────────────────────────────────────────────────
 
     async getProgress(since?: number): Promise<{ revision: number; entries: ProgressEntry[] } | null> {
         const q = new URLSearchParams({ profile: this.profile });
@@ -105,8 +224,14 @@ export class MediaClient {
     }
 
     // ─── Image proxy helpers (`/video/tmdb-image/<size>/<path>`) ─────────
-    image(path: string | null | undefined, size: "w92" | "w185" | "w500" | "w780" | "w1280" | "original"): string | null {
+
+    image(path: string | null | undefined, size: TmdbSize | "w1280" | "original"): string | null {
         if (!path) return null;
         return this.api.tmdbImageUrl(path, size);
+    }
+
+    /** TMDB image sized for a rendered width in CSS px (w185/w342/w500/w780). */
+    imageFor(path: string | null | undefined, renderedWidthPx: number): string | null {
+        return this.image(path, tmdbSize(renderedWidthPx));
     }
 }
