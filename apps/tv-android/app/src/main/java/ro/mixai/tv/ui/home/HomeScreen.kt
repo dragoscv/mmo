@@ -3,7 +3,10 @@ package ro.mixai.tv.ui.home
 import android.os.SystemClock
 import android.util.Log
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
@@ -42,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -78,10 +83,12 @@ import ro.mixai.tv.ui.components.LANDSCAPE_WIDTH
 import ro.mixai.tv.ui.components.LandscapeCard
 import ro.mixai.tv.ui.components.LoadingState
 import ro.mixai.tv.ui.components.LocalBackdrop
+import ro.mixai.tv.ui.components.LocalReducedMotion
 import ro.mixai.tv.ui.components.MediaRow
 import ro.mixai.tv.ui.components.MetaChips
 import ro.mixai.tv.ui.components.MixaiIcons
 import ro.mixai.tv.ui.components.POSTER_WIDTH
+import ro.mixai.tv.ui.components.PerfFlags
 import ro.mixai.tv.ui.components.PosterCard
 import ro.mixai.tv.ui.components.PrimaryButton
 import ro.mixai.tv.ui.components.SecondaryButton
@@ -111,6 +118,33 @@ import java.io.File
 private const val TAG = "MixaiPerf"
 private const val HERO_DEBOUNCE_MS = 150L
 private const val PREFETCH_AHEAD = 10
+
+/**
+ * D25: own rows first (Continue → My list → New in your library → recommendations). The server
+ * orders them too (3.9.1+), but cached home blobs and older servers don't. Stable for the rest.
+ * Mirrors Tizen `ownLibraryFirst` (Home.tsx).
+ */
+internal val OWN_FIRST = mapOf("continue" to 0, "watchlist" to 1, "new_in_library" to 2)
+
+internal fun <T> ownLibraryFirst(rows: List<T>, id: (T) -> String): List<T> =
+    rows.withIndex().sortedWith(compareBy({ OWN_FIRST[id(it.value)] ?: 3 }, { it.index })).map { it.value }
+
+// Staged Home entrance (critic P1-2): backdrop → logo + chips → rows staggered, total < 700 ms,
+// alpha/translation in graphicsLayer only (no relayout). Skipped under reduced motion and when Home
+// re-appears from the in-process memo (Back from Title).
+private const val ENTER_TOTAL_MS = 660
+private const val ENTER_HERO_DELAY = 120
+private const val ENTER_HERO_MS = 220
+private const val ENTER_ROWS_DELAY = 240
+private const val ENTER_ROW_STAGGER = 70
+private const val ENTER_ROW_MS = 280
+private const val ENTER_SHIFT_DP = 14
+
+/** 0..1 progress of the element that starts at [delayMs] and lasts [durMs], given overall [t] in ms. */
+private fun stage(t: Float, delayMs: Int, durMs: Int): Float {
+    val x = ((t - delayMs) / durMs).coerceIn(0f, 1f)
+    return FastOutSlowInEasing.transform(x)
+}
 
 private sealed interface HomeUi {
     data object Loading : HomeUi
@@ -158,7 +192,9 @@ fun HomeScreen(deps: ScreenDeps, nav: Navigator) {
         try {
             deps.media.homeFlow().collect { h ->
                 val rows = h.rows.filter { it.items.isNotEmpty() }
-                if (h.configured && rows.isNotEmpty()) {
+                // Rows come from the server's own cache, so they are usable even when TMDB is not
+                // configured right now (Tizen does the same: `mediaMode = rows.length > 0`).
+                if (rows.isNotEmpty()) {
                     if (first) emitAt = SystemClock.elapsedRealtime()
                     val next = HomeUi.Server(h.copy(rows = rows), cached = first && cachedAtStart)
                     // Same content as the memo → keep the instance (no hero/row reset under the focus).
@@ -210,7 +246,11 @@ fun HomeScreen(deps: ScreenDeps, nav: Navigator) {
     AnimatedContent(
         targetState = current,
         contentKey = { it.javaClass },
-        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+        transitionSpec = {
+            // Loading → content is staged inside ServerHome; a plain swap avoids a double fade.
+            if (initialState is HomeUi.Loading && targetState is HomeUi.Server) fadeIn(snap()) togetherWith fadeOut(snap())
+            else fadeIn(tween(220)) togetherWith fadeOut(tween(160))
+        },
         label = "home",
     ) { state ->
         when (state) {
@@ -230,7 +270,7 @@ fun HomeScreen(deps: ScreenDeps, nav: Navigator) {
                     action = { m -> PrimaryButton(stringResource(R.string.wp16_home_open_settings), { nav.push(Route.Settings("server")) }, m, icon = Icons.Filled.Settings) },
                 )
             }
-            is HomeUi.Server -> ServerHome(deps, nav, state.home, rf)
+            is HomeUi.Server -> ServerHome(deps, nav, state.home, rf, animateIn = memo == null)
             is HomeUi.Local -> LocalHome(deps, nav, state.movies, state.shows, rf)
         }
     }
@@ -239,13 +279,14 @@ fun HomeScreen(deps: ScreenDeps, nav: Navigator) {
 // ─── server rows ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun ServerHome(deps: ScreenDeps, nav: Navigator, home: MediaHome, rf: RestorableFocus) {
+private fun ServerHome(deps: ScreenDeps, nav: Navigator, home: MediaHome, rf: RestorableFocus, animateIn: Boolean) {
     val context = LocalContext.current
     val density = LocalDensity.current
     val backdrop = LocalBackdrop.current
+    val reduced = LocalReducedMotion.current
     val scope = rememberCoroutineScope()
     val api = deps.api
-    val rows = home.rows
+    val rows = remember(home) { ownLibraryFirst(home.rows.distinctBy { it.id }) { it.id } }
     val posterPx = with(density) { POSTER_WIDTH.roundToPx() }
     val posterSize = remember(posterPx) { TmdbSize.poster(posterPx) }
     val landPx = with(density) { LANDSCAPE_WIDTH.roundToPx() }
@@ -336,11 +377,29 @@ private fun ServerHome(deps: ScreenDeps, nav: Navigator, home: MediaHome, rf: Re
         prefetch(context, bd, backdropPx, backdropPx * 9 / 16)
     }
 
-    val heroFraction by animateFloatAsState(if (inRows) 0.46f else 0.56f, tween(260), label = "heroH")
+    // One clock for the whole entrance; finished (= ENTER_TOTAL_MS) when skipped.
+    val skipEntrance = !animateIn || reduced || PerfFlags.noEntrance
+    val enter = remember { Animatable(if (skipEntrance) ENTER_TOTAL_MS.toFloat() else 0f) }
+    LaunchedEffect(Unit) {
+        if (enter.value < ENTER_TOTAL_MS) enter.animateTo(ENTER_TOTAL_MS.toFloat(), tween(ENTER_TOTAL_MS, easing = androidx.compose.animation.core.LinearEasing))
+    }
+    val shiftPx = with(density) { ENTER_SHIFT_DP.dp.toPx() }
+    val heroMod = if (PerfFlags.noEntrance) Modifier else Modifier.graphicsLayer {
+        val p = stage(enter.value, ENTER_HERO_DELAY, ENTER_HERO_MS)
+        alpha = p
+        translationY = (1f - p) * shiftPx
+    }
+    fun rowMod(index: Int) = if (PerfFlags.noEntrance) Modifier else Modifier.graphicsLayer {
+        val p = stage(enter.value, ENTER_ROWS_DELAY + ENTER_ROW_STAGGER * index.coerceAtMost(4), ENTER_ROW_MS)
+        alpha = p
+        translationY = (1f - p) * shiftPx * 1.5f
+    }
+
+    val heroFraction by animateFloatAsState(if (inRows) 0.46f else 0.56f, if (reduced) snap() else tween(260), label = "heroH")
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val heroHeight = maxHeight * heroFraction
         Column(Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxWidth().height(heroHeight)) {
+            Box(Modifier.fillMaxWidth().height(heroHeight).then(heroMod)) {
                 if (!ro.mixai.tv.ui.components.PerfFlags.noHero) CardHero(
                     deps = deps,
                     item = hero,
@@ -369,7 +428,7 @@ private fun ServerHome(deps: ScreenDeps, nav: Navigator, home: MediaHome, rf: Re
                 contentPadding = PaddingValues(bottom = 48.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                items(rows, key = { it.id }) { row ->
+                itemsIndexed(rows, key = { _, it -> it.id }) { rowIndex, row ->
                     val isContinue = row.id == MediaRepository.ROW_CONTINUE
                     MediaRow(
                         title = row.titleFor(deps.lang),
@@ -377,6 +436,7 @@ private fun ServerHome(deps: ScreenDeps, nav: Navigator, home: MediaHome, rf: Re
                         key = { cardKey(it) },
                         onFocusItem = { focused = HeroItem.Card(it, row.id) },
                         onClick = { c -> if (isContinue) openContinue(c) else nav.push(Route.Title(c.kind, c.tmdbId)) },
+                        modifier = rowMod(rowIndex),
                     ) { c, i, onFocus, onClick ->
                         val fk = "${row.id}:${cardKey(c)}"
                         val focusNow = { onFocus(); prefetchFrom(row, i) }
@@ -436,11 +496,16 @@ private fun CardHero(
 ) {
     val c = item.card
     val t = details?.title
+    val reduced = LocalReducedMotion.current
     Column(
         Modifier.fillMaxSize().padding(start = MixaiFocus.overscan, end = MixaiFocus.overscan, top = MixaiFocus.overscanTop, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
     ) {
-        AnimatedContent(targetState = item.key to t?.logoPath, transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(120)) }, label = "heroLogo") { (_, logo) ->
+        AnimatedContent(
+            targetState = item.key to t?.logoPath,
+            transitionSpec = { if (reduced) fadeIn(snap()) togetherWith fadeOut(snap()) else fadeIn(tween(220)) togetherWith fadeOut(tween(120)) },
+            label = "heroLogo",
+        ) { (_, logo) ->
             TitleLogo(deps.api, logo, c.title, height = 96.dp)
         }
         MetaChips(

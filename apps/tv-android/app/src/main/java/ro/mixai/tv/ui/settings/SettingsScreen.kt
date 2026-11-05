@@ -63,6 +63,7 @@ enum class SettingsSection(val id: String, val labelRes: Int) {
     Playback("playback", R.string.set_sec_playback),
     Subtitles("subtitles", R.string.set_sec_subtitles),
     Language("language", R.string.set_sec_language),
+    Accessibility("accessibility", R.string.set_sec_accessibility),
     Navigation("navigation", R.string.set_sec_navigation),
     Server("server", R.string.set_sec_server),
     Account("account", R.string.set_sec_account),
@@ -82,6 +83,7 @@ private fun SettingsSection.icon(): ImageVector = when (this) {
     SettingsSection.Playback -> Icons.Filled.PlayArrow
     SettingsSection.Subtitles -> MixaiIcons.Subtitles
     SettingsSection.Language -> MixaiIcons.Lyrics
+    SettingsSection.Accessibility -> MixaiIcons.Accessibility
     SettingsSection.Navigation -> Icons.Filled.Menu
     SettingsSection.Server -> MixaiIcons.Cast
     SettingsSection.Account -> Icons.Filled.AccountCircle
@@ -138,6 +140,7 @@ fun SettingsScreen(deps: ScreenDeps, nav: Navigator, section: String) {
                     SettingsSection.Playback -> PlaybackPane(deps)
                     SettingsSection.Subtitles -> SubtitlesPane(deps)
                     SettingsSection.Language -> LanguagePane(deps)
+                    SettingsSection.Accessibility -> AccessibilityPane(deps)
                     SettingsSection.Navigation -> NavigationPane(deps)
                     SettingsSection.Server -> ServerPane(deps, nav)
                     SettingsSection.Account -> AccountPane(deps)

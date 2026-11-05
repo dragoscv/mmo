@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
@@ -48,6 +49,9 @@ fun <T> MediaRow(
     spacing: Dp = 20.dp,
     itemContent: @Composable (item: T, index: Int, onFocus: () -> Unit, onClick: () -> Unit) -> Unit,
 ) {
+    // Server rows can repeat a title (two files of one film) → duplicate LazyRow keys crash
+    // ("Key ... was already used"); keep the first occurrence.
+    val unique = remember(items) { items.distinctBy(key) }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (title.isNotBlank()) RowTitle(title, trailing = trailing)
         LazyRow(
@@ -56,7 +60,7 @@ fun <T> MediaRow(
             contentPadding = PaddingValues(horizontal = MixaiFocus.overscan, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(spacing),
         ) {
-            itemsIndexed(items, key = { _, it -> key(it) }) { i, item ->
+            itemsIndexed(unique, key = { _, it -> key(it) }) { i, item ->
                 itemContent(item, i, { onFocusItem(item) }, { onClick(item) })
             }
         }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16 design-critic P1 pass (2.1.0): accessibility / reduced motion, title empty state. Keys mirrored in values-ro. -->
+<resources>
+    <string name="set_sec_accessibility">Accessibility</string>
+    <string name="set_a11y_for">Accessibility for %1$s</string>
+    <string name="set_reduce_motion">Reduce motion</string>
+    <string name="set_reduce_motion_system">Follow system</string>
+    <string name="set_reduce_motion_hint">Turns off page transitions, the moving background and the Home entrance animation.</string>
+    <string name="set_reduce_motion_system_on">The TV currently has animations turned off.</string>
+    <string name="set_reduce_motion_system_off">The TV currently has animations turned on.</string>
+
+    <string name="wp16_title_not_in_library">Not in your library</string>
+    <string name="wp16_title_not_in_library_hint">There is no file for this title on your server and no streaming service lists it in your country yet. Add it to My list to find it later.</string>
+    <string name="wp16_title_not_in_library_offers">There is no file for this title on your server. You can watch it on one of these services:</string>
+    <string name="wp16_title_search_library">Search your library</string>
+</resources>

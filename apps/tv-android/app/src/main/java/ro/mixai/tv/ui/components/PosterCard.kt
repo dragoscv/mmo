@@ -76,7 +76,35 @@ fun CardProgress(fraction: Float, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun cardGlow() = if (PerfFlags.noGlow) CardDefaults.glow() else CardDefaults.glow(focusedGlow = Glow(MixaiFocus.glowColor, MixaiFocus.glowElevation))
+private fun cardGlow() = if (PerfFlags.noGlow || LocalReducedMotion.current) CardDefaults.glow() else CardDefaults.glow(focusedGlow = Glow(MixaiFocus.glowColor, MixaiFocus.glowElevation))
+
+/**
+ * Placeholder art when there is no TMDB poster (WP16 critic P2-9): the file's still frame (if
+ * [stillUrl]) cropped to the card, a soft accent wash, a bottom scrim, and the guessed title as a
+ * lockup in the heading face. Without a still it is a two-stop accent/card gradient.
+ */
+@Composable
+fun PlaceholderArt(title: String, stillUrl: String?, modifier: Modifier = Modifier) {
+    Box(modifier.background(Brush.verticalGradient(listOf(Tokens.accent, Tokens.card)))) {
+        if (stillUrl != null) {
+            AsyncImage(model = stillUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            Box(Modifier.fillMaxSize().background(Tokens.primary.copy(alpha = 0.18f)))
+        }
+        Box(
+            Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Tokens.background.copy(alpha = 0.92f))))
+                .padding(start = 12.dp, end = 12.dp, top = 36.dp, bottom = 12.dp),
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                color = Tokens.foreground,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
 
 /**
  * 2:3 poster card with the MixAI focus treatment (scale + ring + accent glow). Title shows under the
@@ -97,6 +125,7 @@ fun PosterCard(
     alwaysShowTitle: Boolean = false,
     onLongClick: (() -> Unit)? = null,
     onFocus: () -> Unit = {},
+    placeholderStill: String? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     Column(modifier.width(width), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -118,9 +147,7 @@ fun PosterCard(
                 if (imageUrl != null) {
                     AsyncImage(model = imageUrl, contentDescription = title, contentScale = ContentScale.Crop, modifier = imgMod)
                 } else {
-                    Box(imgMod.background(Brush.verticalGradient(listOf(Tokens.accent, Tokens.card))), contentAlignment = Alignment.Center) {
-                        Text(title, style = MaterialTheme.typography.titleSmall, color = Tokens.foreground, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(12.dp))
-                    }
+                    PlaceholderArt(title, placeholderStill, imgMod)
                 }
                 if (badges.isNotEmpty()) {
                     Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -57,6 +57,8 @@ import ro.mixai.tv.ui.components.IconActionButton
 import ro.mixai.tv.ui.components.MixaiIcons
 import ro.mixai.tv.ui.components.PrimaryButton
 import ro.mixai.tv.ui.components.SecondaryButton
+import ro.mixai.tv.ui.components.reduceMotionPref
+import ro.mixai.tv.ui.components.systemReducedMotion
 import ro.mixai.tv.ui.detectPanelAspect
 import ro.mixai.tv.ui.nav.Navigator
 import ro.mixai.tv.ui.nav.RAIL_ITEMS
@@ -291,6 +293,34 @@ internal fun LanguagePane(deps: ScreenDeps) {
         OptionChip(stringResource(R.string.settings_lang_ro), deps.localeTag == "ro", { set("ro") })
         OptionChip(stringResource(R.string.settings_lang_en), deps.localeTag == "en", { set("en") })
     }
+}
+
+// ─── Accessibility (per profile) ───────────────────────────────────────────────
+
+@Composable
+internal fun AccessibilityPane(deps: ScreenDeps) {
+    val active by deps.profiles.activeProfile.collectAsState()
+    var error by remember { mutableStateOf<String?>(null) }
+    val write = rememberPrefWriter(deps) { error = it }
+    val context = LocalContext.current
+    val system = remember { systemReducedMotion(context) }
+    val p = active ?: run { Text(stringResource(R.string.wp16_profile_none), color = Tokens.mutedForeground); return }
+    val choice = p.reduceMotionPref() // null = follow the system
+    Text(stringResource(R.string.set_a11y_for, p.name), style = MaterialTheme.typography.bodyMedium, color = Tokens.mutedForeground)
+    Section(stringResource(R.string.set_reduce_motion)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OptionChip(stringResource(R.string.set_reduce_motion_system), choice == null, { write(ProfilePrefKeys.REDUCE_MOTION, "system") })
+            OptionChip(stringResource(R.string.set_on), choice == true, { write(ProfilePrefKeys.REDUCE_MOTION, true) })
+            OptionChip(stringResource(R.string.set_off), choice == false, { write(ProfilePrefKeys.REDUCE_MOTION, false) })
+        }
+        Text(
+            stringResource(R.string.set_reduce_motion_hint) + " " +
+                stringResource(if (system) R.string.set_reduce_motion_system_on else R.string.set_reduce_motion_system_off),
+            style = MaterialTheme.typography.bodySmall,
+            color = Tokens.mutedForeground,
+        )
+    }
+    error?.let { Text(stringResource(R.string.profile_save_failed, it), color = Tokens.destructive, style = MaterialTheme.typography.bodySmall) }
 }
 
 // ─── Navigation (rail order / visibility) ──────────────────────────────────────

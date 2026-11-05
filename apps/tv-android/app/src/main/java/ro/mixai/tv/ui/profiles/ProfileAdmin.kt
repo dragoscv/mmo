@@ -109,6 +109,8 @@ object ProfilePrefKeys {
     const val SUB_FORCED_ONLY = "subForcedOnly"
     const val SUB_SIZE = "subSize"
     const val SUB_BG = "subBg"
+    /** true / false / "system" (= follow Android's animator scale); same key as the web prefs. */
+    const val REDUCE_MOTION = "reduceMotion"
 }
 
 fun Profile.prefBool(key: String, default: Boolean): Boolean =

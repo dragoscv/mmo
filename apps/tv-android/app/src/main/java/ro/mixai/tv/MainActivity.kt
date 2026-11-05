@@ -60,6 +60,9 @@ import ro.mixai.tv.ui.SqueezeBox
 import ro.mixai.tv.ui.WelcomeScreen
 import ro.mixai.tv.ui.components.BackdropHost
 import ro.mixai.tv.ui.components.LoadingState
+import ro.mixai.tv.ui.components.LocalReducedMotion
+import ro.mixai.tv.ui.components.reducedMotionFor
+import ro.mixai.tv.ui.components.systemReducedMotion
 import ro.mixai.tv.ui.detectPanelAspect
 import ro.mixai.tv.ui.home.HomeScreen
 import ro.mixai.tv.ui.library.LibraryScreen
@@ -131,6 +134,12 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         WatchNext.parseDeepLink(intent)?.let { deepLink.value = it }
+    }
+
+    /** Any remote key pauses the ambient backdrop motion (it resumes after a short idle). */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        ro.mixai.tv.ui.components.AmbientMotion.poke()
+        return super.dispatchKeyEvent(event)
     }
 }
 
@@ -270,12 +279,17 @@ private fun App(
         d.hub.incomingCommands.collect { cmd -> handleHubCommand(d, nav, cmd, scope) }
     }
 
-    CompositionLocalProvider(LocalScreenDeps provides deps) {
+    // Reduced motion: the active profile's choice, else Android's animator scale (read per launch).
+    val activeProfile = graph?.profiles?.activeProfile?.collectAsState()?.value
+    val systemReduced = remember { systemReducedMotion(context) }
+    val reducedMotion = reducedMotionFor(activeProfile, systemReduced)
+
+    CompositionLocalProvider(LocalScreenDeps provides deps, LocalReducedMotion provides reducedMotion) {
         BackdropHost {
             AppShell(
                 nav = nav,
                 settings = settings,
-                activeProfile = graph?.profiles?.activeProfile?.collectAsState()?.value,
+                activeProfile = activeProfile,
                 musicPlayback = graph?.musicPlayback,
                 music = graph?.music,
             ) {

@@ -189,3 +189,69 @@ VERDICT
 waiting for the concurrent server 3.9.0 release, by owner decision. The client-side order covers the TV until then.
 Remaining Tizen gaps: route morphing (#9) only covers cards → title, and the three-layer depth on the title page
 is unchanged.
+
+---
+
+## Android TV — after fixes 2026-11-05 (2.1.0)
+
+Implemented: P1 #1 (own library first, client side too), #2 (staged entrance), #3 (heading face), #4 (reduce
+motion), #5 (title primary action), and the Android P2 items #8 (Ken Burns), #9 (placeholder art), #10 (logo kept
+on screen), #11 (profile picker atmosphere), #12 (glass OSD strip). Found and fixed on the way: Home ignored the
+server rows whenever TMDB was not configured right now (`configured:false`) and fell back to plain scan rows; once
+it used them, a repeated title in a row crashed the app on D-pad (`Key "movie-1756340" was already used`) →
+`MediaRow` dedupes keys. Evidence = Chromecast with Google TV `192.168.100.31:38193`, benchmark builds (R8,
+non-debuggable), `debug.mixai.perf` empty; scripts `.copilot-tmp/atvd/{perf,abseq,final,evidence,rows}.ps1`,
+logs alongside; screenshots `.copilot-tmp/critic/android-after/*-640.jpg` + uiautomator `.xml`.
+
+| Check | Result (device) |
+|---|---|
+| Home first frame, cached, cold launch | 2.1.0: **746 / 798 / 813 / 814 ms** (first launch after install 940 ms, includes ART compile). Like-for-like baseline (HEAD + only the `configured` fix + key dedupe, so it also paints server rows): 741 / 783 / 844 ms. The 2.0.2 build as shipped measured 1101–1217 ms here because it fell back to the scan rows (`mode=scan cached=false`). Budget ≤ 0.9 s met |
+| D-pad jank (`tv-jank.ps1`, 15 keys) | see the table below |
+| Row order (D25) | `ownLibraryFirst` unit test (4 cases, green). On device the first two rows are **Continue watching → New in your library** (uiautomator, `rows.log`); the server already returns `continue > new_in_library > top_picks > because_you_watched > trending > upcoming` (`home-order.mjs`) |
+| Title without file, trailer or offer (`mixai://title/movie/969681`) | focused element = **"Add to My list"** (primary), "Not in your library" + explanation line, "Search your library" next to it; no Back button. The logo and chips stay on screen (`a03-title-nofile`). With offers (`movie/1339713`): primary "Where to watch", the line reads "…You can watch it on one of these services:" |
+| Settings | new **Accessibility** section; **Reduce motion: Follow system / On / Off** (per profile, `prefs.reduceMotion`), hint shows the TV's current animator state (`a06-settings-a11y`) |
+| Fonts | `res/font/space_grotesk_variable.ttf` + `inter_variable.ttf` (OFL in `assets/licenses`); display/headline/title steps use Space Grotesk, body/labels Inter (`a01-home`, `a03-title-nofile`) |
+| Strings | `wp16-parity.mjs`: en = ro, 0 missing either way |
+| Build/tests | `:app:assembleDebug`, `:app:testDebugUnitTest` (10 tests, 0 failures), `:app:assembleBenchmark` green |
+
+D-pad frames, same Home data, same 15-key script:
+
+| Build | p50 | janky | notes |
+|---|---|---|---|
+| baseline (HEAD + configured fix + dedupe), 3 runs | 57 / 57 / 57 ms | 49.0 / 48.6 / 49.2 % | ~240 frames |
+| 2.1.0 with continuous Ken Burns, 3 runs | 48 / 53 / 48 ms | 54.7 / 53.8 / 55.2 % | ~290 frames: the ambient loop added frames |
+| 2.1.0 final (Ken Burns paused on any key, resumes after 2.5 s idle), 3 runs | 57 / 57 / 57 ms | 50.2 / 45.5 / 46.8 % | ~240 frames; same build with `nokenburns`: 61 / 57 / 57 ms, 53.6 / 45.5 / 45.7 % → no measurable cost |
+
+The WP16-20 numbers (p50 38 ms, janky 17 %) were taken on the scan-row Home (landscape stills, no poster rows);
+with server rows (posters, In-library badges, more cards on screen) the same build measured p50 57 ms, janky
+≈ 49 % here. So the ≤ 45 ms / ≤ 20 % jank budget is not met by the poster-row Home on this Chromecast even before
+this change; 2.1.0 does not make it worse. A/B switches added for the next perf pass:
+`debug.mixai.perf=nofont,noentrance,nokenburns` (measured: none of them moves p50 beyond run-to-run noise).
+
+```
+DESIGN REVIEW — TV Android 2.1.0 (Chromecast 4K, 1920×1080 app buffer)
+SCORES
+  Craft (25):     23/25
+    1. Subject presence   5/5  E   — unchanged: backdrop + logo hero (a01-home)
+    2. Composition        5/5  E   — title page keeps logo/chips on screen, primary action is real (My list / Play / Where to watch), honest "Not in your library" state (a03)
+    3. Three layers       4/5  E   — unchanged
+    4. Palette discipline 4/5  E+C — tokens only (no hex added), profile ring uses the profile token colour
+    5. Typography         5/5  E+C — Space Grotesk display/headline/title + Inter body, sculpted TvType scale, RO diacritics in both faces
+  Game feel (25): 20/25
+    6. Choreographed entrance 4/5  C+E — backdrop → logo/chips (+120 ms) → rows staggered 70 ms, 660 ms, graphicsLayer only; skipped on Back and under reduced motion
+    7. Tactile interactions   4/5  E   — unchanged
+    8. Living background      4/5  E+C — Ken Burns 1.0→1.06 / 36 s on the cached offscreen layer, pauses while navigating
+    9. Route morphing         4/5  C   — unchanged (shared poster), now off under reduced motion
+    10. Subject artistry      4/5  E+C — still-frame placeholders with a title lockup, glass OSD strip, profile picker over the dimmed last backdrop with an accent glow
+  Discipline (10): 9/10
+    11. Shell (TV-adapted)    4/5  E+C — cached first frame 746–814 ms; poster-row D-pad p50 ~50–57 ms is above the 45 ms budget (pre-existing with server rows)
+    12. A11y + reduced motion 5/5  C+E — per-profile Reduce motion (system default from ANIMATOR_DURATION_SCALE) turns off route transitions, poster morph, crossfade, Ken Burns, entrance, hero animation and glow
+TOTAL: 52/60
+
+VERDICT
+  ☑ Ship it (≥48)
+```
+
+**TV Android 44 → 52/60 (target met).** Shell drops from 5 to 4 because the D-pad budget is not met on the
+poster-row Home that users now actually get (the earlier 5 was scored on the scan-row Home). That is a
+pre-existing cost of the server rows, not of this pass; the A/B switches above are in place for the follow-up.

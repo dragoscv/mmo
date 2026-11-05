@@ -36,6 +36,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import kotlinx.coroutines.delay
 import ro.mixai.tv.data.DiscoveredServer
 import ro.mixai.tv.player.PlayRequest
+import ro.mixai.tv.ui.components.LocalReducedMotion
 
 /** Every screen of the app. Arguments are plain values so a route can be pushed from anywhere. */
 sealed interface Route {
@@ -171,6 +172,7 @@ private const val NAV_ANIM_MS = 220
 @Composable
 fun NavHost(nav: Navigator, modifier: Modifier = Modifier, content: @Composable (Route) -> Unit) {
     val holder = rememberSaveableStateHolder()
+    val reduced = LocalReducedMotion.current
     val liveKeys = nav.entries.map { it.key }
     val known = remember { mutableSetOf<Int>() }
     LaunchedEffect(liveKeys) {
@@ -185,7 +187,7 @@ fun NavHost(nav: Navigator, modifier: Modifier = Modifier, content: @Composable 
         AnimatedContent(
             targetState = nav.top,
             contentKey = { it.key },
-            transitionSpec = { navTransition(initialState.route, targetState.route, nav.lastWasPop) },
+            transitionSpec = { navTransition(initialState.route, targetState.route, nav.lastWasPop, reduced) },
             label = "nav",
             modifier = modifier,
         ) { entry ->
@@ -200,7 +202,7 @@ fun NavHost(nav: Navigator, modifier: Modifier = Modifier, content: @Composable 
         AnimatedContent(
             targetState = nav.top,
             contentKey = { it.key },
-            transitionSpec = { navTransition(initialState.route, targetState.route, nav.lastWasPop) },
+            transitionSpec = { navTransition(initialState.route, targetState.route, nav.lastWasPop, reduced) },
             label = "nav",
         ) { entry ->
             CompositionLocalProvider(
@@ -214,8 +216,8 @@ fun NavHost(nav: Navigator, modifier: Modifier = Modifier, content: @Composable 
     }
 }
 
-private fun navTransition(from: Route, to: Route, pop: Boolean): ContentTransform {
-    if (from.isFullScreen || to.isFullScreen) return EnterTransition.None togetherWith ExitTransition.None
+private fun navTransition(from: Route, to: Route, pop: Boolean, reduced: Boolean): ContentTransform {
+    if (reduced || from.isFullScreen || to.isFullScreen) return EnterTransition.None togetherWith ExitTransition.None
     val t = tween<Float>(NAV_ANIM_MS)
     return if (!pop) {
         (fadeIn(t) + scaleIn(t, initialScale = 0.96f)) togetherWith (fadeOut(t) + scaleOut(t, targetScale = 1.02f))
@@ -231,6 +233,7 @@ private fun navTransition(from: Route, to: Route, pop: Boolean): ContentTransfor
  */
 @Composable
 fun Modifier.sharedPoster(key: String): Modifier {
+    if (LocalReducedMotion.current) return this
     val shared = LocalSharedTransitionScope.current ?: return this
     val visibility = LocalAnimatedVisibilityScope.current ?: return this
     return with(shared) { this@sharedPoster.sharedElement(rememberSharedContentState("poster-$key"), visibility) }

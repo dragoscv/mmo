@@ -1,5 +1,10 @@
+@file:OptIn(ExperimentalFoundationApi::class)
+
 package ro.mixai.tv.ui.title
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -45,6 +52,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ro.mixai.tv.R
 import ro.mixai.tv.data.MediaRef
@@ -83,6 +91,16 @@ import ro.mixai.tv.ui.theme.Tokens
 // Play/Resume (best version / next episode), Trailer, versions, My list, Mark watched, offers,
 // seasons + episodes inline (TV), cast and "More like this". The poster morphs from the card
 // (shared element `poster-<kind>-<tmdbId>`).
+
+/**
+ * Title list scrolling: a focused element that is already fully visible never scrolls the page
+ * (the TV default pivots it to ~30 % from the top, which cut the logo off on open, critic P2-10);
+ * anything off screen is brought to that pivot.
+ */
+private val TitleBringIntoView = object : BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+        if (offset >= 0f && offset + size <= containerSize) 0f else offset - containerSize * 0.3f
+}
 
 @Composable
 fun TitleScreen(deps: ScreenDeps, nav: Navigator, kind: String, tmdbId: Long) {
@@ -150,6 +168,20 @@ private fun TitleBody(deps: ScreenDeps, nav: Navigator, kind: String, tmdbId: Lo
     }
     val completed = d.progress.isNotEmpty() && d.progress.all { it.completed } && !isTv
     val trailer = remember(t) { trailerKey(t) }
+    // Nothing of this title on the server (Tizen `canPlay`, HomeHero.tsx): say so instead of a Back CTA.
+    val notInLibrary = resolved && target == null && d.files.isEmpty()
+    val hasOffers = d.availability.offers.isNotEmpty()
+    val listState = rememberLazyListState()
+
+    fun toggleList() {
+        val was = inList
+        inList = !was
+        scope.launch {
+            runCatching { if (was) deps.media.removeWatchlist(t.kind, t.tmdbId) else deps.media.addWatchlist(t.kind, t.tmdbId) }
+                .onSuccess { toast(context, context.getString(if (was) R.string.wp16_title_list_removed else R.string.wp16_title_list_added)) }
+                .onFailure { inList = was; toast(context, context.getString(R.string.wp16_title_action_failed)) }
+        }
+    }
 
     fun play(tg: PlayTarget, fromStart: Boolean = false) {
         if (busy) return
@@ -167,10 +199,11 @@ private fun TitleBody(deps: ScreenDeps, nav: Navigator, kind: String, tmdbId: Lo
         }
     }
 
+    CompositionLocalProvider(LocalBringIntoViewSpec provides TitleBringIntoView) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val topHeight = maxHeight * 0.78f
         LazyColumn(
-            state = rememberLazyListState(),
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 56.dp),
             verticalArrangement = Arrangement.spacedBy(28.dp),
@@ -202,38 +235,62 @@ private fun TitleBody(deps: ScreenDeps, nav: Navigator, kind: String, tmdbId: Lo
                             Text(it, style = MaterialTheme.typography.bodyLarge, color = Tokens.foreground.copy(alpha = 0.85f), maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 760.dp))
                         }
                         if (completed) Text(stringResource(R.string.wp16_title_watched), style = MaterialTheme.typography.labelLarge, color = Tokens.success)
-                        Row(Modifier.focusRestorer().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (notInLibrary) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.widthIn(max = 760.dp)) {
+                                Text(stringResource(R.string.wp16_title_not_in_library), style = MaterialTheme.typography.titleMedium, color = Tokens.warning)
+                                Text(
+                                    stringResource(if (hasOffers) R.string.wp16_title_not_in_library_offers else R.string.wp16_title_not_in_library_hint),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Tokens.mutedForeground,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        Row(
+                            Modifier.focusRestorer().padding(top = 8.dp).onFocusChanged {
+                                // Keep the logo and chips on screen whenever focus is in the action row.
+                                if (it.hasFocus && (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0)) {
+                                    scope.launch { delay(16); listState.animateScrollToItem(0) }
+                                }
+                            },
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             val primaryMod = Modifier.focusRequester(rf.requester).then(rf.item("play"))
                             val tg = target
+                            var listIsPrimary = false
                             if (tg != null) {
                                 PrimaryButton(playLabel(tg), { play(tg) }, primaryMod, icon = Icons.Filled.PlayArrow)
                                 if (tg.resumeMs > 0) SecondaryButton(stringResource(R.string.wp16_title_start_over), { play(tg, fromStart = true) }, rf.item("startover"), icon = MixaiIcons.Replay10)
                             } else if (trailer != null) {
                                 PrimaryButton(stringResource(R.string.wp16_title_trailer), { launchTrailer(context, trailer) }, primaryMod, icon = Icons.Filled.PlayArrow)
-                            } else if (d.availability.offers.isNotEmpty()) {
+                            } else if (hasOffers) {
                                 PrimaryButton(stringResource(R.string.wp16_title_where_short), { ro.mixai.tv.data.ProviderLauncher.launch(context, d.availability.offers.first()) }, primaryMod, icon = Icons.Filled.PlayArrow)
                             } else {
-                                SecondaryButton(stringResource(R.string.wp16_title_back), { nav.pop() }, primaryMod)
+                                // Never "Back" as the primary action (critic P1-5): My list is the first actionable thing.
+                                listIsPrimary = true
+                                PrimaryButton(
+                                    stringResource(if (inList) R.string.wp16_title_list_remove else R.string.wp16_title_list_add),
+                                    { toggleList() },
+                                    Modifier.focusRequester(rf.requester).then(rf.item("list")),
+                                    icon = if (inList) MixaiIcons.Bookmark else MixaiIcons.BookmarkBorder,
+                                )
                             }
                             if (trailer != null && tg != null) SecondaryButton(stringResource(R.string.wp16_title_trailer), { launchTrailer(context, trailer) }, rf.item("trailer"))
                             if (targetFiles.size > 1) {
                                 IconActionButton(MixaiIcons.Hd, stringResource(R.string.wp16_title_versions), { showVersions = true }, rf.item("versions"))
                             }
-                            IconActionButton(
+                            if (!listIsPrimary) IconActionButton(
                                 icon = if (inList) MixaiIcons.Bookmark else MixaiIcons.BookmarkBorder,
                                 label = stringResource(if (inList) R.string.wp16_title_list_remove else R.string.wp16_title_list_add),
-                                onClick = {
-                                    val was = inList
-                                    inList = !was
-                                    scope.launch {
-                                        runCatching { if (was) deps.media.removeWatchlist(t.kind, t.tmdbId) else deps.media.addWatchlist(t.kind, t.tmdbId) }
-                                            .onSuccess { toast(context, context.getString(if (was) R.string.wp16_title_list_removed else R.string.wp16_title_list_added)) }
-                                            .onFailure { inList = was; toast(context, context.getString(R.string.wp16_title_action_failed)) }
-                                    }
-                                },
+                                onClick = { toggleList() },
                                 selected = inList,
                                 modifier = rf.item("list"),
                             )
+                            if (notInLibrary) {
+                                SecondaryButton(stringResource(R.string.wp16_title_search_library), { nav.push(Route.Search(t.title)) }, rf.item("search"))
+                            }
                             val watchRef: MediaRef? = if (!isTv) MediaRef(t.kind.ifBlank { "movie" }, t.tmdbId) else target?.ref
                             if (watchRef != null && !completed) {
                                 IconActionButton(
@@ -329,6 +386,7 @@ private fun TitleBody(deps: ScreenDeps, nav: Navigator, kind: String, tmdbId: Lo
                 }
             }
         }
+    }
     }
 
     ChoiceDialog(

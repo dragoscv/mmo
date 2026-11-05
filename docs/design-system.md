@@ -147,6 +147,10 @@ WCAG 2.2 AA. Every accent hue yields ≥ 4.5:1 for `primary-foreground` on `prim
 (L 0.62/0.70 vs 0.99/0.14). Focus is always visible (`:focus-visible` outline in `--ring`; 4 px on
 TV). Touch targets ≥ 44 px (checkbox/switch/radio/slider thumbs pad their hit area). Reduced motion
 honoured. `EmptyState tone="error"` has `role="alert"`.
+Native TV Android (2.1.0+): per-profile `reduceMotion` pref (`true` / `false` / `"system"` = Android
+animator duration scale), exposed as `LocalReducedMotion` (`ui/components/Motion.kt`); headings use the
+bundled Space Grotesk variable font and body text Inter (`ui/components/Typography.kt`, OFL in
+`assets/licenses`).
 
 ## 9. Adding a surface
 

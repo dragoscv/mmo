@@ -10,6 +10,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-05 — TV Android design pass (TV Android 2.1.0)
+
+- **Own library first on Home** (D25): rows are ordered Continue → My list → New in your library → recommendations
+  on the client too (`ownLibraryFirst`, same rule as Tizen), so cached home blobs and older servers comply. Home now
+  uses the server rows whenever they exist, also when TMDB is not configured (Tizen parity) instead of falling back
+  to the plain scan rows.
+- **Staged Home entrance**: backdrop → logo and chips → rows staggered 70 ms, 660 ms in total, `graphicsLayer`
+  alpha/translation only; skipped when coming back from a title and under reduced motion.
+- **Heading typeface**: Space Grotesk (display/headline/title) + Inter (body/labels), bundled OFL variable fonts
+  (`res/font`, licences in `assets/licenses`).
+- **Reduce motion** (Settings › Accessibility, per profile, RO + EN): Follow system / On / Off; "Follow system"
+  reads Android's animator duration scale. Turns off route transitions, the poster morph, the backdrop crossfade
+  and ambient motion, the Home entrance, hero animations and the card glow.
+- **Title page**: "Back" is never the primary action. With no file, trailer or offer, My list is focused and a
+  "Not in your library" line explains why, with "Search your library" next to it; the logo stays on screen when
+  the page opens.
+- **Ambient backdrop**: slow Ken Burns (1.0 → 1.06 over 36 s, stepped at ~12 Hz) on the cached offscreen backdrop
+  layer, paused while the remote is in use (resumes after 2.5 s idle); off under reduced motion
+  (`debug.mixai.perf=nokenburns|noentrance|nofont` for A/B). Measured on the Chromecast: no D-pad cost.
+- **Fix**: a server row that lists the same title twice crashed Home on D-pad (`Key … was already used`);
+  `MediaRow` now drops duplicate keys.
+- **Placeholder art** from the file's still frame with a title lockup; **profile picker** keeps the last backdrop
+  dimmed with an accent glow and profile-colour rings; **player OSD** bar, times and controls sit on one glass strip.
+
 ## 2026-11-05 — MixAI for iPhone, slice 1 (iOS 1.0.0, design-tokens 1.2.0)
 
 - **iOS app (`apps/ios`, WP16-47)**: native SwiftUI app, bundle `ro.mixai.app`, iOS 26, Swift 6. Onboarding (Bonjour discovery,

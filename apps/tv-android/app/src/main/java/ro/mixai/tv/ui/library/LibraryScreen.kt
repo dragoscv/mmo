@@ -110,6 +110,8 @@ private data class LibEntry(
     val addedAt: Long,
     val res: String?,
     val fileCount: Int,
+    /** Shortest-path file; its `/video/thumbs/:id/still.jpg` is the placeholder art. */
+    val fileId: String = "",
 ) {
     val key: String get() = tmdbId.toString()
 }
@@ -171,6 +173,7 @@ private fun group(rows: List<LibraryIndexRow>, kind: String): Pair<List<LibEntry
             addedAt = files.maxOf { maxOf(it.mtime, it.updatedAt) },
             res = res,
             fileCount = files.size,
+            fileId = first.serverFileId,
         )
     }
     return entries to unmatched
@@ -417,6 +420,7 @@ private fun LibraryGrid(deps: ScreenDeps, nav: Navigator, kind: String, cacheKey
                             title = c?.title ?: e.placeholder,
                             subtitle = (c?.year ?: e.year)?.toString(),
                             width = 160.dp,
+                            placeholderStill = if (c?.posterPath == null && e.fileId.isNotBlank()) deps.api.stillUrl(e.fileId) else null,
                             badges = if (e.res == "4k") listOf(CardBadge("4K", BadgeTone.Neutral)) else emptyList(),
                             sharedKey = "$kind-${e.tmdbId}",
                             onClick = { nav.push(Route.Title(kind, e.tmdbId)) },

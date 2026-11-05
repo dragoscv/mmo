@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,6 +40,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +54,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import ro.mixai.tv.R
 import ro.mixai.tv.data.UnlockResult
@@ -59,8 +63,8 @@ import ro.mixai.tv.data.isKid
 import ro.mixai.tv.ui.components.EmptyState
 import ro.mixai.tv.ui.components.ErrorState
 import ro.mixai.tv.ui.components.LoadingState
+import ro.mixai.tv.ui.components.LocalBackdrop
 import ro.mixai.tv.ui.components.MixaiIcons
-import ro.mixai.tv.ui.components.NoBackdrop
 import ro.mixai.tv.ui.components.PinPad
 import ro.mixai.tv.ui.components.PrimaryButton
 import ro.mixai.tv.ui.components.SecondaryButton
@@ -83,10 +87,24 @@ internal fun pickerRows(n: Int): Int = if (n <= 6) 1 else (n + 5) / 6
  * "Who's watching?" (WP16-18): avatars from `/media/profiles` in a centered grid (1..12+), PIN pad
  * for locked profiles (shake + tries left, locked countdown), kids badge, "Add profile" tile →
  * editor, "Manage profiles" → Settings("profiles"). Focus returns to the last chosen tile.
+ * Atmosphere (critic P2-11): the last backdrop stays on screen dimmed to 35 %, with a soft accent
+ * glow behind the avatars; each avatar carries a ring in its profile colour.
  */
 @Composable
 fun ProfilePickerScreen(deps: ScreenDeps, nav: Navigator) {
-    NoBackdrop()
+    val backdrop = LocalBackdrop.current
+    DisposableEffect(backdrop) {
+        val prev = backdrop.intensity
+        backdrop.intensity = 0.35f
+        onDispose { backdrop.intensity = prev }
+    }
+    // Cold start: nothing on the backdrop yet → the first card of the last cached Home (disk only).
+    LaunchedEffect(Unit) {
+        if (backdrop.url != null) return@LaunchedEffect
+        val home = runCatching { kotlinx.coroutines.withTimeoutOrNull(1500) { deps.media.homeFlow().firstOrNull() } }.getOrNull() ?: return@LaunchedEffect
+        val c = home.rows.firstOrNull { it.items.isNotEmpty() }?.items?.first() ?: return@LaunchedEffect
+        backdrop.show(deps.api.tmdbImageUrl(ro.mixai.tv.data.TmdbSize.backdrop(1280), c.backdropPath ?: c.posterPath))
+    }
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<PickerState>(PickerState.Loading) }
     var reload by remember { mutableIntStateOf(0) }
@@ -144,7 +162,12 @@ fun ProfilePickerScreen(deps: ScreenDeps, nav: Navigator) {
 
     BackHandler(enabled = pinForId != null) { pinForId = null; pinMessage = null }
 
-    Box(Modifier.fillMaxSize().padding(horizontal = MixaiFocus.overscan, vertical = 48.dp), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.fillMaxSize()
+            .background(Brush.radialGradient(listOf(Tokens.primary.copy(alpha = 0.22f), Tokens.background.copy(alpha = 0f)), radius = 900f))
+            .padding(horizontal = MixaiFocus.overscan, vertical = 48.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         when {
             pinProfile != null -> {
                 val isLocked = lockedUntil > now
@@ -256,7 +279,7 @@ private fun ProfileTile(p: Profile, isActive: Boolean, size: androidx.compose.ui
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
             border = ClickableSurfaceDefaults.border(
                 focusedBorder = Border(BorderStroke(MixaiFocus.ringWidth, Tokens.ring), shape = CircleShape),
-                border = if (isActive) Border(BorderStroke(2.dp, Tokens.mutedForeground), shape = CircleShape) else Border.None,
+                border = Border(BorderStroke(if (isActive) 3.dp else 2.dp, profileColor(p).copy(alpha = if (isActive) 1f else 0.7f)), shape = CircleShape),
             ),
             glow = ClickableSurfaceDefaults.glow(focusedGlow = Glow(MixaiFocus.glowColor, MixaiFocus.glowElevation)),
         ) {

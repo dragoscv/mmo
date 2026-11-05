@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP16 design-critic P1 pass (2.1.0): accesibilitate / mișcare redusă, stare goală pe pagina titlului. Chei oglindite în values. -->
+<resources>
+    <string name="set_sec_accessibility">Accesibilitate</string>
+    <string name="set_a11y_for">Accesibilitate pentru %1$s</string>
+    <string name="set_reduce_motion">Reduce mișcarea</string>
+    <string name="set_reduce_motion_system">Ca sistemul</string>
+    <string name="set_reduce_motion_hint">Oprește tranzițiile între pagini, fundalul în mișcare și animația de intrare din Acasă.</string>
+    <string name="set_reduce_motion_system_on">Televizorul are acum animațiile oprite.</string>
+    <string name="set_reduce_motion_system_off">Televizorul are acum animațiile pornite.</string>
+
+    <string name="wp16_title_not_in_library">Nu e în biblioteca ta</string>
+    <string name="wp16_title_not_in_library_hint">Nu există niciun fișier pentru acest titlu pe serverul tău și niciun serviciu de streaming nu îl are încă în țara ta. Adaugă-l în Lista mea ca să-l găsești mai târziu.</string>
+    <string name="wp16_title_not_in_library_offers">Nu există niciun fișier pentru acest titlu pe serverul tău. Îl poți viziona pe unul dintre aceste servicii:</string>
+    <string name="wp16_title_search_library">Caută în bibliotecă</string>
+</resources>

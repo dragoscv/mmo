@@ -848,14 +848,16 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
                         )
                     }
 
-                    // Bottom: preview, bar, times, buttons.
-                    Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 56.dp, vertical = 32.dp)) {
+                    // Bottom: preview, bar, times, buttons, on one frosted glass strip (D25 "glass OSD",
+                    // critic P2-12) centred at ≤ 1400 dp.
+                    Column(Modifier.align(Alignment.BottomCenter).widthIn(max = 1400.dp).fillMaxWidth().padding(horizontal = 56.dp, vertical = 32.dp)) {
                         val target = scrubTarget
                         if (target != null && durMs > 0) {
                             val chapter = markers.chapters.lastOrNull { it.startMs <= target }?.title
                             ScrubPreview(sprite, spriteGrid(durMs / 1000.0), target, target.toFloat() / durMs, chapter)
                             Spacer(Modifier.height(8.dp))
                         }
+                        Column(Modifier.fillMaxWidth().glass().padding(horizontal = 24.dp, vertical = 16.dp)) {
                         ScrubBar(
                             posMs = posMs, durMs = durMs, bufMs = bufMs, targetMs = scrubTarget, markers = markers,
                             focusRequester = barFocus, onKey = { false },
@@ -914,6 +916,7 @@ fun PlayerScreen(deps: ScreenDeps, nav: Navigator, request: PlayRequest, resumeM
                             }
                             Spacer(Modifier.size(12.dp))
                             Text(focusedLabel, style = MaterialTheme.typography.titleSmall, color = Tokens.foreground)
+                        }
                         }
                     }
                 }

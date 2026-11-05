@@ -21,4 +21,7 @@ object PerfFlags {
     val noRail get() = "norail" in flags
     val noShared get() = "noshared" in flags
     val noLayerCache get() = "nolayercache" in flags
+    val noKenBurns get() = "nokenburns" in flags
+    val noEntrance get() = "noentrance" in flags
+    val noFont get() = "nofont" in flags
 }
