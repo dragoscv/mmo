@@ -46,10 +46,10 @@ targets:
       - target: MixAIWidgets
         embed: true
         codeSign: true
-      # A watchOS app as a dependency of an iOS app lands in "Embed Watch Content", so the MixAI scheme builds,
-      # signs and archives the watch app with the phone's (same pattern as vitals).
-      - target: MixAIWatch
-        embed: true
+      # The watchOS app (MixAIWatch) is NOT embedded in the 1.1.x App Store build: an embedded watch app makes
+      # App Store require Apple Watch screenshots, and there is no Apple Watch or Simulator to produce them (or to
+      # test it). Re-add `- target: MixAIWatch / embed: true` (lands in "Embed Watch Content") with Watch
+      # screenshots in a later release (tracker WP16-48). The phone keeps its WatchConnectivity side.
       - sdk: AVKit.framework
       - sdk: MediaPlayer.framework
       - sdk: AuthenticationServices.framework
@@ -181,7 +181,6 @@ schemes:
       targets:
         MixAI: all
         MixAIWidgets: all
-        MixAIWatch: all
     run:
       config: Debug
     archive:
