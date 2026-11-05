@@ -42,6 +42,7 @@ services:
     container_name: demo-channel-1
     restart: unless-stopped
     user: "1000:1000"
+    healthcheck: { disable: true } # the image's check probes :17899, which only mmo-server serves
     entrypoint: ["/bin/sh", "/channel/loop.sh", "/media/films/Big Buck Bunny (2008)/Big Buck Bunny (2008).mp4", "/out/1"]
     volumes:
       - /srv/mixai/media:/media:ro
@@ -53,6 +54,7 @@ services:
     container_name: demo-channel-2
     restart: unless-stopped
     user: "1000:1000"
+    healthcheck: { disable: true }
     entrypoint: ["/bin/sh", "/channel/loop.sh", "/media/films/Sintel (2010)/Sintel (2010).mkv", "/out/2"]
     volumes:
       - /srv/mixai/media:/media:ro
@@ -66,6 +68,7 @@ services:
     container_name: demo-epg
     restart: unless-stopped
     user: "1000:1000"
+    healthcheck: { disable: true }
     environment:
       DEMO_HOST: ${DEMO_HOST:-demo.mixai.ro}
     entrypoint: ["/bin/sh", "-c", "sleep 20; while true; do node /channel/gen-epg.mjs /out; sleep 21600; done"]

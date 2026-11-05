@@ -16,6 +16,11 @@ apps without owning a server. Owner-approved always-on VM: it has **no** server-
 | Image | `europe-west1-docker.pkg.dev/mmo-mw-prod/mixai/mmo-server:<server version>-<sha>` (amd64) |
 | Hostnames | `demo.mixai.ro` (Cloudflare A, DNS-only) and `34-118-46-71.sslip.io` (works before mixai.ro DNS) |
 
+**Live state (verified 2026-11-05 ~15:20Z, image `mmo-server:3.9.4-31fb136b`)**: `https://34-118-46-71.sslip.io`
+answers with a Let's Encrypt cert; `demo.mixai.ro` has its A record in Cloudflare but the zone is not yet
+delegated (registrar NS switch pending) — Caddy obtains its certificate automatically once it resolves, then
+re-run `deploy.ps1` + setup so the M3U/XMLTV/Live TV source switch to `demo.mixai.ro`.
+
 ## Layout on the VM
 
 ```
@@ -49,7 +54,7 @@ pwsh -NoProfile -File "$env:USERPROFILE\.copilot\hooks\deploy-clean.ps1" -Target
 pwsh -NoProfile -File infra/demo/deploy.ps1 -Image <tag printed by image.ps1>
 # 4. Content (on the VM, ~5.6 GB, idempotent) then configuration
 gcloud compute ssh mixai-demo --zone europe-central2-a --project mmo-mw-prod --command 'cd /srv/mixai/app && sudo bash content.sh'
-gcloud compute ssh mixai-demo --zone europe-central2-a --project mmo-mw-prod --command 'cd /srv/mixai/app && sudo docker exec -i -e DEMO_HOST=demo.mixai.ro mmo-server node - < setup.mjs'
+gcloud compute ssh mixai-demo --zone europe-central2-a --project mmo-mw-prod --command 'cd /srv/mixai/app && . ./.env && sudo docker exec -i -e DEMO_HOST=$DEMO_HOST mmo-server node - < setup.mjs'
 # 5. Live verification from a PC (pairs like an app; token saved to .copilot-tmp/demo/token.txt, never printed)
 node .copilot-tmp/demo/pair.mjs https://demo.mixai.ro
 ```
