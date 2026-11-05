@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+# Reproducible build of the MixAI iPhone app on a macOS host (vmui-mac, Xcode 26.x). Port of codai apps/ios/scripts/build.sh.
+#
+#   scripts/build.sh test      swift test MixaiCore (no Simulator needed)
+#   scripts/build.sh build     generate project + compile for iphoneos, unsigned
+#   scripts/build.sh devipa    archive + development-signed ro.mixai.app .ipa (registered devices) for a direct install
+#   scripts/build.sh upload    archive, sign (automatic, via App Store Connect API key) and upload to TestFlight
+#
+# Env for devipa/upload (the Windows driver scripts/ios-build.ps1 sets these from Secret Manager and deletes the key
+# file afterwards; nothing is stored in the repo):
+#   DEVELOPMENT_TEAM, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH (0600 .p8), BUILD_NUMBER (git commit count)
+set -euo pipefail
+
+MODE="${1:-build}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$HERE"
+
+XCODEGEN_VERSION="2.46.0"
+XCODEGEN_SHA256="4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806"
+# Shared with codai on vmui-mac (same pinned XcodeGen).
+TOOLS="$HOME/.local/codai-ios-tools"
+XCODEGEN="$TOOLS/xcodegen-$XCODEGEN_VERSION/bin/xcodegen"
+OUT="$HERE/build"
+SPM_CACHE="${MIXAI_SPM_CACHE:-$HOME/.cache/mixai-ios-spm}"
+SPM_FLAGS=(-clonedSourcePackagesDirPath "$SPM_CACHE" -skipPackagePluginValidation -skipMacroValidation)
+KEYCHAIN="$HOME/Library/Keychains/codai-build.keychain-db"
+
+if [ -z "${DEVELOPER_DIR:-}" ] && [ -d "$HOME/Applications/Xcode.app" ]; then
+  export DEVELOPER_DIR="$HOME/Applications/Xcode.app/Contents/Developer"
+fi
+
+log() { printf '== %s\n' "$*"; }
+
+ensure_xcodegen() {
+  if [ -x "$XCODEGEN" ]; then return; fi
+  log "installing XcodeGen $XCODEGEN_VERSION"
+  mkdir -p "$TOOLS"
+  local zip="$TOOLS/xcodegen-$XCODEGEN_VERSION.zip"
+  curl -fsSL -o "$zip" "https://github.com/yonaskolb/XcodeGen/releases/download/$XCODEGEN_VERSION/xcodegen.zip"
+  echo "$XCODEGEN_SHA256  $zip" | shasum -a 256 -c -
+  rm -rf "$TOOLS/xcodegen-$XCODEGEN_VERSION"
+  unzip -q "$zip" -d "$TOOLS/tmp-$XCODEGEN_VERSION"
+  mv "$TOOLS/tmp-$XCODEGEN_VERSION/xcodegen" "$TOOLS/xcodegen-$XCODEGEN_VERSION"
+  rm -rf "$TOOLS/tmp-$XCODEGEN_VERSION" "$zip"
+}
+
+generate() {
+  ensure_xcodegen
+  log "xcodebuild $(xcodebuild -version | tr '\n' ' ')"
+  DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:-}" "$XCODEGEN" generate --spec project.yml --quiet
+  mkdir -p "$SPM_CACHE"
+}
+
+# Headless signing: the login keychain is locked over SSH. Shared dedicated keychain of vmui-mac (codai runbook
+# docs/runbooks/apple-publishing.md): random password in a 0600 file on the Mac, unlocked for the build.
+build_keychain() {
+  local pwf="$HOME/.config/codai/build-keychain.pw"
+  mkdir -p "$(dirname "$pwf")"
+  if [ ! -s "$pwf" ]; then (umask 077; openssl rand -hex 24 > "$pwf"); fi
+  if [ ! -f "$KEYCHAIN" ]; then security create-keychain -p "$(cat "$pwf")" "$KEYCHAIN"; fi
+  security unlock-keychain -p "$(cat "$pwf")" "$KEYCHAIN"
+  security set-keychain-settings -lut 21600 "$KEYCHAIN"
+  security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$(cat "$pwf")" "$KEYCHAIN" >/dev/null 2>&1 || true
+  security list-keychains -d user -s "$KEYCHAIN" "$HOME/Library/Keychains/login.keychain-db"
+  security default-keychain -d user -s "$KEYCHAIN"
+  trap restore_keychains EXIT
+  # Other repos' build.sh reset the search list at their exit; keep ours in it while signing.
+  ( while kill -0 $$ 2>/dev/null; do
+      security list-keychains -d user | grep -q codai-build \
+        || security list-keychains -d user -s "$KEYCHAIN" "$HOME/Library/Keychains/login.keychain-db"
+      sleep 2
+    done ) &
+  KEYCHAIN_GUARD=$!
+  log "build keychain unlocked ($(basename "$KEYCHAIN"))"
+}
+
+restore_keychains() {
+  local rc=$? login="$HOME/Library/Keychains/login.keychain-db"
+  [ -n "${KEYCHAIN_GUARD:-}" ] && { kill "$KEYCHAIN_GUARD" 2>/dev/null; wait "$KEYCHAIN_GUARD" 2>/dev/null || true; }
+  security list-keychains -d user -s "$login" || true
+  security default-keychain -d user -s "$login" || true
+  return "$rc"
+}
+
+archive() {
+  : "${DEVELOPMENT_TEAM:?}" "${ASC_KEY_ID:?}" "${ASC_ISSUER_ID:?}" "${ASC_KEY_PATH:?}" "${BUILD_NUMBER:?}"
+  generate
+  build_keychain
+  AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+  rm -rf "$OUT/MixAI.xcarchive" "$OUT/export"
+  log "archive (build $BUILD_NUMBER)"
+  xcodebuild -project MixAI.xcodeproj -scheme MixAI -configuration Release \
+    -destination 'generic/platform=iOS' -derivedDataPath "$OUT/dd" \
+    -archivePath "$OUT/MixAI.xcarchive" "${AUTH[@]}" "${SPM_FLAGS[@]}" \
+    DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+    OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN" archive -quiet
+}
+
+export_plist() { # method destination
+  cat > "$OUT/ExportOptions.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>method</key><string>$1</string>
+  <key>destination</key><string>$2</string>
+  <key>teamID</key><string>$DEVELOPMENT_TEAM</string>
+  <key>signingStyle</key><string>automatic</string>
+  <key>manageAppVersionAndBuildNumber</key><false/>
+</dict></plist>
+PLIST
+}
+
+case "$MODE" in
+  test)
+    log "swift test MixaiCore"
+    (cd MixaiCore && swift test)
+    ;;
+  build)
+    generate
+    log "compile (iphoneos, unsigned)"
+    xcodebuild -project MixAI.xcodeproj -scheme MixAI -configuration Release \
+      -destination 'generic/platform=iOS' -derivedDataPath "$OUT/dd" "${SPM_FLAGS[@]}" \
+      CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build -quiet
+    log "OK: $OUT/dd/Build/Products/Release-iphoneos/MixAI.app"
+    ;;
+  devipa)
+    archive
+    export_plist "${EXPORT_METHOD:-debugging}" export
+    log "export (${EXPORT_METHOD:-debugging})"
+    xcodebuild -exportArchive -archivePath "$OUT/MixAI.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}"
+    cp "$OUT/export/"*.ipa "$OUT/mixai-dev.ipa"
+    log "OK: $OUT/mixai-dev.ipa ($(du -h "$OUT/mixai-dev.ipa" | cut -f1))"
+    ;;
+  upload)
+    archive
+    export_plist app-store-connect upload
+    log "export + upload to App Store Connect"
+    xcodebuild -exportArchive -archivePath "$OUT/MixAI.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}"
+    log "UPLOADED build $BUILD_NUMBER (TestFlight processing takes ~5-15 min)"
+    ;;
+  *)
+    echo "usage: $0 test|build|devipa|upload" >&2
+    exit 2
+    ;;
+esac

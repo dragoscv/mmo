@@ -1,0 +1,436 @@
+{
+ "title": {
+  "kind": "movie",
+  "tmdbId": 1756340,
+  "title": "River",
+  "originalTitle": "River",
+  "posterPath": null,
+  "backdropPath": null,
+  "releaseDate": "2026-09-18",
+  "voteAverage": 0,
+  "voteCount": 0,
+  "popularity": 2.0953,
+  "genreIds": [
+   99
+  ],
+  "runtime": 27,
+  "status": "Released",
+  "genres": [
+   {
+    "id": 99,
+    "name": "Documentar"
+   }
+  ],
+  "keywords": [],
+  "cast": [],
+  "crew": [
+   {
+    "id": 3003913,
+    "name": "Emily Cohen Ibañez",
+    "role": "Director",
+    "profilePath": null
+   }
+  ],
+  "collectionId": null,
+  "externalIds": {
+   "imdb_id": null,
+   "wikidata_id": null,
+   "facebook_id": null,
+   "instagram_id": null,
+   "twitter_id": null
+  },
+  "videos": [],
+  "logoPath": null,
+  "ratings": {},
+  "age": null,
+  "recommendations": [
+   {
+    "kind": "movie",
+    "tmdbId": 1723460,
+    "title": "A Toxic Love Story",
+    "originalTitle": "A Toxic Love Story",
+    "overview": "A string of threatening emails escalates into a revenge plot involving a newly married US marshal and his ex-girlfriend.",
+    "posterPath": "/9sEgd5utLpVCcTujRy1YLx4NGhc.jpg",
+    "backdropPath": "/c3hLMqh2QqJd7m1ar6rxw9eio35.jpg",
+    "releaseDate": "2026-07-22",
+    "voteAverage": 6.403,
+    "voteCount": 62,
+    "popularity": 4.8976,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 1400780,
+    "title": "Come See Me in the Good Light",
+    "originalTitle": "Come See Me in the Good Light",
+    "overview": "In an intimate and joyful story of love in the face of loss, celebrated poets Andrea Gibson and Megan Falley find strength—and unexpected hilarity—in what might be their final year together.",
+    "posterPath": "/5AFbcDGT78cLZTyHTSDBohczjuO.jpg",
+    "backdropPath": "/x0FZZWBE7Sp5Vz5ncn4wb8JyG5c.jpg",
+    "releaseDate": "2025-11-14",
+    "voteAverage": 7.1,
+    "voteCount": 46,
+    "popularity": 3.7996,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 325365,
+    "title": "Dawg Fight",
+    "originalTitle": "Dawg Fight",
+    "overview": "In a crime-plagued neighborhood near Miami, brutal, bare-knuckled backyard fights give young men a chance to earn money -- and self-respect.",
+    "posterPath": "/thgvd0tjDLJvTVx4BaZjfQAC7yK.jpg",
+    "backdropPath": null,
+    "releaseDate": "2015-03-13",
+    "voteAverage": 6.4,
+    "voteCount": 50,
+    "popularity": 2.1402,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 1015356,
+    "title": "Să omori un tigru",
+    "originalTitle": "To Kill a Tiger",
+    "overview": "După ce fiica lui adolescentă scapă cu bine de o agresiune brutală, un fermier modest începe o călătorie remarcabilă în căutarea dreptății, sfidând intoleranța sătenilor.",
+    "posterPath": "/4U0mxF1HtfITGlX4IiUboitQJpu.jpg",
+    "backdropPath": "/d14tpaz2DlQBRXDk94M4pU2gXvj.jpg",
+    "releaseDate": "2023-10-20",
+    "voteAverage": 7.6,
+    "voteCount": 45,
+    "popularity": 1.9998,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 39333,
+    "title": "180° South",
+    "originalTitle": "180° South",
+    "overview": "The film follows adventurer Jeff Johnson as he retraces the epic 1968 journey of his heroes Yvon Chouinard and Doug Tompkins to Patagonia.",
+    "posterPath": "/jLvxcvpEbQ1bRETJZ3NlKpjQuLC.jpg",
+    "backdropPath": "/l1C0dtWshyoIdEeUbNQyX2B9GUG.jpg",
+    "releaseDate": "2010-02-10",
+    "voteAverage": 7.2,
+    "voteCount": 58,
+    "popularity": 2.6175,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 508003,
+    "title": "McQueen",
+    "originalTitle": "McQueen",
+    "overview": "Alexander McQueen's rags-to-riches story is a modern-day fairy tale, laced with the gothic. Mirroring the savage beauty, boldness and vivacity of his design, this documentary is an intimate revelation of McQueen's own world, both tortured and inspired, which celebrates a radical and mesmerizing genius of profound influence.",
+    "posterPath": "/ayuj76GmmHglhyPlg7apJ9YVj03.jpg",
+    "backdropPath": "/k0o0sFSbv8BPsQijH6QWxUlDpoG.jpg",
+    "releaseDate": "2018-06-08",
+    "voteAverage": 7.4,
+    "voteCount": 147,
+    "popularity": 4.5679,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 20561,
+    "title": "28 Up",
+    "originalTitle": "28 Up",
+    "overview": "Just two years away from turning 30, participants in Michael Apted's documentary series are facing serious questions of identity and purpose, wondering whether they've found their place in the world.",
+    "posterPath": "/1MR6M5bX9r9HNf5SCWP9MRrEm8P.jpg",
+    "backdropPath": "/nKqPwRYh5muLul3cN6zni0fJs11.jpg",
+    "releaseDate": "1985-10-06",
+    "voteAverage": 7.5,
+    "voteCount": 77,
+    "popularity": 3.5784,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 543803,
+    "title": "Black Sheep",
+    "originalTitle": "Black Sheep",
+    "overview": "After the high-profile killing of Damilola Taylor, Cornelius' family move out of London. But when they discover their new town is run by racists, Cornelius takes a drastic step to survive.",
+    "posterPath": "/igcQu4oTlyvheJjyzmeYwWH1J8y.jpg",
+    "backdropPath": "/1hjf0DT9hbmMbgXQvz18cs5dLbg.jpg",
+    "releaseDate": "2018-05-01",
+    "voteAverage": 7.2,
+    "voteCount": 54,
+    "popularity": 2.1182,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 94623,
+    "title": "Directed by John Ford",
+    "originalTitle": "Directed by John Ford",
+    "overview": "A documentary about the life and films of director John Ford.",
+    "posterPath": "/kv3tPDvWyGTQ2Nb66LTXwK18iXR.jpg",
+    "backdropPath": "/fMyttWsQXJCG3V9oUOFebYZ0HJT.jpg",
+    "releaseDate": "1971-09-06",
+    "voteAverage": 7,
+    "voteCount": 42,
+    "popularity": 2.5605,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 21925,
+    "title": "Naqoyqatsi",
+    "originalTitle": "Naqoyqatsi",
+    "overview": "Un portret vizual al lumii contemporane, dominată de tehnologia globalizată și violență.",
+    "posterPath": "/buDo6FcSlOVEQJomKB0IviNV0Do.jpg",
+    "backdropPath": "/qhQCEwJNHlLqb7p7UHA2q0iWBMd.jpg",
+    "releaseDate": "2002-09-02",
+    "voteAverage": 6.2,
+    "voteCount": 164,
+    "popularity": 1.5504,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 603106,
+    "title": "Capital in the Twenty-First Century",
+    "originalTitle": "Capital in the Twenty-First Century",
+    "overview": "Film adaptation of French economist Thomas Piketty's ground-breaking global bestseller of the same name: an eye-opening journey through wealth and power.",
+    "posterPath": "/dfxi1TZ5OwYMoz4OWjuQlcxI3VQ.jpg",
+    "backdropPath": "/4aNOgZLjVkZMPqX3HpZTbA40XTZ.jpg",
+    "releaseDate": "2019-09-12",
+    "voteAverage": 6.5,
+    "voteCount": 78,
+    "popularity": 1.963,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 1462146,
+    "title": "S4: The Bob Lazar Story",
+    "originalTitle": "S4: The Bob Lazar Story",
+    "overview": "De la motoarele cu reacție la Los Alamos, viața lui Bob Lazar este înrădăcinată în știință. În 1988, angajat la S4 lângă Zona 51, a reproiectat tehnologia extraterestră prin inginerie inversă. Narat de Lazar, acest film folosește imagini exclusive pentru a dezvălui cel mai bine păstrat secret al Americii.",
+    "posterPath": "/sQB50PgwLfftaRdNB36eJxtH3AZ.jpg",
+    "backdropPath": "/377Bqi11cmWEQeOAs7GOkCEfazk.jpg",
+    "releaseDate": "2026-04-03",
+    "voteAverage": 8.423,
+    "voteCount": 52,
+    "popularity": 2.2193,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 446173,
+    "title": "Ex Libris: The New York Public Library",
+    "originalTitle": "Ex Libris: The New York Public Library",
+    "overview": "A documentary about how a dominant cultural and demographic institution both sustains their traditional activities and adapts to the digital revolution.",
+    "posterPath": "/5UAtolZFuOFYqUpHcDYamsVKWvb.jpg",
+    "backdropPath": "/fNefgkrnYuXkKVq2bCYnZLBbHS0.jpg",
+    "releaseDate": "2017-09-13",
+    "voteAverage": 6.442,
+    "voteCount": 69,
+    "popularity": 1.6787,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 20562,
+    "title": "35 Up",
+    "originalTitle": "35 Up",
+    "overview": "Director Michael Apted revisits the same group of British-born adults after a 7 year wait. The subjects are interviewed as to the changes that have occurred in their lives during the last seven years.",
+    "posterPath": "/blgrNJpi1jdGhKCKqRjKCl1u9qT.jpg",
+    "backdropPath": "/8vIR41Yq02O37gCkZFvj1rqMF1z.jpg",
+    "releaseDate": "1991-08-29",
+    "voteAverage": 7.6,
+    "voteCount": 60,
+    "popularity": 3.7724,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 1591516,
+    "title": "Evil Influencer: The Jodi Hildebrandt Story",
+    "originalTitle": "Evil Influencer: The Jodi Hildebrandt Story",
+    "overview": "Unravel the case of Utah therapist Jodi Hildebrandt, whose child abuse arrest with parenting YouTuber Ruby Franke exposed a twisted tale of manipulation.",
+    "posterPath": "/xCawp08whOaJS434IDlBytX7sSm.jpg",
+    "backdropPath": "/5lZXIkRpOJICbWYJgImdbZ1vWx6.jpg",
+    "releaseDate": "2025-12-30",
+    "voteAverage": 6.2,
+    "voteCount": 71,
+    "popularity": 3.3578,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 557646,
+    "title": "Above Majestic",
+    "originalTitle": "Above Majestic",
+    "overview": "A look at the origins, history and conspiracies behind the \"Majestic 12\", a clandestine group of military and corporate figureheads charged with reverse-engineering extraterrestrial technology.",
+    "posterPath": "/2Nib1PpekYy58AqfCKbiN9JRZsE.jpg",
+    "backdropPath": "/5ZIE4dEAYaDoFj3e5mQ2R6TMdQx.jpg",
+    "releaseDate": "2018-10-30",
+    "voteAverage": 7.4,
+    "voteCount": 121,
+    "popularity": 3.1681,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 1461714,
+    "title": "Mama mea, Jayne",
+    "originalTitle": "My Mom Jayne",
+    "overview": "Actrița Mariska Hargitay explorează povestea mamei ei, Jayne Mansfield, la aproape 60 de ani de la moartea acesteia.",
+    "posterPath": "/g1WPIEblrWZlIpzxAYvSokcEd4x.jpg",
+    "backdropPath": "/k4MZdogt1DZX0b2tlkr17EFUvP5.jpg",
+    "releaseDate": "2025-06-20",
+    "voteAverage": 7.992,
+    "voteCount": 60,
+    "popularity": 3.3854,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 130824,
+    "title": "As I Was Moving Ahead Occasionally I Saw Brief Glimpses of Beauty",
+    "originalTitle": "As I Was Moving Ahead Occasionally I Saw Brief Glimpses of Beauty",
+    "overview": "A compilation of over 30 years of private home movie footage shot by Lithuanian-American avant-garde director Jonas Mekas, assembled by Mekas \"purely by chance\", without concern for chronological order.",
+    "posterPath": "/tDaxB5juEGwXD7oZwh8IXsnisar.jpg",
+    "backdropPath": "/68Qic4gQ6YGoQdDyYxEhufJCunI.jpg",
+    "releaseDate": "2000-11-05",
+    "voteAverage": 7.8,
+    "voteCount": 87,
+    "popularity": 2.5263,
+    "genreIds": [
+     99
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 473415,
+    "title": "Voyeur",
+    "originalTitle": "Voyeur",
+    "overview": "Legendarul jurnalist Gay Talese demască un proprietar de motel care își spionează oaspeții de zeci de ani. Dar articolul său bombă stârnește în curând un nou scandal.",
+    "posterPath": "/agHt57rWI2MvteLhuCXAJtWcKYL.jpg",
+    "backdropPath": "/vVc2LjQqpF0laTwvVtpuBkAK7UW.jpg",
+    "releaseDate": "2017-10-04",
+    "voteAverage": 5.9,
+    "voteCount": 181,
+    "popularity": 4.1168,
+    "genreIds": [
+     99,
+     80
+    ]
+   },
+   {
+    "kind": "movie",
+    "tmdbId": 1059673,
+    "title": "Avatar: incursiune în culise, editie specială 2020",
+    "originalTitle": "Avatar: The Deep Dive - A Special Edition of 20/20",
+    "overview": "Aruncăm o privire asupra uneia dintre cele mai anticipate continuări ale unui film, alături de regizorul premiat cu Oscar®James Cameron și de distribuția filmului.",
+    "posterPath": "/djudloGxoW9D7G0zLg9oiTsK4PW.jpg",
+    "backdropPath": "/eoAvHxfbaPOcfiQyjqypWIXWxDr.jpg",
+    "releaseDate": "2022-12-13",
+    "voteAverage": 7.2,
+    "voteCount": 101,
+    "popularity": 4.3752,
+    "genreIds": [
+     99
+    ]
+   }
+  ],
+  "similar": [],
+  "watchProviders": {}
+ },
+ "availability": {
+  "offers": [],
+  "source": "none",
+  "attribution": [],
+  "fetchedAt": 1793827248439
+ },
+ "files": [
+  {
+   "serverFileId": "f5pcj9p",
+   "kind": "movie",
+   "tmdbId": 1756340,
+   "season": null,
+   "episode": null,
+   "path": "/media/library/file.mkv",
+   "size": 1060826542,
+   "mtime": 1786070083750,
+   "updatedAt": 1789740993853,
+   "version": {
+    "resolution": null,
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "River (2023) + audio",
+    "rank": 150
+   }
+  },
+  {
+   "serverFileId": "f125zmvg",
+   "kind": "movie",
+   "tmdbId": 1756340,
+   "season": null,
+   "episode": null,
+   "path": "/media/library/file.mkv",
+   "size": 948896901,
+   "mtime": 1785705802471,
+   "updatedAt": 1789740993853,
+   "version": {
+    "resolution": null,
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "River (2023)",
+    "rank": 150
+   }
+  }
+ ],
+ "progress": [
+  {
+   "profileId": "default",
+   "kind": "movie",
+   "tmdbId": 1756340,
+   "season": 0,
+   "episode": 0,
+   "positionSec": 31.122,
+   "durationSec": 6630.816,
+   "completed": false,
+   "updatedAt": 1793874819131,
+   "rev": 25
+  }
+ ],
+ "nextUp": null,
+ "inWatchlist": false,
+ "serverId": "srv-test",
+ "serverName": "mmo-server"
+}

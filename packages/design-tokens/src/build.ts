@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 // Executed directly by `node --experimental-strip-types`, which needs explicit
 // extensions (unlike the bundler-resolved imports elsewhere in this package).
-import { kotlinTokens, plainCss, prehydrateScript, tailwindCss, tokensJson } from "./generate.ts";
+import { kotlinTokens, plainCss, prehydrateScript, swiftTokens, tailwindCss, tokensJson } from "./generate.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = join(here, "..", "dist");
@@ -45,3 +45,9 @@ const phoneKt = join(repo, "apps", "phone-android", "app", "src", "main", "java"
 mkdirSync(dirname(phoneKt), { recursive: true });
 writeFileSync(phoneKt, lf(kotlinTokens("ro.mixai.app.ui.theme", true)) + "\n", { encoding: "utf8" });
 console.log(`mirrored Tokens.kt → ${phoneKt.replace(repo, "")}`);
+
+// iOS app (WP16-47): SwiftUI tokens.
+const iosSwift = join(repo, "apps", "ios", "MixAI", "Theme", "Tokens.swift");
+mkdirSync(dirname(iosSwift), { recursive: true });
+writeFileSync(iosSwift, lf(swiftTokens()) + "\n", { encoding: "utf8" });
+console.log(`mirrored Tokens.swift → ${iosSwift.replace(repo, "")}`);

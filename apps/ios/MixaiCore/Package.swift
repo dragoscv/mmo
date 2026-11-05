@@ -18,7 +18,8 @@ let package = Package(
         .testTarget(
             name: "MixaiCoreTests",
             dependencies: ["MixaiCore"],
-            path: "Tests/MixaiCoreTests"
+            path: "Tests/MixaiCoreTests",
+            resources: [.copy("Fixtures")]
         ),
     ],
     swiftLanguageModes: [.v6]

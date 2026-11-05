@@ -1,0 +1,8 @@
+{
+ "name": "mmo-server",
+ "version": "3.8.1",
+ "lanUrl": "http://192.0.2.10:17899",
+ "port": 17899,
+ "pairingSupported": true,
+ "hasToken": true
+}

@@ -1,0 +1,612 @@
+{
+ "title": {
+  "kind": "tv",
+  "tmdbId": 37606,
+  "title": "Uimitoarea lume a lui Gumball",
+  "originalTitle": "The Amazing World of Gumball",
+  "posterPath": "/ff9dfJr8iJi0fLjqr8k5YbVpMko.jpg",
+  "backdropPath": "/gmO3aezFgDcrhcymhNSJLGZ3CT.jpg",
+  "releaseDate": "2011-05-03",
+  "voteAverage": 8.539,
+  "voteCount": 1824,
+  "popularity": 140.3514,
+  "genreIds": [
+   16,
+   10751,
+   10765,
+   35
+  ],
+  "status": "Ended",
+  "genres": [
+   {
+    "id": 16,
+    "name": "Animaţie"
+   },
+   {
+    "id": 10751,
+    "name": "Familie"
+   },
+   {
+    "id": 10765,
+    "name": "SF & Fantasy"
+   },
+   {
+    "id": 35,
+    "name": "Comedie"
+   }
+  ],
+  "keywords": [
+   {
+    "id": 15284,
+    "name": "cartoon cat"
+   },
+   {
+    "id": 297139,
+    "name": "absurdist humor"
+   },
+   {
+    "id": 325844,
+    "name": "ridiculous"
+   }
+  ],
+  "cast": [
+   {
+    "id": 1696351,
+    "name": "Nicolas Cantu",
+    "role": "Gumball Watterson (voice)",
+    "profilePath": "/ySFxLOQ9ejiZddviRVf9bhZvDsf.jpg"
+   },
+   {
+    "id": 1254162,
+    "name": "Kyla Kowalewski",
+    "role": "Anais Watterson (voice)",
+    "profilePath": "/7MOdiZv7gv1tkI6Aac08rxZGLOQ.jpg"
+   },
+   {
+    "id": 1722640,
+    "name": "Donielle T. Hansley Jr.",
+    "role": "Darwin Watterson (voice)",
+    "profilePath": "/yZVAuQjltznepyoLAGGxW89BLhF.jpg"
+   },
+   {
+    "id": 1983013,
+    "name": "Christian J. Simon",
+    "role": "Darwin Watterson (voice)",
+    "profilePath": "/e9lHgP8xbCP9VOZPC5nonnypIpa.jpg"
+   },
+   {
+    "id": 340927,
+    "name": "Teresa Gallagher",
+    "role": "Nicole Watterson / Penny Fitzgerald / Teri / Mrs. Robinson (voice)",
+    "profilePath": "/2oHiEkrPfgbfKllBFDAhZK4v1Of.jpg"
+   }
+  ],
+  "crew": [
+   {
+    "id": 1254165,
+    "name": "Ben Bocquelet",
+    "role": "Creator",
+    "profilePath": "/hdIZNgPkg50PhhHVvsefQa4lEI.jpg"
+   },
+   {
+    "id": 2279899,
+    "name": "Mic Graves",
+    "role": "Director",
+    "profilePath": "/6labj7ByABk2lTzUoKhnHklhffo.jpg"
+   },
+   {
+    "id": 1254165,
+    "name": "Ben Bocquelet",
+    "role": "Creator",
+    "profilePath": "/hdIZNgPkg50PhhHVvsefQa4lEI.jpg"
+   }
+  ],
+  "collectionId": null,
+  "numberOfSeasons": 6,
+  "numberOfEpisodes": 240,
+  "externalIds": {
+   "imdb_id": "tt1942683",
+   "freebase_mid": "/m/0gg8sxr",
+   "freebase_id": null,
+   "tvdb_id": 248482,
+   "tvrage_id": null,
+   "wikidata_id": "Q906186",
+   "facebook_id": "TheAmazingWorldofGumball",
+   "instagram_id": null,
+   "twitter_id": null
+  },
+  "videos": [],
+  "logoPath": "/z9H6YKN2JqpAhawuRXOA7LOcqTS.png",
+  "certification": "Unrated",
+  "ratings": {
+   "US": "TV-Y7",
+   "FR": "NR",
+   "KR": "ALL",
+   "GB": "PG",
+   "BR": "L",
+   "ES": "TP",
+   "SG": "PG",
+   "IT": "VM14",
+   "MY": "U",
+   "PT": "NR",
+   "PH": "G",
+   "CA": "G",
+   "AU": "G",
+   "MX": "AA",
+   "DE": "6",
+   "TR": "Genel İzleyici",
+   "NL": "6",
+   "AT": "6",
+   "PL": "12",
+   "HU": "Unrated",
+   "CZ": "7+",
+   "RO": "Unrated",
+   "TH": "ท",
+   "FI": "S",
+   "SE": "Från 7 år",
+   "IE": "PG",
+   "BG": "12"
+  },
+  "age": 7,
+  "seasons": [
+   {
+    "seasonNumber": 0,
+    "name": "Speciale",
+    "episodeCount": 14,
+    "airDate": "2008-05-09",
+    "posterPath": "/pS6YjMgyMTHP4PrhaM1ooQvpz2B.jpg"
+   },
+   {
+    "seasonNumber": 1,
+    "name": "Sezonul 1",
+    "episodeCount": 36,
+    "airDate": "2011-05-03",
+    "posterPath": "/1fqBQ41SND38bOLCYSi9BxpJbxs.jpg"
+   },
+   {
+    "seasonNumber": 2,
+    "name": "Sezonul 2",
+    "episodeCount": 40,
+    "airDate": "2012-08-07",
+    "posterPath": "/xXEt3fYfcESN80r6JqIz3zr1tGL.jpg"
+   },
+   {
+    "seasonNumber": 3,
+    "name": "Sezonul 3",
+    "episodeCount": 40,
+    "airDate": "2014-06-05",
+    "posterPath": "/tLO2Q9gleONk58g9pY0fq4jWWMA.jpg"
+   },
+   {
+    "seasonNumber": 4,
+    "name": "Sezonul 4",
+    "episodeCount": 40,
+    "airDate": "2015-07-07",
+    "posterPath": "/6l1oPzAGihlM4ZZN2qSwO2mN7zF.jpg"
+   },
+   {
+    "seasonNumber": 5,
+    "name": "Sezonul 5",
+    "episodeCount": 40,
+    "airDate": "2016-09-01",
+    "posterPath": "/jKRb9MqecrNMCvtwEHlLtyY9MHS.jpg"
+   },
+   {
+    "seasonNumber": 6,
+    "name": "Sezonul 6",
+    "episodeCount": 44,
+    "airDate": "2018-01-05",
+    "posterPath": "/1gnO9DUNmCLnHj5jRL8LeX1pc7V.jpg"
+   }
+  ],
+  "recommendations": [
+   {
+    "kind": "tv",
+    "tmdbId": 291904,
+    "title": "Năstrușnica lume a lui Gumball",
+    "originalTitle": "The Wonderfully Weird World of Gumball",
+    "overview": "Bine ați revenit în Elmore, locul unde legile realității sunt o glumă, iar viața de familie e orice, numai normală nu! Fie că se luptă cu un imperiu malefic de fast-food, se confruntă cu o inteligență artificială îndrăgostită de mama lui sau încearcă să-l oprească pe Banana Joe să poarte pantaloni, Gumball Watterson își târăște fratele Darwin, sora Anais și restul orașului Elmore într-o avalanșă de aventuri nebune.\n\nCu povești și mai trăsnite, întorsături și mai mari și un umor complet ireal, acest show e atât de uimitor încât au fost nevoiți să-i schimbe numele!",
+    "posterPath": "/f1uzzES1MFR33G92YNcH1YC4abY.jpg",
+    "backdropPath": "/xkhniKa1PGj78h3T9xDuV9jG8ZB.jpg",
+    "releaseDate": "2025-10-06",
+    "voteAverage": 8.6,
+    "voteCount": 114,
+    "popularity": 15.0042,
+    "genreIds": [
+     16,
+     10751,
+     35,
+     10765
+    ]
+   },
+   {
+    "kind": "tv",
+    "tmdbId": 126824,
+    "title": "The Patrick Star Show",
+    "originalTitle": "The Patrick Star Show",
+    "overview": "Follow a younger Patrick Star living at home with his family, where he hosts his own variety show for the neighborhood from his television-turned-bedroom.",
+    "posterPath": "/44zbV1t35gxgcSN7sTlkUY85GC9.jpg",
+    "backdropPath": "/kP7pCxfml6erWC9aB72ALtNawJq.jpg",
+    "releaseDate": "2021-07-09",
+    "voteAverage": 5.839,
+    "voteCount": 56,
+    "popularity": 46.1188,
+    "genreIds": [
+     10751,
+     35,
+     16,
+     10765
+    ]
+   },
+   {
+    "kind": "tv",
+    "tmdbId": 504,
+    "title": "REN ŞI STIMPY",
+    "originalTitle": "The Ren & Stimpy Show",
+    "overview": "Ren and Stimpy are a mismatch made in animation heaven with nothing in common but a life-long friendship and an incredible knack for getting into trouble. Join them in their bizarre and gross world for some outlandish situations coupled with hilarious jokes.",
+    "posterPath": "/u4YZhMms48mgP756hniUcw6PQPU.jpg",
+    "backdropPath": "/c8m4NAE774Vsn5AZvn2bFarUtDX.jpg",
+    "releaseDate": "1991-08-11",
+    "voteAverage": 7.6,
+    "voteCount": 544,
+    "popularity": 22.5814,
+    "genreIds": [
+     16,
+     10765,
+     35,
+     10751
+    ]
+   }
+  ],
+  "similar": [
+   {
+    "kind": "tv",
+    "tmdbId": 504,
+    "title": "REN ŞI STIMPY",
+    "originalTitle": "The Ren & Stimpy Show",
+    "posterPath": "/u4YZhMms48mgP756hniUcw6PQPU.jpg",
+    "backdropPath": "/c8m4NAE774Vsn5AZvn2bFarUtDX.jpg",
+    "releaseDate": "1991-08-11",
+    "voteAverage": 7.6,
+    "voteCount": 544,
+    "popularity": 22.5814,
+    "genreIds": [
+     16,
+     10765,
+     35,
+     10751
+    ]
+   },
+   {
+    "kind": "tv",
+    "tmdbId": 676,
+    "title": "Tom and Jerry Tales",
+    "originalTitle": "Tom and Jerry Tales",
+    "posterPath": "/xUASqzq5b3xAeI7iwjtE7pcvx5F.jpg",
+    "backdropPath": "/e7gXqszTL2hWhTOkGA1HIJFnSZ0.jpg",
+    "releaseDate": "2006-09-23",
+    "voteAverage": 7.797,
+    "voteCount": 155,
+    "popularity": 17.2596,
+    "genreIds": [
+     16,
+     10762,
+     35,
+     10751
+    ]
+   },
+   {
+    "kind": "tv",
+    "tmdbId": 1567,
+    "title": "CatDog",
+    "originalTitle": "CatDog",
+    "posterPath": "/fkSCg9negcHAVO3gXohqEidqrsX.jpg",
+    "backdropPath": "/ujmeZPV9A5AdwfTEuRWR1eqOMDR.jpg",
+    "releaseDate": "1998-04-04",
+    "voteAverage": 7.1,
+    "voteCount": 465,
+    "popularity": 29.6265,
+    "genreIds": [
+     16,
+     35,
+     10762
+    ]
+   }
+  ],
+  "watchProviders": {}
+ },
+ "availability": {
+  "offers": [
+   {
+    "providerId": 8,
+    "name": "Netflix",
+    "logo": "/rK1KljqmbvO9HQa1PBFLILWah72.png",
+    "type": "subscription",
+    "launch": {
+     "web": "https://www.netflix.com/search?q=Uimitoarea%20lume%20a%20lui%20Gumball",
+     "search": "https://www.netflix.com/search?q=Uimitoarea%20lume%20a%20lui%20Gumball",
+     "android": {
+      "package": "com.netflix.ninja",
+      "uri": "https://www.netflix.com/search?q=Uimitoarea%20lume%20a%20lui%20Gumball"
+     },
+     "tizen": {
+      "appId": "3201907018807"
+     }
+    }
+   },
+   {
+    "providerId": 1899,
+    "name": "HBO Max",
+    "logo": "/skypuy7SXuugIQeYg0IglmzoKaS.png",
+    "type": "subscription",
+    "launch": {
+     "web": "https://play.max.com/search?q=Uimitoarea%20lume%20a%20lui%20Gumball",
+     "search": "https://play.max.com/search?q=Uimitoarea%20lume%20a%20lui%20Gumball",
+     "android": {
+      "package": "com.wbd.stream"
+     },
+     "tizen": {
+      "appId": "3202301029760"
+     }
+    }
+   }
+  ],
+  "source": "tmdb",
+  "attribution": [
+   "JustWatch"
+  ],
+  "fetchedAt": 1793861137556
+ },
+ "files": [
+  {
+   "serverFileId": "f19vxnjm",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 1,
+   "path": "/media/library/file.mkv",
+   "size": 619238887,
+   "mtime": 1766447620831,
+   "updatedAt": 1789740990051,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  },
+  {
+   "serverFileId": "f4rszfk",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 2,
+   "path": "/media/library/file.mkv",
+   "size": 574200710,
+   "mtime": 1766447529720,
+   "updatedAt": 1789740990052,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  },
+  {
+   "serverFileId": "fdj9kxe",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 3,
+   "path": "/media/library/file.mkv",
+   "size": 575058913,
+   "mtime": 1766447619674,
+   "updatedAt": 1789740990052,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  },
+  {
+   "serverFileId": "f1iiqx9j",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 4,
+   "path": "/media/library/file.mkv",
+   "size": 572836984,
+   "mtime": 1766447551666,
+   "updatedAt": 1789740990052,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  },
+  {
+   "serverFileId": "fyj77x7",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 5,
+   "path": "/media/library/file.mkv",
+   "size": 604069289,
+   "mtime": 1766447549741,
+   "updatedAt": 1789740990052,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  },
+  {
+   "serverFileId": "f9zuuwu",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 6,
+   "path": "/media/library/file.mkv",
+   "size": 598926772,
+   "mtime": 1766447556606,
+   "updatedAt": 1789740990052,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  },
+  {
+   "serverFileId": "f11ywct7",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 7,
+   "path": "/media/library/file.mkv",
+   "size": 598378942,
+   "mtime": 1766447571226,
+   "updatedAt": 1789740990052,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  },
+  {
+   "serverFileId": "f6ch12h",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 8,
+   "path": "/media/library/file.mkv",
+   "size": 583862149,
+   "mtime": 1766447570870,
+   "updatedAt": 1789740990053,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  },
+  {
+   "serverFileId": "f1b3eme6",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 9,
+   "path": "/media/library/file.mkv",
+   "size": 599049131,
+   "mtime": 1766447577456,
+   "updatedAt": 1789740990053,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  },
+  {
+   "serverFileId": "fack7kg",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 10,
+   "path": "/media/library/file.mkv",
+   "size": 576379707,
+   "mtime": 1766447586291,
+   "updatedAt": 1789740990054,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  },
+  {
+   "serverFileId": "f1184txd",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 11,
+   "path": "/media/library/file.mkv",
+   "size": 583885008,
+   "mtime": 1766447593473,
+   "updatedAt": 1789740990054,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  },
+  {
+   "serverFileId": "f10e1i22",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 12,
+   "path": "/media/library/file.mkv",
+   "size": 578517089,
+   "mtime": 1766447618087,
+   "updatedAt": 1789740990055,
+   "version": {
+    "resolution": "1080p",
+    "hdr": null,
+    "edition": null,
+    "remux": false,
+    "label": "1080p",
+    "rank": 300
+   }
+  }
+ ],
+ "progress": [
+  {
+   "profileId": "default",
+   "kind": "tv",
+   "tmdbId": 37606,
+   "season": 2,
+   "episode": 1,
+   "positionSec": 7.813,
+   "durationSec": 728.48,
+   "completed": false,
+   "updatedAt": 1793861732688,
+   "rev": 19
+  }
+ ],
+ "nextUp": {
+  "season": 2,
+  "episode": 1,
+  "positionSec": 7.813
+ },
+ "inWatchlist": false,
+ "serverId": "srv-test",
+ "serverName": "mmo-server"
+}

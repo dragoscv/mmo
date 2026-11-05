@@ -17,6 +17,7 @@ export default {
                 "extension",
                 "tv-android",
                 "phone-android",
+                "ios",
                 "tv-tizen",
                 "gateway",
                 "ui",

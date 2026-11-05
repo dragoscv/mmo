@@ -1,0 +1,567 @@
+{
+ "region": "RO",
+ "profile": "default",
+ "configured": false,
+ "revision": 25,
+ "libraryEtag": 127,
+ "serverId": "srv-test",
+ "serverName": "mmo-server",
+ "rows": [
+  {
+   "id": "continue",
+   "title": {
+    "ro": "Continuă vizionarea",
+    "en": "Continue watching"
+   },
+   "kind": "mixed",
+   "items": [
+    {
+     "kind": "movie",
+     "tmdbId": 1368492,
+     "title": "The Wolf and the Lamb",
+     "originalTitle": "The Wolf and the Lamb",
+     "posterPath": "/y1ooSWuq4FEaexbu0iAFAyezfcO.jpg",
+     "backdropPath": "/b7SffvCoD0EQpmpR6g0YhUeFpdV.jpg",
+     "releaseDate": "2026-04-24",
+     "voteAverage": 4.9,
+     "voteCount": 9,
+     "popularity": 1.4743,
+     "genreIds": [
+      53,
+      37,
+      27
+     ],
+     "progress": 0.3579624478442281,
+     "age": null
+    }
+   ]
+  },
+  {
+   "id": "new_in_library",
+   "title": {
+    "ro": "Nou în bibliotecă",
+    "en": "New in your library"
+   },
+   "kind": "mixed",
+   "items": [
+    {
+     "kind": "movie",
+     "tmdbId": 1756340,
+     "title": "River",
+     "originalTitle": "River",
+     "posterPath": null,
+     "backdropPath": null,
+     "releaseDate": "2026-09-18",
+     "voteAverage": 0,
+     "voteCount": 0,
+     "popularity": 2.0953,
+     "genreIds": [
+      99
+     ],
+     "inLibrary": true,
+     "age": null
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 1756340,
+     "title": "River",
+     "originalTitle": "River",
+     "posterPath": null,
+     "backdropPath": null,
+     "releaseDate": "2026-09-18",
+     "voteAverage": 0,
+     "voteCount": 0,
+     "popularity": 2.0953,
+     "genreIds": [
+      99
+     ],
+     "inLibrary": true,
+     "age": null
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 392447,
+     "title": "Le Temps de l'avant",
+     "originalTitle": "Le Temps de l'avant",
+     "posterPath": "/3bTo08nwF90UlvmZ4ULav3TDIP6.jpg",
+     "backdropPath": "/hoMtgaKWvrctiLMGDO1icJng2xR.jpg",
+     "releaseDate": "1975-04-11",
+     "voteAverage": 9,
+     "voteCount": 1,
+     "popularity": 1.1911,
+     "genreIds": [
+      18
+     ],
+     "inLibrary": true,
+     "age": null
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 1085629,
+     "title": "QUESTION",
+     "originalTitle": "QUESTION",
+     "posterPath": "/f5lsJJSAcZ11SA2ihr7pEPFt4bx.jpg",
+     "backdropPath": null,
+     "releaseDate": "2004-08-20",
+     "voteAverage": 4.2,
+     "voteCount": 4,
+     "popularity": 0.4822,
+     "genreIds": [
+      18
+     ],
+     "inLibrary": true,
+     "age": null
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 156356,
+     "title": "Kiki",
+     "originalTitle": "Kiki",
+     "posterPath": "/eu8cE5GoYjnZngMR30b0OTv6Fv2.jpg",
+     "backdropPath": "/tGAOIaxcBf2OieuiyJnwCdO6ncA.jpg",
+     "releaseDate": "1931-03-14",
+     "voteAverage": 5.2,
+     "voteCount": 6,
+     "popularity": 3.0188,
+     "genreIds": [
+      10402
+     ],
+     "inLibrary": true,
+     "age": null
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 1398050,
+     "title": "Școala de șoferi",
+     "originalTitle": "Driver's Ed",
+     "overview": "Jeremy, un elev de liceu, plănuiește să rămână cu iubita lui când aceasta pleacă la facultate. Un telefon primit de la iubita amețită de băutură îl face să creadă că vrea să se despartă de el. Împreună cu trei colegi, el fură mașina de școală de șoferi și pleacă spre Chapel Hill să o recucerească. În 24 de ore, sunt vânați de un agent de pază, de infractori și de propriile lor decizii proaste.",
+     "posterPath": "/9vBlvC3fjeRRp1anMHNJ3T9ubtK.jpg",
+     "backdropPath": "/3fs6Encf71ChabAKV6VrnpQRrjV.jpg",
+     "releaseDate": "2026-05-14",
+     "voteAverage": 6.92,
+     "voteCount": 100,
+     "popularity": 3.4867,
+     "genreIds": [
+      35
+     ],
+     "inLibrary": true,
+     "age": 15
+    }
+   ]
+  },
+  {
+   "id": "top_picks",
+   "title": {
+    "ro": "Alese pentru tine",
+    "en": "Top picks for you"
+   },
+   "kind": "mixed",
+   "items": [
+    {
+     "kind": "tv",
+     "tmdbId": 2190,
+     "title": "South Park",
+     "originalTitle": "South Park",
+     "overview": "South Park este un serial de animație al cărui personaje principale sunt Stan, Kyle, Kenny și Cartman, patru copii de clasa a treia, care au o pasiune pentru limbajul obscen. Acțiunea se petrece în South Park, orășelul care dă numele serialului, din statul american Colorado, unde personajele principale, însoțite de multitudinea de personaje secundare au de depășit tot felul de situații bizare și hilare.",
+     "posterPath": "/k7n2EVge7G77eMr3brztRGG1fFU.jpg",
+     "backdropPath": "/3UviYOlhn8EgXMBuiT6MnUuo1w9.jpg",
+     "releaseDate": "1997-08-13",
+     "voteAverage": 8.332,
+     "voteCount": 5250,
+     "popularity": 202.8559,
+     "genreIds": [
+      35,
+      16
+     ]
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 795522,
+     "title": "The Spine of Night",
+     "originalTitle": "The Spine of Night",
+     "overview": "When ancient dark magic falls into sinister hands and unleashes ages of suffering onto mankind, a group of heroes from different eras and cultures must band together in order to defeat it at all costs.",
+     "posterPath": "/9uERhKRCtgDztLsx5Pg36j61rqC.jpg",
+     "backdropPath": "/hqS6WKgGBKZITXLCiBBIBfxvE2J.jpg",
+     "releaseDate": "2021-10-29",
+     "voteAverage": 5.986,
+     "voteCount": 105,
+     "popularity": 2.4124,
+     "genreIds": [
+      16,
+      14,
+      28,
+      27
+     ]
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 755,
+     "title": "De la apusul la răsăritul soarelui",
+     "originalTitle": "From Dusk Till Dawn",
+     "overview": "Doi frați periculoși, aflați în afara legii, pornesc o serie sălbatică de infracțiuni. Când aceștia se duc într-un bar mexican pentru a fi în siguranță, se întâlnesc cu un grup de vampiri.",
+     "posterPath": "/cA6l9t3RavCSkLMuAJfp5u51GT2.jpg",
+     "backdropPath": "/phiRQhfwZZeMMn3osvQUmGYmJbp.jpg",
+     "releaseDate": "1996-01-19",
+     "voteAverage": 7.053,
+     "voteCount": 6793,
+     "popularity": 11.1642,
+     "genreIds": [
+      28,
+      27,
+      80
+     ]
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 10072,
+     "title": "Un coșmar pe strada Elm 3: Războinicii viselor",
+     "originalTitle": "A Nightmare on Elm Street 3: Dream Warriors",
+     "overview": "A psychiatrist, familiar with the knife-wielding dream demon Freddy Krueger, helps teens at a mental hospital battle the killer who is invading their dreams.",
+     "posterPath": "/qbtZewU6EGvxi8yFVzwZ31NijLX.jpg",
+     "backdropPath": "/euXJlfeYSyrdkOoFQ9gtUG8OOhH.jpg",
+     "releaseDate": "1987-02-27",
+     "voteAverage": 6.728,
+     "voteCount": 2159,
+     "popularity": 4.8097,
+     "genreIds": [
+      27,
+      53,
+      14
+     ]
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 11880,
+     "title": "Soldați contra câinilor nopții",
+     "originalTitle": "Dog Soldiers",
+     "overview": "A band of soldiers is dispatched to war games deep in the woods. When they stumble across a rival team slaughtered in camp, they realize they're not alone.",
+     "posterPath": "/fYHUYWglzq8Ax0EaDWqg9emjL7T.jpg",
+     "backdropPath": "/bZVVaZK4ig2CMwbMcBfkqwK5mQU.jpg",
+     "releaseDate": "2002-05-10",
+     "voteAverage": 6.717,
+     "voteCount": 1070,
+     "popularity": 4.4853,
+     "genreIds": [
+      27,
+      28,
+      53
+     ]
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 1339713,
+     "title": "Obsesia",
+     "originalTitle": "Obsession",
+     "overview": "După ce rupe o crenguță din misterioasa „Salcie a unei singure dorințe” ca să cucerească inima fetei pe care o place, un romantic incurabil obține exact ce și-a dorit. Curând însă descoperă că unele dorințe vin cu un preț sumbru și sinistru.",
+     "posterPath": "/44NsHXJT05dDJAIc5D6G7nfoOTz.jpg",
+     "backdropPath": "/5lTZyuBTNOfawsfPT8Q0cIg6qAF.jpg",
+     "releaseDate": "2026-05-13",
+     "voteAverage": 8.17,
+     "voteCount": 6512,
+     "popularity": 102.5259,
+     "genreIds": [
+      27,
+      53
+     ]
+    }
+   ],
+   "reason": "profile"
+  },
+  {
+   "id": "because_you_watched:460885",
+   "title": {
+    "ro": "Pentru că ai văzut Mandy",
+    "en": "Because you watched Mandy"
+   },
+   "kind": "movie",
+   "items": [
+    {
+     "kind": "movie",
+     "tmdbId": 9871,
+     "title": "Transformare",
+     "originalTitle": "Ginger Snaps",
+     "overview": "Două surori, Ginger și Brigitte, obsesionate de moarte și outsideri în orașul lor, duc o viață retrasă până când, într-o noapte, Ginger este atacată de o creatură misterioasă. Deși pare să se vindece rapid, schimbările încep să apară – devine agresivă, impulsivă și dezvoltă trăsături animalice. Pe măsură ce luna plină se apropie, Brigitte luptă să găsească un leac înainte ca sora ei să se transforme definitiv într-un monstru.",
+     "posterPath": "/4NmAtQdttqG4d1jyIK3vJvuyMov.jpg",
+     "backdropPath": "/7GAgYVK29A4NADWhPbqC9c44X7P.jpg",
+     "releaseDate": "2000-12-11",
+     "voteAverage": 6.941,
+     "voteCount": 1063,
+     "popularity": 5.7069,
+     "genreIds": [
+      27,
+      14
+     ],
+     "age": 18
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 9495,
+     "title": "Corbul",
+     "originalTitle": "The Crow",
+     "overview": "Eric Draven, un muzician ucis împreună cu logodnica sa în noaptea dinaintea Halloween-ului, revine din morți un an mai târziu. Înzestrat cu puteri supranaturale și călăuzit de un corb misterios, pornește prin orașul întunecat pentru a se răzbuna pe cei vinovați de moartea lor.",
+     "posterPath": "/rMMB3v6jYHjsvXRNJYESacoTD7j.jpg",
+     "backdropPath": "/2VN9umruwVZsT1Pr1NMCV71HpUu.jpg",
+     "releaseDate": "1994-05-11",
+     "voteAverage": 7.534,
+     "voteCount": 4756,
+     "popularity": 34.2565,
+     "genreIds": [
+      14,
+      28,
+      53
+     ],
+     "age": 17
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 9945,
+     "title": "Vampirii",
+     "originalTitle": "Vampires",
+     "overview": "Biserica înrolează o echipă de vânători de vampiri pentru a vâna și a distruge un grup de vampiri care caută o relicvă străveche care să le permită să existe în lumina soarelui.",
+     "posterPath": "/4JhaFBPwyC5IM1rKaRR07Gzutse.jpg",
+     "backdropPath": "/uzlGbsQkpK6C3ZiqRqKw9CwK0Do.jpg",
+     "releaseDate": "1998-10-30",
+     "voteAverage": 6.3,
+     "voteCount": 1436,
+     "popularity": 5.3132,
+     "genreIds": [
+      28,
+      14,
+      27
+     ],
+     "age": 17
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 28148,
+     "title": "Ninja III: The Domination",
+     "originalTitle": "Ninja III: The Domination",
+     "overview": "An aerobics instructor becomes a ruthless assassin after being possessed by a slain ninja's spirit, leading to a showdown with a martial arts expert.",
+     "posterPath": "/6uUMJelRS3CGFehLyspQOS1R4z6.jpg",
+     "backdropPath": "/hwGnb39LPVkZH5ySosyeeU5T1Va.jpg",
+     "releaseDate": "1984-09-14",
+     "voteAverage": 6.216,
+     "voteCount": 160,
+     "popularity": 3.027,
+     "genreIds": [
+      28,
+      14,
+      27,
+      53
+     ],
+     "age": 17
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 285923,
+     "title": "Planeta terorii",
+     "originalTitle": "Grindhouse",
+     "overview": "Quentin Tarantino și Robert Rodriquez șocheaza din nou cu acest omagiu adus thriller-elor de categorie B, pline de sex și violență, proiectate de obicei în cinematografe specializate denumite \"grind houses\". Filmul e compus din două lungmetraje: Death Proof (Tarantino), cu un psihopat poreclit Cascadorul Mike (Kurt Russell), care răpește și ucide femei frumoase făcând cascadorii cu mașina, și Planet Terror (Rodriguez), despre o femeie (Rose McGowan) cu o armă automată în loc de un picior, care luptă alături de partenerul ei specialist în arte marțiale (Freddy Rodriguez) împotriva unei armate de zombie. Cele două filme sunt despărțite de un calup de false trailer-e, semnate de Eli Roth, Edgar Wright și Rob Zombie.",
+     "posterPath": "/tvMBwJlmQTIQf5EBjHzzyE9tjcN.jpg",
+     "backdropPath": "/gRd7O8TRijlJK81ONZSEZfV4Ubn.jpg",
+     "releaseDate": "2007-04-06",
+     "voteAverage": 7.008,
+     "voteCount": 1975,
+     "popularity": 4.8576,
+     "genreIds": [
+      53,
+      28,
+      27
+     ],
+     "age": 17
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 19384,
+     "title": "Dark Angel",
+     "originalTitle": "Dark Angel",
+     "overview": "Jack Caine is a Houston vice cop who's forgotten the rule book. His self-appointed mission is to stop the drugs trade and the number one supplier Victor Manning. While involved in an undercover operation to entrap Victor Manning, his partner is killed, and a sinister newcomer enters the scene...",
+     "posterPath": "/zwsesgAluQKDmdAA2nhlEc4FhFd.jpg",
+     "backdropPath": "/3a3Ch56Y7n8ouiAXPdFDmVLnvWz.jpg",
+     "releaseDate": "1990-01-26",
+     "voteAverage": 6.155,
+     "voteCount": 412,
+     "popularity": 5.0841,
+     "genreIds": [
+      28,
+      53,
+      878,
+      27
+     ]
+    }
+   ],
+   "reason": "seed:movie:460885"
+  },
+  {
+   "id": "trending_on_your_providers",
+   "title": {
+    "ro": "În trend în RO",
+    "en": "Trending in RO"
+   },
+   "kind": "mixed",
+   "items": [
+    {
+     "kind": "movie",
+     "tmdbId": 1423191,
+     "title": "Resident Evil",
+     "originalTitle": "Resident Evil",
+     "overview": "Povestea urmărește un curier ghinionist însărcinat să livreze un colet la un spital izolat. În scurt timp, acesta se trezește prins în mijlocul unei epidemii și trebuie să se lupte cu hoarde de creaturi mutante pentru a supraviețui.",
+     "posterPath": "/6KqJQsSzZInsVAI7qqbflViJR7n.jpg",
+     "backdropPath": "/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
+     "releaseDate": "2026-09-16",
+     "voteAverage": 7.46,
+     "voteCount": 1579,
+     "popularity": 406.627,
+     "genreIds": [
+      27,
+      878,
+      12
+     ],
+     "age": 15
+    },
+    {
+     "kind": "tv",
+     "tmdbId": 289517,
+     "title": "Job infernal",
+     "originalTitle": "꿀알바",
+     "overview": "Înglodat în datorii, un tânăr acceptă slujbe part-time profitabile de la o agenție misterioasă, însă descoperă că goana după bani devine un coșmar.",
+     "posterPath": "/yyA9CI8BLNg6LtVRvmVxki4xiGb.jpg",
+     "backdropPath": "/gWedDgBsZkuOho2qe3q2sTQmbpO.jpg",
+     "releaseDate": "2026-10-30",
+     "voteAverage": 7.7,
+     "voteCount": 46,
+     "popularity": 146.56,
+     "genreIds": [
+      9648
+     ]
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 1375441,
+     "title": "Primetime",
+     "originalTitle": "Primetime",
+     "overview": "Un jurnalist investighează și demască lumea interlopă, ceea ce duce la o schimbare majoră în domeniul televiziunii.",
+     "posterPath": "/c3OZ9HxXIRO9tafXJJEDfwEUaft.jpg",
+     "backdropPath": "/sEsMwSDUWGIx9EfNxzM6KzVSsSQ.jpg",
+     "releaseDate": "2026-09-23",
+     "voteAverage": 6.8,
+     "voteCount": 310,
+     "popularity": 117.3017,
+     "genreIds": [
+      53,
+      18
+     ]
+    },
+    {
+     "kind": "tv",
+     "tmdbId": 213375,
+     "title": "VisionQuest",
+     "originalTitle": "VisionQuest",
+     "overview": "Vision, reactivat și scăpat din mâinile celor care voiau să-l transforme într-o armă, trăiește ascuns. În căutarea unui sens nou, el consultă personalitățile AI integrate în programarea sa: Friday, Edith, Jarvis și temutul Ultron. Liniștea îi este spulberată când o recompensă pusă pe capul lui îl obligă să fugă alături de Thomas Shepherd, un băiat misterios care ar putea fi reîncarnarea fiului lui Vision. În timp ce încearcă să scape de urmăritori, Vision trebuie să-și înfrunte propria natură, să reziste influenței lui Ultron și să dezlege misterul tânărului său însoțitor pentru a supraviețui.",
+     "posterPath": "/WGyAyBPncfuu8MZhLY9RtfZPM0.jpg",
+     "backdropPath": "/31o1Ufd7bStD5dGEcpzapOjwaqx.jpg",
+     "releaseDate": "2026-10-13",
+     "voteAverage": 8.7,
+     "voteCount": 261,
+     "popularity": 288.1133,
+     "genreIds": [
+      10765,
+      18
+     ],
+     "age": 14
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 1507696,
+     "title": "Apocalipsa Z: O lume nouă",
+     "originalTitle": "Apocalipsis Z: Nuevo mundo",
+     "overview": "În urma izbucnirii epidemiei cu virusul TSJ, Insulele Canare au devenit ultimul refugiu al Europei. Când o echipă pornește după provizii la Madrid, Roberto se alătură grupului, cu intenții îndoielnice. Înconjurați de infectați și măcinați de loialități împărțite, cei din echipă luptă pentru supraviețuire, având și o dilemă morală: să se salveze sau să riște tot pentru ce a rămas din umanitate.",
+     "posterPath": "/c5LakPnLfzydW4YFUKfPeiODiWu.jpg",
+     "backdropPath": "/o3XwuDUj0n8qnK91p6q8LKfr6rj.jpg",
+     "releaseDate": "2026-10-09",
+     "voteAverage": 6.074,
+     "voteCount": 115,
+     "popularity": 373.8924,
+     "genreIds": [
+      28,
+      53,
+      27
+     ],
+     "age": 17
+    },
+    {
+     "kind": "tv",
+     "tmdbId": 279246,
+     "title": "재혼 황후",
+     "originalTitle": "재혼 황후",
+     "posterPath": "/9mVhSAIZERTDw7dWbbGuJegCDjl.jpg",
+     "backdropPath": "/1ptukf8gx19U1HcBv3aRzzlXuyJ.jpg",
+     "releaseDate": "2026-11-03",
+     "voteAverage": 8.571,
+     "voteCount": 7,
+     "popularity": 109.3984,
+     "genreIds": [
+      18,
+      10765
+     ]
+    }
+   ]
+  },
+  {
+   "id": "upcoming",
+   "title": {
+    "ro": "În curând",
+    "en": "Coming soon"
+   },
+   "kind": "mixed",
+   "items": [
+    {
+     "kind": "movie",
+     "tmdbId": 1765072,
+     "title": "Poți Vedea Totul",
+     "originalTitle": "You Can See Everything",
+     "overview": "Cu treizeci și patru de zile înainte de a fi trimisă la închisoare, Elizabeth Holmes – celebra fondatoare din Silicon Valley – invită o echipă de filmare sceptică să-i documenteze fiecare mișcare. Ceea ce începe ca un portret intim al unei infractoare enigmatice se transformă într-o călătorie uluitoare, întinsă pe durata a trei ani, înspre abis.",
+     "posterPath": "/Ap8QwmKfSjYbWC4XIP8w9pdn72O.jpg",
+     "backdropPath": "/nhIL3O4W9h5V5JbNQm7yjoDk3So.jpg",
+     "releaseDate": "2026-11-24",
+     "voteAverage": 8.9,
+     "voteCount": 88,
+     "popularity": 69.4693,
+     "genreIds": [
+      99
+     ]
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 1728593,
+     "title": "Nu e locul tau aici",
+     "originalTitle": "Nu e locul tau aici",
+     "posterPath": "/pXPEYMCjuzxyjlyREE1I5uksA7r.jpg",
+     "backdropPath": "/zlTNrh3JMKFTOumP6bdIVHD2Fk3.jpg",
+     "releaseDate": "2026-11-27",
+     "voteAverage": 0,
+     "voteCount": 0,
+     "popularity": 2.6922,
+     "genreIds": [
+      18
+     ]
+    },
+    {
+     "kind": "movie",
+     "tmdbId": 1773633,
+     "title": "Nimic mai mult și nimic diferit",
+     "originalTitle": "Nimic mai mult și nimic diferit",
+     "posterPath": "/vw61A3cFLZes0A79sMOU6ES0zFb.jpg",
+     "backdropPath": null,
+     "releaseDate": "2026-11-13",
+     "voteAverage": 0,
+     "voteCount": 0,
+     "popularity": 1.0911,
+     "genreIds": [
+      18
+     ]
+    }
+   ]
+  }
+ ]
+}

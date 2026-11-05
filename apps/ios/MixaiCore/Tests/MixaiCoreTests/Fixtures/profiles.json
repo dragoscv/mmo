@@ -1,0 +1,18 @@
+{
+ "revision": 0,
+ "profiles": [
+  {
+   "id": "default",
+   "name": "Principal",
+   "avatar": null,
+   "color": null,
+   "kind": "adult",
+   "maxAge": null,
+   "hasPin": false,
+   "prefs": {},
+   "sort": 0,
+   "createdAt": 1793824098726,
+   "updatedAt": 1793824098726
+  }
+ ]
+}

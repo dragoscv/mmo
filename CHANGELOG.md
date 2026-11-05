@@ -10,6 +10,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-05 — MixAI for iPhone, slice 1 (iOS 1.0.0, design-tokens 1.2.0)
+
+- **iOS app (`apps/ios`, WP16-47)**: native SwiftUI app, bundle `ro.mixai.app`, iOS 26, Swift 6. Onboarding (Bonjour discovery,
+  manual address, Quick Connect code, MixAI account device-code sign-in), profile picker + PIN pad, cinematic Home (SWR disk
+  cache), Title (versions, seasons/episodes, cast, where to watch, more like this), AVPlayer player on the server HLS remux
+  (resume via `?start=`, audio tracks via `audio=`, WebVTT subtitles, speed, sleep timer, skip intro, PiP, AirPlay, Now Playing),
+  Search, Library, Music with synced lyrics and background audio, Live TV with a first-use legal notice, Settings. EN + RO.
+- **MixaiCore**: client layer ported from tv-android `:core` with Swift Testing (SyncMath vectors shared with Kotlin/TS, SWR
+  cache, pairing state machine, URL building, decoding of real 3.8.1 server responses).
+- **Build**: `scripts/ios-build.ps1` (test | build | devipa | upload on the devcloud Mac, committed tree only) +
+  `apps/ios/scripts/build.sh`; App ID `ro.mixai.app` registered with Sign in with Apple, Associated Domains and App Groups.
+- **design-tokens 1.2.0**: new `Tokens.swift` mirror (`apps/ios/MixAI/Theme/Tokens.swift`), guarded by `tokens-drift`.
+
 ## 2026-11-05 — /media a11y fix + cloud e2e harness runs end to end (Web 3.0.3)
 
 - **Web 3.0.3**: the active `/media` nav pill in light mode now meets WCAG AA (white label on the accent was
