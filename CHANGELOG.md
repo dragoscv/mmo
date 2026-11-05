@@ -10,6 +10,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-05 — Web for phones (Web 3.1.0)
+
+- **Sign in with Apple on the web** (Auth.js Apple provider, Services ID `ro.mixai.web`, key `F2YDTZV29A`): the
+  6-month client-secret JWT is minted at boot from the key in Secret Manager (`scripts/apple-client-secret.mjs`
+  builds one by hand). Google and Apple link to an existing account by **verified** email only; GitHub never does.
+  The login page shows the Apple button when the provider is configured. Setup: `docs/followups/apple-siwa-setup.md`.
+- **Native token exchange**: `POST /api/auth/native/apple` (identity token checked against Apple's JWKS, aud
+  `ro.mixai.app`, SHA-256 nonce; optional `authorizationCode` → refresh token kept for revocation) and
+  `POST /api/auth/native/google` (Credential Manager ID token, aud = web + Android client ids). Both mint the same
+  30-day Auth.js session as `/api/device/token`; native apps send it as `Authorization: Bearer`.
+- **Account deletion** (App Store 5.1.1(v), Google Play): public page `/account/delete` (RO/EN, typed `DELETE`
+  confirmation when signed in; app / sign-in / `support@mixai.ro` instructions when signed out), `DELETE /api/account`
+  for the apps, and the existing settings action now runs the same routine: Sign in with Apple tokens revoked,
+  Stripe customer deleted, rows without a cascade removed (MCP audit log, private training datasets / LoRAs,
+  verification tokens), then the user row with everything that cascades from it.
+- **Push relay**: `POST /api/push/relay` (MMO Server device token, dedupe on `eventId`, contract in
+  `server/README.md` § Push relay) fans out to the owner's phones via FCM HTTP v1 and APNs token auth (HTTP/2);
+  dead tokens (UNREGISTERED / 410) are deleted. Phones register with `POST|DELETE /api/push/register`. New tables
+  `push_tokens` + `push_relay_events` in migration `0031_push_tokens.sql` — **not applied to production yet**; until
+  it is, the push routes answer `503 push_unavailable` and everything else works.
+- **App links**: `/.well-known/apple-app-site-association` (`S6D533QSV2.ro.mixai.app`: `/media/*`, `/together/*`,
+  `/activate`) and `/.well-known/assetlinks.json` (release SHA-256 placeholder until Play App Signing), served as
+  `application/json`.
+- Deploy script mounts the new optional secrets (`mixai-web-apple-*`, `mixai-web-apns-*`, `mixai-web-fcm-sa`) only
+  when they exist; each feature is off without its env.
+
 ## 2026-11-05 — TV Android design pass (TV Android 2.1.0)
 
 - **Own library first on Home** (D25): rows are ordered Continue → My list → New in your library → recommendations

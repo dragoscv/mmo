@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { appleWebEnabled, auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { LoginPageClient } from "./login-client";
 
@@ -19,5 +19,5 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         redirect(callbackUrl);
     }
 
-    return <LoginPageClient callbackUrl={callbackUrl} />;
+    return <LoginPageClient callbackUrl={callbackUrl} appleEnabled={appleWebEnabled} />;
 }

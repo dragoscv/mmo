@@ -1,0 +1,45 @@
+{
+    "signIn": {
+        "apple": "Conectează-te cu Apple",
+        "or": "sau"
+    },
+    "delete": {
+        "metaTitle": "Șterge contul MixAI",
+        "metaDescription": "Cum îți ștergi definitiv contul MixAI și datele asociate.",
+        "title": "Șterge contul MixAI",
+        "intro": "Îți poți șterge contul oricând, din aplicație sau din această pagină. Ștergerea este definitivă și nu poate fi anulată.",
+        "whatTitle": "Ce se șterge",
+        "what": {
+            "account": "Contul, metodele de autentificare și toate sesiunile active (televizoare, telefoane, browsere)",
+            "devices": "Serverele MMO asociate, tokenurile de dispozitiv, înregistrările pentru notificări",
+            "media": "Profilurile de vizionare, istoricul, notele, colecțiile, playlisturile, istoricul de ascultare și metadatele bibliotecii sincronizate în cloud",
+            "ai": "Conexiunile și cheile AI, audio generat, proiectele și setările salvate",
+            "billing": "Clientul Stripe (un abonament activ este anulat)",
+            "apple": "Autentificarea cu Apple: revocăm accesul MixAI la Apple ID-ul tău"
+        },
+        "keepTitle": "Ce nu este afectat",
+        "keep": "Fișierele de pe calculatorul sau serverul MMO propriu rămân unde sunt — MixAI nu îți încarcă biblioteca media. Facturile pe care legea ne obligă să le păstrăm rămân pe durata legală, fără legătură cu un cont activ.",
+        "timing": "Ștergerea are loc imediat. Copiile de siguranță se rotesc în cel mult 30 de zile.",
+        "signedInAs": "Conectat ca {email}",
+        "signedInAsUnknown": "Ești conectat",
+        "confirmLabel": "Scrie {word} pentru confirmare",
+        "confirmHint": "Este ultimul pas. Contul se șterge imediat ce apeși butonul.",
+        "button": "Șterge definitiv contul",
+        "deleting": "Se șterge…",
+        "mismatch": "Scrie exact {word} pentru a continua.",
+        "failed": "Contul nu a putut fi șters ({error}). Încearcă din nou sau scrie-ne.",
+        "doneTitle": "Contul a fost șters",
+        "doneBody": "Toate datele asociate au fost eliminate. Ai fost deconectat din acest browser.",
+        "doneHome": "Înapoi la pagina principală",
+        "signedOutTitle": "Cum îți ștergi contul",
+        "signedOutSteps": {
+            "app": "În aplicația MixAI: Setări → Cont → Șterge contul.",
+            "web": "Pe web: conectează-te mai jos, apoi revino pe această pagină.",
+            "email": "Nu te mai poți conecta? Scrie la {email} de pe adresa contului și îl ștergem în cel mult 30 de zile."
+        },
+        "signInButton": "Conectează-te pentru ștergere",
+        "emailButton": "Trimite o cerere de ștergere",
+        "emailSubject": "Cerere de ștergere a contului MixAI",
+        "settingsLink": "Setări cont"
+    }
+}

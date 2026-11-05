@@ -1,0 +1,18 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["S6D533QSV2.ro.mixai.app"],
+        "components": [
+          { "/": "/media/*", "comment": "titles, seasons, player, music, live" },
+          { "/": "/together/*", "comment": "Watch Together invites" },
+          { "/": "/activate", "comment": "device-code approval" },
+          { "/": "/activate/*" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["S6D533QSV2.ro.mixai.app"]
+  }
+}

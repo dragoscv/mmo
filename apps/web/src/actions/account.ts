@@ -25,6 +25,7 @@ import {
     savedSearches,
 } from "@/db/schema";
 import { log } from "@/lib/logger";
+import { DELETE_CONFIRMATION, deleteUserAccount } from "@/lib/account/delete-account";
 
 /**
  * GDPR-style "export everything I have on you" snapshot. Returns a JSON
@@ -181,11 +182,9 @@ export async function exportUserData(): Promise<{
 }
 
 /**
- * Fully delete the signed-in user. The schema cascades from `users.id`
- * down through every per-user table, so the only manual cleanup is the
- * Stripe customer (a remote object). The Stripe call is best-effort:
- * if it fails the local row deletion still goes through, because
- * leaving a tenant in our DB after they pressed "Delete" would be the
+ * Fully delete the signed-in user (see `lib/account/delete-account.ts` for what is
+ * removed and revoked). Remote cleanups (Apple token revoke, Stripe customer) are
+ * best-effort: leaving a tenant in our DB after they pressed "Delete" would be the
  * worse failure mode.
  *
  * Requires a typed-string confirmation to defeat accidental clicks.
@@ -196,41 +195,20 @@ export async function deleteAccount(confirmation: string): Promise<
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) return { ok: false, error: "unauthenticated" };
-    if (confirmation !== "DELETE") {
+    if (typeof confirmation !== "string" || confirmation.trim() !== DELETE_CONFIRMATION) {
         return { ok: false, error: "confirmation phrase mismatch" };
     }
 
-    // Best-effort: cancel the Stripe customer so we don't leave a
-    // dangling subscription billing the user after they're gone.
-    try {
-        const sub = await db
-            .select({ customer: subscriptions.stripeCustomerId })
-            .from(subscriptions)
-            .where(eq(subscriptions.userId, userId))
-            .limit(1);
-        if (sub[0]?.customer) {
-            const { stripe } = await import("@/lib/stripe");
-            await stripe().customers.del(sub[0].customer);
-        }
-    } catch (e) {
-        // Don't block the local delete on a Stripe outage.
-        log.warn("[account] stripe customer delete failed", {
-            userId,
-            error: String(e),
-        });
-    }
+    const result = await deleteUserAccount(userId);
+    if (!result.ok) return { ok: false, error: result.error ?? "delete_failed" };
 
-    try {
-        await db.delete(users).where(eq(users.id, userId));
-    } catch (e) {
-        log.error("[account] user delete failed", { userId, error: String(e) });
-        return { ok: false, error: e instanceof Error ? e.message : String(e) };
-    }
-
-    log.info("[account] account deleted", { userId });
     // Sign out invalidates the session cookie. We don't redirect from a
     // server action — the client side will reload to / on its own.
-    await signOut({ redirect: false });
+    try {
+        await signOut({ redirect: false });
+    } catch {
+        // The session row is already gone with the user; clearing the cookie is cosmetic.
+    }
     return { ok: true };
 }
 

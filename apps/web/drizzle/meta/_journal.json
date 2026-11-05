@@ -134,6 +134,13 @@
       "when": 1789948800000,
       "tag": "0030_media_home",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1793836800000,
+      "tag": "0031_push_tokens",
+      "breakpoints": true
     }
   ]
 }

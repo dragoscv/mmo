@@ -216,7 +216,7 @@ const nextConfig: NextConfig = {
             "frame-ancestors 'self'",
             "object-src 'none'",
             "base-uri 'self'",
-            "form-action 'self' https://accounts.google.com",
+            "form-action 'self' https://accounts.google.com https://appleid.apple.com",
             // Service worker scope.
             "worker-src 'self' blob:",
             "manifest-src 'self'",
@@ -258,6 +258,22 @@ const nextConfig: NextConfig = {
                     // on logged-in artwork / per-user JSON).
                     { key: "Cross-Origin-Resource-Policy", value: "same-site" },
                     { key: "Content-Security-Policy", value: csp },
+                ],
+            },
+            // Universal Links / App Links (WP16-51): iOS fetches the extensionless AASA file and
+            // requires application/json; both files are public metadata and may be cached for an hour.
+            {
+                source: "/.well-known/apple-app-site-association",
+                headers: [
+                    { key: "Content-Type", value: "application/json" },
+                    { key: "Cache-Control", value: "public, max-age=3600" },
+                ],
+            },
+            {
+                source: "/.well-known/assetlinks.json",
+                headers: [
+                    { key: "Content-Type", value: "application/json" },
+                    { key: "Cache-Control", value: "public, max-age=3600" },
                 ],
             },
         ];

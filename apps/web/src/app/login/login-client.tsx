@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { LoginForm } from "@/components/login-form";
 import { useRenderCount } from "@/lib/dev-debugger";
 
-export function LoginPageClient({ callbackUrl = "/" }: { callbackUrl?: string }) {
+export function LoginPageClient({ callbackUrl = "/", appleEnabled }: { callbackUrl?: string; appleEnabled?: boolean }) {
     useRenderCount("Page:/login");
     const t = useTranslations("login");
     return (
@@ -32,7 +32,7 @@ export function LoginPageClient({ callbackUrl = "/" }: { callbackUrl?: string })
 
                 {/* Login Card */}
                 <div className="rounded-xl border border-border bg-card p-6 shadow-lg">
-                    <LoginForm callbackUrl={callbackUrl} />
+                    <LoginForm callbackUrl={callbackUrl} appleEnabled={appleEnabled} />
                 </div>
 
                 {/* Skip option */}

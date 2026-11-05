@@ -142,6 +142,12 @@ Producția web rulează pe **Cloud Run `mixai-web`** (proiect `mmo-mw-prod`, `eu
 	`mixai-web-azure-speech-key`, `mixai-web-azure-client-secret`, `mixai-web-cloudflare-api-token`,
 	`mixai-web-mmo-trainer-secret`, `mixai-web-revalidate-secret`, `mixai-web-turn-shared-secret`,
 	`mixai-web-appinsights-connection-string`, `mixai-web-gcp-service-account-key`.
+- Secrete opționale, doar în Secret Manager (montate numai dacă au o versiune activă; fără ele funcția e oprită):
+	`mixai-web-apple-services-id`, `mixai-web-apple-key-id`, `mixai-web-apple-p8` (Sign in with Apple),
+	`mixai-web-auth-apple-secret` (JWT gata făcut, alternativ), `mixai-web-apns-key-id`, `mixai-web-apns-p8` (push iOS),
+	`mixai-web-fcm-sa` (push Android). Pași: [`docs/followups/apple-siwa-setup.md`](../../docs/followups/apple-siwa-setup.md).
+- Push (`/api/push/*`) cere migrarea `drizzle/0031_push_tokens.sql`; până e aplicată rutele răspund
+	`503 push_unavailable`, restul aplicației merge normal.
 - `AUTH_URL`/`NEXTAUTH_URL`/`MMO_APP_URL` = URL-ul run.app până la mutarea pe `https://mixai.ro`.
 	Google OAuth: adaugă redirect URI `<origin>/api/auth/callback/google` în clientul OAuth pentru fiecare
 	origine (run.app acum, mixai.ro după DNS) — fără el login-ul Google dă `redirect_uri_mismatch`.

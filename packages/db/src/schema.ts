@@ -1052,3 +1052,44 @@ export const mediaSyncState = pgTable("media_sync_state", {
 
 export type TrackPlayRow = typeof trackPlays.$inferSelect;
 export type MediaSyncStateRow = typeof mediaSyncState.$inferSelect;
+
+// ─── Phone push (WP16-51, drizzle/0031_push_tokens.sql) ────────────────────
+//
+// Native phone apps register their FCM / APNs token here; the MMO Server relays
+// events through POST /api/push/relay (server/README.md § Push relay) and the web
+// fans out to every token of the device owner. Dead tokens (FCM UNREGISTERED,
+// APNs 410/BadDeviceToken) are deleted by the sender.
+export const pushTokens = pgTable(
+    "push_tokens",
+    {
+        id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+        userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+        /** android | ios */
+        platform: text("platform").notNull(),
+        token: text("token").notNull().unique(),
+        /** APNs only: production | sandbox (debug builds talk to the sandbox gateway). */
+        environment: text("environment").notNull().default("production"),
+        deviceName: text("device_name"),
+        /** MMO Server profile id (e.g. `p_x`) — relay events with a profileId only reach these phones. */
+        profileId: text("profile_id"),
+        liveActivityToken: text("live_activity_token"),
+        createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+        updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+        lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    },
+    (t) => [index("push_tokens_user_idx").on(t.userId)],
+);
+
+/** Idempotency ledger for relay events (`eventId` from the MMO Server). */
+export const pushRelayEvents = pgTable(
+    "push_relay_events",
+    {
+        eventId: text("event_id").primaryKey(),
+        deviceId: text("device_id").notNull().references(() => devices.id, { onDelete: "cascade" }),
+        event: text("event").notNull(),
+        createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    },
+    (t) => [index("push_relay_events_created_idx").on(t.createdAt)],
+);
+
+export type PushTokenRow = typeof pushTokens.$inferSelect;

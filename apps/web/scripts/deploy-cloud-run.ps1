@@ -71,13 +71,29 @@ $SecretMap = [ordered]@{
   APPLICATIONINSIGHTS_CONNECTION_STRING = 'mixai-web-appinsights-connection-string'
   GCP_SERVICE_ACCOUNT_KEY               = 'mixai-web-gcp-service-account-key'
 }
+# Optional secrets that usually live ONLY in Secret Manager (multi-line PEM / JSON don't fit .env.local):
+# synced from .env.local when present there, otherwise mounted iff the secret already has a version.
+# Absent ⇒ not mounted, and the feature stays off (Sign in with Apple, FCM, APNs are env-gated).
+# Setup: docs/followups/apple-siwa-setup.md.
+$OptionalSecretMap = [ordered]@{
+  AUTH_APPLE_ID            = 'mixai-web-apple-services-id'
+  AUTH_APPLE_SECRET        = 'mixai-web-auth-apple-secret'
+  APPLE_KEY_ID             = 'mixai-web-apple-key-id'
+  APPLE_PRIVATE_KEY        = 'mixai-web-apple-p8'
+  FCM_SERVICE_ACCOUNT_JSON = 'mixai-web-fcm-sa'
+  APNS_KEY_ID              = 'mixai-web-apns-key-id'
+  APNS_PRIVATE_KEY         = 'mixai-web-apns-p8'
+}
+foreach ($k in $OptionalSecretMap.Keys) { $SecretMap[$k] = $OptionalSecretMap[$k] }
 $PlainEnv = @(
   'TMDB_DEFAULT_LANG', 'GCP_PROJECT_ID', 'GCP_REGION', 'GCP_TRAINING_REGION', 'GCS_BUCKET', 'GCS_BUCKET_UPLOADS',
   'GCS_BUCKET_GENERATED', 'GCP_ACESTEP_URL', 'GCP_DEMUCS_URL', 'GCP_PIPER_URL', 'GCP_RVC_URL', 'GCP_VOICE_TTS_URL',
   'VERTEX_TRAINER_IMAGE', 'AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_DEPLOYMENT', 'AZURE_OPENAI_API_VERSION',
   'AZURE_SPEECH_REGION', 'AZURE_SPEECH_ENDPOINT', 'AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'CLOUDFLARE_ACCOUNT_ID',
   'CLOUDFLARE_TUNNEL_BASE_HOSTNAME', 'CLOUDFLARE_TUNNEL_ZONE_ID', 'TURN_HOST', 'TURN_REALM',
-  'STRIPE_PRICE_PRO_MONTHLY', 'STRIPE_PRICE_PRO_YEARLY', 'NEXT_PUBLIC_STRIPE_PUBLIC_KEY'
+  'STRIPE_PRICE_PRO_MONTHLY', 'STRIPE_PRICE_PRO_YEARLY', 'NEXT_PUBLIC_STRIPE_PUBLIC_KEY',
+  'APPLE_TEAM_ID', 'APPLE_BUNDLE_ID', 'APPLE_NATIVE_AUDIENCES', 'GOOGLE_NATIVE_CLIENT_IDS',
+  'APNS_TEAM_ID', 'APNS_TOPIC', 'FCM_PROJECT_ID'
 )
 
 $envMap = @{}
@@ -138,6 +154,14 @@ if (-not $NoSecretSync) {
     & gcloud secrets describe $SecretMap[$k] --project $Project --format='value(name)' 2>$null | Out-Null
     if ($LASTEXITCODE -eq 0) { $deployed[$k] = $SecretMap[$k] }
   }
+}
+# Optional secrets not in .env.local: mount only when an ENABLED latest version exists (a secret with
+# no version would make `gcloud run deploy` fail the revision).
+foreach ($k in $OptionalSecretMap.Keys) {
+  if ($deployed.Contains($k)) { continue }
+  $state = (& gcloud secrets versions describe latest --secret $OptionalSecretMap[$k] --project $Project --format='value(state)' 2>$null)
+  if ($LASTEXITCODE -eq 0 -and "$state".Trim() -eq 'ENABLED') { $deployed[$k] = $OptionalSecretMap[$k]; Write-Host "optional secret $($OptionalSecretMap[$k]) mounted" }
+  else { Write-Host "optional secret $($OptionalSecretMap[$k]) absent (feature off)" }
 }
 foreach ($req in 'DATABASE_URL', 'AUTH_SECRET') { if (-not $deployed.Contains($req)) { throw "required secret for $req missing" } }
 
