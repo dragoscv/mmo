@@ -28,6 +28,11 @@ type Remote = { s: "loading" } | { s: "ok" } | { s: "error"; message: string };
 declare global { interface Window { __mixaiPerf?: Record<string, unknown> } }
 
 const HERO_DEBOUNCE_MS = 150;
+/** D25: own rows first. The server orders them too (3.8.x+), but cached blobs and older servers don't. */
+const OWN_FIRST: Record<string, number> = { continue: 0, watchlist: 1, new_in_library: 2 };
+export function ownLibraryFirst(rows: HomeRow[]): HomeRow[] {
+    return rows.map((r, i) => ({ r, i, p: OWN_FIRST[r.id] ?? 3 })).sort((a, b) => a.p - b.p || a.i - b.i).map((x) => x.r);
+}
 /** Staged entrance length (home.css `.is-entering`: last row delay 410 + 270 ms) + slack. */
 const ENTRANCE_MS = 760;
 const mountedAt = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -53,7 +58,7 @@ export function Home({ ctx }: ScreenProps<"home">) {
     const backdrop = useBackdrop();
     const active = useScreenActive();
 
-    const rows = useMemo<HomeRow[]>(() => (home?.rows ?? []).filter((r) => r.items.length > 0), [home]);
+    const rows = useMemo<HomeRow[]>(() => ownLibraryFirst((home?.rows ?? []).filter((r) => r.items.length > 0)), [home]);
     const mediaMode = rows.length > 0;
 
     // ─── Revalidate (mount + every time the screen comes back, e.g. after the player) ───

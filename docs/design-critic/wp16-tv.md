@@ -157,7 +157,7 @@ fake show + dead-end open), and the Tizen P2 items #8 (Ken Burns), #9 (placehold
 | Entrance | `document.getAnimations()` under `.is-entering`: 9 animations, logo/chips `wh-rise` delay 80 + 260 ms, actions `wh-fade` 160 + 240 ms, rows 200/270/340/410 ms + 270 ms → **total 680 ms**, transform/opacity only. Reduced motion: 0 animations, no `mixai:home-enter` measure |
 | Living backdrop | `tv-kenburns` 36 000 ms on the visible backdrop layer, starts after 1.2 s (after the entrance); off with reduced motion |
 | Home first paint (cached, cold launch, since mount) | full motion **343 / 365 / 409 / 415 ms**; reduced motion 349 / 370 / 395 ms; WP16 baseline 372–472 ms → still < 500 ms. (A first build that added the entrance class from React state measured 413–602 ms; the class is now set on the DOM in a layout effect.) |
-| Row order (D25) | Home row titles on device before the server change was deployed: `Continue watching, Top picks…, New in your library` (local server .61 still runs the old build). Server unit test `buildHomeRows order (D25)` asserts `continue → new_in_library → …`; the device order changes when the server with this commit runs there |
+| Row order (D25) | Server: local companion `.61` runs the new `recs.ts` (hot-swapped `dist/media/recs.js`); `GET /media/home` → `continue > new_in_library > top_picks > because_you_watched > trending > upcoming`; unit test `buildHomeRows order (D25)`. The TV kept its cached Home blob (etag = library revision, unchanged by a server upgrade), so Tizen also orders rows client-side (`ownLibraryFirst` in `Home.tsx`: continue → watchlist → new_in_library → rest). **On device, after cold launch and reload: `Continue watching, New in your library, Top picks for you, Because you watched Mandy, Trending in RO, Coming soon`** (`.copilot-tmp/tzd/out-rows2.json`) |
 | Library | Shows grid: 6 cards, **0 fake "TV Shows" entries** (was "TV Shows · 1 episodes"). Opening the unmatched "Tulsa King" opens the episode list (`episode-list` present, player OSD absent) |
 | Placeholders | Movies: 45 of 48 cards without a poster show a blurred still frame + scrim (16 stills already decoded at capture) instead of an icon on grey |
 
@@ -179,14 +179,13 @@ SCORES
   Discipline (10): 10/10
     11. Shell (TV-adapted)    5/5  E+C — first paint 343–415 ms cached, keep-alive stack
     12. A11y + reduced motion 5/5  C+E — 10-foot floor met; entrance + Ken Burns off under the user pref (0 animations measured)
-TOTAL: 51/60 → with the D25 server order live on the TV's server: 52/60
+TOTAL: 52/60
 
 VERDICT
   ☑ Ship it (≥48)
 ```
 
-The score is **51/60 verified on device, 52/60 expected** once server 3.8.x+ with the row-order commit runs on
-`.61`. That last point is composition (#2): own library sits directly under Continue. It is proven by the server
-test, not yet on the TV, because the local server still runs its old build.
+**Tizen 52/60 (target met), verified on device**, including the D25 order. The server change in `recs.ts` is
+waiting for the concurrent server 3.9.0 release, by owner decision. The client-side order covers the TV until then.
 Remaining Tizen gaps: route morphing (#9) only covers cards → title, and the three-layer depth on the title page
 is unchanged.
