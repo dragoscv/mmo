@@ -43,6 +43,7 @@
         "{server/src/**/*.ts,server/openapi.yaml,server/package.json}": "node server/scripts/openapi-check.mjs",
         "{packages/ui/src,apps/mixai/src,server/ui/src,apps/tv-tizen/src}/**/*.{ts,tsx,css}": "node scripts/hex-gate.mjs --staged",
         "apps/tv-android/**/*.kt": "node scripts/hex-gate.mjs --staged",
+        "apps/phone-android/**/*.kt": "node scripts/hex-gate.mjs --staged",
         "docs/mixai-design-tracker.md": "node scripts/tracker-drift.mjs",
         "{server,packages/ui,packages/design-tokens,packages/sdk,packages/ai}/**": "node scripts/check-version-generic.mjs --staged"
     },

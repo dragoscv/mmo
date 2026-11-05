@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="live_notice_title">Live TV uses your own sources</string>
+    <string name="live_notice_body">You add your own sources in MMO Server. MixAI ships no channels. Only use sources you have the right to watch.</string>
+    <string name="live_notice_accept">I understand</string>
+    <string name="live_mode_channels">Channels</string>
+    <string name="live_mode_guide">Guide</string>
+    <string name="live_filter_all">All</string>
+    <string name="live_filter_favourites">Favourites</string>
+    <string name="live_empty_title">No live TV sources</string>
+    <string name="live_empty_hint">Add an M3U playlist, an Xtream account or a HDHomeRun tuner in MMO Server settings (Live TV, Sources).</string>
+    <string name="live_group_empty">No channels in this group</string>
+    <string name="live_no_favourites">No favourite channels</string>
+    <string name="live_no_favourites_hint">Tap the star next to a channel to add it here.</string>
+    <string name="live_no_guide">No guide information</string>
+    <string name="live_next_at">Next %1$s · %2$s</string>
+    <string name="live_on_now">On now</string>
+    <string name="live_favourite">Add to favourites</string>
+    <string name="live_unfavourite">Remove from favourites</string>
+    <string name="live_guide_empty">No programmes in the next 6 hours</string>
+    <string name="live_guide_empty_hint">Add an XMLTV guide URL to the source in MMO Server to see programmes.</string>
+    <string name="live_play_error">This channel cannot be played right now</string>
+    <string name="live_channel_prev">Previous channel</string>
+    <string name="live_channel_next">Next channel</string>
+</resources>

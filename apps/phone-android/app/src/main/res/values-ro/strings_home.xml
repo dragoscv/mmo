@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_my_list">Lista mea</string>
+    <string name="home_info">Detalii</string>
+    <string name="home_list_added">Adăugat în Lista mea</string>
+    <string name="home_list_removed">Scos din Lista mea</string>
+    <string name="home_list_failed">Lista mea nu a putut fi actualizată.</string>
+    <string name="home_play_failed">Redarea nu a putut porni.</string>
+    <string name="home_refresh_failed">Pagina principală nu a putut fi reîmprospătată.</string>
+    <string name="home_ep_code">S%1$d E%2$d</string>
+    <string name="home_left_pct">%1$d%% rămas</string>
+    <string name="home_empty_title">Încă nu e nimic aici</string>
+    <string name="home_empty_hint">Adaugă filme și seriale în biblioteca serverului sau trage în jos pentru reîmprospătare.</string>
+    <string name="home_not_configured_title">Media Home nu este configurat</string>
+    <string name="home_not_configured_hint">Configurează o cheie TMDB pe MMO Server (Setări, Media) ca să vezi aici recomandări și biblioteca ta.</string>
+    <string name="home_refresh">Reîmprospătează</string>
+</resources>

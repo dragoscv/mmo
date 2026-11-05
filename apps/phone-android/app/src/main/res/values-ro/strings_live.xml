@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="live_notice_title">TV live folosește sursele tale</string>
+    <string name="live_notice_body">Sursele le adaugi tu în MMO Server. MixAI nu include niciun canal. Folosește doar surse pe care ai dreptul să le urmărești.</string>
+    <string name="live_notice_accept">Am înțeles</string>
+    <string name="live_mode_channels">Canale</string>
+    <string name="live_mode_guide">Ghid</string>
+    <string name="live_filter_all">Toate</string>
+    <string name="live_filter_favourites">Favorite</string>
+    <string name="live_empty_title">Nicio sursă TV live</string>
+    <string name="live_empty_hint">Adaugă un playlist M3U, un cont Xtream sau un tuner HDHomeRun în setările MMO Server (TV live, Surse).</string>
+    <string name="live_group_empty">Niciun canal în acest grup</string>
+    <string name="live_no_favourites">Niciun canal favorit</string>
+    <string name="live_no_favourites_hint">Atinge steaua de lângă un canal ca să-l adaugi aici.</string>
+    <string name="live_no_guide">Fără informații de program</string>
+    <string name="live_next_at">Urmează %1$s · %2$s</string>
+    <string name="live_on_now">Acum în emisie</string>
+    <string name="live_favourite">Adaugă la favorite</string>
+    <string name="live_unfavourite">Elimină din favorite</string>
+    <string name="live_guide_empty">Nicio emisiune în următoarele 6 ore</string>
+    <string name="live_guide_empty_hint">Adaugă un URL de ghid XMLTV la sursa din MMO Server ca să vezi programul.</string>
+    <string name="live_play_error">Canalul nu poate fi redat acum</string>
+    <string name="live_channel_prev">Canalul anterior</string>
+    <string name="live_channel_next">Canalul următor</string>
+</resources>

@@ -10,6 +10,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-05 — Native Android phone app (Phone 1.0.0)
+
+- **Phone 1.0.0** (`apps/phone-android`, `ro.mixai.app`, WP16-46 slice 1): native Kotlin/Compose app built in the
+  tv-android Gradle build and sharing `:core`. Onboarding (account device-code sign-in, LAN discovery, Quick Connect,
+  profile PIN pad), adaptive navigation with 5 tabs, cinematic Home with cached first frame, Title page, Media3 player
+  with touch gestures + PiP + progress sync, Search with voice, Library grid, Music with synced lyrics, Live TV with a
+  first-use notice. Design tokens now also generate the phone `Tokens.kt` (dark + light); hex gate covers the app.
+  Details: [`apps/phone-android/CHANGELOG.md`](apps/phone-android/CHANGELOG.md).
+
 ## 2026-11-06 — TV Tizen design pass (TV Tizen 2.2.0)
 
 - **TV Tizen 2.2.0** — design-critic Tizen items (docs/design-critic/wp16-tv.md, WP16-35):

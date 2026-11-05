@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_hint">Filme, seriale, muzică, canale</string>
+    <string name="search_clear">Șterge căutarea</string>
+    <string name="search_voice">Caută vocal</string>
+    <string name="search_no_results">Niciun rezultat pentru „%1$s”</string>
+    <string name="search_no_results_hint">Verifică ortografia sau încearcă o căutare mai scurtă.</string>
+    <string name="search_empty_title">Găsește ceva de văzut sau de ascultat</string>
+    <string name="search_empty_hint">Caută simultan în bibliotecă, în TMDB, în muzica ta și în canalele live.</string>
+    <string name="search_recent">Căutări recente</string>
+    <string name="search_clear_all">Șterge tot</string>
+    <string name="search_remove_recent">Elimină „%1$s” din căutările recente</string>
+    <string name="search_in_library">În biblioteca ta</string>
+    <string name="search_movies_series">Filme și seriale</string>
+    <string name="search_music">Muzică</string>
+    <string name="search_artists">Artiști</string>
+    <string name="search_albums">Albume</string>
+    <string name="search_tracks">Piese</string>
+    <string name="search_channels">Canale</string>
+</resources>

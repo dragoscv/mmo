@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="music_tab_home">Home</string>
+    <string name="music_tab_artists">Artists</string>
+    <string name="music_tab_albums">Albums</string>
+    <string name="music_tab_playlists">Playlists</string>
+    <string name="music_row_recent">Recently played</string>
+    <string name="music_row_newest">Recently added</string>
+    <string name="music_row_most_played">Most played</string>
+    <string name="music_row_playlists">Playlists</string>
+    <string name="music_row_genres">Genres</string>
+    <string name="music_row_random">Discover</string>
+    <string name="music_shuffle_all">Shuffle all</string>
+    <string name="music_empty_title">No music library yet</string>
+    <string name="music_empty_hint">Add a music folder in MMO Server (Settings, Libraries). Albums and artists appear here after the scan.</string>
+    <string name="music_no_artists">No artists</string>
+    <string name="music_no_albums">No albums</string>
+    <string name="music_no_playlists">No playlists</string>
+    <string name="music_no_playlists_hint">Playlists created in MixAI or any Subsonic app show up here.</string>
+    <string name="music_playlist_empty">This playlist is empty</string>
+    <string name="music_album_no_tracks">This album has no tracks.</string>
+    <string name="music_tracks_count">Tracks: %1$d</string>
+    <string name="music_tracks_duration">Tracks: %1$d · %2$s</string>
+    <string name="music_albums_count">Albums: %1$d</string>
+    <string name="music_artist_meta">Albums: %1$d · Tracks: %2$d</string>
+    <string name="music_albums">Albums</string>
+    <string name="music_top_tracks">Top tracks</string>
+    <string name="music_similar_artists">Similar artists</string>
+    <string name="music_has_lyrics">Has lyrics</string>
+    <string name="music_play">Play</string>
+    <string name="music_pause">Pause</string>
+    <string name="music_shuffle">Shuffle</string>
+    <string name="music_next">Next</string>
+    <string name="music_previous">Previous</string>
+    <string name="music_repeat_off">Repeat off</string>
+    <string name="music_repeat_all">Repeat all</string>
+    <string name="music_repeat_one">Repeat one</string>
+    <string name="music_now_playing">Now playing</string>
+    <string name="music_open_now_playing">Open now playing</string>
+    <string name="music_nothing_playing">Nothing is playing</string>
+    <string name="music_nothing_playing_hint">Pick an album, a playlist or a track in Music.</string>
+    <string name="music_lyrics">Lyrics</string>
+    <string name="music_queue">Queue</string>
+    <string name="music_queue_empty">The queue is empty.</string>
+    <string name="music_no_lyrics">No lyrics for this track.</string>
+    <string name="music_lyrics_error">Lyrics could not be loaded.</string>
+</resources>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_movies">Filme</string>
+    <string name="library_series">Seriale</string>
+    <string name="library_sort_label">Sortare: %1$s</string>
+    <string name="library_sort_added">Adăugate recent</string>
+    <string name="library_sort_az">Titlu A–Z</string>
+    <string name="library_sort_year">An</string>
+    <string name="library_sort_rating">Notă</string>
+    <string name="library_genre">Gen</string>
+    <string name="library_genre_all">Toate genurile</string>
+    <string name="library_decade">Deceniu</string>
+    <string name="library_decade_all">Toate deceniile</string>
+    <string name="library_decade_value">Anii %1$d</string>
+    <string name="library_unwatched">Nevăzute</string>
+    <string name="library_empty_title">Biblioteca ta este goală</string>
+    <string name="library_empty_hint">Adaugă foldere cu filme și seriale în MMO Server, apoi lasă-l să le scaneze.</string>
+    <string name="library_empty_kind">Încă nu ai titluri de acest tip în bibliotecă</string>
+    <string name="library_no_match">Niciun titlu nu corespunde filtrelor</string>
+    <string name="library_clear_filters">Șterge filtrele</string>
+    <string name="library_alpha_rail">Salt la literă</string>
+</resources>

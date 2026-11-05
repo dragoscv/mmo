@@ -24,6 +24,7 @@ const DEFAULT_ROOTS = [
     "apps/tv-tizen/src",
     "apps/tv-android/app/src/main/java",
     "apps/tv-android/core/src/main/java",
+    "apps/phone-android/app/src/main/java",
 ];
 const EXT_RE = /\.(ts|tsx|css|kt)$/;
 const HEX_RE = /#[0-9a-f]{3,8}\b/gi;

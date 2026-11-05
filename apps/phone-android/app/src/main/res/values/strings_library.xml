@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_movies">Movies</string>
+    <string name="library_series">Series</string>
+    <string name="library_sort_label">Sort: %1$s</string>
+    <string name="library_sort_added">Recently added</string>
+    <string name="library_sort_az">Title A–Z</string>
+    <string name="library_sort_year">Year</string>
+    <string name="library_sort_rating">Rating</string>
+    <string name="library_genre">Genre</string>
+    <string name="library_genre_all">All genres</string>
+    <string name="library_decade">Decade</string>
+    <string name="library_decade_all">All decades</string>
+    <string name="library_decade_value">%1$ds</string>
+    <string name="library_unwatched">Unwatched</string>
+    <string name="library_empty_title">Your library is empty</string>
+    <string name="library_empty_hint">Add movie and series folders in MMO Server, then let it scan them.</string>
+    <string name="library_empty_kind">Nothing of this kind in your library yet</string>
+    <string name="library_no_match">No titles match these filters</string>
+    <string name="library_clear_filters">Clear filters</string>
+    <string name="library_alpha_rail">Jump to letter</string>
+</resources>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_hint">Movies, series, music, channels</string>
+    <string name="search_clear">Clear search</string>
+    <string name="search_voice">Search by voice</string>
+    <string name="search_no_results">No results for “%1$s”</string>
+    <string name="search_no_results_hint">Check the spelling or try a shorter query.</string>
+    <string name="search_empty_title">Find something to watch or listen to</string>
+    <string name="search_empty_hint">Search your library, TMDB, your music and live channels at once.</string>
+    <string name="search_recent">Recent searches</string>
+    <string name="search_clear_all">Clear all</string>
+    <string name="search_remove_recent">Remove “%1$s” from recent searches</string>
+    <string name="search_in_library">In your library</string>
+    <string name="search_movies_series">Movies and series</string>
+    <string name="search_music">Music</string>
+    <string name="search_artists">Artists</string>
+    <string name="search_albums">Albums</string>
+    <string name="search_tracks">Tracks</string>
+    <string name="search_channels">Channels</string>
+</resources>

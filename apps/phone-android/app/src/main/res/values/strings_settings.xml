@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_profile">Profile</string>
+    <string name="settings_profile_none">No profile selected</string>
+    <string name="settings_profile_switch">Switch profile</string>
+    <string name="settings_section_account">Account</string>
+    <string name="settings_account_none">Not signed in</string>
+    <string name="settings_account_signed_in">Signed in with your MixAI account</string>
+    <string name="settings_sign_out">Sign out</string>
+    <string name="settings_sign_out_confirm_title">Sign out?</string>
+    <string name="settings_sign_out_confirm_text">This device will forget your account. You can sign in again at any time.</string>
+    <string name="settings_section_server">Server</string>
+    <string name="settings_server_checking">Checking…</string>
+    <string name="settings_server_online">Online</string>
+    <string name="settings_server_version">Online, version %1$s</string>
+    <string name="settings_server_unreachable">Cannot reach the server</string>
+    <string name="settings_change_server">Change server</string>
+    <string name="settings_change_server_confirm_title">Change server?</string>
+    <string name="settings_change_server_confirm_text">This device will disconnect from the current MMO Server and you will pair it again.</string>
+    <string name="settings_section_device">This device</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_system">System default</string>
+    <string name="settings_language_ro">Română</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_device_name">Device name</string>
+    <string name="settings_device_name_hint">Shown to your other devices in MMO Server. Leave empty to use the phone model.</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_version">MixAI %1$s</string>
+    <string name="settings_licences">Fonts Inter and Space Grotesk are used under the SIL Open Font License 1.1.</string>
+    <string name="settings_live_tv_title">Live TV</string>
+    <string name="settings_live_tv_notice">MixAI ships no channels. Live TV plays only the playlists you add yourself in MMO Server.</string>
+</resources>

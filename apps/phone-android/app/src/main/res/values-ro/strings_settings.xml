@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Setări</string>
+    <string name="settings_section_profile">Profil</string>
+    <string name="settings_profile_none">Niciun profil selectat</string>
+    <string name="settings_profile_switch">Schimbă profilul</string>
+    <string name="settings_section_account">Cont</string>
+    <string name="settings_account_none">Neconectat</string>
+    <string name="settings_account_signed_in">Conectat cu contul tău MixAI</string>
+    <string name="settings_sign_out">Deconectare</string>
+    <string name="settings_sign_out_confirm_title">Te deconectezi?</string>
+    <string name="settings_sign_out_confirm_text">Acest dispozitiv va uita contul tău. Te poți conecta din nou oricând.</string>
+    <string name="settings_section_server">Server</string>
+    <string name="settings_server_checking">Se verifică…</string>
+    <string name="settings_server_online">Online</string>
+    <string name="settings_server_version">Online, versiunea %1$s</string>
+    <string name="settings_server_unreachable">Serverul nu poate fi accesat</string>
+    <string name="settings_change_server">Schimbă serverul</string>
+    <string name="settings_change_server_confirm_title">Schimbi serverul?</string>
+    <string name="settings_change_server_confirm_text">Dispozitivul se va deconecta de la MMO Server-ul curent și va trebui să îl asociezi din nou.</string>
+    <string name="settings_section_device">Acest dispozitiv</string>
+    <string name="settings_language">Limbă</string>
+    <string name="settings_language_system">Limba sistemului</string>
+    <string name="settings_language_ro">Română</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_device_name">Numele dispozitivului</string>
+    <string name="settings_device_name_hint">Apare pe celelalte dispozitive în MMO Server. Lasă gol pentru a folosi modelul telefonului.</string>
+    <string name="settings_save">Salvează</string>
+    <string name="settings_section_about">Despre</string>
+    <string name="settings_version">MixAI %1$s</string>
+    <string name="settings_licences">Fonturile Inter și Space Grotesk sunt folosite sub licența SIL Open Font License 1.1.</string>
+    <string name="settings_live_tv_title">TV live</string>
+    <string name="settings_live_tv_notice">MixAI nu include niciun canal. TV live redă doar listele pe care le adaugi tu în MMO Server.</string>
+</resources>

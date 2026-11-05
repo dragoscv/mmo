@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="music_tab_home">Acasă</string>
+    <string name="music_tab_artists">Artiști</string>
+    <string name="music_tab_albums">Albume</string>
+    <string name="music_tab_playlists">Playlisturi</string>
+    <string name="music_row_recent">Ascultate recent</string>
+    <string name="music_row_newest">Adăugate recent</string>
+    <string name="music_row_most_played">Cele mai ascultate</string>
+    <string name="music_row_playlists">Playlisturi</string>
+    <string name="music_row_genres">Genuri</string>
+    <string name="music_row_random">Descoperă</string>
+    <string name="music_shuffle_all">Amestecă tot</string>
+    <string name="music_empty_title">Încă nu există o bibliotecă muzicală</string>
+    <string name="music_empty_hint">Adaugă un folder de muzică în MMO Server (Setări, Biblioteci). Albumele și artiștii apar aici după scanare.</string>
+    <string name="music_no_artists">Niciun artist</string>
+    <string name="music_no_albums">Niciun album</string>
+    <string name="music_no_playlists">Niciun playlist</string>
+    <string name="music_no_playlists_hint">Playlisturile create în MixAI sau în orice aplicație Subsonic apar aici.</string>
+    <string name="music_playlist_empty">Playlistul este gol</string>
+    <string name="music_album_no_tracks">Albumul nu are piese.</string>
+    <string name="music_tracks_count">Piese: %1$d</string>
+    <string name="music_tracks_duration">Piese: %1$d · %2$s</string>
+    <string name="music_albums_count">Albume: %1$d</string>
+    <string name="music_artist_meta">Albume: %1$d · Piese: %2$d</string>
+    <string name="music_albums">Albume</string>
+    <string name="music_top_tracks">Piese de top</string>
+    <string name="music_similar_artists">Artiști similari</string>
+    <string name="music_has_lyrics">Are versuri</string>
+    <string name="music_play">Redă</string>
+    <string name="music_pause">Pauză</string>
+    <string name="music_shuffle">Amestecă</string>
+    <string name="music_next">Următoarea</string>
+    <string name="music_previous">Anterioara</string>
+    <string name="music_repeat_off">Repetare oprită</string>
+    <string name="music_repeat_all">Repetă tot</string>
+    <string name="music_repeat_one">Repetă piesa</string>
+    <string name="music_now_playing">Se redă acum</string>
+    <string name="music_open_now_playing">Deschide redarea curentă</string>
+    <string name="music_nothing_playing">Nu se redă nimic</string>
+    <string name="music_nothing_playing_hint">Alege un album, un playlist sau o piesă din Muzică.</string>
+    <string name="music_lyrics">Versuri</string>
+    <string name="music_queue">Coadă</string>
+    <string name="music_queue_empty">Coada este goală.</string>
+    <string name="music_no_lyrics">Piesa nu are versuri.</string>
+    <string name="music_lyrics_error">Versurile nu au putut fi încărcate.</string>
+</resources>

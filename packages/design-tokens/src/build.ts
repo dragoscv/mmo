@@ -39,3 +39,9 @@ for (const [name, target] of mirrors) {
   writeFileSync(target, lf(out[name]!) + "\n", { encoding: "utf8" });
   console.log(`mirrored ${name} → ${target.replace(repo, "")}`);
 }
+
+// Phone app (WP16-46): same Kotlin tokens in the phone package.
+const phoneKt = join(repo, "apps", "phone-android", "app", "src", "main", "java", "ro", "mixai", "app", "ui", "theme", "Tokens.kt");
+mkdirSync(dirname(phoneKt), { recursive: true });
+writeFileSync(phoneKt, lf(kotlinTokens("ro.mixai.app.ui.theme", true)) + "\n", { encoding: "utf8" });
+console.log(`mirrored Tokens.kt → ${phoneKt.replace(repo, "")}`);

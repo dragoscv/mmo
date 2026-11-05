@@ -5,6 +5,7 @@
     "**/tokens.plain.css",
     "**/generated/**",
     "apps/tv-android/app/src/main/java/ro/mixai/tv/ui/theme/Tokens.kt",
+    "apps/phone-android/app/src/main/java/ro/mixai/app/ui/theme/Tokens.kt",
     "apps/tv-tizen/src/styles.css",
     "apps/tv-tizen/src/screens/SignIn.tsx",
     "apps/tv-tizen/src/screens/Pair.tsx",
