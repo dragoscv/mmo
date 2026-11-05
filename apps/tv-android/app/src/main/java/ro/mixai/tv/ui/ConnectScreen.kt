@@ -44,7 +44,6 @@ import ro.mixai.tv.data.DiscoveredServer
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.Settings
 import ro.mixai.tv.ui.theme.Tokens
-import java.net.URI
 
 private sealed interface Probe {
     data object Idle : Probe
@@ -125,9 +124,7 @@ fun ConnectScreen(
                             Button(
                                 modifier = Modifier.focusRequester(quickFocus),
                                 onClick = {
-                                    val base = Settings.normalizeBaseUrl(host)
-                                    val u = URI(base)
-                                    onQuickConnect(DiscoveredServer(u.host, if (u.port > 0) u.port else 17899, p.hostname.ifBlank { u.host }, p.version))
+                                    DiscoveredServer.fromBaseUrl(Settings.normalizeBaseUrl(host), p.hostname, p.version)?.let(onQuickConnect)
                                 },
                             ) { Text(stringResource(R.string.connect_quick)) }
                         } else Text(stringResource(R.string.connect_enter_token), color = Tokens.mutedForeground)

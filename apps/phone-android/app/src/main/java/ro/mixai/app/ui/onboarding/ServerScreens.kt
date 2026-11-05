@@ -71,7 +71,6 @@ import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.PairRequest
 import ro.mixai.tv.data.Settings
 import ro.mixai.tv.data.discoverServers
-import java.net.URI
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -275,8 +274,7 @@ fun ManualServerScreen(onConnected: (base: String, token: String) -> Unit, onQui
                         if (p.pairingSupported) {
                             Text(stringResource(R.string.manual_needs_pair), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             OutlinedButton(onClick = {
-                                val u = runCatching { URI(Settings.normalizeBaseUrl(host)) }.getOrNull()
-                                if (u?.host != null) onQuickConnect(DiscoveredServer(u.host, if (u.port > 0) u.port else 17899, p.hostname))
+                                DiscoveredServer.fromBaseUrl(Settings.normalizeBaseUrl(host), p.hostname)?.let(onQuickConnect)
                             }) { Text(stringResource(R.string.manual_quick_connect)) }
                         } else {
                             Text(stringResource(R.string.manual_needs_token), color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -37,6 +37,7 @@ import { engineRegistry } from "./voice/engines";
 import { createVideoRouter, shutdownVideoSubsystem } from "./library/video-routes";
 import { createCastRouter } from "./cast/router";
 import { createPairRouter } from "./pair/router";
+import { demoGuard, isDemoMode } from "./demo";
 import { createMediaModule, type MediaModule } from "./media";
 import { createHub, type Hub } from "./hub";
 import { createLiveTvModule, type LiveTvModule } from "./livetv";
@@ -398,6 +399,12 @@ export async function startServer(): Promise<void> {
         if (req.body === undefined) req.body = {};
         next();
     });
+    // Public store-review demo (MMO_DEMO=1): remote clients are viewers only (src/demo.ts).
+    const demo = isDemoMode();
+    if (demo) {
+        app.use(demoGuard);
+        log("info", "[demo] MMO_DEMO=1: pairing auto-approved, remote clients read-only");
+    }
 
     // ─── Auth Callback (no auth middleware — this IS the auth endpoint) ───
 
@@ -1235,7 +1242,7 @@ export async function startServer(): Promise<void> {
     // /pair/request, /pair/poll and /pair/info are deliberately unauthenticated
     // (the requester has no token yet); approval needs the real device
     // token. See docs/aplicatie/pairing.md and server/src/pair/router.ts.
-    app.use("/pair", createPairRouter({ authMiddleware, getPort: () => serverPort, getVersion: () => SERVER_VERSION }));
+    app.use("/pair", createPairRouter({ authMiddleware, getPort: () => serverPort, getVersion: () => SERVER_VERSION, autoApprove: demo }));
 
     // ─── Media Home brain (recommendations, availability, progress) ─────
     //

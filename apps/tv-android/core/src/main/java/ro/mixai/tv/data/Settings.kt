@@ -207,13 +207,13 @@ class Settings(private val context: Context) {
         /** Rail ids understood by `AppShell`. */
         val DEFAULT_NAV_ORDER = listOf("home", "search", "movies", "shows", "music", "livetv", "settings")
 
-        /** `192.168.1.5` → `http://192.168.1.5:17899`; keeps an explicit scheme/port if given. */
+        /** `192.168.1.5` → `http://192.168.1.5:17899`; keeps an explicit scheme/port; `https://host` stays on 443. */
         fun normalizeBaseUrl(raw: String): String {
             var s = raw.trim().trimEnd('/')
             if (s.isEmpty()) return ""
             if (!s.startsWith("http://") && !s.startsWith("https://")) s = "http://$s"
             val afterScheme = s.substringAfter("://")
-            if (!afterScheme.contains(':')) s = "$s:17899"
+            if (!afterScheme.contains(':') && !s.startsWith("https://")) s = "$s:17899"
             return s
         }
     }

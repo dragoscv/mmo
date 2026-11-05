@@ -75,7 +75,6 @@ import ro.mixai.tv.data.AccountSession
 import ro.mixai.tv.data.Connection
 import ro.mixai.tv.data.DiscoveredServer
 import ro.mixai.tv.data.Settings
-import java.net.URI
 
 private const val TAG = "MixaiPhone"
 
@@ -124,8 +123,7 @@ fun AppRoot(conn: Connection, session: AccountSession, settings: Settings, local
         val d = deps ?: return@LaunchedEffect
         if (nav.current !is Dest.Splash) return@LaunchedEffect
         try { d.api.health() } catch (_: Exception) {
-            val u = runCatching { URI(d.api.baseUrl) }.getOrNull()
-            nav.resetTo(Dest.Welcome, Dest.Discover(u?.host?.let { DiscoveredServer(it, if (u.port > 0) u.port else 17899, "") }))
+            nav.resetTo(Dest.Welcome, Dest.Discover(DiscoveredServer.fromBaseUrl(d.api.baseUrl)))
             return@LaunchedEffect
         }
         launch { runCatching { if (d.media.status() != null) d.progressSync.migrateLegacyOnce() } }

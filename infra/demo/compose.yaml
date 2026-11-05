@@ -1,0 +1,76 @@
+# MixAI public demo server (store review) — runs on GCE VM `mixai-demo`. See infra/demo/README.md.
+# /srv/mixai = 50 GB data disk: media/ (read-only content), data/ (server state), channel/ (HLS loop), caddy/.
+services:
+  mmo-server:
+    image: ${MMO_IMAGE:?set MMO_IMAGE in .env}
+    container_name: mmo-server
+    restart: unless-stopped
+    # host network: Caddy reaches 127.0.0.1:17899; the GCE firewall keeps 17899 closed to the internet.
+    network_mode: host
+    env_file: [./demo.env] # TMDB_API_KEY only, written by deploy.ps1 from Secret Manager (0600, never committed)
+    environment:
+      MMO_HEADLESS: "1"
+      MMO_DEMO: "1"
+      MMO_DATA: /data
+      MMO_PORT: "17899"
+      MMO_MEDIA: /media/films,/media/shows,/media/music
+      MMO_WEB_APP_URL: ${MMO_WEB_APP_URL:-https://mixai-web-622082681070.europe-west1.run.app}
+      MMO_ANALYZER_AUTOINSTALL: "0"
+      TZ: Europe/Bucharest
+    volumes:
+      - /srv/mixai/data:/data
+      - /srv/mixai/media:/media:ro
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  caddy:
+    image: caddy:2.10-alpine
+    container_name: caddy
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      DEMO_HOSTS: ${DEMO_HOSTS:-demo.mixai.ro}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/mixai/caddy/data:/data
+      - /srv/mixai/caddy/config:/config
+      - /srv/mixai/channel/www:/srv/demo-channel:ro
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  # Two looping "live" channels: stream copy of Big Buck Bunny / Sintel into rolling HLS (no re-encode).
+  channel-1:
+    image: ${MMO_IMAGE:?set MMO_IMAGE in .env}
+    container_name: demo-channel-1
+    restart: unless-stopped
+    user: "1000:1000"
+    entrypoint: ["/bin/sh", "/channel/loop.sh", "/media/films/Big Buck Bunny (2008)/Big Buck Bunny (2008).mp4", "/out/1"]
+    volumes:
+      - /srv/mixai/media:/media:ro
+      - /srv/mixai/channel/www:/out
+      - ./loop.sh:/channel/loop.sh:ro
+    logging: { driver: json-file, options: { max-size: "5m", max-file: "2" } }
+  channel-2:
+    image: ${MMO_IMAGE:?set MMO_IMAGE in .env}
+    container_name: demo-channel-2
+    restart: unless-stopped
+    user: "1000:1000"
+    entrypoint: ["/bin/sh", "/channel/loop.sh", "/media/films/Sintel (2010)/Sintel (2010).mkv", "/out/2"]
+    volumes:
+      - /srv/mixai/media:/media:ro
+      - /srv/mixai/channel/www:/out
+      - ./loop.sh:/channel/loop.sh:ro
+    logging: { driver: json-file, options: { max-size: "5m", max-file: "2" } }
+
+  # demo.m3u + epg.xml (48 h ahead), regenerated every 6 h and aligned to each loop's real start.
+  epg:
+    image: ${MMO_IMAGE:?set MMO_IMAGE in .env}
+    container_name: demo-epg
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      DEMO_HOST: ${DEMO_HOST:-demo.mixai.ro}
+    entrypoint: ["/bin/sh", "-c", "sleep 20; while true; do node /channel/gen-epg.mjs /out; sleep 21600; done"]
+    volumes:
+      - /srv/mixai/media:/media:ro
+      - /srv/mixai/channel/www:/out
+      - ./gen-epg.mjs:/channel/gen-epg.mjs:ro
+    logging: { driver: json-file, options: { max-size: "1m", max-file: "2" } }

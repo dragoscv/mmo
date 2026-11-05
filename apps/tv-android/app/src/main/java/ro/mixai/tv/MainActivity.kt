@@ -89,7 +89,6 @@ import ro.mixai.tv.ui.theme.MixaiTheme
 import ro.mixai.tv.ui.title.SeasonScreen
 import ro.mixai.tv.ui.title.TitleScreen
 import ro.mixai.tv.ui.together.WatchTogetherScreen
-import java.net.URI
 import java.util.Locale
 
 private const val TAG = "MainActivity"
@@ -240,8 +239,7 @@ private fun App(
         val d = deps ?: return@LaunchedEffect
         if (nav.current !is Route.Splash) return@LaunchedEffect
         try { d.api.health() } catch (_: Exception) {
-            val u = runCatching { URI(d.api.baseUrl) }.getOrNull()
-            val saved = u?.host?.let { DiscoveredServer(it, if (u.port > 0) u.port else 17899, "") }
+            val saved = DiscoveredServer.fromBaseUrl(d.api.baseUrl)
             nav.resetTo(Route.Discover(saved))
             return@LaunchedEffect
         }

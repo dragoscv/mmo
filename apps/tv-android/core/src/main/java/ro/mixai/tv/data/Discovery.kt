@@ -18,9 +18,22 @@ data class DiscoveredServer(
     val name: String,
     val version: String? = null,
     val serviceName: String = "",
+    /** `https` for a server behind a TLS reverse proxy (e.g. the public demo); mDNS hits are always `http`. */
+    val scheme: String = "http",
 ) {
-    val baseUrl: String get() = "http://$host:$port"
+    val baseUrl: String get() = if (scheme == "https" && port == 443) "https://$host" else "$scheme://$host:$port"
     val key: String get() = "$host:$port"
+
+    companion object {
+        /** From a normalised base URL (`https://demo.mixai.ro`, `http://10.0.0.2:17899`); null when it has no host. */
+        fun fromBaseUrl(base: String, name: String = "", version: String? = null): DiscoveredServer? {
+            val u = runCatching { java.net.URI(base) }.getOrNull() ?: return null
+            val host = u.host ?: return null
+            val https = u.scheme.equals("https", ignoreCase = true)
+            val port = if (u.port > 0) u.port else if (https) 443 else 17899
+            return DiscoveredServer(host, port, name.ifBlank { host }, version, scheme = if (https) "https" else "http")
+        }
+    }
 }
 
 /**

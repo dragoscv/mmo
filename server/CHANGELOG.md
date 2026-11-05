@@ -2,6 +2,14 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.9.2 — Public demo mode (WP16-53)
+
+- `MMO_DEMO=1` (store-review server demo.mixai.ro, `infra/demo/`): Quick Connect requests are approved at once
+	(the first `/pair/poll` hands over the token), and every client behind the reverse proxy is a viewer —
+	browse/play/progress/watchlist/Watch Together pass, library/folder/Live TV source/profile administration,
+	`/fs`, `/logs`, `/folders` and Subsonic `create*/update*/delete*` answer 403 `demo_read_only`. Admin =
+	direct loopback without `x-forwarded-for` (commands on the VM itself). Off by default; no route changes.
+
 ## 3.9.1 — Own library first, commit missing modules
 
 - Home: "New in your library" comes right after Continue watching / My list, before recommendations (D25,

@@ -1,0 +1,38 @@
+# MixAI demo server: TLS termination + reverse proxy to the MMO Server on 127.0.0.1:17899.
+# DEMO_HOSTS = "demo.mixai.ro, <ip-with-dashes>.sslip.io" (the sslip.io name works before mixai.ro DNS is live).
+# Caddy always adds X-Forwarded-For, which is what marks a request as "remote viewer" for MMO_DEMO (server/src/demo.ts).
+{
+	email ops@codai.ro
+}
+
+{$DEMO_HOSTS} {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+
+	# Looping HLS demo channels + M3U + XMLTV (static files written by loop.sh / gen-epg.mjs).
+	handle_path /demo-channel/* {
+		root * /srv/demo-channel
+		@playlist path *.m3u8
+		header @playlist Cache-Control "no-cache"
+		header Access-Control-Allow-Origin "*"
+		file_server
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:17899 {
+			flush_interval -1
+			transport http {
+				read_timeout 0
+			}
+		}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

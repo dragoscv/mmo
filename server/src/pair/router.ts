@@ -30,6 +30,8 @@ export interface PairRouterDeps {
     getUserId?: () => string | undefined;
     getWebAppUrl?: () => string | undefined;
     getLanHost?: () => string | null;
+    /** Public demo server (MMO_DEMO=1): approve every request at once (see src/demo.ts). */
+    autoApprove?: boolean;
 }
 
 function tokenMatches(candidate: unknown, stored: string | undefined): boolean {
@@ -80,11 +82,12 @@ export function createPairRouter(deps: PairRouterDeps): express.Router {
         try {
             const body = (req.body ?? {}) as { deviceName?: unknown; platform?: unknown };
             const pr = service.request(body);
+            if (deps.autoApprove) service.approve(pr.code);
             const port = deps.getPort();
             const host = getLanHost() ?? "127.0.0.1";
             const webAppUrl = (getWebAppUrl() || "https://mixai.ro").replace(/\/+$/, "");
             const q = `host=${encodeURIComponent(host)}&port=${port}&code=${pr.code}`;
-            log("info", `[pair] request code=${pr.code} device="${pr.deviceName}" platform=${pr.platform}`);
+            log("info", `[pair] request code=${pr.code} device="${pr.deviceName}" platform=${pr.platform}${deps.autoApprove ? " (demo: auto-approved)" : ""}`);
             res.status(201).json({
                 code: pr.code,
                 secret: pr.secret,
