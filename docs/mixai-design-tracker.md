@@ -41,6 +41,8 @@
 | D31 | Web | unify on `/media`: search, browse, season/episode, profile gate, now playing, live TV; `/watch/*` redirects; legacy player features (skip, party, cast, bookmarks) kept, restyled with tokens | 2026-11-04 |
 | D32 | Extra ideas (all in) | hero muted trailer after 3 s focus; ambient screensaver; auto collections/franchises + "Surprise me"; voice search (Android) + phone keyboard via remote; versions picker; sleep timer + "still watching?"; global Continue (video+episodes+music+recordings) + customisable nav; year-in-review stats; PWA offline downloads | 2026-11-04 |
 | D33 | Cadence | small vertical slices, each committed with version bump + CHANGELOG and device-verified | 2026-11-04 |
+| D34 | Phone apps | **native**: Kotlin/Compose Android phone app reusing tv-android's data layer (shared module) + SwiftUI iOS app; verified on S25 + iPhone 17 Pro Max; published to **production 100 %** on Play + App Store (owner, 2026-11-06). Feature set/new ideas decided in a research round (WP16-45) | 2026-11-06 |
+| D35 | Web home + live check | `/` → `/media` (classic fan-out on `/?classic=1`); live web e2e runs on a cloud VM with a tunnel to the companion; a 2 h prod session row may be minted + deleted for it | 2026-11-06 |
 
 ## 1. Research summary (verified 2026-09-17)
 
@@ -472,16 +474,24 @@ Decisions D25–D33. Must not regress WP15 (original-quality playback, `?start=`
 #### WP16-E — Web (3.0.0)
 | ID | Item | Status |
 |---|---|---|
-| WP16-36 | Profile gate ("Who's watching", PIN, kids) on `/media` + `/profiles` rewrite on server profiles (i18n) | todo |
-| WP16-37 | Media shell: rail/top nav (Home, Search, Movies, Shows, Music, Live TV), backdrop-follows-hover/focus, hero muted trailer after 3 s, keyboard roving focus in rows | todo |
-| WP16-38 | Pages: `/media/search`, `/media/browse/[kind]` (filters, virtualised grid), season/episode `/media/tv/[id]/season/[n]`, collections, watchlist, stats (year in review); `/watch/*` → `/media` redirects | todo |
-| WP16-39 | Player restyle with tokens + i18n: OSD, tracks, speed, versions, skip, up-next, still watching, sleep; Watch Together on hub; "Play on TV" device picker (hub remote) + phone-as-remote page | todo |
-| WP16-40 | Music: artist/album pages, full-screen now playing with synced lyrics + queue | todo |
-| WP16-41 | Live TV: channels + EPG grid + player (hls.js) + recordings; settings › Live TV sources | todo |
-| WP16-42 | PWA offline downloads (Serwist + IndexedDB, per profile) | todo |
-| WP16-43 | Verification: vitest, typecheck, lint baseline, cloud e2e 390/1440/3440 light/dark + axe, View Transition long-task measure, design-critic ≥ 52 | todo |
+| WP16-36 | Profile gate ("Who's watching", PIN, kids) on `/media` + `/profiles` rewrite on server profiles (i18n) | done (web 3.0.0, d7cf5dd9) - Who's watching gate + PIN pad + kids on server profiles (components/mmo/profile-gate.tsx), profile menu switch/manage |
+| WP16-37 | Media shell: rail/top nav (Home, Search, Movies, Shows, Music, Live TV), backdrop-follows-hover/focus, hero muted trailer after 3 s, keyboard roving focus in rows | done - /media shell: glass top bar nav (roving arrows, '/' search), hub status, backdrop follows hover/focus, hero logo + muted trailer after 3 s, rows with arrow keys up/down/left/right; Home cache-first per profile (window.__mixaiPerf.home); / redirects to /media (?classic=1 keeps WP11 home) |
+| WP16-38 | Pages: `/media/search`, `/media/browse/[kind]` (filters, virtualised grid), season/episode `/media/tv/[id]/season/[n]`, collections, watchlist, stats (year in review); `/watch/*` → `/media` redirects | done - /media/search, /media/browse/[kind] (sort/genres/unwatched/A-Z, 1000+ incremental + content-visibility), unified title page (versions, seasons/episodes, cast, offers, My list, trailer, Play on TV, Download), season page, list, stats, collections; /watch/* 307 -> /media, legacy detail pages forward by TMDB id |
+| WP16-39 | Player restyle with tokens + i18n: OSD, tracks, speed, versions, skip, up-next, still watching, sleep; Watch Together on hub; "Play on TV" device picker (hub remote) + phone-as-remote page | done - /media/play/[kind]/[tmdbId] custom OSD (audio=<n>, subs+style, speed, fit, skip, up next, still watching, sleep, PiP, keyboard/touch), progress putProgress, hub remote; Watch Together panel + drift sync; PlayOnTvButton + remote mode; public /together guest page (TV QR) |
+| WP16-40 | Music: artist/album pages, full-screen now playing with synced lyrics + queue | done - web music engine (2 audio elements, server queue, Media Session, plays), music home/artist/album/playlist/genre/search, now playing with synced lyrics + queue, mini-player in shell, per-track download |
+| WP16-41 | Live TV: channels + EPG grid + player (hls.js) + recordings; settings › Live TV sources | done - /media/live channels + preview, EPG grid (role=grid, windowed), zapping player with preloaded neighbour (__mixaiZap), catch-up, recordings (server 3.8.0 /livetv/recordings/:id/file fallback), sources CRUD + channel table |
+| WP16-42 | PWA offline downloads (Serwist + IndexedDB, per profile) | done - offline downloads: IDB + Cache mixai-offline-v1 parts, SW Range 206/416, token-free keys, quota/persist, static offline shell public/offline, /media/downloads, DownloadButton |
+| WP16-43 | Verification: vitest, typecheck, lint baseline, cloud e2e 390/1440/3440 light/dark + axe, View Transition long-task measure, design-critic ≥ 52 | doing - VERIFIED: vitest 137/137, tsc 0 errors (6 old missing-module errors were a hollow pnpm store, relinked), eslint 0, hex-gate 0 (119 files), i18n parity OK, next build OK 86.6 s; e2e/media-wp16.spec.ts (13 routes x 390/1440/3440 x light/dark, axe wcag22aa, cache < 1 s, keyboard). Pending: live run + design-critic |
 
 #### WP16-F — Closure
 | ID | Item | Status |
 |---|---|---|
 | WP16-44 | CHANGELOGs, versions (server 3.4.0, tv 2.0.0, web 3.0.0, sdk), docs (`docs/aplicatie/media-home.md`, live TV guide, ADR-0011 hub + ADR-0012 live TV), design-critic report | todo |
+
+#### WP16-G — Phone apps (added 2026-11-06, D34)
+| ID | Item | Status |
+|---|---|---|
+| WP16-45 | Research + decision round: phone feature set vs Plex/Infuse/Jellyfin mobile, shared Android module with tv-android, iOS model generation from openapi.yaml, sign-in (device code / pairing), store listings, new ideas | todo |
+| WP16-46 | Android phone app (Kotlin/Compose, Media3, shares data layer with tv-android): profiles, home, browse, title, player (PiP, background audio, cast/Play on TV, Watch Together), music + lyrics, Live TV, downloads; verified on S25 | todo |
+| WP16-47 | iOS app (SwiftUI, AVPlayer, background audio, PiP, AirPlay, offline): same scope; verified on iPhone 17 Pro Max | todo |
+| WP16-48 | Store release to PRODUCTION 100 % on Play + App Store (owner 2026-11-06), listings RO/EN, screenshots, privacy labels, review notes | todo |
