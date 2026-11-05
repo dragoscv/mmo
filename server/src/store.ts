@@ -90,6 +90,8 @@ export interface CompanionSettings {
      *  for a lower quality). Off by default: playback always sends the
      *  original video, and only incompatible audio is converted. */
     allowVideoTranscode: boolean;
+    /** Size cap of `<userData>/downloads-cache` (iOS MP4 remuxes), GB; LRU eviction above it. */
+    downloadsCacheCapGb: number;
 }
 
 const DEFAULTS: CompanionSettings = {
@@ -118,6 +120,7 @@ const DEFAULTS: CompanionSettings = {
     telemetryEnabled: false,
     preRemuxAutoOnScan: false,
     allowVideoTranscode: false,
+    downloadsCacheCapGb: 20,
 };
 
 /**
@@ -325,6 +328,10 @@ export function getSettings(): CompanionSettings {
         telemetryEnabled: (store.get("telemetryEnabled") as boolean | undefined) ?? DEFAULTS.telemetryEnabled,
         preRemuxAutoOnScan: (store.get("preRemuxAutoOnScan") as boolean | undefined) ?? DEFAULTS.preRemuxAutoOnScan,
         allowVideoTranscode: (store.get("allowVideoTranscode") as boolean | undefined) ?? DEFAULTS.allowVideoTranscode,
+        downloadsCacheCapGb: (() => {
+            const v = Number(store.get("downloadsCacheCapGb"));
+            return Number.isFinite(v) && v >= 1 && v <= 10_000 ? v : DEFAULTS.downloadsCacheCapGb;
+        })(),
     };
 }
 

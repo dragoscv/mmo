@@ -7,7 +7,7 @@ import fs from "node:fs";
 import type express from "express";
 import { openLiveTvDb, type LiveTvDb } from "./db";
 import { LiveTvService } from "./service";
-import { DvrScheduler, type SpawnFfmpeg } from "./recorder";
+import { DvrScheduler, type DvrOptions, type SpawnFfmpeg } from "./recorder";
 import { createLiveTvRouter } from "./routes";
 import type { FetchLike, LiveTvLogger } from "./util";
 
@@ -21,6 +21,7 @@ export interface LiveTvModuleOptions {
     spawnFfmpeg?: SpawnFfmpeg;
     /** Start the refresh loop + DVR scheduler immediately (default true). */
     autoStart?: boolean;
+    onRecordingFinished?: DvrOptions["onFinished"];
 }
 
 export interface LiveTvModule {
@@ -35,7 +36,7 @@ export function createLiveTvModule(opts: LiveTvModuleOptions): LiveTvModule {
     fs.mkdirSync(opts.recordingsDir, { recursive: true });
     const db = openLiveTvDb(opts.userDataDir);
     const service = new LiveTvService({ db, log: opts.log, fetch: opts.fetch });
-    const dvr = new DvrScheduler({ db, service, recordingsDir: opts.recordingsDir, log: opts.log, spawnFfmpeg: opts.spawnFfmpeg });
+    const dvr = new DvrScheduler({ db, service, recordingsDir: opts.recordingsDir, log: opts.log, spawnFfmpeg: opts.spawnFfmpeg, onFinished: opts.onRecordingFinished });
     const router = createLiveTvRouter({ service, dvr, log: opts.log, fetch: opts.fetch });
     if (opts.autoStart !== false) {
         service.start();

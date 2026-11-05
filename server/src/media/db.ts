@@ -117,6 +117,84 @@ const MIGRATIONS: string[] = [
     );
     CREATE INDEX IF NOT EXISTS idx_watchlist_profile ON watchlist(profile_id, added_at DESC);
     `,
+    // v4 — phone apps (WP16-50): chat moderation, subtitle text search, scene bookmarks,
+    // daily usage (kids caps), imported user ratings
+    `
+    CREATE TABLE IF NOT EXISTS chat_reports (
+        id TEXT PRIMARY KEY,
+        room_id TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        reporter_device_id TEXT NOT NULL,
+        reporter_name TEXT NOT NULL,
+        offender_device_id TEXT,
+        offender_name TEXT,
+        text TEXT,
+        reason TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        resolved_at INTEGER,
+        resolution TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_reports_open ON chat_reports(resolved_at, created_at DESC);
+    CREATE TABLE IF NOT EXISTS hub_blocks (
+        profile_id TEXT NOT NULL,
+        blocked_device_id TEXT NOT NULL,
+        blocked_name TEXT,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (profile_id, blocked_device_id)
+    );
+    CREATE VIRTUAL TABLE IF NOT EXISTS subtitle_fts USING fts5(
+        folded,
+        text UNINDEXED,
+        file_id UNINDEXED,
+        track_key UNINDEXED,
+        start_sec UNINDEXED,
+        end_sec UNINDEXED,
+        tokenize = 'unicode61'
+    );
+    CREATE TABLE IF NOT EXISTS subtitle_sources (
+        file_id TEXT NOT NULL,
+        track_key TEXT NOT NULL,
+        track_index INTEGER,
+        source TEXT NOT NULL,
+        lang TEXT,
+        label TEXT,
+        sig TEXT NOT NULL,
+        cues INTEGER NOT NULL,
+        indexed_at INTEGER NOT NULL,
+        PRIMARY KEY (file_id, track_key)
+    );
+    CREATE TABLE IF NOT EXISTS bookmarks (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        title_key TEXT NOT NULL,
+        kind TEXT,
+        tmdb_id INTEGER,
+        season INTEGER,
+        episode INTEGER,
+        file_id TEXT,
+        sec REAL NOT NULL,
+        label TEXT NOT NULL DEFAULT '',
+        shared INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_bookmarks_title ON bookmarks(title_key, sec);
+    CREATE TABLE IF NOT EXISTS usage_daily (
+        profile_id TEXT NOT NULL,
+        day TEXT NOT NULL,
+        watch_sec REAL NOT NULL DEFAULT 0,
+        listen_sec REAL NOT NULL DEFAULT 0,
+        PRIMARY KEY (profile_id, day)
+    );
+    CREATE TABLE IF NOT EXISTS user_ratings (
+        profile_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        tmdb_id INTEGER NOT NULL,
+        rating REAL NOT NULL,
+        rated_at INTEGER NOT NULL,
+        source TEXT NOT NULL DEFAULT 'local',
+        PRIMARY KEY (profile_id, kind, tmdb_id)
+    );
+    `,
 ];
 
 export const MEDIA_SCHEMA_VERSION = MIGRATIONS.length;

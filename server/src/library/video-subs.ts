@@ -54,6 +54,19 @@ export async function subtitleVttPath(fileId: string, absPath: string, track: nu
     return fs.existsSync(want) ? want : null;
 }
 
+/** Already-extracted WebVTT files of `fileId` (fresh against the source), for the subtitle text index. */
+export function cachedSubtitleVtts(fileId: string, absPath: string): { index: number; path: string; sig: string }[] {
+    const dir = cacheDir(fileId);
+    const stamp = path.join(dir, "source.sig");
+    const current = sig(absPath);
+    if (!current || !fs.existsSync(stamp) || fs.readFileSync(stamp, "utf8") !== current) return [];
+    return fs.readdirSync(dir)
+        .map((n) => /^(\d+)\.vtt$/.exec(n))
+        .filter((m): m is RegExpExecArray => m !== null)
+        .map((m) => ({ index: Number(m[1]), path: path.join(dir, m[0]), sig: current }))
+        .sort((a, b) => a.index - b.index);
+}
+
 async function extractAll(dir: string, absPath: string, tracks: SubTrackInfo[], current: string): Promise<boolean> {
     await fsp.rm(dir, { recursive: true, force: true });
     await fsp.mkdir(dir, { recursive: true });

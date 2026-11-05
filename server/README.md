@@ -175,6 +175,55 @@ Ghid utilizator: `docs/aplicatie/opensubsonic.md`.
 
 ---
 
+## 📱 Phone apps (WP16-50, 3.9.0)
+
+- `platform` acceptă `android-phone` și `ios` (plus `android-tv`, `tizen`, `web`, `desktop`) la pairing și hub
+   `hello`; `/hub/devices` întoarce `formFactor` + `playbackTarget` (telefoanele sunt ținte „Play on…” doar cu
+   cap `playback`; `?targets=1` filtrează).
+- Watch Together: mesaje cu `id` stabil, filtru RO+EN (`***`, oprit din `PUT /hub/settings`), `report` →
+   `chat_reports` (`GET /hub/reports`, `POST /hub/reports/{id}/resolve`), `block`/`unblock` (persistat per profil
+   în `hub_blocks`), `kick` (doar host-ul). Camerele rămân invite-only.
+- `/media/subtitles/search` (FTS5 `subtitle_fts`, fără diacritice), `POST /media/subtitles/index` (extragere
+   în coada ffmpeg), `/media/bookmarks`, `/media/profiles/{id}/usage`, `/media/stats/family`,
+   `POST /media/import/plex` (tokenul Plex nu se stochează).
+- Descărcări: `GET /video/file/{fileId}` (original, Range — Android), `GET /video/download/{fileId}?container=mp4`
+   (remux `-c copy` în `downloads-cache`, LRU 20 GB, `202` cât se pregătește — iOS).
+- Limită zilnică copii: `prefs.dailyCapMin` pe profil `kid` → `403 {"error":"daily_cap"}` la pornirea redării
+   (`/video/stream`, `/video/direct`, `/video/file`, `/video/download`) când clientul trimite `?profile=` /
+   `x-profile-id` sau tokenul de profil.
+
+### Push relay
+
+Companion-ul anunță evenimente aplicației web, care le trimite pe telefoane (FCM v1 / APNs). Contract:
+
+```http
+POST {webAppUrl}/api/push/relay
+Authorization: Bearer <deviceToken>            # același token ca /api/media/sync
+Content-Type: application/json
+
+{
+   "event": "recording.done" | "recording.failed" | "download.ready" | "episode.new",
+   "eventId": "uuid v4 (idempotency key — relay must dedupe on it)",
+   "serverId": "<companion deviceId>",
+   "at": 1762300000000,
+   "profileId": "p_x",                         # optional: only that profile's phones
+   "title": "Recording ready",
+   "body": "Știrile Pro TV",
+   "deepLink": "mixai://livetv/recordings/<id>", # mixai://title/tv/<tmdbId>?season=&episode=, mixai://download/<fileId>?audio=
+   "data": { "recordingId": "…" }               # optional flat string/number/boolean/null map
+}
+```
+
+- Răspuns așteptat `2xx` (corp ignorat). `401/403` ⇒ companion-ul oprește relay-ul până se schimbă tokenul;
+   alte `4xx` sunt finale; `429`/`5xx`/rețea ⇒ 3 încercări (0, 1 s, 4 s).
+- Debounce în companion: același `(event, deepLink, profileId)` max o dată pe minut; `episode.new` o dată la
+   10 min per serial + profil (un sezon întreg = un push). No-op fără `webAppUrl` sau device token.
+- `episode.new` pleacă pentru fiecare profil care are serialul în watchlist când un episod nou intră în bibliotecă.
+- Cod: `src/media/push-relay.ts`; legături în `server.ts` (DVR `onRecordingFinished`, download cache `onReady`,
+   library hooks `onNewEpisode`).
+
+---
+
 ## 🔐 Securitate
 
 - HTTP **doar pe loopback** (`127.0.0.1`), niciodată pe `0.0.0.0`

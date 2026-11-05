@@ -165,6 +165,8 @@ export interface StatsHandlerDeps {
     resolveProfile?: (req: express.Request, res: express.Response) => string | null;
     now?: () => number;
     log?: { error: (msg: string, err: unknown, fields?: Record<string, unknown>) => void };
+    /** Extra fields merged into the response (e.g. `weekly` minutes per profile, WP16-50). */
+    extra?: (profileId: string) => Record<string, unknown>;
 }
 
 /** Express handler for `GET /media/stats?profile=&year=`. */
@@ -182,7 +184,7 @@ export function createStatsHandler(deps: StatsHandlerDeps): express.RequestHandl
                 res.status(400).json({ error: "year must be an integer between 1970 and next year" });
                 return;
             }
-            res.json(buildStats(deps.db, profileId, year, deps.lookupTitle));
+            res.json({ ...buildStats(deps.db, profileId, year, deps.lookupTitle), ...(deps.extra?.(profileId) ?? {}) });
         } catch (err: unknown) {
             deps.log?.error("[media/stats] handler failed", err, { path: req.path });
             if (!res.headersSent) res.status(500).json({ error: "Internal error" });

@@ -41,6 +41,7 @@ import { rateLimit } from "./rate-limit";
 import { fileRegistry, registerFile, makeFileId, resolveFileId, listRegistered } from "./video-registry";
 import { createScanJob, listActiveScanJobs } from "./scan-jobs";
 import { runVideoScanJob } from "./video-scan-runner";
+import { playbackGate } from "../media/playback-gate";
 
 /** Walk configured library roots once and try to recover the absolute
  *  path for an unknown fileId by re-computing makeFileId() for every
@@ -105,6 +106,8 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
                 "video.scan", "video.transcode", "video.subtitles", "video.tmdb-cache",
                 // Media Home brain (WP10): /media/* behind the device token.
                 "media.home", "media.library", "media.progress", "media.plays",
+                // Phone apps (WP16-50).
+                "video.download", "media.subtitles.search", "media.bookmarks", "hub.moderation",
             ],
             ffmpeg: !!FFMPEG_BIN,
         });
@@ -114,17 +117,22 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
         res.json({
             preRemuxAutoOnScan: getSettings().preRemuxAutoOnScan,
             allowVideoTranscode: getSettings().allowVideoTranscode,
+            downloadsCacheCapGb: getSettings().downloadsCacheCapGb,
             analysisQueue: analysisQueueStats(),
         });
     });
 
     r.post("/flags", authMiddleware, express.json(), (req, res) => {
-        const body = req.body as { preRemuxAutoOnScan?: boolean; allowVideoTranscode?: boolean };
+        const body = req.body as { preRemuxAutoOnScan?: boolean; allowVideoTranscode?: boolean; downloadsCacheCapGb?: number };
         if (typeof body.preRemuxAutoOnScan === "boolean") updateSettings({ preRemuxAutoOnScan: body.preRemuxAutoOnScan });
         if (typeof body.allowVideoTranscode === "boolean") updateSettings({ allowVideoTranscode: body.allowVideoTranscode });
+        if (typeof body.downloadsCacheCapGb === "number" && body.downloadsCacheCapGb >= 1 && body.downloadsCacheCapGb <= 10_000) {
+            updateSettings({ downloadsCacheCapGb: body.downloadsCacheCapGb });
+        }
         res.json({
             preRemuxAutoOnScan: getSettings().preRemuxAutoOnScan,
             allowVideoTranscode: getSettings().allowVideoTranscode,
+            downloadsCacheCapGb: getSettings().downloadsCacheCapGb,
             analysisQueue: analysisQueueStats(),
         });
     });
@@ -194,7 +202,7 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
         res.json({ fileId });
     });
 
-    r.get("/direct/:fileId", queryAuth, authMiddleware, async (req, res) => {
+    r.get("/direct/:fileId", queryAuth, authMiddleware, playbackGate, async (req, res) => {
         const abs = await resolveOrRecoverFileId(req.params.fileId);
         if (!abs || !fs.existsSync(abs)) { res.status(404).end(); return; }
         // Prefer the pre-remuxed sidecar (MP4 with hvc1 + AAC stereo,
@@ -236,7 +244,7 @@ export function createVideoRouter(authMiddlewareIn: express.RequestHandler): exp
         res.json({ ok: true, destroyed: n });
     });
 
-    r.get("/stream/:fileId", queryAuth, authMiddleware, async (req, res) => {
+    r.get("/stream/:fileId", queryAuth, authMiddleware, playbackGate, async (req, res) => {
         const abs = await resolveOrRecoverFileId(req.params.fileId);
         if (!abs) { res.status(404).json({ error: "unknown fileId" }); return; }
         // Registry can outlive the file (deleted/moved, drive unplugged): say so instead of a 500 from ffmpeg.

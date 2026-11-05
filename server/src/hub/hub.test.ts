@@ -129,7 +129,8 @@ describe("HubCore Watch Together", () => {
         const { core, last, advance } = mkCore();
         const { room, invite } = core.createRoom("x");
         expect(core.verifyInvite(invite)).toBe(room.id);
-        expect(core.verifyInvite(invite.replace(/.$/, "x"))).toBeNull();
+        // Flip the last MAC char to a DIFFERENT one (a fixed "x" was a no-op 1 time in 64).
+        expect(core.verifyInvite(invite.slice(0, -1) + (invite.endsWith("x") ? "y" : "x"))).toBeNull();
         core.connect("g", { guest: true, guestName: "Guest", inviteRoomId: room.id });
         expect(last("g", "room:joined")).toMatchObject({ roomId: room.id });
         expect(core.listDevices()).toEqual([]);

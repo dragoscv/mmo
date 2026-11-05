@@ -14,12 +14,22 @@
  *   room:ready {ready, positionSec?}   buffering report; anyone not ready → group waits
  *   room:report {positionSec, rttMs}   1 Hz while playing (lead time + drift view)
  *   room:chat {text} | room:react {emoji, mediaSec?}
+ *   Moderation (WP16-50): report {messageId, reason, roomId?} | block {memberId} | unblock {memberId|deviceId}
+ *   | kick {memberId} (host only; alias room:kick)
  * Server → client: welcome, devices, time, cmd, ack, room:joined, room:members, room:state, room:chat,
- *   room:react, room:left, error.
+ *   room:react, room:left, room:kicked, report:ok, block:ok, error.
+ *
+ * `platform` is normalised (`android-tv`, `tizen`, `web`, `android-phone`, `ios`, …); the device list carries
+ * `formFactor` and `playbackTarget` (phones are targets only with the `playback` cap).
+ * Chat messages carry a stable `id`; text is masked by the word filter unless the owner disabled it.
+ * Blocks hide the blocked member's chat + reactions from the blocker for the room lifetime and are persisted
+ * per profile (`hub_blocks`) so they apply again in later rooms.
  */
 
 import crypto from "node:crypto";
 import { expectedPosition, leadTimeMs, type PlaybackAnchor } from "./sync-math";
+import { formFactorOf, isPlaybackTarget, normalizePlatform, type FormFactor } from "../lib/client-platform";
+import { maskProfanity, REPORT_REASONS, type ModerationStore, type ReportReason } from "./moderation";
 
 export type Send = (connId: string, msg: object) => void;
 
@@ -52,7 +62,11 @@ export interface DeviceInfo {
 
 export type RoomPhase = "idle" | "waiting" | "playing" | "paused";
 
-export interface RoomMember { connId: string; name: string; ready: boolean; rttMs: number; positionSec: number; joinedAt: number; guest: boolean }
+export interface RoomMember { connId: string; deviceId: string; name: string; ready: boolean; rttMs: number; positionSec: number; joinedAt: number; guest: boolean }
+
+export interface ChatLogEntry { id: string; connId: string; deviceId: string; name: string; text: string; ts: number }
+
+export type PublicDevice = Omit<DeviceInfo, "connId"> & { formFactor: FormFactor; playbackTarget: boolean };
 
 export interface Room {
     id: string;
@@ -67,7 +81,15 @@ export interface Room {
     /** Phase to enter once everyone is ready again. */
     resumeTo: "playing" | "paused";
     waitingSince: number | null;
+    /** Last messages (for reports), newest last. */
+    chatLog: ChatLogEntry[];
+    /** blocker connId → blocked deviceIds (room lifetime). */
+    blocks: Map<string, Set<string>>;
+    /** deviceIds the host removed; they cannot rejoin this room. */
+    kicked: Set<string>;
 }
+
+export const CHAT_LOG_MAX = 200;
 
 export const ROOM_EMPTY_TTL_MS = 10 * 60_000;
 export const WAIT_TIMEOUT_MS = 8_000;
@@ -95,6 +117,7 @@ export class HubCore {
         private readonly send: Send,
         private readonly secret: () => string,
         private readonly now: () => number = Date.now,
+        private readonly moderation: ModerationStore | null = null,
     ) {}
 
     // ── connection lifecycle ──────────────────────────────────────────────
@@ -121,7 +144,7 @@ export class HubCore {
         const msg = raw as Record<string, unknown>;
         const type = str(msg.type, 32);
         if (!type) return;
-        if (dev.guest && !(type.startsWith("room:") || type === "time" || type === "hello")) return;
+        if (dev.guest && !(type.startsWith("room:") || type === "time" || type === "hello" || type === "report" || type === "block" || type === "unblock")) return;
         switch (type) {
             case "hello": return this.onHello(dev, msg);
             case "time": {
@@ -132,6 +155,10 @@ export class HubCore {
             case "state": return this.onState(dev, msg);
             case "cmd": return this.onCmd(dev, msg);
             case "ack": return this.onAck(dev, msg);
+            case "report": return this.onReport(dev, msg);
+            case "block": return this.onBlock(dev, msg, true);
+            case "unblock": return this.onBlock(dev, msg, false);
+            case "kick": return this.onKick(dev, msg);
             default:
                 if (type.startsWith("room:")) return this.onRoom(dev, type, msg);
         }
@@ -142,7 +169,7 @@ export class HubCore {
     private onHello(dev: DeviceInfo, msg: Record<string, unknown>): void {
         if (!dev.guest) {
             dev.deviceId = str(msg.deviceId, 64) ?? dev.deviceId;
-            dev.platform = str(msg.platform, 32) ?? dev.platform;
+            dev.platform = msg.platform === undefined ? dev.platform : normalizePlatform(msg.platform, dev.platform);
             dev.caps = Array.isArray(msg.caps) ? (msg.caps as unknown[]).filter((c): c is string => typeof c === "string").slice(0, 32) : [];
             dev.profileId = str(msg.profileId, 64) ?? null;
             dev.app = str(msg.app, 64) ?? null;
@@ -204,8 +231,10 @@ export class HubCore {
         });
     }
 
-    listDevices(): Omit<DeviceInfo, "connId">[] {
-        return [...this.devices.values()].filter((d) => !d.guest).map(({ connId: _c, ...d }) => d);
+    listDevices(opts: { targetsOnly?: boolean } = {}): PublicDevice[] {
+        return [...this.devices.values()]
+            .filter((d) => !d.guest && (!opts.targetsOnly || isPlaybackTarget(d)))
+            .map(({ connId: _c, ...d }) => ({ ...d, formFactor: formFactorOf(d.platform), playbackTarget: isPlaybackTarget(d) }));
     }
 
     private broadcastDevices(): void {
@@ -248,6 +277,7 @@ export class HubCore {
             id, name: (name ?? "").slice(0, 60) || "Watch Together", hostConnId: null, phase: "idle", media: null,
             anchor: { playing: false, positionSec: 0, atServerMs: this.now() }, members: new Map(),
             createdAt: this.now(), emptySince: this.now(), resumeTo: "paused", waitingSince: null,
+            chatLog: [], blocks: new Map(), kicked: new Set(),
         };
         this.rooms.set(id, room);
         return { room, invite: this.makeInvite(id) };
@@ -309,27 +339,98 @@ export class HubCore {
                 return;
             }
             case "room:chat": {
-                const text = str(msg.text, 500)?.trim();
-                if (!text) return;
-                this.toRoom(room, { type: "room:chat", from: { connId: dev.connId, name: dev.name }, text, ts: t });
+                const raw = str(msg.text, 500)?.trim();
+                if (!raw) return;
+                const filtered = this.moderation?.chatFilterEnabled() !== false ? maskProfanity(raw) : { text: raw, masked: false };
+                const id = `m_${crypto.randomBytes(6).toString("base64url")}`;
+                room.chatLog.push({ id, connId: dev.connId, deviceId: dev.deviceId, name: dev.name, text: filtered.text, ts: t });
+                if (room.chatLog.length > CHAT_LOG_MAX) room.chatLog.splice(0, room.chatLog.length - CHAT_LOG_MAX);
+                this.toRoomFrom(room, dev.deviceId, {
+                    type: "room:chat", id, from: { connId: dev.connId, deviceId: dev.deviceId, name: dev.name }, text: filtered.text,
+                    ...(filtered.masked ? { masked: true } : {}), ts: t,
+                });
                 return;
             }
             case "room:react": {
                 const emoji = str(msg.emoji, 16);
                 if (!emoji) return;
-                this.toRoom(room, { type: "room:react", from: { connId: dev.connId, name: dev.name }, emoji, mediaSec: num(msg.mediaSec) ?? expectedPosition(room.anchor, t), ts: t });
+                this.toRoomFrom(room, dev.deviceId, {
+                    type: "room:react", id: `r_${crypto.randomBytes(6).toString("base64url")}`, from: { connId: dev.connId, deviceId: dev.deviceId, name: dev.name },
+                    emoji, mediaSec: num(msg.mediaSec) ?? expectedPosition(room.anchor, t), ts: t,
+                });
                 return;
             }
+            case "room:kick": return this.onKick(dev, msg);
         }
+    }
+
+    // ── moderation ────────────────────────────────────────────────────────
+
+    private roomOf(connId: string): Room | undefined {
+        return [...this.rooms.values()].find((r) => r.members.has(connId));
+    }
+
+    private onReport(dev: DeviceInfo, msg: Record<string, unknown>): void {
+        const room = (str(msg.roomId, 32) && this.rooms.get(str(msg.roomId, 32)!)?.members.has(dev.connId) ? this.rooms.get(str(msg.roomId, 32)!) : undefined) ?? this.roomOf(dev.connId);
+        const messageId = str(msg.messageId, 64);
+        if (!room || !messageId) { this.send(dev.connId, { type: "error", error: room ? "bad_report" : "not_in_room" }); return; }
+        const reason: ReportReason = (REPORT_REASONS as readonly string[]).includes(String(msg.reason)) ? msg.reason as ReportReason : "other";
+        const entry = room.chatLog.find((m) => m.id === messageId);
+        const report = this.moderation?.addReport({
+            roomId: room.id, messageId, reporterDeviceId: dev.deviceId, reporterName: dev.name,
+            offenderDeviceId: entry?.deviceId ?? null, offenderName: entry?.name ?? null, text: entry?.text ?? null, reason,
+        });
+        this.send(dev.connId, { type: "report:ok", messageId, reportId: report?.id ?? null });
+    }
+
+    private onBlock(dev: DeviceInfo, msg: Record<string, unknown>, block: boolean): void {
+        const room = this.roomOf(dev.connId);
+        const memberId = str(msg.memberId, 64);
+        const target = memberId ? room?.members.get(memberId) : undefined;
+        const deviceId = target?.deviceId ?? str(msg.deviceId, 64);
+        if (!deviceId || deviceId === dev.deviceId) { this.send(dev.connId, { type: "error", error: "bad_block" }); return; }
+        if (room) {
+            const set = room.blocks.get(dev.connId) ?? new Set<string>();
+            if (block) set.add(deviceId); else set.delete(deviceId);
+            room.blocks.set(dev.connId, set);
+        }
+        // Persist per profile (paired devices only; guest ids are per-connection and meaningless later).
+        if (!dev.guest && dev.profileId && !deviceId.startsWith("guest:")) {
+            if (block) this.moderation?.addBlock(dev.profileId, deviceId, target?.name ?? null);
+            else this.moderation?.removeBlock(dev.profileId, deviceId);
+        }
+        this.send(dev.connId, { type: "block:ok", deviceId, blocked: block });
+    }
+
+    private onKick(dev: DeviceInfo, msg: Record<string, unknown>): void {
+        const room = this.roomOf(dev.connId);
+        if (!room) { this.send(dev.connId, { type: "error", error: "not_in_room" }); return; }
+        if (room.hostConnId !== dev.connId) { this.send(dev.connId, { type: "error", error: "not_host" }); return; }
+        const memberId = str(msg.memberId, 64);
+        const target = memberId ? room.members.get(memberId) : undefined;
+        if (!target || target.connId === dev.connId) { this.send(dev.connId, { type: "error", error: "bad_kick" }); return; }
+        room.kicked.add(target.deviceId);
+        this.send(target.connId, { type: "room:kicked", roomId: room.id });
+        this.leaveRoom(target.connId, room.id);
+    }
+
+    /** Room members' blocks: deviceIds hidden from `connId` (room lifetime + persisted profile blocks). */
+    private isBlockedFor(room: Room, receiverConnId: string, senderDeviceId: string): boolean {
+        return room.blocks.get(receiverConnId)?.has(senderDeviceId) === true;
     }
 
     joinRoom(connId: string, roomId: string): void {
         const room = this.rooms.get(roomId);
         const dev = this.devices.get(connId);
         if (!room || !dev) { this.send(connId, { type: "error", error: "room_not_found" }); return; }
+        if (room.kicked.has(dev.deviceId)) { this.send(connId, { type: "error", error: "kicked" }); return; }
         if (room.members.size >= MAX_ROOM_MEMBERS && !room.members.has(connId)) { this.send(connId, { type: "error", error: "room_full" }); return; }
         for (const r of this.rooms.values()) if (r.id !== roomId && r.members.has(connId)) this.leaveRoom(connId, r.id);
-        room.members.set(connId, { connId, name: dev.name, ready: room.phase !== "waiting", rttMs: 0, positionSec: 0, joinedAt: this.now(), guest: dev.guest });
+        room.members.set(connId, { connId, deviceId: dev.deviceId, name: dev.name, ready: room.phase !== "waiting", rttMs: 0, positionSec: 0, joinedAt: this.now(), guest: dev.guest });
+        if (!dev.guest && dev.profileId && this.moderation) {
+            const persisted = this.moderation.blockedDeviceIds(dev.profileId);
+            if (persisted.size > 0) room.blocks.set(connId, new Set([...(room.blocks.get(connId) ?? []), ...persisted]));
+        }
         room.emptySince = null;
         if (!room.hostConnId) room.hostConnId = connId;
         this.send(connId, { type: "room:joined", roomId: room.id, name: room.name, invite: dev.guest ? undefined : this.makeInvite(room.id) });
@@ -346,6 +447,7 @@ export class HubCore {
     leaveRoom(connId: string, roomId: string): void {
         const room = this.rooms.get(roomId);
         if (!room || !room.members.delete(connId)) return;
+        room.blocks.delete(connId);
         this.send(connId, { type: "room:left", roomId });
         if (room.hostConnId === connId) room.hostConnId = [...room.members.values()].sort((a, b) => a.joinedAt - b.joinedAt)[0]?.connId ?? null;
         if (room.members.size === 0) room.emptySince = this.now();
@@ -396,7 +498,7 @@ export class HubCore {
     roomSnapshot(room: Room): Record<string, unknown> {
         return {
             id: room.id, name: room.name, phase: room.phase, media: room.media, anchor: room.anchor, hostConnId: room.hostConnId,
-            members: [...room.members.values()].map((m) => ({ connId: m.connId, name: m.name, ready: m.ready, guest: m.guest })),
+            members: [...room.members.values()].map((m) => ({ connId: m.connId, deviceId: m.deviceId, name: m.name, ready: m.ready, guest: m.guest })),
         };
     }
 
@@ -411,5 +513,10 @@ export class HubCore {
 
     private toRoom(room: Room, msg: object): void {
         for (const m of room.members.keys()) this.send(m, msg);
+    }
+
+    /** Like `toRoom`, but skips members who blocked the sender. */
+    private toRoomFrom(room: Room, senderDeviceId: string, msg: object): void {
+        for (const m of room.members.keys()) if (!this.isBlockedFor(room, m, senderDeviceId)) this.send(m, msg);
     }
 }

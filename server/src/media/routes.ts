@@ -42,6 +42,11 @@ import { parseVersion } from "./versions";
 import { MusicService } from "./music";
 import { createMusicRouter } from "./music-routes";
 import { createStatsHandler } from "./stats";
+import { BookmarkStore } from "./bookmarks";
+import { SubtitleIndex } from "./subtitles";
+import { registerPhoneRoutes, type SubtitleIndexing } from "./phone-routes";
+import { weeklyUsage } from "./usage";
+import type { PlexFetch } from "./plex-import";
 import type { HistoryEntry, LibraryIndexRow, MediaKind, MediaLogger, ProgressEntry, TitleCard, TitleDetails } from "./types";
 
 export interface MediaRouterDeps {
@@ -63,6 +68,12 @@ export interface MediaRouterDeps {
     getServerId?: () => string;
     /** Human label for the server (defaults to the OS hostname). */
     getServerName?: () => string;
+    bookmarks?: BookmarkStore;
+    subtitles?: SubtitleIndex;
+    /** Embedded-track indexing jobs (video pillar); absent in tests that don't need it. */
+    subtitleIndexing?: () => SubtitleIndexing | null;
+    plexFetch?: PlexFetch;
+    now?: () => number;
 }
 
 const isKind = (v: unknown): v is MediaKind => v === "movie" || v === "tv";
@@ -187,8 +198,29 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
     const profileIdOf = (req: express.Request, res: express.Response) => profileOf(req, res)?.id ?? null;
 
     if (deps.music) router.use("/music", createMusicRouter({ music: deps.music, resolveProfile: profileIdOf, log }));
-    const statsHandler = createStatsHandler({ db, lookupTitle: (k, id) => tmdb.getCachedTitle(k, id), resolveProfile: profileIdOf, log });
+    const statsHandler = createStatsHandler({
+        db, lookupTitle: (k, id) => tmdb.getCachedTitle(k, id), resolveProfile: profileIdOf, log,
+        extra: (profileId) => ({ weekly: weeklyUsage(db, profileId, (deps.now ?? Date.now)()) }),
+    });
     router.get("/stats", statsHandler);
+
+    const titleOfFile = (fileId: string) => {
+        const r = db.prepare("SELECT kind, tmdb_id, season, episode, path FROM library_index WHERE server_file_id = ?").get(fileId) as
+            { kind: MediaKind; tmdb_id: number | null; season: number | null; episode: number | null; path: string } | undefined;
+        if (!r) return { kind: null, tmdbId: null, season: null, episode: null, title: fileId };
+        const t = r.tmdb_id ? tmdb.getCachedTitle(r.kind, r.tmdb_id) : null;
+        const base = r.path.split(/[\\/]/).pop() ?? r.path;
+        return { kind: r.kind, tmdbId: r.tmdb_id, season: r.season, episode: r.episode, title: t?.title ?? base.replace(/\.[^.]+$/, "") };
+    };
+    registerPhoneRoutes(router, {
+        db, tmdb, profiles, progress, watchlist, log, titleOfFile,
+        bookmarks: deps.bookmarks ?? new BookmarkStore(db),
+        subtitles: deps.subtitles ?? new SubtitleIndex(db),
+        subtitleIndexing: deps.subtitleIndexing,
+        resolveProfile: profileOf,
+        plexFetch: deps.plexFetch,
+        now: deps.now,
+    });
 
     const wrap = (fn: (req: express.Request, res: express.Response) => Promise<void>): express.RequestHandler =>
         (req, res) => {

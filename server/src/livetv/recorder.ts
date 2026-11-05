@@ -52,6 +52,8 @@ export interface DvrOptions {
     now?: () => number;
     /** Scheduler tick (default 5 s). */
     tickMs?: number;
+    /** Called once a recording ends as `done` or `failed` (push relay, WP16-50). Never throws into the DVR. */
+    onFinished?: (r: { id: string; title: string; channelId: string; status: "done" | "failed"; error: string | null }) => void;
 }
 
 interface RecRow {
@@ -104,8 +106,10 @@ export class DvrScheduler {
     private readonly tickMs: number;
     private timer: NodeJS.Timeout | null = null;
     private readonly active = new Map<string, Active>();
+    private readonly onFinished: DvrOptions["onFinished"];
 
     constructor(opts: DvrOptions) {
+        this.onFinished = opts.onFinished;
         this.db = opts.db;
         this.service = opts.service;
         this.dir = opts.recordingsDir;
@@ -173,6 +177,11 @@ export class DvrScheduler {
         this.db.prepare("UPDATE recordings SET status = ?, path = ?, error = ? WHERE id = ?").run(
             status, extra.path !== undefined ? extra.path : r.path, extra.error !== undefined ? extra.error : r.error, id,
         );
+        if ((status === "done" || status === "failed") && r.status !== status && this.onFinished) {
+            try {
+                this.onFinished({ id, title: r.title, channelId: r.channel_id, status, error: extra.error !== undefined ? extra.error : r.error });
+            } catch { /* best-effort */ }
+        }
     }
 
     /** Ids of scheduled/recording entries that do not fit their source's tuner limit (first created wins). */

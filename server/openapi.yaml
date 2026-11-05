@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.8.1
+  version: 3.9.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -2408,6 +2408,7 @@ paths:
                 allowVideoTranscode:
                   type: boolean
                   description: Re-encode the video stream for clients that cannot decode it. Off by default (original quality only).
+                downloadsCacheCapGb: { type: number, minimum: 1, maximum: 10000, description: 'Size cap of the iOS MP4 download cache (LRU).' }
       responses:
         '200':
           description: Flags after update
@@ -2499,7 +2500,10 @@ paths:
         - { $ref: '#/components/parameters/QueryT' }
         - { $ref: '#/components/parameters/QueryU' }
         - { $ref: '#/components/parameters/Range' }
+        - { $ref: '#/components/parameters/ViewerProfile' }
+        - { $ref: '#/components/parameters/ViewerProfileToken' }
       responses:
+        '403': { $ref: '#/components/responses/DailyCap' }
         '200':
           description: Whole file
           content:
@@ -2569,6 +2573,8 @@ paths:
         - { name: caps, in: query, schema: { type: string }, description: Comma-separated client capability list. }
         - { name: mode, in: query, schema: { type: string, enum: [remux, audio-transcode, full-transcode] } }
         - { name: audio, in: query, schema: { type: integer, minimum: 0, default: 0 }, description: 'Audio track ordinal (ffmpeg 0:a:N = audioTracks[N]); non-zero bypasses the single-track pre-remux sidecar.' }
+        - { $ref: '#/components/parameters/ViewerProfile' }
+        - { $ref: '#/components/parameters/ViewerProfileToken' }
       responses:
         '200':
           description: HLS playlist
@@ -2579,8 +2585,116 @@ paths:
             application/vnd.apple.mpegurl:
               schema: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/DailyCap' }
         '404': { $ref: '#/components/responses/ErrorJson' }
         '500': { $ref: '#/components/responses/ErrorJson' }
+
+  /video/file/{fileId}:
+    get:
+      operationId: videoOriginalFile
+      tags: [video]
+      summary: Original file as an attachment (offline downloads on Android), with HTTP Range
+      security:
+        - deviceToken: []
+        - queryToken: []
+      parameters:
+        - { $ref: '#/components/parameters/FileId' }
+        - { $ref: '#/components/parameters/QueryT' }
+        - { $ref: '#/components/parameters/Range' }
+        - { $ref: '#/components/parameters/ViewerProfile' }
+        - { $ref: '#/components/parameters/ViewerProfileToken' }
+      responses:
+        '200': { $ref: '#/components/responses/VideoBinary' }
+        '206': { $ref: '#/components/responses/VideoBinary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/DailyCap' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '416': { description: Range not satisfiable }
+
+  /video/download/{fileId}:
+    get:
+      operationId: videoDownload
+      tags: [video]
+      summary: Offline download - original file, or an MP4 remux (`-c copy`) for iOS
+      description: |
+        `container=mp4` remuxes through the ffmpeg job queue into `<userData>/downloads-cache` (LRU, cap
+        `downloadsCacheCapGb`, default 20 GB). The video stream is never re-encoded (HEVC tagged `hvc1`); audio
+        track `audio` is copied when AAC/AC-3/E-AC-3, else converted to E-AC-3 (playback policy); text subtitles
+        become `mov_text`, bitmap subtitles are dropped. While preparing the answer is `202` with the job (poll
+        `/status`); once cached the MP4 is served with Range. Without `container=mp4` this is the original file.
+      security:
+        - deviceToken: []
+        - queryToken: []
+      parameters:
+        - { $ref: '#/components/parameters/FileId' }
+        - { $ref: '#/components/parameters/QueryT' }
+        - { $ref: '#/components/parameters/Range' }
+        - { name: container, in: query, schema: { type: string, enum: [mp4, original], default: original } }
+        - { name: audio, in: query, schema: { type: integer, minimum: 0, default: 0 }, description: Audio track ordinal kept in the MP4. }
+        - { $ref: '#/components/parameters/ViewerProfile' }
+        - { $ref: '#/components/parameters/ViewerProfileToken' }
+      responses:
+        '200': { $ref: '#/components/responses/VideoBinary' }
+        '202':
+          description: Remux queued or running
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DownloadJob' }
+        '206': { $ref: '#/components/responses/VideoBinary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/DailyCap' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '416': { description: Range not satisfiable }
+        '500':
+          description: Remux failed (retry re-queues it)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DownloadJob' }
+        '503': { $ref: '#/components/responses/ErrorJson' }
+
+  /video/download/{fileId}/status:
+    get:
+      operationId: videoDownloadStatus
+      tags: [video]
+      summary: State of the MP4 remux for (fileId, audio)
+      security:
+        - deviceToken: []
+        - queryToken: []
+      parameters:
+        - { $ref: '#/components/parameters/FileId' }
+        - { $ref: '#/components/parameters/QueryT' }
+        - { name: audio, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        '200':
+          description: Job (or the cached file as a finished job)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DownloadJob' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '503': { $ref: '#/components/responses/ErrorJson' }
+
+  /video/downloads/cache:
+    get:
+      operationId: videoDownloadsCache
+      tags: [video]
+      summary: Size of the MP4 download cache
+      responses:
+        '200':
+          description: Usage
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bytes, files, capBytes]
+                properties:
+                  bytes: { type: integer }
+                  files: { type: integer }
+                  capBytes: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/ErrorJson' }
 
   /video/stream/{fileId}/seg/{sessionKey}/{seg}:
     get:
@@ -5097,6 +5211,302 @@ paths:
                   members: { type: integer }
         '404': { $ref: '#/components/responses/ErrorJson' }
 
+  /hub/reports:
+    get:
+      operationId: hubListReports
+      tags: [hub]
+      summary: Watch Together chat reports (owner moderation queue)
+      description: |
+        Members report a message over the hub socket with `report {roomId?, messageId, reason}`
+        (reasons: spam, harassment, hate, sexual, violence, other). Other WS moderation messages:
+        `block {memberId}` / `unblock {memberId|deviceId}` (hide a member's chat + reactions for the room
+        lifetime, persisted per profile), `kick {memberId}` (room host only). Chat messages carry a stable
+        `id` and are masked by the RO+EN word filter unless disabled in `/hub/settings`.
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [open, resolved, all], default: open } }
+        - { name: limit, in: query, schema: { type: integer, default: 100, maximum: 500 } }
+      responses:
+        '200':
+          description: Reports, newest first
+          content:
+            application/json:
+              schema: { type: object, required: [reports], properties: { reports: { type: array, items: { $ref: '#/components/schemas/ChatReport' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/ErrorJson' }
+
+  /hub/reports/{id}/resolve:
+    post:
+      operationId: hubResolveReport
+      tags: [hub]
+      summary: Mark a chat report as handled
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { resolution: { type: string, maxLength: 200, default: resolved } } }
+      responses:
+        '200':
+          description: Updated report
+          content:
+            application/json:
+              schema: { type: object, required: [report], properties: { report: { $ref: '#/components/schemas/ChatReport' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '503': { $ref: '#/components/responses/ErrorJson' }
+
+  /hub/blocks:
+    get:
+      operationId: hubListBlocks
+      tags: [hub]
+      summary: Persisted Watch Together blocks (per profile)
+      parameters:
+        - { name: profile, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Blocks
+          content:
+            application/json:
+              schema: { type: object, required: [blocks], properties: { blocks: { type: array, items: { $ref: '#/components/schemas/HubBlock' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/ErrorJson' }
+
+  /hub/blocks/{profileId}/{deviceId}:
+    delete:
+      operationId: hubDeleteBlock
+      tags: [hub]
+      summary: Remove a persisted block
+      parameters:
+        - { name: profileId, in: path, required: true, schema: { type: string } }
+        - { name: deviceId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema: { type: object, required: [removed], properties: { removed: { type: boolean } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/ErrorJson' }
+
+  /hub/settings:
+    get:
+      operationId: hubGetSettings
+      tags: [hub]
+      summary: Owner moderation settings
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HubSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      operationId: hubPutSettings
+      tags: [hub]
+      summary: Turn the chat word filter on/off
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HubSettings' }
+      responses:
+        '200':
+          description: Settings after update
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HubSettings' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/bookmarks:
+    get:
+      operationId: mediaListBookmarks
+      tags: [media]
+      summary: Scene bookmarks visible to a profile (own + shared; kids see shared ones within their max age)
+      parameters:
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+        - { name: titleKey, in: query, schema: { type: string }, description: '`movie:603`, `tv:1399` (all episodes), `tv:1399:s1e2`, `file:<fileId>`.' }
+      responses:
+        '200':
+          description: Bookmarks ordered by title and second
+          content:
+            application/json:
+              schema: { type: object, required: [bookmarks], properties: { bookmarks: { type: array, items: { $ref: '#/components/schemas/Bookmark' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+    post:
+      operationId: mediaAddBookmark
+      tags: [media]
+      summary: Bookmark a scene
+      parameters:
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookmarkInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { type: object, required: [bookmark], properties: { bookmark: { $ref: '#/components/schemas/Bookmark' } } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/bookmarks/{id}:
+    delete:
+      operationId: mediaDeleteBookmark
+      tags: [media]
+      summary: Delete one of the profile's bookmarks
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/profiles/{id}/usage:
+    get:
+      operationId: mediaProfileUsage
+      tags: [media]
+      summary: Minutes watched/listened today, daily cap state and the last 7 days
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Usage
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileUsage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/stats/family:
+    get:
+      operationId: mediaFamilyStats
+      tags: [media]
+      summary: Weekly minutes per profile + today's cap state (household view)
+      responses:
+        '200':
+          description: Family stats
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FamilyStats' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/subtitles/search:
+    get:
+      operationId: mediaSubtitleSearch
+      tags: [media]
+      summary: Search inside subtitles (accent-insensitive, prefix words, max 50 hits)
+      description: Index = external `.srt`/`.vtt` sidecars + already-extracted embedded text tracks (`POST /media/subtitles/index`). Never spawns ffmpeg. Kid profiles only see hits from titles within their max age.
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 2, maxLength: 200 } }
+        - { name: fileId, in: query, schema: { type: string }, description: Limit to one file (hits ordered by time); omitted = whole library (best matches). }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 50 } }
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
+      responses:
+        '200':
+          description: Hits
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [q, hits]
+                properties:
+                  q: { type: string }
+                  hits: { type: array, items: { $ref: '#/components/schemas/SubtitleHit' } }
+                  indexedFiles: { type: boolean, description: With `fileId` - whether that file has any indexed track. }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/subtitles/index:
+    post:
+      operationId: mediaSubtitleIndex
+      tags: [media]
+      summary: Index a file's subtitles (sidecars now; embedded text tracks via one ffmpeg job in the analysis queue)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [fileId], properties: { fileId: { type: string } } }
+      responses:
+        '200':
+          description: Already complete
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubtitleIndexResponse' }
+        '202':
+          description: Extraction queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubtitleIndexResponse' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '503': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/subtitles/index/{fileId}:
+    get:
+      operationId: mediaSubtitleIndexStatus
+      tags: [media]
+      summary: Indexing job + indexed tracks of a file
+      parameters:
+        - { $ref: '#/components/parameters/FileId' }
+      responses:
+        '200':
+          description: State
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fileId, job, sources]
+                properties:
+                  fileId: { type: string }
+                  job: { oneOf: [{ $ref: '#/components/schemas/SubtitleIndexJob' }, { type: 'null' }] }
+                  sources: { type: array, items: { $ref: '#/components/schemas/SubtitleSource' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/import/plex:
+    post:
+      operationId: mediaImportPlex
+      tags: [media]
+      summary: Import Plex watch history, ratings and watchlist into a profile
+      description: Server-side fetch from the Plex Media Server (+ plex.tv Discover watchlist). Items are matched by `tmdb://` guid (then `imdb://` via TMDB). The Plex token is used for these requests only and never stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [serverUrl, token]
+              properties:
+                serverUrl: { type: string, examples: ['http://192.168.1.20:32400'] }
+                token: { type: string, description: X-Plex-Token. }
+                profileId: { type: string, default: default }
+      responses:
+        '200':
+          description: Counts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlexImportResult' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/ErrorJson' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '502': { $ref: '#/components/responses/ErrorJson' }
+
   /media/music/home:
     get:
       operationId: musicHome
@@ -5756,6 +6166,16 @@ components:
       name: t
       description: Same device token as a query parameter; accepted only on routes that declare it.
   parameters:
+    ViewerProfile:
+      name: profile
+      in: query
+      schema: { type: string }
+      description: 'Viewing profile (also `x-profile-id` header). Kid profiles over `prefs.dailyCapMin` get 403 `daily_cap`.'
+    ViewerProfileToken:
+      name: pt
+      in: query
+      schema: { type: string }
+      description: 'Profile token (also `x-profile-token` header); identifies the profile and wins over `profile`.'
     ProfileToken:
       name: x-profile-token
       in: header
@@ -5799,6 +6219,17 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    DailyCap:
+      description: Kid profile over its daily screen-time cap
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/DailyCapError' }
+    VideoBinary:
+      description: File bytes (whole or a range)
+      content:
+        video/mp4: { schema: { type: string, format: binary } }
+        video/x-matroska: { schema: { type: string, format: binary } }
+        application/octet-stream: { schema: { type: string, format: binary } }
     Unauthorized:
       description: Missing or invalid device token
       content:
@@ -6111,7 +6542,7 @@ components:
       type: object
       properties:
         deviceName: { type: string, maxLength: 64, default: Unknown device }
-        platform: { type: string, maxLength: 64, default: unknown }
+        platform: { $ref: '#/components/schemas/ClientPlatform' }
     PairRequestResponse:
       type: object
       required: [code, secret, expiresAt, qr, approveUrl]
@@ -6536,6 +6967,7 @@ components:
         allowVideoTranscode:
           type: boolean
           description: Re-encode the video stream for clients that cannot decode it. Off by default (original quality only).
+        downloadsCacheCapGb: { type: number, description: 'Size cap of `<userData>/downloads-cache` in GB (default 20).' }
         analysisQueue:
           type: object
           description: Background ffmpeg analyses (sprite, intro, credits, loudness, crop) run one at a time at idle priority.
@@ -7158,13 +7590,25 @@ components:
         durationSec: { type: number }
         media: { $ref: '#/components/schemas/HubMedia' }
         at: { type: integer }
+    ClientPlatform:
+      type: string
+      description: |
+        Client platform sent on pairing and hub `hello`. Known values: `android-tv`, `tizen`, `web`, `android-phone`,
+        `ios`, `desktop`, `android` (aliases such as `iphone` fold to `ios`). Unknown strings are kept (sanitised to
+        `[a-z0-9._-]`, 32 chars) for forward compatibility.
+      examples: [android-phone]
+    FormFactor:
+      type: string
+      enum: [tv, phone, web, desktop, unknown]
     HubDevice:
       type: object
       required: [deviceId, name, platform, caps, profileId, app, connectedAt, guest, nowPlaying]
       properties:
         deviceId: { type: string }
         name: { type: string }
-        platform: { type: string }
+        platform: { $ref: '#/components/schemas/ClientPlatform' }
+        formFactor: { $ref: '#/components/schemas/FormFactor', description: 'Since 3.9.0 (absent on older servers).' }
+        playbackTarget: { type: boolean, description: 'Since 3.9.0. May be offered as a "Play on" target; phones only when caps include `playback`.' }
         caps: { type: array, items: { type: string } }
         profileId: { type: [string, 'null'] }
         app: { type: [string, 'null'] }
@@ -7200,9 +7644,10 @@ components:
           type: array
           items:
             type: object
-            required: [connId, name, ready, guest]
+            required: [connId, deviceId, name, ready, guest]
             properties:
               connId: { type: string }
+              deviceId: { type: string }
               name: { type: string }
               ready: { type: boolean }
               guest: { type: boolean }
@@ -7502,6 +7947,196 @@ components:
             plays: { type: integer }
             topTracks: { type: array, items: { type: object, required: [trackKey, plays], properties: { trackKey: { type: string }, plays: { type: integer } } } }
             byMonth: { type: array, items: { type: number } }
+        weekly: { $ref: '#/components/schemas/WeeklyUsage' }
+    WeeklyUsage:
+      type: object
+      description: Minutes per local day for the last 7 days (oldest first), from live progress writes and music plays.
+      required: [profileId, days, watchMin, listenMin, totalWatchMin, totalListenMin]
+      properties:
+        profileId: { type: string }
+        days: { type: array, items: { type: string, format: date } }
+        watchMin: { type: array, items: { type: integer } }
+        listenMin: { type: array, items: { type: integer } }
+        totalWatchMin: { type: integer }
+        totalListenMin: { type: integer }
+    ProfileUsage:
+      type: object
+      required: [profileId, day, watchMin, listenMin, dailyCapMin, remainingMin, overCap, enforced, week]
+      properties:
+        profileId: { type: string }
+        day: { type: string, format: date }
+        watchMin: { type: integer }
+        listenMin: { type: integer }
+        dailyCapMin: { type: [integer, 'null'], description: 'Profile `prefs.dailyCapMin`.' }
+        remainingMin: { type: [integer, 'null'] }
+        overCap: { type: boolean, description: 'Kid profile at/over its cap: playback starts answer 403 `daily_cap`.' }
+        enforced: { type: boolean, description: Caps apply to kid profiles only. }
+        week: { $ref: '#/components/schemas/WeeklyUsage' }
+    FamilyStats:
+      type: object
+      required: [generatedAt, profiles]
+      properties:
+        generatedAt: { type: integer }
+        profiles:
+          type: array
+          items:
+            type: object
+            required: [profileId, name, kind, days, watchMin, listenMin, weeklyWatchMin, weeklyListenMin, todayWatchMin, dailyCapMin, overCap]
+            properties:
+              profileId: { type: string }
+              name: { type: string }
+              kind: { type: string, enum: [adult, kid] }
+              avatar: { type: [string, 'null'] }
+              color: { type: [string, 'null'] }
+              days: { type: array, items: { type: string, format: date } }
+              watchMin: { type: array, items: { type: integer } }
+              listenMin: { type: array, items: { type: integer } }
+              weeklyWatchMin: { type: integer }
+              weeklyListenMin: { type: integer }
+              todayWatchMin: { type: integer }
+              dailyCapMin: { type: [integer, 'null'] }
+              overCap: { type: boolean }
+    DailyCapError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, enum: [daily_cap] }
+        profileId: { type: string }
+        dailyCapMin: { type: [integer, 'null'] }
+        watchMin: { type: integer }
+    Bookmark:
+      type: object
+      required: [id, profileId, titleKey, kind, tmdbId, season, episode, fileId, sec, label, shared, createdAt]
+      properties:
+        id: { type: string }
+        profileId: { type: string }
+        titleKey: { type: string, description: '`movie:<tmdbId>`, `tv:<tmdbId>:s<S>e<E>`, `tv:<tmdbId>` or `file:<fileId>`.' }
+        kind: { oneOf: [{ $ref: '#/components/schemas/MediaKind' }, { type: 'null' }] }
+        tmdbId: { type: [integer, 'null'] }
+        season: { type: [integer, 'null'] }
+        episode: { type: [integer, 'null'] }
+        fileId: { type: [string, 'null'] }
+        sec: { type: number }
+        label: { type: string }
+        shared: { type: boolean }
+        createdAt: { type: integer }
+        mine: { type: boolean, description: List responses only. }
+        profileName: { type: [string, 'null'], description: List responses only. }
+    BookmarkInput:
+      type: object
+      required: [sec]
+      properties:
+        profileId: { type: string, description: 'Defaults to `?profile=`, then `default`.' }
+        kind: { $ref: '#/components/schemas/MediaKind' }
+        tmdbId: { type: integer }
+        season: { type: integer }
+        episode: { type: integer }
+        fileId: { type: string, description: 'Untagged local file (no TMDB id).' }
+        sec: { type: number, minimum: 0, maximum: 172800 }
+        label: { type: string, maxLength: 120 }
+        shared: { type: boolean, default: false, description: Visible to the whole household (kids only within their max age). }
+    SubtitleHit:
+      type: object
+      required: [fileId, tmdbId, kind, season, episode, title, source, trackIndex, trackKey, lang, startSec, endSec, text]
+      properties:
+        fileId: { type: string }
+        tmdbId: { type: [integer, 'null'] }
+        kind: { type: [string, 'null'] }
+        season: { type: [integer, 'null'] }
+        episode: { type: [integer, 'null'] }
+        title: { type: string }
+        source: { type: string, enum: [external, embedded] }
+        trackIndex: { type: [integer, 'null'], description: 'Subtitle ordinal (`/video/subs/{fileId}/{track}`) for embedded tracks.' }
+        trackKey: { type: string }
+        lang: { type: [string, 'null'] }
+        startSec: { type: number }
+        endSec: { type: number }
+        text: { type: string }
+    SubtitleSource:
+      type: object
+      required: [fileId, trackKey, trackIndex, source, lang, label, cues, indexedAt]
+      properties:
+        fileId: { type: string }
+        trackKey: { type: string }
+        trackIndex: { type: [integer, 'null'] }
+        source: { type: string, enum: [external, embedded] }
+        lang: { type: [string, 'null'] }
+        label: { type: [string, 'null'] }
+        cues: { type: integer }
+        indexedAt: { type: integer }
+    SubtitleIndexJob:
+      type: object
+      required: [state, externalCues, embeddedCues, error]
+      properties:
+        fileId: { type: string }
+        state: { type: string, enum: [queued, running, done, failed] }
+        externalCues: { type: integer }
+        embeddedCues: { type: integer }
+        error: { type: [string, 'null'] }
+        startedAt: { type: integer }
+        finishedAt: { type: [integer, 'null'] }
+    PlexImportResult:
+      type: object
+      required: [profileId, sections, watchedMovies, watchedEpisodes, ratings, watchlist, unmatched, errors]
+      properties:
+        profileId: { type: string }
+        sections: { type: integer }
+        watchedMovies: { type: integer }
+        watchedEpisodes: { type: integer }
+        ratings: { type: integer }
+        watchlist: { type: integer }
+        unmatched: { type: integer }
+        errors: { type: array, items: { type: string } }
+    DownloadJob:
+      type: object
+      required: [jobId, fileId, audio, state, progress, error, sizeBytes, createdAt, finishedAt]
+      properties:
+        jobId: { type: string }
+        fileId: { type: string }
+        audio: { type: integer }
+        state: { type: string, enum: [queued, running, done, failed] }
+        progress: { type: number, minimum: 0, maximum: 1 }
+        error: { type: [string, 'null'] }
+        sizeBytes: { type: [integer, 'null'] }
+        createdAt: { type: number }
+        finishedAt: { type: [number, 'null'] }
+    ChatReport:
+      type: object
+      required: [id, roomId, messageId, reporterDeviceId, reporterName, offenderDeviceId, offenderName, text, reason, createdAt, resolvedAt, resolution]
+      properties:
+        id: { type: string }
+        roomId: { type: string }
+        messageId: { type: string }
+        reporterDeviceId: { type: string }
+        reporterName: { type: string }
+        offenderDeviceId: { type: [string, 'null'] }
+        offenderName: { type: [string, 'null'] }
+        text: { type: [string, 'null'], description: Message text as relayed (after the word filter). }
+        reason: { type: string, enum: [spam, harassment, hate, sexual, violence, other] }
+        createdAt: { type: integer }
+        resolvedAt: { type: [integer, 'null'] }
+        resolution: { type: [string, 'null'] }
+    HubBlock:
+      type: object
+      required: [profileId, deviceId, name, createdAt]
+      properties:
+        profileId: { type: string }
+        deviceId: { type: string }
+        name: { type: [string, 'null'] }
+        createdAt: { type: integer }
+    HubSettings:
+      type: object
+      required: [chatFilter]
+      properties:
+        chatFilter: { type: boolean, description: RO+EN word filter on Watch Together chat (masks with ***). Default on. }
+    SubtitleIndexResponse:
+      allOf:
+        - { $ref: '#/components/schemas/SubtitleIndexJob' }
+        - type: object
+          required: [fileId, sources]
+          properties:
+            fileId: { type: string }
+            sources: { type: array, items: { $ref: '#/components/schemas/SubtitleSource' } }
     LiveTvSourceInput:
       type: object
       properties:

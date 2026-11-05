@@ -42,6 +42,15 @@ import { createHub, type Hub } from "./hub";
 import { createLiveTvModule, type LiveTvModule } from "./livetv";
 import { getMeta as getMediaMeta, setMeta as setMediaMeta } from "./media/db";
 import { createMediaLibraryHooks, setMediaLibraryHooks } from "./media/library-hooks";
+import { createDownloadRouter, tracksFromMeta } from "./library/download-routes";
+import { DownloadCache, parseProgressChunk } from "./library/download-cache";
+import { runFfmpeg, withAnalysisSlot } from "./library/ffmpeg-jobs";
+import { fileRegistry, resolveFileId } from "./library/video-registry";
+import { probeStreamCodecs } from "./library/transcode-video";
+import { SubtitleIndexer } from "./library/subtitle-indexer";
+import { setPlaybackGate } from "./media/playback-gate";
+import { capStatus } from "./media/usage";
+import { MediaModerationStore } from "./hub/moderation";
 import { buildCompanionMetrics } from "./metrics";
 import {
     createScanJob,
@@ -100,6 +109,7 @@ let httpServer: http.Server | null = null;
 let mediaModule: MediaModule | null = null;
 let hub: Hub | null = null;
 let liveTv: LiveTvModule | null = null;
+let downloadCache: DownloadCache | null = null;
 let wss: WebSocketServer | null = null;
 let serverPort = 17899;
 const wsClients = new Set<WebSocket>();
@@ -1173,6 +1183,45 @@ export async function startServer(): Promise<void> {
     });
     app.use("/video", createVideoRouter(authMiddleware));
     app.use("/video", createWatchPartyRouter(authMiddleware));
+    // Offline downloads (WP16-50): original file (Android) + MP4 `-c copy` remux cache (iOS).
+    app.use("/video", createDownloadRouter({
+        auth: authMiddleware,
+        cache: () => {
+            if (!downloadCache) {
+                downloadCache = new DownloadCache({
+                    dir: path.join(platform.getPath("userData"), "downloads-cache"),
+                    getCapBytes: () => getSettings().downloadsCacheCapGb * 1024 ** 3,
+                    slot: withAnalysisSlot,
+                    run: async (args, onSec) => {
+                        const r = await runFfmpeg(args, {
+                            priority: "below-normal", timeoutMs: 6 * 3600_000,
+                            onStdout: (b) => { const s = parseProgressChunk(b.toString("utf8")); if (s !== null) onSec(s); },
+                        });
+                        return { code: r.code, stderr: r.stderr };
+                    },
+                    onReady: (job, title) => {
+                        void mediaModule?.push?.notify({
+                            event: "download.ready", title: "Download ready", body: title || job.fileId,
+                            deepLink: `mixai://download/${encodeURIComponent(job.fileId)}?audio=${job.audio}`,
+                            data: { fileId: job.fileId, audio: job.audio, sizeBytes: job.sizeBytes },
+                        });
+                    },
+                    log: { warn: (m, f) => log("warn", m, f ?? "") },
+                });
+            }
+            return downloadCache;
+        },
+        resolve: async (fileId) => {
+            const abs = resolveFileId(fileId);
+            return abs ? { absPath: abs, meta: fileRegistry.get(fileId)?.meta ?? {} } : null;
+        },
+        tracks: async (abs, meta) => {
+            const known = tracksFromMeta(meta);
+            if (known) return known;
+            const c = await probeStreamCodecs(abs);
+            return { videoCodec: c.video, durationSec: null, audioTracks: c.audioStreams ?? [], subtitleTracks: [] };
+        },
+    }));
 
     // ─── Casting (DLNA renderers + Home Assistant media players) ────────
     //
@@ -1214,10 +1263,32 @@ export async function startServer(): Promise<void> {
                 getDeviceToken: () => (store.get("deviceToken") as string | undefined) || undefined,
             },
         });
-        setMediaLibraryHooks(createMediaLibraryHooks(mediaModule.library, {
+        const mm = mediaModule;
+        setMediaLibraryHooks(createMediaLibraryHooks(mm.library, {
             getRoots: () => getSettings().scanFolders.filter((f) => f.kind === "movies" || f.kind === "tv-shows").map((f) => f.path),
             log: mediaLog,
+            // Push `episode.new` to every profile that has the show on its watchlist (WP16-50).
+            onNewEpisode: (row) => {
+                const profiles = mm.db.prepare("SELECT profile_id FROM watchlist WHERE kind = 'tv' AND tmdb_id = ?").all(row.tmdbId) as { profile_id: string }[];
+                const show = mm.tmdb.getCachedTitle("tv", row.tmdbId!)?.title ?? `#${row.tmdbId}`;
+                const se = `S${String(row.season).padStart(2, "0")}E${String(row.episode).padStart(2, "0")}`;
+                for (const p of profiles) {
+                    void mm.push?.notify({
+                        event: "episode.new", profileId: p.profile_id, title: show, body: `${se} is in your library`,
+                        deepLink: `mixai://title/tv/${row.tmdbId}?season=${row.season}&episode=${row.episode}`,
+                        data: { tmdbId: row.tmdbId, season: row.season, episode: row.episode, fileId: row.serverFileId },
+                        // A season dropped at once = one push per show+profile per 10 minutes.
+                        dedupeKey: `tv:${row.tmdbId}:${p.profile_id}`, windowMs: 10 * 60_000,
+                    });
+                }
+            },
         }));
+        // Kids screen-time caps on playback starts (/video/stream, /video/direct, downloads).
+        setPlaybackGate(
+            (profileId) => capStatus(mm.db, mm.profiles.get(profileId), profileId, Date.now()),
+            (tok) => mm.profiles.verifyToken(tok),
+        );
+        mm.setSubtitleIndexing(new SubtitleIndexer({ index: mm.subtitles }));
     }
     app.use("/media", authMiddleware, mediaModule.router);
 
@@ -1236,6 +1307,7 @@ export async function startServer(): Promise<void> {
                 if (!s) { s = crypto.randomBytes(32).toString("base64url"); setMediaMeta(mm.db, "hub_secret", s); }
                 return s;
             },
+            moderation: new MediaModerationStore(mm.db),
             log: { info: (m, f) => log("info", m, f ?? ""), warn: (m, f) => log("warn", m, f ?? "") },
         });
     }
@@ -1251,6 +1323,15 @@ export async function startServer(): Promise<void> {
         liveTv = createLiveTvModule({
             userDataDir: platform.getPath("userData"),
             recordingsDir: recFolder ? path.join(recFolder, "Live TV") : path.join(platform.getPath("userData"), "recordings"),
+            onRecordingFinished: (r) => {
+                void mediaModule?.push?.notify({
+                    event: r.status === "done" ? "recording.done" : "recording.failed",
+                    title: r.status === "done" ? "Recording ready" : "Recording failed",
+                    body: r.status === "done" ? r.title : `${r.title}: ${r.error ?? "error"}`.slice(0, 180),
+                    deepLink: `mixai://livetv/recordings/${encodeURIComponent(r.id)}`,
+                    data: { recordingId: r.id, channelId: r.channelId },
+                });
+            },
             log: {
                 debug: () => undefined,
                 info: (msg: string, fields?: Record<string, unknown>) => log("info", msg, fields ?? ""),
@@ -1814,7 +1895,7 @@ export async function stopServer(): Promise<void> {
 
     try { closeLibraryDb(); } catch { /* ignore */ }
     try { shutdownVideoSubsystem(); } catch { /* ignore */ }
-    try { setMediaLibraryHooks(null); mediaModule?.close(); mediaModule = null; } catch { /* ignore */ }
+    try { setMediaLibraryHooks(null); setPlaybackGate(null); mediaModule?.close(); mediaModule = null; } catch { /* ignore */ }
     try { voiceHost.shutdown(); } catch { /* ignore */ }
     try { engineRegistry.shutdown(); } catch { /* ignore */ }
 

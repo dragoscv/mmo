@@ -1699,6 +1699,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/video/file/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Original file as an attachment (offline downloads on Android), with HTTP Range */
+        get: operations["videoOriginalFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/video/download/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Offline download - original file, or an MP4 remux (`-c copy`) for iOS
+         * @description `container=mp4` remuxes through the ffmpeg job queue into `<userData>/downloads-cache` (LRU, cap
+         *     `downloadsCacheCapGb`, default 20 GB). The video stream is never re-encoded (HEVC tagged `hvc1`); audio
+         *     track `audio` is copied when AAC/AC-3/E-AC-3, else converted to E-AC-3 (playback policy); text subtitles
+         *     become `mov_text`, bitmap subtitles are dropped. While preparing the answer is `202` with the job (poll
+         *     `/status`); once cached the MP4 is served with Range. Without `container=mp4` this is the original file.
+         */
+        get: operations["videoDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/video/download/{fileId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** State of the MP4 remux for (fileId, audio) */
+        get: operations["videoDownloadStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/video/downloads/cache": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Size of the MP4 download cache */
+        get: operations["videoDownloadsCache"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/video/stream/{fileId}/seg/{sessionKey}/{seg}": {
         parameters: {
             query?: never;
@@ -3403,6 +3478,242 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/hub/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Watch Together chat reports (owner moderation queue)
+         * @description Members report a message over the hub socket with `report {roomId?, messageId, reason}`
+         *     (reasons: spam, harassment, hate, sexual, violence, other). Other WS moderation messages:
+         *     `block {memberId}` / `unblock {memberId|deviceId}` (hide a member's chat + reactions for the room
+         *     lifetime, persisted per profile), `kick {memberId}` (room host only). Chat messages carry a stable
+         *     `id` and are masked by the RO+EN word filter unless disabled in `/hub/settings`.
+         */
+        get: operations["hubListReports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hub/reports/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a chat report as handled */
+        post: operations["hubResolveReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hub/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Persisted Watch Together blocks (per profile) */
+        get: operations["hubListBlocks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hub/blocks/{profileId}/{deviceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a persisted block */
+        delete: operations["hubDeleteBlock"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hub/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Owner moderation settings */
+        get: operations["hubGetSettings"];
+        /** Turn the chat word filter on/off */
+        put: operations["hubPutSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/bookmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scene bookmarks visible to a profile (own + shared; kids see shared ones within their max age) */
+        get: operations["mediaListBookmarks"];
+        put?: never;
+        /** Bookmark a scene */
+        post: operations["mediaAddBookmark"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/bookmarks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete one of the profile's bookmarks */
+        delete: operations["mediaDeleteBookmark"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/profiles/{id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Minutes watched/listened today, daily cap state and the last 7 days */
+        get: operations["mediaProfileUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/stats/family": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Weekly minutes per profile + today's cap state (household view) */
+        get: operations["mediaFamilyStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/subtitles/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search inside subtitles (accent-insensitive, prefix words, max 50 hits)
+         * @description Index = external `.srt`/`.vtt` sidecars + already-extracted embedded text tracks (`POST /media/subtitles/index`). Never spawns ffmpeg. Kid profiles only see hits from titles within their max age.
+         */
+        get: operations["mediaSubtitleSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/subtitles/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Index a file's subtitles (sidecars now; embedded text tracks via one ffmpeg job in the analysis queue) */
+        post: operations["mediaSubtitleIndex"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/subtitles/index/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Indexing job + indexed tracks of a file */
+        get: operations["mediaSubtitleIndexStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/import/plex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Plex watch history, ratings and watchlist into a profile
+         * @description Server-side fetch from the Plex Media Server (+ plex.tv Discover watchlist). Items are matched by `tmdb://` guid (then `imdb://` via TMDB). The Plex token is used for these requests only and never stored.
+         */
+        post: operations["mediaImportPlex"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/media/music/home": {
         parameters: {
             query?: never;
@@ -4177,8 +4488,7 @@ export interface components {
         PairRequest: {
             /** @default Unknown device */
             deviceName: string;
-            /** @default unknown */
-            platform: string;
+            platform?: components["schemas"]["ClientPlatform"];
         };
         PairRequestResponse: {
             code: string;
@@ -4539,6 +4849,8 @@ export interface components {
             preRemuxAutoOnScan: boolean;
             /** @description Re-encode the video stream for clients that cannot decode it. Off by default (original quality only). */
             allowVideoTranscode: boolean;
+            /** @description Size cap of `<userData>/downloads-cache` in GB (default 20). */
+            downloadsCacheCapGb?: number;
             /** @description Background ffmpeg analyses (sprite, intro, credits, loudness, crop) run one at a time at idle priority. */
             analysisQueue?: {
                 active: number;
@@ -5079,10 +5391,23 @@ export interface components {
             media?: components["schemas"]["HubMedia"];
             at: number;
         };
+        /**
+         * @description Client platform sent on pairing and hub `hello`. Known values: `android-tv`, `tizen`, `web`, `android-phone`,
+         *     `ios`, `desktop`, `android` (aliases such as `iphone` fold to `ios`). Unknown strings are kept (sanitised to
+         *     `[a-z0-9._-]`, 32 chars) for forward compatibility.
+         * @example android-phone
+         */
+        ClientPlatform: string;
+        /** @enum {string} */
+        FormFactor: "tv" | "phone" | "web" | "desktop" | "unknown";
         HubDevice: {
             deviceId: string;
             name: string;
-            platform: string;
+            platform: components["schemas"]["ClientPlatform"];
+            /** @description Since 3.9.0 (absent on older servers). */
+            formFactor?: components["schemas"]["FormFactor"];
+            /** @description Since 3.9.0. May be offered as a "Play on" target; phones only when caps include `playback`. */
+            playbackTarget?: boolean;
             caps: string[];
             profileId: string | null;
             app: string | null;
@@ -5113,6 +5438,7 @@ export interface components {
             hostConnId: string | null;
             members: {
                 connId: string;
+                deviceId: string;
                 name: string;
                 ready: boolean;
                 guest: boolean;
@@ -5369,6 +5695,183 @@ export interface components {
                 }[];
                 byMonth: number[];
             };
+            weekly?: components["schemas"]["WeeklyUsage"];
+        };
+        /** @description Minutes per local day for the last 7 days (oldest first), from live progress writes and music plays. */
+        WeeklyUsage: {
+            profileId: string;
+            days: string[];
+            watchMin: number[];
+            listenMin: number[];
+            totalWatchMin: number;
+            totalListenMin: number;
+        };
+        ProfileUsage: {
+            profileId: string;
+            /** Format: date */
+            day: string;
+            watchMin: number;
+            listenMin: number;
+            /** @description Profile `prefs.dailyCapMin`. */
+            dailyCapMin: number | null;
+            remainingMin: number | null;
+            /** @description Kid profile at/over its cap: playback starts answer 403 `daily_cap`. */
+            overCap: boolean;
+            /** @description Caps apply to kid profiles only. */
+            enforced: boolean;
+            week: components["schemas"]["WeeklyUsage"];
+        };
+        FamilyStats: {
+            generatedAt: number;
+            profiles: {
+                profileId: string;
+                name: string;
+                /** @enum {string} */
+                kind: "adult" | "kid";
+                avatar?: string | null;
+                color?: string | null;
+                days: string[];
+                watchMin: number[];
+                listenMin: number[];
+                weeklyWatchMin: number;
+                weeklyListenMin: number;
+                todayWatchMin: number;
+                dailyCapMin: number | null;
+                overCap: boolean;
+            }[];
+        };
+        DailyCapError: {
+            /** @enum {string} */
+            error: "daily_cap";
+            profileId?: string;
+            dailyCapMin?: number | null;
+            watchMin?: number;
+        };
+        Bookmark: {
+            id: string;
+            profileId: string;
+            /** @description `movie:<tmdbId>`, `tv:<tmdbId>:s<S>e<E>`, `tv:<tmdbId>` or `file:<fileId>`. */
+            titleKey: string;
+            kind: components["schemas"]["MediaKind"] | null;
+            tmdbId: number | null;
+            season: number | null;
+            episode: number | null;
+            fileId: string | null;
+            sec: number;
+            label: string;
+            shared: boolean;
+            createdAt: number;
+            /** @description List responses only. */
+            mine?: boolean;
+            /** @description List responses only. */
+            profileName?: string | null;
+        };
+        BookmarkInput: {
+            /** @description Defaults to `?profile=`, then `default`. */
+            profileId?: string;
+            kind?: components["schemas"]["MediaKind"];
+            tmdbId?: number;
+            season?: number;
+            episode?: number;
+            /** @description Untagged local file (no TMDB id). */
+            fileId?: string;
+            sec: number;
+            label?: string;
+            /**
+             * @description Visible to the whole household (kids only within their max age).
+             * @default false
+             */
+            shared: boolean;
+        };
+        SubtitleHit: {
+            fileId: string;
+            tmdbId: number | null;
+            kind: string | null;
+            season: number | null;
+            episode: number | null;
+            title: string;
+            /** @enum {string} */
+            source: "external" | "embedded";
+            /** @description Subtitle ordinal (`/video/subs/{fileId}/{track}`) for embedded tracks. */
+            trackIndex: number | null;
+            trackKey: string;
+            lang: string | null;
+            startSec: number;
+            endSec: number;
+            text: string;
+        };
+        SubtitleSource: {
+            fileId: string;
+            trackKey: string;
+            trackIndex: number | null;
+            /** @enum {string} */
+            source: "external" | "embedded";
+            lang: string | null;
+            label: string | null;
+            cues: number;
+            indexedAt: number;
+        };
+        SubtitleIndexJob: {
+            fileId?: string;
+            /** @enum {string} */
+            state: "queued" | "running" | "done" | "failed";
+            externalCues: number;
+            embeddedCues: number;
+            error: string | null;
+            startedAt?: number;
+            finishedAt?: number | null;
+        };
+        PlexImportResult: {
+            profileId: string;
+            sections: number;
+            watchedMovies: number;
+            watchedEpisodes: number;
+            ratings: number;
+            watchlist: number;
+            unmatched: number;
+            errors: string[];
+        };
+        DownloadJob: {
+            jobId: string;
+            fileId: string;
+            audio: number;
+            /** @enum {string} */
+            state: "queued" | "running" | "done" | "failed";
+            progress: number;
+            error: string | null;
+            sizeBytes: number | null;
+            createdAt: number;
+            finishedAt: number | null;
+        };
+        ChatReport: {
+            id: string;
+            roomId: string;
+            messageId: string;
+            reporterDeviceId: string;
+            reporterName: string;
+            offenderDeviceId: string | null;
+            offenderName: string | null;
+            /** @description Message text as relayed (after the word filter). */
+            text: string | null;
+            /** @enum {string} */
+            reason: "spam" | "harassment" | "hate" | "sexual" | "violence" | "other";
+            createdAt: number;
+            resolvedAt: number | null;
+            resolution: string | null;
+        };
+        HubBlock: {
+            profileId: string;
+            deviceId: string;
+            name: string | null;
+            createdAt: number;
+        };
+        HubSettings: {
+            /** @description RO+EN word filter on Watch Together chat (masks with ***). Default on. */
+            chatFilter: boolean;
+        };
+        SubtitleIndexResponse: components["schemas"]["SubtitleIndexJob"] & {
+            fileId: string;
+            sources: components["schemas"]["SubtitleSource"][];
         };
         LiveTvSourceInput: {
             /** @enum {string} */
@@ -5467,6 +5970,26 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Kid profile over its daily screen-time cap */
+        DailyCap: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["DailyCapError"];
+            };
+        };
+        /** @description File bytes (whole or a range) */
+        VideoBinary: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "video/mp4": string;
+                "video/x-matroska": string;
+                "application/octet-stream": string;
+            };
+        };
         /** @description Missing or invalid device token */
         Unauthorized: {
             headers: {
@@ -5524,6 +6047,10 @@ export interface components {
         };
     };
     parameters: {
+        /** @description Viewing profile (also `x-profile-id` header). Kid profiles over `prefs.dailyCapMin` get 403 `daily_cap`. */
+        ViewerProfile: string;
+        /** @description Profile token (also `x-profile-token` header); identifies the profile and wins over `profile`. */
+        ViewerProfileToken: string;
         /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
         ProfileToken: string;
         /** @description Device token (alternative to the `x-device-token` header). */
@@ -8474,6 +9001,8 @@ export interface operations {
                     preRemuxAutoOnScan?: boolean;
                     /** @description Re-encode the video stream for clients that cannot decode it. Off by default (original quality only). */
                     allowVideoTranscode?: boolean;
+                    /** @description Size cap of the iOS MP4 download cache (LRU). */
+                    downloadsCacheCapGb?: number;
                 };
             };
         };
@@ -8579,6 +9108,10 @@ export interface operations {
                 t?: components["parameters"]["QueryT"];
                 /** @description User id, copied into the `x-user-id` header. */
                 u?: components["parameters"]["QueryU"];
+                /** @description Viewing profile (also `x-profile-id` header). Kid profiles over `prefs.dailyCapMin` get 403 `daily_cap`. */
+                profile?: components["parameters"]["ViewerProfile"];
+                /** @description Profile token (also `x-profile-token` header); identifies the profile and wins over `profile`. */
+                pt?: components["parameters"]["ViewerProfileToken"];
             };
             header?: {
                 /** @description HTTP byte range, e.g. `bytes=0-`. */
@@ -8617,6 +9150,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["DailyCap"];
             /** @description Unknown file id or missing file (empty body) */
             404: {
                 headers: {
@@ -8681,6 +9215,10 @@ export interface operations {
                 mode?: "remux" | "audio-transcode" | "full-transcode";
                 /** @description Audio track ordinal (ffmpeg 0:a:N = audioTracks[N]); non-zero bypasses the single-track pre-remux sidecar. */
                 audio?: number;
+                /** @description Viewing profile (also `x-profile-id` header). Kid profiles over `prefs.dailyCapMin` get 403 `daily_cap`. */
+                profile?: components["parameters"]["ViewerProfile"];
+                /** @description Profile token (also `x-profile-token` header); identifies the profile and wins over `profile`. */
+                pt?: components["parameters"]["ViewerProfileToken"];
             };
             header?: never;
             path: {
@@ -8702,8 +9240,160 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["DailyCap"];
             404: components["responses"]["ErrorJson"];
             500: components["responses"]["ErrorJson"];
+        };
+    };
+    videoOriginalFile: {
+        parameters: {
+            query?: {
+                /** @description Device token (alternative to the `x-device-token` header). */
+                t?: components["parameters"]["QueryT"];
+                /** @description Viewing profile (also `x-profile-id` header). Kid profiles over `prefs.dailyCapMin` get 403 `daily_cap`. */
+                profile?: components["parameters"]["ViewerProfile"];
+                /** @description Profile token (also `x-profile-token` header); identifies the profile and wins over `profile`. */
+                pt?: components["parameters"]["ViewerProfileToken"];
+            };
+            header?: {
+                /** @description HTTP byte range, e.g. `bytes=0-`. */
+                Range?: components["parameters"]["Range"];
+            };
+            path: {
+                /** @description Opaque id returned by `/video/scan` or `/video/lookup`. */
+                fileId: components["parameters"]["FileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["VideoBinary"];
+            206: components["responses"]["VideoBinary"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["DailyCap"];
+            404: components["responses"]["ErrorJson"];
+            /** @description Range not satisfiable */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    videoDownload: {
+        parameters: {
+            query?: {
+                /** @description Device token (alternative to the `x-device-token` header). */
+                t?: components["parameters"]["QueryT"];
+                container?: "mp4" | "original";
+                /** @description Audio track ordinal kept in the MP4. */
+                audio?: number;
+                /** @description Viewing profile (also `x-profile-id` header). Kid profiles over `prefs.dailyCapMin` get 403 `daily_cap`. */
+                profile?: components["parameters"]["ViewerProfile"];
+                /** @description Profile token (also `x-profile-token` header); identifies the profile and wins over `profile`. */
+                pt?: components["parameters"]["ViewerProfileToken"];
+            };
+            header?: {
+                /** @description HTTP byte range, e.g. `bytes=0-`. */
+                Range?: components["parameters"]["Range"];
+            };
+            path: {
+                /** @description Opaque id returned by `/video/scan` or `/video/lookup`. */
+                fileId: components["parameters"]["FileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["VideoBinary"];
+            /** @description Remux queued or running */
+            202: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadJob"];
+                };
+            };
+            206: components["responses"]["VideoBinary"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["DailyCap"];
+            404: components["responses"]["ErrorJson"];
+            /** @description Range not satisfiable */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Remux failed (retry re-queues it) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadJob"];
+                };
+            };
+            503: components["responses"]["ErrorJson"];
+        };
+    };
+    videoDownloadStatus: {
+        parameters: {
+            query?: {
+                /** @description Device token (alternative to the `x-device-token` header). */
+                t?: components["parameters"]["QueryT"];
+                audio?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Opaque id returned by `/video/scan` or `/video/lookup`. */
+                fileId: components["parameters"]["FileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job (or the cached file as a finished job) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadJob"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+            503: components["responses"]["ErrorJson"];
+        };
+    };
+    videoDownloadsCache: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        bytes: number;
+                        files: number;
+                        capBytes: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ErrorJson"];
         };
     };
     videoStreamSegment: {
@@ -12056,6 +12746,447 @@ export interface operations {
                 };
             };
             404: components["responses"]["ErrorJson"];
+        };
+    };
+    hubListReports: {
+        parameters: {
+            query?: {
+                status?: "open" | "resolved" | "all";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reports, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        reports: components["schemas"]["ChatReport"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ErrorJson"];
+        };
+    };
+    hubResolveReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @default resolved */
+                    resolution?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        report: components["schemas"]["ChatReport"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+            503: components["responses"]["ErrorJson"];
+        };
+    };
+    hubListBlocks: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Blocks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        blocks: components["schemas"]["HubBlock"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ErrorJson"];
+        };
+    };
+    hubDeleteBlock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: string;
+                deviceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        removed: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ErrorJson"];
+        };
+    };
+    hubGetSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HubSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    hubPutSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HubSettings"];
+            };
+        };
+        responses: {
+            /** @description Settings after update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HubSettings"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaListBookmarks: {
+        parameters: {
+            query?: {
+                profile?: string;
+                /** @description `movie:603`, `tv:1399` (all episodes), `tv:1399:s1e2`, `file:<fileId>`. */
+                titleKey?: string;
+            };
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bookmarks ordered by title and second */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        bookmarks: components["schemas"]["Bookmark"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaAddBookmark: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookmarkInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        bookmark: components["schemas"]["Bookmark"];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaDeleteBookmark: {
+        parameters: {
+            query?: {
+                profile?: string;
+            };
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaProfileUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileUsage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaFamilyStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Family stats */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FamilyStats"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    mediaSubtitleSearch: {
+        parameters: {
+            query: {
+                q: string;
+                /** @description Limit to one file (hits ordered by time); omitted = whole library (best matches). */
+                fileId?: string;
+                limit?: number;
+                profile?: string;
+            };
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hits */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        q: string;
+                        hits: components["schemas"]["SubtitleHit"][];
+                        /** @description With `fileId` - whether that file has any indexed track. */
+                        indexedFiles?: boolean;
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaSubtitleIndex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    fileId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Already complete */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubtitleIndexResponse"];
+                };
+            };
+            /** @description Extraction queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubtitleIndexResponse"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+            503: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaSubtitleIndexStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Opaque id returned by `/video/scan` or `/video/lookup`. */
+                fileId: components["parameters"]["FileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description State */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        fileId: string;
+                        job: components["schemas"]["SubtitleIndexJob"] | null;
+                        sources: components["schemas"]["SubtitleSource"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    mediaImportPlex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example http://192.168.1.20:32400 */
+                    serverUrl: string;
+                    /** @description X-Plex-Token. */
+                    token: string;
+                    /** @default default */
+                    profileId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlexImportResult"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["ErrorJson"];
+            403: components["responses"]["ErrorJson"];
+            404: components["responses"]["ErrorJson"];
+            502: components["responses"]["ErrorJson"];
         };
     };
     musicHome: {

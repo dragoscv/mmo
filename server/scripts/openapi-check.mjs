@@ -26,6 +26,7 @@ const MOUNTS = {
     "library/routes.ts": "/library",
     "library/video-routes.ts": "/video",
     "library/watch-party.ts": "/video",
+    "library/download-routes.ts": "/video",
     "subsonic/router.ts": "/rest",
     "sync/http-router.ts": "/v1/sync",
     "projects/router.ts": "/projects",
@@ -37,6 +38,7 @@ const MOUNTS = {
     "pair/router.ts": "/pair",
     "media/routes.ts": "/media",
     "media/music-routes.ts": "/media/music",
+    "media/phone-routes.ts": "/media",
     "hub/index.ts": "/hub",
     "livetv/routes.ts": "/livetv",
 };

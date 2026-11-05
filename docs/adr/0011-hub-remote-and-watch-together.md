@@ -96,6 +96,12 @@ clock model, not just event forwarding.
 - **Security.** Full access still equals the device token (same trust as every other route). Guests are
   limited by the HMAC invite, the `Origin` check and the per-file `/video` gate. Chat moderation
   (report/block/filter) is not built in this ADR; it is scoped to WP16-50.
+  *Amendment 2026-11-05 (server 3.9.0, WP16-50):* built — chat messages carry stable ids; RO+EN word filter
+  masks with `***` (owner switch `PUT /hub/settings`); WS `report` → `chat_reports` in media.sqlite
+  (`GET /hub/reports`, resolve); `block`/`unblock` hides a member's chat + reactions from the blocker for the
+  room lifetime and is persisted per profile (`hub_blocks`); host-only `kick` bars the device from that room.
+  Devices report `platform` `android-phone`/`ios`; phones are "Play on" targets only with the `playback` cap.
+  Push events to phones go through the web relay (contract: `server/README.md` § Push relay).
 - **Contract.** Routes are in `server/openapi.yaml` (drift-guarded by `openapi:check`), `Models.kt` and the SDK
   are regenerated; the WS message set is documented at the top of `server/src/hub/core.ts`. The old
   `/video/party` router stays as it was.

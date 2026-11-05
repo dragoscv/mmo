@@ -87,6 +87,10 @@ export class LibraryIndex {
         return next;
     }
 
+    hasPath(absPath: string): boolean {
+        return Boolean(this.db.prepare("SELECT 1 FROM library_index WHERE server_file_id = ?").get(makeServerFileId(absPath)));
+    }
+
     count(): number {
         return (this.db.prepare("SELECT COUNT(*) AS n FROM library_index").get() as { n: number }).n;
     }

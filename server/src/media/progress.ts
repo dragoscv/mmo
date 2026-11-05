@@ -6,6 +6,7 @@
 import type { MediaDb } from "./db";
 import { getMeta, setMeta } from "./db";
 import type { MediaKind, ProgressEntry, TrackPlay } from "./types";
+import { addUsage, watchAdvance } from "./usage";
 
 export const COMPLETED_THRESHOLD = 0.9;
 
@@ -97,6 +98,14 @@ export class ProgressStore {
         const durationSec = Math.max(0, Number(input.durationSec) || 0);
         const completed = isCompleted(positionSec, durationSec, input.completed);
         const updatedAt = input.updatedAt ?? this.now();
+        const prev = this.db
+            .prepare("SELECT position_sec, updated_at FROM progress WHERE profile_id = ? AND kind = ? AND tmdb_id = ? AND season = ? AND episode = ?")
+            .get(input.profileId, input.kind, input.tmdbId, season, episode) as { position_sec: number; updated_at: number } | undefined;
+        // Daily usage (kids caps / family stats) only from live writes, never from replayed sync batches.
+        if (input.updatedAt === undefined && (!prev || updatedAt >= prev.updated_at)) {
+            const adv = watchAdvance(prev ? { positionSec: prev.position_sec, updatedAt: prev.updated_at } : null, { positionSec, updatedAt });
+            addUsage(this.db, input.profileId, updatedAt, adv, 0);
+        }
         const rev = this.bumpRevision();
         this.db.prepare(
             `INSERT INTO progress (profile_id, kind, tmdb_id, season, episode, position_sec, duration_sec, completed, updated_at, rev)
@@ -147,6 +156,7 @@ export class ProgressStore {
         const r = this.db
             .prepare("INSERT INTO track_plays (profile_id, track_key, played_at, duration_sec, completed, rev) VALUES (?, ?, ?, ?, ?, ?)")
             .run(profileId, trackKey, at, Math.max(0, Number(durationSec) || 0), completed ? 1 : 0, rev);
+        addUsage(this.db, profileId, at, 0, Math.min(3600, Math.max(0, Number(durationSec) || 0)));
         return { id: Number(r.lastInsertRowid), profileId, trackKey, playedAt: at, durationSec, completed, rev };
     }
 

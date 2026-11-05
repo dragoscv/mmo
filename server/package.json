@@ -1,6 +1,6 @@
 {
   "name": "mmo-server",
-  "version": "3.8.1",
+  "version": "3.9.0",
   "description": "MMO Server (MixAI Companion) — serves local music and video files to the MixAI web app",
   "main": "dist/main.js",
   "author": {

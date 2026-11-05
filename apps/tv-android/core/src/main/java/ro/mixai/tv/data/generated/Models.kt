@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.8.0); generator: server/scripts/openapi-kotlin.mjs
+// Source: server/openapi.yaml (info.version 3.9.0); generator: server/scripts/openapi-kotlin.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 @file:Suppress("unused")
 
@@ -626,6 +626,8 @@ data class HubDevice(
     val deviceId: String = "",
     val name: String = "",
     val platform: String = "",
+    val formFactor: String? = null,
+    val playbackTarget: Boolean? = null,
     val caps: List<String> = emptyList(),
     val profileId: String? = null,
     val app: String? = null,
@@ -794,12 +796,24 @@ data class Lyrics(
     val source: String = "",
 )
 
+/** Minutes per local day for the last 7 days (oldest first), from live progress writes and music plays. */
+@Serializable
+data class WeeklyUsage(
+    val profileId: String = "",
+    val days: List<String> = emptyList(),
+    val watchMin: List<Long> = emptyList(),
+    val listenMin: List<Long> = emptyList(),
+    val totalWatchMin: Long = 0L,
+    val totalListenMin: Long = 0L,
+)
+
 @Serializable
 data class MediaStats(
     val year: Long = 0L,
     val profileId: String = "",
     val watch: JsonObject = JsonObject(emptyMap()),
     val listen: JsonObject = JsonObject(emptyMap()),
+    val weekly: WeeklyUsage? = null,
 )
 
 @Serializable

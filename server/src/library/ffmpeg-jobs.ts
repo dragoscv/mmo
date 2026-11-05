@@ -84,14 +84,18 @@ export function killTree(pid: number | undefined): void {
 
 /** Spawn ffmpeg at IDLE priority and collect its output. Does NOT take the
  *  analysis slot — wrap in `withAnalysisSlot` for background work. */
-export function runFfmpeg(args: string[], opts: { timeoutMs?: number; bin?: string; priority?: ProcPriority } = {}): Promise<FfmpegResult> {
+export function runFfmpeg(
+    args: string[],
+    opts: { timeoutMs?: number; bin?: string; priority?: ProcPriority; onStdout?: (chunk: Buffer) => void; signal?: AbortSignal } = {},
+): Promise<FfmpegResult> {
     const bin = opts.bin ?? FFMPEG_BIN;
     return new Promise((resolve) => {
         const child = spawn(bin, args, { windowsHide: true });
         lowerPriority(child.pid, opts.priority ?? "idle");
         const out: Buffer[] = [];
         let stderr = "";
-        child.stdout?.on("data", (b: Buffer) => out.push(b));
+        child.stdout?.on("data", (b: Buffer) => { if (opts.onStdout) opts.onStdout(b); else out.push(b); });
+        opts.signal?.addEventListener("abort", () => killTree(child.pid), { once: true });
         child.stderr?.on("data", (b: Buffer) => { stderr = (stderr + b.toString("utf8")).slice(-64_000); });
         const timer = setTimeout(() => killTree(child.pid), opts.timeoutMs ?? 10 * 60_000);
         timer.unref();

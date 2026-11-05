@@ -15,6 +15,10 @@ import { createMediaRouter } from "./routes";
 import { ProfileStore } from "./profiles";
 import { WatchlistStore } from "./watchlist";
 import { MusicService } from "./music";
+import { BookmarkStore } from "./bookmarks";
+import { SubtitleIndex } from "./subtitles";
+import { PushRelay } from "./push-relay";
+import type { SubtitleIndexing } from "./phone-routes";
 import type { MediaLogger } from "./types";
 
 export interface MediaModuleOptions {
@@ -40,6 +44,12 @@ export interface MediaModule {
     profiles: ProfileStore;
     watchlist: WatchlistStore;
     sync: MediaSyncClient | null;
+    bookmarks: BookmarkStore;
+    subtitles: SubtitleIndex;
+    /** Companion events → web push relay (no-op without webAppUrl/device token). */
+    push: PushRelay | null;
+    /** Installs the embedded-subtitle indexer (video pillar) once it exists. */
+    setSubtitleIndexing(i: SubtitleIndexing | null): void;
     router: express.Router;
     region: string;
     language: string;
@@ -59,6 +69,15 @@ export function createMediaModule(opts: MediaModuleOptions): MediaModule {
     const profiles = new ProfileStore(db);
     const watchlist = new WatchlistStore(db, progress);
     const music = new MusicService({ mediaDb: db });
+    const bookmarks = new BookmarkStore(db);
+    const subtitles = new SubtitleIndex(db);
+    let subtitleIndexing: SubtitleIndexing | null = null;
+    const push = opts.sync
+        ? new PushRelay({
+            getWebAppUrl: opts.sync.getWebAppUrl, getDeviceToken: opts.sync.getDeviceToken,
+            getServerId: () => opts.getServerId?.() ?? "", log: opts.log,
+        })
+        : null;
     const sync = opts.sync
         ? new MediaSyncClient({
             db, progress, log: opts.log,
@@ -70,6 +89,7 @@ export function createMediaModule(opts: MediaModuleOptions): MediaModule {
     const router = createMediaRouter({
         db, tmdb, registry, availability, progress, library, profiles, watchlist, music, sync: sync ?? undefined, region, log: opts.log,
         getServerId: opts.getServerId, getServerName: opts.getServerName,
+        bookmarks, subtitles, subtitleIndexing: () => subtitleIndexing,
     });
 
     if (!tmdb.configured) opts.log.info("[media] TMDB_API_KEY missing — media module runs in no-op mode");
@@ -79,6 +99,7 @@ export function createMediaModule(opts: MediaModuleOptions): MediaModule {
 
     return {
         db, tmdb, registry, availability, progress, library, profiles, watchlist, sync, router, region, language,
+        bookmarks, subtitles, push, setSubtitleIndexing: (i) => { subtitleIndexing = i; },
         configured: { tmdb: tmdb.configured, motn: availability.motnConfigured },
         close: () => { sync?.stop(); try { db.close(); } catch { /* ignore */ } },
     };
@@ -94,4 +115,7 @@ export { ProfileStore } from "./profiles";
 export { WatchlistStore } from "./watchlist";
 export { LibraryIndex, makeServerFileId } from "./library";
 export { MediaSyncClient } from "./sync-client";
+export { PushRelay } from "./push-relay";
+export { BookmarkStore } from "./bookmarks";
+export { SubtitleIndex } from "./subtitles";
 export * from "./types";

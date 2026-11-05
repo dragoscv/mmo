@@ -8,6 +8,10 @@
  *   POST /hub/rooms {name?}             → {roomId, invite}                (device token)
  *   GET  /hub/rooms/:id                 snapshot                           (device token)
  *   GET  /hub/invite/:invite            public: {roomId, name, phase, media} for the join page
+ *   GET  /hub/reports?status=open|resolved|all     chat reports (device token, owner)
+ *   POST /hub/reports/:id/resolve {resolution}     mark a report handled
+ *   GET  /hub/blocks?profile=           persisted blocks; DELETE /hub/blocks/:profileId/:deviceId
+ *   GET|PUT /hub/settings {chatFilter}  owner switch for the chat word filter
  *
  * Guests stream only the room's current file: `/video/*` accepts `?inv=` for that fileId
  * (see `inviteAllowsFile`).
@@ -18,12 +22,15 @@ import crypto from "node:crypto";
 import express from "express";
 import { WebSocketServer, WebSocket } from "ws";
 import { HubCore } from "./core";
+import type { MediaModerationStore } from "./moderation";
 
 export interface HubOptions {
     getDeviceToken: () => string | undefined;
     isAllowedOrigin: (origin: string | undefined) => boolean;
     /** Secret for invites (persisted by the caller so links survive restarts). */
     getSecret: () => string;
+    /** Chat moderation persistence (media.sqlite). Without it, filter is on and reports/blocks are not stored. */
+    moderation?: MediaModerationStore;
     log?: { info: (m: string, f?: Record<string, unknown>) => void; warn: (m: string, f?: Record<string, unknown>) => void };
 }
 
@@ -45,7 +52,8 @@ export function createHub(opts: HubOptions): Hub {
         const ws = sockets.get(connId);
         if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
     };
-    const core = new HubCore(send, opts.getSecret);
+    const core = new HubCore(send, opts.getSecret, Date.now, opts.moderation ?? null);
+    const moderation = opts.moderation;
     const ticker = setInterval(() => core.tick(), 1000);
     ticker.unref?.();
 
@@ -67,8 +75,40 @@ export function createHub(opts: HubOptions): Hub {
         if (!room) { res.status(404).json({ error: "invite_invalid" }); return; }
         res.json({ roomId: room.id, name: room.name, phase: room.phase, media: room.media, members: room.members.size });
     });
-    router.get("/devices", auth, (_req, res) => {
-        res.json({ devices: core.listDevices(), serverTime: Date.now() });
+    router.get("/devices", auth, (req, res) => {
+        res.json({ devices: core.listDevices({ targetsOnly: req.query.targets === "1" }), serverTime: Date.now() });
+    });
+    const noModeration = (res: express.Response) => res.status(503).json({ error: "moderation storage unavailable" });
+    router.get("/reports", auth, (req, res) => {
+        if (!moderation) { noModeration(res); return; }
+        const s = req.query.status;
+        const status = s === "resolved" || s === "all" ? s : "open";
+        const limit = Number(req.query.limit);
+        res.json({ reports: moderation.listReports({ status, limit: Number.isFinite(limit) ? limit : undefined }) });
+    });
+    router.post("/reports/:id/resolve", auth, (req, res) => {
+        if (!moderation) { noModeration(res); return; }
+        const resolution = typeof req.body?.resolution === "string" ? req.body.resolution : "resolved";
+        const r = moderation.resolveReport(String(req.params.id), resolution);
+        if (!r) { res.status(404).json({ error: "report not found" }); return; }
+        res.json({ report: r });
+    });
+    router.get("/blocks", auth, (req, res) => {
+        if (!moderation) { noModeration(res); return; }
+        res.json({ blocks: moderation.listBlocks(typeof req.query.profile === "string" ? req.query.profile : undefined) });
+    });
+    router.delete("/blocks/:profileId/:deviceId", auth, (req, res) => {
+        if (!moderation) { noModeration(res); return; }
+        res.json({ removed: moderation.removeBlock(String(req.params.profileId), String(req.params.deviceId)) });
+    });
+    router.get("/settings", auth, (_req, res) => {
+        res.json({ chatFilter: moderation ? moderation.chatFilterEnabled() : true });
+    });
+    router.put("/settings", auth, (req, res) => {
+        if (!moderation) { noModeration(res); return; }
+        if (typeof req.body?.chatFilter !== "boolean") { res.status(400).json({ error: "chatFilter must be a boolean" }); return; }
+        moderation.setChatFilter(req.body.chatFilter);
+        res.json({ chatFilter: moderation.chatFilterEnabled() });
     });
     router.post("/command", auth, (req, res) => {
         const b = (req.body ?? {}) as Record<string, unknown>;

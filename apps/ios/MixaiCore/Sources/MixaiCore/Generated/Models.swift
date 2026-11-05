@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.8.1); generator: server/scripts/openapi-swift.mjs
+// Source: server/openapi.yaml (info.version 3.9.0); generator: server/scripts/openapi-swift.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 // swiftlint:disable all
 
@@ -1679,6 +1679,10 @@ public struct HubDevice: Codable, Sendable, Hashable {
     public let deviceId: String
     public let name: String
     public let platform: String
+    /// Since 3.9.0 (absent on older servers).
+    public let formFactor: FormFactor?
+    /// Since 3.9.0. May be offered as a "Play on" target; phones only when caps include `playback`.
+    public let playbackTarget: Bool?
     public let caps: [String]
     public let profileId: String?
     public let app: String?
@@ -1690,6 +1694,8 @@ public struct HubDevice: Codable, Sendable, Hashable {
         deviceId: String,
         name: String,
         platform: String,
+        formFactor: FormFactor? = nil,
+        playbackTarget: Bool? = nil,
         caps: [String],
         profileId: String? = nil,
         app: String? = nil,
@@ -1700,6 +1706,8 @@ public struct HubDevice: Codable, Sendable, Hashable {
         self.deviceId = deviceId
         self.name = name
         self.platform = platform
+        self.formFactor = formFactor
+        self.playbackTarget = playbackTarget
         self.caps = caps
         self.profileId = profileId
         self.app = app
@@ -2110,22 +2118,51 @@ public struct Lyrics: Codable, Sendable, Hashable {
     }
 }
 
+/// Minutes per local day for the last 7 days (oldest first), from live progress writes and music plays.
+public struct WeeklyUsage: Codable, Sendable, Hashable {
+    public let profileId: String
+    public let days: [String]
+    public let watchMin: [Int]
+    public let listenMin: [Int]
+    public let totalWatchMin: Int
+    public let totalListenMin: Int
+
+    public init(
+        profileId: String,
+        days: [String],
+        watchMin: [Int],
+        listenMin: [Int],
+        totalWatchMin: Int,
+        totalListenMin: Int
+    ) {
+        self.profileId = profileId
+        self.days = days
+        self.watchMin = watchMin
+        self.listenMin = listenMin
+        self.totalWatchMin = totalWatchMin
+        self.totalListenMin = totalListenMin
+    }
+}
+
 public struct MediaStats: Codable, Sendable, Hashable {
     public let year: Int
     public let profileId: String
     public let watch: [String: JSONValue]
     public let listen: [String: JSONValue]
+    public let weekly: WeeklyUsage?
 
     public init(
         year: Int,
         profileId: String,
         watch: [String: JSONValue],
-        listen: [String: JSONValue]
+        listen: [String: JSONValue],
+        weekly: WeeklyUsage? = nil
     ) {
         self.year = year
         self.profileId = profileId
         self.watch = watch
         self.listen = listen
+        self.weekly = weekly
     }
 }
 
@@ -2329,6 +2366,19 @@ public enum AvailabilitySource: String, Codable, Sendable, CaseIterable {
     case tmdb
     case none
     /// Any value this client does not know yet (newer server).
+    case unknown
+
+    public init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: raw) ?? .unknown
+    }
+}
+
+public enum FormFactor: String, Codable, Sendable, CaseIterable {
+    case tv
+    case phone
+    case web
+    case desktop
     case unknown
 
     public init(from decoder: any Decoder) throws {

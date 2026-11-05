@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseFilename } from "../library/video-scanner";
 import type { LibraryIndex, LibraryFileInput } from "./library";
-import type { MediaLogger } from "./types";
+import type { LibraryIndexRow, MediaLogger } from "./types";
 
 export interface ScannedForIndex {
     filepath: string;
@@ -69,13 +69,20 @@ export function toLibraryInput(f: ScannedForIndex): LibraryFileInput {
 }
 
 /** Real hooks over a `LibraryIndex`. */
-export function createMediaLibraryHooks(index: LibraryIndex, opts: { getRoots: () => string[]; log?: MediaLogger }): MediaLibraryHooks {
+export function createMediaLibraryHooks(
+    index: LibraryIndex,
+    opts: { getRoots: () => string[]; log?: MediaLogger; onNewEpisode?: (row: LibraryIndexRow) => void },
+): MediaLibraryHooks {
     const upsertAll = async (inputs: LibraryFileInput[]) => {
         let matched = 0;
         for (const input of inputs) {
             try {
+                const isNew = !index.hasPath(input.path);
                 const row = await index.upsertMatched(input);
                 if (row.tmdbId !== null) matched++;
+                if (isNew && row.kind === "tv" && row.tmdbId !== null && row.season && row.episode) {
+                    try { opts.onNewEpisode?.(row); } catch { /* push is best-effort */ }
+                }
             } catch (err) {
                 opts.log?.warn("[media/library] upsert failed", { path: input.path }, err);
             }

@@ -2,6 +2,39 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.9.0 — Server features for the phone apps (WP16-50)
+
+- Client platforms `android-phone` and `ios` (aliases folded, e.g. `iphone` → `ios`) on pairing and hub `hello`.
+  `/hub/devices` adds `formFactor` + `playbackTarget`; phones are "Play on" targets only with the `playback`
+  cap (`?targets=1` filters).
+- Watch Together moderation (App Store 1.2 / Play UGC): stable chat message ids, RO+EN word filter masking
+  with `***` (owner switch `GET|PUT /hub/settings`), WS `report {messageId, reason}` → `chat_reports`
+  (`GET /hub/reports`, `POST /hub/reports/{id}/resolve`), `block`/`unblock {memberId}` hides a member's chat
+  and reactions for the blocker (room lifetime, persisted per profile in `hub_blocks`, `GET/DELETE /hub/blocks`),
+  host-only `kick` (kicked devices cannot rejoin the room).
+- Subtitle text search: `GET /media/subtitles/search?q=&fileId=` (≤ 50 hits, SQLite FTS5 `subtitle_fts`,
+  ș/ț/ă/â/î folded in JS) over `.srt`/`.vtt` sidecars and already-extracted text tracks;
+  `POST /media/subtitles/index {fileId}` extracts embedded tracks through the ffmpeg analysis slot only.
+- Offline downloads: `GET /video/file/{fileId}` (original, Range, attachment — Android) and
+  `GET /video/download/{fileId}?container=mp4&audio=<n>` (iOS): MP4 remux `-c copy` (video never re-encoded,
+  HEVC `hvc1`, AAC/AC-3/E-AC-3 copied else E-AC-3, text subs → `mov_text`) through the ffmpeg queue into
+  `<userData>/downloads-cache` (LRU, `downloadsCacheCapGb` default 20 in `/video/flags`), `202` while
+  preparing + `/status`; `GET /video/downloads/cache`.
+- Scene bookmarks: `GET|POST /media/bookmarks`, `DELETE /media/bookmarks/{id}` (private or shared with the
+  household; kids see shared ones within their max age).
+- Family stats + kids screen-time caps: daily minutes recorded from live progress writes (seeks don't count) and
+  music plays (`usage_daily`); `/media/stats` gains `weekly`; `GET /media/profiles/{id}/usage`,
+  `GET /media/stats/family`; kid profiles with `prefs.dailyCapMin` get `403 {"error":"daily_cap"}` on
+  `/video/stream`, `/video/direct`, `/video/file`, `/video/download` (viewer via `?profile=`/`x-profile-id`/profile token).
+- Push relay hook: `recording.done`, `recording.failed`, `download.ready`, `episode.new` (new episode of a
+  watchlisted show) → `POST {webAppUrl}/api/push/relay` (device token Bearer, debounce, 3 tries). Contract in
+  README § Push relay.
+- Plex importer: `POST /media/import/plex {serverUrl, token, profileId}` imports watched movies/episodes
+  (completed progress), ratings (`user_ratings`) and the Discover watchlist, matched by `tmdb://` / `imdb://`
+  guid; the Plex token is never stored.
+- media.sqlite schema v4 (`chat_reports`, `hub_blocks`, `subtitle_fts`, `subtitle_sources`, `bookmarks`,
+  `usage_daily`, `user_ratings`).
+
 ## 3.8.1 — openapi:swift generator
 
 - `pnpm openapi:swift` (`scripts/openapi-swift.mjs`, also run by `openapi:gen`) emits Swift 6 Codable
