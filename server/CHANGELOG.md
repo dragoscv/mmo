@@ -2,6 +2,15 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.8.1 — openapi:swift generator
+
+- `pnpm openapi:swift` (`scripts/openapi-swift.mjs`, also run by `openapi:gen`) emits Swift 6 Codable
+  models from `openapi.yaml` into `apps/ios/MixaiCore/Sources/MixaiCore/Generated/Models.swift` for the
+  iOS/macOS apps: same schema subset and type names as the Kotlin `Models.kt`, string enums with an
+  `unknown` catch-all, `JSONValue` for free-form objects, `Error` emitted as `APIError`.
+- New SwiftPM package `apps/ios/MixaiCore` (iOS 26 / macOS 15) with decode tests on server-shaped fixtures.
+- No API change.
+
 ## 3.8.0 — Play finished Live TV recordings from any client
 
 - `GET /livetv/recordings/{id}/file` streams a finished recording exactly as recorded (`-c copy`

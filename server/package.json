@@ -1,6 +1,6 @@
 {
   "name": "mmo-server",
-  "version": "3.8.0",
+  "version": "3.8.1",
   "description": "MMO Server (MixAI Companion) — serves local music and video files to the MixAI web app",
   "main": "dist/main.js",
   "author": {
@@ -38,7 +38,8 @@
     "test:watch": "vitest",
     "openapi:lint": "redocly lint openapi.yaml",
     "openapi:check": "node scripts/openapi-check.mjs",
-    "openapi:gen": "node scripts/openapi-kotlin.mjs && pnpm --dir ../packages/sdk gen:openapi",
+    "openapi:gen": "node scripts/openapi-kotlin.mjs && node scripts/openapi-swift.mjs && pnpm --dir ../packages/sdk gen:openapi",
+    "openapi:swift": "node scripts/openapi-swift.mjs",
     "openapi:preview": "redocly preview-docs openapi.yaml"
   },
   "build": {
