@@ -16,6 +16,10 @@ apps without owning a server. Owner-approved always-on VM: it has **no** server-
 | Image | `europe-west1-docker.pkg.dev/mmo-mw-prod/mixai/mmo-server:<server version>-<sha>` (amd64) |
 | Hostnames | `demo.mixai.ro` (Cloudflare A, DNS-only), `34-118-46-71.sslip.io` and `34-118-46-71.nip.io` (both work before mixai.ro DNS; the owner's home router rewrites `*.sslip.io` to 81.196.9.130, so the Live TV channels use the nip.io name since 2026-11-05) |
 
+**DNS live 2026-11-05 22:43Z**: registrar NS → Cloudflare; `https://demo.mixai.ro` serves a Let's Encrypt cert
+(Caddy had backed off after SERVFAIL — `docker compose restart caddy` retried at once). `deploy.ps1` re-run from a
+clean tree @217a6fbf: `DEMO_HOST=demo.mixai.ro`, M3U/XMLTV + Live TV source on demo.mixai.ro (2 ch, 527 programmes).
+
 **Live state (verified 2026-11-05 ~15:20Z, image `mmo-server:3.9.4-31fb136b`)**: `https://34-118-46-71.sslip.io`
 answers with a Let's Encrypt cert; `demo.mixai.ro` has its A record in Cloudflare but the zone is not yet
 delegated (registrar NS switch pending) — Caddy obtains its certificate automatically once it resolves, then

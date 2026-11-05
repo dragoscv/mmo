@@ -6,7 +6,9 @@ Server operations: `infra/demo/README.md`.
 
 ## Demo server
 
-- URL: **https://demo.mixai.ro** (fallback while DNS propagates: **https://34-118-46-71.sslip.io**)
+- URL: **https://demo.mixai.ro** (live with a Let's Encrypt cert since 2026-11-05 22:43Z; the same server also answers
+  on `https://34-118-46-71.sslip.io` / `.nip.io`, which the submitted 1.1.0 notes still mention)
+- Support contact: **support@mixai.ro** (Brivio Stalwart mailing list → owner inbox, 2026-11-06)
 - No username, password or code to type: Quick Connect on the demo server is approved automatically.
 - Content: Blender open movies (CC BY), a public-domain TV series (The Beverly Hillbillies, 1962), CC BY music
   (Kevin MacLeod, Tears of Steel and Elephants Dream soundtracks) and two looping demo "live" channels made
@@ -44,7 +46,9 @@ Sign-in required: **No** (leave username/password empty).
 Submitted text (2026-11-05, iOS 1.1.0) uses the sslip.io host because demo.mixai.ro does not resolve yet; the
 exact notes are reproduced by `apps/ios/store/listing/*.json` + the App Store tracker row WP16-48.
 Store URLs until mixai.ro is live: privacy `https://mixai-web-622082681070.europe-west1.run.app/privacy?lang=en|ro`,
-support/marketing = the same origin's home, account deletion `/account/delete`.
+support/marketing = the same origin's home, account deletion `/account/delete`. After the web moves to
+`https://mixai.ro` the run.app origin keeps serving the same app (no redirect, owner 2026-11-06) so the 1.1.0
+builds in review keep working; switch the listing URLs to mixai.ro at the next store update, not during review.
 
 ## Google Play — App access (paste)
 
