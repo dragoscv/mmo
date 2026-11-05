@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Statistici familie (WP16-46 item 8) -->
+    <string name="family_title">Familie</string>
+    <string name="family_empty_title">Niciun profil încă</string>
+    <string name="family_empty_hint">Creează profiluri pe serverul MMO ca să vezi timpul de vizionare și de ascultare al fiecăruia.</string>
+    <string name="family_kid_badge">Copil</string>
+    <string name="family_minutes">%1$d min</string>
+    <string name="family_hours_minutes">%1$d h %2$02d min</string>
+    <string name="family_week_line">Săptămâna aceasta: %1$s vizionat · %2$s muzică</string>
+    <string name="family_today_line">Azi: %1$s vizionat</string>
+    <string name="family_today_cap_line">Azi: %1$s din %2$s</string>
+    <string name="family_left_today">%1$d min rămase azi</string>
+    <string name="family_limit_reached">Limită atinsă</string>
+    <string name="family_chart_title">Ultimele 7 zile</string>
+    <string name="family_chart_desc">Ultimele 7 zile pentru %1$s: %2$s</string>
+    <string name="family_chart_day">%1$s %2$s vizionat, %3$s muzică</string>
+    <string name="family_legend_watch">Vizionat</string>
+    <string name="family_legend_listen">Muzică</string>
+
+    <!-- Import Plex (WP16-46 item 9) -->
+    <string name="plex_title">Import din Plex</string>
+    <string name="plex_intro">Importă istoricul de vizionare, notele și lista de urmărit din Plex în profilul curent. Tokenul Plex este trimis o singură dată către serverul tău MMO pentru acest import și nu este stocat niciodată.</string>
+    <string name="plex_token_hint_title">Cum găsești tokenul Plex</string>
+    <string name="plex_token_hint">În Plex Web, deschide orice element media, alege Get Info, apoi View XML. Adresa paginii care se deschide se termină cu X-Plex-Token=… — copiază valoarea de după semnul egal.</string>
+    <string name="plex_profile_line">Import în profilul: %1$s</string>
+    <string name="plex_server_url">URL server Plex</string>
+    <string name="plex_server_url_placeholder">http://192.168.1.20:32400</string>
+    <string name="plex_token">Token Plex</string>
+    <string name="plex_token_show">Arată tokenul</string>
+    <string name="plex_token_hide">Ascunde tokenul</string>
+    <string name="plex_import_action">Importă</string>
+    <string name="plex_importing">Se importă din Plex…</string>
+    <string name="plex_result_title">Import finalizat</string>
+    <string name="plex_result_sections">Biblioteci scanate</string>
+    <string name="plex_result_movies">Filme vizionate</string>
+    <string name="plex_result_episodes">Episoade vizionate</string>
+    <string name="plex_result_ratings">Note</string>
+    <string name="plex_result_watchlist">Elemente în lista de urmărit</string>
+    <string name="plex_result_unmatched">Negăsite</string>
+    <string name="plex_result_errors">Probleme raportate</string>
+    <string name="plex_error_400">Verifică URL-ul serverului.</string>
+    <string name="plex_error_401">Plex a refuzat tokenul.</string>
+    <string name="plex_error_403">Doar proprietarul serverului poate importa.</string>
+    <string name="plex_error_404">Serverul Plex nu a fost găsit.</string>
+    <string name="plex_error_502">Serverul MMO nu a putut contacta Plex.</string>
+    <string name="plex_error_generic">Importul a eșuat (HTTP %1$d).</string>
+    <string name="plex_error_network">Serverul MMO nu poate fi contactat. Verifică conexiunea și încearcă din nou.</string>
+</resources>

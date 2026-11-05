@@ -1,5 +1,49 @@
 # Changelog — MixAI for Android phones
 
+## 1.1.0 — 2026-11-05
+
+Slice 2 (WP16-46, D38). versionCode 2.
+
+- Downloads: original files (`GET /video/file/{id}`, Range) through a Media3 `DownloadManager` +
+  `DownloadService` (foreground type dataSync, user-initiated) resumed by `WorkManagerScheduler`; per-profile list
+  grouped by show and season, storage gauge, delete, Wi-Fi only; offline playback from the download cache (works in
+  airplane mode, also when the server is unreachable).
+- Smart downloads (D38): follow a show on its page; every 6 h on Wi-Fi while charging the next 3 unwatched episodes
+  are kept downloaded and smart copies watched more than 24 h ago are deleted (WorkManager constraints).
+- Offline-first progress: the queued `PUT /media/progress` entries flush as soon as the network returns.
+- Play on TV + handoff (D38): device sheet lists hub `playbackTarget` devices; "Continue on TV" sends the current
+  position and pauses the phone; "Pull back from <TV>" when a TV plays the same file. Google Cast button
+  (Media3 `CastPlayer`, default receiver).
+- Phone as TV remote: touchpad (tap play/pause, swipe seek ±10 s / next / previous), stop, home, shortcuts
+  (movies, shows, music, Live TV, search) and text input to the TV search, with hub acks.
+- Watch Together: create / join (deep link `mixai://together/<roomId>`), invite share sheet (web guest link),
+  members, synced playback (core SyncMath drift correction), chat, reactions, report message, block member,
+  host kick.
+- Push: FCM (`firebase-messaging`, google-services), token registered at `/api/push/register` with the account
+  session (skipped when not signed in), channels Recordings / Downloads / New episodes (RO+EN), deep links from the
+  payload, notification permission asked in context.
+- Native Google sign-in: Credential Manager `GetGoogleIdOption` → `/api/auth/native/google`; device code stays as
+  fallback. Account session token stored with an Android Keystore AES-GCM key (decrypted once per process).
+- Player extras (D38): night mode / dialogue boost (Media3 `AudioProcessor`: centre boost on 5.1, mid boost on
+  stereo, compressor), second subtitles overlay, search inside subtitles (index on demand) with jump, scene
+  bookmarks (add from the player, list on the title page, shareable with the household), sleep timer that fades to
+  silence over 30 s (timed and end of episode), data saver prompt on mobile data with a per-title override.
+- Kids: remaining minutes today for kid profiles, friendly "That is all for today" screen on the daily cap
+  (`/media/profiles/{id}/usage`, 403 `daily_cap`); Family stats screen (`/media/stats/family`).
+- Plex importer in Settings (`/media/import/plex`; the token is used once by the server and never stored).
+- Karaoke word highlight in synced lyrics (enhanced LRC `<mm:ss.xx>` word tags). Lyrics translation is not built:
+  the server has no translation endpoint.
+- Sentry (`sentry-android`), env-gated by `MIXAI_SENTRY_DSN_PHONE`: off without a DSN; no PII, no screenshots or
+  view hierarchy, no tracing, release = versionName.
+- Unit tests: 104 (smart download selection, progress queue merge, room sync / drift, sleep fade curve, daily-cap
+  UI state, night mode DSP, WebVTT, data saver, Play-on targets, remote gestures, karaoke).
+- Play on a TV that is already playing sends `stop`, waits for the TV to report idle, then `play`: TV app 2.1.0
+  crashes ("Session ID must be unique") when `play` replaces a running player. The phone player uses a unique
+  MediaSession id per instance for the same reason.
+- Verified on the Galaxy S25 (SM-S938B): Downloads (35.1 MB Blender film, played in airplane mode), music in the
+  background with the screen off, Live TV channel, Play on TV / continue / pull back with the Chromecast, remote
+  command acked by the TV, Watch Together room + chat, FCM token (registration skipped without account), Sentry off.
+
 ## 1.0.0 — 2026-11-05
 
 First native phone build (WP16-46 slice 1).

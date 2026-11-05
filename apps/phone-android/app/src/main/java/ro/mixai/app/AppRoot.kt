@@ -71,6 +71,13 @@ import ro.mixai.app.ui.profiles.ProfilePickerScreen
 import ro.mixai.app.ui.search.SearchScreen
 import ro.mixai.app.ui.settings.SettingsScreen
 import ro.mixai.app.ui.title.TitleScreen
+import ro.mixai.app.push.PushRegistrar
+import ro.mixai.app.ui.downloads.DownloadsScreen
+import ro.mixai.app.ui.family.FamilyStatsScreen
+import ro.mixai.app.ui.settings.PlexImportScreen
+import ro.mixai.app.ui.remote.RemoteScreen
+import ro.mixai.app.ui.together.TogetherScreen
+import ro.mixai.app.data.SessionVault
 import ro.mixai.tv.data.AccountSession
 import ro.mixai.tv.data.Connection
 import ro.mixai.tv.data.DiscoveredServer
@@ -97,20 +104,32 @@ fun AppRoot(conn: Connection, session: AccountSession, settings: Settings, local
     val nav = remember { Navigator(if (conn.isComplete) Dest.Splash else Dest.Welcome) }
 
     val graph = remember(conn.baseUrl, conn.token) { if (conn.isComplete) buildGraph(context, conn, settings) else null }
+    val app = context.applicationContext as MixaiPhoneApp
     DisposableEffect(graph) {
         graph?.hub?.start()
         graph?.musicPlayback?.connect()
-        onDispose { graph?.hub?.stop(); graph?.musicPlayback?.release() }
+        graph?.let { app.progressFlusher.attach(it.media, settings) }
+        onDispose { graph?.hub?.stop(); graph?.musicPlayback?.release(); app.progressFlusher.detach() }
     }
+    // Push token registration after sign-in / pairing (skipped without a MixAI account session).
+    LaunchedEffect(session.userId, conn.baseUrl) { PushRegistrar.sync(context) }
 
     fun changeServer() { scope.launch { settings.clear(); nav.resetTo(Dest.Welcome, Dest.Discover()) } }
-    fun signOut() { scope.launch { settings.clearAll(); nav.resetTo(Dest.Welcome) } }
+    fun signOut() {
+        scope.launch {
+            PushRegistrar.unregister(context)
+            app.phone.vault.clear()
+            settings.clearAll()
+            nav.resetTo(Dest.Welcome)
+        }
+    }
 
     val deps = remember(graph, localeTag, session) {
         graph?.let { g ->
             AppDeps(
                 api = g.api, media = g.media, profiles = g.profiles, music = g.music, musicPlayback = g.musicPlayback,
                 liveTv = g.liveTv, hub = g.hub, settings = settings, progressSync = g.progressSync,
+                phoneApi = g.phoneApi, phone = app.phone,
                 localeTag = localeTag, session = session, scope = scope,
                 onChangeServer = { changeServer() },
                 onSignOut = if (session.isSignedIn) ({ signOut() }) else null,
@@ -136,7 +155,11 @@ fun AppRoot(conn: Connection, session: AccountSession, settings: Settings, local
     LaunchedEffect(deepLink, deps, nav.current) {
         val l = deepLink ?: return@LaunchedEffect
         if (deps == null || nav.current.isChromeless) return@LaunchedEffect
-        nav.resetTo(Dest.TabRoot(Tab.Home), Dest.Title(l.first, l.second))
+        when (l.first) {
+            "downloads" -> nav.resetTo(Dest.TabRoot(Tab.Home), Dest.Downloads)
+            "together" -> nav.resetTo(Dest.TabRoot(Tab.Home), Dest.Together(MainActivity.pendingRoomId.also { MainActivity.pendingRoomId = null }))
+            else -> nav.resetTo(Dest.TabRoot(Tab.Home), Dest.Title(l.first, l.second))
+        }
         onDeepLinkConsumed()
     }
 
@@ -183,12 +206,14 @@ fun AppRoot(conn: Connection, session: AccountSession, settings: Settings, local
 
 @Composable
 private fun Screen(dest: Dest, nav: Navigator, deps: AppDeps?, conn: Connection, settings: Settings, scope: kotlinx.coroutines.CoroutineScope) {
+    val app = LocalContext.current.applicationContext as MixaiPhoneApp
     when (dest) {
         Dest.Welcome -> WelcomeScreen(onSignIn = { nav.push(Dest.SignIn) }, onLocal = { nav.push(Dest.Discover()) })
         Dest.SignIn -> SignInScreen(
             onSignedIn = { body, picked ->
                 scope.launch {
-                    settings.saveSession(body.session_token, body.user)
+                    app.phone.vault.save(body.session_token)
+                    settings.saveSession(SessionVault.MARKER, body.user)
                     if (picked != null) { settings.save(picked.second, picked.first.token, body.user.id); nav.resetTo(Dest.Splash) }
                     else nav.resetTo(Dest.Welcome, Dest.Discover())
                 }
@@ -244,6 +269,11 @@ private fun Connected(dest: Dest, nav: Navigator, d: AppDeps) {
         Dest.NowPlaying -> NowPlayingScreen(d, nav)
         is Dest.LivePlayer -> LivePlayerScreen(d, nav, dest.channelId)
         Dest.Settings -> SettingsScreen(d, nav)
+        Dest.Downloads -> DownloadsScreen(d, nav)
+        is Dest.Remote -> RemoteScreen(d, nav, dest.deviceId)
+        is Dest.Together -> TogetherScreen(d, nav, dest.roomId)
+        Dest.FamilyStats -> FamilyStatsScreen(d, nav)
+        Dest.PlexImport -> PlexImportScreen(d, nav)
         Dest.Welcome, Dest.SignIn, Dest.Manual, is Dest.Discover, is Dest.Pair -> Unit
     }
 }

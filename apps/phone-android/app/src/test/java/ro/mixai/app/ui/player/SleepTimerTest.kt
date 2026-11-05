@@ -38,9 +38,34 @@ class SleepTimerTest {
         clock += 30_000L
         assertEquals(1f, timer.fadeVolume(), 0.0001f)
         clock += 15_000L
-        assertEquals(0.6f, timer.fadeVolume(), 0.0001f)
+        // Quadratic curve: half the fade window left -> quarter volume.
+        assertEquals(0.25f, timer.fadeVolume(), 0.0001f)
         clock += 15_000L
-        assertEquals(0.2f, timer.fadeVolume(), 0.0001f)
+        assertEquals(0f, timer.fadeVolume(), 0.0001f)
+    }
+
+    @Test
+    fun fadeCurveIsMonotonicAndBounded() {
+        var prev = 0f
+        for (left in 0L..SLEEP_FADE_MS step 1_000L) {
+            val v = sleepFadeCurve(left)
+            assertTrue(v >= prev)
+            assertTrue(v in 0f..1f)
+            prev = v
+        }
+        assertEquals(1f, sleepFadeCurve(SLEEP_FADE_MS + 5_000L), 0.0001f)
+        assertEquals(0f, sleepFadeCurve(-500L), 0.0001f)
+    }
+
+    @Test
+    fun endOfEpisodeFadesBeforeThePausePoint() {
+        timer.startEndOfEpisode()
+        val dur = 600_000L
+        val pauseAt = dur - SLEEP_END_MARGIN_MS
+        assertEquals(1f, timer.fadeVolumeAt(pauseAt - 40_000L, dur), 0.0001f)
+        assertEquals(0.25f, timer.fadeVolumeAt(pauseAt - 15_000L, dur), 0.0001f)
+        assertEquals(0f, timer.fadeVolumeAt(pauseAt, dur), 0.0001f)
+        assertEquals(1f, timer.fadeVolumeAt(0L, 0L), 0.0001f)
     }
 
     @Test

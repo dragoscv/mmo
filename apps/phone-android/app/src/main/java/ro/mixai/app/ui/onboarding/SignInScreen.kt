@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,8 +38,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import ro.mixai.app.BuildConfig
+import ro.mixai.app.MixaiPhoneApp
 import ro.mixai.app.R
+import ro.mixai.app.auth.GoogleSignIn
+import ro.mixai.app.auth.GoogleSignInResult
 import ro.mixai.app.ui.components.QrCode
 import ro.mixai.app.ui.components.errorText
 import ro.mixai.tv.data.CompanionServer
@@ -46,6 +51,7 @@ import ro.mixai.tv.data.DeviceAuth
 import ro.mixai.tv.data.DeviceAuthException
 import ro.mixai.tv.data.DeviceCode
 import ro.mixai.tv.data.DeviceTokenOk
+import ro.mixai.tv.data.SessionUser
 import ro.mixai.tv.data.TokenResult
 
 private sealed interface SignInState {
@@ -57,6 +63,13 @@ private sealed interface SignInState {
     data class Failed(val error: Throwable) : SignInState
 }
 
+private sealed interface GoogleState {
+    data object Idle : GoogleState
+    data object Working : GoogleState
+    data object NoAccount : GoogleState
+    data class Failed(val message: String) : GoogleState
+}
+
 /** Opens `url` in a Custom Tab (falls back to any browser). */
 fun openInBrowser(context: Context, url: String) {
     runCatching { CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, Uri.parse(url)) }
@@ -66,12 +79,16 @@ fun openInBrowser(context: Context, url: String) {
 }
 
 /**
- * MixAI account sign-in, device-code flow (same contract as the TV): code + QR, "Open browser"
+ * MixAI account sign-in. Primary: "Continue with Google" (Credential Manager, native session exchange).
+ * Fallback: device-code flow (same contract as the TV): code + QR, "Open browser"
  * (Custom Tab on this phone, approve there), polls `/api/device/token`, then probes the companions.
  */
 @Composable
 fun SignInScreen(onSignedIn: (body: DeviceTokenOk, picked: Pair<CompanionServer, String>?) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val web = remember(context) { (context.applicationContext as MixaiPhoneApp).phone.web }
+    var google by remember { mutableStateOf<GoogleState>(GoogleState.Idle) }
     val auth = remember { DeviceAuth(BuildConfig.MIXAI_ORIGIN) }
     var state by remember { mutableStateOf<SignInState>(SignInState.Requesting) }
     var secondsLeft by remember { mutableIntStateOf(0) }
@@ -120,6 +137,41 @@ fun SignInScreen(onSignedIn: (body: DeviceTokenOk, picked: Pair<CompanionServer,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(stringResource(R.string.signin_title), style = MaterialTheme.typography.headlineMedium)
+        Button(
+            onClick = {
+                if (google == GoogleState.Working) return@Button
+                google = GoogleState.Working
+                scope.launch {
+                    google = when (val r = GoogleSignIn.signIn(context, web)) {
+                        is GoogleSignInResult.Ok -> {
+                            val u = r.session.user
+                            onSignedIn(
+                                DeviceTokenOk(
+                                    session_token = r.session.token,
+                                    expires = r.session.expires,
+                                    user = SessionUser(id = u.id, name = u.name, image = u.image),
+                                    companions = emptyList(),
+                                ),
+                                null,
+                            )
+                            GoogleState.Idle
+                        }
+                        GoogleSignInResult.Cancelled -> GoogleState.Idle
+                        GoogleSignInResult.NoAccount -> GoogleState.NoAccount
+                        is GoogleSignInResult.Failed -> GoogleState.Failed(r.message)
+                    }
+                }
+            },
+            enabled = google != GoogleState.Working,
+            modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth(),
+        ) { Text(stringResource(R.string.signin_google)) }
+        when (val g = google) {
+            GoogleState.Working -> Text(stringResource(R.string.signin_google_working), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            GoogleState.NoAccount -> Text(stringResource(R.string.signin_google_no_account), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+            is GoogleState.Failed -> Text(stringResource(R.string.signin_google_failed, g.message), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+            GoogleState.Idle -> Unit
+        }
+        Text(stringResource(R.string.signin_or_code), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(stringResource(R.string.signin_open, auth.host), color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         when (val s = state) {
             SignInState.Requesting -> {

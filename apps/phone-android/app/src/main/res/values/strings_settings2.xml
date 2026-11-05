@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings2_section_watch">Watch</string>
+    <string name="settings2_downloads">Downloads</string>
+    <string name="settings2_remote">Remote control</string>
+    <string name="settings2_together">Watch Together</string>
+    <string name="settings2_family">Family</string>
+    <string name="settings2_plex_import">Import from Plex</string>
+
+    <string name="settings2_section_playback">Playback and data</string>
+    <string name="settings2_data_saver">Data saver</string>
+    <string name="settings2_data_saver_desc">On mobile data, ask before streaming the original</string>
+    <string name="settings2_wifi_only">Download on Wi-Fi only</string>
+    <string name="settings2_wifi_only_desc">Downloads wait for an unmetered network</string>
+    <string name="settings2_smart_downloads">Smart downloads</string>
+    <string name="settings2_smart_downloads_desc">Keep the next episodes of shows you follow ready offline</string>
+    <string name="settings2_night_mode">Night mode by default</string>
+    <string name="settings2_night_mode_desc">Quieter loud scenes and clearer dialogue in the player</string>
+
+    <string name="settings2_section_privacy">Privacy</string>
+    <string name="settings2_crash_reports">Crash reports</string>
+    <string name="settings2_crash_off">Off in this build</string>
+    <string name="settings2_crash_on">Anonymous crash reports (no personal data, no screenshots)</string>
+
+    <string name="settings2_notifications">Notifications</string>
+    <string name="settings2_notifications_desc">Manage notifications in system settings</string>
+</resources>

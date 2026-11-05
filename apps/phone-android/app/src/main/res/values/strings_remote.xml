@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="remote_title">Remote</string>
+    <string name="remote_back">Back</string>
+    <string name="remote_empty_title">No TV connected</string>
+    <string name="remote_empty_hint">Open MixAI on your TV and pair it with the same MMO Server as this phone.</string>
+    <string name="remote_hub_status">Server link: %1$s</string>
+    <string name="remote_hub_connected">connected</string>
+    <string name="remote_hub_connecting">connecting</string>
+    <string name="remote_hub_disconnected">disconnected</string>
+    <string name="remote_now_playing">%1$s · %2$s / %3$s</string>
+    <string name="remote_now_playing_noduration">%1$s · %2$s</string>
+    <string name="remote_untitled">Playing</string>
+    <string name="remote_idle">Nothing playing on this TV</string>
+    <string name="remote_touchpad">Touchpad</string>
+    <string name="remote_touchpad_hint">Tap to play or pause · swipe left or right to skip 10 s · swipe up or down for next or previous</string>
+    <string name="remote_stop">Stop</string>
+    <string name="remote_home">Home</string>
+    <string name="remote_play">Play</string>
+    <string name="remote_pause">Pause</string>
+    <string name="remote_go_movies">Movies</string>
+    <string name="remote_go_shows">Shows</string>
+    <string name="remote_go_music">Music</string>
+    <string name="remote_go_livetv">Live TV</string>
+    <string name="remote_go_search">Search</string>
+    <string name="remote_text_label">Type on TV</string>
+    <string name="remote_text_send">Send text to TV search</string>
+    <string name="remote_status_sending">Sending…</string>
+    <string name="remote_status_sent">Sent</string>
+    <string name="remote_status_error">TV says: %1$s</string>
+    <string name="remote_status_noanswer">No answer</string>
+</resources>

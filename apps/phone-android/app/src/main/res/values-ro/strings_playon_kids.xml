@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- play on / handoff / cast -->
+    <string name="playon_title">Redă pe</string>
+    <string name="playon_empty">Niciun televizor cu MixAI nu e conectat la acest server. Deschide MixAI pe televizor și asociază-l cu același MMO Server.</string>
+    <string name="playon_now_playing">Rulează: %1$s</string>
+    <string name="playon_ready">Pregătit</string>
+    <string name="playon_sent">Se redă pe %1$s</string>
+    <string name="playon_refused">%1$s nu a putut porni redarea</string>
+    <string name="playon_no_answer">%1$s nu a răspuns</string>
+    <string name="playon_button">Redă pe TV</string>
+    <string name="handoff_continue_tv">Continuă pe TV</string>
+    <string name="handoff_pull_back">Preia de pe %1$s</string>
+    <string name="handoff_pulled">Continui aici de pe %1$s</string>
+    <string name="cast_title">Proiectează</string>
+
+    <!-- kids caps -->
+    <string name="kids_locked_title">Gata pentru azi</string>
+    <string name="kids_locked_body">%1$s a folosit cele %2$d minute de azi.</string>
+    <string name="kids_locked_body_nocap">%1$s a folosit timpul de ecran de azi.</string>
+    <string name="kids_locked_tomorrow">Mâine primești timp nou. Un adult poate schimba limita din setările Familie.</string>
+    <string name="kids_switch_profile">Schimbă profilul</string>
+    <string name="kids_remaining">%1$d min rămase azi</string>
+    <string name="kids_none_left">Niciun minut rămas azi</string>
+</resources>

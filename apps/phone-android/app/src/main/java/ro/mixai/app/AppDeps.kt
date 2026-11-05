@@ -17,6 +17,8 @@ import ro.mixai.tv.data.MusicRepository
 import ro.mixai.tv.data.ProfileRepository
 import ro.mixai.tv.data.ProgressSync
 import ro.mixai.tv.data.Settings
+import ro.mixai.app.data.PhoneApi
+import ro.mixai.app.data.PhoneDeps
 
 /** Long-lived objects of one server connection (rebuilt when base URL / token change). Same wiring as the TV app. */
 class ConnectionGraph(
@@ -28,6 +30,7 @@ class ConnectionGraph(
     val liveTv: LiveTvRepository,
     val hub: HubClient,
     val progressSync: ProgressSync,
+    val phoneApi: PhoneApi,
 )
 
 fun buildGraph(context: Context, conn: Connection, settings: Settings): ConnectionGraph {
@@ -45,6 +48,7 @@ fun buildGraph(context: Context, conn: Connection, settings: Settings): Connecti
         liveTv = LiveTvRepository(api, profileId),
         hub = HubClient(api, settings) { profiles.activeProfile.value?.id },
         progressSync = ProgressSync(media, settings),
+        phoneApi = PhoneApi(api, profileId) { profiles.profileToken },
     )
 }
 
@@ -63,6 +67,10 @@ data class AppDeps(
     val hub: HubClient,
     val settings: Settings,
     val progressSync: ProgressSync,
+    /** Server 3.9 phone routes (bookmarks, usage, family stats, subtitle search, Plex import, downloads). */
+    val phoneApi: PhoneApi,
+    /** Phone-only prefs, session vault, web API (push, native sign-in). */
+    val phone: PhoneDeps,
     val localeTag: String,
     val session: AccountSession,
     val scope: CoroutineScope,

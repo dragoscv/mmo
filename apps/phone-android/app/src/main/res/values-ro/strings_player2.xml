@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- player extras (D38) -->
+    <string name="player_night_mode">Mod noapte</string>
+    <string name="player_night_mode_desc">Dialog mai clar, explozii mai încete</string>
+    <string name="player_night_on">Mod noapte pornit</string>
+    <string name="player_night_off">Mod noapte oprit</string>
+    <string name="player_more">Mai mult</string>
+    <string name="player_dual_subs">Subtitrare secundară</string>
+    <string name="bookmark_title">Marcaje de scene</string>
+    <string name="bookmark_add_at">Marcaj la %1$s</string>
+    <string name="bookmark_label">Etichetă (opțional)</string>
+    <string name="bookmark_shared">Partajează cu familia</string>
+    <string name="bookmark_shared_badge">Partajat</string>
+    <string name="bookmark_add">Adaugă marcaj</string>
+    <string name="bookmark_empty">Niciun marcaj încă.</string>
+    <string name="bookmark_delete">Șterge marcajul</string>
+    <string name="bookmark_error">Serverul nu răspunde.</string>
+    <string name="subsearch_title">Caută în subtitrări</string>
+    <string name="subsearch_hint">Cuvinte pe care ți le amintești</string>
+    <string name="subsearch_go">Caută</string>
+    <string name="subsearch_searching">Se caută…</string>
+    <string name="subsearch_indexing">Serverul indexează subtitrările…</string>
+    <string name="subsearch_none">Nicio replică nu se potrivește.</string>
+    <string name="subsearch_no_subs">Fișierul nu are subtitrări text în care să cauți.</string>
+    <!-- data saver -->
+    <string name="cellular_title">Folosești date mobile</string>
+    <string name="cellular_body">Fișierul original poate consuma multe date. Originalul doar pe Wi-Fi?</string>
+    <string name="cellular_once">Redă o dată</string>
+    <string name="cellular_always_title">Mereu pentru acest titlu</string>
+</resources>

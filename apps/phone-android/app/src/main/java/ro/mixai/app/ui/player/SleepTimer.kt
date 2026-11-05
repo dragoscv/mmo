@@ -6,8 +6,15 @@ internal const val SLEEP_FADE_MS = 30_000L
 /** End-of-episode sleep pauses this close to the end. */
 internal const val SLEEP_END_MARGIN_MS = 1_500L
 
-/** Lowest volume reached by the fade. */
-internal const val SLEEP_MIN_VOLUME = 0.2f
+/** Lowest volume reached by the fade (silence: the pause happens at the end of the fade). */
+internal const val SLEEP_MIN_VOLUME = 0f
+
+/** Fade curve (D38): quadratic, so loudness drops evenly to the ear; 1.0 at >= 30 s left, 0.0 at 0. */
+internal fun sleepFadeCurve(leftMs: Long): Float {
+    if (leftMs >= SLEEP_FADE_MS) return 1f
+    val x = (leftMs.coerceAtLeast(0L).toFloat() / SLEEP_FADE_MS)
+    return SLEEP_MIN_VOLUME + (1f - SLEEP_MIN_VOLUME) * x * x
+}
 
 /**
  * Player sleep timer: either N minutes (with a 30 s volume fade) or "end of episode".
@@ -51,10 +58,18 @@ class SleepTimer(private val now: () -> Long) {
         return endOfEpisode && durationMs > 0 && positionMs >= durationMs - SLEEP_END_MARGIN_MS
     }
 
-    /** 1.0 until the last 30 s of a timed sleep, then linear down to 0.2. */
+    /** 1.0 until the last 30 s of a timed sleep, then [sleepFadeCurve] down to silence. */
     fun fadeVolume(): Float {
         val left = remainingMs() ?: return 1f
-        if (left >= SLEEP_FADE_MS) return 1f
-        return SLEEP_MIN_VOLUME + (1f - SLEEP_MIN_VOLUME) * (left.toFloat() / SLEEP_FADE_MS)
+        return sleepFadeCurve(left)
+    }
+
+    /** Like [fadeVolume], but end-of-episode mode also fades over the last 30 s before the pause point. */
+    fun fadeVolumeAt(positionMs: Long, durationMs: Long): Float {
+        if (endOfEpisode) {
+            if (durationMs <= 0) return 1f
+            return sleepFadeCurve(durationMs - SLEEP_END_MARGIN_MS - positionMs)
+        }
+        return fadeVolume()
     }
 }

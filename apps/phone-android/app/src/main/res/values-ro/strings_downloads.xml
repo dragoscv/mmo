@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="downloads_title">Descărcări</string>
+    <string name="downloads_storage_title">Spațiu de stocare</string>
+    <string name="downloads_storage_line">%1$s folosiți · %2$s liberi</string>
+    <string name="downloads_storage_cd">Descărcările ocupă %1$s, %2$s liberi pe acest dispozitiv</string>
+    <string name="downloads_section_settings">Setări</string>
+    <string name="downloads_section_items">Pe acest telefon</string>
+    <string name="downloads_wifi_only">Descarcă doar pe Wi-Fi</string>
+    <string name="downloads_wifi_only_hint">Pune descărcările pe pauză pe date mobile</string>
+    <string name="downloads_smart">Descărcări inteligente</string>
+    <string name="downloads_smart_hint">Păstrează următoarele 3 episoade din serialele urmărite, pe Wi-Fi și la încărcare, și le șterge pe cele văzute după 24 h</string>
+    <string name="downloads_smart_chip">Inteligent</string>
+    <string name="downloads_movies">Filme</string>
+    <string name="downloads_season">Sezonul %1$d</string>
+    <string name="downloads_episode">E%1$d · %2$s</string>
+    <string name="downloads_episode_untitled">Episodul %1$d</string>
+    <string name="downloads_status_downloading">Se descarcă %1$d %%</string>
+    <string name="downloads_status_queued">În așteptare</string>
+    <string name="downloads_status_paused">Pe pauză</string>
+    <string name="downloads_status_done">Descărcat · %1$s</string>
+    <string name="downloads_status_failed">Eșuat</string>
+    <string name="downloads_status_removing">Se șterge…</string>
+    <string name="downloads_delete">Șterge descărcarea</string>
+    <string name="downloads_delete_title">Ștergi descărcarea?</string>
+    <string name="downloads_delete_body">„%1$s” va fi eliminat de pe acest telefon. Îl poți descărca din nou mai târziu.</string>
+    <string name="downloads_delete_confirm">Șterge</string>
+    <string name="downloads_cancel">Anulează</string>
+    <string name="downloads_empty_title">Încă nu ai descărcări</string>
+    <string name="downloads_empty_hint">Descarcă un film sau un episod din pagina lui ca să-l vezi fără internet.</string>
+</resources>

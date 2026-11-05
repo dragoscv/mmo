@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="title_download">Descarcă</string>
+    <string name="title_downloaded">Descărcat</string>
+    <string name="title_downloading">Se descarcă %1$d %%</string>
+    <string name="title_download_started">Descărcarea a început</string>
+    <string name="title_follow">Urmărește</string>
+    <string name="title_following">Urmărit</string>
+</resources>

@@ -265,6 +265,9 @@ private fun TitleBody(deps: AppDeps, nav: Navigator, kind: String, tmdbId: Long,
                     },
                 )
 
+                // Slice 2: offline download, Play on TV, follow (smart downloads).
+                TitleExtras(deps, d, target, isTv, kind)
+
                 t.tagline?.takeIf { it.isNotBlank() }?.let {
                     Text(it, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
@@ -275,6 +278,8 @@ private fun TitleBody(deps: AppDeps, nav: Navigator, kind: String, tmdbId: Long,
         if (isTv && !t.seasons.isNullOrEmpty()) item("episodes") {
             EpisodesSection(deps, nav, d)
         }
+
+        item("bookmarks") { TitleBookmarks(deps, nav, d, kind) }
 
         if (t.cast.isNotEmpty()) item("cast") {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

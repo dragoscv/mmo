@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="title_download">Download</string>
+    <string name="title_downloaded">Downloaded</string>
+    <string name="title_downloading">Downloading %1$d %%</string>
+    <string name="title_download_started">Download started</string>
+    <string name="title_follow">Follow</string>
+    <string name="title_following">Following</string>
+</resources>

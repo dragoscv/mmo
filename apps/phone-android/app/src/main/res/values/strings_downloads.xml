@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="downloads_title">Downloads</string>
+    <string name="downloads_storage_title">Storage</string>
+    <string name="downloads_storage_line">%1$s used · %2$s free</string>
+    <string name="downloads_storage_cd">Downloads use %1$s, %2$s free on this device</string>
+    <string name="downloads_section_settings">Settings</string>
+    <string name="downloads_section_items">On this phone</string>
+    <string name="downloads_wifi_only">Download on Wi-Fi only</string>
+    <string name="downloads_wifi_only_hint">Pauses downloads on mobile data</string>
+    <string name="downloads_smart">Smart downloads</string>
+    <string name="downloads_smart_hint">Keeps the next 3 episodes of shows you follow on Wi-Fi while charging, deletes watched ones after 24 h</string>
+    <string name="downloads_smart_chip">Smart</string>
+    <string name="downloads_movies">Movies</string>
+    <string name="downloads_season">Season %1$d</string>
+    <string name="downloads_episode">E%1$d · %2$s</string>
+    <string name="downloads_episode_untitled">Episode %1$d</string>
+    <string name="downloads_status_downloading">Downloading %1$d %%</string>
+    <string name="downloads_status_queued">Queued</string>
+    <string name="downloads_status_paused">Paused</string>
+    <string name="downloads_status_done">Downloaded · %1$s</string>
+    <string name="downloads_status_failed">Failed</string>
+    <string name="downloads_status_removing">Removing…</string>
+    <string name="downloads_delete">Delete download</string>
+    <string name="downloads_delete_title">Delete download?</string>
+    <string name="downloads_delete_body">“%1$s” will be removed from this phone. You can download it again later.</string>
+    <string name="downloads_delete_confirm">Delete</string>
+    <string name="downloads_cancel">Cancel</string>
+    <string name="downloads_empty_title">No downloads yet</string>
+    <string name="downloads_empty_hint">Download a film or episode from its page to watch it without internet.</string>
+</resources>

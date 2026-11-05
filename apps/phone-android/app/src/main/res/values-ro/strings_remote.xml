@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="remote_title">Telecomandă</string>
+    <string name="remote_back">Înapoi</string>
+    <string name="remote_empty_title">Niciun televizor conectat</string>
+    <string name="remote_empty_hint">Deschide MixAI pe televizor și asociază-l cu același MMO Server ca acest telefon.</string>
+    <string name="remote_hub_status">Legătură cu serverul: %1$s</string>
+    <string name="remote_hub_connected">conectat</string>
+    <string name="remote_hub_connecting">se conectează</string>
+    <string name="remote_hub_disconnected">deconectat</string>
+    <string name="remote_now_playing">%1$s · %2$s / %3$s</string>
+    <string name="remote_now_playing_noduration">%1$s · %2$s</string>
+    <string name="remote_untitled">Se redă</string>
+    <string name="remote_idle">Nu se redă nimic pe acest televizor</string>
+    <string name="remote_touchpad">Touchpad</string>
+    <string name="remote_touchpad_hint">Atinge pentru redare sau pauză · glisează stânga sau dreapta pentru salt de 10 s · glisează sus sau jos pentru următorul sau anteriorul</string>
+    <string name="remote_stop">Oprește</string>
+    <string name="remote_home">Acasă</string>
+    <string name="remote_play">Redă</string>
+    <string name="remote_pause">Pauză</string>
+    <string name="remote_go_movies">Filme</string>
+    <string name="remote_go_shows">Seriale</string>
+    <string name="remote_go_music">Muzică</string>
+    <string name="remote_go_livetv">TV live</string>
+    <string name="remote_go_search">Căutare</string>
+    <string name="remote_text_label">Scrie pe televizor</string>
+    <string name="remote_text_send">Trimite textul la căutarea de pe televizor</string>
+    <string name="remote_status_sending">Se trimite…</string>
+    <string name="remote_status_sent">Trimis</string>
+    <string name="remote_status_error">Televizorul răspunde: %1$s</string>
+    <string name="remote_status_noanswer">Niciun răspuns</string>
+</resources>

@@ -7,6 +7,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    // FCM (push): reads app/google-services.json (Firebase project mmo-mw-prod). Phone only.
+    alias(libs.plugins.google.services)
 }
 
 // Release signing from CI secrets (PHONE_KEYSTORE_B64 / PHONE_KEYSTORE_PASSWORD /
@@ -23,6 +25,18 @@ if (hasReleaseKeystore && !releaseKeystoreFile.exists()) {
 val mixaiOrigin: String = (project.findProperty("mixaiOrigin") as String?)?.trim()?.trimEnd('/')
     ?.takeIf { it.isNotEmpty() } ?: "https://mixai.ro"
 
+// Web origin for push registration + native Google sign-in (`/api/push/register`, `/api/auth/native/google`).
+// mixai.ro DNS is pending, so it defaults to the Cloud Run URL. Override: -PmixaiWebOrigin=https://mixai.ro
+val mixaiWebOrigin: String = (project.findProperty("mixaiWebOrigin") as String?)?.trim()?.trimEnd('/')
+    ?.takeIf { it.isNotEmpty() } ?: "https://mixai-web-622082681070.europe-west1.run.app"
+
+// Google "web" OAuth client id the ID token is requested for (= apps/web AUTH_GOOGLE_ID; a public id, not a secret).
+val googleWebClientId: String = (project.findProperty("mixaiGoogleWebClientId") as String?)?.trim()?.takeIf { it.isNotEmpty() }
+    ?: "622082681070-12mtrfam879ia4cc0mp8prcmslphs0vg.apps.googleusercontent.com"
+
+// Sentry DSN: gradle property or env MIXAI_SENTRY_DSN_PHONE. Empty = Sentry disabled (env-gated).
+val sentryDsn: String = ((project.findProperty("MIXAI_SENTRY_DSN_PHONE") as String?) ?: System.getenv("MIXAI_SENTRY_DSN_PHONE") ?: "").trim()
+
 android {
     namespace = "ro.mixai.app"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -31,9 +45,12 @@ android {
         applicationId = "ro.mixai.app"
         minSdk = 31
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         buildConfigField("String", "MIXAI_ORIGIN", "\"$mixaiOrigin\"")
+        buildConfigField("String", "MIXAI_WEB_ORIGIN", "\"$mixaiWebOrigin\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
     }
 
     signingConfigs {
@@ -96,6 +113,18 @@ dependencies {
 
     implementation(libs.bundles.media3)
     implementation(libs.media3.ui.compose)
+    implementation(libs.media3.cast)
+    implementation(libs.media3.exoplayer.workmanager)
+    implementation(libs.work.runtime.ktx)
+
+    implementation(libs.credentials)
+    implementation(libs.credentials.play.services.auth)
+    implementation(libs.googleid)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+    implementation(libs.sentry.android)
+    implementation(libs.datastore.preferences)
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)

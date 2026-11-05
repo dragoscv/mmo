@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings2_section_watch">Vizionare</string>
+    <string name="settings2_downloads">Descărcări</string>
+    <string name="settings2_remote">Telecomandă</string>
+    <string name="settings2_together">Vizionare împreună</string>
+    <string name="settings2_family">Familie</string>
+    <string name="settings2_plex_import">Importă din Plex</string>
+
+    <string name="settings2_section_playback">Redare și date</string>
+    <string name="settings2_data_saver">Economisire date</string>
+    <string name="settings2_data_saver_desc">Pe date mobile, întreabă înainte de a reda originalul</string>
+    <string name="settings2_wifi_only">Descarcă doar pe Wi-Fi</string>
+    <string name="settings2_wifi_only_desc">Descărcările așteaptă o rețea fără limită de date</string>
+    <string name="settings2_smart_downloads">Descărcări inteligente</string>
+    <string name="settings2_smart_downloads_desc">Păstrează offline următoarele episoade din serialele urmărite</string>
+    <string name="settings2_night_mode">Mod de noapte implicit</string>
+    <string name="settings2_night_mode_desc">Scene zgomotoase mai încete și dialog mai clar în player</string>
+
+    <string name="settings2_section_privacy">Confidențialitate</string>
+    <string name="settings2_crash_reports">Rapoarte de erori</string>
+    <string name="settings2_crash_off">Dezactivate în această versiune</string>
+    <string name="settings2_crash_on">Rapoarte anonime de erori (fără date personale, fără capturi de ecran)</string>
+
+    <string name="settings2_notifications">Notificări</string>
+    <string name="settings2_notifications_desc">Gestionează notificările în setările sistemului</string>
+</resources>

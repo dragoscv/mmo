@@ -27,11 +27,20 @@ sealed interface Dest {
     data object NowPlaying : Dest
     data class LivePlayer(val channelId: String) : Dest
     data object Settings : Dest
+    // Slice 2 (WP16-46 / D38)
+    data object Downloads : Dest
+    /** Phone as TV remote; `deviceId` preselects a TV. */
+    data class Remote(val deviceId: String? = null) : Dest
+    /** Watch Together; `roomId` joins an existing room. */
+    data class Together(val roomId: String? = null) : Dest
+    data object FamilyStats : Dest
+    data object PlexImport : Dest
 
     /** Onboarding / full-screen destinations hide the bottom bar. */
     val isChromeless: Boolean
         get() = this is Splash || this is Welcome || this is SignIn || this is Discover || this is Pair ||
-            this is Manual || this is ProfilePicker || this is Player || this is NowPlaying || this is LivePlayer
+            this is Manual || this is ProfilePicker || this is Player || this is NowPlaying || this is LivePlayer ||
+            this is Remote
 }
 
 /** Single back stack observed by NavDisplay. */

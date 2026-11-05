@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- notification channels -->
+    <string name="channel_recordings">Înregistrări</string>
+    <string name="channel_recordings_desc">Înregistrări TV live pornite, terminate sau eșuate.</string>
+    <string name="channel_downloads">Descărcări</string>
+    <string name="channel_downloads_desc">Progresul descărcărilor offline.</string>
+    <string name="channel_episodes">Episoade noi</string>
+    <string name="channel_episodes_desc">Episoade și titluri noi în biblioteca ta.</string>
+    <string name="downloads_notification">Se descarcă pentru offline</string>
+
+    <!-- native sign-in -->
+    <string name="signin_google">Continuă cu Google</string>
+    <string name="signin_google_working">Conectare cu Google…</string>
+    <string name="signin_google_failed">Conectarea cu Google a eșuat: %1$s</string>
+    <string name="signin_google_no_account">Niciun cont Google pe acest telefon. Folosește codul de mai jos.</string>
+    <string name="signin_or_code">Sau conectează-te cu un cod</string>
+</resources>

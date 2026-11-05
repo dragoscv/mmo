@@ -57,7 +57,10 @@ data class RoomState(
     val invite: String? = null,
 )
 
-data class RoomChat(val fromName: String, val fromConnId: String, val text: String, val ts: Long)
+data class RoomChat(val fromName: String, val fromConnId: String, val text: String, val ts: Long, val id: String = "", val fromDeviceId: String = "")
+
+/** Inbound `ack {seq, ok, error?, from?}` for a command this device sent. */
+data class HubAckMsg(val seq: String, val ok: Boolean, val error: String?, val from: String?)
 data class RoomReaction(val fromName: String, val emoji: String, val mediaSec: Double, val ts: Long)
 
 enum class HubStatus { Disconnected, Connecting, Connected }
@@ -99,6 +102,14 @@ class HubClient(
 
     private val _reactions = MutableSharedFlow<RoomReaction>(extraBufferCapacity = 64)
     val reactions: SharedFlow<RoomReaction> = _reactions.asSharedFlow()
+
+    private val _acks = MutableSharedFlow<HubAckMsg>(extraBufferCapacity = 32)
+    /** Acks for [command] calls (remote control). */
+    val acks: SharedFlow<HubAckMsg> = _acks.asSharedFlow()
+
+    private val _moderation = MutableSharedFlow<String>(extraBufferCapacity = 16)
+    /** `report:ok` / `block:ok` / `unblock:ok` / `kicked` notices (WP16-50 moderation). */
+    val moderation: SharedFlow<String> = _moderation.asSharedFlow()
 
     private val _errors = MutableSharedFlow<String>(extraBufferCapacity = 8)
     /** Server `error {error}` codes (room_not_found, room_full, not_in_room). */
@@ -266,13 +277,20 @@ class HubClient(
             }
             "room:chat" -> {
                 val from = msg["from"]?.jsonObjectOrNull()
-                _chat.tryEmit(RoomChat(from?.str("name") ?: "", from?.str("connId") ?: "", msg.str("text") ?: return, msg.num("ts")?.toLong() ?: 0L))
+                _chat.tryEmit(RoomChat(
+                    from?.str("name") ?: "", from?.str("connId") ?: "", msg.str("text") ?: return, msg.num("ts")?.toLong() ?: 0L,
+                    id = msg.str("id") ?: "", fromDeviceId = from?.str("deviceId") ?: "",
+                ))
             }
             "room:react" -> {
                 val from = msg["from"]?.jsonObjectOrNull()
                 _reactions.tryEmit(RoomReaction(from?.str("name") ?: "", msg.str("emoji") ?: return, msg.num("mediaSec") ?: 0.0, msg.num("ts")?.toLong() ?: 0L))
             }
             "room:left" -> if (_room.value?.roomId == msg.str("roomId")) _room.value = null
+            "room:kicked" -> { if (_room.value?.roomId == msg.str("roomId")) _room.value = null; _moderation.tryEmit("kicked") }
+            "report:ok" -> _moderation.tryEmit("report:ok")
+            "block:ok" -> _moderation.tryEmit(if (msg.bool("blocked") == false) "unblock:ok" else "block:ok")
+            "ack" -> _acks.tryEmit(HubAckMsg(msg.str("seq") ?: "", msg.bool("ok") == true, msg.str("error"), msg.str("from")))
             "error" -> msg.str("error")?.let { _errors.tryEmit(it) }
         }
     }
@@ -322,6 +340,18 @@ class HubClient(
     fun report(positionSec: Double) = sendRaw(buildJsonObject { put("type", "room:report"); put("positionSec", positionSec); put("rttMs", clock.rttMs) })
     fun chat(text: String) = sendRaw(buildJsonObject { put("type", "room:chat"); put("text", text) })
     fun react(emoji: String, mediaSec: Double? = null) = sendRaw(buildJsonObject { put("type", "room:react"); put("emoji", emoji); mediaSec?.let { put("mediaSec", it) } })
+
+    // ─── outbound: moderation (WP16-50) ───────────────────────────────────
+
+    /** Report a chat message; reasons: spam, harassment, hate, sexual, violence, other. */
+    fun reportMessage(messageId: String, reason: String) = sendRaw(buildJsonObject {
+        put("type", "report"); put("messageId", messageId); put("reason", reason); _room.value?.roomId?.let { put("roomId", it) }
+    })
+    /** Hide a member's chat + reactions (persisted per profile on the server). `memberId` = connId. */
+    fun block(memberId: String) = sendRaw(buildJsonObject { put("type", "block"); put("memberId", memberId) })
+    fun unblock(memberId: String) = sendRaw(buildJsonObject { put("type", "unblock"); put("memberId", memberId) })
+    /** Host only. */
+    fun kick(memberId: String) = sendRaw(buildJsonObject { put("type", "kick"); put("memberId", memberId) })
 
     private fun sendRaw(o: JsonObject): Boolean = ws?.send(o.toString()) ?: false
 

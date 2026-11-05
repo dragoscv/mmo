@@ -60,6 +60,24 @@ import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.runtime.collectAsState
+import androidx.media3.cast.CastPlayer
+import androidx.media3.cast.MediaRouteButton
+import androidx.media3.cast.MediaRouteButtonState
+import ro.mixai.app.cast.CastSupport
+import ro.mixai.app.downloads.DownloadCenter
+import ro.mixai.app.ui.kids.CapUi
+import ro.mixai.app.ui.kids.DailyCapLocked
+import ro.mixai.app.ui.kids.capUiState
+import ro.mixai.app.ui.playon.PlayOnRequest
+import ro.mixai.app.ui.playon.PlayOnSheet
+import ro.mixai.app.ui.playon.deviceSessionFor
+import ro.mixai.app.ui.together.RoomPlaybackSync
+import ro.mixai.app.ui.together.SyncCommand
+import ro.mixai.tv.data.isKid
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -181,7 +199,7 @@ private const val SUB_OFF = "off"
 private const val PIP_MIN_ASPECT = 0.42f
 private const val PIP_MAX_ASPECT = 2.38f
 
-private enum class Sheet { None, Tracks, SubStyle, Speed, Sleep }
+private enum class Sheet { None, Tracks, SubStyle, Speed, Sleep, Audio, Bookmarks, SubSearch, More }
 
 private data class TapSeek(val forward: Boolean, val taps: Int, val baseMs: Long)
 
@@ -193,21 +211,37 @@ private data class LevelHud(val volume: Boolean, val level: Float)
  */
 @Composable
 fun PlayerScreen(deps: AppDeps, nav: Navigator, dest: Dest.Player) {
+    val context = LocalContext.current
     var file by remember(dest) { mutableStateOf<VideoFile?>(null) }
     var resume by remember(dest) { mutableLongStateOf(0L) }
     var loadError by remember(dest) { mutableStateOf<Throwable?>(null) }
     var attempt by remember(dest) { mutableIntStateOf(0) }
+    var capLocked by remember(dest) { mutableStateOf<CapUi.Locked?>(null) }
+    var askCellular by remember(dest) { mutableStateOf(false) }
+    val cellKey = remember(dest) { cellularKey(dest.ref?.kind, dest.ref?.tmdbId, dest.fileId) }
 
     LaunchedEffect(dest, attempt) {
         loadError = null
+        val offline = offlineDownload(dest.fileId)
         try {
-            val f = deps.api.fileInfo(dest.fileId)
+            // Offline (airplane mode): the downloaded copy carries enough metadata to play.
+            val f = try { deps.api.fileInfo(dest.fileId) } catch (e: CancellationException) { throw e } catch (e: Exception) {
+                offline?.let { offlineVideoFile(it.meta) } ?: throw e
+            }
             resume = when {
                 dest.resumeMs > 0 -> dest.resumeMs
                 dest.resumeMs == 0L -> 0L
                 else -> deps.settings.progress.first()[dest.fileId]
                     ?.let { p -> if (p.dur > 0 && p.fraction >= 0.95f) 0L else p.pos.coerceAtLeast(0L) } ?: 0L
             }
+            // Kids daily cap (server answers 403 daily_cap on playback; check first for a friendly screen).
+            val prof = deps.profiles.activeProfile.value
+            if (prof?.isKid == true && offline == null) {
+                (capUiState(runCatching { deps.phoneApi.usage(prof.id) }.getOrNull(), true) as? CapUi.Locked)?.let { capLocked = it }
+            }
+            askCellular = shouldAskCellular(
+                currentNet(context), deps.phone.settings.dataSaver.first(), deps.phone.settings.cellularAllowed(cellKey), offline != null,
+            )
             file = f
         } catch (e: CancellationException) {
             throw e
@@ -217,10 +251,32 @@ fun PlayerScreen(deps: AppDeps, nav: Navigator, dest: Dest.Player) {
     }
 
     val f = file
-    BackHandler(enabled = f == null) { nav.pop() }
+    val locked = capLocked
+    if (locked != null) {
+        BackHandler { nav.pop() }
+        DailyCapLocked(locked, deps.profiles.activeProfile.value?.name, onSwitchProfile = { nav.replace(Dest.ProfilePicker) }, onBack = { nav.pop() })
+        return
+    }
+    BackHandler(enabled = f == null || askCellular) { nav.pop() }
     Box(Modifier.fillMaxSize().background(Mixai.colors.scrimBase), contentAlignment = Alignment.Center) {
         when {
-            f != null -> key(f.fileId) { VideoPlayer(deps, nav, dest, f, resume) }
+            f != null && askCellular -> AlertDialog(
+                onDismissRequest = { nav.pop() },
+                title = { Text(stringResource(R.string.cellular_title)) },
+                text = { Text(stringResource(R.string.cellular_body)) },
+                confirmButton = {
+                    Button(onClick = { deps.scope.launch { deps.phone.settings.allowCellular(cellKey) }; askCellular = false }) {
+                        Text(stringResource(R.string.cellular_always_title))
+                    }
+                },
+                dismissButton = {
+                    Row {
+                        TextButton(onClick = { nav.pop() }) { Text(stringResource(R.string.action_cancel)) }
+                        TextButton(onClick = { askCellular = false }) { Text(stringResource(R.string.cellular_once)) }
+                    }
+                },
+            )
+            f != null -> key(f.fileId) { VideoPlayer(deps, nav, dest, f, resume, onDailyCap = { capLocked = it }) }
             loadError != null -> Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.padding(24.dp).widthIn(max = 480.dp)) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
                     ErrorState(loadError, onRetry = { attempt++ })
@@ -243,13 +299,14 @@ private fun Modifier.semanticsDescription(label: String): Modifier = semantics {
 @OptIn(UnstableApi::class)
 @kotlin.OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: VideoFile, resumeMs: Long) {
+private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: VideoFile, resumeMs: Long, onDailyCap: (CapUi.Locked) -> Unit) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val view = LocalView.current
     val api = deps.api
     val scope = rememberCoroutineScope()
-    val hls = !file.directPlayable
+    val offline = remember(file.fileId) { offlineDownload(file.fileId) }
+    val hls = !file.directPlayable && offline == null
     val ref: MediaRef? = dest.ref
     val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
@@ -327,6 +384,19 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
     var sleepMinutes by remember { mutableIntStateOf(0) }
     var sleepLeftMs by remember { mutableStateOf<Long?>(null) }
     val inPip by PipController.inPip
+    // D38 extras
+    val boost = remember { DialogueBoostProcessor() }
+    var nightMode by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { nightMode = deps.phone.settings.nightMode.first() }
+    LaunchedEffect(nightMode) { boost.enabled = nightMode }
+    var secondSub by remember { mutableIntStateOf(-1) }
+    var secondCues by remember { mutableStateOf<List<VttCue>>(emptyList()) }
+    var playOnOpen by remember { mutableStateOf(false) }
+    val roomSync = remember { RoomPlaybackSync(deps.hub) }
+    val devices by deps.hub.devices.collectAsState()
+    var myDeviceId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { myDeviceId = deps.settings.deviceId() }
+    val tvSession = deviceSessionFor(devices, file.fileId, myDeviceId)
 
     val player = remember {
         val http = DefaultHttpDataSource.Factory()
@@ -334,11 +404,13 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(30_000)
+        // Downloaded originals play from the Media3 download cache (works in airplane mode).
+        val source = if (offline != null) DownloadCenter.cacheDataSourceFactory(context) else http
         ExoPlayer.Builder(context)
             .setRenderersFactory(
-                DefaultRenderersFactory(context).setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER),
+                BoostRenderersFactory(context, boost).setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER),
             )
-            .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(http))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(source))
             .setHandleAudioBecomingNoisy(true)
             .build().apply {
                 val b = trackSelectionParameters.buildUpon()
@@ -348,7 +420,14 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
                 trackSelectionParameters = b.build()
             }
     }
-    val session = remember(player) { MediaSession.Builder(context, player).setId("video").build() }
+    // Google Cast: CastPlayer wraps the local ExoPlayer and moves playback to a Cast device when a session starts.
+    val castPlayer = remember(player) {
+        if (CastSupport.available && offline == null) runCatching { CastPlayer.Builder(context).setLocalPlayer(player).build() }.getOrNull() else null
+    }
+    val controlPlayer: Player = castPlayer ?: player
+    // Unique id: during nav.replace (next episode, handoff) the old player is still composed and holds its session;
+    // a fixed id throws "Session ID must be unique" (seen on the TV app, tv PlayerScreen.kt:254).
+    val session = remember(player) { MediaSession.Builder(context, controlPlayer).setId("video-${file.fileId}-${SystemClock.elapsedRealtimeNanos()}").build() }
 
     // ─── positions (hlsOffset math, same as TV) ──────────────────────────
     /** HLS started server-side at this ABSOLUTE position: player time is relative to it. */
@@ -396,7 +475,9 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
         ended = false
     }
     fun togglePlay() {
-        if (player.isPlaying) player.pause() else { if (ended) seekAbs(0); player.play() }
+        val inRoom = roomSync.isActiveFor(file.fileId)
+        if (player.isPlaying) { player.pause(); if (inRoom) roomSync.onLocalPause(absPos() / 1000.0) }
+        else { if (ended) seekAbs(0); player.play(); if (inRoom) roomSync.onLocalPlay(absPos() / 1000.0) }
     }
 
     fun touched() {
@@ -446,6 +527,10 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
         val listener = object : Player.Listener {
             override fun onPlayerError(e: PlaybackException) {
                 val code = (e.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
+                val body = (e.cause as? HttpDataSource.InvalidResponseCodeException)?.responseBody?.let { String(it) }
+                if (code == 403 && body?.contains("daily_cap") == true) {
+                    onDailyCap(CapUi.Locked(null, 0)); return
+                }
                 error = when (code) {
                     404 -> context.getString(R.string.player_err_missing)
                     null -> context.getString(R.string.player_err_playback, e.errorCodeName)
@@ -473,6 +558,7 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
             reportServer()
             player.removeListener(listener)
             session.release()
+            castPlayer?.release()
             player.release()
         }
     }
@@ -489,6 +575,7 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
             if (idx > 0) hlsAudio = idx
         }
         val item = buildVideoItem(context, api, file, hls, hlsStartSec, hlsAudio)
+            .let { if (offline != null) DownloadCenter.offlineMediaItem(file.fileId, file.title) ?: it else it }
         val startPos = if (resumeMs > 0 && hlsStartSec == 0L) resumeMs else C.TIME_UNSET
         player.setMediaItems(listOf(item), 0, startPos)
         player.prepare()
@@ -534,7 +621,7 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
     LaunchedEffect(sleepMinutes) {
         if (sleepMinutes == 0) { player.volume = 1f; sleepLeftMs = null; return@LaunchedEffect }
         while (true) {
-            player.volume = sleep.fadeVolume()
+            player.volume = sleep.fadeVolumeAt(absPos(), absDur())
             sleepLeftMs = sleep.remainingMs()
             if (sleep.shouldPause(absPos(), absDur())) {
                 val endOfEpisode = sleepMinutes < 0
@@ -548,6 +635,26 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
             }
             delay(500)
         }
+    }
+
+    // ─── Watch Together: follow the room when it plays this file ─────────
+    LaunchedEffect(file.fileId) {
+        while (true) {
+            delay(1_000)
+            if (!roomSync.isActiveFor(file.fileId)) continue
+            when (val c = roomSync.tick(absPos() / 1000.0, player.isPlaying)) {
+                SyncCommand.None -> Unit
+                is SyncCommand.SetRate -> player.setPlaybackSpeed(speed * c.rate)
+                is SyncCommand.SeekTo -> seekAbs((c.sec * 1000).toLong())
+                SyncCommand.Play -> player.play()
+                SyncCommand.Pause -> player.pause()
+            }
+        }
+    }
+
+    // ─── dual subtitles: second track rendered as an overlay ─────────────
+    LaunchedEffect(secondSub) {
+        secondCues = if (secondSub < 0) emptyList() else runCatching { loadVtt(api.subtitleUrl(file.fileId, secondSub)) }.getOrDefault(emptyList())
     }
 
     // ─── PiP ─────────────────────────────────────────────────────────────
@@ -647,7 +754,7 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
         }
     }
     fun commitScrub() {
-        scrubTarget?.let { seekAbs(it) }
+        scrubTarget?.let { seekAbs(it); if (roomSync.isActiveFor(file.fileId)) roomSync.onLocalSeek(it / 1000.0) }
         scrubTarget = null
     }
     fun tapSeekAdd(forward: Boolean, taps: Int) {
@@ -729,6 +836,23 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
             },
             modifier = Modifier.fillMaxSize(),
         )
+
+        // Dual subtitles: the second language above the main line.
+        val second = remember(secondCues, posMs) { Vtt.activeText(secondCues, posMs) }
+        if (second != null && !inPip) {
+            Text(
+                second,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 40.dp, start = 48.dp, end = 48.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
 
         // Gesture layer (under the OSD).
         if (!inPip) {
@@ -908,9 +1032,33 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
                         }) {
                             Icon(Icons.Filled.PictureInPictureAlt, stringResource(R.string.player_pip), tint = onScrim)
                         }
+                        if (castPlayer != null) {
+                            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                                MediaRouteButton(Modifier.size(40.dp), remember { MediaRouteButtonState() })
+                            }
+                        }
+                        IconButton(onClick = { touched(); playOnOpen = true }) {
+                            Icon(Icons.Filled.Tv, stringResource(R.string.handoff_continue_tv), tint = onScrim)
+                        }
                         IconButton(onClick = { locked = true; osdVisible = false; toast(R.string.player_locked) }) {
                             Icon(Icons.Filled.Lock, stringResource(R.string.player_lock), tint = onScrim)
                         }
+                    }
+
+                    // Handoff "Pull back": a TV is already playing this file -> continue here from its position.
+                    if (tvSession != null) {
+                        val tvName = tvSession.name
+                        Button(
+                            onClick = {
+                                touched()
+                                val pos = tvSession.nowPlaying?.positionSec ?: 0.0
+                                deps.hub.command(tvSession.deviceId, "pause")
+                                seekAbs((pos * 1000).toLong())
+                                player.play()
+                                context.toastShort(context.getString(R.string.handoff_pulled, tvName))
+                            },
+                            modifier = Modifier.align(Alignment.TopCenter).padding(top = 64.dp),
+                        ) { Text(stringResource(R.string.handoff_pull_back, tvName)) }
                     }
 
                     // Centre transport.
@@ -983,6 +1131,13 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
                                 stringResource(if (zoom) R.string.player_fit else R.string.player_zoom), onScrim,
                             ) { touched(); zoom = !zoom }
                             OsdIcon(Icons.Filled.Bedtime, stringResource(R.string.player_sleep), onScrim, selected = sleepMinutes != 0) { touched(); sheet = Sheet.Sleep }
+                            OsdIcon(Icons.Filled.RecordVoiceOver, stringResource(R.string.player_night_mode), onScrim, selected = nightMode) {
+                                touched()
+                                nightMode = !nightMode
+                                deps.scope.launch { deps.phone.settings.setNightMode(nightMode) }
+                                toast(if (nightMode) R.string.player_night_on else R.string.player_night_off)
+                            }
+                            OsdIcon(Icons.Filled.MoreHoriz, stringResource(R.string.player_more), onScrim) { touched(); sheet = Sheet.More }
                             if (next != null) {
                                 OsdIcon(Icons.Filled.SkipNext, stringResource(R.string.player_next_episode), onScrim) { playNext(auto = false) }
                             }
@@ -1169,9 +1324,62 @@ private fun VideoPlayer(deps: AppDeps, nav: Navigator, dest: Dest.Player, file: 
                         }
                     }
                     Sheet.None -> Unit
+                    Sheet.More -> {
+                        SheetHeader(stringResource(R.string.player_more))
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.player_night_mode)) },
+                            supportingContent = { Text(stringResource(R.string.player_night_mode_desc)) },
+                            trailingContent = {
+                                Switch(checked = nightMode, onCheckedChange = { v -> nightMode = v; deps.scope.launch { deps.phone.settings.setNightMode(v) } })
+                            },
+                        )
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.player_dual_subs)) },
+                            supportingContent = { Text(if (secondSub >= 0) file.subtitleTracks.getOrNull(secondSub)?.let { it.title ?: it.lang } ?: "" else stringResource(R.string.player_subs_off)) },
+                            modifier = Modifier.clickable { sheet = Sheet.Audio },
+                        )
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.bookmark_title)) },
+                            modifier = Modifier.clickable { sheet = Sheet.Bookmarks },
+                        )
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.subsearch_title)) },
+                            modifier = Modifier.clickable { sheet = Sheet.SubSearch },
+                        )
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.handoff_continue_tv)) },
+                            modifier = Modifier.clickable { sheet = Sheet.None; playOnOpen = true },
+                        )
+                    }
+                    Sheet.Audio -> {
+                        SheetHeader(stringResource(R.string.player_dual_subs))
+                        SheetOption(stringResource(R.string.player_subs_off), null, secondSub < 0) { secondSub = -1; sheet = Sheet.None }
+                        file.subtitleTracks.forEachIndexed { i, t ->
+                            if (t.codec.lowercase() !in BITMAP_SUBS) {
+                                SheetOption(t.title ?: t.lang ?: stringResource(R.string.player_subtitle_n, i + 1), t.lang, secondSub == i) { secondSub = i; sheet = Sheet.None }
+                            }
+                        }
+                    }
+                    Sheet.Bookmarks -> {
+                        SheetHeader(stringResource(R.string.bookmark_title))
+                        BookmarksPanel(deps, ref, file.fileId, posMs) { ms -> seekAbs(ms); sheet = Sheet.None }
+                    }
+                    Sheet.SubSearch -> {
+                        SheetHeader(stringResource(R.string.subsearch_title))
+                        SubtitleSearchPanel(deps, file.fileId) { ms -> seekAbs(ms); sheet = Sheet.None }
+                    }
                 }
             }
         }
+    }
+
+    if (playOnOpen) {
+        PlayOnSheet(
+            deps,
+            PlayOnRequest(file.fileId, absPos() / 1000.0, ref, file.title),
+            onDismiss = { playOnOpen = false },
+            onSent = { player.pause(); report(); reportServer() },
+        )
     }
 
     if (stillWatching) {

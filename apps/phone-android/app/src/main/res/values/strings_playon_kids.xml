@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- play on / handoff / cast -->
+    <string name="playon_title">Play on</string>
+    <string name="playon_empty">No TV with MixAI is connected to this server. Open MixAI on the TV and pair it with the same MMO Server.</string>
+    <string name="playon_now_playing">Playing: %1$s</string>
+    <string name="playon_ready">Ready</string>
+    <string name="playon_sent">Playing on %1$s</string>
+    <string name="playon_refused">%1$s could not start it</string>
+    <string name="playon_no_answer">%1$s did not answer</string>
+    <string name="playon_button">Play on TV</string>
+    <string name="handoff_continue_tv">Continue on TV</string>
+    <string name="handoff_pull_back">Pull back from %1$s</string>
+    <string name="handoff_pulled">Continuing here from %1$s</string>
+    <string name="cast_title">Cast</string>
+
+    <!-- kids caps -->
+    <string name="kids_locked_title">That is all for today</string>
+    <string name="kids_locked_body">%1$s has used the %2$d minutes for today.</string>
+    <string name="kids_locked_body_nocap">%1$s has used the screen time for today.</string>
+    <string name="kids_locked_tomorrow">More time tomorrow. A grown-up can change the limit in Family settings.</string>
+    <string name="kids_switch_profile">Switch profile</string>
+    <string name="kids_remaining">%1$d min left today</string>
+    <string name="kids_none_left">No time left today</string>
+</resources>

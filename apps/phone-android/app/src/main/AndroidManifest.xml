@@ -9,6 +9,10 @@
     <!-- Music notification; requested in context when music starts. MusicService +
          FOREGROUND_SERVICE(_MEDIA_PLAYBACK) come from :core's manifest. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Offline downloads (Media3 DownloadService, user-initiated; resumed by WorkManagerScheduler). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
@@ -68,6 +72,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="mixai" android:host="title" />
             </intent-filter>
+            <!-- mixai://downloads, mixai://together/<roomId> (push payloads, invites). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mixai" android:host="downloads" />
+                <data android:scheme="mixai" android:host="together" />
+            </intent-filter>
             <!-- https://mixai.ro/media/<kind>/<tmdbId> (autoVerify once assetlinks.json is published). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -76,5 +88,31 @@
                 <data android:scheme="https" android:host="mixai.ro" android:pathPrefix="/media/" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".downloads.MixaiDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync">
+            <intent-filter>
+                <action android:name="androidx.media3.exoplayer.downloadService.action.RESTART" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".push.PushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="new_episodes" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_mixai" />
+        <!-- Sentry: initialised manually (Telemetry.kt) only when a DSN is configured. -->
+        <meta-data android:name="io.sentry.auto-init" android:value="false" />
     </application>
 </manifest>

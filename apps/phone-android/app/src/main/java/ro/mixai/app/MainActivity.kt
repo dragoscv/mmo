@@ -88,9 +88,17 @@ class MainActivity : ComponentActivity() {
     fun updatePip() { runCatching { setPictureInPictureParams(pipParams()) } }
 
     companion object {
+        /** Room id of the last `mixai://together/<roomId>` link (consumed by AppRoot). */
+        @Volatile var pendingRoomId: String? = null
+
         fun parseDeepLink(intent: Intent?): Pair<String, Long>? {
             val data: Uri = intent?.data ?: return null
             val seg = data.pathSegments
+            if (data.scheme == "mixai" && data.host == "downloads") return "downloads" to 0L
+            if (data.scheme == "mixai" && data.host == "together") {
+                pendingRoomId = seg.firstOrNull()?.takeIf { it.isNotBlank() }
+                return "together" to 0L
+            }
             return when {
                 data.scheme == "mixai" && data.host == "title" && seg.size >= 2 -> seg[0] to (seg[1].toLongOrNull() ?: return null)
                 data.scheme == "https" && seg.size >= 3 && seg[0] == "media" -> seg[1] to (seg[2].toLongOrNull() ?: return null)

@@ -60,7 +60,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -271,12 +274,27 @@ private fun SyncedLyrics(lines: List<LyricLine>, positionMs: Long, onSeek: (Long
         LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = maxHeight / 3, bottom = maxHeight / 2)) {
             itemsIndexed(lines, key = { i, _ -> i }) { i, line ->
                 val isActive = i == active
+                val plain = remember(line.text) { Karaoke.plainText(line.text) }
+                val style = if (isActive) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium
+                val weight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                val rowModifier = Modifier.fillMaxWidth().clickable { onSeek(line.timeMs) }.padding(vertical = 8.dp)
+                if (isActive && Karaoke.hasWordTiming(line.text)) {
+                    val nextStart = lines.getOrNull(i + 1)?.timeMs
+                    val words = remember(line.text, line.timeMs, nextStart) { Karaoke.parse(line.text, line.timeMs, nextStart) }
+                    val sung = MaterialTheme.colorScheme.primary
+                    val pending = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    val annotated = buildAnnotatedString {
+                        words.forEach { w -> withStyle(SpanStyle(color = if (w.startMs <= positionMs) sung else pending)) { append(w.text) } }
+                    }
+                    Text(annotated, style = style, fontWeight = weight, modifier = rowModifier)
+                    return@itemsIndexed
+                }
                 Text(
-                    line.text.ifBlank { " " },
-                    style = if (isActive) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                    plain.ifBlank { " " },
+                    style = style,
+                    fontWeight = weight,
                     color = if (isActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.fillMaxWidth().clickable { onSeek(line.timeMs) }.padding(vertical = 8.dp),
+                    modifier = rowModifier,
                 )
             }
         }

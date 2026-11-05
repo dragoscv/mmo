@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- player extras (D38) -->
+    <string name="player_night_mode">Night mode</string>
+    <string name="player_night_mode_desc">Clearer dialogue, quieter explosions</string>
+    <string name="player_night_on">Night mode on</string>
+    <string name="player_night_off">Night mode off</string>
+    <string name="player_more">More</string>
+    <string name="player_dual_subs">Second subtitles</string>
+    <string name="bookmark_title">Scene bookmarks</string>
+    <string name="bookmark_add_at">Bookmark at %1$s</string>
+    <string name="bookmark_label">Label (optional)</string>
+    <string name="bookmark_shared">Share with the household</string>
+    <string name="bookmark_shared_badge">Shared</string>
+    <string name="bookmark_add">Add bookmark</string>
+    <string name="bookmark_empty">No bookmarks yet.</string>
+    <string name="bookmark_delete">Delete bookmark</string>
+    <string name="bookmark_error">Could not reach the server.</string>
+    <string name="subsearch_title">Search in subtitles</string>
+    <string name="subsearch_hint">Words you remember</string>
+    <string name="subsearch_go">Search</string>
+    <string name="subsearch_searching">Searching…</string>
+    <string name="subsearch_indexing">Indexing subtitles on the server…</string>
+    <string name="subsearch_none">No line matches.</string>
+    <string name="subsearch_no_subs">This file has no text subtitles to search.</string>
+    <!-- data saver -->
+    <string name="cellular_title">You are on mobile data</string>
+    <string name="cellular_body">The original file can use a lot of data. Original only on Wi-Fi?</string>
+    <string name="cellular_once">Play once</string>
+    <string name="cellular_always_title">Always for this title</string>
+</resources>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- notification channels -->
+    <string name="channel_recordings">Recordings</string>
+    <string name="channel_recordings_desc">Live TV recordings that started, finished or failed.</string>
+    <string name="channel_downloads">Downloads</string>
+    <string name="channel_downloads_desc">Progress of offline downloads.</string>
+    <string name="channel_episodes">New episodes</string>
+    <string name="channel_episodes_desc">New episodes and titles in your library.</string>
+    <string name="downloads_notification">Downloading for offline</string>
+
+    <!-- native sign-in -->
+    <string name="signin_google">Continue with Google</string>
+    <string name="signin_google_working">Signing in with Google…</string>
+    <string name="signin_google_failed">Google sign-in failed: %1$s</string>
+    <string name="signin_google_no_account">No Google account on this phone. Use the code below instead.</string>
+    <string name="signin_or_code">Or sign in with a code</string>
+</resources>

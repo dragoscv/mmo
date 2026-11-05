@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Family stats (WP16-46 item 8) -->
+    <string name="family_title">Family</string>
+    <string name="family_empty_title">No profiles yet</string>
+    <string name="family_empty_hint">Create profiles on your MMO Server to see each person\'s viewing and listening time.</string>
+    <string name="family_kid_badge">Kid</string>
+    <string name="family_minutes">%1$d min</string>
+    <string name="family_hours_minutes">%1$d h %2$02d min</string>
+    <string name="family_week_line">This week: %1$s watched · %2$s music</string>
+    <string name="family_today_line">Today: %1$s watched</string>
+    <string name="family_today_cap_line">Today: %1$s of %2$s</string>
+    <string name="family_left_today">%1$d min left today</string>
+    <string name="family_limit_reached">Limit reached</string>
+    <string name="family_chart_title">Last 7 days</string>
+    <string name="family_chart_desc">Last 7 days for %1$s: %2$s</string>
+    <string name="family_chart_day">%1$s %2$s watched, %3$s music</string>
+    <string name="family_legend_watch">Watched</string>
+    <string name="family_legend_listen">Music</string>
+
+    <!-- Plex import (WP16-46 item 9) -->
+    <string name="plex_title">Import from Plex</string>
+    <string name="plex_intro">Imports your Plex watch history, ratings and watchlist into the current profile. Your Plex token is sent once to your MMO Server for this import and is never stored.</string>
+    <string name="plex_token_hint_title">How to find your Plex token</string>
+    <string name="plex_token_hint">In Plex Web, open any media item, choose Get Info, then View XML. The address of the page that opens ends with X-Plex-Token=… — copy the value after the equals sign.</string>
+    <string name="plex_profile_line">Importing into profile: %1$s</string>
+    <string name="plex_server_url">Plex server URL</string>
+    <string name="plex_server_url_placeholder">http://192.168.1.20:32400</string>
+    <string name="plex_token">Plex token</string>
+    <string name="plex_token_show">Show token</string>
+    <string name="plex_token_hide">Hide token</string>
+    <string name="plex_import_action">Import</string>
+    <string name="plex_importing">Importing from Plex…</string>
+    <string name="plex_result_title">Import complete</string>
+    <string name="plex_result_sections">Libraries scanned</string>
+    <string name="plex_result_movies">Watched movies</string>
+    <string name="plex_result_episodes">Watched episodes</string>
+    <string name="plex_result_ratings">Ratings</string>
+    <string name="plex_result_watchlist">Watchlist items</string>
+    <string name="plex_result_unmatched">Not matched</string>
+    <string name="plex_result_errors">Problems reported</string>
+    <string name="plex_error_400">Check the server URL.</string>
+    <string name="plex_error_401">Plex refused the token.</string>
+    <string name="plex_error_403">Only the server owner can import.</string>
+    <string name="plex_error_404">Plex server not found.</string>
+    <string name="plex_error_502">The MMO Server could not reach Plex.</string>
+    <string name="plex_error_generic">Import failed (HTTP %1$d).</string>
+    <string name="plex_error_network">Could not reach your MMO Server. Check your connection and try again.</string>
+</resources>
