@@ -142,6 +142,7 @@ const IGNORED_PREFIXES = [
     "apps/web/public/",
 ];
 const IGNORED_FILES = new Set([
+    "apps/web/README.md",
     "apps/web/pnpm-lock.yaml",
     "apps/web/eslint-snapshot.json",
     "apps/web/eslint-out.json",

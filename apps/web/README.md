@@ -147,7 +147,9 @@ Producția web rulează pe **Cloud Run `mixai-web`** (proiect `mmo-mw-prod`, `eu
 	origine (run.app acum, mixai.ro după DNS) — fără el login-ul Google dă `redirect_uri_mismatch`.
 - Domeniu `mixai.ro`: Cloud Run domain mapping (europe-west1 suportă) →
 	`gcloud beta run domain-mappings create --service mixai-web --domain mixai.ro --region europe-west1 --project mmo-mw-prod`
-	(necesită domeniul verificat în Search Console pentru contul gcloud), apoi în Cloudflare înregistrările
+	(necesită domeniul verificat pentru contul gcloud — la 2026-11-05 `mixai.ro` NU era în
+	`gcloud domains list-user-verified`; `gcloud domains verify mixai.ro` → TXT `google-site-verification=…` în
+	Cloudflare), apoi în Cloudflare înregistrările
 	A/AAAA afișate de comandă (apex) sau `CNAME www → ghs.googlehosted.com.`, **DNS only** (proxy gri) până
 	emite Google certificatul. Alternativ: Cloudflare proxy + Load Balancer — nu e configurat.
 - `public/samples` (934 MB) NU este în imagine; mostrele DAW trebuie mutate în GCS.
