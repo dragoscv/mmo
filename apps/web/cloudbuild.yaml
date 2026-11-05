@@ -1,0 +1,23 @@
+# Cloud Build for the web image. Submitted by apps/web/scripts/deploy-cloud-run.ps1 with a
+# staged repo-root context (git archive of the deployed commit).
+steps:
+  - name: gcr.io/cloud-builders/docker
+    env: ["DOCKER_BUILDKIT=1"]
+    args:
+      - build
+      - -f
+      - apps/web/Dockerfile
+      - --build-arg
+      - COMMIT_SHA=${_COMMIT_SHA}
+      - -t
+      - ${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
+substitutions:
+  _IMAGE: europe-west1-docker.pkg.dev/mmo-mw-prod/mixai/mixai-web:manual
+  _COMMIT_SHA: unknown
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+timeout: 2400s

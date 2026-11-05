@@ -9,6 +9,7 @@
     "apps/tv-tizen/src/screens/SignIn.tsx",
     "apps/tv-tizen/src/screens/Pair.tsx",
     "server/ui/src/views/AuthView.tsx",
+    "apps/web/src/app/theme-color-meta.tsx",
     "**/*-logo.tsx",
     "**/logos/**",
     "**/visualizer*/palettes.ts"
@@ -22,6 +23,7 @@
     "apps/tv-tizen/src/screens/SignIn.tsx": "QR canvas must be pure #000000/#ffffff for scanner contrast",
     "apps/tv-tizen/src/screens/Pair.tsx": "QR canvas must be pure #000000/#ffffff for scanner contrast",
     "server/ui/src/views/AuthView.tsx": "Google 'G' brand mark — colours fixed by Google's brand guidelines",
+    "apps/web/src/app/theme-color-meta.tsx": "<meta name=theme-color> cannot read CSS variables — sRGB of the --background tokens",
     "**/*-logo.tsx, **/logos/**": "third-party brand marks",
     "**/visualizer*/palettes.ts": "audio visualizer palettes are artistic data, not UI chrome"
   }

@@ -11,10 +11,17 @@
  */
 
 import { createHash, randomBytes, randomInt } from "node:crypto";
+import { USER_CODE_ALPHABET, USER_CODE_LENGTH } from "./device-code-format";
 
-/** Human-friendly alphabet: no 0/O, no 1/I. 32 symbols → 8 chars = 40 bits. */
-export const USER_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-export const USER_CODE_LENGTH = 8;
+export {
+    USER_CODE_ALPHABET,
+    USER_CODE_LENGTH,
+    USER_CODE_RE,
+    formatUserCode,
+    isValidUserCode,
+    normalizeUserCode,
+} from "./device-code-format";
+
 /** Lifetime of a pending code (seconds). */
 export const DEVICE_CODE_TTL_SEC = 900;
 /** Minimum polling interval the TV must respect (seconds). */
@@ -28,23 +35,6 @@ export function generateUserCode(): string {
         out += USER_CODE_ALPHABET[randomInt(USER_CODE_ALPHABET.length)];
     }
     return out;
-}
-
-/** "ABCD1234" → "ABCD-1234" (display form). */
-export function formatUserCode(code: string): string {
-    const c = normalizeUserCode(code);
-    return `${c.slice(0, 4)}-${c.slice(4)}`;
-}
-
-/** Accepts "abcd-1234", "ABCD 1234", "ABCD1234" → "ABCD1234". Does NOT validate. */
-export function normalizeUserCode(input: string): string {
-    return input.toUpperCase().replace(/[^A-Z2-9]/g, "");
-}
-
-export const USER_CODE_RE = new RegExp(`^[${USER_CODE_ALPHABET}]{${USER_CODE_LENGTH}}$`);
-
-export function isValidUserCode(normalized: string): boolean {
-    return USER_CODE_RE.test(normalized);
 }
 
 /** Opaque 32-byte device_code (base64url) that the TV polls with. */

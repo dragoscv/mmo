@@ -14,7 +14,7 @@ import {
     type DeviceCodeInfo,
     type DeviceCodeLookup,
 } from "@/actions/device-code";
-import { formatUserCode, isValidUserCode, normalizeUserCode } from "@/lib/device-code";
+import { formatUserCode, isValidUserCode, normalizeUserCode } from "@/lib/device-code-format";
 
 interface ActivateClientProps {
     initialCode: string;

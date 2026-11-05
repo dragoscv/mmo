@@ -31,18 +31,28 @@ if (!connectionString) {
 // Detect serverless to keep the pool tiny — Vercel functions are short-lived
 // and many concurrent invocations would otherwise saturate Cloud SQL.
 const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+// Cloud Run sets K_SERVICE. Instances scale out (max 4) against a db-f1-micro (~25 connections),
+// so keep the per-instance pool small and drop idle connections; DB_POOL_MAX overrides.
+const isCloudRun = !!process.env.K_SERVICE;
+const poolMax = Number(process.env.DB_POOL_MAX) || (isServerless ? 1 : isCloudRun ? 4 : 10);
 
 // `globalThis` cache prevents creating a new pool on every Hot Reload in
 // `next dev` (which would exhaust connections fast).
 const globalForDb = globalThis as unknown as { __mmoSql?: ReturnType<typeof postgres> };
 
+// Cloud Run: `--add-cloudsql-instances` mounts the Cloud SQL socket under /cloudsql/<connection>.
+// When DB_SOCKET_DIR is set, connect through it (credentials/db still come from DATABASE_URL);
+// the auth proxy encrypts the hop, so no client SSL on the socket.
+const socketDir = process.env.DB_SOCKET_DIR;
+
 const sqlClient = globalForDb.__mmoSql ?? postgres(connectionString, {
-    max: isServerless ? 1 : 10,
-    idle_timeout: isServerless ? 20 : 0,
+    max: poolMax,
+    idle_timeout: isServerless || isCloudRun ? 20 : 0,
     connect_timeout: 30,
     // Cloud SQL public IP requires SSL but the cert chain is signed by Google's
     // root which Node trusts; `require` is enough.
-    ssl: connectionString.includes("sslmode=require") ? "require" : undefined,
+    ssl: !socketDir && connectionString.includes("sslmode=require") ? "require" : false,
+    ...(socketDir ? { host: socketDir } : {}),
     prepare: false, // safer with PgBouncer / serverless poolers
 });
 

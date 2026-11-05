@@ -10,6 +10,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — Web on Cloud Run (web 3.0.1)
+
+- **Web 3.0.1** — builds on Linux and ships as a container. Fonts are self-hosted with `next/font/local`
+  (Inter, Space Grotesk, JetBrains Mono variable woff2, latin + latin-ext incl. ș/ț, OFL texts next to them in
+  `apps/web/src/app/fonts/`) — `next/font/google` failed under Turbopack on Linux (`Can't resolve
+  '@vercel/turbopack-next/internal/font/google/font'`) and needed network at build time; same CSS variables.
+  `/activate` no longer pulls `node:crypto` into the client bundle (user-code helpers moved to
+  `lib/device-code-format.ts`, re-exported by `lib/device-code.ts`). New `apps/web/Dockerfile` (Next standalone
+  via `NEXT_OUTPUT_STANDALONE=1`, node 22, non-root, port 8080), `apps/web/cloudbuild.yaml` and
+  `apps/web/scripts/deploy-cloud-run.ps1` → Cloud Run `mixai-web` (europe-west1, Cloud SQL socket via
+  `DB_SOCKET_DIR`, secrets in Secret Manager). `public/samples` is not in the image yet (DAW samples → GCS later).
+
 ## 2026-11-06 — Shared Android data module (TV Android 2.0.2)
 
 - **TV Android 2.0.2** — internal refactor, no user-visible change (WP16-49): the data layer moved from `:app`

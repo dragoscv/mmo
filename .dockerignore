@@ -1,0 +1,24 @@
+# Repo-root build context (apps/web/Dockerfile). The deploy script already stages a clean
+# `git archive` context; this file keeps an ad-hoc `docker build -f apps/web/Dockerfile .`
+# from uploading GBs of local state.
+**/node_modules
+**/.next
+**/.turbo
+**/.pnpm-cache
+**/.vercel
+**/.env*
+**/*.tsbuildinfo
+**/test-results
+**/playwright-report
+.git
+.copilot-tmp
+external
+infra
+server
+apps/*
+!apps/web
+apps/web/public/samples
+apps/web/data
+apps/web/learn-content
+apps/web/public/sw*
+apps/web/public/globals.css

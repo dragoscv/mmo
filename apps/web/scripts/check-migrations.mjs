@@ -75,9 +75,10 @@ function changedStatus() {
 const files = changedFiles();
 const status = changedStatus();
 
-const schemaChanged = files.some(
-    (p) => p.startsWith("apps/web/src/db/") && /\.(ts|sql)$/.test(p),
-);
+// `src/db/index.ts` is the connection client (pool, SSL, socket), not schema — it never needs a migration.
+const NOT_SCHEMA = new Set(["apps/web/src/db/index.ts"]);
+const isSchemaFile = (p) => p.startsWith("apps/web/src/db/") && /\.(ts|sql)$/.test(p) && !NOT_SCHEMA.has(p);
+const schemaChanged = files.some(isSchemaFile);
 if (!schemaChanged) {
     process.exit(0);
 }
@@ -105,7 +106,7 @@ console.error(
 );
 console.error("");
 console.error(`  ${BOLD}Schema files in this change:${RESET}`);
-for (const p of files.filter((p) => p.startsWith("apps/web/src/db/"))) {
+for (const p of files.filter(isSchemaFile)) {
     console.error(`    ${DIM}-${RESET} ${p}`);
 }
 console.error("");

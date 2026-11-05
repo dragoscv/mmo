@@ -119,6 +119,41 @@ TURN_SHARED_SECRET=                    # din Terraform output
 
 ---
 
+## ☁️ Cloud Run
+
+Producția web rulează pe **Cloud Run `mixai-web`** (proiect `mmo-mw-prod`, `europe-west1`, lângă Cloud SQL
+`mmo-pg`). Vercel (`codai-ro/mmo`) este dezactivat din 2026-11.
+
+- Imagine: `apps/web/Dockerfile` (context = rădăcina repo-ului, Next `output: standalone` prin
+	`NEXT_OUTPUT_STANDALONE=1`, node 22, user non-root, port 8080), build prin `apps/web/cloudbuild.yaml`
+	în Artifact Registry `europe-west1-docker.pkg.dev/mmo-mw-prod/mixai/mixai-web:<sha12>`.
+- Deploy (doar din arbore curat, commit împins):
+	`pwsh -NoProfile -File "$env:USERPROFILE\.copilot\hooks\deploy-clean.ps1" -Command 'pwsh -NoProfile -File apps/web/scripts/deploy-cloud-run.ps1'`
+	Opțiuni: `-AppUrl https://mixai.ro` (după DNS), `-NoSecretSync`, `-SkipBuild`.
+- Migrații: NU rulează la deploy. Verifică întâi `pnpm -C apps/web db:status` (`.env.local` = PROD).
+- DB: socket Cloud SQL (`--add-cloudsql-instances`, `DB_SOCKET_DIR=/cloudsql/mmo-mw-prod:europe-west1:mmo-pg`);
+	user/parolă/db din `DATABASE_URL`. Pool 4 conexiuni/instanță (`DB_POOL_MAX`), max 4 instanțe.
+- Runtime SA: `mmo-web-app@mmo-mw-prod.iam.gserviceaccount.com` (secretAccessor, cloudsql.client, storage).
+- Secret Manager (sincronizate din `.env.local`, valori niciodată afișate; doar cele nevide se montează):
+	`mixai-web-database-url`, `mixai-web-auth-secret`, `mixai-web-auth-token-enc-key`,
+	`mixai-web-auth-google-id`, `mixai-web-auth-google-secret`, `mixai-web-auth-github-id`,
+	`mixai-web-auth-github-secret`, `mixai-web-stripe-secret-key`, `mixai-web-stripe-webhook-secret`,
+	`mixai-web-tmdb-api-key`, `mixai-web-tmdb-read-token`, `mixai-web-azure-openai-key`,
+	`mixai-web-azure-speech-key`, `mixai-web-azure-client-secret`, `mixai-web-cloudflare-api-token`,
+	`mixai-web-mmo-trainer-secret`, `mixai-web-revalidate-secret`, `mixai-web-turn-shared-secret`,
+	`mixai-web-appinsights-connection-string`, `mixai-web-gcp-service-account-key`.
+- `AUTH_URL`/`NEXTAUTH_URL`/`MMO_APP_URL` = URL-ul run.app până la mutarea pe `https://mixai.ro`.
+	Google OAuth: adaugă redirect URI `<origin>/api/auth/callback/google` în clientul OAuth pentru fiecare
+	origine (run.app acum, mixai.ro după DNS) — fără el login-ul Google dă `redirect_uri_mismatch`.
+- Domeniu `mixai.ro`: Cloud Run domain mapping (europe-west1 suportă) →
+	`gcloud beta run domain-mappings create --service mixai-web --domain mixai.ro --region europe-west1 --project mmo-mw-prod`
+	(necesită domeniul verificat în Search Console pentru contul gcloud), apoi în Cloudflare înregistrările
+	A/AAAA afișate de comandă (apex) sau `CNAME www → ghs.googlehosted.com.`, **DNS only** (proxy gri) până
+	emite Google certificatul. Alternativ: Cloudflare proxy + Load Balancer — nu e configurat.
+- `public/samples` (934 MB) NU este în imagine; mostrele DAW trebuie mutate în GCS.
+
+---
+
 ## 🛠️ Stack pe scurt
 
 - **Next.js 16** (App Router, RSC, Server Actions, Turbopack default, React Compiler)

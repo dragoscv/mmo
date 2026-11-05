@@ -18,6 +18,12 @@ const pkgVersion = (JSON.parse(
 ) as { version: string }).version;
 
 const nextConfig: NextConfig = {
+    // Cloud Run image (apps/web/Dockerfile) sets NEXT_OUTPUT_STANDALONE=1 → self-contained
+    // `.next/standalone` server. Local/dev builds keep the default output. Tracing root = repo
+    // root because packages/* are consumed through tsconfig paths from outside apps/web.
+    ...(process.env.NEXT_OUTPUT_STANDALONE === "1"
+        ? { output: "standalone" as const, outputFileTracingRoot: resolve(__dirname, "../..") }
+        : {}),
     env: {
         NEXT_PUBLIC_APP_VERSION: pkgVersion,
     },
