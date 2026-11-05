@@ -51,8 +51,9 @@ targets:
       properties:
         com.apple.developer.applesignin: [Default]
         com.apple.developer.associated-domains: ['applinks:mixai.ro']
-        # Widgets / Live Activities (later slice) share state through this group.
-        com.apple.security.application-groups: [group.ro.mixai.app]
+        # Widgets / Live Activities slice: add `com.apple.security.application-groups: [group.ro.mixai.app]` once the
+        # group identifier exists in the developer portal (the ASC API key cannot create App Group ids; Xcode's attempt
+        # failed with "Authentication failed ... bearer token" on 2026-11-05). The App ID already has APP_GROUPS enabled.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.app
