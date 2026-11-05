@@ -59,7 +59,7 @@ fun SignInScreen(
     onSignedIn: (body: DeviceTokenOk, picked: Pair<CompanionServer, String>?) -> Unit,
     onBack: () -> Unit,
 ) {
-    val auth = remember { DeviceAuth() }
+    val auth = remember { DeviceAuth(BuildConfig.MIXAI_ORIGIN) }
     var state by remember { mutableStateOf<SignInState>(SignInState.Requesting) }
     var secondsLeft by remember { mutableIntStateOf(0) }
     var attempt by remember { mutableIntStateOf(0) }

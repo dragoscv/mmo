@@ -10,6 +10,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — Shared Android data module (TV Android 2.0.2)
+
+- **TV Android 2.0.2** — internal refactor, no user-visible change (WP16-49): the data layer moved from `:app`
+  into a new Android library module `apps/tv-android/core` (namespace `ro.mixai.core`, packages unchanged):
+  MMO Server / mixai.ro client, repositories, generated OpenAPI models, settings store (same DataStore, existing
+  installs keep their pairing), hub client and the background `MusicService`. Platform, version and User-Agent
+  now come from `ClientIdentity`, set by the host app, so the upcoming phone app can reuse the module.
+  `pnpm -C server openapi:gen` writes `apps/tv-android/core/src/main/java/ro/mixai/tv/data/generated/Models.kt`.
+
 ## 2026-11-06 — Better than Plex, part 3 (web 3.0.0 · MMO Server 3.8.0 · `@mmo/sdk` 0.6.1)
 
 - **Web 3.0.0 — one cinematic media surface at `/media`** (WP16-36..42). `/` now opens it (the

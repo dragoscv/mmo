@@ -34,7 +34,6 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
-import ro.mixai.tv.BuildConfig
 import ro.mixai.tv.data.generated.HubDevice
 import ro.mixai.tv.data.generated.HubMedia
 
@@ -192,15 +191,16 @@ class HubClient(
     private fun ping() = sendRaw(buildJsonObject { put("type", "time"); put("t0", System.currentTimeMillis()) })
 
     private suspend fun sendHello() {
-        val name = settings.deviceName.firstOrNullSafe()?.ifBlank { null } ?: Build.MODEL ?: "Android TV"
+        val identity = ClientIdentity.current
+        val name = settings.deviceName.firstOrNullSafe()?.ifBlank { null } ?: Build.MODEL ?: identity.fallbackDeviceName
         sendRaw(buildJsonObject {
             put("type", "hello")
             put("deviceId", settings.deviceId())
             put("name", name)
-            put("platform", "android-tv")
+            put("platform", identity.platform)
             put("caps", JsonArray(CAPS.map { JsonPrimitive(it) }))
             profileId()?.let { put("profileId", it) }
-            put("app", "mixai-tv/${BuildConfig.VERSION_NAME}")
+            put("app", identity.appTag)
         })
         pendingRejoin?.let { joinRoom(it); pendingRejoin = null }
     }

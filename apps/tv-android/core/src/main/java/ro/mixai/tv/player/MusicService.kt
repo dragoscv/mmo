@@ -13,7 +13,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
-import ro.mixai.tv.BuildConfig
+import ro.mixai.tv.data.ClientIdentity
 
 // Background music (WP16-21): one ExoPlayer owned by a MediaSessionService so playback continues
 // while the user browses (and shows in the system now-playing). The app talks to it through a
@@ -26,7 +26,7 @@ class MusicService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         val http = DefaultHttpDataSource.Factory()
-            .setUserAgent("MixAI-TV/${BuildConfig.VERSION_NAME}")
+            .setUserAgent(ClientIdentity.current.userAgent)
             .setAllowCrossProtocolRedirects(true)
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(http))

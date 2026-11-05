@@ -12,11 +12,14 @@ apps/tv-android/
   gradle/libs.versions.toml     EVERY version lives here (deps, plugins, compile/target/minSdk)
   gradle/wrapper/               Gradle 9.7.1
   app/build.gradle.kts          android {} + dependencies via libs.* aliases
+  core/                         Android library `:core` (namespace ro.mixai.core, packages ro.mixai.tv.*):
+                                data/ (MmoApi, repositories, generated/Models.kt, Settings, HubClient,
+                                DeviceAuth, Discovery, ClientIdentity) + player/MusicService — shared with
+                                the phone app; no resources, identity set by MixaiApp
   app/src/main/java/ro/mixai/tv/
     MainActivity.kt             back-stack navigation (Screen sealed interface) + locale override
-    MixaiApp.kt                 Application → Settings (DataStore)
-    data/                       MmoApi (HttpURLConnection + kotlinx.serialization), Models, Settings,
-                                Discovery (NsdManager), DeviceAuth (mixai.ro device-code flow)
+    MixaiApp.kt                 Application → ClientIdentity + Settings (DataStore)
+    data/                       TV-only: WatchNext (launcher channel), ProviderLauncher
     player/PlayerScreen.kt      ExoPlayer + PlayerView + MediaSession, resume, D-pad keys
     ui/                         Welcome, SignIn, Discover, Pair, Connect, Home, Movie, Show, Album,
                                 Settings, SpriteStill, Skeleton, EmptyState

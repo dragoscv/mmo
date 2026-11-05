@@ -30,7 +30,7 @@ import ro.mixai.tv.data.generated.TrackPlayInput
 import java.io.File
 
 // Client for the server `media` module (`/media/*`, WP12-01). Every shape comes from the
-// generated `data/generated/Models.kt` (server/openapi.yaml) — nothing is hand-duplicated here.
+// generated `core/…/data/generated/Models.kt` (server/openapi.yaml) — nothing is hand-duplicated here.
 //
 // `home()` is cached in memory for 5 min: a cheap `GET /media/etag` runs first and the rows
 // are only refetched when `revision` or `libraryEtag` moved (or the cache aged out).

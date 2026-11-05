@@ -87,7 +87,7 @@ Dacă adaugi un router nou montat pe alt prefix, adaugă-l în `MOUNTS`, altfel 
 cd server
 pnpm openapi:gen
 #  1. node scripts/openapi-kotlin.mjs
-#     → apps/tv-android/app/src/main/java/ro/mixai/tv/data/generated/Models.kt
+#     → apps/tv-android/core/src/main/java/ro/mixai/tv/data/generated/Models.kt
 #  2. pnpm --dir ../packages/sdk gen:openapi
 #     → packages/sdk/src/generated/mmo-server.d.ts (openapi-typescript)
 ```

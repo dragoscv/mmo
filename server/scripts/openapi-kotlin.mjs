@@ -3,7 +3,7 @@
 // server/openapi.yaml component schemas — the ones the TV apps consume.
 //
 // No Gradle plugin: the output is committed as plain Kotlin under
-// apps/tv-android/app/src/main/java/ro/mixai/tv/data/generated/Models.kt so the
+// apps/tv-android/core/src/main/java/ro/mixai/tv/data/generated/Models.kt (shared `:core` module) so the
 // Android build stays a pure `assembleDebug` with nothing extra to install.
 // Re-run with `pnpm openapi:gen` after editing the spec.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -15,7 +15,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const serverRoot = resolve(here, "..");
 const repoRoot = resolve(serverRoot, "..");
 const specPath = join(serverRoot, "openapi.yaml");
-const outDir = join(repoRoot, "apps/tv-android/app/src/main/java/ro/mixai/tv/data/generated");
+const outDir = join(repoRoot, "apps/tv-android/core/src/main/java/ro/mixai/tv/data/generated");
 const outFile = join(outDir, "Models.kt");
 const PACKAGE = "ro.mixai.tv.data.generated";
 

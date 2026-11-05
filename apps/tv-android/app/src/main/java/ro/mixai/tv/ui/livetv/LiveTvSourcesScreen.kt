@@ -190,9 +190,9 @@ private fun SourceRow(s: LiveTvSource, busy: Boolean, onTest: () -> Unit, onRefr
             Text(sourceStatus(s), style = MaterialTheme.typography.bodySmall, color = Tokens.mutedForeground)
             when {
                 busy -> Text(stringResource(R.string.livetv_working), style = MaterialTheme.typography.bodySmall, color = Tokens.info)
-                s.lastError != null -> Text(stringResource(R.string.livetv_source_error, s.lastError), style = MaterialTheme.typography.bodySmall, color = Tokens.destructive, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    s.lastError != null -> Text(stringResource(R.string.livetv_source_error, s.lastError.orEmpty()), style = MaterialTheme.typography.bodySmall, color = Tokens.destructive, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 s.enabled && s.lastRefresh == null -> Text(stringResource(R.string.livetv_source_pending), style = MaterialTheme.typography.bodySmall, color = Tokens.info)
-                s.guideError != null -> Text(stringResource(R.string.livetv_guide_error, s.guideError), style = MaterialTheme.typography.bodySmall, color = Tokens.warning, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    s.guideError != null -> Text(stringResource(R.string.livetv_guide_error, s.guideError.orEmpty()), style = MaterialTheme.typography.bodySmall, color = Tokens.warning, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

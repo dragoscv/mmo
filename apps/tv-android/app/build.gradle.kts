@@ -29,8 +29,8 @@ android {
         applicationId = "ro.mixai.tv"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 8
-        versionName = "2.0.1"
+        versionCode = 9
+        versionName = "2.0.2"
         buildConfigField("String", "MIXAI_ORIGIN", "\"$mixaiOrigin\"")
     }
 
@@ -80,6 +80,9 @@ android {
 }
 
 dependencies {
+    // Data layer (API, repositories, generated models, MusicService) — shared with the phone app.
+    implementation(project(":core"))
+
     implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose)
 

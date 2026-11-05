@@ -52,7 +52,7 @@ class MmoApi(val baseUrl: String, private val token: String) {
     suspend fun pairInfo(): PairInfo = json.decodeFromString(get("$baseUrl/pair/info", auth = false))
 
     suspend fun pairRequest(deviceName: String): PairRequest {
-        val body = """{"deviceName":${jsonStr(deviceName)},"platform":"android-tv"}"""
+        val body = """{"deviceName":${jsonStr(deviceName)},"platform":${jsonStr(ClientIdentity.current.platform)}}"""
         return json.decodeFromString(request("POST", "$baseUrl/pair/request", body, auth = false))
     }
 

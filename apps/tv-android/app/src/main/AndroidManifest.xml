@@ -5,9 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
-    <!-- Background music (player/MusicService.kt, Media3 MediaSessionService) -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Background music: MusicService + FOREGROUND_SERVICE(_MEDIA_PLAYBACK) come from :core's manifest. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <uses-feature android:name="android.software.leanback" android:required="true" />
@@ -62,15 +60,6 @@
                 <data android:scheme="mixai" android:host="title" />
             </intent-filter>
         </activity>
-
-        <service
-            android:name=".player.MusicService"
-            android:exported="true"
-            android:foregroundServiceType="mediaPlayback">
-            <intent-filter>
-                <action android:name="androidx.media3.session.MediaSessionService" />
-            </intent-filter>
-        </service>
 
         <!-- Ambient screensaver (WP16-28): backdrops from the cached home + clock + now playing. -->
         <service

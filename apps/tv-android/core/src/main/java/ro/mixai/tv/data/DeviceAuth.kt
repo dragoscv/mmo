@@ -6,7 +6,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import ro.mixai.tv.BuildConfig
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -66,12 +65,14 @@ class DeviceAuthException(val status: Int, val kind: Kind, val host: String) :
     enum class Kind { Network, Status, Invalid }
 }
 
-class DeviceAuth(private val origin: String = BuildConfig.MIXAI_ORIGIN) {
+/** [origin] = the MixAI web origin (host app's `BuildConfig.MIXAI_ORIGIN`). */
+class DeviceAuth(private val origin: String) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true; explicitNulls = false }
     val host: String = origin.substringAfter("://").substringBefore('/')
 
     suspend fun requestCode(deviceName: String, appVersion: String): DeviceCode {
-        val body = """{"deviceName":${str(deviceName)},"platform":"android-tv","appVersion":${str(appVersion)}}"""
+        val platform = ClientIdentity.current.platform
+        val body = """{"deviceName":${str(deviceName)},"platform":${str(platform)},"appVersion":${str(appVersion)}}"""
         val (code, text) = post("$origin/api/device/code", body)
         if (code !in 200..299) throw DeviceAuthException(code, DeviceAuthException.Kind.Status, host)
         return try { json.decodeFromString<DeviceCode>(text) } catch (e: Exception) {

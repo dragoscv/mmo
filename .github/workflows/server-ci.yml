@@ -63,7 +63,7 @@ jobs:
               working-directory: .
               run: |
                   git diff --exit-code --stat -- \
-                    apps/tv-android/app/src/main/java/ro/mixai/tv/data/generated/Models.kt \
+                    apps/tv-android/core/src/main/java/ro/mixai/tv/data/generated/Models.kt \
                     packages/sdk/src/generated \
                   || (echo "::error::Run pnpm -C server openapi:gen and commit Models.kt + packages/sdk/src/generated" && exit 1)
             - name: Version bump guard (server, packages)
