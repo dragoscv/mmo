@@ -57,6 +57,26 @@ choose the profile "Reviewer".
 No username or password is needed.
 ```
 
+Submitted text (Play Console > App content > Sign in details, set "Demo server (no account needed)", 2026-11-05) uses
+`https://34-118-46-71.sslip.io` (same server; `demo.mixai.ro` resolves only after the mixai.ro NS switch):
+
+```
+No username or password. The app needs a media server; use our public demo server. Open MixAI > "Connect to a
+server on this network" > "Enter the address manually" > type https://34-118-46-71.sslip.io (same server:
+https://demo.mixai.ro) > Connect > "Pair with a code". The demo server approves the code automatically in ~3 s.
+Choose profile "Reviewer". All features (Home, titles, player, Music, Live TV, Watch Together) are then available.
+Signing in to a MixAI account is optional.
+```
+
+Other Play declarations (2026-11-05): ads no; advertising ID no (merged manifest has no AD_ID); target audience
+13+; IARC = PEGI 3 / ESRB Everyone / USK 0 with "Users interact" (chat moderated, block, report, invite-only rooms);
+Data safety = collected, not shared: name, email, user IDs (account, optional), app interactions (watch history
+cloud sync, optional), device IDs (push token); encrypted in transit; deletion URL `/account/delete`. Watch Together
+chat is not declared: it is relayed only by the user's own MMO Server hub and never reaches MixAI cloud. Foreground
+services: dataSync = "Other network processing" (offline downloads, video https://youtube.com/shorts/yD_RRplAiGQ),
+mediaPlayback = media playback (https://youtube.com/shorts/PG5bqbNpINk); both unlisted, personal notifications
+blurred. Store settings: Video Players & Editors, contact = developer account email, website = web origin.
+
 ## Content declarations (both stores)
 
 - No user-generated public content except Watch Together room chat (moderated: word filter, report, block —
