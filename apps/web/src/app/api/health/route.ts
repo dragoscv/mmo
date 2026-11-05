@@ -35,7 +35,9 @@ export async function GET() {
 
     const body = {
         ok: dbOk,
-        version: process.env.npm_package_version ?? "0.0.0",
+        // Standalone `node server.js` (Cloud Run) has no npm_package_version; next.config inlines the
+        // package.json version as NEXT_PUBLIC_APP_VERSION at build time.
+        version: process.env.NEXT_PUBLIC_APP_VERSION ?? process.env.npm_package_version ?? "0.0.0",
         commitSha: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.COMMIT_SHA ?? null,
         env: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown",
         timestamp: new Date().toISOString(),

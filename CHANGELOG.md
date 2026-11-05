@@ -10,8 +10,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
-## 2026-11-06 — Web on Cloud Run (web 3.0.1)
+## 2026-11-06 — Web on Cloud Run (web 3.0.1 · 3.0.2)
 
+- **Web 3.0.2** — `/api/health` reports the real app version under the standalone server (was `0.0.0`).
 - **Web 3.0.1** — builds on Linux and ships as a container. Fonts are self-hosted with `next/font/local`
   (Inter, Space Grotesk, JetBrains Mono variable woff2, latin + latin-ext incl. ș/ț, OFL texts next to them in
   `apps/web/src/app/fonts/`) — `next/font/google` failed under Turbopack on Linux (`Can't resolve
