@@ -9,7 +9,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { app } from "electron";
+import { platform as app } from "./platform";
 
 const DEBUG_LOG_MAX = 500;
 const ring: string[] = [];

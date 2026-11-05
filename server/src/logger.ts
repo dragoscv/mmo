@@ -3,7 +3,7 @@
  *
  * Why this exists: in packaged Electron apps on Windows, console.log
  * goes nowhere — there's no terminal. The picker / queue debug needs
- * to be inspectable from `%APPDATA%\mmo-companion\logs\main.log` so
+ * to be inspectable from `%APPDATA%\mixai-companion\logs\main.log` so
  * users can paste it into bug reports without rebuilding.
  *
  * The companion runs as a single main process; importing this from

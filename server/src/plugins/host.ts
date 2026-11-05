@@ -20,7 +20,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { app } from "electron";
+import { platform as app } from "../platform";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { analyzer } from "../library/analyzer";

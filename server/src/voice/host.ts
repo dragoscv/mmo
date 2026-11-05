@@ -22,7 +22,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { randomUUID, createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { app } from "electron";
+import { platform as app } from "../platform";
 import { log } from "../lib/logger";
 import { FFMPEG_BIN } from "../library/ffmpeg-paths";
 import { Sidecar, type SidecarProgress } from "./sidecar";

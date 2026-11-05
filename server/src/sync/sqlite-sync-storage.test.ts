@@ -9,7 +9,7 @@ let storage: SqliteSyncStorage;
 beforeEach(() => {
     db = new Database(":memory:");
     storage = new SqliteSyncStorage(db, {
-        seed: { apiUrl: "https://muzicai.ro", deviceToken: "tok-abc" },
+        seed: { apiUrl: "https://mixai.ro", deviceToken: "tok-abc" },
     });
 });
 
@@ -25,22 +25,22 @@ const change = (over: Partial<SyncChange> = {}): SyncChange => ({
 describe("SqliteSyncStorage — state row", () => {
     it("seeds the singleton state row on first construction", async () => {
         const s = await storage.load();
-        expect(s).toEqual({ apiUrl: "https://muzicai.ro", deviceToken: "tok-abc", lastPullCursor: 0 });
+        expect(s).toEqual({ apiUrl: "https://mixai.ro", deviceToken: "tok-abc", lastPullCursor: 0 });
     });
 
     it("does not re-seed an existing state row on re-open", async () => {
         // Mutate the seeded row, then construct a new storage with a different
         // seed — the original values must survive.
-        await storage.save({ apiUrl: "https://muzicai.ro", deviceToken: "tok-abc", lastPullCursor: 42 });
+        await storage.save({ apiUrl: "https://mixai.ro", deviceToken: "tok-abc", lastPullCursor: 42 });
         const second = new SqliteSyncStorage(db, {
             seed: { apiUrl: "https://other", deviceToken: "tok-xyz" },
         });
         const s = await second.load();
-        expect(s).toEqual({ apiUrl: "https://muzicai.ro", deviceToken: "tok-abc", lastPullCursor: 42 });
+        expect(s).toEqual({ apiUrl: "https://mixai.ro", deviceToken: "tok-abc", lastPullCursor: 42 });
     });
 
     it("save() persists cursor advances", async () => {
-        await storage.save({ apiUrl: "https://muzicai.ro", deviceToken: "tok-abc", lastPullCursor: 100 });
+        await storage.save({ apiUrl: "https://mixai.ro", deviceToken: "tok-abc", lastPullCursor: 100 });
         const s = await storage.load();
         expect(s?.lastPullCursor).toBe(100);
     });

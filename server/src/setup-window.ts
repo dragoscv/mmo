@@ -69,7 +69,7 @@ function html(dark: boolean): string {
   #close:active { transform:translateY(1px); }
 </style></head><body>
 <div class="wrap">
-  <div class="title"><span class="dot" id="dot"></span> Setting up MuzicAI analyzer</div>
+  <div class="title"><span class="dot" id="dot"></span> Setting up MixAI analyzer</div>
   <div class="sub">Installing audio analysis & stem-separation engine. This happens once — you don't need to do anything.</div>
   <div class="bar"><div class="fill" id="fill"></div></div>
   <div class="msg" id="msg">Starting…</div>
@@ -117,7 +117,7 @@ export function showSetupWindow(parent?: BrowserWindow | null): void {
         minimizable: true,
         maximizable: false,
         fullscreenable: false,
-        title: "MuzicAI — Setup",
+        title: "MixAI — Setup",
         alwaysOnTop: true,
         skipTaskbar: false,
         parent: parent ?? undefined,

@@ -1,7 +1,7 @@
 /**
  * Cloud sync client for the companion app.
  *
- * Bidirectional, last-write-wins sync against `https://muzicai.ro/api/sync`.
+ * Bidirectional, last-write-wins sync against `https://mixai.ro/api/sync`.
  * Push runs on a debounce after every local write that affects a synced
  * entity; pull runs on a 30-second interval (and immediately after push).
  *
@@ -28,7 +28,7 @@ export interface SyncChange {
 }
 
 export interface SyncState {
-    apiUrl: string; // e.g. https://muzicai.ro
+    apiUrl: string; // e.g. https://mixai.ro
     deviceToken: string;
     lastPullCursor: number;
 }

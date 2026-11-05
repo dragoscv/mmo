@@ -11,7 +11,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import http from "node:http";
 import https from "node:https";
-import { app } from "electron";
+import { platform as app } from "../platform";
 
 const TMDB_BASE = "https://image.tmdb.org/t/p";
 const VALID_SIZES = new Set([

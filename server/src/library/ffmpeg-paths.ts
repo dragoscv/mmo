@@ -1,15 +1,33 @@
 /**
  * Resolve ffmpeg / ffprobe binary paths.
  *
- * In dev: uses ffmpeg-static + ffprobe-static (npm packages).
+ * Order: `FFMPEG_PATH` / `FFPROBE_PATH` env (Docker: distro ffmpeg) →
+ * ffmpeg-static + ffprobe-static (npm packages, dev + Electron) →
  * In packaged build: those packages ship the binaries inside the asar,
  * so we resolve them via `app.asar.unpacked` (electron-builder
- * automatically unpacks them when listed in asarUnpack).
+ * automatically unpacks them when listed in asarUnpack) → PATH lookup.
  */
 
 import path from "node:path";
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
+
+function envBin(name: string): string | null {
+    const v = process.env[name]?.trim();
+    if (!v) return null;
+    try { if (fs.existsSync(v)) return v; } catch { /* ignore */ }
+    return null;
+}
+
+function lookupOnPath(binName: string): string | null {
+    const exe = binName + (process.platform === "win32" ? ".exe" : "");
+    for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
+        if (!dir) continue;
+        const candidate = path.join(dir, exe);
+        try { if (fs.existsSync(candidate)) return candidate; } catch { /* ignore */ }
+    }
+    return null;
+}
 
 function resolveStaticBin(pkg: string, binName: string): string {
     try {
@@ -26,11 +44,13 @@ function resolveStaticBin(pkg: string, binName: string): string {
         binName + (process.platform === "win32" ? ".exe" : ""),
     );
     if (fs.existsSync(unpacked)) return unpacked;
-    return binName; // fall back to PATH
+    return lookupOnPath(binName) ?? binName; // fall back to PATH (bare name → spawn resolves)
 }
 
-export const FFMPEG_BIN = resolveStaticBin("ffmpeg-static", "ffmpeg");
+export const FFMPEG_BIN = envBin("FFMPEG_PATH") ?? resolveStaticBin("ffmpeg-static", "ffmpeg");
 export const FFPROBE_BIN = (() => {
+    const fromEnv = envBin("FFPROBE_PATH");
+    if (fromEnv) return fromEnv;
     try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const probe = require("ffprobe-static") as { path?: string };

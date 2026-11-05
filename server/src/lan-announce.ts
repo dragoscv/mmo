@@ -4,7 +4,7 @@
  * Why this exists:
  *  - The web app's loopback discovery (`probe(127.0.0.1) || probe(localhost)`)
  *    only works when the BROWSER runs on the same machine as the
- *    companion. A tablet on the couch hitting muzicai.ro can't reach
+ *    companion. A tablet on the couch hitting mixai.ro can't reach
  *    `http://127.0.0.1:17899` because that loopback is its own.
  *  - Solution: the companion enumerates its non-loopback IPv4
  *    interfaces, picks a stable one, and POSTs the URL to
@@ -21,6 +21,7 @@
  */
 
 import os from "node:os";
+import dgram from "node:dgram";
 import { Bonjour, type Service } from "bonjour-service";
 import { getSettings, store } from "./store";
 import { executeCommands, type InboundCommand, type OutboundResult } from "./command-worker";
@@ -41,7 +42,7 @@ const RE_ANNOUNCE_INTERVAL_MS = 3 * 1000;
 // so multi-step flows (pick → kind → watch toggle) feel snappy.
 const BURST_INTERVAL_MS = 750;
 const BURST_DURATION_MS = 20_000;
-const SERVICE_NAME = "MMO Companion";
+const SERVICE_NAME = "MixAI Companion";
 const SERVICE_TYPE = "mmo-companion";
 
 let timer: NodeJS.Timeout | null = null;
@@ -63,7 +64,7 @@ let burstUntil = 0;
  * Returns null when offline.
  */
 export function pickLanAddress(): string | null {
-    const blocked = /^(vEthernet|Loopback|vmnet|vbox|docker|WSL|Tailscale|utun|tap)/i;
+    const blocked = /^(vEthernet|Loopback|vmnet|vbox|docker|br-|veth|WSL|Tailscale|utun|tap|tun)/i;
     const ifaces = os.networkInterfaces();
     const candidates: { name: string; address: string; preferred: boolean }[] = [];
     for (const [name, list] of Object.entries(ifaces)) {
@@ -81,8 +82,51 @@ export function pickLanAddress(): string | null {
         }
     }
     if (candidates.length === 0) return null;
-    const preferred = candidates.find((c) => c.preferred);
-    return (preferred ?? candidates[0]).address;
+    // Rank: real LAN ranges first (RFC1918), CGNAT/Tailscale (100.64/10) and
+    // everything else last; within a rank prefer non-virtual interface names.
+    // On Windows the physical NIC often appears as `vEthernet (External)`
+    // when Hyper-V is installed, so name alone must not decide.
+    const rank = (ip: string): number => {
+        if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip)) return 3; // CGNAT / Tailscale
+        if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)) return 0;
+        return 2;
+    };
+    candidates.sort((a, b) => {
+        const r = rank(a.address) - rank(b.address);
+        if (r !== 0) return r;
+        return Number(b.preferred) - Number(a.preferred);
+    });
+    // Docker/WSL/vmnet bridges are RFC1918 too, and on Hyper-V hosts the real
+    // NIC is ALSO named `vEthernet (…)`. The discriminator that works
+    // everywhere: the interface that has the default route (MMO_LAN_IP wins).
+    const forced = process.env.MMO_LAN_IP?.trim();
+    if (forced && candidates.some((c) => c.address === forced)) return forced;
+    const viaDefaultRoute = defaultRouteAddress();
+    if (viaDefaultRoute && candidates.some((c) => c.address === viaDefaultRoute)) return viaDefaultRoute;
+    const best = candidates.find((c) => rank(c.address) === 0 && c.preferred)
+        ?? candidates.find((c) => rank(c.address) === 0 && !/^(docker|br-|veth|WSL|vmnet|vbox)/i.test(c.name))
+        ?? candidates[0];
+    return best.address;
+}
+
+/** Local IPv4 the OS uses for the default route (UDP connect to a public
+ *  address selects the outbound interface; no packet is sent). Resolved
+ *  asynchronously and cached; `pickLanAddress()` reads the cache, so call
+ *  `refreshDefaultRouteAddress()` at startup and on a timer. */
+let defaultRouteIp: string | null = null;
+function defaultRouteAddress(): string | null { return defaultRouteIp; }
+export function refreshDefaultRouteAddress(): Promise<string | null> {
+    return new Promise((resolve) => {
+        try {
+            const s = dgram.createSocket("udp4");
+            const done = (ip: string | null) => { try { s.close(); } catch { /* ignore */ } defaultRouteIp = ip; resolve(ip); };
+            s.once("error", () => done(null));
+            s.connect(53, "1.1.1.1", () => {
+                const a = s.address();
+                done(typeof a === "object" && a.address && a.address !== "0.0.0.0" ? a.address : null);
+            });
+        } catch { resolve(null); }
+    });
 }
 
 /** Build the URL the web app should store: `http://<lan-ip>:<port>`. */
@@ -102,7 +146,7 @@ async function postAnnounce(lanUrl: string | null): Promise<void> {
     // Control plane targets the gateway (Cloud Run), not the Vercel web
     // app. Falls back to webAppUrl only if a gatewayUrl somehow resolves
     // empty, so an older/misconfigured client still heartbeats somewhere.
-    const webAppUrl = settings.gatewayUrl || settings.webAppUrl || "https://muzicai.ro";
+    const webAppUrl = settings.gatewayUrl || settings.webAppUrl || "https://mixai.ro";
     const token = store.get("deviceToken") as string | undefined;
     if (!token) return; // not paired yet
 
@@ -255,20 +299,50 @@ export function setOnDeviceName(cb: ((name: string) => void) | null): void {
 function startBonjour(port: number, version: string): void {
     if (bonjourInstance) return;
     try {
-        bonjourInstance = new Bonjour();
         const hostname = os.hostname();
+        // Advertise a host name WE own. In Docker (host network) avahi owns
+        // `<hostname>.local`, so node's default answer is NXDOMAIN for
+        // resolvers; `mmo-<hostname>.local` is answered by us with the LAN IP.
+        //
+        // Pin the mDNS socket to the default-route NIC. multicast-dns binds
+        // 0.0.0.0 and lets the OS choose the outgoing multicast interface;
+        // on a Windows host with Hyper-V/WSL/Docker bridges that is the
+        // lowest-metric virtual adapter (observed: 172.23.192.1, WSL), so
+        // the LAN never sees our announcements. On a Pi (eth0 + wlan0) the
+        // default-route NIC is still the one clients reach us on.
+        const lanIp = pickLanAddress();
+        const mdnsOpts: Record<string, unknown> = lanIp ? { interface: lanIp } : {};
+        bonjourInstance = new Bonjour(mdnsOpts as ConstructorParameters<typeof Bonjour>[0]);
         bonjourService = bonjourInstance.publish({
             name: `${SERVICE_NAME} (${hostname})`,
             type: SERVICE_TYPE,
             port,
+            // Android NSD needs an SRV target that ends in `.local` (the library
+            // default is the bare hostname → resolve fails silently).
+            host: `mmo-${hostname.toLowerCase().replace(/[^a-z0-9-]/g, "-")}.local`,
+            disableIPv6: true,
             // TXT record exposes product + version so native discovery
             // clients can sanity-check before talking to us.
             txt: {
                 product: "MMOCompanion",
                 version,
                 api: "/audio/native/probe",
+                // Quick Connect: TV/mobile shells can pair via /pair/* (see
+                // docs/aplicatie/pairing.md) and label us by hostname.
+                pair: "1",
+                name: hostname,
             },
         });
+        // bonjour-service emits an A record for EVERY non-internal IPv4
+        // (vmnet, Default Switch, WSL, Tailscale…) and Android NSD resolves
+        // to the first one. Advertise only the LAN address. `records()` is
+        // read lazily at announce time (after the probe), so patching here
+        // is early enough.
+        if (lanIp && bonjourService) {
+            const svc = bonjourService;
+            const original = svc.records.bind(svc);
+            svc.records = () => original().filter((r) => r.type !== "A" || r.data === lanIp);
+        }
     } catch (err) {
         console.warn("[lan-announce] mDNS publish failed:", err instanceof Error ? err.message : err);
         bonjourInstance = null;
@@ -290,9 +364,12 @@ function stopBonjour(): void {
 export function startLanAnnounce(opts: { port: number; version: string }): void {
     stopLanAnnounce();
     currentVersion = opts.version;
-    startBonjour(opts.port, opts.version);
+    // Resolve the default-route IP first so the mDNS A record and lanUrl
+    // point at the real NIC (Hyper-V/Docker/Tailscale hosts have many).
+    void refreshDefaultRouteAddress().then(() => startBonjour(opts.port, opts.version));
 
     const tick = async () => {
+        await refreshDefaultRouteAddress();
         const url = buildLanUrl(opts.port);
         await postAnnounce(url);
         lastAnnouncedUrl = url;

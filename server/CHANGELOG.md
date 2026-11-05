@@ -2,6 +2,15 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.9.4 — Headless core really runs without Electron
+
+- Commit the ADR-0002 platform swap that stayed uncommitted since 2026-09: 14 modules (library db, analyzer,
+  python-env, tmdb-cache, debug-log, cloudflared, command-worker, plugins/render/voice hosts, projects router,
+  virtual devices) import `platform` instead of `electron`, so `node dist/headless.js` (Docker) no longer dies
+  with "Cannot find module 'electron'". `ffmpeg-paths` honours `FFMPEG_PATH`/`FFPROBE_PATH` then PATH (the
+  image ships BtbN ffmpeg). LAN announce picks the default-route NIC, pins mDNS to it, advertises
+  `mmo-<host>.local` + TXT `pair=1,name`. Leftover MuzicAI strings → MixAI.
+
 ## 3.9.3 — Docker image builds again
 
 - `Dockerfile` runs `pnpm build:headless` (tsc) instead of `pnpm build`, which since the Vite renderer

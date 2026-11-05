@@ -51,7 +51,7 @@ function readSeed(): { apiUrl: string; deviceToken: string } | null {
         getSettings().gatewayUrl ||
         process.env.MMO_WEB_APP_URL?.trim() ||
         (store.get("webAppUrl") as string | undefined) ||
-        "https://muzicai.ro";
+        "https://mixai.ro";
     const deviceToken = (store.get("deviceToken") as string | undefined) ?? "";
     if (!deviceToken) return null;
     return { apiUrl, deviceToken };
