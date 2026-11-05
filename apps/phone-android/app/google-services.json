@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "622082681070",
+    "project_id": "mmo-mw-prod",
+    "storage_bucket": "mmo-mw-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:622082681070:android:3e326e620c4c138d15abff",
+        "android_client_info": {
+          "package_name": "ro.mixai.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "622082681070-12mtrfam879ia4cc0mp8prcmslphs0vg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBabLtJ3MchOw5occBs5Vq3U2rH0fYQbgo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "622082681070-12mtrfam879ia4cc0mp8prcmslphs0vg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
