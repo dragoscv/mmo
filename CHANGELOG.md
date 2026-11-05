@@ -21,6 +21,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   via `NEXT_OUTPUT_STANDALONE=1`, node 22, non-root, port 8080), `apps/web/cloudbuild.yaml` and
   `apps/web/scripts/deploy-cloud-run.ps1` → Cloud Run `mixai-web` (europe-west1, Cloud SQL socket via
   `DB_SOCKET_DIR`, secrets in Secret Manager). `public/samples` is not in the image yet (DAW samples → GCS later).
+- **`@mmo/ai` 0.0.2** — commits the `codai` provider id + registry entry (ADR-0006) that had stayed uncommitted
+  since 2026-09-17: a clean checkout failed `next build` type-check (`'codai' does not exist in type …`).
 
 ## 2026-11-06 — Shared Android data module (TV Android 2.0.2)
 
