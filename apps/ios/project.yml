@@ -95,8 +95,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.app
         PRODUCT_NAME: MixAI
-        # iPhone + iPad (NavigationSplitView-style sidebar via .sidebarAdaptable on regular width).
-        TARGETED_DEVICE_FAMILY: '1,2'
+        # iPhone only for the 1.1.x App Store release: App Store requires iPad screenshots + an iPad test when
+        # family 2 is declared, and there is no iPad device or Simulator (vmui-mac). The regular-width
+        # .sidebarAdaptable layout stays in code; re-enable '1,2' with iPad screenshots (tracker WP16-48).
+        TARGETED_DEVICE_FAMILY: '1'
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
         SENTRY_DSN: ''
@@ -138,7 +140,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.app.widgets
         PRODUCT_NAME: MixAIWidgets
-        TARGETED_DEVICE_FAMILY: '1,2'
+        TARGETED_DEVICE_FAMILY: '1'
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: MixAI
         SKIP_INSTALL: YES
