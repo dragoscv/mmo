@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.7.0
+  version: 3.8.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -5674,6 +5674,25 @@ paths:
         '400': { $ref: '#/components/responses/ErrorJson' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /livetv/recordings/{id}/file:
+    get:
+      operationId: liveTvRecordingFile
+      tags: [livetv]
+      summary: "Finished recording file as recorded (-c copy, never re-encoded); Range-capable, `?t=` auth"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: Range, in: header, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: "Whole file"
+          content:
+            video/x-matroska: { schema: { type: string, format: binary } }
+            video/mp2t: { schema: { type: string, format: binary } }
+        '206': { description: "Partial content (Range)" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+        '416': { description: "Range not satisfiable" }
 
   /livetv/rules:
     get:

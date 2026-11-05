@@ -271,6 +271,18 @@ export class DvrScheduler {
         return { status: r.status, deleted: true };
     }
 
+    /**
+     * Absolute path of a finished recording's file for playback, or null (not done, missing, or outside the
+     * recordings directory — the DB path is never trusted blindly).
+     */
+    filePath(id: string): string | null {
+        const r = this.rec(id);
+        if (!r || r.status !== "done" || !r.path) return null;
+        const resolved = path.resolve(r.path);
+        if (!resolved.startsWith(path.resolve(this.dir) + path.sep)) return null;
+        return fs.existsSync(resolved) ? resolved : null;
+    }
+
     private deleteFile(p: string | null): void {
         if (!p) return;
         const resolved = path.resolve(p);

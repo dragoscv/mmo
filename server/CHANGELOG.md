@@ -2,6 +2,13 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.8.0 — Play finished Live TV recordings from any client
+
+- `GET /livetv/recordings/{id}/file` streams a finished recording exactly as recorded (`-c copy`
+	MKV/TS, never re-encoded) with Range support (206/416) and `?t=` auth, so the web player can seek
+	and the PWA can download it for offline viewing. Only `done` recordings whose path resolves inside
+	the recordings directory are served (the stored path is never trusted blindly).
+
 ## 3.7.0 — Audio track switching on HLS, Live TV HLS through the proxy, more music endpoints
 
 - `GET /video/stream/{fileId}?audio=<n>` picks the audio track (`0:a:<n>`, same ordinal as

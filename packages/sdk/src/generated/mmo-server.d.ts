@@ -3887,6 +3887,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/livetv/recordings/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Finished recording file as recorded (-c copy, never re-encoded); Range-capable, `?t=` auth */
+        get: operations["liveTvRecordingFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/livetv/rules": {
         parameters: {
             query?: never;
@@ -12966,6 +12983,47 @@ export interface operations {
             400: components["responses"]["ErrorJson"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["ErrorJson"];
+        };
+    };
+    liveTvRecordingFile: {
+        parameters: {
+            query?: never;
+            header?: {
+                Range?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whole file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "video/x-matroska": string;
+                    "video/mp2t": string;
+                };
+            };
+            /** @description Partial content (Range) */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+            /** @description Range not satisfiable */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     liveTvRules: {

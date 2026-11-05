@@ -8,7 +8,7 @@ import { openMemoryLiveTvDb } from "./db";
 import { LiveTvService } from "./service";
 import { DvrScheduler, type SpawnFfmpeg } from "./recorder";
 import { createLiveTvRouter } from "./routes";
-import { rewritePlaylist } from "./routes";
+import { parseByteRange, rewritePlaylist } from "./routes";
 import { silentLogger, type FetchLike } from "./util";
 
 const H = 3_600_000;
@@ -52,14 +52,29 @@ describe("rewritePlaylist", () => {
 
 const neverSpawn: SpawnFfmpeg = () => { throw new Error("ffmpeg must not run in route tests"); };
 
+describe("parseByteRange", () => {
+    it("handles a-b, a-, -n and rejects unsatisfiable ranges", () => {
+        expect(parseByteRange("bytes=0-9", 100)).toEqual([0, 9]);
+        expect(parseByteRange("bytes=90-", 100)).toEqual([90, 99]);
+        expect(parseByteRange("bytes=50-500", 100)).toEqual([50, 99]);
+        expect(parseByteRange("bytes=-10", 100)).toEqual([90, 99]);
+        expect(parseByteRange("bytes=100-", 100)).toBeNull();
+        expect(parseByteRange("bytes=9-3", 100)).toBeNull();
+        expect(parseByteRange("bytes=-", 100)).toBeNull();
+        expect(parseByteRange("items=0-1", 100)).toBeNull();
+    });
+});
+
 let server: http.Server;
 let base = "";
 let svc: LiveTvService;
 let dir: string;
+let liveDb: ReturnType<typeof openMemoryLiveTvDb>;
 
 beforeAll(async () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "livetv-routes-"));
     const db = openMemoryLiveTvDb();
+    liveDb = db;
     svc = new LiveTvService({ db, fetch: upstreamFetch });
     const dvr = new DvrScheduler({ db, service: svc, recordingsDir: dir, spawnFfmpeg: neverSpawn });
     const app = express();
@@ -205,5 +220,30 @@ describe("livetv router", () => {
         expect(((await j("/rules")).body.rules as unknown[]).length).toBe(1);
         expect((await j(`/rules/${rule.body.id as string}`, { method: "DELETE" })).body).toEqual({ ok: true });
         expect((await j(`/rules/${rule.body.id as string}`, { method: "DELETE" })).status).toBe(404);
+    });
+
+    it("streams a finished recording with Range; refuses unfinished or out-of-dir paths", async () => {
+        const file = path.join(dir, "done.mkv");
+        fs.writeFileSync(file, Buffer.from("0123456789"));
+        const ins = liveDb.prepare("INSERT INTO recordings (id, channel_id, title, start, stop, status, path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        ins.run("rec-done", newsId, "Done", NOW - 2 * H, NOW - H, "done", file, NOW);
+        ins.run("rec-sched", newsId, "Later", NOW + H, NOW + 2 * H, "scheduled", null, NOW);
+        ins.run("rec-escape", newsId, "Escape", NOW - 2 * H, NOW - H, "done", path.join(os.tmpdir(), "outside.mkv"), NOW);
+
+        const full = await j("/recordings/rec-done/file");
+        expect(full.status).toBe(200);
+        expect(full.text).toBe("0123456789");
+        expect(full.headers.get("content-type")).toBe("video/x-matroska");
+        expect(full.headers.get("accept-ranges")).toBe("bytes");
+
+        const part = await j("/recordings/rec-done/file", { headers: { range: "bytes=2-5" } });
+        expect(part.status).toBe(206);
+        expect(part.text).toBe("2345");
+        expect(part.headers.get("content-range")).toBe("bytes 2-5/10");
+
+        expect((await j("/recordings/rec-done/file", { headers: { range: "bytes=20-" } })).status).toBe(416);
+        expect((await j("/recordings/rec-sched/file")).status).toBe(404);
+        expect((await j("/recordings/rec-escape/file")).status).toBe(404);
+        expect((await j("/recordings/missing/file")).status).toBe(404);
     });
 });

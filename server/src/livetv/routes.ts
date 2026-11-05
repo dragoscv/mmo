@@ -25,6 +25,8 @@
 
 import express from "express";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { Readable } from "node:stream";
 import type { LiveTvService } from "./service";
 import type { DvrScheduler } from "./recorder";
@@ -57,6 +59,35 @@ const truthy = (v: unknown) => v === "1" || v === "true";
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
 const PROFILE_RE = /^[A-Za-z0-9_.:-]{1,64}$/;
+
+const CT: Record<string, string> = { ".mkv": "video/x-matroska", ".ts": "video/mp2t", ".mp4": "video/mp4" };
+
+/** Parse one `bytes=` range against `size` → inclusive [start, end], or null when unsatisfiable. */
+export function parseByteRange(header: string, size: number): [number, number] | null {
+    const m = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+    if (!m || (m[1] === "" && m[2] === "") || size <= 0) return null;
+    let start: number, end: number;
+    if (m[1] === "") { const n = Number(m[2]); start = Math.max(0, size - n); end = size - 1; }
+    else { start = Number(m[1]); end = m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1); }
+    return start <= end && start < size ? [start, end] : null;
+}
+
+function sendFileRange(req: express.Request, res: express.Response, file: string): void {
+    const size = fs.statSync(file).size;
+    const ct = CT[path.extname(file).toLowerCase()] ?? "application/octet-stream";
+    const name = path.basename(file).replace(/[^\w.\- ]/g, "_");
+    const base = { "Content-Type": ct, "Accept-Ranges": "bytes", "Content-Disposition": `inline; filename="${name}"`, "Cache-Control": "no-store" };
+    const range = req.headers.range;
+    if (range) {
+        const r = parseByteRange(range, size);
+        if (!r) { res.writeHead(416, { "Content-Range": `bytes */${size}` }); res.end(); return; }
+        res.writeHead(206, { ...base, "Content-Range": `bytes ${r[0]}-${r[1]}/${size}`, "Content-Length": r[1] - r[0] + 1 });
+        fs.createReadStream(file, { start: r[0], end: r[1] }).pipe(res);
+        return;
+    }
+    res.writeHead(200, { ...base, "Content-Length": size });
+    fs.createReadStream(file).pipe(res);
+}
 function profileOf(req: express.Request): string {
     const p = qs(req.query.profile) ?? "default";
     if (!PROFILE_RE.test(p)) throw new LiveTvError(400, "invalid profile");
@@ -296,6 +327,13 @@ export function createLiveTvRouter(deps: LiveTvRouterDeps): express.Router {
 
     router.delete("/recordings/:id", wrap((req, res) => {
         res.json({ ok: true, ...dvr.remove(param(req, "id")) });
+    }));
+
+    // Finished recording as-is (`-c copy` MKV/TS), Range-capable for <video> seeking + offline download.
+    router.get("/recordings/:id/file", wrap((req, res) => {
+        const file = dvr.filePath(param(req, "id"));
+        if (!file) throw new LiveTvError(404, "recording not found or not finished");
+        sendFileRange(req, res, file);
     }));
 
     router.get("/rules", wrap((_req, res) => { res.json({ rules: dvr.listRules() }); }));
