@@ -17,9 +17,9 @@ export { SUPPORTED_LOCALES, DEFAULT_LOCALE, isAppLocale, type AppLocale };
 /** Must match the files in `messages/wp16/` (checked by `scripts/i18n-parity.mjs`). */
 export const WP16_AREAS = ["shell", "profiles", "browse", "player", "music", "live", "offline", "account", "privacy"] as const;
 
-export default getRequestConfig(async () => {
-    const cookieStore = await cookies();
-    const raw = cookieStore.get("mmo-locale")?.value ?? DEFAULT_LOCALE;
+export default getRequestConfig(async ({ locale: override }) => {
+    // An explicit `getTranslations({ locale })` (e.g. /privacy?lang=en for store reviewers) wins over the cookie.
+    const raw = override ?? (await cookies()).get("mmo-locale")?.value ?? DEFAULT_LOCALE;
     const locale: AppLocale = isAppLocale(raw) ? raw : DEFAULT_LOCALE;
     const base = (await import(`../../messages/${locale}.json`)).default;
     // WP16 media surfaces keep their strings in per-area files (`messages/wp16/<area>.<locale>.json`,
