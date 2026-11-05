@@ -39,7 +39,7 @@ $image = "$Region-docker.pkg.dev/$Project/$Repo/${Service}:$short"
 $connection = "${Project}:${Region}:$SqlInstance"
 $saEmail = "$RuntimeSa@$Project.iam.gserviceaccount.com"
 function Step([string]$m) { Write-Host "::step $m" }
-function Gc { & gcloud @args; if ($LASTEXITCODE -ne 0) { throw "gcloud $($args -join ' ') failed ($LASTEXITCODE)" } }
+function Invoke-Gcloud { & gcloud @args; if ($LASTEXITCODE -ne 0) { throw "gcloud $($args -join ' ') failed ($LASTEXITCODE)" } }
 function Phase([string]$p, [switch]$Unsafe) {
   if (-not $env:AGENTQ_RELEASE_FILE) { return }
   $q = Join-Path $env:USERPROFILE '.copilot\bin\agentq.ps1'
@@ -92,19 +92,19 @@ if (Test-Path $EnvFile) {
 } elseif (-not $NoSecretSync) { throw "env file not found: $EnvFile (needed for the secret sync; pass -NoSecretSync to reuse existing secrets)" }
 
 Phase prepare
-$projectNumber = (Gc projects describe $Project --format='value(projectNumber)').Trim()
+$projectNumber = (Invoke-Gcloud projects describe $Project --format='value(projectNumber)').Trim()
 if (-not $AppUrl) { $AppUrl = "https://$Service-$projectNumber.$Region.run.app" }
 Write-Host "sha=$short image=$image appUrl=$AppUrl"
 
 Step 'artifact registry'
 & gcloud artifacts repositories describe $Repo --location $Region --project $Project --format='value(name)' 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) {
-  Gc artifacts repositories create $Repo --repository-format docker --location $Region --project $Project --description 'MixAI container images'
+  Invoke-Gcloud artifacts repositories create $Repo --repository-format docker --location $Region --project $Project --description 'MixAI container images'
 }
 
 Step 'iam'
 foreach ($role in 'roles/secretmanager.secretAccessor', 'roles/cloudsql.client') {
-  Gc projects add-iam-policy-binding $Project --member "serviceAccount:$saEmail" --role $role --condition None --quiet --format none
+  Invoke-Gcloud projects add-iam-policy-binding $Project --member "serviceAccount:$saEmail" --role $role --condition None --quiet --format none
 }
 
 $deployed = [ordered]@{}
@@ -118,7 +118,7 @@ if (-not $NoSecretSync) {
       $value = $envMap[$k]
       & gcloud secrets describe $name --project $Project --format='value(name)' 2>$null | Out-Null
       if ($LASTEXITCODE -ne 0) {
-        Gc secrets create $name --project $Project --replication-policy automatic --labels app=mixai-web --format none
+        Invoke-Gcloud secrets create $name --project $Project --replication-policy automatic --labels app=mixai-web --format none
         $current = $null
       } else {
         $current = (& gcloud secrets versions access latest --secret $name --project $Project 2>$null) -join "`n"
@@ -126,7 +126,7 @@ if (-not $NoSecretSync) {
       }
       if ($current -ceq $value) { Write-Host "secret $name unchanged"; continue }
       [IO.File]::WriteAllText($tmp, $value)
-      Gc secrets versions add $name --project $Project --data-file $tmp --format none
+      Invoke-Gcloud secrets versions add $name --project $Project --data-file $tmp --format none
       Remove-Item $tmp -Force
       Write-Host "secret $name new version"
     }
@@ -157,7 +157,7 @@ if (-not $SkipBuild) {
   [IO.File]::WriteAllText((Join-Path $ctx '.gcloudignore'), ".gcloudignore`n")
   Step 'cloud build'
   Phase build
-  Gc builds submit $ctx --project $Project --config (Join-Path $ctx 'apps/web/cloudbuild.yaml') --substitutions "_IMAGE=$image,_COMMIT_SHA=$sha"
+  Invoke-Gcloud builds submit $ctx --project $Project --config (Join-Path $ctx 'apps/web/cloudbuild.yaml') --substitutions "_IMAGE=$image,_COMMIT_SHA=$sha"
   Remove-Item $ctx -Recurse -Force
 }
 
@@ -177,14 +177,14 @@ try {
   [IO.File]::WriteAllLines($envFileYaml, [string[]]$yaml)
   $secrets = ($deployed.Keys | ForEach-Object { "$_=$($deployed[$_]):latest" }) -join ','
   Phase deploy -Unsafe
-  Gc run deploy $Service --project $Project --region $Region --image $image `
+  Invoke-Gcloud run deploy $Service --project $Project --region $Region --image $image `
     --service-account $saEmail --add-cloudsql-instances $connection `
     --env-vars-file $envFileYaml --set-secrets $secrets `
     --port 8080 --cpu 1 --memory 1Gi --concurrency 40 --min-instances 0 --max-instances 4 `
     --cpu-boost --timeout 300 --allow-unauthenticated --labels "app=mixai-web,commit=$short" --quiet
 } finally { if (Test-Path $envFileYaml) { Remove-Item $envFileYaml -Force } }
 
-$svc = Gc run services describe $Service --project $Project --region $Region --format json | ConvertFrom-Json
+$svc = Invoke-Gcloud run services describe $Service --project $Project --region $Region --format json | ConvertFrom-Json
 Write-Host "url=$($svc.status.url)"
 Write-Host "latestReady=$($svc.status.latestReadyRevisionName) latestCreated=$($svc.status.latestCreatedRevisionName)"
 Write-Host "image=$image secrets=$(($deployed.Values) -join ',')"
