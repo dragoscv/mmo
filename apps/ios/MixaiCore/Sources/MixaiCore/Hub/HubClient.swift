@@ -30,6 +30,8 @@ public actor HubClient {
 
     private var commandHandlers: [@Sendable (HubCommand) -> Void] = []
     private var statusHandlers: [@Sendable (HubStatus) -> Void] = []
+    private var messageHandlers: [@Sendable (JSONValue) -> Void] = []
+    private var deviceHandlers: [@Sendable ([HubDevice]) -> Void] = []
 
     public init(client: MmoClient, deviceId: String, deviceName: String, profileId: String?) {
         self.client = client
@@ -40,6 +42,17 @@ public actor HubClient {
 
     public func onCommand(_ h: @escaping @Sendable (HubCommand) -> Void) { commandHandlers.append(h) }
     public func onStatus(_ h: @escaping @Sendable (HubStatus) -> Void) { statusHandlers.append(h) }
+    /// Every decoded message (Watch Together `room:*`, `report:ok`, `block:ok`, `error`, `welcome`).
+    public func onMessage(_ h: @escaping @Sendable (JSONValue) -> Void) { messageHandlers.append(h) }
+    public func onDevices(_ h: @escaping @Sendable ([HubDevice]) -> Void) { deviceHandlers.append(h) }
+
+    /// Send a raw message (room protocol). Dropped while disconnected.
+    public func sendRaw(_ o: [String: JSONValue]) { send(o) }
+
+    /// Remote-control a device through the hub socket (ack arrives as an `ack` message).
+    public func command(target: String, action: String, args: [String: JSONValue] = [:]) {
+        send(["type": .string("cmd"), "target": .string(target), "action": .string(action), "args": .object(args), "seq": .string(UUID().uuidString)])
+    }
 
     public func serverNowMs() -> Double { Date().timeIntervalSince1970 * 1000 + clock.offsetMs }
 
@@ -117,6 +130,7 @@ public actor HubClient {
 
     func handle(_ text: String) {
         guard let v = try? JSON.decoder.decode(JSONValue.self, from: Data(text.utf8)) else { return }
+        for h in messageHandlers { h(v) }
         switch v["type"]?.stringValue {
         case "welcome":
             connId = v["you"]?["connId"]?.stringValue
@@ -133,6 +147,8 @@ public actor HubClient {
         case "devices":
             if case .array(let arr)? = v["devices"], let data = try? JSON.encoder.encode(arr) {
                 devices = (try? JSON.decoder.decode([HubDevice].self, from: data)) ?? []
+                let list = devices
+                for h in deviceHandlers { h(list) }
             }
         default:
             break

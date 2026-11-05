@@ -10,34 +10,55 @@ struct PlayerView: View {
     @State private var scrubbing: Double?
     @State private var pip = PiPController()
     @State private var hideTask: Task<Void, Never>?
+    @State private var showSubSearch = false
+    @State private var showBookmarks = false
 
     private var player: PlayerCoordinator { app.player }
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            VideoSurface(player: player.avPlayer, pip: pip)
-                .ignoresSafeArea()
-                .onTapGesture { toggleOSD() }
-                .accessibilityLabel(Text("player.surface"))
-                .accessibilityAddTraits(.isButton)
-            if let cue = player.activeCue {
-                VStack {
-                    Spacer()
-                    Text(cue)
-                        .font(Theme.body(20, weight: .semibold))
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(.black.opacity(0.6), in: .rect(cornerRadius: 8))
-                        .padding(.bottom, osd ? 130 : 40)
+            Group {
+                if player.usingVLC {
+                    VLCSurface(player: player, generation: player.engineGeneration)
+                } else {
+                    VideoSurface(player: player.avPlayer, pip: pip)
                 }
+            }
+            .ignoresSafeArea()
+            .onTapGesture { toggleOSD() }
+            .accessibilityLabel(Text("player.surface"))
+            .accessibilityAddTraits(.isButton)
+            if player.activeCue != nil || player.secondaryCue != nil {
+                VStack(spacing: 6) {
+                    Spacer()
+                    if let second = player.secondaryCue {
+                        Text(second)
+                            .font(Theme.body(15, weight: .medium))
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.white.opacity(0.78))
+                            .padding(.horizontal, 10).padding(.vertical, 4)
+                            .background(.black.opacity(0.5), in: .rect(cornerRadius: 6))
+                    }
+                    if let cue = player.activeCue {
+                        Text(cue)
+                            .font(Theme.body(20, weight: .semibold))
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(.black.opacity(0.6), in: .rect(cornerRadius: 8))
+                    }
+                }
+                .padding(.bottom, osd ? 130 : 40)
                 .allowsHitTesting(false)
             }
-            if player.buffering && player.error == nil {
+            if player.buffering && player.error == nil && !player.capLocked && !player.askDataSaver {
                 ProgressView().controlSize(.large).tint(.white)
             }
-            if let err = player.error {
+            if player.capLocked {
+                Color.black.opacity(0.85).ignoresSafeArea()
+                CapLockedView(minutes: player.capMinutes) { player.dismiss() }
+            } else if let err = player.error {
                 VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle.fill").font(.largeTitle).foregroundStyle(Theme.destructive)
                     Text("player.error.title").font(Theme.heading(20))
@@ -63,6 +84,15 @@ struct PlayerView: View {
         .persistentSystemOverlays(osd ? .automatic : .hidden)
         .onAppear { pip.attach(player.avPlayer); scheduleHide() }
         .onChange(of: player.request?.id) { pip.attach(player.avPlayer) }
+        .onChange(of: player.avPlayer) { pip.attach(player.avPlayer) }
+        .alert(Text("datasaver.title"), isPresented: Binding(get: { player.askDataSaver }, set: { if !$0 { player.askDataSaver = false } })) {
+            Button("datasaver.play_anyway") { player.confirmDataSaver() }
+            Button("action.close", role: .cancel) { player.dismiss() }
+        } message: {
+            Text("datasaver.body")
+        }
+        .sheet(isPresented: $showSubSearch) { SubtitleSearchSheet(player: player) }
+        .sheet(isPresented: $showBookmarks) { BookmarksSheet(player: player) }
     }
 
     private func toggleOSD() {
@@ -84,12 +114,19 @@ struct PlayerView: View {
                 Button { player.dismiss() } label: { Image(systemName: "chevron.down").font(.title3.weight(.semibold)) }
                     .accessibilityLabel(Text("action.close"))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(player.request?.title ?? "").font(Theme.heading(17)).lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(player.request?.title ?? "").font(Theme.heading(17)).lineLimit(1)
+                        if player.usingVLC { badge(Text(verbatim: player.engineName)) }
+                        if player.isOffline { badge(Text("player.offline_badge")) }
+                    }
                     if let s = player.request?.subtitle { Text(s).font(Theme.body(13)).foregroundStyle(.white.opacity(0.75)).lineLimit(1) }
                 }
                 Spacer()
-                RoutePicker().frame(width: 32, height: 32).accessibilityLabel(Text("player.airplay"))
-                if pip.possible {
+                if player.isFile { PlayOnTVButton(player: player) }
+                if !player.usingVLC {
+                    RoutePicker().frame(width: 32, height: 32).accessibilityLabel(Text("player.airplay"))
+                }
+                if pip.possible && !player.usingVLC {
                     Button { pip.toggle() } label: { Image(systemName: "pip.enter") }.accessibilityLabel(Text("player.pip"))
                 }
                 menu
@@ -131,7 +168,7 @@ struct PlayerView: View {
 
     private var menu: some View {
         Menu {
-            if !player.audioTracks.isEmpty {
+            if !player.audioTracks.isEmpty && player.canSwitchAudio {
                 Picker(selection: Binding(get: { player.audioOrdinal }, set: { player.selectAudio($0) })) {
                     ForEach(Array(player.audioTracks.enumerated()), id: \.offset) { i, t in
                         Text(audioLabel(lang: t.lang, codec: t.codec, channels: t.channels, title: t.title)).tag(i)
@@ -146,6 +183,15 @@ struct PlayerView: View {
                 }
             } label: { Label("player.subtitles", systemImage: "captions.bubble") }
             .pickerStyle(.menu)
+            if !player.subtitleTracks.isEmpty { SecondarySubtitlePicker(player: player) }
+            if player.isFile {
+                Button { showSubSearch = true } label: { Label("player.search_subs", systemImage: "text.magnifyingglass") }
+                Button { showBookmarks = true } label: { Label("player.bookmarks", systemImage: "bookmark") }
+            }
+            Toggle(isOn: Binding(get: { player.nightMode }, set: { player.setNightMode($0) })) {
+                Label(player.nightModeAvailable ? LocalizedStringKey("player.night_mode") : LocalizedStringKey("player.night_mode_unavailable"), systemImage: "moon.stars")
+            }
+            .disabled(!player.nightModeAvailable)
             Picker(selection: Binding(get: { player.speed }, set: { player.setSpeed($0) })) {
                 ForEach([Float(0.5), 0.75, 1, 1.25, 1.5, 2], id: \.self) { Text(String(format: "%.2g×", $0)).tag($0) }
             } label: { Label("player.speed", systemImage: "speedometer") }
@@ -153,11 +199,24 @@ struct PlayerView: View {
             Menu {
                 Button("player.sleep_off") { player.setSleep(minutes: nil) }
                 ForEach([15, 30, 45, 60, 90], id: \.self) { m in Button("player.sleep_min \(m)") { player.setSleep(minutes: m) } }
+                if case .file = player.request?.source {
+                    Button("player.sleep_end") { player.setSleepEndOfItem() }
+                }
             } label: { Label("player.sleep", systemImage: "moon.zzz") }
+            if player.isFile {
+                Button { player.playOnTV() } label: { Label("player.play_on", systemImage: "airplayvideo") }
+            }
         } label: {
             Image(systemName: "ellipsis.circle").font(.title3)
         }
         .accessibilityLabel(Text("player.options"))
+    }
+
+    private func badge(_ text: Text) -> some View {
+        text
+            .font(Theme.body(10, weight: .bold))
+            .padding(.horizontal, 5).padding(.vertical, 2)
+            .background(.white.opacity(0.2), in: .rect(cornerRadius: 4))
     }
 }
 

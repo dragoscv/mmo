@@ -5,7 +5,8 @@ import UIKit
 
 @main
 struct MixAIApp: App {
-    @State private var app = AppModel()
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    @State private var app = AppModel.shared
 
     init() {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
@@ -22,6 +23,10 @@ struct MixAIApp: App {
                 .preferredColorScheme(.dark)
                 .tint(Theme.primary)
                 .task { await app.boot() }
+                .onOpenURL { app.handle(url: $0) }
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                    if let url = activity.webpageURL { app.handle(url: url) }
+                }
         }
     }
 }
@@ -43,6 +48,7 @@ struct RootView: View {
             }
         }
         .animation(.smooth(duration: 0.35), value: app.phase)
+        .onAppear { IntentBridge.app = app }
     }
 }
 

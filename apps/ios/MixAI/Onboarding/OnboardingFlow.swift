@@ -21,6 +21,7 @@ struct OnboardingFlow: View {
 }
 
 struct WelcomeView: View {
+    @Environment(AppModel.self) private var app
     @Binding var path: [OnboardingFlow.Step]
 
     var body: some View {
@@ -34,6 +35,13 @@ struct WelcomeView: View {
                 Text("welcome.subtitle").font(Theme.body(17)).foregroundStyle(Theme.mutedForeground).multilineTextAlignment(.center).padding(.horizontal, 24)
                 Spacer()
                 VStack(spacing: 12) {
+                    if app.accountStore.signedIn {
+                        Label("welcome.signed_in \(app.accountStore.user?.name ?? "")", systemImage: "checkmark.seal.fill")
+                            .font(Theme.body(14)).foregroundStyle(Theme.success)
+                    } else {
+                        AppleSignInButton()
+                        if let e = app.accountStore.error { Text(e).font(Theme.body(13)).foregroundStyle(Theme.destructive) }
+                    }
                     Button { path.append(.servers) } label: {
                         Label("welcome.connect_lan", systemImage: "wifi").frame(maxWidth: .infinity).padding(.vertical, 6)
                     }
@@ -220,7 +228,7 @@ struct SignInView: View {
                 case .accessDenied: errorText = String(localized: "signin.denied"); code = nil; return
                 case .expired: errorText = String(localized: "pair.expired"); code = nil; return
                 case .ok(let ok):
-                    app.account = ok.user
+                    app.accountStore.adopt(ok, app: app)
                     status = "signin.finding_server"
                     if let (c, base) = await auth.pickReachable(ok.companions ?? []) {
                         await app.connect(ServerConnection(name: c.name ?? "MMO Server", baseURL: base), token: c.token)

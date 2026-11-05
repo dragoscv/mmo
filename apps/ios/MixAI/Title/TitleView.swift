@@ -101,6 +101,10 @@ struct TitleView: View {
                 }
                 .buttonStyle(.glassProminent)
                 if let left = target.leftMin { Text("title.left \(left)").font(Theme.body(12)).foregroundStyle(Theme.mutedForeground) }
+                if d.title.kind != .tv {
+                    DownloadButton(fileId: target.fileId, ref: target.ref, title: d.title.title, show: nil, posterPath: d.title.posterPath)
+                        .buttonStyle(.glass)
+                }
             } else {
                 Text("title.not_in_library").font(Theme.body(14)).foregroundStyle(Theme.mutedForeground).frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -191,6 +195,10 @@ struct TitleView: View {
                     if ep.progress?.completed == true { Label("title.watched", systemImage: "checkmark.circle.fill").font(Theme.body(11)).foregroundStyle(Theme.success) }
                 }
                 Spacer(minLength: 0)
+                if let t {
+                    DownloadButton(fileId: t.fileId, ref: t.ref, title: "S\(ep.seasonNumber) E\(ep.episodeNumber) · \(ep.name)", show: show.title, posterPath: show.posterPath)
+                        .buttonStyle(.borderless)
+                }
             }
             .padding(.horizontal, 20)
             .contentShape(.rect)

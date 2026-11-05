@@ -66,6 +66,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **Placeholder art** from the file's still frame with a title lockup; **profile picker** keeps the last backdrop
   dimmed with an accent glow and profile-colour rings; **player OSD** bar, times and controls sit on one glass strip.
 
+## 2026-11-05 — MixAI for iPhone, slice 2 (iOS 1.1.0)
+
+- **Account**: native Sign in with Apple (nonce → `POST /api/auth/native/apple`, session in the Keychain), Google via
+  the web device-code page in `ASWebAuthenticationSession`, in-app account deletion (typed `DELETE` → `DELETE /api/account`).
+- **Push + Live Activities**: APNs registration (`/api/push/register`, sandbox/production from the build), categories
+  (new episode, recording, Watch Together invite); Live Activities for downloads and DVR recordings.
+- **Widgets** (`MixAIWidgets`, App Group `group.ro.mixai.app`): Continue Watching per profile (App Intent configuration)
+  and Now Playing; **Apple Watch** companion (`MixAIWatch`): now playing + TV remote through the iPhone.
+- **Downloads**: server MP4 remux (`/video/download?container=mp4`) → background URLSession, offline library by
+  show/season, storage gauge, Wi-Fi only, smart downloads (next 3 episodes on Wi-Fi + charging), auto-delete watched
+  after 24 h, offline progress queue.
+- **Play on TV / remote**: hub "Play on" sheet with handoff and pull-back, phone-as-remote touchpad, the iPhone is a hub
+  playback target too; AirPlay unchanged (no Google Cast on iOS by design).
+- **Watch Together**: create/join, invite share sheet, members, synced playback (drift correction), chat + reactions,
+  report / block / host kick.
+- **Player extras**: dual subtitles, search inside subtitles, scene bookmarks, fading sleep timer (incl. end of episode),
+  night mode compressor (offline/direct files), data saver prompt on cellular, kids daily-cap lock screen, VLCKit
+  4.0.0-a25 fallback engine for files AVPlayer refuses.
+- **More**: App Intents + Siri shortcuts (Resume last, Play on TV, Open Live TV), iPad sidebar layout, family stats,
+  kids usage, Plex importer, Settings › Licences (OFL fonts, VLCKit LGPL, Sentry MIT), Sentry (DSN env-gated, no PII),
+  CarPlay audio scene behind `MIXAI_CARPLAY` until Apple grants the entitlement.
+- **MixaiCore**: account API, phone store (downloads, bookmarks, subtitle search, usage, family, Plex, rooms), Watch
+  Together room reducer, offline library rules, player math; 70 Swift Testing tests.
+
 ## 2026-11-05 — MixAI for iPhone, slice 1 (iOS 1.0.0, design-tokens 1.2.0)
 
 - **iOS app (`apps/ios`, WP16-47)**: native SwiftUI app, bundle `ro.mixai.app`, iOS 26, Swift 6. Onboarding (Bonjour discovery,

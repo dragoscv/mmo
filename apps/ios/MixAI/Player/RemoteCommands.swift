@@ -31,12 +31,12 @@ enum RemoteCommands {
         }
         c.skipForwardCommand.preferredIntervals = [30]
         c.skipForwardCommand.addTarget { _ in
-            MainActor.assumeIsolated { app.player.skip(30) }
+            MainActor.assumeIsolated { app.player.request != nil ? app.player.skip(30) : app.music.seek(app.music.position + 30) }
             return .success
         }
         c.skipBackwardCommand.preferredIntervals = [10]
         c.skipBackwardCommand.addTarget { _ in
-            MainActor.assumeIsolated { app.player.skip(-10) }
+            MainActor.assumeIsolated { app.player.request != nil ? app.player.skip(-10) : app.music.seek(max(0, app.music.position - 10)) }
             return .success
         }
         c.changePlaybackPositionCommand.addTarget { e in
