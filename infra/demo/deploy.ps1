@@ -25,8 +25,13 @@ try {
     if (-not $Hosts) { $Hosts = "demo.mixai.ro, $sslip, $nip" }
     # Public name written into the M3U/XMLTV and the Live TV source: demo.mixai.ro once it resolves to this VM
     # (checked over DoH), the nip.io name until then. Re-run deploy.ps1 + setup after the DNS switch.
-    $doh = curl.exe -s -H 'accept: application/dns-json' 'https://cloudflare-dns.com/dns-query?name=demo.mixai.ro&type=A' | ConvertFrom-Json
-    $publicHost = if (@($doh.Answer | Where-Object { $_.data -eq $ip }).Count -gt 0) { 'demo.mixai.ro' } else { $nip }
+    # Two resolvers: right after the NS switch 1.1.1.1 kept a cached SERVFAIL for >20 min while dns.google answered.
+    $resolves = $false
+    foreach ($u in 'https://cloudflare-dns.com/dns-query?name=demo.mixai.ro&type=A', 'https://dns.google/resolve?name=demo.mixai.ro&type=A') {
+        $doh = curl.exe -s -H 'accept: application/dns-json' $u | ConvertFrom-Json
+        if (@($doh.Answer | Where-Object { $_.data -eq $ip }).Count -gt 0) { $resolves = $true }
+    }
+    $publicHost = if ($resolves) { 'demo.mixai.ro' } else { $nip }
     $lf = { param($p, $s) [IO.File]::WriteAllText($p, ($s -replace "`r`n", "`n"), [Text.UTF8Encoding]::new($false)) }
     foreach ($f in 'compose.yaml', 'Caddyfile', 'loop.sh', 'gen-epg.mjs', 'content.sh', 'setup.mjs', 'ATTRIBUTION.md') {
         & $lf (Join-Path $tmp $f) (Get-Content (Join-Path $here $f) -Raw)
