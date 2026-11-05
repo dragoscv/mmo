@@ -13,7 +13,8 @@ import { ApiError } from "@/lib/mmo/api";
 import { tmdbImg } from "@/lib/media/normalize";
 import { useBackdrop } from "../backdrop";
 import { useMmo } from "../mmo-provider";
-import { titleHref } from "../title-card";
+import { stillUrl } from "../player/model";
+import { tagPosterForMorph, titleHref } from "../title-card";
 import { gridMove, type LibDetails, type LibEntry } from "./lib";
 
 export type Load<T> = { s: "loading" } | { s: "ok"; data: T } | { s: "error"; error: unknown } | { s: "unsupported" };
@@ -109,8 +110,11 @@ export const LibCard = memo(function LibCard({ entry, details, progress, sub }: 
     entry: LibEntry; details: LibDetails | null; progress?: number | null; sub?: string;
 }) {
     const { set } = useBackdrop();
+    const { server } = useMmo();
     const title = details?.title ?? entry.guess;
     const img = tmdbImg(details?.posterPath ?? null, "w342");
+    const fileId = entry.files[0]?.serverFileId;
+    const still = !img && server && fileId ? stillUrl(server.baseUrl, fileId, { kind: "token", token: server.token, userId: server.userId }) : null;
     const subtitle = sub ?? [details?.year, details?.rating ? `★ ${details.rating.toFixed(1)}` : null, entry.res !== "SD" ? entry.res : null].filter(Boolean).join(" · ");
     const body = (
         <>
@@ -118,7 +122,13 @@ export const LibCard = memo(function LibCard({ entry, details, progress, sub }: 
                 {img
                     // eslint-disable-next-line @next/next/no-img-element -- TMDB CDN poster
                     ? <img src={img} alt="" loading="lazy" decoding="async" />
-                    : <span className="mx-card-fallback">{title}</span>}
+                    : (
+                        <>
+                            {/* eslint-disable-next-line @next/next/no-img-element -- server still frame, hidden if it fails */}
+                            {still ? <img src={still} alt="" loading="lazy" decoding="async" className="mx-card-still" onError={(e) => { e.currentTarget.hidden = true; }} /> : null}
+                            <span className="mx-card-fallback" data-still={still ? "" : undefined}>{title}</span>
+                        </>
+                    )}
                 {typeof progress === "number" && progress > 0 ? (
                     <span className="mx-card-progress" aria-hidden><span style={{ width: `${Math.round(Math.min(1, progress) * 100)}%` }} /></span>
                 ) : null}
@@ -130,7 +140,7 @@ export const LibCard = memo(function LibCard({ entry, details, progress, sub }: 
     if (entry.tmdbId == null) return <div className="mx-card mxb-card-static">{body}</div>;
     const focus = () => set(details?.backdropPath);
     return (
-        <Link href={titleHref(entry.kind, entry.tmdbId)} className="mx-card" onMouseEnter={focus} onFocus={focus} prefetch={false}>
+        <Link href={titleHref(entry.kind, entry.tmdbId)} className="mx-card" onMouseEnter={focus} onFocus={focus} onClick={img ? tagPosterForMorph : undefined} prefetch={false}>
             {body}
         </Link>
     );

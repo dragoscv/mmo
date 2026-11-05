@@ -68,6 +68,11 @@ export function spriteUrl(baseUrl: string, fileId: string, auth: StreamAuth): st
     return `${trimBase(baseUrl)}/video/thumbs/${enc(fileId)}/sprite.jpg?${authQuery(auth)}`;
 }
 
+/** One 640 px keyframe ~10 % into the file (server caches it); card placeholder art. */
+export function stillUrl(baseUrl: string, fileId: string, auth: StreamAuth): string {
+    return `${trimBase(baseUrl)}/video/thumbs/${enc(fileId)}/still.jpg?${authQuery(auth)}`;
+}
+
 export function pauseStreamUrl(baseUrl: string, fileId: string, auth: StreamAuth): string {
     return `${trimBase(baseUrl)}/video/stream/${enc(fileId)}/pause?${authQuery(auth)}`;
 }

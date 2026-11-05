@@ -10,6 +10,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-05 — Web 3.1.6 (`/media` design pass, critic 37 → 51)
+
+- **The `/media` backdrop is visible.** The focus-following backdrop, the hero's muted trailer and the stills were
+  `position:fixed; z-index:-1` and painted under the app shell's opaque background on every route. The media shell is
+  now its own stacking context with a sticky full-height backdrop stage, and the trailer plays in that stage.
+- **Headings use Space Grotesk (app-wide).** The tokens stylesheet redefined `--font-heading` / `--font-mono` on
+  `:root` after next/font set them on `<html>`, so every heading fell back to Inter and mono text to the system
+  font. The next/font variables now sit on `<body>`.
+- Home has a 3-act entrance (backdrop → title/meta/actions → staggered rows, about 1 s, transform/opacity only),
+  a slow Ken Burns drift on the backdrop, cards with a primary ring + accent glow on hover/focus, placeholder art
+  (accent gradient + title, or the server still frame for library files without a poster), and a poster → title
+  page morph (View Transitions). All of it is off under reduced motion (`data-motion` or the OS setting).
+- Report: `docs/design-critic/wp16-web.md`.
+
+## 2026-11-05 — Web 3.1.5
+
+- i18n: an explicit `getTranslations({ locale })` now wins over the `mmo-locale` cookie in the request config, so
+  `/privacy?lang=en` renders English for store reviewers (3.1.2 always rendered the cookie/default locale).
+
 ## 2026-11-05 — Web 3.1.3
 
 - `/.well-known/assetlinks.json`: real `ro.mixai.app` fingerprints (Play App Signing key + upload key) replace the

@@ -39,9 +39,8 @@ function HeroBody({ item }: { item: TitleCard }) {
     const t = useTranslations("mx.shell.home");
     const locale = useLocale();
     const { clients } = useMmo();
-    const { set } = useBackdrop();
+    const { set, trailer: showTrailer } = useBackdrop();
     const [details, setDetails] = useState<TitleDetails | null>(null);
-    const [trailerOn, setTrailerOn] = useState(false);
 
     useEffect(() => { set(item.backdropPath); }, [item.backdropPath, set]);
 
@@ -54,9 +53,9 @@ function HeroBody({ item }: { item: TitleCard }) {
     const trailer = pickTrailer(details);
     useEffect(() => {
         if (!trailer || !trailerAllowed()) return;
-        const id = setTimeout(() => setTrailerOn(true), 3000);
-        return () => clearTimeout(id);
-    }, [trailer]);
+        const id = setTimeout(() => showTrailer(trailer), 3000);
+        return () => { clearTimeout(id); showTrailer(null); };
+    }, [trailer, showTrailer]);
 
     const logo = tmdbImg(details?.logoPath ?? null, "w500");
     const year = item.releaseDate?.slice(0, 4);
@@ -64,17 +63,6 @@ function HeroBody({ item }: { item: TitleCard }) {
     const runtime = details?.runtime ? new Intl.NumberFormat(locale).format(details.runtime) + " min" : null;
     return (
         <section className="mx-hero" aria-label={item.title}>
-            {trailer && trailerOn ? (
-                <iframe
-                    title={item.title}
-                    className="mx-hero-trailer"
-                    data-on
-                    tabIndex={-1}
-                    aria-hidden
-                    allow="autoplay; encrypted-media"
-                    src={`https://www.youtube-nocookie.com/embed/${trailer}?autoplay=1&mute=1&controls=0&loop=1&playlist=${trailer}&modestbranding=1&playsinline=1&rel=0`}
-                />
-            ) : null}
             {logo
                 // eslint-disable-next-line @next/next/no-img-element -- TMDB logo, transparent PNG
                 ? <img src={logo} alt={item.title} className="mx-hero-logo" />

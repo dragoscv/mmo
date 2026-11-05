@@ -22,7 +22,7 @@ import { useMmo } from "../mmo-provider";
 import { DownloadButton } from "../offline/download-button";
 import { PlayOnTvButton } from "../play-on-tv";
 import { MxRow } from "../row";
-import { MxTitleCard } from "../title-card";
+import { MxTitleCard, POSTER_VT } from "../title-card";
 import { ErrorBlock, Unsupported, useMediaScope } from "./common";
 import { EpisodeList, useSeason } from "./episodes";
 import { formatChips, previewTarget, targetHref, versionChoices } from "./lib";
@@ -111,8 +111,8 @@ function TitleBody({ kind, tmdbId }: { kind: MediaKind; tmdbId: number }) {
                 <div className="mxb-poster-wrap">
                     {poster
                         // eslint-disable-next-line @next/next/no-img-element -- TMDB poster
-                        ? <img src={poster} alt="" className="mxb-poster" decoding="async" />
-                        : <div className="mxb-poster" aria-hidden />}
+                        ? <img src={poster} alt="" className="mxb-poster" decoding="async" style={{ viewTransitionName: POSTER_VT }} />
+                        : <div className="mxb-poster" aria-hidden style={{ viewTransitionName: POSTER_VT }} />}
                 </div>
                 <div className="mxb-title-info">
                     {logo ? (
@@ -338,7 +338,7 @@ export function TitleSkeleton({ label }: { label: string }) {
     return (
         <div className="mxb-title-hero" aria-busy>
             <p className="sr-only" role="status">{label}</p>
-            <div className="mxb-poster-wrap"><div className="mxb-poster bg-muted animate-pulse" aria-hidden /></div>
+            <div className="mxb-poster-wrap"><div className="mxb-poster bg-muted animate-pulse" aria-hidden style={{ viewTransitionName: POSTER_VT }} /></div>
             <div className="mxb-title-info" aria-hidden>
                 <div className="mxb-skel-block bg-muted animate-pulse" style={{ height: "3.5rem", width: "60%" }} />
                 <div className="mxb-skel-line bg-muted animate-pulse" style={{ width: "40%" }} />

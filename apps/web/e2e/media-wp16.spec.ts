@@ -136,6 +136,32 @@ test.describe("signed-in /media", () => {
         }
     });
 
+    test("design: headings render in the heading face; the Home backdrop is on screen", async ({ page, baseURL }) => {
+        await signIn(page, baseURL!);
+        await page.goto("/media");
+        await passGate(page);
+        await expect(page.getByTestId("media-home-rows")).toBeVisible({ timeout: 20_000 });
+        await page.evaluate(() => document.fonts.ready);
+        const probe = await page.evaluate(() => {
+            const h = document.querySelector<HTMLElement>(".mx-row-title");
+            const family = h ? getComputedStyle(h).fontFamily : "";
+            const first = family.split(",")[0]?.trim().replace(/["']/g, "") ?? "";
+            const img = document.querySelector<HTMLImageElement>(".mx-backdrop-img[data-on]");
+            const shell = document.querySelector<HTMLElement>(".mx-shell");
+            return {
+                family,
+                loaded: first ? document.fonts.check(`600 16px "${first}"`) : false,
+                backdrop: !!img && img.complete && img.naturalWidth > 0 && Number(getComputedStyle(img).opacity) > 0,
+                // Without its own stacking context the z-index:-1 backdrop paints under AppShell's background.
+                isolated: shell ? getComputedStyle(shell).isolation === "isolate" : false,
+            };
+        });
+        console.log(`__DESIGN__ ${JSON.stringify(probe)}`);
+        expect(probe.family.toLowerCase(), "heading face").toContain("grotesk");
+        expect(probe.loaded, "heading face loaded").toBe(true);
+        expect(probe.isolated, "media shell must isolate so the backdrop is visible").toBe(true);
+    });
+
     test("keyboard: nav toolbar arrows + '/' opens search", async ({ page, baseURL }) => {
         await signIn(page, baseURL!);
         await page.goto("/media");

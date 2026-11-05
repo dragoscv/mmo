@@ -9,6 +9,8 @@
     --mx-scrim: color-mix(in oklch, var(--background) 92%, transparent);
     --mx-ease: var(--ease-out, cubic-bezier(0.2, 0.8, 0.2, 1));
     position: relative;
+    /* Own stacking context: the backdrop (z-index -1) paints above AppShell's opaque background. */
+    isolation: isolate;
     min-height: 100dvh;
     color: var(--foreground);
     /* Same variable bag PosterCard reads (see media-home.css). */
@@ -179,10 +181,19 @@
 /* ─── backdrop (follows hover/focus) ──────────────────────────────────── */
 
 .mx-backdrop {
-    position: fixed;
+    /* Absolute in the isolated shell + a sticky viewport-tall stage: `fixed` here sat under AppShell's
+       bg-background (invisible) and, once isolated, would also paint over the sidebar. */
+    position: absolute;
     inset: 0;
     z-index: -1;
     pointer-events: none;
+    overflow: clip; /* not `hidden`: that would make this the sticky scroll container */
+}
+.mx-backdrop-stage {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    max-height: 100%;
     overflow: hidden;
 }
 .mx-backdrop-img {
@@ -196,12 +207,19 @@
     transition: opacity 600ms var(--mx-ease);
 }
 .mx-backdrop-img[data-on] { opacity: 0.55; }
-.mx-backdrop::after {
+/* Living background: slow Ken Burns on the visible still, full motion only. */
+@keyframes mx-kenburns { from { scale: 1; } to { scale: 1.06; } }
+:root[data-motion="full"] .mx-backdrop-img[data-on] {
+    animation: mx-kenburns 36s var(--ease-in-out, ease-in-out) 1.2s infinite alternate;
+    transform-origin: 60% 30%;
+}
+.mx-backdrop-stage::after {
     content: "";
     position: absolute;
     inset: 0;
+    z-index: 1;
     background:
-        linear-gradient(to right, var(--background) 0%, color-mix(in oklch, var(--background) 60%, transparent) 45%, transparent 75%),
+        linear-gradient(to right, var(--background) 0%, color-mix(in oklch, var(--background) 82%, transparent) 30%, color-mix(in oklch, var(--background) 45%, transparent) 58%, transparent 82%),
         linear-gradient(to top, var(--background) 8%, color-mix(in oklch, var(--background) 40%, transparent) 55%, color-mix(in oklch, var(--background) 30%, transparent) 100%);
 }
 
@@ -218,7 +236,7 @@
     max-width: min(46rem, 100%);
 }
 .mx-hero-logo { max-height: clamp(70px, 14vh, 160px); max-width: min(30rem, 80%); object-fit: contain; object-position: left bottom; }
-.mx-hero-title { font-size: clamp(2rem, 4.5vw, 4.25rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.02; }
+.mx-hero-title { font-family: var(--font-heading); font-size: clamp(2.25rem, 5vw, 4.75rem); font-weight: 700; letter-spacing: -0.035em; line-height: 1; }
 .mx-hero-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; color: var(--muted-foreground); font-size: 0.95rem; }
 .mx-chip {
     display: inline-flex;
@@ -234,9 +252,8 @@
 .mx-hero-overview { color: color-mix(in oklch, var(--foreground) 85%, transparent); font-size: clamp(0.95rem, 1.1vw, 1.1rem); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .mx-hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .mx-hero-trailer {
-    position: fixed;
+    position: absolute;
     inset: 0;
-    z-index: -1;
     width: 100%;
     height: 100%;
     border: 0;
@@ -247,11 +264,23 @@
 }
 .mx-hero-trailer[data-on] { opacity: 0.5; }
 
+/* Choreographed entrance (3 acts): backdrop fades in (600 ms, above) → logo/title, meta, overview,
+   actions rise → rows follow, staggered. transform/opacity only; full motion only. */
+@keyframes mx-rise { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
+:root[data-motion="full"] .mx-hero > * { animation: mx-rise 420ms var(--mx-ease) both; animation-delay: 120ms; }
+:root[data-motion="full"] .mx-hero > :nth-child(2) { animation-delay: 200ms; }
+:root[data-motion="full"] .mx-hero > :nth-child(3) { animation-delay: 270ms; }
+:root[data-motion="full"] .mx-hero > :nth-child(4) { animation-delay: 340ms; }
+:root[data-motion="full"] .mx-rows > * { animation: mx-rise 480ms var(--mx-ease) both; animation-delay: 420ms; }
+:root[data-motion="full"] .mx-rows > :nth-child(2) { animation-delay: 490ms; }
+:root[data-motion="full"] .mx-rows > :nth-child(3) { animation-delay: 560ms; }
+:root[data-motion="full"] .mx-rows > :nth-child(n + 4) { animation-delay: 630ms; }
+
 /* ─── rows ────────────────────────────────────────────────────────────── */
 
 .mx-rows { display: flex; flex-direction: column; gap: clamp(1.5rem, 2.4vw, 2.75rem); }
 .mx-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.65rem; }
-.mx-row-title { font-size: clamp(1.05rem, 1.25vw, 1.4rem); font-weight: 700; letter-spacing: -0.01em; }
+.mx-row-title { font-family: var(--font-heading); font-size: clamp(1.1rem, 1.35vw, 1.55rem); font-weight: 600; letter-spacing: -0.015em; }
 .mx-row-reason { color: var(--muted-foreground); font-size: 0.85rem; }
 .mx-row-track {
     display: flex;
@@ -275,6 +304,9 @@
     color: inherit;
 }
 .mx-card:hover, .mx-card:focus-visible { transform: scale(1.05); z-index: 2; }
+.mx-card:hover .mx-card-img, .mx-card:focus-visible .mx-card-img {
+    box-shadow: 0 0 0 2px var(--primary), 0 18px 40px -14px var(--watch-accent-glow);
+}
 .mx-card[data-variant="landscape"] { width: calc(var(--watch-poster-w) * 1.78); }
 .mx-card-img {
     position: relative;
@@ -284,11 +316,32 @@
     overflow: hidden;
     background: var(--muted);
     box-shadow: 0 8px 24px -12px color-mix(in oklch, var(--foreground) 35%, transparent);
+    transition: box-shadow 200ms var(--mx-ease);
 }
 .mx-card[data-variant="landscape"] .mx-card-img { aspect-ratio: 16 / 9; }
 .mx-card[data-variant="square"] .mx-card-img { aspect-ratio: 1 / 1; }
 .mx-card-img img { width: 100%; height: 100%; object-fit: cover; }
-.mx-card-fallback { position: absolute; inset: 0; display: grid; place-items: center; padding: 0.75rem; text-align: center; font-size: 0.85rem; font-weight: 600; color: var(--muted-foreground); }
+/* Placeholder art: accent-tinted gradient + the title in the heading face (no flat grey tile). */
+.mx-card-fallback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    padding: 0.8rem;
+    font-family: var(--font-heading);
+    font-size: clamp(0.9rem, 0.95vw, 1.1rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--foreground);
+    text-wrap: balance;
+    background:
+        radial-gradient(120% 80% at 20% 0%, color-mix(in oklch, var(--primary) 28%, transparent), transparent 70%),
+        linear-gradient(to top, var(--card), var(--muted));
+}
+/* Library entry without a poster: the server's still frame under a bottom scrim, title on top. */
+.mx-card-still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.mx-card-fallback[data-still] { background: linear-gradient(to top, color-mix(in oklch, var(--background) 92%, transparent) 0%, color-mix(in oklch, var(--background) 55%, transparent) 40%, transparent 70%); }
 .mx-card-progress { position: absolute; left: 0.5rem; right: 0.5rem; bottom: 0.5rem; height: 4px; border-radius: 999px; background: color-mix(in oklch, var(--background) 60%, transparent); overflow: hidden; }
 .mx-card-progress > span { display: block; height: 100%; background: var(--primary); }
 .mx-card-title { display: block; margin-top: 0.45rem; font-size: 0.875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -298,7 +351,7 @@
 /* ─── grids / pages ───────────────────────────────────────────────────── */
 
 .mx-page-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 1rem; padding: 1.5rem 0 1rem; }
-.mx-page-title { font-size: clamp(1.6rem, 2.6vw, 2.6rem); font-weight: 800; letter-spacing: -0.02em; }
+.mx-page-title { font-family: var(--font-heading); font-size: clamp(1.75rem, 2.8vw, 2.9rem); font-weight: 700; letter-spacing: -0.03em; }
 .mx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--watch-poster-w), 1fr)); gap: 1.25rem var(--watch-row-gap); list-style: none; padding: 0; }
 .mx-grid .mx-card { width: 100%; }
 .mx-grid-wide { grid-template-columns: repeat(auto-fill, minmax(calc(var(--watch-poster-w) * 1.6), 1fr)); }
@@ -308,6 +361,12 @@
 
 @keyframes mx-pulse { 50% { opacity: 0.4; } }
 
+/* Poster → title morph: the clicked card's image and the title page poster share this name. */
+::view-transition-group(mx-poster) { animation-duration: var(--dur-page, 320ms); animation-timing-function: var(--mx-ease); }
+[data-motion="reduced"] ::view-transition-group(mx-poster),
+[data-motion="reduced"] ::view-transition-old(mx-poster),
+[data-motion="reduced"] ::view-transition-new(mx-poster) { animation: none; }
+
 [data-motion="reduced"] .mx-shell *,
 [data-motion="reduced"] .mx-shell *::before,
 [data-motion="reduced"] .mx-shell *::after {
@@ -316,4 +375,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
     .mx-card:hover, .mx-card:focus-visible, .mx-gate-tile:hover, .mx-gate-tile:focus-visible { transform: none; }
+    .mx-hero > *, .mx-rows > *, .mx-backdrop-img[data-on] { animation: none; }
+    ::view-transition-group(mx-poster), ::view-transition-old(mx-poster), ::view-transition-new(mx-poster) { animation: none; }
 }
