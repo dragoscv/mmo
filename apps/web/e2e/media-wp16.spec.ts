@@ -44,17 +44,32 @@ async function signIn(page: Page, baseURL: string) {
     }]);
 }
 
-/** Past the "Who's watching" gate: pick the first profile when the gate is shown (PIN-less profiles only). */
+/**
+ * Past the "Who's watching" gate: pick the first profile when the gate is shown (PIN-less profiles only).
+ * `locator.isVisible({ timeout })` does NOT wait (the option is ignored), and the gate only mounts once the
+ * companion's profiles load — so wait for either the gate or the page content first (run 2611051105-z2ek).
+ */
 async function passGate(page: Page) {
     const tile = page.locator(".mx-gate-tile").first();
-    if (await tile.isVisible({ timeout: 4000 }).catch(() => false)) await tile.click();
+    const content = page.locator("main.mx-main");
+    const either = await tile.or(content).first().waitFor({ timeout: 15_000 }).then(() => true, () => false);
+    if (!either) return; // pages without the media shell (or no server) — the caller's assertions decide
+    if (await tile.isVisible()) {
+        await tile.click();
+        await content.waitFor({ timeout: 15_000 });
+    }
 }
 
 async function noBlockingAxe(page: Page, label: string) {
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).include("main").analyze();
     const blocking = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+    console.log(`__AXE__ ${JSON.stringify({ route: label, violations: results.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, target: v.nodes[0]?.target })) })}`);
     expect(blocking, `${label}: ${blocking.map((v) => `${v.id}×${v.nodes.length}`).join(", ")}`).toEqual([]);
 }
+
+type HomePerf = { firstPaintMs: number; cached: boolean };
+const readHomePerf = (page: Page) =>
+    page.evaluate(() => (window as unknown as { __mixaiPerf?: { home?: HomePerf } }).__mixaiPerf?.home ?? null);
 
 test("guest /together rejects a malformed link without a session", async ({ page }) => {
     const res = await page.goto("/together?server=javascript:alert(1)&inv=x");
@@ -98,6 +113,12 @@ test.describe("signed-in /media", () => {
                     expect(o.sw, `horizontal overflow ${route} @${width}`).toBeLessThanOrEqual(o.iw + 1);
                     const name = route.replace(/[^a-z0-9]+/gi, "_");
                     await page.screenshot({ path: `test-results/media-wp16/${name}-${mode}-${width}.png` });
+                    if (route === "/media") {
+                        // Report-only: the second visit should paint Home from the cache (asserted in the test above).
+                        await page.reload();
+                        await page.getByTestId("media-home-rows").waitFor({ timeout: 20_000 }).catch(() => undefined);
+                        console.log(`__PERF__ ${JSON.stringify({ mode, width, home: await readHomePerf(page) })}`);
+                    }
                 }
                 expect(errors, "uncaught page errors").toEqual([]);
             });

@@ -42,7 +42,9 @@ const SA = `brivio-e2e-runner@${PROJECT}.iam.gserviceaccount.com`;
 const IMAGE_FAMILY = "brivio-e2e-runner";
 const VM_PREFIX = "brivio-e2e-mmo-"; // the runner SA may delete ONLY brivio-e2e-* VMs (IAM condition)
 const SPOT_USD_PER_HOUR = { "n2d-standard-8": 0.09, "n2d-standard-16": 0.18, "n2d-standard-32": 0.36 };
-const ENV_WHITELIST = ["DATABASE_URL", "AUTH_SECRET"];
+// lib/env.ts refuses to boot a production build without the Google OAuth pair (run 2611051056-fmga:
+// every /api/health → 500). MMO_SECRET_KEY decrypts stored AI keys; TMDB_API_KEY feeds /media enrichment.
+const ENV_WHITELIST = ["DATABASE_URL", "AUTH_SECRET", "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "MMO_SECRET_KEY", "TMDB_API_KEY"];
 const COMPANION_PORT = 17899;
 
 // ---------------------------------------------------------------- args --
@@ -254,7 +256,15 @@ async function launch() {
     // real index is never touched. external/ (vendored model repos) is not needed by apps/web.
     git(["read-tree", "HEAD"]);
     git(["add", "--all", "--", "."]);
-    git(["rm", "-r", "--cached", "--quiet", "--ignore-unmatch", "--", "external"]);
+    // Only apps/web + packages/* + scripts are used on the VM. public/samples (932 MB of WAVs, only
+    // manifest.json is read at build/runtime by the tested routes) and data/{generated,downloads}
+    // made the bundle 840 MB → ~2 min of tar + upload per run.
+    // (two calls: an :(exclude) pathspec applies to every pattern of the same command)
+    // docs/ stays: apps/web prebuild `sync:learn` copies docs/ into the app.
+    git(["rm", "-r", "-f", "--cached", "--quiet", "--ignore-unmatch", "--", "external", "infra", "server", ":(glob)apps/**", ":(exclude,glob)apps/web/**"]);
+    git(["rm", "-r", "-f", "--cached", "--quiet", "--ignore-unmatch", "--", "apps/web/public/samples", "apps/web/data/generated", "apps/web/data/downloads"]);
+    const manifest = "apps/web/public/samples/manifest.json";
+    if (existsSync(join(ROOT, manifest))) git(["add", "-f", "--", manifest]);
     const tree = git(["write-tree"]);
     const count = git(["ls-tree", "-r", "--name-only", tree]).split("\n").length;
     execFileSync("git", ["-c", "core.autocrlf=false", "archive", "--format=tar.gz", "-o", bundle, tree], { cwd: ROOT });

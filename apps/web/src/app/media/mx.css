@@ -81,6 +81,10 @@
 }
 .mx-nav-link:hover { color: var(--foreground); background: color-mix(in oklch, var(--foreground) 8%, transparent); }
 .mx-nav-link[aria-current="page"] { color: var(--primary-foreground); background: var(--primary); }
+/* Light tokens pair white --primary-foreground with --primary at L 0.62 = 3.8:1 (axe color-contrast on the
+    active nav pill and the hero CTA, e2e runs 2611051105-z2ek / 2611051115-xbtj). Inside the media shell the
+    light primary drops to L − 0.12 (≈ 6:1); dark mode already pairs dark text on a light primary. */
+:root[data-mode="light"] .mx-shell { --primary: oklch(calc(var(--primary-l) - 0.12) var(--primary-c) var(--accent-h)); }
 
 @media (max-width: 47.99rem) {
     .mx-brand span { display: none; }

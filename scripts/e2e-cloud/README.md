@@ -45,9 +45,18 @@ VM's `next.log` / `fwd.log` / `build.log` land in `--out` (default `apps/web`).
 ### Env shipped to the VM (`vm-prod`)
 
 A whitelist, never `.env.local` wholesale: `DATABASE_URL`, `AUTH_SECRET` (session lookup + device-token
-decryption), plus `COMPANION_TUNNEL_URL` / `E2E_SESSION_COOKIE` when those flags are used. The key names
-are printed on launch and on the VM; values never are. The VM deletes the `env` object as soon as it
-has read it; the launcher deletes it again in `finally` in case the VM never booted.
+decryption), `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` (`lib/env.ts` refuses to boot a production build
+without them — every request 500s), `MMO_SECRET_KEY`, `TMDB_API_KEY` (when set), plus
+`COMPANION_TUNNEL_URL` / `E2E_SESSION_COOKIE` when those flags are used. The key names are printed on
+launch and on the VM; values never are. The VM deletes the `env` object as soon as it has read it; the
+launcher deletes it again in `finally` in case the VM never booted.
+
+### What is shipped
+
+The working tree (tracked + untracked-not-ignored, via a throwaway index) minus everything apps/web does
+not use: `external/`, `infra/`, `server/`, every `apps/*` except `apps/web`, and the 932 MB
+`apps/web/public/samples` (only `manifest.json` is kept) + `apps/web/data/{generated,downloads}`.
+840 MB → 3.5 MB; VM launch 120 s → 38 s.
 
 ## Cost
 
@@ -55,13 +64,18 @@ Spot `n2d-standard-16` ≈ 0.18 USD/h list price. The ledger counts seconds from
 VM creation (~2 min) is extra. Measured: install of web + 7 packages 11 s (parallel, warm image store).
 A full WP16 run (build + 7 tests) is expected at ~15–25 min → ≈ 0.05–0.08 USD.
 
-## Known blocker (2026-11-05)
+## Remote mode and the companion
 
-`next build` (Turbopack) fails on the VM: `Module not found: Can't resolve
-'@vercel/turbopack-next/internal/font/google/font'` / `next/font/google queries have exactly one entry`
-for the fonts in `apps/web/src/app/layout.tsx` (same tree builds on the workstation). The harness then
-tries `build:webpack`, which fails on a real app bug (`node:crypto` in a client import chain). Server
-logs of every run land in `<out>/server-logs/`.
+A hosted web (Cloud Run sets `K_SERVICE`) reaches a companion only through the device row's
+`tunnelHostname` (`pickCompanionUrl`, `lib/companion-url.ts`), which the web provisions itself via the
+Cloudflare API on heartbeat (`/api/devices/announce` → `ensureDeviceTunnel`, needs the
+`CLOUDFLARE_*` env + a live `devices.mixai.ro` zone). Until that exists, remote runs cover only guest
+pages; signed-in companion-backed routes need `--target vm-prod --companion-tunnel`.
+
+## History
+
+The Turbopack `next/font/google` + `node:crypto` build failures on the VM were fixed in 7dd9a542
+(self-hosted fonts, client-safe device-code). Server logs of every run land in `<out>/server-logs/`.
 
 ## Cleanup / checks
 

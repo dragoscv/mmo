@@ -10,6 +10,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-05 — /media a11y fix + cloud e2e harness runs end to end (Web 3.0.3)
+
+- **Web 3.0.3**: the active `/media` nav pill in light mode now meets WCAG AA (white label on the accent was
+  3.8:1, axe `color-contrast` serious; pill darkened to ≈ 6:1). Found by the cloud e2e matrix (WP16-43/54).
+- **Cloud e2e harness** (`scripts/e2e-cloud`): `vm-prod` runs now execute the full WP16 matrix (~4 min, ~$0.01):
+  the env whitelist ships `AUTH_GOOGLE_ID/SECRET` (production boot refused without them → every request 500),
+  and the bundle drops everything apps/web does not use (840 MB → 3.5 MB). `media-wp16.spec.ts` waits for the
+  profile gate properly and logs the Home cache metric per viewport + an axe summary per route.
+
 ## 2026-11-05 — Native Android phone app (Phone 1.0.0)
 
 - **Phone 1.0.0** (`apps/phone-android`, `ro.mixai.app`, WP16-46 slice 1): native Kotlin/Compose app built in the
