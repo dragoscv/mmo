@@ -23,9 +23,9 @@ param(
   [string]$Repo = 'mixai',
   [string]$SqlInstance = 'mmo-pg',
   [string]$RuntimeSa = 'mmo-web-app',
-  # Public origin for Auth.js. Default = the service's run.app URL; switch to https://mixai.ro once
-  # DNS + domain mapping are live (also add the Google OAuth redirect URI for it).
-  [string]$AppUrl,
+  # Public origin for Auth.js. mixai.ro (+ www) are Cloud Run domain mappings since 2026-11-05; the
+  # run.app URL keeps serving the same app (no redirect) and stays in the Google OAuth redirect URIs.
+  [string]$AppUrl = 'https://mixai.ro',
   [string]$EnvFile,
   [switch]$NoSecretSync,
   [switch]$SkipBuild

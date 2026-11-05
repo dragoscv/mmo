@@ -129,7 +129,7 @@ Producția web rulează pe **Cloud Run `mixai-web`** (proiect `mmo-mw-prod`, `eu
 	în Artifact Registry `europe-west1-docker.pkg.dev/mmo-mw-prod/mixai/mixai-web:<sha12>`.
 - Deploy (doar din arbore curat, commit împins):
 	`pwsh -NoProfile -File "$env:USERPROFILE\.copilot\hooks\deploy-clean.ps1" -Command 'pwsh -NoProfile -File apps/web/scripts/deploy-cloud-run.ps1'`
-	Opțiuni: `-AppUrl https://mixai.ro` (după DNS), `-NoSecretSync`, `-SkipBuild`.
+	Opțiuni: `-AppUrl` (implicit `https://mixai.ro`), `-NoSecretSync`, `-SkipBuild`.
 - Migrații: NU rulează la deploy. Verifică întâi `pnpm -C apps/web db:status` (`.env.local` = PROD).
 - DB: socket Cloud SQL (`--add-cloudsql-instances`, `DB_SOCKET_DIR=/cloudsql/mmo-mw-prod:europe-west1:mmo-pg`);
 	user/parolă/db din `DATABASE_URL`. Pool 4 conexiuni/instanță (`DB_POOL_MAX`), max 4 instanțe.
@@ -148,10 +148,12 @@ Producția web rulează pe **Cloud Run `mixai-web`** (proiect `mmo-mw-prod`, `eu
 	`mixai-web-fcm-sa` (push Android). Pași: [`docs/followups/apple-siwa-setup.md`](../../docs/followups/apple-siwa-setup.md).
 - Push (`/api/push/*`) cere migrarea `drizzle/0031_push_tokens.sql`; până e aplicată rutele răspund
 	`503 push_unavailable`, restul aplicației merge normal.
-- `AUTH_URL`/`NEXTAUTH_URL`/`MMO_APP_URL` = URL-ul run.app până la mutarea pe `https://mixai.ro`.
-	Google OAuth: adaugă redirect URI `<origin>/api/auth/callback/google` în clientul OAuth pentru fiecare
-	origine (run.app acum, mixai.ro după DNS) — fără el login-ul Google dă `redirect_uri_mismatch`.
-- Domeniu `mixai.ro`: Cloud Run domain mapping (europe-west1 suportă) →
+- `AUTH_URL`/`NEXTAUTH_URL`/`MMO_APP_URL` = `https://mixai.ro` (live din 2026-11-05, rev `mixai-web-00010-7bd`).
+	URL-ul run.app servește aceeași aplicație (fără redirect — build-urile mobile 1.1.0 îl folosesc).
+	Google OAuth (client `Web client 1`, mmo-mw-prod): redirect URI `<origin>/api/auth/callback/google` pentru
+	mixai.ro, www.mixai.ro și run.app — fără el login-ul Google dă `redirect_uri_mismatch`.
+- Domeniu `mixai.ro` (configurat 2026-11-05, DNS în Cloudflare prin `scripts/cloudflare-dns-mixai.ps1`):
+	Cloud Run domain mapping (europe-west1 suportă) →
 	`gcloud beta run domain-mappings create --service mixai-web --domain mixai.ro --region europe-west1 --project mmo-mw-prod`
 	(necesită domeniul verificat pentru contul gcloud — la 2026-11-05 `mixai.ro` NU era în
 	`gcloud domains list-user-verified`; `gcloud domains verify mixai.ro` → TXT `google-site-verification=…` în
