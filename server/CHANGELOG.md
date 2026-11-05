@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.9.3 — Docker image builds again
+
+- `Dockerfile` runs `pnpm build:headless` (tsc) instead of `pnpm build`, which since the Vite renderer
+	(`ui/`) also runs `vite build` and failed in the image context ("Cannot resolve entry module
+	ui/vite.config.ts"). The headless image never shipped the renderer.
+
 ## 3.9.2 — Public demo mode (WP16-53)
 
 - `MMO_DEMO=1` (store-review server demo.mixai.ro, `infra/demo/`): Quick Connect requests are approved at once

@@ -57,7 +57,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
  && pnpm install --frozen-lockfile --prod=false
 COPY tsconfig.json ./
 COPY src ./src
-RUN pnpm build \
+# build:headless = tsc only; `pnpm build` also runs the Electron renderer (ui/), which the image never ships.
+RUN pnpm build:headless \
  && pnpm prune --prod --config.ignore-scripts=true \
  && rm -rf node_modules/ffmpeg-static node_modules/ffprobe-static node_modules/audify \
            node_modules/@types node_modules/typescript node_modules/.cache \
