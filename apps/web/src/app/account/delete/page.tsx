@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/auth";
-import { buttonVariants } from "@/components/ui/button";
 import { DELETE_CONFIRMATION } from "@/lib/account/delete-account";
 import { DeleteAccountForm } from "./delete-account-form";
+import { SignedOutActions } from "./signed-out-actions";
 
 /**
  * PUBLIC account-deletion page (App Store 5.1.1(v) + Google Play "delete account URL").
@@ -64,12 +64,7 @@ export default async function AccountDeletePage() {
                         <li>{t("signedOutSteps.web")}</li>
                         <li>{t("signedOutSteps.email", { email: SUPPORT_EMAIL })}</li>
                     </ol>
-                    <div className="flex flex-wrap gap-3">
-                        <Link href={`/login?callbackUrl=${encodeURIComponent("/account/delete")}`} className={buttonVariants({ variant: "default" })}>
-                            {t("signInButton")}
-                        </Link>
-                        <a href={mailto} className={buttonVariants({ variant: "outline" })}>{t("emailButton")}</a>
-                    </div>
+                    <SignedOutActions mailto={mailto} />
                 </section>
             )}
         </main>

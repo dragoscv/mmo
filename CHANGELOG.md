@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-05 — Web 3.1.1
+
+- `/account/delete` rendered only the app shell for signed-out visitors: the server page called `buttonVariants()`
+  from a client module ("Attempted to call buttonVariants() from the server" in the Cloud Run log). The sign-in /
+  email buttons are now a client island; a guard test fails if any server file under `src/app` calls it again.
+
 ## 2026-11-05 — Web for phones (Web 3.1.0)
 
 - **Sign in with Apple on the web** (Auth.js Apple provider, Services ID `ro.mixai.web`, key `F2YDTZV29A`): the
