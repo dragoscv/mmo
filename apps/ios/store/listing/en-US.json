@@ -1,0 +1,12 @@
+{
+  "name": "MixAI",
+  "subtitle": "Your library, every screen",
+  "promotionalText": "Your movies, shows and music from your own MixAI server, on your iPhone. Watch Together with friends, download for offline, and pick up where you left off on any screen.",
+  "keywords": "media server,movies,music,player,offline,watch together,library,home server,self-hosted,streaming,tv",
+  "supportUrl": "https://mixai-web-622082681070.europe-west1.run.app/",
+  "marketingUrl": "https://mixai-web-622082681070.europe-west1.run.app/",
+  "privacyPolicyUrl": "https://mixai-web-622082681070.europe-west1.run.app/privacy?lang=en",
+  "copyright": "2026 Dragos Catalin Vladulescu",
+  "description": "MixAI plays YOUR media: the movies, shows and music on your own MixAI server at home. No ads, no subscription, no catalogue we sell you.\n\nYOUR LIBRARY\n• Find your server on the Wi-Fi or type its address, then pair with a 6-digit code.\n• Home with Continue Watching, new episodes and your own collections.\n• Rich title pages with seasons, cast and trailers.\n• Profiles with an age-filtered Kids view.\n\nPLAYER\n• Direct play for the files your iPhone supports, with a fallback engine for the rest.\n• Subtitles, audio tracks, Picture in Picture, AirPlay and resume on any screen.\n• Sleep timer and night mode.\n\nMUSIC\n• Artists, albums and playlists from your server.\n• Background playback, lock screen controls, queue and lyrics.\n\nDOWNLOADS\n• Save movies and episodes for the plane or the metro.\n• Progress you make offline syncs when you are back online.\n\nWATCH TOGETHER\n• Start a room and watch in sync with friends on their own devices.\n• Room chat with report, block and kick.\n\nLIVE TV\n• Watch live channels from your own TV tuner or from playlists you add to your server. MixAI ships no channels.\n\nEVERY SCREEN\n• Control the TV app from your phone, hand playback over between devices, widgets and Live Activities.\n\nACCOUNT (OPTIONAL)\n• Use MixAI without an account, or sign in with Apple or Google to sync across devices.\n• Delete your account from Settings at any time.\n\nMixAI needs a MixAI server (free, self-hosted). Third-party streaming services only open in their own apps.",
+  "whatsNew": "First App Store release."
+}

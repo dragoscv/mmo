@@ -41,6 +41,11 @@ generated from Big Buck Bunny and Sintel. Credits: https://demo.mixai.ro (ATTRIB
 
 Sign-in required: **No** (leave username/password empty).
 
+Submitted text (2026-11-05, iOS 1.1.0) uses the sslip.io host because demo.mixai.ro does not resolve yet; the
+exact notes are reproduced by `apps/ios/store/listing/*.json` + the App Store tracker row WP16-48.
+Store URLs until mixai.ro is live: privacy `https://mixai-web-622082681070.europe-west1.run.app/privacy?lang=en|ro`,
+support/marketing = the same origin's home, account deletion `/account/delete`.
+
 ## Google Play — App access (paste)
 
 - "All or some functionality is restricted": **Yes** → instructions:
