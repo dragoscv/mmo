@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-05 — Web 3.1.2
+
+- Public privacy policy at `/privacy` (RO/EN, `?lang=en|ro` override) for the Google Play and App Store
+  listings: own-server model, optional account (email, name, user id), cloud sync of watch history, push tokens,
+  no crash/analytics data, no ads or tracking, processors, retention, GDPR rights and account deletion.
+
 ## 2026-11-05 — TV Android 2.1.1
 
 - Crash fix: a hub `play` (phone / web "Play on TV") while a video was already playing killed the app with

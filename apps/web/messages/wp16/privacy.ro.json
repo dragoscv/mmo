@@ -1,0 +1,47 @@
+{
+    "metaTitle": "Politica de confidențialitate MixAI",
+    "metaDescription": "Ce colectează aplicațiile și site-ul MixAI, de ce, unde sunt stocate datele și cum le ștergi.",
+    "title": "Politica de confidențialitate",
+    "updated": "Ultima actualizare: 5 noiembrie 2026",
+    "intro": "MixAI este un player pentru propria ta bibliotecă media, servită de propriul tău MMO Server. Politica acoperă site-ul MixAI și aplicațiile MixAI pentru Android, iOS și TV. MixAI nu afișează reclame și nu te urmărește în alte aplicații sau site-uri.",
+    "controller": "Operator: Dragoș Cătălin Vlădulescu, România. Contact:",
+    "langSwitch": "Read in English",
+    "sections": {
+        "server": {
+            "title": "Serverul tău",
+            "body": "Filmele, serialele, muzica și sursele live rămân pe MMO Server-ul pe care îl rulezi tu. Aplicația vorbește direct cu acel server. Progresul vizionării, camerele și mesajele Watch Together, descărcările și istoricul ascultărilor sunt stocate pe serverul tău, nu de noi. Chatul Watch Together trece doar prin serverul tău și nu ajunge la MixAI."
+        },
+        "account": {
+            "title": "Cont MixAI (opțional)",
+            "body": "Poți folosi aplicațiile fără cont. Dacă te autentifici (Google, Apple sau email), stocăm adresa de email, numele afișat și un identificator de utilizator ca să rămâi conectat pe toate dispozitivele, plus tokenuri de sesiune și de dispozitiv pentru televizoarele și telefoanele pe care le asociezi."
+        },
+        "sync": {
+            "title": "Sincronizare în cloud (opțională)",
+            "body": "Când serverul tău este asociat contului MixAI, sincronizează metadatele bibliotecii și istoricul vizionărilor (titluri, progres, note) în contul tău, ca dispozitivele să rămână la zi. Datele sunt folosite doar pentru a-ți furniza serviciul."
+        },
+        "push": {
+            "title": "Notificări",
+            "body": "Dacă permiți notificările, stocăm un token push pentru dispozitiv (Firebase Cloud Messaging pe Android, Apple Push Notification service pe iOS) ca să te anunțăm despre episoade noi și descărcări finalizate. Le poți opri oricând din setările sistemului."
+        },
+        "diagnostics": {
+            "title": "Diagnosticare erori",
+            "body": "În prezent aplicațiile nu colectează date despre erori sau analytics. Dacă raportarea erorilor va fi activată într-o versiune viitoare, vom actualiza mai întâi această politică, iar rapoartele nu vor conține titluri media sau conținut personal."
+        },
+        "noAds": {
+            "title": "Fără reclame, fără urmărire, fără vânzare",
+            "body": "Nu afișăm reclame, nu folosim identificatori de publicitate, nu vindem și nu partajăm datele tale cu terți în scop de marketing și nu construim profiluri. Împuterniciți folosiți pentru serviciu: Google Cloud și Firebase (găzduire și bază de date în UE, push pe Android), Apple (Sign in with Apple, push)."
+        },
+        "security": {
+            "title": "Securitate și păstrare",
+            "body": "Tot traficul către MixAI este criptat în tranzit (HTTPS). Datele contului sunt păstrate cât timp contul există și sunt șterse la ștergerea contului. Jurnalele serverului sunt păstrate cel mult 30 de zile."
+        },
+        "rights": {
+            "title": "Drepturile tale și ștergerea",
+            "body": "Conform GDPR poți accesa, rectifica, exporta sau șterge datele și te poți opune prelucrării. Îți poți șterge oricând contul și toate datele din cloud la {deleteUrl} sau din aplicație (Setări → Cont). Poți depune plângere la ANSPDCP."
+        },
+        "children": {
+            "title": "Copii",
+            "body": "MixAI nu se adresează copiilor sub 13 ani. Profilurile pentru copii sunt o funcție parentală gestionată de titularul adult al contului, pe propriul server."
+        }
+    }
+}

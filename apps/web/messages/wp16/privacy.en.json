@@ -1,0 +1,47 @@
+{
+    "metaTitle": "MixAI privacy policy",
+    "metaDescription": "What the MixAI apps and website collect, why, where it is stored and how to delete it.",
+    "title": "Privacy policy",
+    "updated": "Last updated: 5 November 2026",
+    "intro": "MixAI is a player for your own media library, served by your own MMO Server. This policy covers the MixAI website and the MixAI apps for Android, iOS and TV. MixAI shows no ads and does not track you across apps or websites.",
+    "controller": "Controller: Dragos Catalin Vladulescu, Romania. Contact:",
+    "langSwitch": "Citește în română",
+    "sections": {
+        "server": {
+            "title": "Your own server",
+            "body": "Your films, series, music and live sources stay on the MMO Server you run. The app talks to that server directly. Watch progress, Watch Together rooms and chat messages, downloads and listening history are stored on your server, not by us. Watch Together chat is relayed only through your server and is not sent to MixAI."
+        },
+        "account": {
+            "title": "MixAI account (optional)",
+            "body": "You can use the apps without an account. If you sign in (Google, Apple or email), we store your email address, display name and a user identifier to keep you signed in across devices, plus session and device tokens for the TVs and phones you link."
+        },
+        "sync": {
+            "title": "Cloud sync (optional)",
+            "body": "When your server is linked to your MixAI account, it syncs library metadata and watch history (titles, progress, ratings) to your account so your devices stay in step. This is used only to provide the service to you."
+        },
+        "push": {
+            "title": "Notifications",
+            "body": "If you allow notifications, we store a push token for your device (Firebase Cloud Messaging on Android, Apple Push Notification service on iOS) to tell you about new episodes and finished downloads. You can turn notifications off at any time in the system settings."
+        },
+        "diagnostics": {
+            "title": "Crash diagnostics",
+            "body": "The apps currently collect no crash or analytics data. If crash reporting is enabled in a future version, this policy will be updated first and reports will contain no media titles or personal content."
+        },
+        "noAds": {
+            "title": "No ads, no tracking, no selling",
+            "body": "We do not show ads, do not use advertising identifiers, do not sell or share your data with third parties for marketing, and do not build profiles. Processors we use to run the service: Google Cloud and Firebase (hosting and database in the EU, Android push), Apple (Sign in with Apple, push)."
+        },
+        "security": {
+            "title": "Security and retention",
+            "body": "All traffic to MixAI is encrypted in transit (HTTPS). Account data is kept while your account exists and is deleted when you delete the account. Server logs are kept for at most 30 days."
+        },
+        "rights": {
+            "title": "Your rights and deletion",
+            "body": "Under the GDPR you can access, correct, export or delete your data and object to processing. Delete your account and all associated cloud data at any time at {deleteUrl} or from the app (Settings → Account). You can also complain to the Romanian data protection authority (ANSPDCP)."
+        },
+        "children": {
+            "title": "Children",
+            "body": "MixAI is not directed at children under 13. Kids profiles are a parental feature managed by the adult account holder on their own server."
+        }
+    }
+}
