@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
+
+PackageIdentifier: MixAI.Server
+PackageVersion: 3.10.1
+PackageLocale: en-US
+Publisher: Dragos Catalin Vladulescu
+PublisherUrl: https://mixai.ro
+PublisherSupportUrl: https://github.com/dragoscv/mmo/issues
+PrivacyUrl: https://mixai.ro/privacy?lang=en
+PackageName: MixAI Server
+PackageUrl: https://mixai.ro
+License: AGPL-3.0-or-later
+LicenseUrl: https://github.com/dragoscv/mmo/blob/main/LICENSE
+ShortDescription: Self-hosted media server for the MixAI apps (TV, Music, Studio, DJ).
+Description: MixAI Server (MixAI Companion) serves your own movies, series, music, Live TV sources and recordings to the MixAI apps on TVs, phones, desktop and the web. Your library stays on your computer.
+Moniker: mixai-server
+Tags:
+  - media-server
+  - music
+  - movies
+  - self-hosted
+  - streaming
+ReleaseNotesUrl: https://github.com/dragoscv/mmo/releases/tag/v3.10.1
+ManifestType: defaultLocale
+ManifestVersion: 1.10.0

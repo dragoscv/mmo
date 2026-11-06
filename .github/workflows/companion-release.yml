@@ -298,6 +298,20 @@ jobs:
         shell: bash
         run: node scripts/extract-release-notes.mjs release/RELEASE_NOTES.md
 
+      # electron-builder's own "create release" POST failed on the first runner with 422 "Published releases must
+      # have a valid tag" (3.10.1, Windows), so latest.yml never reached the release. Create the tag + release here
+      # (idempotent; max-parallel 1) and let electron-builder only attach assets.
+      - name: Ensure GitHub release exists
+        if: steps.pub.outputs.flag == '--publish always'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ver=$(node -p "require('./package.json').version")
+          if ! gh release view "v$ver" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "v$ver" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$ver" --notes-file release/RELEASE_NOTES.md
+          fi
+
       # ── Windows ────────────────────────────────────────────────────────
       - name: Build Windows installer
         if: matrix.os == 'windows-latest'
