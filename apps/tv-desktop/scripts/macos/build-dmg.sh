@@ -28,6 +28,10 @@ security create-keychain -p "$KCPW" "$KC"
 security set-keychain-settings -lut 7200 "$KC"
 security unlock-keychain -p "$KCPW" "$KC"
 security import "$DEVID_P12" -k "$KC" -f pkcs12 -P "$P12_PASSWORD" -T /usr/bin/codesign >/dev/null
+# Developer ID G2 leaf certs chain to this intermediate; without it find-identity -v reports 0 valid identities.
+CA="$(mktemp -d)/DeveloperIDG2CA.cer"
+curl -fsSL -o "$CA" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+security import "$CA" -k "$KC" >/dev/null 2>&1 || true
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPW" "$KC" >/dev/null
 # shellcheck disable=SC2086
 security list-keychains -d user -s "$KC" $OLD_KCS
