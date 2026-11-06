@@ -5,7 +5,7 @@
  * token kept in localStorage (`mixai-web:profile`). Kids profiles are filtered server-side by age.
  * Keyboard: arrows move between tiles, Enter picks; the PIN pad accepts typed digits + Backspace.
  */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Lock } from "lucide-react";

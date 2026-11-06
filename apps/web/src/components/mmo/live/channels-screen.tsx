@@ -6,8 +6,7 @@
  * focused/hovered channel sits beside the list (debounced 450 ms, one <video>). Enter/click opens the player.
  * Keyboard: ↑/↓ move between rows, Enter plays, F toggles favourite, `/` focuses the search.
  */
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Link, { useRouter } from "@/components/host/host-context";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslations } from "next-intl";
 import { Heart, Play, Radio, Search, Settings2, Star } from "lucide-react";

@@ -5,8 +5,8 @@
  * albums, similar), playlist, genre (paged albums) and search. Every screen has loading / not-found / error /
  * loaded states; playing opens nothing — the mini-player and Now Playing follow the engine.
  */
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link, { useRouter } from "@/components/host/host-context";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { ListPlus, Play, Search, Shuffle } from "lucide-react";

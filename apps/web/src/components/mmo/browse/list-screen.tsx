@@ -1,7 +1,7 @@
 "use client";
 
 /** My list (`/media/list`): the active profile's watchlist (`/media/watchlist`) as a poster grid, remove per card. */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Heart, X } from "lucide-react";

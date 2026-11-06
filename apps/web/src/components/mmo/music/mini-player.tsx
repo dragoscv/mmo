@@ -6,8 +6,7 @@
  * on the Now Playing page itself, and while a video/live player owns the player bus. Mounted by the media shell.
  */
 import "./music.css";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link, { usePathname } from "@/components/host/host-context";
 import { useTranslations } from "next-intl";
 import { useNowPlaying } from "@/lib/mmo/player-bus";
 import { fmtClock } from "@/lib/mmo/music-core";

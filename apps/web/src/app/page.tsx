@@ -16,6 +16,10 @@ import { ServerNotices } from "@/components/media/server-notices";
 import { WatchRows } from "@/components/media/watch-rows";
 import { noCompanionFor } from "@/components/empty-state-server";
 import { buildServerChips, pickHeroCandidates } from "@/lib/media/home";
+import { SuiteLanding, SuiteTopBar, SuiteFooter } from "@/components/suite/suite-landing";
+import { SuiteLauncher } from "@/components/suite/suite-launcher";
+import { currentHostKind } from "@/lib/host/server";
+import "@/components/suite/suite.css";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +31,17 @@ export const dynamic = "force-dynamic";
  */
 export default async function MediaHome({ searchParams }: { searchParams?: Promise<{ classic?: string }> }) {
     const session = await auth();
+    // WP17-12: mixai.ro is the suite homepage (landing for visitors, launcher when signed in).
+    if ((await currentHostKind()) === "suite") {
+        if (!session?.user?.id) return <SuiteLanding />;
+        return (
+            <div className="sx">
+                <SuiteTopBar />
+                <main><SuiteLauncher name={session.user.name?.split(" ")[0] ?? null} /></main>
+                <SuiteFooter />
+            </div>
+        );
+    }
     if (!session?.user?.id) return <LandingPage />;
     // WP16 (D31, owner 2026-11-06): one home on every surface — the cinematic, cache-first `/media`.
     // `?classic=1` keeps the multi-server fan-out page reachable while `/media` covers one server.

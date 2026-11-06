@@ -14,6 +14,7 @@ import { Emitter } from "./emitter";
 import { ServerHttp, enc } from "./http";
 import type { HubAck, HubDevice, HubMedia, HubRoom, HubRoomPhase } from "./media-types";
 import { playerBus, type NowPlaying } from "./player-bus";
+import { deviceLabel, pairPlatform, platformKind } from "../platform";
 import { ClockEstimator, expectedPosition, sampleFrom, type PlaybackAnchor } from "./sync-math";
 
 export const DEVICE_ID_KEY = "mixai-tv:device-id";
@@ -79,18 +80,9 @@ export function displayDeviceName(): string {
     return hubDeviceName();
 }
 
-/** "Samsung <model>" via tizen.systeminfo / webapis.productinfo, else "Samsung TV". */
+/** Device label for the hub ("Samsung QN90", "Windows PC", "Mac") — see platform/. */
 export function hubDeviceName(): string {
-    try {
-        const t = (globalThis as { tizen?: { systeminfo?: { getCapability(k: string): unknown } } }).tizen;
-        const m = t?.systeminfo?.getCapability("http://tizen.org/system/model_name");
-        if (typeof m === "string" && m) return `Samsung ${m}`;
-    } catch { /* not on Tizen */ }
-    try {
-        const m = typeof webapis !== "undefined" ? webapis?.productinfo?.getModel() : undefined;
-        if (m) return `Samsung ${m}`;
-    } catch { /* ignore */ }
-    return "Samsung TV";
+    return deviceLabel();
 }
 
 type Json = Record<string, unknown>;
@@ -225,10 +217,10 @@ export class HubClient {
             type: "hello",
             deviceId: deviceId(),
             name: displayDeviceName(),
-            platform: "tizen",
+            platform: pairPlatform(),
             caps: HUB_CAPS,
             ...(pid ? { profileId: pid } : {}),
-            app: `mixai-tizen/${this.appVersion}`,
+            app: `mixai-${platformKind() === "desktop" ? "desktop" : "tizen"}/${this.appVersion}`,
         });
         if (this.pendingRejoin) { this.joinRoom(this.pendingRejoin); this.pendingRejoin = null; }
         const np = playerBus.nowPlaying();

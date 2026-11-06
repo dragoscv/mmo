@@ -4,7 +4,7 @@
  * Shared building blocks for the browse pages: skeleton grid, error/unsupported states, a keyboard-navigable
  * poster grid (arrows move by the real rendered column count, Home/End jump) and a library card.
  */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { memo, useCallback, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { AlertTriangle, RefreshCw, ServerOff } from "lucide-react";

@@ -6,7 +6,7 @@
  * reduced motion; paused 4 s after the user scrolls), click a line to seek. Queue: play, move up/down, remove.
  * Space toggles play when focus is not in a form field.
  */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ArrowDown, ArrowUp, ListMusic, Mic2, Music2, Volume1, Volume2, VolumeX, X } from "lucide-react";

@@ -7,7 +7,7 @@
  * `GET /video/lookup?path=` and streams `/video/stream/:fileId` (HLS remux, never re-encoded).
  * Refreshes every 30 s while something is recording or about to start.
  */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertTriangle, CalendarClock, CircleDot, Disc3, ListVideo, Play, Trash2, X } from "lucide-react";

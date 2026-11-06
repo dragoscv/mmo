@@ -4,6 +4,7 @@
  *   GET  /pair/poll?code&secret               → {status: pending|approved|expired, deviceToken?, userId?}
  */
 import { t } from "../i18n/messages";
+import { deviceLabel, pairPlatform, platformKind } from "../platform";
 
 export interface PairRequest {
     code: string;
@@ -22,19 +23,14 @@ export const DEVICE_NAME = "Samsung TV · MixAI TV";
 export const POLL_INTERVAL_MS = 3000;
 
 export function deviceName(): string {
-    try {
-        const model = typeof webapis !== "undefined" ? webapis?.productinfo?.getModel() : undefined;
-        return model ? `Samsung ${model} · MixAI TV` : DEVICE_NAME;
-    } catch {
-        return DEVICE_NAME;
-    }
+    return platformKind() === "browser" ? DEVICE_NAME : `${deviceLabel()} · MixAI TV`;
 }
 
 export async function requestPair(baseUrl: string): Promise<PairRequest> {
     const res = await fetch(baseUrl + "/pair/request", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ deviceName: deviceName(), platform: "tizen" }),
+        body: JSON.stringify({ deviceName: deviceName(), platform: pairPlatform() }),
     });
     if (!res.ok) {
         const msg = res.status === 503 ? t("pair.errNoToken") : `${res.status} ${res.statusText}`;

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { AlertCircle, Download, HardDrive, Pause, Play, RotateCcw, Trash2, WifiOff } from "lucide-react";

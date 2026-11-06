@@ -46,6 +46,7 @@ import { langName } from "./player/prefs";
 import { usePlayerPrefs } from "./player/usePlayerPrefs";
 import { useRoomSync } from "./player/useRoomSync";
 import { activeCues, parseVtt, type Cue } from "./player/vtt";
+import { platformKind } from "../platform";
 import "./player/player.css";
 
 export type { PlayItem };
@@ -263,7 +264,7 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit,
                 await el.play().catch(() => undefined);
                 return;
             }
-            const { default: HlsCtor } = await import("hls.js");
+            const { default: HlsCtor, FetchLoader } = await import("hls.js");
             if (cancelled) return;
             if (!HlsCtor.isSupported()) { setError(t("player.errMse")); return; }
             const hls = new HlsCtor({
@@ -273,6 +274,8 @@ export function PlayerScreen({ client, media = null, item, queue, index, onExit,
                 backBufferLength: 30,
                 enableWorker: false, // Tizen workers + blob URLs are flaky on older firmware
                 startPosition: 0,
+                // Desktop (Tauri): fetch is routed through the native HTTP client (LAN http, no CORS) — XHR is not.
+                ...(platformKind() === "desktop" ? { loader: FetchLoader } : {}),
             });
             hlsRef.current = hls;
             hls.on(HlsCtor.Events.ERROR, (_e, data) => {

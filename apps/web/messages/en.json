@@ -719,7 +719,7 @@
         }
     },
     "nav": {
-        "home": "Home",
+        "home": "MixAI apps",
         "dashboard": "Dashboard",
         "library": "Library",
         "analysis": "Analysis",
@@ -792,7 +792,9 @@
         "generate": "AI Generate",
         "training": "Training",
         "maestro": "Maestro",
-        "settings-copilot": "AI Copilot"
+        "settings-copilot": "AI Copilot",
+        "mixaiTv": "MixAI TV",
+        "suiteHome": "Back to MixAI apps"
     },
     "common": {
         "loading": "Loading…",

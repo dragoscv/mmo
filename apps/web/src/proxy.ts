@@ -1,7 +1,25 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { hostRoutingEnabled, routeRequest } from "@/lib/host/products";
+
+/** Staging/preview can mount the product hosts under another root (`MIXAI_ROOT_DOMAIN=staging.mixai.ro`). */
+const ROOT = process.env.MIXAI_ROOT_DOMAIN?.trim() || undefined;
 
 export function proxy(request: NextRequest) {
+    const { pathname, search } = request.nextUrl;
+    if (!pathname.startsWith("/api/")) {
+        if (!hostRoutingEnabled()) return NextResponse.next();
+        // WP17-10 host routing (tv./music./app./dj./apex). Legacy hosts (run.app, localhost) → unchanged.
+        const host = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() || request.headers.get("host");
+        const d = routeRequest(host, pathname, search, ROOT);
+        if (d.type === "redirect") return NextResponse.redirect(d.url, d.status);
+        if (d.type === "rewrite") {
+            const url = request.nextUrl.clone();
+            url.pathname = d.path;
+            return NextResponse.rewrite(url);
+        }
+        return NextResponse.next();
+    }
     const headers = new Headers(request.headers);
     const host = headers.get("host") || "";
     const xfh = headers.get("x-forwarded-host");
@@ -34,5 +52,10 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ["/api/auth/:path*", "/api/companion-auth"],
+    // Auth API (tunnel header fix) + every page path; static assets and Next internals never reach the proxy.
+    matcher: [
+        "/api/auth/:path*",
+        "/api/companion-auth",
+        "/((?!api/|_next/|__offline/|fonts/|offline/|.*\\.[a-z0-9]+$).*)",
+    ],
 };

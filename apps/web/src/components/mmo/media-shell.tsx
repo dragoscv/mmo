@@ -5,16 +5,16 @@
  * Music, Live TV, My list), hub status + profile menu, and the profile gate in front of every page.
  * Keyboard: the nav is a roving-tabindex toolbar (←/→, Home/End); `/` focuses Search.
  */
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import Link, { usePathname, useRouter } from "@/components/host/host-context";
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { BarChart3, Clapperboard, Download, Film, Heart, Home, Library, Music2, Radio, Search, Tv } from "lucide-react";
+import { BarChart3, Clapperboard, Download, Film, Grid3x3, Heart, Home, Library, Music2, Radio, Search, Tv } from "lucide-react";
 import { Button, EmptyState } from "@mmo/ui";
 import { useMmo } from "./mmo-provider";
 import { ProfileGate } from "./profile-gate";
 import { ProfileMenu } from "./profile-menu";
 import { MusicMiniPlayer } from "./music/mini-player";
+import { useHost } from "@/components/host/host-context";
 
 export const MEDIA_NAV = [
     { key: "home", href: "/media", icon: Home, exact: true },
@@ -40,6 +40,9 @@ export function MediaShell({ children }: { children: ReactNode }) {
     const pathname = usePathname() ?? "/media";
     const router = useRouter();
     const navRef = useRef<HTMLElement>(null);
+    const { kind, root } = useHost();
+    // On product hosts the TV shell is the whole app: give it a way back to the suite launcher.
+    const standalone = kind !== "legacy" && kind !== "studio";
     // The guest join page and the full-screen player have their own chrome.
     const bare = pathname.startsWith("/media/together") || pathname.startsWith("/media/play/") || pathname.startsWith("/media/live/play");
 
@@ -103,6 +106,11 @@ export function MediaShell({ children }: { children: ReactNode }) {
                     })}
                 </nav>
                 <ProfileMenu />
+                {standalone ? (
+                    <a href={`https://${root}/`} className="mx-apps" aria-label={t("apps")} title={t("apps")}>
+                        <Grid3x3 aria-hidden className="size-5" />
+                    </a>
+                ) : null}
             </header>
             <ProfileGate>
                 <main className="mx-main">{children}</main>

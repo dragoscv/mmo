@@ -189,6 +189,19 @@ export async function getMediaHome(): Promise<MediaHomeResult | null> {
     return { servers: ctx.servers, rows, errors: [...home.errors, ...offlineErrors], region: ctx.region, curatorNotes, now: Date.now() };
 }
 
+/**
+ * Suite launcher strip (WP17-12): the "continue" row only. `state` tells the UI which empty/error copy to show;
+ * `servers: 0` = no paired MixAI Server yet.
+ */
+export async function getLauncherContinue(): Promise<{ state: "ok" | "empty" | "error" | "noServer"; items: TitleCard[] }> {
+    const home = await getMediaHome().catch(() => null);
+    if (!home) return { state: "error", items: [] };
+    if (home.servers.length === 0) return { state: "noServer", items: [] };
+    const items = (home.rows.find((r) => r.id === "continue")?.items ?? []).slice(0, 12);
+    if (items.length > 0) return { state: "ok", items };
+    return { state: home.errors.length > 0 && home.rows.length === 0 ? "error" : "empty", items: [] };
+}
+
 export async function getMediaTitle(kind: MediaKind, tmdbId: number): Promise<(MergedTitleDetails & { servers: MediaServer[]; preferredProviders: number[] }) | null> {
     const ctx = await context();
     if (!ctx) return null;

@@ -7,7 +7,8 @@
  * Keyboard: Enter / ↓ in the box focuses the first result, arrows move in the grids, Esc clears.
  * Recent searches per profile in localStorage.
  */
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "@/components/host/host-context";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslations } from "next-intl";
 import { Search, SearchX, X } from "lucide-react";

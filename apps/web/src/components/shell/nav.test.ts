@@ -84,7 +84,7 @@ describe("shellTabs", () => {
         expect(home.href).toBe("/");
         expect(home.exact).toBe(true);
         expect(currentNavLabel("/dashboard")).toEqual({ key: "dashboard", label: "Dashboard" });
-        expect(currentNavLabel("/")).toEqual({ key: "home", label: "Home" });
+        expect(currentNavLabel("/")).toEqual({ key: "home", label: "MixAI apps" }); // WP17-11: "/" = suite launcher
     });
 
     it("isTabActive matches the parent namespace and never the 'more' tab", () => {

@@ -6,7 +6,7 @@
  * `useTransition`; the server actions revalidate the relevant paths.
  */
 import { Check, Eye, EyeOff, ListMinus, ListPlus } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/components/host/host-context";
 import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@mmo/ui";

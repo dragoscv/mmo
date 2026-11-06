@@ -1,3 +1,4 @@
+import { exitApp as platformExit } from "../platform";
 /**
  * Tizen remote → logical key mapping. Arrow/Enter are standard; Back is 10009,
  * media keys need `tizen.tvinputdevice.registerKey` or the platform swallows them.
@@ -49,13 +50,7 @@ export function registerTvKeys(): void {
 }
 
 export function exitApp(): void {
-    try {
-        if (typeof tizen !== "undefined" && tizen?.application) {
-            tizen.application.getCurrentApplication().exit();
-            return;
-        }
-    } catch { /* fallthrough */ }
-    window.close();
+    platformExit();
 }
 
 export function isTizen(): boolean {

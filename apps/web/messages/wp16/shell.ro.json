@@ -1,6 +1,6 @@
 {
     "nav": {
-        "label": "Media",
+        "label": "MixAI TV",
         "home": "Acasă",
         "search": "Caută",
         "movies": "Filme",
@@ -45,5 +45,6 @@
         "myList": "Lista mea",
         "inList": "În lista mea",
         "surprise": "Surprinde-mă"
-    }
+    },
+    "apps": "Toate aplicațiile MixAI"
 }

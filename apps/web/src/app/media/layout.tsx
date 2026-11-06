@@ -6,6 +6,8 @@ import { auth } from "@/auth";
 import { getMmoConnections } from "@/actions/mmo";
 import { MmoProvider } from "@/components/mmo/mmo-provider";
 import { MediaShell } from "@/components/mmo/media-shell";
+import { centralLoginUrl } from "@/lib/host/login";
+import { currentHostKind, rootDomain } from "@/lib/host/server";
 
 /**
  * `/media/*` — WP16 cinematic media surface (D31): one connection to the user's MMO Server
@@ -13,7 +15,7 @@ import { MediaShell } from "@/components/mmo/media-shell";
  */
 export default async function MediaLayout({ children }: { children: ReactNode }) {
     const session = await auth();
-    if (!session?.user?.id) redirect("/login?from=/media");
+    if (!session?.user?.id) redirect(centralLoginUrl(await currentHostKind(), "/media", rootDomain()) ?? "/login?from=/media");
     const { servers } = await getMmoConnections();
     return (
         <MmoProvider servers={servers}>

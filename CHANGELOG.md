@@ -10,6 +10,31 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — Web 3.2.0 (MixAI product family on its own hosts, WP17-10/11/12)
+
+- **Host routing (ADR-0013).** One Cloud Run service answers `mixai.ro` (suite), `tv.mixai.ro` (MixAI TV with clean
+  URLs: `/browse/movie`, `/live/guide`), `music.mixai.ro` (MixAI Music), `app.mixai.ro` (MixAI Studio) and
+  `dj.mixai.ro`. Old paths answer 308 to their product (`mixai.ro/media/movie/1` → `tv.mixai.ro/movie/1`,
+  `mixai.ro/library` → `app.mixai.ro/library`). The `run.app` origin and localhost are unchanged.
+- **One sign-in across `*.mixai.ro`.** The session cookie on product hosts is `__Secure-mixai.session-token` on
+  `.mixai.ro`; sign-in happens on `mixai.ro/login` and returns to the product. Signed-in users on `mixai.ro` sign in
+  once more after this release.
+- **Suite homepage.** `mixai.ro` shows the MixAI family (server core with orbiting products, product cards,
+  download matrix that highlights your device, privacy band). Signed in, it becomes a launcher: last-used apps first,
+  a morph transition into the chosen app, "always open X", and Continue watching.
+- **MixAI Studio.** The organizer brands itself Studio, its logo returns to the suite, and its nav links MixAI TV.
+  `app.mixai.ro/` opens the dashboard. TV / Music / suite hosts render without the organizer sidebar.
+- Per-host web manifest, title, Open Graph, canonical URL, `robots.txt` and `sitemap.xml`; `/dj` landing.
+- Host routing is off until the deploy passes `-HostRouting` (`MIXAI_HOST_ROUTING=1`), i.e. once every product
+  host has DNS and a certificate; until then every host keeps the 3.1.x behaviour.
+
+## 2026-11-06 — TV Tizen 2.3.0 (one TV-web codebase: platform adapter, mouse support)
+
+- `src/platform/` hides Samsung APIs (device name, LAN IP, exit, pairing platform) behind one interface so the same
+  UI runs as MixAI TV desktop (Tauri) and, next, on LG webOS. The hub and pairing report the real platform.
+- Pointer support on desktop/browser: hovering focuses a card, the mouse wheel moves focus (Shift = sideways).
+- Desktop playback loads HLS through the native HTTP client (no CORS limits for LAN servers).
+
 ## 2026-11-06 — TV Android 2.1.2 (Home D-pad p50 57–61 → 36–40 ms on Chromecast)
 
 - **Backdrop scrims are baked strips.** The two multi-stop gradient shaders (left 70 %, bottom 55 % of the screen)

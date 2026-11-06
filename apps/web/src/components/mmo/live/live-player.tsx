@@ -9,7 +9,7 @@
  * Zap time key → `playing` is pushed to `window.__mixaiZap` and logged as `[perf] zap`.
  * Catch-up: `?start=<ms>&dur=<min>` plays `catchupUrl` (no zapping preload while in catch-up).
  */
-import { useRouter } from "next/navigation";
+import { useHref, useRouter } from "@/components/host/host-context";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
@@ -46,6 +46,7 @@ export function LivePlayer({ channelId, catchup: initialCatchup }: { channelId: 
     const { clients } = useMmo();
     const livetv = clients?.livetv ?? null;
     const router = useRouter();
+    const mapHref = useHref();
     const fmt = useLiveFormat();
     const now = useNow(15_000);
     const rootRef = useRef<HTMLDivElement>(null);
@@ -244,7 +245,7 @@ export function LivePlayer({ channelId, catchup: initialCatchup }: { channelId: 
         catchupRef.current = null;
         setError(null);
         showOsd(strip);
-        window.history.replaceState(window.history.state, "", `/media/live/play/${encodeURIComponent(target.id)}`);
+        window.history.replaceState(window.history.state, "", mapHref(`/media/live/play/${encodeURIComponent(target.id)}`));
         const f = frontRef.current;
         const b = 1 - f;
         const bs = slots.current[b]!;
@@ -264,7 +265,7 @@ export function LivePlayer({ channelId, catchup: initialCatchup }: { channelId: 
             if (oldFront) oldFront.muted = true;
             void load(b, target.id, livetv.streamUrl(target.id), false);
         }
-    }, [livetv, load, showOsd, strip]);
+    }, [livetv, load, showOsd, strip, mapHref]);
 
     const zap = useCallback((d: 1 | -1) => {
         dirRef.current = d;
@@ -308,10 +309,10 @@ export function LivePlayer({ channelId, catchup: initialCatchup }: { channelId: 
         if (!livetv) return;
         setCatchup(null);
         catchupRef.current = null;
-        window.history.replaceState(window.history.state, "", `/media/live/play/${encodeURIComponent(curRef.current)}`);
+        window.history.replaceState(window.history.state, "", mapHref(`/media/live/play/${encodeURIComponent(curRef.current)}`));
         setLoading(true);
         void load(frontRef.current, curRef.current, livetv.streamUrl(curRef.current), false);
-    }, [load, livetv]);
+    }, [load, livetv, mapHref]);
 
     const recordNow = useCallback(async () => {
         if (!livetv) return;

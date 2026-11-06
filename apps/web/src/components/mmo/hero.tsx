@@ -4,7 +4,7 @@
  * Cinematic hero (D25/D32): backdrop, logo (or title), meta chips, overview, one primary action.
  * After 3 s of rest (and no reduced motion / save-data) a muted YouTube trailer fades in behind.
  */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Info, Play } from "lucide-react";

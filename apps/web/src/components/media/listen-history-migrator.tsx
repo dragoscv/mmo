@@ -5,7 +5,7 @@
  * history to `track_plays` (one-shot, flag-guarded). Renders nothing.
  */
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/components/host/host-context";
 import { recordTrackPlay } from "@/actions/track-plays";
 import { migrateListenHistory } from "@/lib/listen-history-migration";
 

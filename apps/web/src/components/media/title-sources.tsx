@@ -3,7 +3,7 @@
  * MMO Server. Links to `/watch/play/<companionFileId>?server=<deviceId>&cid=…`
  * so the play page builds stream URLs for that device directly.
  */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { Play } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { Button } from "@mmo/ui";

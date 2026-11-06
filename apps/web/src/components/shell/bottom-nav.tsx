@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link from "@/components/host/host-context";
+import { usePathname } from "@/components/host/host-context";
 import { useTranslations } from "next-intl";
 import { BottomTabBar, type BottomTabItem } from "@mmo/ui";
 import { useSidebar } from "@/components/sidebar-context";

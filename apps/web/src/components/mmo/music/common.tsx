@@ -5,7 +5,7 @@
  * plays), hero header, page states (loading / empty library / error), equaliser glyph. Covers come from
  * `MusicClient.coverUrl` as plain lazy <img>.
  */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { memo, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { AlertTriangle, Disc3, ListMusic, Mic2, Music2, User } from "lucide-react";

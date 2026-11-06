@@ -3,7 +3,7 @@
  * component — links to the playlist page (`/playlists?id=`), which owns
  * playback for the whole list.
  */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { ListMusic } from "lucide-react";
 import { Badge } from "@mmo/ui";
 import type { PlaylistWithSource } from "@/lib/media/listen-types";

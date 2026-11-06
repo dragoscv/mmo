@@ -5,8 +5,7 @@
  * position (explicit `t` > progress > 0), episode + next-up, then mounts the cinematic player. Watch Together
  * (`room`), "Play on TV" (remote mode) and hub remote commands are wired here.
  */
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Link, { useRouter } from "@/components/host/host-context";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, Film, Loader2 } from "lucide-react";

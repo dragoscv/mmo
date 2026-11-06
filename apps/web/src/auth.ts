@@ -1,4 +1,5 @@
 import NextAuth from "next-auth";
+import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
 import Apple from "next-auth/providers/apple";
@@ -9,6 +10,8 @@ import { userOauthTokens } from "@/db/schema-projects-normalized";
 import { encryptToken } from "@/lib/token-crypto";
 import { makeAppleClientSecret } from "@/lib/apple/client-secret";
 import { appleKeyConfig } from "@/lib/apple/server";
+import { authCookiesFor, isAllowedRedirect } from "@/lib/host/auth-cookies";
+import { hostRoutingEnabled } from "@/lib/host/products";
 import { eq, and } from "drizzle-orm";
 
 // Optional: comma-separated list of email addresses allowed to sign in.
@@ -69,13 +72,36 @@ if (appleWebEnabled) {
     }));
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+/**
+ * Host of the current request. Route handlers and `proxy.ts` pass the request; RSC / server actions call
+ * `auth()` without one, so read the forwarded host from `headers()` (Cloud Run passes the custom domain).
+ */
+async function requestHost(req: { headers: Headers } | undefined): Promise<string | null> {
+    let h: Headers | undefined = req?.headers;
+    if (!h) {
+        try {
+            const { headers } = await import("next/headers");
+            h = await headers();
+        } catch {
+            return null; // outside a request scope (scripts, tests)
+        }
+    }
+    return h.get("x-forwarded-host")?.split(",")[0]?.trim() || h.get("host");
+}
+
+function configFor(host: string | null): NextAuthConfig {
+    const sameOrigin = (url: string, base: string): boolean => {
+        try { return new URL(url).origin === new URL(base).origin; } catch { return false; }
+    };
+    return {
     adapter: DrizzleAdapter(db),
     trustHost: true,
     providers,
     pages: {
         signIn: "/login",
     },
+    // WP17-10: one sign-in across *.mixai.ro (session cookie on `.mixai.ro`); other hosts keep the defaults.
+    cookies: hostRoutingEnabled() ? authCookiesFor(host, true) : undefined,
     callbacks: {
         async signIn({ user, account, profile }) {
             // Sign-in is restricted to Google and Apple. GitHub is allowed only as a
@@ -100,18 +126,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
             return true;
         },
-        // Redirect callback: keep users on this origin. Auth.js's default
-        // already strips cross-origin URLs, but we tighten by also
-        // rejecting protocol-relative (`//evil.com/...`) and any URL whose
-        // origin doesn't match `baseUrl` after parsing.
+        // Redirect callback: same origin only, plus https://*.mixai.ro when signing in on a product host
+        // (tv.mixai.ro → login → back to tv.mixai.ro). Protocol-relative (`//evil.com/...`) is refused.
         redirect({ url, baseUrl }) {
-            try {
-                if (url.startsWith("/") && !url.startsWith("//")) {
-                    return `${baseUrl}${url}`;
-                }
-                const parsed = new URL(url);
-                if (parsed.origin === baseUrl) return url;
-            } catch { /* fall through */ }
+            if (url.startsWith("/") && !url.startsWith("//")) return `${baseUrl}${url}`;
+            if (hostRoutingEnabled() ? isAllowedRedirect(url, baseUrl) : sameOrigin(url, baseUrl)) return url;
             return baseUrl;
         },
         session({ session, user }) {
@@ -161,4 +180,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
         },
     },
-});
+    };
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => configFor(await requestHost(req)));

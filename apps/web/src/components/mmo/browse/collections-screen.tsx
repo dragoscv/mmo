@@ -5,7 +5,7 @@
  * (`collection:<id>`, TMDB collection parts) from what the profile watched. This page lists those rows from the
  * cached/revalidated `/media/home` — one grid per franchise.
  */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { useMemo, useSyncExternalStore } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Library } from "lucide-react";

@@ -35,7 +35,8 @@ export interface NavParent {
 export type NavNode = NavLeaf | NavParent;
 
 export const navTree: NavNode[] = [
-    { kind: "leaf", key: "home", href: "/", label: "Home", icon: Home, exact: true },
+    // WP17-11: on app.mixai.ro "/" is the suite launcher on mixai.ro (hrefFor maps it cross-host).
+    { kind: "leaf", key: "home", href: "/", label: "MixAI apps", icon: Home, exact: true },
     {
         kind: "leaf", key: "dashboard", href: "/dashboard", label: "Dashboard",
         icon: LayoutDashboard, exact: true,
@@ -44,6 +45,7 @@ export const navTree: NavNode[] = [
         kind: "parent", key: "watch", label: "Watch", icon: Clapperboard,
         accent: "from-deck-b to-deck-d",
         children: [
+            { kind: "leaf", key: "mixaiTv", href: "/media", label: "MixAI TV", icon: Tv, exact: true },
             { kind: "leaf", key: "watch-browse", href: "/watch", label: "Home", icon: Home, exact: true },
             { kind: "leaf", key: "watch-movies", href: "/watch/movies", label: "Movies", icon: Film },
             { kind: "leaf", key: "watch-shows", href: "/watch/shows", label: "TV Shows", icon: Tv },

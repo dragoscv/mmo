@@ -1,5 +1,5 @@
 import { Sparkles } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { getLocale, getTranslations } from "next-intl/server";
 import type { CuratorNoteItem } from "@/lib/media/curator";
 import { titleHref } from "./media-card";

@@ -28,7 +28,10 @@ param(
   [string]$AppUrl = 'https://mixai.ro',
   [string]$EnvFile,
   [switch]$NoSecretSync,
-  [switch]$SkipBuild
+  [switch]$SkipBuild,
+  # WP17-10: turn on tv./music./app./dj. host routing + the .mixai.ro session cookie. Only after the domain
+  # mappings for every product host have a certificate (otherwise 308s point at hosts without TLS).
+  [switch]$HostRouting
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = (git rev-parse --show-toplevel).Trim()
@@ -195,6 +198,7 @@ try {
     AUTH_TRUST_HOST  = 'true'
     MMO_APP_URL      = $AppUrl
     COMMIT_SHA       = $sha
+    MIXAI_HOST_ROUTING = $(if ($HostRouting) { '1' } else { '0' })
   }
   foreach ($k in $PlainEnv) { if ($envMap[$k]) { $plain[$k] = $envMap[$k] } }
   $yaml = foreach ($k in $plain.Keys) { "${k}: '" + ($plain[$k] -replace "'", "''") + "'" }

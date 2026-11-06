@@ -99,11 +99,13 @@ describe("validateDeviceApiUrl", () => {
         expect(validateDeviceApiUrl("http://192.168.1.50:7777/")).toBe("http://192.168.1.50:7777/");
     });
 
-    it("rejects private hosts in production unless explicitly opted in", async () => {
+    // The guard accepts loopback/LAN unconditionally (companions live there) and rejects only SSRF ranges.
+    it("accepts loopback in production but still rejects cloud metadata", async () => {
         vi.stubEnv("NODE_ENV", "production");
         vi.stubEnv("MMO_ALLOW_PRIVATE_DEVICE_URLS", "");
         const { validateDeviceApiUrl } = await loadGuard();
-        expect(validateDeviceApiUrl("http://127.0.0.1:7777/")).toBeNull();
+        expect(validateDeviceApiUrl("http://127.0.0.1:7777/")).toBe("http://127.0.0.1:7777/");
+        expect(validateDeviceApiUrl("http://169.254.169.254/")).toBeNull();
     });
 
     it("opt-in flag re-enables private hosts in production", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 /** Poster/landscape card for a server `TitleCard`; hover/focus drives the shared backdrop. */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { memo, type MouseEvent } from "react";
 import type { TitleCard } from "@/lib/mmo/media-types";
 import { tmdbImg } from "@/lib/media/normalize";

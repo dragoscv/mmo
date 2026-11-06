@@ -1,0 +1,85 @@
+{
+    "meta": {
+        "title": "MixAI — TV, muzică, Studio și DJ pe orice ecran",
+        "description": "Un singur server la tine acasă, aplicații pentru fiecare ecran: privești în MixAI TV, asculți în MixAI Music, organizezi în MixAI Studio, mixezi în MixAI DJ."
+    },
+    "hero": {
+        "eyebrow": "Suita MixAI",
+        "title": "Media ta. Pe orice ecran. De pe serverul tău.",
+        "subtitle": "MixAI Server îți ține acasă filmele, serialele, Live TV și muzica. Aplicațiile le aduc pe televizor, telefon, calculator și în mașină — frumos și sincronizat.",
+        "ctaStart": "Începe gratuit",
+        "ctaOpen": "Deschide aplicațiile",
+        "ctaDownload": "Descarcă",
+        "ctaDemo": "Încearcă demo-ul",
+        "orbit": "Produsele MixAI în jurul serverului tău"
+    },
+    "products": {
+        "tv": { "name": "MixAI TV", "tagline": "Privește", "body": "Filme, seriale, Live TV cu reluare și Watch Together. Cinematic pe Android TV, Samsung, LG, Apple TV, Fire TV, telefoane și desktop." },
+        "music": { "name": "MixAI Music", "tagline": "Ascultă", "body": "Albume, artiști, playlisturi, radio și versuri sincronizate. Descărcări offline, automix pe ritm, CarPlay și Android Auto." },
+        "studio": { "name": "MixAI Studio", "tagline": "Organizează", "body": "Etichetare cu AI, analiză BPM și tonalitate, playlisturi inteligente, descărcări și administrarea serverului cu un panou live." },
+        "dj": { "name": "MixAI DJ", "tagline": "Mixează", "body": "Aplicație profesională de DJ pentru desktop, cu motor audio în Rust, stem-uri AI, sincronizare pe ritm și suport pentru controllere." },
+        "server": { "name": "MixAI Server", "tagline": "Creierul", "body": "Găzduit de tine pe Windows, macOS, Linux, Docker sau Raspberry Pi. Biblioteca ta nu pleacă niciodată de acasă." }
+    },
+    "sections": {
+        "productsTitle": "O familie de aplicații",
+        "productsBody": "Fiecare aplicație face un singur lucru, bine. Au aceeași autentificare, același server și același design.",
+        "downloadTitle": "MixAI pe fiecare dispozitiv",
+        "downloadBody": "Am evidențiat descărcarea potrivită pentru acest dispozitiv.",
+        "yourDevice": "Dispozitivul tău",
+        "live": "Disponibil",
+        "soon": "În curând",
+        "privacyTitle": "Privat din construcție",
+        "privacyBody": "Fișierele tale rămân pe serverul tău. Live TV redă sursele tale sau listele tale M3U — MixAI nu livrează canale.",
+        "openApp": "Deschide {name}",
+        "learnMore": "Află mai multe"
+    },
+    "platforms": {
+        "web": "Web",
+        "android": "Android",
+        "ios": "iPhone și iPad",
+        "androidTv": "Android TV",
+        "fireTv": "Fire TV",
+        "tizen": "Televizor Samsung",
+        "webos": "Televizor LG",
+        "appleTv": "Apple TV",
+        "windows": "Windows",
+        "macos": "macOS",
+        "linux": "Linux",
+        "docker": "Docker",
+        "pi": "Raspberry Pi",
+        "chrome": "Chrome"
+    },
+    "launcher": {
+        "greeting": "Bine ai revenit, {name}",
+        "greetingAnon": "Bine ai revenit",
+        "subtitle": "Continuă de unde ai rămas.",
+        "appsLabel": "Aplicațiile tale MixAI",
+        "continue": "Continuă vizionarea",
+        "continueEmpty": "Nimic început. Pornește ceva în MixAI TV.",
+        "continueError": "Nu am putut contacta serverul tău acum.",
+        "remember": "Deschide mereu {name} de pe mixai.ro",
+        "rememberOff": "Arată acest ecran de fiecare dată",
+        "forwarding": "Se deschide {name}…",
+        "cancel": "Rămân aici",
+        "lastUsed": "Folosit recent",
+        "noServerTitle": "Conectează-ți MixAI Server",
+        "noServerBody": "Instalează MixAI Server pe un calculator de acasă, apoi asociază-l ca să-ți vezi biblioteca peste tot.",
+        "noServerCta": "Configurează serverul"
+    },
+    "footer": {
+        "privacy": "Confidențialitate",
+        "status": "Stare servicii",
+        "support": "Asistență",
+        "rights": "© {year} MixAI"
+    },
+    "dj": {
+        "title": "MixAI DJ",
+        "subtitle": "Software profesional de DJ cu motor audio în Rust, stem-uri AI și automix pe ritm. Gratuit pentru Windows, macOS și Linux.",
+        "cta": "Descarcă MixAI DJ",
+        "features": {
+            "engine": { "title": "Motor cu latență mică", "body": "Audio nativ în Rust, latență sub 10 ms, blocarea tonalității și time-stretch." },
+            "stems": { "title": "Stem-uri AI", "body": "Separă vocea, tobele, basul și melodia live, pe propriul calculator." },
+            "library": { "title": "Biblioteca ta MixAI", "body": "Cue-uri, etichete și playlisturi din MixAI Studio, sincronizate de pe serverul tău." }
+        }
+    }
+}

@@ -528,11 +528,11 @@ Fire TV Vega OS runs no APK; Apple 5.2.3/2.1 demo account), Plex/Jellyfin/Emby f
 | ID | Item | Status |
 |---|---|---|
 | WP17-01 | ADR-0013 product family + domains + IDs; app inventory doc; tracker §12 | done 2026-11-06 |
-| WP17-02 | Store accounts: Amazon Appstore, Samsung TV Seller Office (+ Partner request for RO/EU), LG Seller Lounge (Individual), Flathub (GitHub + domain verification); MS Partner Center app reservations (MixAI TV, MixAI Music, MixAI Studio, MixAI DJ) | todo |
+| WP17-02 | Store accounts: Amazon Appstore, Samsung TV Seller Office (+ Partner request for RO/EU), LG Seller Lounge (Individual), Flathub (GitHub + domain verification); MS Partner Center app reservations (MixAI TV, MixAI Music, MixAI Studio, MixAI DJ) | doing: owner has MS Partner Center only (2026-11-06); Amazon / Samsung / LG / Flathub accounts not yet created — packages are built, submissions wait on the owner |
 | WP17-03 | Brand assets per product (MixAI TV, Music, Studio, DJ, Server marks + store icons/feature graphics) via Brand Designer | todo |
-| WP17-10 | Web: host routing in `proxy.ts` (tv./music./app./dj./apex), Auth.js cookie domain `.mixai.ro`, 308 map for old paths, per-host manifest/PWA name/icons/metadata, Cloud Run domain mappings + DNS (CF token needed), sitemap/robots per host | todo |
-| WP17-11 | MixAI Studio on app.mixai.ro: organizer shell rename, nav, launcher back to suite | todo |
-| WP17-12 | mixai.ro suite landing (cinematic, per-product sections + per-platform download matrix) + signed-in app launcher with morph transitions; RO/EN | todo |
+| WP17-10 | Web: host routing in `proxy.ts` (tv./music./app./dj./apex), Auth.js cookie domain `.mixai.ro`, 308 map for old paths, per-host manifest/PWA name/icons/metadata, Cloud Run domain mappings + DNS (CF token needed), sitemap/robots per host | doing: code done (lib/host/*, proxy.ts, lazy Auth.js .mixai.ro cookie, central login, per-host manifest/metadata/robots/sitemap, 20 unit tests); DNS + domain mappings wait on the owner's scoped Cloudflare token |
+| WP17-11 | MixAI Studio on app.mixai.ro: organizer shell rename, nav, launcher back to suite | doing: Studio brand + nav (MixAI apps / MixAI TV), logo → suite, organizer chrome only on app./legacy hosts, app.mixai.ro/ = dashboard |
+| WP17-12 | mixai.ro suite landing (cinematic, per-product sections + per-platform download matrix) + signed-in app launcher with morph transitions; RO/EN | doing: SuiteLanding (orbit hero, product cards, OS-aware download matrix, privacy band), SuiteLauncher (last-used tiles, FLIP morph into the product, always-open, continue strip with loading/empty/error/no-server), /dj landing; RO/EN `mx.suite` |
 | WP17-20 | MixAI TV Android TV: Play TV listing (TV screenshots, banner), Engage SDK replaces Watch Next, release track | todo |
 | WP17-21 | MixAI TV Fire TV: `amazon` flavor without GMS, Amazon listing + submission | todo |
 | WP17-22 | MixAI TV Samsung: Seller Office submission (after Partner approval), QA checklist | todo |
@@ -566,4 +566,13 @@ Fire TV Vega OS runs no APK; Apple 5.2.3/2.1 demo account), Plex/Jellyfin/Emby f
 | WP17-69 | Smart DVR: ad/recap detection, AI chapters, auto-skip | todo |
 | WP17-70 | Simkl + Letterboxd sync (Trakt API is VIP-only since Aug 2026) | todo |
 | WP17-71 | Home Assistant scenes (dim lights on play, pause on doorbell) | todo |
+| WP17-72 | Idea: continue on another device — "Play on Living room TV" handoff via hub from web/phone/desktop | todo |
+| WP17-73 | Idea: phone-as-QR sign-in on every TV + desktop surface (scan, approve, done) | todo |
+| WP17-74 | Idea: desktop TV media keys / Windows SMTC + macOS Now Playing + PiP mini-player | todo |
+| WP17-75 | OS-aware download matrix on mixai.ro (highlights your platform, store badges, QR for phones) | doing: matrix + UA detection in WP17-12; store badges + QR pending store links |
+| WP17-76 | Idea: custom Chromecast web receiver branded MixAI TV (cast from web/phone) | todo |
+| WP17-77 | Idea: status.mixai.ro public status + per-product changelog pages | todo |
+| WP17-78 | Idea: Discord Rich Presence + Last.fm/ListenBrainz scrobbling in MixAI Music | todo |
+| WP17-79 | Idea: server setup wizard from mixai.ro (detect OS, one-liner, pair by QR) | todo |
+| WP17-80 | Idea: Watch Together over the internet via a relay, with emoji reactions | todo |
 | WP17-90 | Verification: per-store checklists, demo-server reviewer path on every client, e2e cloud runs per host, design critic ≥ 52 per new surface | todo |

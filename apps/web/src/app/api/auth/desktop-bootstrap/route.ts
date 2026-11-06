@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { devices, sessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { hashDeviceToken } from "@/lib/device-token";
+import { sessionCookieFor } from "@/lib/host/auth-cookies";
+import { hostRoutingEnabled } from "@/lib/host/products";
 
 // Desktop-shell sign-in bootstrap.
 //
@@ -62,14 +64,17 @@ export async function GET(request: NextRequest) {
 
     const response = NextResponse.redirect(dest, { status: 303 });
     const secure = request.nextUrl.protocol === "https:";
-    const cookieName = secure ? "__Secure-authjs.session-token" : "authjs.session-token";
+    const cookie = hostRoutingEnabled()
+        ? sessionCookieFor(request.headers.get("x-forwarded-host") ?? request.headers.get("host"), secure)
+        : { name: secure ? "__Secure-authjs.session-token" : "authjs.session-token", domain: undefined };
     response.cookies.set({
-        name: cookieName,
+        name: cookie.name,
         value: sessionToken,
         httpOnly: true,
         sameSite: "lax",
         secure,
         path: "/",
+        ...(cookie.domain ? { domain: cookie.domain } : {}),
         expires,
     });
     response.headers.set("Referrer-Policy", "no-referrer");

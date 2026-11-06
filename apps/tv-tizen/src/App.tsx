@@ -23,7 +23,8 @@ import { flushQueue, migrateLocalProgress } from "./lib/progress-sync";
 import type { MediaKind } from "./lib/media-types";
 import { keyFromEvent, registerTvKeys, exitApp, type TvKey } from "./lib/tv-keys";
 import { installE2ePressHook, setE2eCommandHandler } from "./lib/e2e-press";
-import { moveFocus, currentFocus, installRowMemory, focusRail, isInRail } from "./lib/focus";
+import { moveFocus, currentFocus, installRowMemory, installPointer, focusRail, isInRail } from "./lib/focus";
+import { hasPointer } from "./platform";
 import type { DiscoveredServer } from "./lib/discovery";
 import { useLocale } from "./i18n/useLocale";
 import { t, type Locale } from "./i18n/messages";
@@ -122,7 +123,7 @@ function AppRoot({ lang }: { lang: Locale }) {
 
     const restart = useCallback((route: Route) => setStart((s) => ({ n: (s?.n ?? 0) + 1, route })), []);
 
-    useEffect(() => { registerTvKeys(); installRowMemory(); installE2ePressHook(); }, []);
+    useEffect(() => { registerTvKeys(); installRowMemory(); if (hasPointer()) installPointer(); installE2ePressHook(); }, []);
 
     // Hub: one socket per server config.
     useEffect(() => {

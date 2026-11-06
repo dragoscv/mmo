@@ -1,0 +1,144 @@
+/*
+ * MixAI suite landing + launcher (WP17-12). Tokens only (no hex). Scene brief: docs/design-critic/wp17-suite.md.
+ * SUBJECT: your MixAI Server as a luminous core; the five products orbit it on tilted rings, each in its accent.
+ */
+.sx {
+    --sx-tv: var(--chart-1);
+    --sx-music: var(--chart-2);
+    --sx-studio: var(--chart-3);
+    --sx-dj: var(--chart-4);
+    --sx-server: var(--chart-5);
+    position: relative;
+    isolation: isolate;
+    min-height: 100dvh;
+    overflow-x: clip;
+    background:
+        radial-gradient(120% 80% at 70% 10%, color-mix(in oklch, var(--primary) 16%, transparent), transparent 60%),
+        radial-gradient(90% 70% at 10% 90%, color-mix(in oklch, var(--sx-music) 12%, transparent), transparent 60%),
+        var(--background);
+    color: var(--foreground);
+}
+
+.sx-wrap { width: min(100%, 1440px); margin-inline: auto; padding-inline: clamp(1rem, 4vw, 3rem); }
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+.sx-top { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px) saturate(1.2); background: color-mix(in oklch, var(--background) 72%, transparent); border-bottom: 1px solid color-mix(in oklch, var(--border) 60%, transparent); }
+.sx-top-in { display: flex; align-items: center; gap: 1rem; height: 4rem; }
+.sx-brand { display: inline-flex; align-items: center; gap: .6rem; font-family: var(--font-heading); font-weight: 700; font-size: 1.1rem; letter-spacing: -.01em; }
+.sx-top-nav { display: none; gap: .25rem; margin-inline-start: 1.5rem; }
+.sx-top-nav a { padding: .45rem .8rem; border-radius: var(--radius-md); color: var(--muted-foreground); font-size: .9rem; transition: color var(--dur-fast) ease, background var(--dur-fast) ease; }
+.sx-top-nav a:hover { color: var(--foreground); background: color-mix(in oklch, var(--foreground) 6%, transparent); }
+.sx-top-end { margin-inline-start: auto; display: flex; gap: .5rem; align-items: center; }
+@media (min-width: 900px) { .sx-top-nav { display: flex; } }
+
+/* ── Hero ────────────────────────────────────────────────────────────── */
+.sx-hero { display: grid; gap: clamp(2rem, 5vw, 4rem); align-items: center; padding-block: clamp(3rem, 9vw, 7rem) clamp(2rem, 6vw, 5rem); }
+@media (min-width: 1024px) { .sx-hero { grid-template-columns: 1.05fr 1fr; } }
+.sx-eyebrow { font-family: var(--font-mono); font-size: .75rem; letter-spacing: .22em; text-transform: uppercase; color: var(--muted-foreground); }
+.sx-title { font-family: var(--font-heading); font-weight: 650; font-size: clamp(2.4rem, 6.2vw, 5rem); line-height: 1.02; letter-spacing: -.035em; text-wrap: balance; margin-block: 1rem 1.25rem; }
+.sx-sub { font-size: clamp(1rem, 1.4vw, 1.2rem); color: var(--muted-foreground); max-width: 38rem; text-wrap: pretty; }
+.sx-cta { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 2rem; }
+
+.sx-rise { animation: sx-rise 700ms var(--ease-out, cubic-bezier(.16,1,.3,1)) both; animation-delay: calc(var(--i, 0) * 90ms + 250ms); }
+@keyframes sx-rise { from { opacity: 0; transform: translateY(18px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+
+/* ── Orbit (hero subject) ────────────────────────────────────────────── */
+.sx-orbit { position: relative; aspect-ratio: 1; width: min(100%, 560px); justify-self: center; perspective: 1100px; animation: sx-fade 900ms ease both; }
+@keyframes sx-fade { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+.sx-core { position: absolute; inset: 36%; border-radius: 50%; display: grid; place-items: center;
+    background: radial-gradient(circle at 35% 30%, color-mix(in oklch, var(--primary) 70%, var(--foreground)), var(--primary) 45%, color-mix(in oklch, var(--primary) 30%, var(--background)) 100%);
+    box-shadow: 0 0 60px color-mix(in oklch, var(--primary) 55%, transparent), 0 0 160px color-mix(in oklch, var(--primary) 30%, transparent), inset 0 -10px 30px color-mix(in oklch, var(--background) 50%, transparent);
+    color: var(--primary-foreground); animation: sx-breathe 6s ease-in-out infinite; }
+@keyframes sx-breathe { 50% { transform: scale(1.04); box-shadow: 0 0 80px color-mix(in oklch, var(--primary) 65%, transparent), 0 0 200px color-mix(in oklch, var(--primary) 35%, transparent); } }
+.sx-ring { position: absolute; inset: var(--inset); border-radius: 50%; border: 1px solid color-mix(in oklch, var(--foreground) 12%, transparent); transform: rotateX(68deg) rotateZ(var(--tilt, 0deg)); transform-style: preserve-3d; }
+.sx-ring-spin { position: absolute; inset: 0; border-radius: 50%; animation: sx-spin var(--dur, 40s) linear infinite; transform-style: preserve-3d; }
+@keyframes sx-spin { to { transform: rotate(360deg); } }
+.sx-planet { position: absolute; inset: 0; transform: rotate(var(--a)); transform-style: preserve-3d; }
+.sx-planet-body { position: absolute; top: 0; left: 50%; translate: -50% -50%; display: grid; place-items: center; width: clamp(2.6rem, 6vw, 3.6rem); aspect-ratio: 1; border-radius: 30%;
+    /* exact inverse of ring tilt + spin + angle, so icons face the viewer upright while orbiting */
+    transform: rotateZ(calc(-1 * var(--a) - var(--tilt, 0deg))) rotateX(-68deg);
+    background: color-mix(in oklch, var(--c) 22%, var(--card)); color: var(--c); border: 1px solid color-mix(in oklch, var(--c) 45%, transparent);
+    box-shadow: 0 0 24px color-mix(in oklch, var(--c) 45%, transparent); animation: sx-counter var(--dur, 40s) linear infinite; }
+@keyframes sx-counter { to { rotate: -360deg; } }
+.sx-planet-body svg { width: 46%; height: 46%; }
+.sx-stars { position: absolute; inset: -10%; background-image: radial-gradient(1px 1px at 20% 30%, color-mix(in oklch, var(--foreground) 50%, transparent), transparent), radial-gradient(1px 1px at 70% 20%, color-mix(in oklch, var(--foreground) 40%, transparent), transparent), radial-gradient(1.5px 1.5px at 85% 70%, color-mix(in oklch, var(--foreground) 45%, transparent), transparent), radial-gradient(1px 1px at 35% 80%, color-mix(in oklch, var(--foreground) 35%, transparent), transparent), radial-gradient(1px 1px at 55% 55%, color-mix(in oklch, var(--foreground) 30%, transparent), transparent); opacity: .7; pointer-events: none; }
+
+/* ── Product cards ───────────────────────────────────────────────────── */
+.sx-section { padding-block: clamp(3rem, 8vw, 6rem); }
+.sx-h2 { font-family: var(--font-heading); font-size: clamp(1.8rem, 3.6vw, 2.8rem); letter-spacing: -.025em; font-weight: 650; text-wrap: balance; }
+.sx-lead { color: var(--muted-foreground); margin-top: .75rem; max-width: 42rem; }
+.sx-products { display: grid; gap: 1rem; margin-top: 2.5rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); }
+@media (min-width: 1280px) { .sx-products { grid-template-columns: 1.4fr 1fr 1fr; } .sx-products > :first-child { grid-row: span 2; } }
+.sx-card { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: .75rem; padding: 1.5rem; border-radius: calc(var(--radius-lg) + 6px); background: color-mix(in oklch, var(--card) 88%, transparent); border: 1px solid var(--border); transition: transform var(--dur-base) var(--ease-out, ease), border-color var(--dur-base) ease, box-shadow var(--dur-base) ease; }
+.sx-card::before { content: ""; position: absolute; inset: -40% -40% auto auto; width: 70%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, color-mix(in oklch, var(--c) 30%, transparent), transparent 70%); opacity: .55; transition: opacity var(--dur-base) ease, transform var(--dur-slow, 500ms) ease; pointer-events: none; }
+.sx-card:hover, .sx-card:focus-within { transform: translateY(-3px); border-color: color-mix(in oklch, var(--c) 50%, var(--border)); box-shadow: 0 18px 50px -20px color-mix(in oklch, var(--c) 55%, transparent); }
+.sx-card:hover::before { opacity: .9; transform: scale(1.1); }
+.sx-card-icon { display: grid; place-items: center; width: 3rem; aspect-ratio: 1; border-radius: 30%; background: color-mix(in oklch, var(--c) 20%, transparent); color: var(--c); }
+.sx-card-icon svg { width: 1.5rem; height: 1.5rem; }
+.sx-tag { font-family: var(--font-mono); font-size: .7rem; letter-spacing: .18em; text-transform: uppercase; color: var(--c); }
+.sx-card h3 { font-family: var(--font-heading); font-size: 1.35rem; font-weight: 650; letter-spacing: -.015em; }
+.sx-card p { color: var(--muted-foreground); font-size: .95rem; }
+.sx-card-link { margin-top: auto; display: inline-flex; align-items: center; gap: .35rem; font-weight: 600; font-size: .9rem; color: var(--foreground); }
+.sx-card-link::after { content: ""; position: absolute; inset: 0; }
+.sx-card-link svg { transition: transform var(--dur-fast) ease; }
+.sx-card:hover .sx-card-link svg { transform: translateX(3px); }
+
+/* ── Download matrix ─────────────────────────────────────────────────── */
+.sx-matrix { margin-top: 2rem; display: grid; gap: .75rem; }
+.sx-row { display: grid; gap: .75rem; align-items: center; padding: 1rem 1.25rem; border-radius: var(--radius-lg); background: color-mix(in oklch, var(--card) 80%, transparent); border: 1px solid var(--border); }
+@media (min-width: 768px) { .sx-row { grid-template-columns: 13rem 1fr; } }
+.sx-row-name { display: flex; align-items: center; gap: .6rem; font-weight: 650; }
+.sx-row-name svg { color: var(--c); width: 1.2rem; height: 1.2rem; }
+.sx-chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+.sx-chip { display: inline-flex; align-items: center; gap: .4rem; padding: .4rem .75rem; border-radius: 999px; font-size: .85rem; border: 1px solid var(--border); color: var(--foreground); background: color-mix(in oklch, var(--foreground) 3%, transparent); transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease; }
+.sx-chip:hover { background: color-mix(in oklch, var(--c) 12%, transparent); border-color: color-mix(in oklch, var(--c) 45%, var(--border)); }
+.sx-chip[data-soon] { color: var(--muted-foreground); border-style: dashed; }
+.sx-chip[data-mine] { border-color: var(--c); background: color-mix(in oklch, var(--c) 16%, transparent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--c) 18%, transparent); }
+.sx-chip small { font-size: .7rem; color: var(--muted-foreground); }
+
+.sx-privacy { display: grid; gap: 1.5rem; align-items: center; padding: clamp(1.5rem, 4vw, 3rem); border-radius: calc(var(--radius-lg) + 10px); border: 1px solid var(--border);
+    background: linear-gradient(135deg, color-mix(in oklch, var(--primary) 14%, var(--card)), var(--card)); }
+@media (min-width: 900px) { .sx-privacy { grid-template-columns: auto 1fr auto; } }
+.sx-privacy-icon { width: 3.5rem; aspect-ratio: 1; border-radius: 30%; display: grid; place-items: center; background: color-mix(in oklch, var(--primary) 22%, transparent); color: var(--primary); }
+
+.sx-foot { border-top: 1px solid var(--border); padding-block: 2rem; color: var(--muted-foreground); font-size: .875rem; }
+.sx-foot-in { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; align-items: center; }
+.sx-foot a:hover { color: var(--foreground); }
+
+/* ── Launcher ────────────────────────────────────────────────────────── */
+.lx { padding-block: clamp(2rem, 6vw, 4rem); }
+.lx-head h1 { font-family: var(--font-heading); font-size: clamp(2rem, 4.5vw, 3.4rem); font-weight: 650; letter-spacing: -.03em; }
+.lx-head p { color: var(--muted-foreground); margin-top: .5rem; }
+.lx-grid { margin-top: 2rem; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); }
+@media (min-width: 1800px) { .lx-grid { grid-template-columns: repeat(5, 1fr); } }
+.lx-tile { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; padding: 1.25rem; min-height: 11rem; text-align: start; border-radius: calc(var(--radius-lg) + 6px); border: 1px solid var(--border); background: color-mix(in oklch, var(--card) 90%, transparent); color: var(--foreground); cursor: pointer;
+    transition: transform var(--dur-base) var(--ease-out, ease), border-color var(--dur-base) ease, box-shadow var(--dur-base) ease; }
+.lx-tile::before { content: ""; position: absolute; inset: auto -30% -50% auto; width: 80%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, color-mix(in oklch, var(--c) 35%, transparent), transparent 70%); pointer-events: none; transition: transform var(--dur-slow, 500ms) ease; }
+.lx-tile:hover, .lx-tile:focus-visible { transform: translateY(-4px) scale(1.01); border-color: color-mix(in oklch, var(--c) 55%, var(--border)); box-shadow: 0 22px 50px -24px color-mix(in oklch, var(--c) 65%, transparent); }
+.lx-tile:hover::before { transform: scale(1.25); }
+.lx-tile:focus-visible { outline: 2px solid var(--c); outline-offset: 3px; }
+.lx-tile .sx-card-icon { width: 3.25rem; }
+.lx-tile strong { font-family: var(--font-heading); font-size: 1.2rem; font-weight: 650; }
+.lx-tile span.lx-sub { color: var(--muted-foreground); font-size: .875rem; }
+.lx-badge { position: absolute; top: .9rem; inset-inline-end: .9rem; font-size: .7rem; font-family: var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--c); }
+.lx-morph { position: fixed; z-index: 100; border-radius: calc(var(--radius-lg) + 6px); background: radial-gradient(circle at 50% 40%, color-mix(in oklch, var(--c) 45%, var(--background)), var(--background) 75%); display: grid; place-items: center; pointer-events: none; }
+.lx-morph-label { display: flex; flex-direction: column; align-items: center; gap: .75rem; font-family: var(--font-heading); font-size: 1.25rem; color: var(--foreground); }
+.lx-remember { margin-top: 1.25rem; display: flex; align-items: center; gap: .6rem; color: var(--muted-foreground); font-size: .9rem; }
+.lx-forward { position: fixed; inset-inline: 0; bottom: 1.5rem; z-index: 50; display: flex; justify-content: center; }
+.lx-forward-in { display: flex; align-items: center; gap: 1rem; padding: .75rem 1rem .75rem 1.25rem; border-radius: 999px; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--surface-shadow); }
+.lx-continue { margin-top: 3rem; }
+.lx-continue h2 { font-family: var(--font-heading); font-size: 1.35rem; font-weight: 650; margin-bottom: 1rem; }
+.lx-strip { display: grid; grid-auto-flow: column; grid-auto-columns: clamp(11rem, 18vw, 16rem); gap: .9rem; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: .5rem; }
+.lx-strip > * { scroll-snap-align: start; }
+.lx-still { position: relative; display: block; aspect-ratio: 16/9; border-radius: var(--radius-lg); overflow: hidden; background: var(--muted); border: 1px solid var(--border); }
+.lx-still img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--dur-slow, 500ms) ease; }
+.lx-still:hover img { transform: scale(1.05); }
+.lx-still-title { position: absolute; inset: auto 0 0 0; padding: 1.5rem .75rem .6rem; font-size: .85rem; font-weight: 600; color: var(--foreground); background: linear-gradient(to top, color-mix(in oklch, var(--background) 92%, transparent), transparent); }
+.lx-progress { position: absolute; inset: auto 0 0 0; height: 3px; background: color-mix(in oklch, var(--foreground) 15%, transparent); }
+.lx-progress > i { display: block; height: 100%; background: var(--primary); }
+
+/* ── Motion preferences ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .sx *, .sx *::before, .sx *::after { animation: none !important; transition-duration: 1ms !important; }
+}
+[data-motion="reduced"] .sx *, [data-motion="reduced"] .sx *::before, [data-motion="reduced"] .sx *::after { animation: none !important; transition-duration: 1ms !important; }

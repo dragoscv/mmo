@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname } from "@/components/host/host-context";
 import { useTranslations } from "next-intl";
 import { Search, Menu } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
@@ -15,7 +15,7 @@ export function MobileHeader() {
     const pathname = usePathname();
     const t = useTranslations("nav");
     const current = currentNavLabel(pathname);
-    const title = current ? (t.has(current.key) ? t(current.key) : current.label) : "MixAI";
+    const title = current ? (t.has(current.key) ? t(current.key) : current.label) : "MixAI Studio";
 
     return (
         <>

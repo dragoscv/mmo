@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import Link, { usePathname, useRouter } from "@/components/host/host-context";
 import { useTranslations } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Menu, Search, ChevronRight, ArrowLeft, CircleHelp, Star, Pin } from "lucide-react";
@@ -135,17 +134,20 @@ function SidebarBody({ onOpenSearch, onOpenLegend }: { onOpenSearch: () => void;
     return (
         <>
             <SidebarHeader className="h-16 gap-2.5 border-b border-sidebar-border px-4">
-                <Image
-                    src="/logo.svg"
-                    alt="MixAI"
-                    width={32}
-                    height={32}
-                    className="shrink-0 rounded-lg shadow-[0_0_12px_color-mix(in_oklch,var(--primary)_30%,transparent)]"
-                />
+                {/* WP17-11: the logo goes back to the suite launcher (mixai.ro). */}
+                <Link href="/" aria-label={t("suiteHome")} className="shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                    <Image
+                        src="/logo.svg"
+                        alt=""
+                        width={32}
+                        height={32}
+                        className="rounded-lg shadow-[0_0_12px_color-mix(in_oklch,var(--primary)_30%,transparent)]"
+                    />
+                </Link>
                 {!collapsed && (
                     <div className="flex min-w-0 flex-col leading-tight">
                         <span className="overflow-hidden font-heading text-[15px] font-bold tracking-tight whitespace-nowrap text-sidebar-foreground">
-                            Mix<span className="text-gradient-accent">AI</span>
+                            Mix<span className="text-gradient-accent">AI</span> <span className="font-medium text-sidebar-foreground/70">Studio</span>
                         </span>
                         <span className="text-[10px] whitespace-nowrap text-sidebar-foreground/40">
                             v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}

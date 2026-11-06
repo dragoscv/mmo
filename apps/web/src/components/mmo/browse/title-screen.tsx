@@ -7,8 +7,8 @@
  * My list, trailer dialog (youtube-nocookie), seasons + episodes (tv), where to watch, cast, recommendations, similar.
  * `?play=1` (hero Play buttons) replaces itself with the player route as soon as the target is known.
  */
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link, { useRouter } from "@/components/host/host-context";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, ChevronRight, ExternalLink, Play, Plus, RotateCcw, SquarePlay } from "lucide-react";

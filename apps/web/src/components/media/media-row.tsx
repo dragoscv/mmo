@@ -16,7 +16,7 @@
  * "See all" link when a row is longer.
  */
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import useEmblaCarousel from "embla-carousel-react";
 import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Button, usePrefersReducedMotion } from "@mmo/ui";

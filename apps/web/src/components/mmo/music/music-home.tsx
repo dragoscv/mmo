@@ -5,8 +5,8 @@
  * (random 50 → play → Now Playing). Home rows: recently played, recently added, most played, playlists,
  * genre chips, random albums. Albums grid uses `content-visibility:auto` (music.css) for 1000+ items.
  */
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import Link, { usePathname, useRouter } from "@/components/host/host-context";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { Search, Shuffle } from "lucide-react";

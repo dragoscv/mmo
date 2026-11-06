@@ -11,6 +11,7 @@ import { MobileHeader } from "./mobile-header";
 import { BottomNav } from "./shell/bottom-nav";
 import { ScrollRestoration } from "./scroll-restoration";
 import { SidebarSync, useShellSidebarProps } from "./sidebar-context";
+import { useHost } from "./host/host-context";
 
 /**
  * App frame on `@mmo/ui`'s AppShell. The player bar (AudioPlayer, 72px with a
@@ -24,7 +25,10 @@ import { SidebarSync, useShellSidebarProps } from "./sidebar-context";
 export function PlayerAwareLayout({ children }: { children: React.ReactNode }) {
     const { currentTrack } = usePlayer();
     const { isFocusMode } = useFocusMode();
-    const playerH = isFocusMode ? "0px" : currentTrack ? "72px" : "56px";
+    // WP17-10: MixAI TV / Music / suite / DJ hosts bring their own chrome; the organizer frame is Studio's.
+    const { kind } = useHost();
+    const bare = isFocusMode || (kind !== "studio" && kind !== "legacy");
+    const playerH = bare ? "0px" : currentTrack ? "72px" : "56px";
     const sidebarProps = useShellSidebarProps();
 
     useKeyboardShortcuts();
@@ -32,13 +36,14 @@ export function PlayerAwareLayout({ children }: { children: React.ReactNode }) {
     return (
         <AppShell
             data-app-layout
-            data-focus-mode={isFocusMode || undefined}
+            data-focus-mode={bare || undefined}
+            data-product={kind}
             style={{ ["--player-h" as string]: playerH }}
             className="h-dvh"
             sidebarProps={sidebarProps}
-            sidebar={isFocusMode ? null : <AppSidebar />}
-            header={isFocusMode ? null : <MobileHeader />}
-            bottomBar={isFocusMode ? null : <BottomNav />}
+            sidebar={bare ? null : <AppSidebar />}
+            header={bare ? null : <MobileHeader />}
+            bottomBar={bare ? null : <BottomNav />}
             mainClassName={cn(
                 "overflow-x-hidden transition-[padding] duration-(--dur-base)",
                 "pb-[calc(var(--player-h)+var(--shell-tabbar-height,0px)+var(--safe-bottom,0px))]",

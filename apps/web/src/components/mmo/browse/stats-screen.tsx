@@ -4,8 +4,8 @@
  * Year in review (`/media/stats`, `GET /media/stats?year=`): hero numbers, monthly bars (pure CSS, transform only),
  * top genres + titles, listening hours/plays/top tracks; year picker in `?year=`.
  */
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import Link, { usePathname, useRouter } from "@/components/host/host-context";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { BarChart3 } from "lucide-react";

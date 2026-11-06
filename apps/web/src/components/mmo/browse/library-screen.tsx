@@ -7,7 +7,8 @@
  * Scales to 1000+ titles: the grid renders in growing pages (IntersectionObserver sentinel) and every card uses
  * `content-visibility:auto`, so off-screen cards cost neither layout nor paint. Sort/filters live in the URL.
  */
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "@/components/host/host-context";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Film, Tv } from "lucide-react";

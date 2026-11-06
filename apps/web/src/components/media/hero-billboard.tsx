@@ -8,7 +8,7 @@
  * accent is `artwork`, the backdrop's dominant hue drives `--accent-h`.
  */
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { Info, ListPlus, Play, Tv } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";

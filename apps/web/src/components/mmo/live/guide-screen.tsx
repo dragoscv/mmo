@@ -10,8 +10,7 @@
  * channel, PageUp/PageDown ±10 channels, Home/End first/last programme of the row, Enter opens the sheet
  * (Watch live / Watch from start (catch-up) / Record / Record series).
  */
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Link, { useRouter } from "@/components/host/host-context";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslations } from "next-intl";
 import { CalendarClock, Clock, Disc3, History, ListVideo, Play, Radio, Settings2 } from "lucide-react";

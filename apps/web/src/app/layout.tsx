@@ -41,6 +41,9 @@ import { SerwistProvider } from "@serwist/next/react";
 import localFont from "next/font/local";
 import { cn } from "@/lib/utils";
 import { ThemeColorMeta } from "./theme-color-meta";
+import { HostProvider } from "@/components/host/host-context";
+import { currentHostKind, rootDomain } from "@/lib/host/server";
+import { productOrigin, type HostKind } from "@/lib/host/products";
 
 const inter = localFont({
     src: "./fonts/InterVariable.woff2",
@@ -64,7 +67,7 @@ const jetbrainsMono = localFont({
     fallback: ["ui-monospace", "Consolas", "monospace"],
 });
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
     metadataBase: new URL("https://mixai.ro"),
     title: {
         default: "MixAI — AI Music Suite",
@@ -133,6 +136,34 @@ export const metadata: Metadata = {
     },
 };
 
+/** WP17-10: product name, description, manifest and canonical origin per host (legacy hosts keep the suite). */
+const PRODUCT_META: Record<Exclude<HostKind, "legacy">, { name: string; description: string; manifest: string }> = {
+    suite: { name: "MixAI", description: "MixAI — TV, Music, Studio and DJ on every screen, powered by your own MixAI Server.", manifest: "/manifest-suite.webmanifest" },
+    tv: { name: "MixAI TV", description: "Movies, series, Live TV and Watch Together from your own MixAI Server, on every screen.", manifest: "/manifest-tv.webmanifest" },
+    music: { name: "MixAI Music", description: "Albums, artists, playlists, radio and synced lyrics from your own MixAI Server.", manifest: "/manifest-music.webmanifest" },
+    studio: { name: "MixAI Studio", description: "Organize, analyze, tag and mix your music library with AI. Server admin and dashboard.", manifest: "/manifest-studio.webmanifest" },
+    dj: { name: "MixAI DJ", description: "Pro DJ desktop app with a Rust audio engine, AI stems and beat-matched automix.", manifest: "/manifest-suite.webmanifest" },
+};
+
+export async function generateMetadata(): Promise<Metadata> {
+    const kind = await currentHostKind();
+    if (kind === "legacy") return baseMetadata;
+    const p = PRODUCT_META[kind];
+    const origin = productOrigin(kind, rootDomain());
+    return {
+        ...baseMetadata,
+        metadataBase: new URL(origin),
+        title: { default: p.name, template: `%s · ${p.name}` },
+        applicationName: p.name,
+        description: p.description,
+        manifest: p.manifest,
+        openGraph: { ...baseMetadata.openGraph, siteName: p.name, title: p.name, description: p.description, url: origin },
+        twitter: { ...baseMetadata.twitter, title: p.name, description: p.description },
+        appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: p.name },
+        alternates: { canonical: "./" },
+    };
+}
+
 export const viewport: Viewport = {
     width: "device-width",
     initialScale: 1,
@@ -153,6 +184,7 @@ export default function RootLayout({
 async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
     const locale = await getLocale();
     const messages = await getMessages();
+    const hostKind = await currentHostKind();
     return (
         // next/font variables live on <body>: /globals.css (tokens) sets the same custom properties on :root
         // and loads after the next/font chunk, so on <html> it won and headings never got Space Grotesk.
@@ -179,6 +211,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                     cacheOnNavigation={false}
                     reloadOnOnline={false}
                 />
+                <HostProvider kind={hostKind} root={rootDomain()}>
                 <ThemeProvider initialLocale={locale as "ro" | "en"}>
                     {/* WP4-03: <html data-standalone> for installed PWA / Capacitor / Tauri. */}
                     <PwaStandalone />
@@ -238,6 +271,7 @@ async function RootLayoutAsync({ children }: { children: React.ReactNode }) {
                         </QueryProvider>
                     </AuthProvider>
                 </ThemeProvider>
+                </HostProvider>
             </body>
         </html>
     );

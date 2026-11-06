@@ -719,7 +719,7 @@
         }
     },
     "nav": {
-        "home": "Acasă",
+        "home": "Aplicații MixAI",
         "dashboard": "Panou principal",
         "library": "Bibliotecă",
         "analysis": "Analiză",
@@ -792,7 +792,9 @@
         "generate": "Generare AI",
         "training": "Antrenare",
         "maestro": "Maestro",
-        "settings-copilot": "AI Copilot"
+        "settings-copilot": "AI Copilot",
+        "mixaiTv": "MixAI TV",
+        "suiteHome": "Înapoi la aplicațiile MixAI"
     },
     "common": {
         "loading": "Se încarcă…",

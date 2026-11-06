@@ -9,7 +9,7 @@
  * /media/downloads) → error (press = retry). Progress is announced through a polite live region.
  */
 import { useEffect, useMemo } from "react";
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { useTranslations } from "next-intl";
 import { AlertCircle, CheckCircle2, Download, Pause, Play } from "lucide-react";
 import { Button, cn, type ButtonProps } from "@mmo/ui";

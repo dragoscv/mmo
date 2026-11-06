@@ -1,6 +1,7 @@
 "use client";
 
 import { useFocusMode } from "./focus-mode-context";
+import { useHost } from "./host/host-context";
 import { cn } from "@/lib/utils";
 
 /** Hides the sidebar when focus mode is active. */
@@ -30,13 +31,15 @@ export function FocusAwareMobileHeader({ children }: { children: React.ReactNode
 /** Hides the now playing bar when focus mode is active. */
 export function FocusAwareNowPlayingBar({ children }: { children: React.ReactNode }) {
     const { isFocusMode } = useFocusMode();
+    const { kind } = useHost();
+    const hidden = isFocusMode || (kind !== "studio" && kind !== "legacy");
 
     return (
         <div
             data-app-nowplaying=""
             className={cn(
                 "transition-all duration-300",
-                isFocusMode && "hidden"
+                hidden && "hidden"
             )}
         >
             {children}

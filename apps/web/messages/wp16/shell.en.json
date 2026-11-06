@@ -1,6 +1,6 @@
 {
     "nav": {
-        "label": "Media",
+        "label": "MixAI TV",
         "home": "Home",
         "search": "Search",
         "movies": "Movies",
@@ -45,5 +45,6 @@
         "myList": "My list",
         "inList": "In my list",
         "surprise": "Surprise me"
-    }
+    },
+    "apps": "All MixAI apps"
 }

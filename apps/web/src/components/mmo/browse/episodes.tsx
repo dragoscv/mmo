@@ -5,7 +5,7 @@
  * "On your server" badge and a play link (best local version, resume handled by the player). Used by the
  * title page (with a season picker) and by the dedicated season page.
  */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { useFormatter, useTranslations } from "next-intl";
 import { Play, Server } from "lucide-react";
 import type { MediaSeasonResponse, SeasonEpisode } from "@/lib/mmo/media-types";

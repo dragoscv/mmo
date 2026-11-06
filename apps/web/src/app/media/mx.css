@@ -378,3 +378,8 @@
     .mx-hero > *, .mx-rows > *, .mx-backdrop-img[data-on] { animation: none; }
     ::view-transition-group(mx-poster), ::view-transition-old(mx-poster), ::view-transition-new(mx-poster) { animation: none; }
 }
+
+/* WP17-10: back to the suite launcher on product hosts */
+.mx-apps { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: var(--radius-md); color: var(--muted-foreground); transition: color var(--dur-fast) ease, background var(--dur-fast) ease; }
+.mx-apps:hover { color: var(--foreground); background: color-mix(in oklch, var(--foreground) 8%, transparent); }
+

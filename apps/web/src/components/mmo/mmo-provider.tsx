@@ -6,7 +6,8 @@
  * "Play on TV", Watch Together) and exposes the active profile so pages re-render on switch.
  */
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useHost, useRouter } from "@/components/host/host-context";
+import { internalPathname } from "@/lib/host/products";
 import type { MmoConnection } from "@/actions/mmo";
 import { playHref } from "./player/model";
 import { makeClients, type MmoClients } from "@/lib/mmo/clients";
@@ -47,6 +48,7 @@ export function hubPlayHref(args: Record<string, unknown>): string | null {
 
 export function MmoProvider({ servers, children }: { servers: MmoConnection[]; children: ReactNode }) {
     const router = useRouter();
+    const { kind: hostKindNow } = useHost();
     const server = servers.find((s) => s.online) ?? servers[0] ?? null;
     const key = server ? `${server.deviceId}|${server.baseUrl}` : "";
     // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild only when the target server changes
@@ -71,7 +73,7 @@ export function MmoProvider({ servers, children }: { servers: MmoConnection[]; c
         const offD = clients.hub.devicesChanged.on(setDevices);
         // "Play on this browser" from a phone/TV while not on the player (the player acks its own commands).
         const offC = clients.hub.commands.on((c) => {
-            if (c.action !== "play" || location.pathname.startsWith("/media/play/")) return;
+            if (c.action !== "play" || internalPathname(location.pathname, hostKindNow).startsWith("/media/play/")) return;
             const href = hubPlayHref(c.args);
             if (!href) { clients.hub.ack(c.seq, false, "unsupported"); return; }
             clients.hub.ack(c.seq, true);
@@ -79,7 +81,7 @@ export function MmoProvider({ servers, children }: { servers: MmoConnection[]; c
         });
         clients.hub.start();
         return () => { alive = false; offP(); offS(); offD(); offC(); clients.hub.stop(); };
-    }, [clients, router]);
+    }, [clients, router, hostKindNow]);
 
     const value = useMemo<MmoContextValue>(() => ({
         clients, server, servers, profile, profilesReady: profilesReady || !clients, needsPicker, hubStatus, devices,

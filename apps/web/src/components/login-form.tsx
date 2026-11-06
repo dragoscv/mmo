@@ -7,6 +7,8 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { AppleLogo } from "@/components/auth/apple-logo";
 import { GoogleLogo } from "@/components/auth/google-logo";
+import { useHost } from "@/components/host/host-context";
+import { centralLoginUrl } from "@/lib/host/login";
 
 interface LoginFormProps {
     callbackUrl?: string;
@@ -20,9 +22,13 @@ export function LoginForm({ callbackUrl = "/", compact, appleEnabled }: LoginFor
     const tLogin = useTranslations("login");
     const tAuth = useTranslations("auth");
     const tAccount = useTranslations("mx.account.signIn");
+    const { kind, root } = useHost();
 
     async function handleSignIn(provider: "google" | "apple") {
         setLoading(provider);
+        // OAuth state/PKCE cookies are host-only and the redirect URIs are the apex's: sign in on mixai.ro.
+        const central = centralLoginUrl(kind, callbackUrl === "/" ? window.location.href : callbackUrl, root);
+        if (central) { window.location.assign(central); return; }
         try {
             await signIn(provider, { callbackUrl });
         } catch {

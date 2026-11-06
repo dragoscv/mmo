@@ -4,7 +4,7 @@
  * Horizontal row with roving keyboard focus (←/→ move within, ↑/↓ jump to the same column of the
  * previous/next row — rows are found via `[data-mx-row]`). Native scroll + snap, no carousel lib.
  */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { useId, type KeyboardEvent, type ReactNode } from "react";
 
 export function MxRow({ title, reason, seeAllHref, seeAllLabel, children, testId }: {

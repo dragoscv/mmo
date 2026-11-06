@@ -133,6 +133,41 @@ export function installRowMemory(): void {
     }
 }
 
+/**
+ * Mouse/trackpad support for desktop + browser (WP17-25): hovering a focusable focuses it (no scroll jump, the
+ * focus ring follows the pointer like on Apple TV), and the wheel moves focus — vertical wheel = up/down, horizontal
+ * or Shift+wheel = left/right — throttled so one notch is one step. Idempotent; a no-op on TVs (no pointer).
+ */
+let pointerInstalled = false;
+export function installPointer(): void {
+    if (pointerInstalled || typeof document === "undefined") return;
+    pointerInstalled = true;
+    document.documentElement.setAttribute("data-pointer", "");
+    document.addEventListener("pointerover", (e) => {
+        if (e.pointerType !== "mouse") return;
+        const el = (e.target as HTMLElement | null)?.closest?.<HTMLElement>(SELECTOR);
+        if (!el || el === document.activeElement) return;
+        const scope = topScope();
+        if (scope && !scope.contains(el)) return;
+        focusEl(el, false);
+    });
+    let last = 0;
+    document.addEventListener("wheel", (e) => {
+        // Let real scrollers (text panels, lists with native overflow) scroll themselves.
+        const t = e.target as HTMLElement | null;
+        if (t?.closest?.("[data-native-scroll], input, textarea, select")) return;
+        const now = performance.now();
+        e.preventDefault();
+        if (now - last < 110) return;
+        last = now;
+        const horizontal = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
+        const d = horizontal ? (e.shiftKey ? e.deltaY : e.deltaX) : e.deltaY;
+        if (Math.abs(d) < 2) return;
+        if (!currentFocus()) { focusFirst(); return; }
+        moveFocus(horizontal ? (d > 0 ? "right" : "left") : (d > 0 ? "down" : "up"));
+    }, { passive: false });
+}
+
 function usable(el: HTMLElement | null | undefined): el is HTMLElement {
     return !!el && el.isConnected && el.matches(SELECTOR) && visibleRect(el.getBoundingClientRect());
 }

@@ -1,7 +1,7 @@
 "use client";
 
 /** Season page (`/media/tv/{id}/season/{n}`): all episodes with stills, overview, progress and play links. */
-import Link from "next/link";
+import Link from "@/components/host/host-context";
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronLeft } from "lucide-react";

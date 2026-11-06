@@ -4,8 +4,7 @@
  * Shared Live TV bits (WP16-41): locale time formatters (24 h in RO), the section sub-nav, channel logo,
  * progress bar, the `now` ticker, now/next fetching and error-message extraction.
  */
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link, { usePathname } from "@/components/host/host-context";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CalendarClock, Disc3, LayoutList, Settings2 } from "lucide-react";

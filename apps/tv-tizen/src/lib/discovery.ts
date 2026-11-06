@@ -7,6 +7,9 @@
  * against 127.0.0.1 / a specific server from a desktop browser.
  */
 import { DEFAULT_PORT } from "./config";
+import { localNetwork } from "../platform";
+
+export { localNetwork };
 
 export interface PairInfo {
     name: string;
@@ -39,21 +42,6 @@ export function scanHostsOverride(): string[] | null {
     if (!raw) return null;
     const hosts = raw.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
     return hosts.length ? hosts : null;
-}
-
-/** The TV's own IPv4 + netmask via the Samsung `webapis.network` API (null on desktop). */
-export function localNetwork(): { ip: string; netmask: string } | null {
-    try {
-        const net = typeof webapis !== "undefined" ? webapis?.network : undefined;
-        if (!net) return null;
-        const ip = net.getIp();
-        if (!ip || !/^\d+\.\d+\.\d+\.\d+$/.test(ip)) return null;
-        let netmask = "255.255.255.0";
-        try { const m = net.getSubnetMask?.(); if (m && /^\d+\.\d+\.\d+\.\d+$/.test(m)) netmask = m; } catch { /* keep /24 */ }
-        return { ip, netmask };
-    } catch {
-        return null;
-    }
 }
 
 /** Hosts in the subnet of `ip`/`netmask`, capped to a /24 (bigger masks are truncated to the TV's /24). */
