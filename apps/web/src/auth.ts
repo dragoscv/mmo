@@ -137,7 +137,9 @@ function configFor(host: string | null): NextAuthConfig {
             if (session.user) {
                 session.user.id = user.id;
             }
-            return session;
+            // Database sessions pass the whole AdapterSession here (sessionToken, userId). Returning it as-is put
+            // the httpOnly cookie value into `/api/auth/session` JSON, readable by page scripts — expose only these.
+            return { user: session.user, expires: session.expires };
         },
     },
     events: {

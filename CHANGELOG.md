@@ -10,6 +10,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — Web 3.2.1 (product hosts live, session JSON hardening)
+
+- **Product hosts are live**: `tv.mixai.ro`, `music.mixai.ro`, `app.mixai.ro` and `dj.mixai.ro` (Google-managed
+  certificates), with host routing switched on; `mixai.ro/media`, `/library` and `/dj` answer 308 to their product host.
+- **Security:** `/api/auth/session` returned the whole database session, including the session token that the
+  httpOnly cookie protects. The session callback now returns only `user` and `expires`.
+- Clients in the same release train: MixAI TV for Apple TV (new tvOS target), MixAI TV desktop 0.1.1 (Microsoft
+  Store), MixAI TV for Samsung/LG 2.3.1 (`https://` servers such as `demo.mixai.ro` keep port 443).
+
 ## 2026-11-06 — Web 3.2.0 (MixAI product family on its own hosts, WP17-10/11/12)
 
 - **Host routing (ADR-0013).** One Cloud Run service answers `mixai.ro` (suite), `tv.mixai.ro` (MixAI TV with clean
