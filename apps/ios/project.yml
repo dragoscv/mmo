@@ -8,6 +8,7 @@ options:
   bundleIdPrefix: ro.mixai
   deploymentTarget:
     iOS: '26.0'
+    tvOS: '26.0'
     watchOS: '11.0'
   developmentLanguage: en
   createIntermediateGroups: true
@@ -175,12 +176,65 @@ targets:
         # Archived inside the iPhone app only, never as a second top-level product.
         SKIP_INSTALL: YES
         SWIFT_EMIT_LOC_STRINGS: NO
+  # MixAI TV for Apple TV (WP17-24, ADR-0013): same bundle id as the iPhone app = one App Store record, universal
+  # purchase. SwiftUI focus engine + AVPlayerViewController; reuses MixaiCore, the generated Tokens, fonts and the
+  # iPhone string catalog. No ActivityKit / WidgetKit / BackgroundTasks / WatchConnectivity / CarPlay on tvOS.
+  MixAITV:
+    type: application
+    platform: tvOS
+    deploymentTarget: '26.0'
+    sources:
+      - path: MixAITV
+      - path: MixAI/Theme/Tokens.swift
+      - path: MixAI/Localizable.xcstrings
+      - path: MixAI/Resources/Fonts
+        buildPhase: resources
+      - path: MixAI/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: MixaiCore
+      - sdk: AVKit.framework
+      - sdk: Network.framework
+    info:
+      path: MixAITV/Info.plist
+      properties:
+        UIBackgroundModes: [audio]
+        NSBonjourServices: [_mmo-companion._tcp]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UIAppFonts: [SpaceGrotesk-Variable.ttf, Inter-Variable.ttf]
+        CFBundleURLTypes:
+          - CFBundleURLName: ro.mixai.app
+            CFBundleURLSchemes: [mixai]
+        UIUserInterfaceStyle: Dark
+        CFBundleLocalizations: [en, ro]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.app
+        PRODUCT_NAME: MixAITV
+        TARGETED_DEVICE_FAMILY: '3'
+        ASSETCATALOG_COMPILER_APPICON_NAME: App Icon & Top Shelf Image
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MixAI TV
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.entertainment
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: MixAI TV finds and connects to your MixAI Server on this network to play your movies, shows and music.
+        SWIFT_EMIT_LOC_STRINGS: NO
 schemes:
   MixAI:
     build:
       targets:
         MixAI: all
         MixAIWidgets: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  MixAITV:
+    build:
+      targets:
+        MixAITV: all
     run:
       config: Debug
     archive:

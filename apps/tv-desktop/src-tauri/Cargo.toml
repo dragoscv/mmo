@@ -1,6 +1,6 @@
 [package]
 name = "mixai-tv"
-version = "0.1.0"
+version = "0.1.1"
 description = "MixAI TV — watch your MixAI Server on Windows, macOS and Linux"
 authors = ["MixAI <support@mixai.ro>"]
 license = "AGPL-3.0-or-later"

@@ -2092,7 +2092,7 @@ dependencies = [
 
 [[package]]
 name = "mixai-tv"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "gethostname",
  "local-ip-address",

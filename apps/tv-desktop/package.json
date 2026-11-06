@@ -1,6 +1,6 @@
 {
     "name": "@mmo/tv-desktop",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "private": true,
     "description": "MixAI TV for Windows, macOS and Linux — Tauri 2 shell around the shared TV web UI (apps/tv-tizen/src). Microsoft Store (MSIX), Mac App Store, Flathub.",
     "type": "module",

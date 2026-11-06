@@ -16,9 +16,9 @@ export function normalizeBaseUrl(input: string): string {
     let s = input.trim();
     if (!s) return "";
     if (!/^https?:\/\//i.test(s)) s = "http://" + s;
-    // Host without port → default MMO Server port.
+    // Plain-http host without port → default MMO Server port. An explicit https URL (demo.mixai.ro, tunnels) stays on 443.
     const m = /^(https?:\/\/)([^/:]+)(:\d+)?(\/.*)?$/i.exec(s);
-    if (m && !m[3]) s = `${m[1]}${m[2]}:${DEFAULT_PORT}`;
+    if (m && !m[3] && m[1]?.toLowerCase() === "http://") s = `${m[1]}${m[2]}:${DEFAULT_PORT}`;
     return s.replace(/\/+$/, "");
 }
 

@@ -5,6 +5,7 @@ let package = Package(
     name: "MixaiCore",
     platforms: [
         .iOS("26.0"),
+        .tvOS("26.0"),
         .macOS(.v15),
     ],
     products: [

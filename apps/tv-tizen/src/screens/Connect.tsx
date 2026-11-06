@@ -12,8 +12,9 @@ interface Props {
 }
 
 function toServer(baseUrl: string): DiscoveredServer {
-    const m = /^https?:\/\/([^/:]+)(?::(\d+))?/i.exec(baseUrl);
-    return { baseUrl, host: m?.[1] ?? baseUrl, port: m?.[2] ? Number(m[2]) : 17899, info: null };
+    const m = /^(https?):\/\/([^/:]+)(?::(\d+))?/i.exec(baseUrl);
+    const port = m?.[3] ? Number(m[3]) : m?.[1]?.toLowerCase() === "https" ? 443 : 17899;
+    return { baseUrl, host: m?.[2] ?? baseUrl, port, info: null };
 }
 
 export function ConnectScreen({ initial, onConnected, onQuickConnect }: Props) {

@@ -10,10 +10,12 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 const own = location.origin;
+// Tauri's own IPC travels as fetch to http://ipc.localhost (Windows/Android) — never reroute it through plugin-http.
+const isIpc = (url: string) => /^https?:\/\/ipc\.localhost(\/|$)/i.test(url);
 
 globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    if (/^https?:\/\//i.test(url) && !url.startsWith(own)) return tauriFetch(input, init);
+    if (/^https?:\/\//i.test(url) && !url.startsWith(own) && !isIpc(url)) return tauriFetch(input, init);
     return nativeFetch(input, init);
 }) as typeof fetch;
 

@@ -3,6 +3,7 @@
 #
 #   scripts/build.sh test      swift test MixaiCore (no Simulator needed)
 #   scripts/build.sh build     generate project + compile for iphoneos, unsigned
+#   scripts/build.sh tvbuild   generate project + compile MixAI TV for appletvos, unsigned (WP17-24)
 #   scripts/build.sh devipa    archive + development-signed ro.mixai.app .ipa (registered devices) for a direct install
 #   scripts/build.sh upload    archive, sign (automatic, via App Store Connect API key) and upload to TestFlight
 #
@@ -122,6 +123,14 @@ case "$MODE" in
       -destination 'generic/platform=iOS' -derivedDataPath "$OUT/dd" "${SPM_FLAGS[@]}" \
       CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build -quiet
     log "OK: $OUT/dd/Build/Products/Release-iphoneos/MixAI.app"
+    ;;
+  tvbuild)
+    generate
+    log "compile MixAI TV (appletvos, unsigned)"
+    xcodebuild -project MixAI.xcodeproj -scheme MixAITV -configuration Release \
+      -destination 'generic/platform=tvOS' -derivedDataPath "$OUT/dd" "${SPM_FLAGS[@]}" \
+      CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build -quiet
+    log "OK: $OUT/dd/Build/Products/Release-appletvos/MixAITV.app"
     ;;
   devipa)
     archive
