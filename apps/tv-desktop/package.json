@@ -1,0 +1,27 @@
+{
+    "name": "@mmo/tv-desktop",
+    "version": "0.1.0",
+    "private": true,
+    "description": "MixAI TV for Windows, macOS and Linux — Tauri 2 shell around the shared TV web UI (apps/tv-tizen/src). Microsoft Store (MSIX), Mac App Store, Flathub.",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc --noEmit && vite build",
+        "typecheck": "tsc --noEmit",
+        "tauri": "tauri",
+        "tauri:dev": "tauri dev",
+        "tauri:build": "tauri build --no-bundle",
+        "msix": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-msix.ps1"
+    },
+    "dependencies": {
+        "@tauri-apps/api": "~2.11.1",
+        "@tauri-apps/plugin-http": "~2.7.0"
+    },
+    "devDependencies": {
+        "@tauri-apps/cli": "^2.12.4",
+        "@types/node": "^24",
+        "@vitejs/plugin-react": "^6.1.1",
+        "typescript": "^7.0.2",
+        "vite": "^8.3.0"
+    }
+}

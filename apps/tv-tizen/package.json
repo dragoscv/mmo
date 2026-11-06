@@ -11,6 +11,7 @@
         "typecheck": "tsc --noEmit",
         "test": "node --experimental-strip-types --test src/lib/screen-format.test.mjs src/lib/sync-math.test.mjs src/screens/player/model.test.mjs",
         "package": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-wgt.ps1",
+        "package:webos": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-ipk.ps1",
         "setup:cert": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-tizen-cert.ps1"
     },
     "dependencies": {

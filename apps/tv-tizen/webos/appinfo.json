@@ -1,0 +1,16 @@
+{
+    "id": "ro.mixai.tv",
+    "version": "2.3.0",
+    "vendor": "MixAI",
+    "type": "web",
+    "main": "index.html",
+    "title": "MixAI TV",
+    "icon": "icon.png",
+    "largeIcon": "largeIcon.png",
+    "bgColor": "#0b0b12",
+    "resolution": "1920x1080",
+    "disableBackHistoryAPI": true,
+    "handlesRelaunch": false,
+    "requiredMemory": 400,
+    "requiredACG": []
+}

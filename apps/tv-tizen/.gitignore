@@ -5,3 +5,5 @@ dist/
 .sign/
 author-signature.xml
 signature1.xml
+webos-out/
+*.ipk

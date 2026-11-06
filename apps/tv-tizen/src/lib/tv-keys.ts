@@ -1,7 +1,7 @@
 import { exitApp as platformExit } from "../platform";
 /**
- * Tizen remote → logical key mapping. Arrow/Enter are standard; Back is 10009,
- * media keys need `tizen.tvinputdevice.registerKey` or the platform swallows them.
+ * TV remote → logical key mapping. Arrow/Enter are standard; Back is 10009 (Tizen) / 461 (LG webOS);
+ * on Tizen media keys need `tizen.tvinputdevice.registerKey` or the platform swallows them.
  */
 
 export type TvKey =
@@ -12,7 +12,7 @@ export type TvKey =
 
 const CODES: Record<number, TvKey> = {
     37: "left", 38: "up", 39: "right", 40: "down", 13: "enter",
-    10009: "back", 27: "back", 8: "back",
+    10009: "back", 461: "back", 27: "back", 8: "back",
     415: "play", 19: "pause", 10252: "playpause", 413: "stop",
     412: "rewind", 417: "fastforward",
     403: "red", 404: "green", 405: "yellow", 406: "blue",

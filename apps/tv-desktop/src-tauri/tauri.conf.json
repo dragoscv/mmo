@@ -1,0 +1,50 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "productName": "MixAI TV",
+    "version": "0.1.0",
+    "identifier": "ro.mixai.tv.desktop",
+    "build": {
+        "beforeDevCommand": "pnpm dev",
+        "devUrl": "http://localhost:13795",
+        "beforeBuildCommand": "pnpm build",
+        "frontendDist": "../dist"
+    },
+    "app": {
+        "withGlobalTauri": false,
+        "windows": [
+            {
+                "label": "main",
+                "title": "MixAI TV",
+                "width": 1600,
+                "height": 900,
+                "minWidth": 960,
+                "minHeight": 540,
+                "center": true,
+                "resizable": true,
+                "fullscreen": false,
+                "backgroundColor": "#0b0b12"
+            }
+        ],
+        "security": {
+            "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' blob: data: https: http:; connect-src 'self' ipc: http://ipc.localhost https: http: ws: wss:; font-src 'self' data:"
+        }
+    },
+    "bundle": {
+        "active": true,
+        "targets": ["nsis", "dmg", "app", "deb", "appimage"],
+        "publisher": "MixAI",
+        "category": "Video",
+        "shortDescription": "Watch your MixAI Server",
+        "longDescription": "MixAI TV plays the movies, series, Live TV and music from your own MixAI Server, with Watch Together and phone remote control.",
+        "copyright": "© 2026 MixAI",
+        "icon": [
+            "icons/32x32.png",
+            "icons/128x128.png",
+            "icons/128x128@2x.png",
+            "icons/icon.icns",
+            "icons/icon.ico"
+        ],
+        "windows": { "nsis": { "installMode": "currentUser" } },
+        "macOS": { "minimumSystemVersion": "11.0" }
+    }
+}

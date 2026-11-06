@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="ro" data-tv data-desktop data-mode="dark" data-accent="violet" data-surface="solid" data-motion="full">
+<head>
+    <meta charset="UTF-8" />
+    <!-- Same TV defaults as apps/tv-tizen/index.html (only when the user has none), then the shared prehydrate. -->
+    <script>try{var K="mixai:prefs:v1",r=localStorage.getItem(K),p=r?JSON.parse(r):null;if(!p)p={mode:"dark",accent:"violet",surface:"solid",density:"comfortable",radius:"md",motion:"full",locale:(navigator.language||"ro").slice(0,2)==="en"?"en":"ro",feedback:false};if(!p.tvMotionV2){p.tvMotionV2=true}localStorage.setItem(K,JSON.stringify(p))}catch(e){}</script>
+    <script src="./prehydrate.js"></script>
+    <meta name="viewport" content="width=device-width" />
+    <title>MixAI TV</title>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

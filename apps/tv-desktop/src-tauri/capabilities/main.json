@@ -1,0 +1,16 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "main-capability",
+    "description": "MixAI TV main window: core window ops + HTTP to MixAI Servers (LAN http and any https host).",
+    "windows": ["main"],
+    "permissions": [
+        "core:default",
+        "core:window:allow-close",
+        "core:window:allow-set-fullscreen",
+        "core:window:allow-is-fullscreen",
+        {
+            "identifier": "http:default",
+            "allow": [{ "url": "http://*:*" }, { "url": "https://*:*" }, { "url": "http://*" }, { "url": "https://*" }]
+        }
+    ]
+}

@@ -1,0 +1,30 @@
+[package]
+name = "mixai-tv"
+version = "0.1.0"
+description = "MixAI TV — watch your MixAI Server on Windows, macOS and Linux"
+authors = ["MixAI <support@mixai.ro>"]
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/dragoscv/mmo"
+edition = "2024"
+rust-version = "1.88"
+
+[lib]
+name = "mixai_tv_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+
+[dependencies]
+tauri = { version = "2.11", features = [] }
+tauri-plugin-http = "2.5"
+serde = { version = "1.0", features = ["derive"] }
+local-ip-address = "0.6"
+gethostname = "1.1"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

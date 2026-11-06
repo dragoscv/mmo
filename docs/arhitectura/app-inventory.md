@@ -53,3 +53,15 @@ Work: tracker §12 WP17. Update this table in the same commit as any release, re
 | Samsung TV Seller Office | needed (free) | EU sales need approved Partner status |
 | LG Seller Lounge | needed (free, Individual seller) | UX scenario + self-checklist mandatory |
 | Flathub | needed (free, GitHub) | Domain verification for the verified badge |
+
+### Microsoft Store reservations (2026-11-06, Partner Center, publisher "Dragos Catalin")
+
+| Product | Store ID | Package identity |
+|---|---|---|
+| MixAI TV | `9P3WGV62ZRN5` | Name `DragosCatalin.MixAITV`, Publisher `CN=FE8B5839-E0F9-495F-854C-53165710EB07`, PFN `DragosCatalin.MixAITV_2n7wyqrzmk6fw` |
+| MixAI Music | `9PC31TGKW4FP` | read from Partner Center → Product identity when the package is built |
+| MixAI Studio | `9NKKC4WGMX67` | idem |
+| MixAI DJ | `9P5P2WN26RMS` | idem |
+
+Reservations expire if nothing is submitted within 3 months (by 2027-02-06).
+`apps/tv-desktop/scripts/package-msix.ps1 -IdentityName DragosCatalin.MixAITV -Publisher 'CN=FE8B5839-E0F9-495F-854C-53165710EB07' -PublisherDisplay 'Dragos Catalin'`.
