@@ -28,13 +28,11 @@ security create-keychain -p "$KCPW" "$KC"
 security set-keychain-settings -lut 7200 "$KC"
 security unlock-keychain -p "$KCPW" "$KC"
 security import "$DEVID_P12" -k "$KC" -f pkcs12 -P "$P12_PASSWORD" -T /usr/bin/codesign >/dev/null
-# Developer ID G2 leaf certs chain to this intermediate (and Apple Root CA); without both, find-identity -v reports
-# 0 identities and codesign fails with "unable to build chain to self-signed root" / errSecInternalComponent.
+# Developer ID G2 leaf certs chain to this intermediate (Apple Root CA ships in System Roots); without it
+# find-identity -v reports 0 identities and codesign fails with "unable to build chain to self-signed root".
 CADIR="$(mktemp -d)"
-for ca in DeveloperIDG2CA.cer AppleIncRootCertificate.cer; do
-  curl -fsSL -o "$CADIR/$ca" "https://www.apple.com/certificateauthority/$ca"
-  security import "$CADIR/$ca" -k "$KC" -T /usr/bin/codesign || log "CA $ca already present"
-done
+curl -fsSL -o "$CADIR/g2.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+security import "$CADIR/g2.cer" -k "$KC" || log "G2 CA already present"
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPW" "$KC" >/dev/null
 # shellcheck disable=SC2086
 security list-keychains -d user -s "$KC" $OLD_KCS
