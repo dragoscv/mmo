@@ -10,6 +10,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — Web 3.2.4 (dashboard hydration), MixAI Studio desktop 1.1.0, MixAI TV for Mac 0.1.1
+
+- Web: the dashboard greeting depended on the clock during render, so the server (UTC) and the browser (local time)
+  produced different text and React threw #418 on every load of `/dashboard` (seen by the cloud store-shot run). The
+  greeting is now neutral on the first render and set after mount; stat-card numbers format with a fixed locale.
+- MixAI Studio desktop 1.1.0 (`apps/native`, `ro.mixai.studio`): opens app.mixai.ro with native sign-in
+  (`withGlobalTauri` was missing, so the bootstrap fell through to mixai.ro); Microsoft Store MSIX via the shared
+  `scripts/package-msix.ps1`.
+- MixAI TV for Mac 0.1.1 submitted to the Mac App Store; Developer ID DMG mode (`macos-appstore.ps1 -Mode dmg`).
+
 ## 2026-11-06 — Web 3.2.3 (suite title, one sentence per line)
 
 - The 3.2.2 measure change did not help: the cloud e2e assertion it added still saw 3 lines with breaks inside a phrase

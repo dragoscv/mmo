@@ -224,10 +224,10 @@ function StatCard({
     const animated = useCountUp(skipCountUp ? 0 : value, 1400, delay + 200);
     const colors = STAT_THEMES[theme];
     const displayValue = skipCountUp
-        ? (formattedValue || value.toLocaleString())
+        ? (formattedValue || value.toLocaleString("en-US"))
         : (formattedValue
-            ? formattedValue.replace(/[\d,]+/, String(animated.toLocaleString()))
-            : animated.toLocaleString());
+            ? formattedValue.replace(/[\d,]+/, String(animated.toLocaleString("en-US")))
+            : animated.toLocaleString("en-US"));
 
     return (
         <div
@@ -582,7 +582,12 @@ function FormatBadges({ data }: { data: DashboardStats["formatStats"] }) {
 
 // ── Greeting ─────────────────────────────────────────────────────
 
-function getGreeting() {
+type Greeting = { text: string; emoji: string };
+
+// Server (UTC) and browser (local) hours differ, so the first render must not depend on the clock (React #418).
+const NEUTRAL_GREETING: Greeting = { text: "Welcome back", emoji: "🎧" };
+
+function getGreeting(): Greeting {
     const h = new Date().getHours();
     if (h >= 5 && h < 12) return { text: "Good morning", emoji: "🌅" };
     if (h >= 12 && h < 18) return { text: "Good afternoon", emoji: "☀️" };
@@ -603,7 +608,8 @@ function formatTotalDuration(seconds: number) {
 export function DashboardClient({ stats, recommendedCategories, recentScans, growth = [] }: DashboardClientProps) {
     useRenderCount("Page:/dashboard");
     useSyncRefresh();
-    const greeting = getGreeting();
+    const [greeting, setGreeting] = useState<Greeting>(NEUTRAL_GREETING);
+    useEffect(() => setGreeting(getGreeting()), []);
     const locale = useLocale() as "ro" | "en";
     const tNav = useTranslations("nav");
 
