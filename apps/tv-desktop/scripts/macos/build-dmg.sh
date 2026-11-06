@@ -28,16 +28,20 @@ security create-keychain -p "$KCPW" "$KC"
 security set-keychain-settings -lut 7200 "$KC"
 security unlock-keychain -p "$KCPW" "$KC"
 security import "$DEVID_P12" -k "$KC" -f pkcs12 -P "$P12_PASSWORD" -T /usr/bin/codesign >/dev/null
-# Developer ID G2 leaf certs chain to this intermediate; without it find-identity -v reports 0 valid identities.
-CA="$(mktemp -d)/DeveloperIDG2CA.cer"
-curl -fsSL -o "$CA" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
-security import "$CA" -k "$KC" >/dev/null 2>&1 || true
+# Developer ID G2 leaf certs chain to this intermediate (and Apple Root CA); without both, find-identity -v reports
+# 0 identities and codesign fails with "unable to build chain to self-signed root" / errSecInternalComponent.
+CADIR="$(mktemp -d)"
+for ca in DeveloperIDG2CA.cer AppleIncRootCertificate.cer; do
+  curl -fsSL -o "$CADIR/$ca" "https://www.apple.com/certificateauthority/$ca"
+  security import "$CADIR/$ca" -k "$KC" -T /usr/bin/codesign || log "CA $ca already present"
+done
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPW" "$KC" >/dev/null
 # shellcheck disable=SC2086
 security list-keychains -d user -s "$KC" $OLD_KCS
 IDENTITY="$(security find-identity -v -p codesigning "$KC" | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -1)"
 [ -n "$IDENTITY" ] || { echo "no Developer ID Application identity in DEVID_P12" >&2; exit 1; }
 log "signing as: $IDENTITY"
+security find-identity -v -p codesigning "$KC" | sed -E 's/[0-9A-F]{40}/<sha>/'
 
 notarise() {
   xcrun notarytool submit "$1" --key "$ASC_KEY_PATH" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" \
