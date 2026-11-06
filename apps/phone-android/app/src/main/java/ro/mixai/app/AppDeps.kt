@@ -19,6 +19,7 @@ import ro.mixai.tv.data.ProgressSync
 import ro.mixai.tv.data.Settings
 import ro.mixai.app.data.PhoneApi
 import ro.mixai.app.data.PhoneDeps
+import ro.mixai.music.ui.MusicDeps
 
 /** Long-lived objects of one server connection (rebuilt when base URL / token change). Same wiring as the TV app. */
 class ConnectionGraph(
@@ -58,11 +59,11 @@ fun buildGraph(context: Context, conn: Connection, settings: Settings): Connecti
  */
 @Immutable
 data class AppDeps(
-    val api: MmoApi,
+    override val api: MmoApi,
     val media: MediaRepository,
     val profiles: ProfileRepository,
-    val music: MusicRepository,
-    val musicPlayback: MusicPlayback,
+    override val music: MusicRepository,
+    override val musicPlayback: MusicPlayback,
     val liveTv: LiveTvRepository,
     val hub: HubClient,
     val settings: Settings,
@@ -76,7 +77,7 @@ data class AppDeps(
     val scope: CoroutineScope,
     val onChangeServer: () -> Unit = {},
     val onSignOut: (() -> Unit)? = null,
-) {
+) : MusicDeps {
     fun saveLocalProgress(fileId: String, posMs: Long, durMs: Long) {
         scope.launch { settings.saveProgress(fileId, posMs, durMs) }
     }

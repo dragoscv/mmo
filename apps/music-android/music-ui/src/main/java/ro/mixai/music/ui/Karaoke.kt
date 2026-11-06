@@ -1,4 +1,4 @@
-package ro.mixai.app.ui.music
+package ro.mixai.music.ui
 
 /** One timed unit of an enhanced-LRC line; [text] keeps its trailing whitespace. */
 data class KaraokeWord(val text: String, val startMs: Long)

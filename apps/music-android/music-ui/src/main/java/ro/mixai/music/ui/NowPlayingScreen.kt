@@ -1,4 +1,4 @@
-package ro.mixai.app.ui.music
+package ro.mixai.music.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -68,26 +68,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
-import ro.mixai.app.AppDeps
-import ro.mixai.app.R
-import ro.mixai.app.nav.Dest
-import ro.mixai.app.nav.Navigator
-import ro.mixai.app.ui.components.EmptyState
+import ro.mixai.music.ui.R
 import ro.mixai.tv.data.MusicState
 import ro.mixai.tv.data.RepeatMode
 import ro.mixai.tv.data.generated.LyricLine
 import ro.mixai.tv.data.generated.Lyrics
 
 @Composable
-fun NowPlayingScreen(deps: AppDeps, nav: Navigator) {
+fun NowPlayingScreen(deps: MusicDeps, nav: MusicNav) {
     val state by deps.musicPlayback.state.collectAsState()
     var panel by rememberSaveable { mutableIntStateOf(0) } // 0 lyrics, 1 queue
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { nav.pop() }) {
-                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = stringResource(R.string.action_close))
+                IconButton(onClick = { nav.back() }) {
+                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = stringResource(R.string.music_action_close))
                 }
                 Text(
                     stringResource(R.string.music_now_playing), style = MaterialTheme.typography.titleMedium,
@@ -129,7 +125,7 @@ fun NowPlayingScreen(deps: AppDeps, nav: Navigator) {
 }
 
 @Composable
-private fun PlayerHeader(deps: AppDeps, nav: Navigator, state: MusicState, compact: Boolean = false) {
+private fun PlayerHeader(deps: MusicDeps, nav: MusicNav, state: MusicState, compact: Boolean = false) {
     val t = state.track ?: return
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         val coverMod = if (compact) Modifier.size(120.dp) else Modifier.weight(1f).widthIn(max = 360.dp).aspectRatio(1f)
@@ -140,27 +136,27 @@ private fun PlayerHeader(deps: AppDeps, nav: Navigator, state: MusicState, compa
 }
 
 @Composable
-private fun TrackInfo(nav: Navigator, state: MusicState, modifier: Modifier) {
+private fun TrackInfo(nav: MusicNav, state: MusicState, modifier: Modifier) {
     val t = state.track ?: return
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(t.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
         t.artist?.let { a ->
             Text(
                 a, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable(enabled = !t.artistId.isNullOrBlank()) { t.artistId?.let { nav.push(Dest.Artist(it)) } },
+                modifier = Modifier.clickable(enabled = !t.artistId.isNullOrBlank()) { t.artistId?.let { nav.openArtist(it) } },
             )
         }
         t.album?.let { al ->
             Text(
                 al, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable(enabled = t.albumId.isNotBlank()) { nav.push(Dest.Album(t.albumId)) },
+                modifier = Modifier.clickable(enabled = t.albumId.isNotBlank()) { nav.openAlbum(t.albumId) },
             )
         }
     }
 }
 
 @Composable
-private fun PlayerControls(deps: AppDeps, state: MusicState) {
+private fun PlayerControls(deps: MusicDeps, state: MusicState) {
     val pb = deps.musicPlayback
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableFloatStateOf(0f) }
@@ -233,14 +229,14 @@ private fun PanelSwitch(panel: Int, onSelect: (Int) -> Unit) {
 }
 
 @Composable
-private fun PanelContent(deps: AppDeps, state: MusicState, panel: Int, modifier: Modifier) {
+private fun PanelContent(deps: MusicDeps, state: MusicState, panel: Int, modifier: Modifier) {
     Box(modifier.fillMaxWidth()) {
         if (panel == 0) LyricsPanel(deps, state) else QueuePanel(deps, state)
     }
 }
 
 @Composable
-private fun LyricsPanel(deps: AppDeps, state: MusicState) {
+private fun LyricsPanel(deps: MusicDeps, state: MusicState) {
     val track = state.track ?: return
     var lyrics by remember(track.id) { mutableStateOf<Lyrics?>(null) }
     var loaded by remember(track.id) { mutableStateOf(false) }
@@ -302,7 +298,7 @@ private fun SyncedLyrics(lines: List<LyricLine>, positionMs: Long, onSeek: (Long
 }
 
 @Composable
-private fun QueuePanel(deps: AppDeps, state: MusicState) {
+private fun QueuePanel(deps: MusicDeps, state: MusicState) {
     if (state.queue.isEmpty()) {
         Text(stringResource(R.string.music_queue_empty), Modifier.fillMaxWidth().padding(32.dp), textAlign = TextAlign.Center)
         return
@@ -320,7 +316,7 @@ private fun QueuePanel(deps: AppDeps, state: MusicState) {
 
 /** Compact bar above the bottom navigation while music is active. */
 @Composable
-fun MiniPlayer(deps: AppDeps, nav: Navigator) {
+fun MiniPlayer(deps: MusicDeps, nav: MusicNav) {
     val state by deps.musicPlayback.state.collectAsState()
     val t = state.track ?: return
     val openLabel = stringResource(R.string.music_open_now_playing)
@@ -335,7 +331,7 @@ fun MiniPlayer(deps: AppDeps, nav: Navigator) {
                 gapSize = 0.dp,
             )
             Row(
-                Modifier.fillMaxSize().clickable(onClickLabel = openLabel) { nav.push(Dest.NowPlaying) }.padding(horizontal = 12.dp),
+                Modifier.fillMaxSize().clickable(onClickLabel = openLabel) { nav.openNowPlaying() }.padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {

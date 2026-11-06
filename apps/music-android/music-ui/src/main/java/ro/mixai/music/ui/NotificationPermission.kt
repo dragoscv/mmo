@@ -1,4 +1,4 @@
-package ro.mixai.app.ui.music
+package ro.mixai.music.ui
 
 import android.Manifest
 import android.content.pm.PackageManager

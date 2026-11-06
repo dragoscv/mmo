@@ -1,4 +1,4 @@
-package ro.mixai.app.ui.music
+package ro.mixai.music.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,7 +45,7 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
 import okhttp3.Request
-import ro.mixai.app.R
+import ro.mixai.music.ui.R
 import ro.mixai.tv.data.ApiException
 import ro.mixai.tv.data.Http
 import ro.mixai.tv.data.MmoApi

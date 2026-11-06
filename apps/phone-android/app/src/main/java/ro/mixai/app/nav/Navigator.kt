@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import ro.mixai.tv.data.DiscoveredServer
 import ro.mixai.tv.data.MediaRef
+import ro.mixai.music.ui.MusicNav
 
 /** Bottom bar / rail destinations. */
 enum class Tab { Home, Search, Library, Music, Live }
@@ -49,6 +50,14 @@ class Navigator(start: Dest) {
     val backStack: SnapshotStateList<Dest> = mutableStateListOf(start)
 
     val current: Dest get() = backStack.last()
+
+    /** Adapter for the shared :music-ui screens. */
+    val music: MusicNav = object : MusicNav {
+        override fun openAlbum(id: String) = push(Dest.Album(id))
+        override fun openArtist(id: String) = push(Dest.Artist(id))
+        override fun openNowPlaying() = push(Dest.NowPlaying)
+        override fun back() { pop() }
+    }
 
     /** Tab whose root is at the bottom of the current stack (Home when none). */
     val currentTab: Tab get() = backStack.filterIsInstance<Dest.TabRoot>().lastOrNull()?.tab ?: Tab.Home

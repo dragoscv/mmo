@@ -1,4 +1,4 @@
-package ro.mixai.app.ui.music
+package ro.mixai.music.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,15 +60,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import ro.mixai.app.AppDeps
-import ro.mixai.app.R
-import ro.mixai.app.nav.Dest
-import ro.mixai.app.nav.Navigator
-import ro.mixai.app.ui.components.EmptyState
-import ro.mixai.app.ui.components.ErrorState
-import ro.mixai.app.ui.components.LoadingSkeleton
-import ro.mixai.app.ui.components.TabHeader
-import ro.mixai.app.ui.components.errorText
+import ro.mixai.music.ui.R
 import ro.mixai.tv.data.generated.AlbumCard
 import ro.mixai.tv.data.generated.ArtistCard
 import ro.mixai.tv.data.generated.MusicHome
@@ -81,7 +73,7 @@ private enum class MusicTab(val label: Int) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MusicScreen(deps: AppDeps, nav: Navigator) {
+fun MusicScreen(deps: MusicDeps, nav: MusicNav, header: @Composable () -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var home by remember { mutableStateOf(PhoneMusicCache.home) }
     var error by remember { mutableStateOf<Throwable?>(null) }
@@ -105,16 +97,16 @@ fun MusicScreen(deps: AppDeps, nav: Navigator) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        TabHeader(stringResource(R.string.tab_music), deps, nav)
+        header()
         val h = home
         when {
             error != null -> ErrorState(error, onRetry = { reload++ })
-            h == null -> LoadingSkeleton(hero = false, rows = 3, cardWidth = 140.dp)
+            h == null -> LoadingSkeleton(rows = 3, cardWidth = 140.dp)
             emptyLibrary -> EmptyState(
                 icon = Icons.Outlined.LibraryMusic,
                 title = stringResource(R.string.music_empty_title),
                 hint = stringResource(R.string.music_empty_hint),
-            ) { Button(onClick = { reload++ }) { Text(stringResource(R.string.action_retry)) } }
+            ) { Button(onClick = { reload++ }) { Text(stringResource(R.string.music_action_retry)) } }
             else -> {
                 PrimaryScrollableTabRow(selectedTabIndex = tab, edgePadding = 16.dp) {
                     MusicTab.entries.forEachIndexed { i, t ->
@@ -141,20 +133,20 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun AlbumRow(deps: AppDeps, nav: Navigator, title: String, albums: List<AlbumCard>) {
+private fun AlbumRow(deps: MusicDeps, nav: MusicNav, title: String, albums: List<AlbumCard>) {
     if (albums.isEmpty()) return
     Column {
         SectionTitle(title)
         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(albums.distinctBy { it.id }, key = { it.id }) { a ->
-                AlbumTile(deps.music.coverUrl(a), a, onClick = { nav.push(Dest.Album(a.id)) })
+                AlbumTile(deps.music.coverUrl(a), a, onClick = { nav.openAlbum(a.id) })
             }
         }
     }
 }
 
 @Composable
-private fun MusicHomeTab(deps: AppDeps, nav: Navigator, home: MusicHome, onPlaylist: (PlaylistCard) -> Unit, onGenre: (String) -> Unit) {
+private fun MusicHomeTab(deps: MusicDeps, nav: MusicNav, home: MusicHome, onPlaylist: (PlaylistCard) -> Unit, onGenre: (String) -> Unit) {
     val askNotif = rememberNotificationPermissionRequester()
     val scope = rememberCoroutineScope()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
@@ -213,7 +205,7 @@ private fun MusicHomeTab(deps: AppDeps, nav: Navigator, home: MusicHome, onPlayl
 }
 
 @Composable
-private fun ArtistsTab(deps: AppDeps, nav: Navigator) {
+private fun ArtistsTab(deps: MusicDeps, nav: MusicNav) {
     val loaded = remember { mutableStateListOf<ArtistCard>() }
     var total by remember { mutableStateOf(-1L) }
     var loading by remember { mutableStateOf(false) }
@@ -258,14 +250,14 @@ private fun ArtistsTab(deps: AppDeps, nav: Navigator) {
                     supportingContent = { Text(stringResource(R.string.music_albums_count, a.albumCount.toInt())) },
                     leadingContent = { ArtistAvatar(deps.music.coverUrl(a), 48.dp) },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
-                    modifier = Modifier.clickable { nav.push(Dest.Artist(a.id)) },
+                    modifier = Modifier.clickable { nav.openArtist(a.id) },
                 )
             }
             if (loading) item { CenteredSpinner(Modifier.fillMaxWidth().height(64.dp)) }
             if (error != null) item {
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(errorText(error), Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
-                    Button(onClick = { error = null; attempt++ }) { Text(stringResource(R.string.action_retry)) }
+                    Button(onClick = { error = null; attempt++ }) { Text(stringResource(R.string.music_action_retry)) }
                 }
             }
         }
@@ -273,7 +265,7 @@ private fun ArtistsTab(deps: AppDeps, nav: Navigator) {
 }
 
 @Composable
-private fun AlbumsTab(deps: AppDeps, nav: Navigator) {
+private fun AlbumsTab(deps: MusicDeps, nav: MusicNav) {
     val loaded = remember { mutableStateListOf<AlbumCard>() }
     var done by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
@@ -319,14 +311,14 @@ private fun AlbumsTab(deps: AppDeps, nav: Navigator) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             items(loaded.distinctBy { it.id }, key = { it.id }) { a ->
-                AlbumTile(deps.music.coverUrl(a), a, onClick = { nav.push(Dest.Album(a.id)) }, width = null)
+                AlbumTile(deps.music.coverUrl(a), a, onClick = { nav.openAlbum(a.id) }, width = null)
             }
         }
     }
 }
 
 @Composable
-private fun PlaylistsTab(deps: AppDeps, playlists: List<PlaylistCard>, onPlaylist: (PlaylistCard) -> Unit) {
+private fun PlaylistsTab(deps: MusicDeps, playlists: List<PlaylistCard>, onPlaylist: (PlaylistCard) -> Unit) {
     if (playlists.isEmpty()) {
         EmptyState(Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.music_no_playlists), stringResource(R.string.music_no_playlists_hint))
         return
@@ -346,7 +338,7 @@ private fun PlaylistsTab(deps: AppDeps, playlists: List<PlaylistCard>, onPlaylis
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PlaylistSheet(deps: AppDeps, playlist: PlaylistCard, onDismiss: () -> Unit) {
+private fun PlaylistSheet(deps: MusicDeps, playlist: PlaylistCard, onDismiss: () -> Unit) {
     val askNotif = rememberNotificationPermissionRequester()
     var tracks by remember(playlist.id) { mutableStateOf<List<TrackCard>?>(null) }
     var error by remember(playlist.id) { mutableStateOf<Throwable?>(null) }
@@ -398,7 +390,7 @@ internal fun CenteredSpinner(modifier: Modifier = Modifier.fillMaxSize()) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun GenreSheet(deps: AppDeps, nav: Navigator, genre: String, onDismiss: () -> Unit) {
+private fun GenreSheet(deps: MusicDeps, nav: MusicNav, genre: String, onDismiss: () -> Unit) {
     var albums by remember(genre) { mutableStateOf<List<AlbumCard>?>(null) }
     var error by remember(genre) { mutableStateOf<Throwable?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -424,7 +416,7 @@ private fun GenreSheet(deps: AppDeps, nav: Navigator, genre: String, onDismiss: 
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     items(list.distinctBy { it.id }, key = { it.id }) { a ->
-                        AlbumTile(deps.music.coverUrl(a), a, onClick = { onDismiss(); nav.push(Dest.Album(a.id)) }, width = null)
+                        AlbumTile(deps.music.coverUrl(a), a, onClick = { onDismiss(); nav.openAlbum(a.id) }, width = null)
                     }
                 }
             }

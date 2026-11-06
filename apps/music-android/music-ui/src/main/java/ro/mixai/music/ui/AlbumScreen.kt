@@ -1,4 +1,4 @@
-package ro.mixai.app.ui.music
+package ro.mixai.music.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,19 +42,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
-import ro.mixai.app.AppDeps
-import ro.mixai.app.R
-import ro.mixai.app.nav.Dest
-import ro.mixai.app.nav.Navigator
-import ro.mixai.app.ui.components.ErrorState
+import ro.mixai.music.ui.R
 import ro.mixai.tv.data.generated.AlbumDetail
 import ro.mixai.tv.data.generated.ArtistDetail
 
 @Composable
-internal fun BackBar(nav: Navigator) {
+internal fun BackBar(nav: MusicNav) {
     Box(Modifier.fillMaxWidth().statusBarsPadding().padding(4.dp)) {
-        IconButton(onClick = { nav.pop() }) {
-            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
+        IconButton(onClick = { nav.back() }) {
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.music_action_back))
         }
     }
 }
@@ -76,7 +72,7 @@ internal fun PlayShuffleButtons(onPlay: () -> Unit, onShuffle: () -> Unit, enabl
 }
 
 @Composable
-fun AlbumScreen(deps: AppDeps, nav: Navigator, id: String) {
+fun AlbumScreen(deps: MusicDeps, nav: MusicNav, id: String) {
     var detail by remember(id) { mutableStateOf<AlbumDetail?>(null) }
     var error by remember(id) { mutableStateOf<Throwable?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -115,7 +111,7 @@ fun AlbumScreen(deps: AppDeps, nav: Navigator, id: String) {
                                 Text(
                                     artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.clickable(enabled = !d.album.artistId.isNullOrBlank()) {
-                                        d.album.artistId?.let { nav.push(Dest.Artist(it)) }
+                                        d.album.artistId?.let { nav.openArtist(it) }
                                     },
                                 )
                             }
@@ -149,7 +145,7 @@ fun AlbumScreen(deps: AppDeps, nav: Navigator, id: String) {
 }
 
 @Composable
-fun ArtistScreen(deps: AppDeps, nav: Navigator, id: String) {
+fun ArtistScreen(deps: MusicDeps, nav: MusicNav, id: String) {
     var detail by remember(id) { mutableStateOf<ArtistDetail?>(null) }
     var error by remember(id) { mutableStateOf<Throwable?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -201,7 +197,7 @@ fun ArtistScreen(deps: AppDeps, nav: Navigator, id: String) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             rows[r].forEach { a ->
                                 Box(Modifier.weight(1f)) {
-                                    AlbumTile(deps.music.coverUrl(a), a, onClick = { nav.push(Dest.Album(a.id)) }, width = null)
+                                    AlbumTile(deps.music.coverUrl(a), a, onClick = { nav.openAlbum(a.id) }, width = null)
                                 }
                             }
                             if (rows[r].size == 1) Spacer(Modifier.weight(1f))
@@ -214,7 +210,7 @@ fun ArtistScreen(deps: AppDeps, nav: Navigator, id: String) {
                         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             items(d.similar.distinctBy { it.id }, key = { it.id }) { s ->
                                 Column(
-                                    Modifier.widthIn(max = 96.dp).clickable { nav.push(Dest.Artist(s.id)) },
+                                    Modifier.widthIn(max = 96.dp).clickable { nav.openArtist(s.id) },
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {

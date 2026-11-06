@@ -56,11 +56,12 @@ import ro.mixai.app.ui.home.HomeScreen
 import ro.mixai.app.ui.library.LibraryScreen
 import ro.mixai.app.ui.live.LivePlayerScreen
 import ro.mixai.app.ui.live.LiveScreen
-import ro.mixai.app.ui.music.AlbumScreen
-import ro.mixai.app.ui.music.ArtistScreen
-import ro.mixai.app.ui.music.MiniPlayer
-import ro.mixai.app.ui.music.MusicScreen
-import ro.mixai.app.ui.music.NowPlayingScreen
+import ro.mixai.music.ui.AlbumScreen
+import ro.mixai.music.ui.ArtistScreen
+import ro.mixai.music.ui.MiniPlayer
+import ro.mixai.music.ui.MusicScreen
+import ro.mixai.music.ui.NowPlayingScreen
+import ro.mixai.app.ui.components.TabHeader
 import ro.mixai.app.ui.onboarding.DiscoverScreen
 import ro.mixai.app.ui.onboarding.ManualServerScreen
 import ro.mixai.app.ui.onboarding.PairScreen
@@ -198,7 +199,7 @@ fun AppRoot(conn: Connection, session: AccountSession, settings: Settings, local
                         )
                     }
                 }
-                if (showChrome && deps != null && music?.isActive == true) MiniPlayer(deps, nav)
+                if (showChrome && deps != null && music?.isActive == true) MiniPlayer(deps, nav.music)
             }
         }
     }
@@ -259,14 +260,14 @@ private fun Connected(dest: Dest, nav: Navigator, d: AppDeps) {
             Tab.Home -> HomeScreen(d, nav)
             Tab.Search -> SearchScreen(d, nav)
             Tab.Library -> LibraryScreen(d, nav)
-            Tab.Music -> MusicScreen(d, nav)
+            Tab.Music -> MusicScreen(d, nav.music) { TabHeader(stringResource(R.string.tab_music), d, nav) }
             Tab.Live -> LiveScreen(d, nav)
         }
         is Dest.Title -> TitleScreen(d, nav, dest.kind, dest.tmdbId)
         is Dest.Player -> PlayerScreen(d, nav, dest)
-        is Dest.Artist -> ArtistScreen(d, nav, dest.id)
-        is Dest.Album -> AlbumScreen(d, nav, dest.id)
-        Dest.NowPlaying -> NowPlayingScreen(d, nav)
+        is Dest.Artist -> ArtistScreen(d, nav.music, dest.id)
+        is Dest.Album -> AlbumScreen(d, nav.music, dest.id)
+        Dest.NowPlaying -> NowPlayingScreen(d, nav.music)
         is Dest.LivePlayer -> LivePlayerScreen(d, nav, dest.channelId)
         Dest.Settings -> SettingsScreen(d, nav)
         Dest.Downloads -> DownloadsScreen(d, nav)

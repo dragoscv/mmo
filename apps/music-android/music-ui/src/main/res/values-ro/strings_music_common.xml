@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="music_action_back">Înapoi</string>
+    <string name="music_action_retry">Încearcă din nou</string>
+    <string name="music_action_close">Închide</string>
+    <string name="music_error_title">Ceva nu a mers</string>
+    <string name="music_error_generic">Eroare necunoscută.</string>
+    <string name="music_error_network">Serverul nu poate fi contactat. Verifică conexiunea.</string>
+    <string name="music_error_unauthorized">Serverul a refuzat acest dispozitiv. Asociază-l din nou.</string>
+    <string name="music_error_not_found">Nu există pe server.</string>
+    <string name="music_error_http">Serverul a răspuns cu eroarea %1$d.</string>
+</resources>
