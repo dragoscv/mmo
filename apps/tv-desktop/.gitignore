@@ -13,3 +13,8 @@ src-tauri/icons/
 
 *.local
 *.log
+
+# Mac App Store build (WP17-26)
+target-mac/
+src-tauri/macos/embedded.provisionprofile
+src-tauri/macos/Entitlements.appstore.resolved.plist
