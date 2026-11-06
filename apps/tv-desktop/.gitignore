@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 msix-out/
+linux-out/
 
 # Tauri / Rust
 src-tauri/target/

@@ -56,10 +56,10 @@ $manifest = Get-Content (Join-Path $PSScriptRoot 'msix\AppxManifest.template.xml
 $map = @{
     '__IDENTITY_NAME__' = $IdentityName; '__PUBLISHER__' = $Publisher; '__PUBLISHER_DISPLAY__' = $PublisherDisplay
     '__VERSION__' = $msixVer; '__DISPLAY_NAME__' = $DisplayName; '__DESCRIPTION__' = $Description
-    '__EXE__' = $Exe; '__APP_ID__' = $AppId; '__LAN_CAPABILITY__' = $lan
+    '__EXE__' = $Exe; '__APP_ID__' = $AppId
 }
 foreach ($k in $map.Keys) { $manifest = $manifest.Replace($k, [Security.SecurityElement]::Escape($map[$k])) }
-$manifest = $manifest.Replace([Security.SecurityElement]::Escape($lan), $lan)
+  $manifest = $manifest.Replace('__LAN_CAPABILITY__', $lan)
 [IO.File]::WriteAllText((Join-Path $layout 'AppxManifest.xml'), $manifest, [Text.UTF8Encoding]::new($false))
 
 $msix = Join-Path $out "${FilePrefix}_${msixVer}_x64.msix"

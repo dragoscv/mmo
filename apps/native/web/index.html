@@ -4,7 +4,7 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="color-scheme" content="dark light" />
-        <title>MixAI</title>
+        <title>MixAI Studio</title>
         <script>
             // Pre-hydrate theme: read the shared MixAI prefs blob (same key the
             // web app persists), fall back to the OS colour scheme. Runs before
@@ -165,12 +165,12 @@
         <script type="module">
             // Resolved at runtime via the Tauri `get_web_app_url` command
             // so dev hits localhost:13789 and release hits mixai.ro.
-            let WEB_APP_URL = "https://mixai.ro";
+            let WEB_APP_URL = "https://app.mixai.ro";
 
             const STRINGS = {
                 en: {
                     loading: "Loading…",
-                    welcomeTitle: "Welcome to MixAI",
+                    welcomeTitle: "Welcome to MixAI Studio",
                     welcomeBody:
                         "Sign in with your Google account to continue. We'll open your default browser so you can use your existing session.",
                     signIn: "Sign in with Google",
@@ -188,7 +188,7 @@
                 },
                 ro: {
                     loading: "Se încarcă…",
-                    welcomeTitle: "Bine ai venit în MixAI",
+                    welcomeTitle: "Bine ai venit în MixAI Studio",
                     welcomeBody:
                         "Autentifică-te cu contul Google pentru a continua. Deschidem browserul implicit ca să folosești sesiunea existentă.",
                     signIn: "Autentificare cu Google",

@@ -8,10 +8,11 @@
 .EXAMPLE
   pwsh -NoProfile -File apps/tv-desktop/scripts/macos-appstore.ps1 -Mode build
   pwsh -NoProfile -File apps/tv-desktop/scripts/macos-appstore.ps1 -Mode upload -AppleId <App Store app id>
+  pwsh -NoProfile -File apps/tv-desktop/scripts/macos-appstore.ps1 -Mode dmg     # Developer ID, notarised DMG
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('build', 'upload')] [string]$Mode = 'build',
+  [ValidateSet('build', 'upload', 'dmg')] [string]$Mode = 'build',
   [string]$Ref = 'HEAD',
   [string]$AppleId = '',
   [string]$GuestHost = '100.106.244.19',
@@ -51,11 +52,13 @@ Invoke-Guest "mkdir -p ~/$remote"
 if ($LASTEXITCODE -ne 0) { throw 'scp failed' }
 Invoke-Guest "cd ~/$remote && tar -xf tree.tar && rm tree.tar"
 
-$prov = Join-Path $tmp 'embedded.provisionprofile'
-node (Join-Path $repo 'apps\tv-desktop\scripts\macos\appstore-profile.mjs') $prov
-if ($LASTEXITCODE -ne 0) { throw 'provisioning profile fetch failed' }
-& scp @scp $prov "${target}:$remote/apps/tv-desktop/src-tauri/macos/embedded.provisionprofile"
-if ($LASTEXITCODE -ne 0) { throw 'scp profile failed' }
+if ($Mode -ne 'dmg') {
+  $prov = Join-Path $tmp 'embedded.provisionprofile'
+  node (Join-Path $repo 'apps\tv-desktop\scripts\macos\appstore-profile.mjs') $prov
+  if ($LASTEXITCODE -ne 0) { throw 'provisioning profile fetch failed' }
+  & scp @scp $prov "${target}:$remote/apps/tv-desktop/src-tauri/macos/embedded.provisionprofile"
+  if ($LASTEXITCODE -ne 0) { throw 'scp profile failed' }
+}
 
 function Get-SecretFile([string]$name, [string]$path) {
   gcloud secrets versions access latest --secret=$name --project $Project --out-file=$path 2>$null
@@ -72,10 +75,16 @@ function ConvertTo-Der([string]$path) {
   $txt = [Text.Encoding]::ASCII.GetString($b) -replace '\s', ''
   [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($txt))
 }
-$files = @{ dist = Join-Path $tmp 'd.p12'; inst = Join-Path $tmp 'i.p12'; pw = Join-Path $tmp 'pw'; p8 = Join-Path $tmp 'k.p8' }
+$files = @{ dist = Join-Path $tmp 'd.p12'; inst = Join-Path $tmp 'i.p12'; devid = Join-Path $tmp 'v.p12'; pw = Join-Path $tmp 'pw'; p8 = Join-Path $tmp 'k.p8' }
 try {
-  Get-SecretFile 'apple-distribution-p12' $files.dist; ConvertTo-Der $files.dist
-  Get-SecretFile 'apple-mac-installer-p12' $files.inst; ConvertTo-Der $files.inst
+  if ($Mode -eq 'dmg') {
+    Get-SecretFile 'apple-developer-id-app-p12' $files.devid; ConvertTo-Der $files.devid
+    $send = @($files.devid)
+  } else {
+    Get-SecretFile 'apple-distribution-p12' $files.dist; ConvertTo-Der $files.dist
+    Get-SecretFile 'apple-mac-installer-p12' $files.inst; ConvertTo-Der $files.inst
+    $send = @($files.dist, $files.inst)
+  }
   Get-SecretFile 'apple-signing-p12-password' $files.pw
   Get-SecretFile 'apple-asc-key-p8' $files.p8
   $kid = Get-SecretText 'apple-asc-key-id'
@@ -83,7 +92,7 @@ try {
   $team = Get-SecretText 'apple-team-id'
   if ($kid -notmatch '^[A-Z0-9]{8,12}$' -or $team -notmatch '^[A-Z0-9]{10}$' -or $iss -notmatch '^[0-9a-f-]{36}$') { throw 'ASC ids have an unexpected shape' }
   Invoke-Guest "mkdir -p ~/$remote/.sec && chmod 700 ~/$remote/.sec"
-  & scp @scp $files.dist $files.inst $files.pw $files.p8 "${target}:$remote/.sec/"
+  & scp @scp @send $files.pw $files.p8 "${target}:$remote/.sec/"
   if ($LASTEXITCODE -ne 0) { throw 'scp secrets failed' }
 } finally {
   $files.Values | ForEach-Object { Remove-Item $_ -Force -ErrorAction SilentlyContinue }
@@ -91,8 +100,9 @@ try {
 
 $build = (git -C $repo rev-list --count $sha).Trim()
 $log = Join-Path $tmp "$Mode.log"
-$envs = "TEAM_ID=$team BUILD_NUMBER=$build APPLE_ID=$AppleId DIST_P12=`$S/d.p12 INSTALLER_P12=`$S/i.p12 ASC_KEY_ID=$kid ASC_ISSUER_ID=$iss ASC_KEY_PATH=`$S/k.p8"
-$cmd = "export PATH=`$HOME/.local/bin:`$HOME/.cargo/bin:/opt/homebrew/bin:`$PATH; cd ~/$remote && S=`$PWD/.sec && chmod 600 `$S/* && P12_PASSWORD=`$(tr -d '\r\n' < `$S/pw) $envs bash apps/tv-desktop/scripts/macos/build-appstore.sh $Mode; rc=`$?; rm -rf `$S; exit `$rc"
+$envs = "TEAM_ID=$team BUILD_NUMBER=$build APPLE_ID=$AppleId DIST_P12=`$S/d.p12 INSTALLER_P12=`$S/i.p12 DEVID_P12=`$S/v.p12 ASC_KEY_ID=$kid ASC_ISSUER_ID=$iss ASC_KEY_PATH=`$S/k.p8"
+$script = if ($Mode -eq 'dmg') { 'build-dmg.sh' } else { "build-appstore.sh $Mode" }
+$cmd = "export PATH=`$HOME/.local/bin:`$HOME/.cargo/bin:/opt/homebrew/bin:`$PATH; cd ~/$remote && S=`$PWD/.sec && chmod 600 `$S/* && P12_PASSWORD=`$(tr -d '\r\n' < `$S/pw) $envs bash apps/tv-desktop/scripts/macos/$script; rc=`$?; rm -rf `$S; exit `$rc"
 & ssh @ssh $target $cmd *>&1 | Tee-Object -FilePath $log
 $rc = $LASTEXITCODE
 Write-Host "tv macos-appstore $Mode @ $sha (build $build) -> rc=$rc (log $log)"
