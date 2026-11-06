@@ -1,0 +1,106 @@
+name: MMO Server — Docker image
+
+# Multi-arch headless server image (ADR-0002) → ghcr.io/dragoscv/mmo-server.
+# Native builds per arch (no QEMU): amd64 on ubuntu-24.04, arm64 on
+# ubuntu-24.04-arm, pushed by digest, then merged into one manifest list.
+# Build context is `server/` — it has its own pnpm-lock.yaml.
+
+on:
+  push:
+    tags:
+      - "server-v*"
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/dragoscv/mmo-server
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          file: server/Dockerfile
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=mmo-server-${{ matrix.arch }}
+          cache-to: type=gha,scope=mmo-server-${{ matrix.arch }},mode=max
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          echo "${{ steps.build.outputs.digest }}" > "/tmp/digests/${{ matrix.arch }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve version
+        id: ver
+        run: |
+          VERSION=$(node -p "require('./server/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create manifest list
+        run: |
+          cd /tmp/digests
+          refs=()
+          for f in *; do refs+=("$IMAGE@$(cat "$f")"); done
+          docker buildx imagetools create \
+            -t "$IMAGE:latest" \
+            -t "$IMAGE:${{ steps.ver.outputs.version }}" \
+            -t "$IMAGE:sha-${GITHUB_SHA::7}" \
+            "${refs[@]}"
+
+      - name: Inspect
+        run: docker buildx imagetools inspect "$IMAGE:${{ steps.ver.outputs.version }}"

@@ -43,7 +43,8 @@ export default defineConfig({
     // Produce a build the webview can consume from a file:// origin.
     build: {
         target: "es2022",
-        minify: "esbuild",
+        // Vite 8 minifies with Oxc; "esbuild" would require installing esbuild separately (build fails otherwise).
+        minify: "oxc",
         sourcemap: false,
         // Skip the gzip pass used only for the size report.
         reportCompressedSize: false,
