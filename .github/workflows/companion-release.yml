@@ -166,6 +166,10 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
+          # Same pnpm as the lockfile and the server Docker image. server/package.json has no packageManager,
+          # so this exact pin does not collide with the root `packageManager` check (which failed every run).
+          version: 10.0.0
+          package_json_file: server/package.json
           run_install: false
 
       - name: Setup Node 22
