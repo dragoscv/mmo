@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.10.0); generator: server/scripts/openapi-kotlin.mjs
+// Source: server/openapi.yaml (info.version 3.10.1); generator: server/scripts/openapi-kotlin.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 @file:Suppress("unused")
 

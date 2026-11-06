@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.10.1 — Desktop installers build again
+
+- Release packaging pins `node-abi` ≥ 4.40 through npm `overrides` (the packaging step reinstalls with npm, whose lock
+	still resolved node-abi 4.29, which does not know Electron 44.10 → "Could not detect abi"). `package-lock.json`
+	regenerated (it was also stale on Electron 34).
+
 ## 3.10.0 — Music radio, songs list, playlists list, lyrics on demand (WP17-40)
 
 - `GET /media/music/radio?seed=tr_|al_|ar_&size=`: the seed track first, then the seed artist and up to 12

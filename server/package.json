@@ -1,6 +1,6 @@
 {
   "name": "mmo-server",
-  "version": "3.10.0",
+  "version": "3.10.1",
   "description": "MMO Server (MixAI Companion) — serves local music and video files to the MixAI web app",
   "main": "dist/main.js",
   "author": {
@@ -313,5 +313,8 @@
       "electron",
       "electron-winstaller"
     ]
+  },
+  "overrides": {
+    "node-abi": "^4.40.0"
   }
 }
