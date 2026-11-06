@@ -134,6 +134,9 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      # server/ keeps its own lockfile; every pnpm call (install, rebuild, exec) must stay out of workspace mode.
+      npm_config_ignore_workspace: "true"
     defaults:
       run:
         working-directory: server
@@ -203,7 +206,9 @@ jobs:
       - name: Install dependencies
         # The `pnpm.onlyBuiltDependencies` array in server/package.json already
         # whitelists `audify`, so prebuild-install runs automatically.
-        run: pnpm install --no-frozen-lockfile
+        # --ignore-workspace: server/ has its own lockfile; workspace mode pulls in all 16 projects and dies
+        # (repo rule, AGENTS.md "per-app lockfiles").
+        run: pnpm install --frozen-lockfile --ignore-workspace
 
       - name: Approve native build scripts (audify, electron)
         # pnpm v10 requires explicit approval for postinstall scripts even
