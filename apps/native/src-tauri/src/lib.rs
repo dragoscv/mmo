@@ -224,7 +224,7 @@ fn desktop_auth_cancel(state: State<'_, Arc<AuthState>>) -> Result<(), String> {
 /// Precedence:
 ///   1. `MMO_WEB_APP_URL` env var (lets the dev task override at will).
 ///   2. `http://localhost:13789` in debug builds (matches `pnpm dev`).
-///   3. `https://muzicai.ro` in release builds.
+///   3. `https://app.mixai.ro` in release builds (MixAI Studio's own host, WP17-50; mixai.ro is the suite landing).
 #[tauri::command]
 fn get_web_app_url() -> String {
     if let Ok(v) = std::env::var("MMO_WEB_APP_URL") {
@@ -236,7 +236,7 @@ fn get_web_app_url() -> String {
     if cfg!(debug_assertions) {
         "http://localhost:13789".to_string()
     } else {
-        "https://muzicai.ro".to_string()
+        "https://app.mixai.ro".to_string()
     }
 }
 

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MixAI desktop apps — MSIX for the Microsoft Store (WP17-25/50/51, ADR-0013). Rendered by scripts/package-msix.ps1 with
+  the Partner Center identity (Name / Publisher / PublisherDisplayName). The Store re-signs uploads.
+-->
+<Package
+    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+    IgnorableNamespaces="uap rescap">
+    <Identity Name="__IDENTITY_NAME__" Publisher="__PUBLISHER__" Version="__VERSION__" ProcessorArchitecture="x64" />
+    <Properties>
+        <DisplayName>__DISPLAY_NAME__</DisplayName>
+        <PublisherDisplayName>__PUBLISHER_DISPLAY__</PublisherDisplayName>
+        <Logo>Assets\StoreLogo.png</Logo>
+        <Description>__DESCRIPTION__</Description>
+    </Properties>
+    <Dependencies>
+        <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+    </Dependencies>
+    <Resources>
+        <Resource Language="en-us" />
+        <Resource Language="ro-ro" />
+    </Resources>
+    <Applications>
+        <Application Id="__APP_ID__" Executable="__EXE__" EntryPoint="Windows.FullTrustApplication">
+            <uap:VisualElements
+                DisplayName="__DISPLAY_NAME__"
+                Description="__DESCRIPTION__"
+                BackgroundColor="transparent"
+                Square150x150Logo="Assets\Square150x150Logo.png"
+                Square44x44Logo="Assets\Square44x44Logo.png">
+                <uap:DefaultTile Wide310x150Logo="Assets\Square150x150Logo.png" Square310x310Logo="Assets\Square310x310Logo.png" />
+            </uap:VisualElements>
+        </Application>
+    </Applications>
+    <Capabilities>
+        <Capability Name="internetClient" />
+__LAN_CAPABILITY__
+        <rescap:Capability Name="runFullTrust" />
+    </Capabilities>
+</Package>
