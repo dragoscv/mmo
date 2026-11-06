@@ -94,15 +94,21 @@ jobs:
                   # Include only the runtime files; exclude dev cruft.
                   zip -rq "build/$name" \
                     manifest.json \
+                    _locales \
                     background.js \
                     content.js \
                     beacon.js \
                     content.css \
+                    i18n.js \
+                    tokens.css \
                     popup.html popup.js \
                     options.html options.js \
                     vendor \
-                    icons \
+                    icons/*.png \
                     -x "*.DS_Store" "*/.DS_Store"
+                  # Fail fast on what Edge/Chrome reject: every file the manifest or pages reference must be inside.
+                  unzip -l "build/$name" | grep -q "_locales/en/messages.json" || { echo "missing _locales"; exit 1; }
+                  unzip -l "build/$name" | grep -q "i18n.js" || { echo "missing i18n.js"; exit 1; }
                   ls -lh build/
                   echo "zip_path=apps/extension/build/$name" >> $GITHUB_OUTPUT
 

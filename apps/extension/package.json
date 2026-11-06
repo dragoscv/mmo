@@ -1,6 +1,6 @@
 {
 	"name": "mmo-extension",
-	"version": "3.0.1",
+	"version": "3.0.2",
 	"private": true,
 	"description": "MixAI browser extension (Chrome/Firefox MV3) — one-click 'Download to MixAI' button on streaming sites; opens /download in the MixAI web app. Vendored deps live in vendor/, design tokens in tokens.css (generated).",
 	"scripts": {

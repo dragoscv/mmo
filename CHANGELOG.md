@@ -10,6 +10,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — MixAI Connector (extension) 3.0.2, MixAI DJ 1.0.0 on the Microsoft Store, MMO Server image on GHCR
+
+- Connector: the release zip left out `_locales/`, `i18n.js` and `tokens.css`, so `__MSG_extName__` never resolved and
+  Edge Add-ons refused the package ("default_locale ... _locales directory is absent"). The workflow now ships them
+  and fails if they are missing. Manifest icons are PNG (stores reject SVG); `scripts/icons-png.mjs` rasterises them.
+- MixAI DJ 1.0.0 MSIX submitted to the Microsoft Store; `apps/mixai` builds again on Vite 8 (`minify: "oxc"` —
+  `"esbuild"` now requires a separate esbuild install and failed the build).
+- `ghcr.io/dragoscv/mmo-server:3.9.6` multi-arch (amd64 + arm64) published by `mmo-server-docker.yml`; companion
+  release workflow pins pnpm 10.0.0 (the pnpm/action-setup version pin conflicted with `packageManager`).
+
 ## 2026-11-06 — Web 3.2.5 (MixAI TV desktop downloads)
 
 - mixai.ro download matrix: MixAI TV for macOS and Linux are live and link to the GitHub release
