@@ -19,6 +19,17 @@ struct TVMainTabs: View {
             Tab("settings.title", systemImage: "gearshape", value: 4) { TVStack { TVSettingsView() } }
         }
         .onChange(of: model.pendingRoute) { _, r in if r != nil { tab = 0 } }
+        .task {
+            #if DEBUG
+            // Simulator screenshots: SIMCTL_CHILD_MIXAI_TAB=<0-4>, SIMCTL_CHILD_MIXAI_OPEN=title/<kind>/<id>.
+            let env = ProcessInfo.processInfo.environment
+            if let t = env["MIXAI_TAB"].flatMap(Int.init) { tab = t }
+            if let open = env["MIXAI_OPEN"] {
+                let p = open.split(separator: "/").map(String.init)
+                if p.count == 3, p[0] == "title", let k = MediaKind(rawValue: p[1]), let id = Int(p[2]) { model.pendingRoute = .title(kind: k, tmdbId: id) }
+            }
+            #endif
+        }
     }
 }
 
@@ -98,6 +109,11 @@ struct TVFocusProbe: View {
     var body: some View {
         Color.clear.onChange(of: focused) { _, now in if now { onFocus() } }
     }
+}
+
+/// A restarted `.task(id:)` cancels the previous request; that is not an error worth showing.
+func tvIsCancellation(_ e: Error) -> Bool {
+    e is CancellationError || (e as? URLError)?.code == .cancelled
 }
 
 /// Server rows can repeat a title (two files of one film) → keep the first occurrence.

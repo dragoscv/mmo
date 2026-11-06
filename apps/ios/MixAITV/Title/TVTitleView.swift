@@ -39,7 +39,7 @@ struct TVTitleView: View {
                 await loadSeason(first)
             }
         } catch {
-            self.error = error.localizedDescription
+            if !tvIsCancellation(error) { self.error = error.localizedDescription }
         }
     }
 
@@ -123,8 +123,13 @@ struct TVTitleView: View {
                 ScrollView(.horizontal) {
                     HStack(spacing: 20) {
                         ForEach(list, id: \.seasonNumber) { s in
-                            Button(String(localized: "title.season \(s.seasonNumber)")) { Task { await loadSeason(s.seasonNumber) } }
-                                .tint(season == s.seasonNumber ? TVTheme.primary : nil)
+                            Button { Task { await loadSeason(s.seasonNumber) } } label: {
+                                if season == s.seasonNumber {
+                                    Label(String(localized: "title.season \(s.seasonNumber)"), systemImage: "checkmark")
+                                } else {
+                                    Text(String(localized: "title.season \(s.seasonNumber)"))
+                                }
+                            }
                         }
                     }
                     .padding(.vertical, 20)

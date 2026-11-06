@@ -71,6 +71,7 @@ struct TVLibraryView: View {
             }
             cards = out.sorted { $0.title.localizedCompare($1.title) == .orderedAscending }
         } catch {
+            if tvIsCancellation(error) { return }
             self.error = error.localizedDescription
         }
         loaded = true
@@ -147,6 +148,11 @@ struct TVLiveView: View {
             }
         }
         .background(TVTheme.background.ignoresSafeArea())
+        .onAppear {
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["MIXAI_LIVE_ACCEPTED"] == "1" { accepted = true }
+            #endif
+        }
         .task(id: accepted) { if accepted { await load() } }
     }
 
@@ -186,6 +192,7 @@ struct TVLiveView: View {
             channels = list.sorted { ($0.favourite ? 0 : 1, $0.sort ?? Int.max, $0.name) < ($1.favourite ? 0 : 1, $1.sort ?? Int.max, $1.name) }
             if let nn = try? await live.nowNext() { now = Dictionary(nn.map { ($0.channelId, $0) }, uniquingKeysWith: { a, _ in a }) }
         } catch {
+            if tvIsCancellation(error) { return }
             self.error = error.localizedDescription
         }
         loaded = true

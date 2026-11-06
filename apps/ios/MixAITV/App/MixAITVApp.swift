@@ -19,7 +19,7 @@ struct MixAITVApp: App {
             TVRootView()
                 .environment(model)
                 .preferredColorScheme(.dark)
-                .tint(TVTheme.primary)
+                // No app-wide .tint: tvOS draws a tinted button's label in the tint colour on a tinted platter (invisible).
                 .task { await model.boot() }
                 .onOpenURL { url in
                     // mixai://title/<kind>/<id> (Top Shelf, Siri, shared links) opens the title page, like the iPhone app.

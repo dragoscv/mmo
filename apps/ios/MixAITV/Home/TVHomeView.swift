@@ -31,7 +31,7 @@ struct TVHomeView: View {
                 }
             }
         } catch {
-            if home == nil { self.error = error.localizedDescription }
+            if home == nil, !tvIsCancellation(error) { self.error = error.localizedDescription }
         }
     }
 
