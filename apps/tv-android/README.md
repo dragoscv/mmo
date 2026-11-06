@@ -55,6 +55,19 @@ adb shell am start -n ro.mixai.tv/.MainActivity
 
 ## Features
 
+## Fire TV (Amazon Appstore, WP17-21)
+
+The same `ro.mixai.tv` APK runs on Fire TV — no `amazon` flavor is needed:
+
+- `:app` and `:core` have **no Google Play Services** dependency (Firebase / Credential Manager are phone-only).
+  Checked 2026-11-06: 0 `Lcom/google/android/gms/` references in the dex of the benchmark APK.
+- `minSdk 26` covers Fire OS 7 (API 28) and Fire OS 8 (API 30); Fire OS 6 (API 25) devices are filtered out.
+- `android.software.leanback` is required, which is what the Appstore uses to offer the app to Fire TV only.
+- Fire OS has no Android TV home rows: `WatchNext.publish` already no-ops when the TvProvider is missing.
+- Upload the **release** APK signed with the TV key (`TV_KEYSTORE_*`, same key as Google Play builds so updates keep
+  working across stores), target devices "Fire TV" only, reviewer path = `docs/store/review-notes.md` (demo server).
+
+
 - **Quick Connect** — mDNS discovery of `_mmo-companion._tcp`, 6-digit code + QR, polls `/pair/poll`.
 - **MixAI account sign-in** — device-code flow on `BuildConfig.MIXAI_ORIGIN` (`/api/device/code|token`),
   then probes the returned companions and connects to the first reachable one.
