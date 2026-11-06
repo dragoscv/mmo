@@ -112,6 +112,15 @@ jobs:
                   ls -lh build/
                   echo "zip_path=apps/extension/build/$name" >> $GITHUB_OUTPUT
 
+            - name: Package store edition (.zip, no host permissions)
+              # Owner decision 2026-11-06 (WP17-53): stores get the Connector edition only — no download button,
+              # no content scripts, no third-party host permissions. The downloader stays on GitHub releases.
+              shell: bash
+              run: |
+                  node store/build.mjs --zip
+                  unzip -p "build/mixai-connector-store-v${{ steps.meta.outputs.version }}.zip" manifest.json | grep -q '"host_permissions"' \
+                    && { echo "store edition must not request host permissions"; exit 1; } || true
+
             - name: Upload zip as workflow artifact
               uses: actions/upload-artifact@v5
               with:
@@ -178,7 +187,7 @@ jobs:
               if: steps.secrets.outputs.have == 'true'
               uses: mnao305/chrome-extension-upload@v5.0.0
               with:
-                  file-path: ./out/mmo-extension-v${{ needs.build.outputs.version }}.zip
+                  file-path: ./out/mixai-connector-store-v${{ needs.build.outputs.version }}.zip
                   extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
                   client-id: ${{ secrets.CHROME_CLIENT_ID }}
                   client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
@@ -223,7 +232,7 @@ jobs:
               run: |
                   npm install --global web-ext@8
                   cd ./out
-                  unzip -q "mmo-extension-v${{ needs.build.outputs.version }}.zip" -d unpacked
+                  unzip -q "mixai-connector-store-v${{ needs.build.outputs.version }}.zip" -d unpacked
                   cd unpacked
                   web-ext sign \
                     --channel=listed \
@@ -260,6 +269,6 @@ jobs:
               uses: wdzeng/edge-addon@v2
               with:
                   product-id: ${{ secrets.EDGE_PRODUCT_ID }}
-                  zip-path: ./out/mmo-extension-v${{ needs.build.outputs.version }}.zip
+                  zip-path: ./out/mixai-connector-store-v${{ needs.build.outputs.version }}.zip
                   client-id: ${{ secrets.EDGE_CLIENT_ID }}
                   api-key: ${{ secrets.EDGE_API_KEY }}

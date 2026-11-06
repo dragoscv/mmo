@@ -10,6 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — MixAI Connector 3.0.3 (store edition)
+
+- New store edition built by `apps/extension/store/build.mjs`: no host permissions, no content scripts, no download
+  flow. The popup searches the user's own MixAI library for the active tab's title (`app.mixai.ro/library?search=`)
+  or opens MixAI. The release workflow now publishes only this edition to Chrome Web Store / Edge Add-ons / AMO; the
+  downloader edition stays on GitHub releases. Verified loaded unpacked in Chromium (`e2e/connector-store.spec.ts`).
+
 ## 2026-11-06 — MixAI Connector (extension) 3.0.2, MixAI DJ 1.0.0 on the Microsoft Store, MMO Server image on GHCR
 
 - Connector: the release zip left out `_locales/`, `i18n.js` and `tokens.css`, so `__MSG_extName__` never resolved and

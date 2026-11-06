@@ -2,7 +2,19 @@
 
 > **MixAI - Music Downloader** — extensie Chrome / Firefox (Manifest V3, vanilla JS) care adaugă un buton
 > **„MixAI”** pe paginile de streaming și deschide pagina `/download` din aplicația web MixAI cu URL-ul
-> media precompletat. Versiune curentă: **3.0.0**.
+> media precompletat. Versiune curentă: **3.0.3**.
+
+## Două ediții (WP17-53)
+
+| Ediție | Unde | Ce face |
+|---|---|---|
+| **MixAI - Music Downloader** (`manifest.json`) | doar GitHub Releases (`mmo-extension-vX.zip`) | butonul de descărcare pe platformele de streaming |
+| **MixAI Connector** (`store/build.mjs`) | Chrome Web Store, Edge Add-ons, AMO (`mixai-connector-store-vX.zip`) | fără permisiuni de host și fără content scripts: caută titlul tabului activ în biblioteca MixAI (`/library?search=`) |
+
+Magazinele interzic descărcătoarele de YouTube/Spotify, iar o sancțiune ar lovi același cont de developer ca
+aplicațiile MixAI; de aceea workflow-ul publică în magazine **numai** ediția Connector. Build local:
+`node apps/extension/store/build.mjs [--zip]` (verifică paritatea RO/EN și că nu apare nicio țintă interzisă).
+Test: `apps/web/e2e/connector-store.spec.ts` (copiază `build/store` în `apps/web/e2e/.connector-store/`).
 
 [🏠 Home](../../README.md) · [📚 Ghid utilizator](../../docs/extension/README.md)
 
