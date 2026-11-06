@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — Web 3.2.5 (MixAI TV desktop downloads)
+
+- mixai.ro download matrix: MixAI TV for macOS and Linux are live and link to the GitHub release
+  [`tv-desktop-v0.1.1`](https://github.com/dragoscv/mmo/releases/tag/tv-desktop-v0.1.1) (notarised universal DMG,
+  AppImage, deb). Windows (Microsoft Store) and Apple TV stay "soon" until certification/review pass.
+
 ## 2026-11-06 — Web 3.2.4 (dashboard hydration), MixAI Studio desktop 1.1.0, MixAI TV for Mac 0.1.1
 
 - Web: the dashboard greeting depended on the clock during render, so the server (UTC) and the browser (local time)

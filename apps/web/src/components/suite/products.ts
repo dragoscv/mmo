@@ -36,7 +36,7 @@ export const SUITE_PRODUCTS: readonly SuiteProduct[] = [
 
 /** Platform availability today (D43). `soon` = package built or in review, not yet in a store. */
 export const PLATFORM_STATUS: Record<SuiteProductKey, Partial<Record<PlatformKey, "live" | "soon">>> = {
-    tv: { web: "live", androidTv: "live", tizen: "live", android: "live", ios: "soon", windows: "soon", macos: "soon", linux: "soon", fireTv: "soon", webos: "soon", appleTv: "soon" },
+    tv: { web: "live", androidTv: "live", tizen: "live", android: "live", ios: "soon", windows: "soon", macos: "live", linux: "live", fireTv: "soon", webos: "soon", appleTv: "soon" },
     music: { web: "live", android: "soon", ios: "soon", windows: "soon", macos: "soon", linux: "soon" },
     studio: { web: "live", windows: "live", macos: "live", linux: "live", chrome: "live" },
     dj: { windows: "live", macos: "live", linux: "live" },

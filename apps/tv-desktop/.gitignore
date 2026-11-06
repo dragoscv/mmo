@@ -19,3 +19,4 @@ src-tauri/icons/
 target-mac/
 src-tauri/macos/embedded.provisionprofile
 src-tauri/macos/Entitlements.appstore.resolved.plist
+mac-out/
