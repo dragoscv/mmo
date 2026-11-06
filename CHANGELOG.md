@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — Web 3.2.2 (suite hero measure)
+
+- mixai.ro hero: copy column on the golden ratio (1.382fr : 1fr) and a slightly smaller display size, so the title reads
+  in two lines on desktop (it wrapped on three at 1920). New e2e `e2e/suite-wp17.spec.ts` (landing, launcher, product
+  hosts signed in, 308 map, axe, reduced motion) + design critic run in `docs/design-critic/wp17-suite.md`.
+
 ## 2026-11-06 — Web 3.2.1 (product hosts live, session JSON hardening)
 
 - **Product hosts are live**: `tv.mixai.ro`, `music.mixai.ro`, `app.mixai.ro` and `dj.mixai.ro` (Google-managed

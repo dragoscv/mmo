@@ -34,3 +34,39 @@ EXTRAS       — "Always open X" switch → cancellable 1.6 s forward toast on t
 - RO + EN copy complete (`mx.suite`, i18n-parity OK); diacritics render in Space Grotesk.
 - Reduced motion: zero running animations.
 - Keyboard: Tab order top bar → CTAs → cards → chips → footer; launcher tiles reachable and activate with Enter.
+
+## Run 2026-11-06 — live `mixai.ro` (rev `mixai-web-00014-k72`, web 3.2.1)
+
+Evidence: cloud run `2611061357-z0qo` (`pnpm e2e:cloud --target https://mixai.ro --prod-session e2e/suite-wp17.spec.ts`),
+**19/19 passed**: landing at 390 / 1280 / 1920 / 3440 × light + dark with no horizontal overflow and no page error;
+launcher at 390 / 1920 × both modes; `tv.` / `music.` / `app.` / `dj.mixai.ro` signed in with the `.mixai.ro`
+product cookie (and `/api/auth/session` carries no session token); legacy `/media`, `/media/music`, `/library`, `/dj`
+answer 308 to their product host. axe (wcag serious/critical) in `main`: `[]`. Reduced motion: 0 running animations.
+Heading face check: `#sx-title` computes `spaceGrotesk`; loaded faces `inter, spaceGrotesk, jetbrainsMono`; RO diacritics
+("tău", "ține", "mașină") render in the display face. Tab order reaches the top bar, the CTAs, every product card, the
+per-platform matrix and the demo link. Screenshots: `test-results/suite-wp17/*` in the run's results.tgz.
+
+```
+SCORES
+    Craft (25):     22/25
+        1. Subject presence   4/5  E   — the luminous server core with orbiting product planets reads at once in both modes; at 390 it drops below the fold (copy first, by design)
+        2. Composition        5/5  E   — copy at ~0.382, orbit at ~0.618, 1440 px max, generous air; 390 stacks cleanly; 3440 stays centred, no stretched lines
+        3. Three layers       4/5  E   — radial washes + star field (background), orbit (mid), copy and CTAs (front); the product section below the fold is flatter
+        4. Palette discipline 5/5  E+C — tokens only (hex gate 0), violet primary + per-product chart accents; light mode keeps AA on the gradient title
+        5. Typography         4/5  E+C — Space Grotesk display with gradient + Inter body + JetBrains Mono eyebrow; the gradient title wraps on three lines at 1920 (a wider measure would read in two)
+    Game feel (25): 19/25
+        6. Choreographed entrance 4/5  C   — washes → orbit (0–900 ms) → staggered eyebrow/title/subtitle/CTAs (250 ms + 90 ms·i); reduced motion freezes all
+        7. Tactile interactions   4/5  C   — cards lift + accent glow on hover/focus, whole card is the link, platform chip for your OS glows
+        8. Living background      4/5  C   — the core breathes and planets orbit continuously; washes are static
+        9. Route morphing         4/5  C   — launcher tile → FLIP morph (inset + radius, 420 ms) into the product host; landing → product is a full navigation (different origin)
+        10. Subject artistry      3/5  E   — orbit glyphs are icons; no product imagery (TV stills, album art) yet on the landing
+    Discipline (10): 10/10
+        11. Server-first shell    5/5  C   — server page decides landing vs launcher from the session; launcher continue strip loads client-side with loading / empty / error / no-server states
+        12. A11y + reduced motion 5/5  E+C — axe 0 serious/critical, orbit role=img with a label, focus-visible in product accent, 0 animations with reduced motion
+    TOTAL: 51/60
+```
+
+**Result: 51/60, one short of 52.** Fix in web 3.2.2: the hero columns move to the golden ratio from the brief
+(1.382fr : 1fr) and the display size to `clamp(2.4rem, 5.4vw, 4.5rem)`, so the title reads in two lines on desktop
+(criterion 5). The spec now asserts at most two lines at ≥ 1280 px. Still open, not blocking: product imagery in the
+orbit / product cards (10) and depth on the product section (3).

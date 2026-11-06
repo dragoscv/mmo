@@ -33,9 +33,10 @@
 
 /* ── Hero ────────────────────────────────────────────────────────────── */
 .sx-hero { display: grid; gap: clamp(2rem, 5vw, 4rem); align-items: center; padding-block: clamp(3rem, 9vw, 7rem) clamp(2rem, 6vw, 5rem); }
-@media (min-width: 1024px) { .sx-hero { grid-template-columns: 1.05fr 1fr; } }
+/* Copy at ~0.618 of the row, orbit at ~0.382 (brief: golden ratio); keeps the display title to two lines at 1280+. */
+@media (min-width: 1024px) { .sx-hero { grid-template-columns: 1.382fr 1fr; } }
 .sx-eyebrow { font-family: var(--font-mono); font-size: .75rem; letter-spacing: .22em; text-transform: uppercase; color: var(--muted-foreground); }
-.sx-title { font-family: var(--font-heading); font-weight: 650; font-size: clamp(2.4rem, 6.2vw, 5rem); line-height: 1.02; letter-spacing: -.035em; text-wrap: balance; margin-block: 1rem 1.25rem; }
+.sx-title { font-family: var(--font-heading); font-weight: 650; font-size: clamp(2.4rem, 5.4vw, 4.5rem); line-height: 1.02; letter-spacing: -.035em; text-wrap: balance; margin-block: 1rem 1.25rem; }
 .sx-sub { font-size: clamp(1rem, 1.4vw, 1.2rem); color: var(--muted-foreground); max-width: 38rem; text-wrap: pretty; }
 .sx-cta { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 2rem; }
 
