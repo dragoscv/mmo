@@ -202,3 +202,33 @@ chunk contains `mx-backdrop-stage` and `isolation:isolate`, and `<body>` carries
 **Mostly met.** The D25 backdrop-first look is now actually on screen on every `/media` route, in light and dark, at
 390, 1440 and 3440 px, with entrance and ambient motion matching the TVs. D31 is unchanged and met. The glass OSD
 and logo treatment exist in code but were outside this screenshot matrix and data.
+
+## Rescore with TMDB data (web 3.1.7 + server 3.9.6, 2026-11-06)
+
+The missing point was data, so the data gap was closed and the same matrix was rerun:
+
+- The local companion behind the e2e tunnel was restarted with `TMDB_API_KEY` (from Secret Manager, not printed).
+  `/media/status` reports `configured:true, tmdb:true`, and Home has 4 rows (continue 1, new_in_library 24,
+  top_picks 24, because_you_watched 24).
+- **Server 3.9.6 (6e4b0037):** with UI language `ro-RO`, TMDB had returned `videos: []` for almost every title,
+  so no client could ever show a trailer. TMDB details now ask for `include_video_language=ro,en,null`, and media db
+  v5 marks cached titles stale. Live companion after the change: Școala de șoferi went from 0 to 1 video, Gumball from 0 to 2.
+- **Web 3.1.7 (c011f91d):** the hero picked the first in-library title. That was an audio-only file with no TMDB logo, so the
+  hero showed a plain text title. It now probes up to 6 candidates and switches once to the first one that has logo art.
+  Live rev `mixai-web-00011-t86`: an authenticated `GET /media?dv-e827030e07` returned 200, and its Cloud Run log
+  line names `mixai-web-00011-t86`. There were 0 responses with status 5xx in 30 min.
+
+Cloud run `out-critic3`: **11/11 passed (2.1 min)**, axe found 0 violations on 13 routes, the VM was deleted, and 1 session was deleted.
+The Home screenshot at 1440 dark shows the **TMDB logo lockup "Școala de șoferi"** over the full-bleed backdrop, plus chips
+(2026 · 15 · 103 min · ★ 6.9 · Comedie), the overview, Play and Details. The spec's `__DESIGN__` line logs `backdrop:false`
+because the probe reads the image synchronously while the new TMDB backdrop is still loading. The probe only logs
+this value and does not assert it, and the screenshot shows the backdrop.
+
+```
+DESIGN REVIEW — web /media 3.1.7 (TMDB data)
+    1. Subject presence   5/5  E   — logo art + backdrop + chips on the hero (out-critic3 _media-dark-1440)
+    10. Subject artistry  3/5  E+C — logo now shown; trailer data exists since 3.9.6, but its 3 s delayed fade-in is
+                                     not in a still screenshot, so the trailer point is not claimed
+    all other criteria unchanged (see "Score after fixes")
+TOTAL: 52/60  (51 + 1 subject presence) — meets the WP16 target of 52
+```
