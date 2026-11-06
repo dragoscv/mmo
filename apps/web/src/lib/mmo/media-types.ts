@@ -370,6 +370,7 @@ export interface Page<T> {
 
 export type ArtistPage = Page<ArtistCard>;
 export type AlbumPage = Page<AlbumCard>;
+export type TrackPage = Page<TrackCard>;
 
 export interface ArtistDetail {
     artist: ArtistCard;

@@ -5,16 +5,19 @@
  * plays), hero header, page states (loading / empty library / error), equaliser glyph. Covers come from
  * `MusicClient.coverUrl` as plain lazy <img>.
  */
-import Link from "@/components/host/host-context";
-import { memo, type ReactNode } from "react";
+import Link, { useRouter } from "@/components/host/host-context";
+import { memo, useMemo, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { AlertTriangle, Disc3, ListMusic, Mic2, Music2, User } from "lucide-react";
-import { Button, EmptyState } from "@mmo/ui";
+import { toast } from "sonner";
+import { AlertTriangle, CheckCircle2, Disc3, Download, ListMusic, Mic2, Music2, Radio, User } from "lucide-react";
+import { Button, EmptyState, type ButtonProps } from "@mmo/ui";
 import type { MusicClient } from "@/lib/mmo/music";
 import type { AlbumCard, ArtistCard, PlaylistCard, TrackCard } from "@/lib/mmo/media-types";
 import { discGroups, fmtClock } from "@/lib/mmo/music-core";
+import { buildKey, scopeOf } from "@/lib/mmo/offline/keys";
 import { useWebMusicState, webMusicPlayer } from "@/lib/mmo/web-music-player";
 import { DownloadButton } from "../offline/download-button";
+import { useOfflineList } from "../offline/use-offline";
 
 export const albumHref = (id: string) => `/media/music/album/${encodeURIComponent(id)}`;
 export const artistHref = (id: string) => `/media/music/artist/${encodeURIComponent(id)}`;
@@ -151,6 +154,79 @@ export function TrackList({ music, tracks, onPlay, showArtist, showAlbum, showCo
                 </div>
             ))}
         </div>
+    );
+}
+
+/** "Start radio" from a track / album / artist id: queue = seed + similar artists, then Now Playing. */
+export function RadioButton({ music, seed, size = "lg", variant = "ghost", className, label }: {
+    music: MusicClient; seed: string; size?: ButtonProps["size"]; variant?: ButtonProps["variant"]; className?: string; label?: string;
+}) {
+    const t = useTranslations("mx.music.radio");
+    const router = useRouter();
+    const [busy, setBusy] = useState(false);
+    const start = async () => {
+        setBusy(true);
+        try {
+            const tracks = await music.radio(seed, 50);
+            if (tracks === null) { toast.error(t("unsupported")); return; }
+            if (tracks.length === 0) { toast.error(t("empty")); return; }
+            webMusicPlayer.play(tracks, 0);
+            router.push(NOW_PLAYING_HREF);
+        } catch {
+            toast.error(t("error"));
+        } finally { setBusy(false); }
+    };
+    const icon = size === "icon" || size === "icon-sm";
+    return (
+        <Button size={size} variant={variant} className={className} loading={busy} onClick={() => void start()}
+            aria-label={label ?? t("start")} title={icon ? (label ?? t("start")) : undefined} data-testid="music-radio">
+            <Radio aria-hidden />{icon ? null : t("start")}
+        </Button>
+    );
+}
+
+/** Queues every track of an album / playlist for offline; shows "n of m downloaded" once started. */
+export function DownloadAllButton({ music, tracks, scope, album }: {
+    music: MusicClient; tracks: TrackCard[]; scope: { serverId: string; profileId: string } | undefined; album?: string | null;
+}) {
+    const t = useTranslations("mx.music.download");
+    const { items, manager } = useOfflineList(scope ? scopeOf(scope.serverId, scope.profileId) : null);
+    const [busy, setBusy] = useState(false);
+    const keys = useMemo(() => (scope ? tracks.map((tr) => buildKey({ ...scope, kind: "track", id: tr.id })) : []), [scope, tracks]);
+    const done = useMemo(() => {
+        const ok = new Set((items ?? []).filter((i) => i.status === "done").map((i) => i.key));
+        return keys.filter((k) => ok.has(k)).length;
+    }, [items, keys]);
+    if (!scope || tracks.length === 0) return null;
+    if (!manager) {
+        return <Button size="lg" variant="ghost" disabled title={t("unavailable")}><Download aria-hidden />{t("all")}</Button>;
+    }
+    if (done === tracks.length) {
+        return (
+            <Button size="lg" variant="ghost" render={<Link href="/media/downloads" />} data-testid="music-download-all" data-state="done">
+                <CheckCircle2 aria-hidden className="text-primary" />{t("allDone")}
+            </Button>
+        );
+    }
+    const queueAll = async () => {
+        setBusy(true);
+        try {
+            for (const tr of tracks) {
+                await manager.enqueue({
+                    serverId: scope.serverId, profileId: scope.profileId, kind: "track", id: tr.id, title: tr.title,
+                    subtitle: [tr.artist, album ?? tr.album].filter(Boolean).join(" · "), poster: music.coverUrl(tr, 300),
+                    durationSec: tr.durationSec, url: music.streamUrl(tr),
+                });
+            }
+            toast.success(t("queued", { count: tracks.length - done }));
+        } catch {
+            toast.error(t("error"));
+        } finally { setBusy(false); }
+    };
+    return (
+        <Button size="lg" variant="ghost" loading={busy} onClick={() => void queueAll()} data-testid="music-download-all">
+            <Download aria-hidden />{done > 0 ? t("progress", { done, total: tracks.length }) : t("all")}
+        </Button>
     );
 }
 

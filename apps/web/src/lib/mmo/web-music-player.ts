@@ -24,6 +24,7 @@ import {
     shuffleKeepFirst, trackKeyOf,
 } from "./music-core";
 import { playerBus, type PlayerCommand } from "./player-bus";
+import { mediaUrl } from "./offline/keys";
 
 export interface WebMusicState {
     queue: TrackCard[];
@@ -89,6 +90,8 @@ class WebMusicPlayer {
     private lastTime = 0;
     private playLogged = false;
     private errorSkips = 0;
+    /** Track id → offline key of finished downloads (current server + profile); played from `/__offline/`. */
+    private offline: ReadonlyMap<string, string> = new Map();
 
     // ─── wiring ──────────────────────────────────────────────────────────
 
@@ -128,6 +131,17 @@ class WebMusicPlayer {
             if (el instanceof HTMLVideoElement && !el.muted && this.state.playing) this.pause();
         }, true);
         this.installMediaSession();
+    }
+
+    /** Downloaded tracks of the current server + profile; those play from the device instead of the server. */
+    setOffline(map: ReadonlyMap<string, string>): void { this.offline = map; }
+
+    /** Whether `trackId` plays from a download on this device. */
+    isOffline(trackId: string): boolean { return this.offline.has(trackId); }
+
+    private srcOf(t: TrackCard): string {
+        const key = this.offline.get(t.id);
+        return key ? mediaUrl(key) : this.music!.streamUrl(t);
     }
 
     private makeAudio(): HTMLAudioElement {
@@ -306,7 +320,7 @@ class WebMusicPlayer {
         const t = n === null ? null : queue[n];
         if (!t || !this.music || t.id === this.state.current?.id || this.standbyId === t.id) return;
         if (!this.standby) this.standby = this.makeAudio();
-        this.standby.src = this.music.streamUrl(t);
+        this.standby.src = this.srcOf(t);
         this.standby.load();
         this.standbyId = t.id;
     }
@@ -327,7 +341,7 @@ class WebMusicPlayer {
             old.load();
             a.currentTime = 0;
         } else {
-            a.src = this.music.streamUrl(t);
+            a.src = this.srcOf(t);
         }
         this.listened = 0;
         this.lastTime = startAt;

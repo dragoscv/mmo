@@ -4,7 +4,9 @@
         "label": "Secțiuni muzică",
         "home": "Acasă",
         "artists": "Artiști",
-        "albums": "Albume"
+        "albums": "Albume",
+        "songs": "Melodii",
+        "playlists": "Playlisturi"
     },
     "search": {
         "title": "Caută muzică",
@@ -35,7 +37,8 @@
     "count": {
         "albums": "{count, plural, =0 {Niciun album} one {# album} few {# albume} other {# de albume}}",
         "tracks": "{count, plural, =0 {Nicio melodie} one {# melodie} few {# melodii} other {# de melodii}}",
-        "artists": "{count, plural, =0 {Niciun artist} one {# artist} few {# artiști} other {# de artiști}}"
+        "artists": "{count, plural, =0 {Niciun artist} one {# artist} few {# artiști} other {# de artiști}}",
+        "playlists": "{count, plural, =0 {Niciun playlist} one {# playlist} few {# playlisturi} other {# de playlisturi}}"
     },
     "state": {
         "loading": "Se încarcă muzica…",
@@ -46,7 +49,8 @@
         "emptyLibraryBody": "Adaugă un folder de muzică pe server și scanează-l. Albumele și artiștii apar aici imediat.",
         "notFound": "Nu a fost găsit",
         "notFoundBody": "Elementul nu mai este în bibliotecă. Poate a fost mutat sau șters.",
-        "backToMusic": "Înapoi la Muzică"
+        "backToMusic": "Înapoi la Muzică",
+        "serverTooOld": "Lista de melodii are nevoie de MMO Server 3.10 sau mai nou. Actualizează serverul ca să vezi toate melodiile aici."
     },
     "track": {
         "playLabel": "Redă {title}, {duration}",
@@ -109,6 +113,25 @@
         "moveDown": "Mută {title} mai jos",
         "remove": "Scoate {title} din coadă",
         "mini": "Player muzică",
-        "openNowPlaying": "Deschide Se redă acum: {title}"
+        "openNowPlaying": "Deschide Se redă acum: {title}",
+        "offline": "Se redă de pe acest dispozitiv"
+    },
+    "playlists": {
+        "empty": "Încă nu ai playlisturi. Cele create în MixAI Studio sau într-o aplicație Subsonic apar aici."
+    },
+    "radio": {
+        "start": "Pornește radio",
+        "fromSong": "Pornește radio din {title}",
+        "empty": "Nu ai încă destulă muzică pentru un radio.",
+        "error": "Radioul nu a pornit. Încearcă din nou.",
+        "unsupported": "Radioul are nevoie de MMO Server 3.10 sau mai nou. Actualizează serverul și încearcă din nou."
+    },
+    "download": {
+        "all": "Descarcă tot",
+        "allDone": "Descărcat",
+        "progress": "{done} din {total} descărcate",
+        "queued": "{count, plural, one {# melodie pusă la descărcat} few {# melodii puse la descărcat} other {# de melodii puse la descărcat}}",
+        "error": "Descărcările nu au putut fi pornite.",
+        "unavailable": "Browserul acesta nu poate păstra muzica offline."
     }
 }

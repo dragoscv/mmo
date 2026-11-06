@@ -10,6 +10,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — MixAI Music web 3.2.6 (radio, songs, playlists, offline-first), MMO Server 3.10.0–3.10.1
+
+- **Music on music.mixai.ro (web 3.2.6):** "Start radio" on albums, artists and Now Playing (seed + up to 12 similar
+  artists, interleaved); new Songs (A–Z, paged) and Playlists tabs; every track list can be downloaded per song, and
+  albums/playlists get "Download all" with "n of m downloaded". Downloaded songs play from the device first (Now
+  Playing says so). Downloads now open on the host that saved them (`/media/downloads` renders on music.mixai.ro too;
+  the offline shell also answers tv.mixai.ro's `/downloads`). Older servers get "update to 3.10" instead of an empty page.
+- **MMO Server 3.10.0:** `GET /media/music/radio`, `/media/music/tracks`, `/media/music/playlists`; lyrics ask LRCLIB on
+  demand and keep the hit (SDK 0.8.0). **3.10.1:** desktop installers build again (node-abi pinned for Electron 44).
+
 ## 2026-11-06 — MixAI Connector 3.0.3 (store edition)
 
 - New store edition built by `apps/extension/store/build.mjs`: no host permissions, no content scripts, no download

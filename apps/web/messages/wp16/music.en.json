@@ -4,7 +4,9 @@
         "label": "Music sections",
         "home": "Home",
         "artists": "Artists",
-        "albums": "Albums"
+        "albums": "Albums",
+        "songs": "Songs",
+        "playlists": "Playlists"
     },
     "search": {
         "title": "Search music",
@@ -35,7 +37,8 @@
     "count": {
         "albums": "{count, plural, =0 {No albums} one {# album} other {# albums}}",
         "tracks": "{count, plural, =0 {No songs} one {# song} other {# songs}}",
-        "artists": "{count, plural, =0 {No artists} one {# artist} other {# artists}}"
+        "artists": "{count, plural, =0 {No artists} one {# artist} other {# artists}}",
+        "playlists": "{count, plural, =0 {No playlists} one {# playlist} other {# playlists}}"
     },
     "state": {
         "loading": "Loading music…",
@@ -46,7 +49,8 @@
         "emptyLibraryBody": "Add a music folder on the server and scan it. Albums and artists show up here right away.",
         "notFound": "Not found",
         "notFoundBody": "This item is no longer in the library. It may have been moved or removed.",
-        "backToMusic": "Back to Music"
+        "backToMusic": "Back to Music",
+        "serverTooOld": "The song list needs MMO Server 3.10 or newer. Update the server to see every song here."
     },
     "track": {
         "playLabel": "Play {title}, {duration}",
@@ -109,6 +113,25 @@
         "moveDown": "Move {title} down",
         "remove": "Remove {title} from the queue",
         "mini": "Music player",
-        "openNowPlaying": "Open Now playing: {title}"
+        "openNowPlaying": "Open Now playing: {title}",
+        "offline": "Playing from this device"
+    },
+    "playlists": {
+        "empty": "No playlists yet. Playlists made in MixAI Studio or a Subsonic app show up here."
+    },
+    "radio": {
+        "start": "Start radio",
+        "fromSong": "Start radio from {title}",
+        "empty": "Not enough music for a radio yet.",
+        "error": "Could not start the radio. Try again.",
+        "unsupported": "Radio needs MMO Server 3.10 or newer. Update the server, then try again."
+    },
+    "download": {
+        "all": "Download all",
+        "allDone": "Downloaded",
+        "progress": "{done} of {total} downloaded",
+        "queued": "{count, plural, one {# song queued for download} other {# songs queued for download}}",
+        "error": "Could not queue the downloads.",
+        "unavailable": "This browser cannot keep music offline."
     }
 }

@@ -9,13 +9,13 @@
 import Link from "@/components/host/host-context";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ArrowDown, ArrowUp, ListMusic, Mic2, Music2, Volume1, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowDown, ArrowUp, HardDrive, ListMusic, Mic2, Music2, Volume1, Volume2, VolumeX, X } from "lucide-react";
 import { Button, EmptyState } from "@mmo/ui";
 import type { LyricLine, Lyrics } from "@/lib/mmo/media-types";
 import type { MusicClient } from "@/lib/mmo/music";
 import { currentLineIndex, fmtClock, looksLikeLrc, parseLrc } from "@/lib/mmo/music-core";
 import { useWebMusicProgress, useWebMusicState, useWebMusicVolume, webMusicPlayer } from "@/lib/mmo/web-music-player";
-import { Cover, PlayingBars, albumHref, artistHref } from "./common";
+import { Cover, PlayingBars, RadioButton, albumHref, artistHref } from "./common";
 import { NextButton, PlayPauseButton, PrevButton, RepeatButton, ShuffleButton } from "./transport";
 import { useLoad, useMusic } from "./use-music";
 
@@ -73,6 +73,9 @@ export function NowPlayingScreen() {
                         {cur.artist ? (cur.artistId ? <Link href={artistHref(cur.artistId)}>{cur.artist}</Link> : <span>{cur.artist}</span>) : null}
                         {cur.album ? (cur.albumId ? <Link href={albumHref(cur.albumId)}>{cur.album}</Link> : <span>{cur.album}</span>) : null}
                     </p>
+                    {webMusicPlayer.isOffline(cur.id) ? (
+                        <p className="np-sub" data-testid="np-offline"><HardDrive aria-hidden className="size-4" />{t("player.offline")}</p>
+                    ) : null}
                 </div>
                 <SeekBar fallbackDuration={cur.durationSec} error={st.error !== null} buffering={st.buffering} />
                 <div className="np-controls" role="group" aria-label={t("player.controls")}>
@@ -83,6 +86,9 @@ export function NowPlayingScreen() {
                     <RepeatButton st={st} />
                 </div>
                 <VolumeControl />
+                <div className="flex justify-center">
+                    <RadioButton music={music} seed={cur.id} size="sm" variant="outline" label={t("radio.fromSong", { title: cur.title })} />
+                </div>
             </div>
             <div className="np-right">
                 <div className="np-tabs" role="group" aria-label={t("player.panel")}>

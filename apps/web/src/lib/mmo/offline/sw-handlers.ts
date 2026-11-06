@@ -63,7 +63,9 @@ export async function handleOfflineRequest({ request, url }: { request: Request;
 /** Navigations that the static offline shell may answer when the network is down. */
 export function isShellRequest(url: URL, request: Request): boolean {
     if (SHELL_ASSETS.includes(url.pathname)) return true;
-    const isDownloads = (p: string): boolean => p === DOWNLOADS_ROUTE || p.startsWith(`${DOWNLOADS_ROUTE}/`) || p.startsWith("/offline/");
+    // `/downloads` = the clean URL on tv.mixai.ro (rewritten to DOWNLOADS_ROUTE by proxy.ts while online).
+    const isDownloads = (p: string): boolean => p === DOWNLOADS_ROUTE || p.startsWith(`${DOWNLOADS_ROUTE}/`) || p === "/downloads"
+        || p.startsWith("/downloads/") || p.startsWith("/offline/");
     if (request.mode === "navigate") return isDownloads(url.pathname);
     // Tokens CSS / theme script requested BY a downloads document: everywhere else they keep `defaultCache`.
     if (!SHELL_DEPS.includes(url.pathname) || !request.referrer) return false;

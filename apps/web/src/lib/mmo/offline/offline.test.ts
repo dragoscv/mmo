@@ -125,6 +125,8 @@ describe("shell routing", () => {
     it("routes downloads navigations and shell files, not other pages", () => {
         expect(isShellRequest(u("/media/downloads"), req({ mode: "navigate" }))).toBe(true);
         expect(isShellRequest(u("/media/downloads/play/x"), req({ mode: "navigate" }))).toBe(true);
+        expect(isShellRequest(u("/downloads/play/x"), req({ mode: "navigate" }))).toBe(true);
+        expect(isShellRequest(u("/downloadsx"), req({ mode: "navigate" }))).toBe(false);
         expect(isShellRequest(u("/offline/downloads.js"), req({}))).toBe(true);
         expect(isShellRequest(u("/media"), req({ mode: "navigate" }))).toBe(false);
         expect(isShellRequest(u("/media/downloadsx"), req({ mode: "navigate" }))).toBe(false);

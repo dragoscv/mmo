@@ -15,12 +15,11 @@ import type { AlbumCard, AlbumDetail, ArtistDetail, GenreAlbums, MusicSearch, Pl
 import type { MusicClient } from "@/lib/mmo/music";
 import { fmtClock, totalSeconds } from "@/lib/mmo/music-core";
 import { webMusicPlayer } from "@/lib/mmo/web-music-player";
-import { useMmo } from "../mmo-provider";
 import { rowKeys } from "../row";
 import {
-    AlbumTile, ArtistTile, MusicError, MusicHero, MusicLoading, MusicNotFound, TileGrid, TrackList, artistHref, genreHref,
+    AlbumTile, ArtistTile, DownloadAllButton, MusicError, MusicHero, MusicLoading, MusicNotFound, RadioButton, TileGrid, TrackList, artistHref, genreHref,
 } from "./common";
-import { useLoad, useMusic } from "./use-music";
+import { useDownloadable, useLoad, useMusic } from "./use-music";
 
 function PlayActions({ tracks }: { tracks: TrackCard[] }) {
     const t = useTranslations("mx.music.actions");
@@ -44,8 +43,8 @@ function Duration({ tracks }: { tracks: TrackCard[] }) {
 export function AlbumScreen({ id }: { id: string }) {
     const t = useTranslations("mx.music");
     const { music } = useMusic();
-    const { server, clients } = useMmo();
     const r = useLoad<AlbumDetail | null>(music ? `album|${id}` : null, () => (music ? music.album(id) : Promise.resolve(null)));
+    const dl = useDownloadable(r.data?.album.name);
     if (!music || r.status === "loading") return <div className="mu-page"><MusicLoading label={t("state.loading")} /></div>;
     if (r.status === "error") return <div className="mu-page"><MusicError onRetry={r.retry} /></div>;
     if (!r.data) return <div className="mu-page"><MusicNotFound /></div>;
@@ -59,10 +58,13 @@ export function AlbumScreen({ id }: { id: string }) {
                     {album.genre ? <Link href={genreHref(album.genre)}>{album.genre}</Link> : null}
                     <Duration tracks={tracks} />
                 </>}
-                actions={<PlayActions tracks={tracks} />} />
+                actions={<>
+                    <PlayActions tracks={tracks} />
+                    {tracks.length > 0 ? <RadioButton music={music} seed={album.id} /> : null}
+                    <DownloadAllButton music={music} tracks={tracks} scope={dl} album={album.name} />
+                </>} />
             {tracks.length > 0
-                ? <TrackList music={music} tracks={tracks} numbering="track" discs label={t("album.tracklist")}
-                    downloadable={server && clients ? { serverId: server.deviceId, profileId: clients.profiles.profileId, album: album.name } : undefined} />
+                ? <TrackList music={music} tracks={tracks} numbering="track" discs label={t("album.tracklist")} downloadable={dl} />
                 : <p className="text-muted-foreground">{t("album.empty")}</p>}
         </div>
     );
@@ -74,6 +76,7 @@ export function ArtistScreen({ id }: { id: string }) {
     const t = useTranslations("mx.music");
     const { music } = useMusic();
     const r = useLoad<ArtistDetail | null>(music ? `artist|${id}` : null, () => (music ? music.artist(id) : Promise.resolve(null)));
+    const dl = useDownloadable();
     if (!music || r.status === "loading") return <div className="mu-page"><MusicLoading label={t("state.loading")} /></div>;
     if (r.status === "error") return <div className="mu-page"><MusicError onRetry={r.retry} /></div>;
     if (!r.data) return <div className="mu-page"><MusicNotFound /></div>;
@@ -86,11 +89,14 @@ export function ArtistScreen({ id }: { id: string }) {
                     <span>{t("count.albums", { count: artist.albumCount })}</span>
                     <span>{t("count.tracks", { count: artist.songCount })}</span>
                 </>}
-                actions={<PlayActions tracks={topTracks} />} />
+                actions={<>
+                    <PlayActions tracks={topTracks} />
+                    {artist.songCount > 0 ? <RadioButton music={music} seed={artist.id} /> : null}
+                </>} />
             {topTracks.length > 0 ? (
                 <section aria-labelledby="mu-top">
                     <h2 id="mu-top" className="mu-section-title">{t("artist.top")}</h2>
-                    <TrackList music={music} tracks={topTracks.slice(0, 10)} showAlbum showCover label={t("artist.top")} />
+                    <TrackList music={music} tracks={topTracks.slice(0, 10)} showAlbum showCover label={t("artist.top")} downloadable={dl} />
                 </section>
             ) : null}
             {albums.length > 0 ? (
@@ -119,6 +125,7 @@ export function PlaylistScreen({ id }: { id: string }) {
     const t = useTranslations("mx.music");
     const { music } = useMusic();
     const r = useLoad<PlaylistDetail | null>(music ? `pl|${id}` : null, () => (music ? music.playlist(id) : Promise.resolve(null)));
+    const dl = useDownloadable();
     if (!music || r.status === "loading") return <div className="mu-page"><MusicLoading label={t("state.loading")} /></div>;
     if (r.status === "error") return <div className="mu-page"><MusicError onRetry={r.retry} /></div>;
     if (!r.data) return <div className="mu-page"><MusicNotFound /></div>;
@@ -126,9 +133,10 @@ export function PlaylistScreen({ id }: { id: string }) {
     return (
         <div className="mu-page" data-testid="music-playlist">
             <MusicHero cover={music.coverUrl(playlist, 600)} backdrop={music.coverUrl(playlist, 120)} kicker={t("playlist.kicker")} title={playlist.name}
-                meta={<Duration tracks={tracks} />} actions={<PlayActions tracks={tracks} />} />
+                meta={<Duration tracks={tracks} />}
+                actions={<><PlayActions tracks={tracks} /><DownloadAllButton music={music} tracks={tracks} scope={dl} /></>} />
             {tracks.length > 0
-                ? <TrackList music={music} tracks={tracks} showArtist showAlbum showCover label={playlist.name} />
+                ? <TrackList music={music} tracks={tracks} showArtist showAlbum showCover label={playlist.name} downloadable={dl} />
                 : <p className="text-muted-foreground">{t("playlist.empty")}</p>}
         </div>
     );
@@ -201,6 +209,7 @@ export function MusicSearchScreen() {
     }, [input, q, router]);
 
     const r = useLoad<MusicSearch | null>(music && q ? `search|${q}` : null, () => (music ? music.search(q) : Promise.resolve(null)));
+    const dl = useDownloadable();
     const onSubmit = (e: FormEvent) => {
         e.preventDefault();
         const s = input.trim();
@@ -230,7 +239,7 @@ export function MusicSearchScreen() {
                                             <section aria-labelledby="mu-s-tracks">
                                                 <h2 id="mu-s-tracks" className="mu-section-title">{t("search.tracks")}</h2>
                                                 <TrackList music={music} tracks={res.tracks} showArtist showAlbum showCover label={t("search.tracks")}
-                                                    onPlay={(i) => webMusicPlayer.play(res.tracks, i)} />
+                                                    onPlay={(i) => webMusicPlayer.play(res.tracks, i)} downloadable={dl} />
                                             </section>
                                         ) : null}
                                         {res.artists.length > 0 ? (

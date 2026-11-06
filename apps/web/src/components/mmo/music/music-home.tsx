@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * `/media/music` (WP16-40): Home / Artists A–Z / Albums tabs (tab in `?tab=`), search box, "Surprise me"
+ * `/media/music` (WP16-40, WP17-40): Home / Artists A–Z / Albums / Songs / Playlists tabs (tab in `?tab=`), search box, "Surprise me"
  * (random 50 → play → Now Playing). Home rows: recently played, recently added, most played, playlists,
  * genre chips, random albums. Albums grid uses `content-visibility:auto` (music.css) for 1000+ items.
  */
@@ -11,7 +11,7 @@ import { useCallback, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { Search, Shuffle } from "lucide-react";
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@mmo/ui";
-import type { AlbumCard, ArtistCard, MusicHome } from "@/lib/mmo/media-types";
+import type { AlbumCard, ArtistCard, MusicHome, PlaylistCard, TrackCard } from "@/lib/mmo/media-types";
 import type { MusicClient } from "@/lib/mmo/music";
 import { MUSIC_LETTERS } from "@/lib/mmo/music-core";
 import { webMusicPlayer } from "@/lib/mmo/web-music-player";
@@ -19,10 +19,10 @@ import { rowKeys } from "../row";
 import {
     AlbumTile, ArtistTile, MusicEmptyLibrary, MusicError, MusicLoading, NOW_PLAYING_HREF, PlaylistTile, TileGrid, TrackList, genreHref,
 } from "./common";
-import { useLoad, useMusic } from "./use-music";
+import { useDownloadable, useLoad, useMusic } from "./use-music";
 
-type Tab = "home" | "artists" | "albums";
-const TABS: readonly Tab[] = ["home", "artists", "albums"];
+type Tab = "home" | "artists" | "albums" | "songs" | "playlists";
+const TABS: readonly Tab[] = ["home", "artists", "albums", "songs", "playlists"];
 const PAGE = 200;
 
 export function MusicHomeScreen() {
@@ -82,6 +82,8 @@ export function MusicHomeScreen() {
                 <TabsContent value="home" className="pt-4"><HomeTab music={music} profileKey={profileKey} /></TabsContent>
                 <TabsContent value="artists" className="pt-4"><LetterPaged kind="artists" music={music} /></TabsContent>
                 <TabsContent value="albums" className="pt-4"><LetterPaged kind="albums" music={music} /></TabsContent>
+                <TabsContent value="songs" className="pt-4"><SongsTab music={music} /></TabsContent>
+                <TabsContent value="playlists" className="pt-4"><PlaylistsTab music={music} /></TabsContent>
             </Tabs>
         </div>
     );
@@ -94,6 +96,7 @@ function isEmpty(h: MusicHome | null): boolean {
 function HomeTab({ music, profileKey }: { music: MusicClient; profileKey: string }) {
     const t = useTranslations("mx.music");
     const home = useLoad<MusicHome | null>(`home|${profileKey}`, () => music.home());
+    const dl = useDownloadable();
     if (home.status === "loading") return <MusicLoading label={t("state.loading")} />;
     if (home.status === "error") return <MusicError onRetry={home.retry} />;
     const h = home.data;
@@ -120,7 +123,7 @@ function HomeTab({ music, profileKey }: { music: MusicClient; profileKey: string
             {h.mostPlayed.length > 0 ? (
                 <section aria-labelledby="mu-most">
                     <h2 id="mu-most" className="mu-section-title">{t("home.mostPlayed")}</h2>
-                    <TrackList music={music} tracks={h.mostPlayed.slice(0, 10)} showArtist showCover label={t("home.mostPlayed")} />
+                    <TrackList music={music} tracks={h.mostPlayed.slice(0, 10)} showArtist showCover label={t("home.mostPlayed")} downloadable={dl} />
                 </section>
             ) : null}
             {h.playlists.length > 0 ? (
@@ -150,6 +153,60 @@ function AlbumRow({ title, items, music }: { title: string; items: AlbumCard[]; 
 }
 
 interface PagedState<T> { items: T[]; total: number }
+
+/** All songs A–Z, 200 per page with "Load more"; play-from-here plays the loaded list. */
+function SongsTab({ music }: { music: MusicClient }) {
+    const t = useTranslations("mx.music");
+    const dl = useDownloadable();
+    const [extra, setExtra] = useState<TrackCard[]>([]);
+    const [more, setMore] = useState(false);
+    const first = useLoad<PagedState<TrackCard> | null>("songs", async () => {
+        const r = await music.tracks({ limit: PAGE });
+        return r ? { items: r.items, total: r.total } : null;
+    });
+    const items = first.data ? [...first.data.items, ...extra] : [];
+    const total = first.data?.total ?? 0;
+    const loadMore = async () => {
+        setMore(true);
+        try {
+            const r = await music.tracks({ offset: items.length, limit: PAGE });
+            setExtra((e) => [...e, ...(r?.items ?? [])]);
+        } catch { /* keep what we have */ } finally { setMore(false); }
+    };
+    if (first.status === "loading") return <MusicLoading label={t("state.loading")} />;
+    if (first.status === "error") return <MusicError onRetry={first.retry} />;
+    if (first.data === null) return <p className="text-muted-foreground" role="status">{t("state.serverTooOld")}</p>;
+    if (items.length === 0) return <MusicEmptyLibrary />;
+    return (
+        <div className="flex flex-col gap-4" data-testid="music-songs">
+            <p className="text-muted-foreground text-sm" aria-live="polite">{t("count.tracks", { count: total })}</p>
+            <TrackList music={music} tracks={items} showArtist showAlbum showCover label={t("tabs.songs")} downloadable={dl} />
+            {items.length < total ? (
+                <div className="flex justify-center">
+                    <Button variant="outline" onClick={() => void loadMore()} loading={more}>{t("letters.more", { shown: items.length, total })}</Button>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+function PlaylistsTab({ music }: { music: MusicClient }) {
+    const t = useTranslations("mx.music");
+    // Servers before 3.10 have no list route: fall back to the playlists on Home.
+    const r = useLoad<PlaylistCard[]>("playlists", async () => (await music.playlists()) ?? (await music.home())?.playlists ?? []);
+    if (r.status === "loading") return <MusicLoading label={t("state.loading")} />;
+    if (r.status === "error") return <MusicError onRetry={r.retry} />;
+    const items = r.data ?? [];
+    if (items.length === 0) return <p className="text-muted-foreground" role="status">{t("playlists.empty")}</p>;
+    return (
+        <div className="flex flex-col gap-4" data-testid="music-playlists">
+            <p className="text-muted-foreground text-sm">{t("count.playlists", { count: items.length })}</p>
+            <TileGrid label={t("tabs.playlists")}>
+                {items.map((p) => <li key={p.id}><PlaylistTile music={music} playlist={p} /></li>)}
+            </TileGrid>
+        </div>
+    );
+}
 
 /** Artists or albums, optionally filtered by first letter, paged by 200 with "Load more". */
 function LetterPaged({ kind, music }: { kind: "artists" | "albums"; music: MusicClient }) {

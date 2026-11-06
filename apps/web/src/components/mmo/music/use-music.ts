@@ -6,16 +6,35 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MusicClient } from "@/lib/mmo/music";
+import { scopeOf } from "@/lib/mmo/offline/keys";
 import { webMusicPlayer } from "@/lib/mmo/web-music-player";
 import { useMmo } from "../mmo-provider";
+import { useOfflineList } from "../offline/use-offline";
 
 export function useMusic(): { music: MusicClient | null; profileKey: string } {
-    const { clients, profile } = useMmo();
+    const { clients, profile, server } = useMmo();
     const profileId = profile?.id ?? null;
     useEffect(() => {
         if (clients) webMusicPlayer.attach(clients.music, clients.media, profileId);
     }, [clients, profileId]);
+    // Finished track downloads of this server + profile play from the device (offline-first).
+    const scope = server && clients ? scopeOf(server.deviceId, clients.profiles.profileId) : null;
+    const { items } = useOfflineList(scope);
+    useEffect(() => {
+        const m = new Map<string, string>();
+        for (const i of items ?? []) if (i.kind === "track" && i.status === "done") m.set(i.id, i.key);
+        webMusicPlayer.setOffline(m);
+    }, [items]);
     return { music: clients?.music ?? null, profileKey: profileId ?? "default" };
+}
+
+export interface DownloadScope { serverId: string; profileId: string; album?: string | null }
+
+/** Server + profile for offline downloads (`TrackList.downloadable`), `undefined` until both are known. */
+export function useDownloadable(album?: string | null): DownloadScope | undefined {
+    const { server, clients } = useMmo();
+    if (!server || !clients) return undefined;
+    return { serverId: server.deviceId, profileId: clients.profiles.profileId, album: album ?? null };
 }
 
 export type LoadStatus = "loading" | "error" | "ready";

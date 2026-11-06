@@ -137,6 +137,13 @@ describe("routeRequest", () => {
         expect(routeRequest("music.mixai.ro", "/privacy")).toEqual({ type: "next" });
         expect(routeRequest("app.mixai.ro", "/pair")).toEqual({ type: "next" });
     });
+    it("opens downloads on the host that saved them (per-origin storage)", () => {
+        expect(routeRequest("music.mixai.ro", "/media/downloads")).toEqual({ type: "next" });
+        expect(routeRequest("music.mixai.ro", "/media/downloads/play/k")).toEqual({ type: "next" });
+        expect(routeRequest("tv.mixai.ro", "/media/downloads")).toEqual({ type: "next" });
+        expect(routeRequest("tv.mixai.ro", "/downloads")).toEqual({ type: "rewrite", path: "/media/downloads" });
+        expect(hrefFor("/media/downloads", "music")).toBe("/media/downloads");
+    });
     it("honours a staging root domain", () => {
         expect(routeRequest("tv.staging.mixai.ro", "/", "", "staging.mixai.ro")).toEqual({ type: "rewrite", path: "/media" });
         expect(routeRequest("staging.mixai.ro", "/library", "", "staging.mixai.ro")).toEqual({ type: "redirect", url: "https://app.staging.mixai.ro/library", status: 308 });

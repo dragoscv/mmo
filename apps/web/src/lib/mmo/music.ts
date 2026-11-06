@@ -8,7 +8,7 @@ import type { ServerConfig } from "./config";
 import { ServerHttp, enc } from "./http";
 import type {
     AlbumCard, AlbumDetail, AlbumPage, ArtistDetail, ArtistPage, GenreAlbums, GenreCard, Lyrics, MusicHome, MusicQueue,
-    MusicQueueInput, MusicSearch, PlaylistDetail, TrackCard,
+    MusicQueueInput, MusicSearch, PlaylistCard, PlaylistDetail, TrackCard, TrackPage,
 } from "./media-types";
 import type { ProfilesClient } from "./profiles";
 
@@ -51,6 +51,24 @@ export class MusicClient {
     search(q: string): Promise<MusicSearch | null> { return this.http.get<MusicSearch>(`/media/music/search?q=${enc(q)}`, { allow404: true }); }
 
     playlist(id: string): Promise<PlaylistDetail | null> { return this.http.get<PlaylistDetail>(`/media/music/playlists/${enc(id)}`, { allow404: true }); }
+
+    /** `null` = server older than 3.10 (route missing). */
+    async playlists(): Promise<PlaylistCard[] | null> {
+        const r = await this.http.get<{ playlists: PlaylistCard[] }>("/media/music/playlists", { allow404: true });
+        return r ? r.playlists : null;
+    }
+
+    /** All songs A–Z by title, paged (server 3.10+; `null` on older servers). */
+    tracks(opts: { offset?: number; limit?: number } = {}): Promise<TrackPage | null> {
+        return this.http.get<TrackPage>(`/media/music/tracks?${qs(opts)}`, { allow404: true });
+    }
+
+    /** Radio from a track / album / artist id (server 3.10+): the seed first, then similar artists interleaved.
+     *  `null` = the server has no radio route (older than 3.10) or the seed is gone. */
+    async radio(seed: string, size = 50): Promise<TrackCard[] | null> {
+        const r = await this.http.get<{ seed: string; tracks: TrackCard[] }>(`/media/music/radio?seed=${enc(seed)}&size=${size}`, { allow404: true });
+        return r ? r.tracks : null;
+    }
 
     async random(size = 50): Promise<TrackCard[]> {
         const r = await this.http.get<{ tracks: TrackCard[] }>(`/media/music/random?size=${size}`, { allow404: true });

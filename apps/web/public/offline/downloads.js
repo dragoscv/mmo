@@ -171,7 +171,7 @@
 
   if (typeof indexedDB === "undefined") { main.appendChild(el("p", { class: "od-empty", text: t("unsupported") })); return; }
 
-  var m = /^\/media\/downloads\/play\/([^/]+)\/?$/.exec(location.pathname);
+  var m = /^(?:\/media)?\/downloads\/play\/([^/]+)\/?$/.exec(location.pathname);
   openDb().then(function (db) {
     if (m) {
       var key = null;
