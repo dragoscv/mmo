@@ -59,12 +59,18 @@ test.describe("suite landing (signed out)", () => {
                 await page.waitForTimeout(1200); // entrance choreography (~900 ms)
                 await noOverflow(page);
                 if (width >= 1280) {
-                    const lines = await page.locator("#sx-title").evaluate((el) => {
+                    // One sentence per line: never a break inside a phrase ("Pe / orice ecran" at 1920 before 3.2.3).
+                    const m = await page.locator("#sx-title").evaluate((el) => {
                         const lh = parseFloat(getComputedStyle(el).lineHeight);
-                        return Math.round(el.getBoundingClientRect().height / lh);
+                        const spans = [...el.querySelectorAll(".sx-title-line")];
+                        return { lines: Math.round(el.getBoundingClientRect().height / lh), spans: spans.length,
+                            broken: spans.filter((s) => s.getBoundingClientRect().height > lh * 1.5).length,
+                            overflow: el.scrollWidth - el.clientWidth };
                     });
-                    console.log(`__TITLE_LINES__ ${width} ${lines}`);
-                    expect(lines, "display title wraps to at most two lines on desktop").toBeLessThanOrEqual(2);
+                    console.log(`__TITLE_LINES__ ${width} ${JSON.stringify(m)}`);
+                    expect(m.broken, "a sentence wraps inside itself").toBe(0);
+                    expect(m.lines, "one line per sentence").toBe(m.spans);
+                    expect(m.overflow, "title overflows its column").toBeLessThanOrEqual(1);
                 }
                 await page.screenshot({ path: `test-results/suite-wp17/landing-${mode}-${width}.png` });
                 await page.screenshot({ path: `test-results/suite-wp17/landing-${mode}-${width}-full.png`, fullPage: true });

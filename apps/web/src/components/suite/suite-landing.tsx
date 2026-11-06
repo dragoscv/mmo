@@ -22,7 +22,10 @@ export async function SuiteLanding() {
                 <section className="sx-wrap sx-hero" aria-labelledby="sx-title">
                     <div>
                         <p className="sx-eyebrow sx-rise" style={{ ["--i" as string]: 0 }}>{t("hero.eyebrow")}</p>
-                        <h1 id="sx-title" className="sx-title text-gradient-brand sx-rise" style={{ ["--i" as string]: 1 }}>{t("hero.title")}</h1>
+                        <h1 id="sx-title" className="sx-title text-gradient-brand sx-rise" style={{ ["--i" as string]: 1 }}>
+                            {/* One sentence per line on desktop ("Media ta." / "Pe orice ecran." / "De pe serverul tău."); breaks no longer fall mid-phrase. */}
+                            {t("hero.title").split(/(?<=\.)\s+/).map((s, i) => <span key={i} className="sx-title-line">{s} </span>)}
+                        </h1>
                         <p className="sx-sub sx-rise" style={{ ["--i" as string]: 2 }}>{t("hero.subtitle")}</p>
                         <div className="sx-cta sx-rise" style={{ ["--i" as string]: 3 }}>
                             <SignInButton size="lg" className="shadow-glow" label={t("hero.ctaStart")} />

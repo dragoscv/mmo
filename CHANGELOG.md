@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — Web 3.2.3 (suite title, one sentence per line)
+
+- The 3.2.2 measure change did not help: the cloud e2e assertion it added still saw 3 lines with breaks inside a phrase
+  ("Pe / orice ecran"). The display title now sets each sentence on its own line from 1024 px (mobile keeps natural
+  wrapping); the spec asserts one line per sentence and no overflow at 1280 / 1920 / 3440.
+
 ## 2026-11-06 — Web 3.2.2 (suite hero measure)
 
 - mixai.ro hero: copy column on the golden ratio (1.382fr : 1fr) and a slightly smaller display size, so the title reads
