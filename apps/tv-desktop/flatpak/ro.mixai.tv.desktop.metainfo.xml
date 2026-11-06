@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>ro.mixai.tv.desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-or-later</project_license>
+  <name>MixAI TV</name>
+  <summary>Watch your own MixAI Server on the big screen</summary>
+  <summary xml:lang="ro">Media de pe propriul tău MixAI Server, pe ecranul mare</summary>
+  <developer id="ro.mixai">
+    <name>MixAI</name>
+  </developer>
+  <description>
+    <p>MixAI TV plays the movies, series, music and Live TV from your own MixAI Server, with an interface made for a
+      big screen, a keyboard, a mouse or a remote.</p>
+    <ul>
+      <li>Cinematic home: continue watching, new in your library, recommendations</li>
+      <li>Movies and series with seasons, episodes and cast; resume on any device</li>
+      <li>Direct play of your files with subtitles and audio tracks</li>
+      <li>Live TV from the sources you add</li>
+      <li>Profiles for the whole family, with PINs and age limits for kids</li>
+    </ul>
+    <p>MixAI TV needs a MixAI Server (free, self-hosted) on your network or over the internet. Your media stays on your
+      server. To try it, connect to the public demo at https://demo.mixai.ro.</p>
+  </description>
+  <launchable type="desktop-id">ro.mixai.tv.desktop.desktop</launchable>
+  <url type="homepage">https://mixai.ro</url>
+  <url type="bugtracker">https://github.com/dragoscv/mmo/issues</url>
+  <url type="contact">mailto:support@mixai.ro</url>
+  <url type="vcs-browser">https://github.com/dragoscv/mmo</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Home on the demo server</caption>
+      <image>https://mixai.ro/store/tv-desktop/1-home.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Title page</caption>
+      <image>https://mixai.ro/store/tv-desktop/2-title.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">moderate</content_attribute>
+  </content_rating>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <releases>
+    <release version="0.1.1" date="2026-11-06">
+      <description><p>First release of MixAI TV for Linux.</p></description>
+    </release>
+  </releases>
+</component>

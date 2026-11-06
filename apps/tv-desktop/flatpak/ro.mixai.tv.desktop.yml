@@ -1,0 +1,45 @@
+# Flathub manifest for MixAI TV (WP17-27). Offline build: cargo-sources.json + node-sources-{tizen,desktop}.json are
+# generated with flatpak-builder-tools (scripts/linux/flatpak-sources.sh) from the committed Cargo.lock / pnpm-lock.yaml.
+# Submit: fork github.com/flathub/flathub, branch new-pr, add this file + the two generated source lists.
+app-id: ro.mixai.tv.desktop
+runtime: org.gnome.Platform
+runtime-version: '48'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.node22
+command: mixai-tv
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node22/bin
+modules:
+  - name: mixai-tv
+    buildsystem: simple
+    build-options:
+      env:
+        CARGO_HOME: /run/build/mixai-tv/cargo
+        XDG_CACHE_HOME: /run/build/mixai-tv/flatpak-node/cache
+    build-commands:
+      # Shared TV UI (apps/tv-tizen) + desktop shell, from the offline pnpm store the generator pre-fills.
+      - npm i -g --offline --prefix /run/build/mixai-tv/pnpm pnpm@10.0.0
+      - cd apps/tv-tizen && /run/build/mixai-tv/pnpm/bin/pnpm install --offline --frozen-lockfile --ignore-workspace --ignore-scripts
+      - cd apps/tv-desktop && /run/build/mixai-tv/pnpm/bin/pnpm install --offline --frozen-lockfile --ignore-workspace --ignore-scripts
+      - cd apps/tv-desktop && /run/build/mixai-tv/pnpm/bin/pnpm exec vite build
+      - cd apps/tv-desktop/src-tauri && cargo --offline build --release --features tauri/custom-protocol
+      - install -Dm755 apps/tv-desktop/src-tauri/target/release/mixai-tv /app/bin/mixai-tv
+      - install -Dm644 apps/tv-desktop/flatpak/ro.mixai.tv.desktop.desktop /app/share/applications/ro.mixai.tv.desktop.desktop
+      - install -Dm644 apps/tv-desktop/flatpak/ro.mixai.tv.desktop.metainfo.xml /app/share/metainfo/ro.mixai.tv.desktop.metainfo.xml
+      - install -Dm644 apps/web/public/icon-512.png /app/share/icons/hicolor/512x512/apps/ro.mixai.tv.desktop.png
+    sources:
+      - type: git
+        url: https://github.com/dragoscv/mmo.git
+        tag: tv-desktop-v0.1.1
+      - cargo-sources.json
+      - node-sources-tizen.json
+      - node-sources-desktop.json

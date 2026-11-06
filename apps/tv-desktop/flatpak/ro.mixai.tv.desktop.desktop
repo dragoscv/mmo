@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=MixAI TV
+GenericName=Media player
+GenericName[ro]=Player media
+Comment=Watch the movies, series, music and Live TV from your own MixAI Server
+Comment[ro]=Filmele, serialele, muzica și Live TV de pe propriul tău MixAI Server
+Exec=mixai-tv
+Icon=ro.mixai.tv.desktop
+Terminal=false
+Categories=AudioVideo;Video;Player;TV;
+Keywords=movies;series;tv;media;server;filme;seriale;
+StartupWMClass=mixai-tv
