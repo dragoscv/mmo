@@ -265,6 +265,64 @@ describe("MusicService lyrics", () => {
         expect(() => music.lyrics(`tr_${ids.other}`)).toThrow(MusicError);
         expect(() => music.lyrics("al_0000000000000000")).toThrow(/track not found/);
     });
+
+    it("lyricsAsync asks LRCLIB only when nothing is stored, persists hits, caches misses for a day", async () => {
+        let clock = NOW;
+        const calls: string[] = [];
+        const fetchLyrics = vi.fn(async (artist: string, title: string) => {
+            calls.push(`${artist}|${title}`);
+            return title === "Galvanize" ? { plainLyrics: "Don't hold back", syncedLyrics: "[00:05.00]Don't hold back" } : null;
+        });
+        const m = new MusicService({ mediaDb: media, getLibraryDb: () => lib, now: () => clock, fetchLyrics });
+        expect(await m.lyricsAsync(`tr_${ids.funk}`)).toMatchObject({ source: "embedded" });
+        expect(fetchLyrics).not.toHaveBeenCalled();
+
+        const hit = await m.lyricsAsync(`tr_${ids.galv}`);
+        expect(hit).toMatchObject({ source: "lrclib", plain: "Don't hold back", synced: [{ timeMs: 5000, text: "Don't hold back" }] });
+        expect(await m.lyricsAsync(`tr_${ids.galv}`)).toMatchObject({ source: "embedded" });
+        expect(calls.filter((c) => c.endsWith("Galvanize"))).toHaveLength(1);
+
+        expect(await m.lyricsAsync(`tr_${ids.omt}`)).toMatchObject({ source: "none" });
+        expect(await m.lyricsAsync(`tr_${ids.omt}`)).toMatchObject({ source: "none" });
+        expect(calls.filter((c) => c.endsWith("One More Time"))).toHaveLength(1);
+        clock += 25 * 3_600_000;
+        await m.lyricsAsync(`tr_${ids.omt}`);
+        expect(calls.filter((c) => c.endsWith("One More Time"))).toHaveLength(2);
+
+        const boom = new MusicService({ mediaDb: media, getLibraryDb: () => lib, now: () => NOW, fetchLyrics: async () => { throw new Error("net"); } });
+        expect(await boom.lyricsAsync(`tr_${ids.aero}`)).toMatchObject({ source: "none" });
+    });
+});
+
+describe("MusicService radio, songs, playlists", () => {
+    it("track seed first, then the seed artist and genre-similar artists interleaved, no duplicates, no hidden/foreign", () => {
+        const r = music.radio(`tr_${ids.omt}`, 50, () => 0);
+        expect(r.tracks[0]!.id).toBe(`tr_${ids.omt}`);
+        const titles = r.tracks.map((t) => t.title);
+        expect(new Set(titles).size).toBe(titles.length);
+        expect(titles).not.toContain("Hidden");
+        expect(titles).not.toContain("Secret");
+        expect(titles).not.toContain("Galvanize"); // Big Beat shares no genre with House
+        expect(r.tracks.some((t) => t.artist === "Ștefan Bănică")).toBe(true);
+        const artists = r.tracks.map((t) => t.artist);
+        expect(artists[1]).not.toBe(artists[2]); // interleaved, not one artist's whole catalogue first
+    });
+
+    it("artist and album seeds, size cap, unknown seed → 404", () => {
+        expect(music.radio(artistId("Daft Punk"), 2).tracks).toHaveLength(2);
+        expect(music.radio(albumId("Push the Button", "The Chemical Brothers")).tracks.map((t) => t.title)).toEqual(["Galvanize"]);
+        expect(() => music.radio("ar_0000000000000000")).toThrow(/seed not found/);
+        expect(() => music.radio("pl_1")).toThrow(/seed not found/);
+        expect(() => music.radio(`tr_${ids.other}`)).toThrow(MusicError);
+    });
+
+    it("songs A–Z paged and the playlists list", () => {
+        const p = music.tracks({ limit: 3 });
+        expect(p.total).toBe(6);
+        expect(p.items.map((t) => t.title)).toEqual(["Aerodynamic", "Da Funk", "Dor de țară"]);
+        expect(music.tracks({ offset: 5, limit: 3 }).items.map((t) => t.title)).toEqual(["Plain One"]);
+        expect(music.playlistsList()).toEqual([expect.objectContaining({ id: "pl_1", name: "Party", songCount: 2 })]);
+    });
 });
 
 describe("music router (http)", () => {
@@ -299,6 +357,11 @@ describe("music router (http)", () => {
         expect(((await j(`/search?q=${encodeURIComponent("bănică")}`)).body.artists as unknown[]).length).toBe(1);
         expect((await j(`/artists/${artistId("Daft Punk")}`)).body).toMatchObject({ artist: { name: "Daft Punk" } });
         expect((await j(`/lyrics/tr_${ids.funk}`)).body).toMatchObject({ source: "embedded" });
+        expect((await j("/radio")).status).toBe(400);
+        expect((await j("/radio?seed=ar_0000000000000000")).status).toBe(404);
+        expect(((await j(`/radio?seed=tr_${ids.omt}&size=3`)).body.tracks as unknown[]).length).toBe(3);
+        expect((await j("/playlists")).body).toMatchObject({ playlists: [{ id: "pl_1" }] });
+        expect((await j("/tracks?limit=2")).body).toMatchObject({ total: 6, limit: 2 });
     });
 
     it("PUT/GET /queue with validation", async () => {

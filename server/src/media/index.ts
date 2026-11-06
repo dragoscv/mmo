@@ -15,6 +15,7 @@ import { createMediaRouter } from "./routes";
 import { ProfileStore } from "./profiles";
 import { WatchlistStore } from "./watchlist";
 import { MusicService } from "./music";
+import { getLyrics } from "../library/metadata-services";
 import { BookmarkStore } from "./bookmarks";
 import { SubtitleIndex } from "./subtitles";
 import { PushRelay } from "./push-relay";
@@ -68,7 +69,7 @@ export function createMediaModule(opts: MediaModuleOptions): MediaModule {
     const library = new LibraryIndex(db, tmdb, opts.log);
     const profiles = new ProfileStore(db);
     const watchlist = new WatchlistStore(db, progress);
-    const music = new MusicService({ mediaDb: db });
+    const music = new MusicService({ mediaDb: db, fetchLyrics: (artist, title, album, duration) => getLyrics(artist, title, album, duration) });
     const bookmarks = new BookmarkStore(db);
     const subtitles = new SubtitleIndex(db);
     let subtitleIndexing: SubtitleIndexing | null = null;

@@ -3884,6 +3884,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/music/radio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Radio from a track, album or artist seed (seed artist + genre-similar artists, interleaved) */
+        get: operations["musicRadio"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/playlists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All playlists of the library owner */
+        get: operations["musicPlaylists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All songs A-Z by title, paged */
+        get: operations["musicTracks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/livetv/proxy/{channelId}": {
         parameters: {
             query?: never;
@@ -3929,7 +3980,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Synced (LRC) or plain lyrics */
+        /** Synced (LRC) or plain lyrics: stored, .lrc sidecar, else one LRCLIB lookup (hits persisted, misses cached 24 h) */
         get: operations["musicLyrics"];
         put?: never;
         post?: never;
@@ -13444,6 +13495,88 @@ export interface operations {
                 content: {
                     "application/json": {
                         tracks: components["schemas"]["TrackCard"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicRadio: {
+        parameters: {
+            query: {
+                /** @description tr_, al_ or ar_ id */
+                seed: string;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tracks (a track seed is first) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        seed: string;
+                        tracks: components["schemas"]["TrackCard"][];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    musicPlaylists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Playlists */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        playlists: components["schemas"]["PlaylistCard"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicTracks: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page of tracks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        total: number;
+                        offset: number;
+                        limit: number;
+                        items: components["schemas"]["TrackCard"][];
                     };
                 };
             };

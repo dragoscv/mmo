@@ -11,6 +11,9 @@
  *   GET /media/music/queue?profile=                → MusicQueue
  *   PUT /media/music/queue?profile=                {trackIds, index, positionSec, shuffle, repeat} → MusicQueue
  *   GET /media/music/lyrics/:trackId               → LyricsResult
+ *   GET /media/music/radio?seed=tr_|al_|ar_&size=   → {seed, tracks: TrackCard[]}
+ *   GET /media/music/playlists                     → {playlists: PlaylistCard[]}
+ *   GET /media/music/tracks?offset=&limit=         → Page<TrackCard> (A–Z by title)
  *
  * Ids are Subsonic ids; `coverUrlPath` / `streamUrlPath` are relative to the server origin
  * (client appends its auth). Auth is the caller's concern (mount behind authMiddleware).
@@ -45,10 +48,10 @@ export function createMusicRouter(deps: MusicRouterDeps): express.Router {
     const profileOf = (req: express.Request, res: express.Response): string | null =>
         deps.resolveProfile ? deps.resolveProfile(req, res) : (qs(req.query.profile) ?? "default").slice(0, 128);
 
-    const wrap = (fn: (req: express.Request, res: express.Response) => void): express.RequestHandler =>
-        (req, res) => {
+    const wrap = (fn: (req: express.Request, res: express.Response) => void | Promise<void>): express.RequestHandler =>
+        async (req, res) => {
             try {
-                fn(req, res);
+                await fn(req, res);
             } catch (err: unknown) {
                 if (err instanceof MusicError) { res.status(err.status).json({ error: err.message }); return; }
                 deps.log?.error("[media/music] handler failed", err, { path: req.path });
@@ -90,6 +93,20 @@ export function createMusicRouter(deps: MusicRouterDeps): express.Router {
         res.json(music.playlist(String(req.params.id)));
     }));
 
+    router.get("/playlists", wrap((_req, res) => {
+        res.json({ playlists: music.playlistsList() });
+    }));
+
+    router.get("/tracks", wrap((req, res) => {
+        res.json(music.tracks({ offset: qint(req.query.offset), limit: qint(req.query.limit) }));
+    }));
+
+    router.get("/radio", wrap((req, res) => {
+        const seed = qs(req.query.seed);
+        if (!seed) { res.status(400).json({ error: "seed required" }); return; }
+        res.json(music.radio(seed, qint(req.query.size)));
+    }));
+
     router.get("/random", wrap((req, res) => {
         res.json({ tracks: music.randomTracks(qint(req.query.size)) });
     }));
@@ -112,8 +129,8 @@ export function createMusicRouter(deps: MusicRouterDeps): express.Router {
         res.json(music.setQueue(p, req.body));
     }));
 
-    router.get("/lyrics/:trackId", wrap((req, res) => {
-        res.json(music.lyrics(String(req.params.trackId)));
+    router.get("/lyrics/:trackId", wrap(async (req, res) => {
+        res.json(await music.lyricsAsync(String(req.params.trackId)));
     }));
 
     return router;

@@ -12,8 +12,8 @@
  * in `parseTrackKey`. The per-profile queue lives in `music_queue`, created
  * lazily here (no media db migration).
  *
- * Never touches the network: LRCLIB lyrics are already persisted into
- * `tracks.lyrics` / `tracks.synced_lyrics` by the analyzer lane.
+ * Lyrics: stored tags / analyzer LRCLIB result first, then a `.lrc` sidecar; only when both are missing does
+ * `lyricsAsync` ask LRCLIB once (injectable `fetchLyrics`), persisting hits and caching misses for a day.
  */
 
 import fs from "node:fs";
@@ -142,6 +142,9 @@ export interface MusicServiceDeps {
     /** Library owner whose tracks are served; defaults to the Subsonic `resolveUserId()`. */
     getUserId?: () => string | null;
     now?: () => number;
+    /** LRCLIB lookup for on-demand lyrics (production: `getLyrics` from library/metadata-services). */
+    fetchLyrics?: (artist: string, title: string, album: string | null, durationSec: number | null) =>
+        Promise<{ plainLyrics: string | null; syncedLyrics: string | null } | null>;
 }
 
 export const MAX_QUEUE = 2000;
@@ -280,6 +283,9 @@ export class MusicService {
     private readonly media: MediaDb;
     private readonly userId: () => string | null;
     private readonly now: () => number;
+    private readonly fetchLyrics: MusicServiceDeps["fetchLyrics"];
+    /** track id → time of the last LRCLIB miss (no lookup again for a day). */
+    private readonly lyricsMiss = new Map<number, number>();
     private queueReady = false;
 
     constructor(deps: MusicServiceDeps) {
@@ -287,6 +293,7 @@ export class MusicService {
         this.media = deps.mediaDb;
         this.userId = deps.getUserId ?? resolveUserId;
         this.now = deps.now ?? Date.now;
+        this.fetchLyrics = deps.fetchLyrics;
     }
 
     // ── plays ────────────────────────────────────────────────────────────────
@@ -391,6 +398,12 @@ export class MusicService {
         };
     }
 
+    /** Every playlist of the library owner (Library → Playlists). */
+    playlistsList(): PlaylistCard[] {
+        const uid = this.userId();
+        return uid ? this.playlists(uid) : [];
+    }
+
     private playlists(uid: string): PlaylistCard[] {
         const first = this.lib().prepare("SELECT track_id FROM playlist_tracks WHERE playlist_id = ? ORDER BY position LIMIT 1");
         return listPlaylists(uid).map((p) => {
@@ -434,8 +447,13 @@ export class MusicService {
             .slice(0, 10)
             .map(({ t, c }) => trackCard(t, c));
 
-        // similar artists: most shared genres, then song count
-        // keys folded in JS: SQLite LOWER() only folds ASCII
+        const similar = this.similarArtists(uid, a.artist).slice(0, 10).map(artistCard);
+
+        return { artist: artistCard(a), albums, topTracks, similar };
+    }
+
+    /** Other artists ranked by shared genres, then song count (keys folded in JS: SQLite LOWER() is ASCII-only). */
+    private similarArtists(uid: string, artist: string | null): ArtistAgg[] {
         const raw = this.lib().prepare(
             `SELECT DISTINCT COALESCE(artist,'') AS a, genre AS g FROM tracks
              WHERE user_id = ? AND COALESCE(is_hidden, 0) = 0 AND genre IS NOT NULL AND genre != ''`,
@@ -444,17 +462,73 @@ export class MusicService {
             const [pa, pg] = s.split("\u0000");
             return { a: pa!, g: pg! };
         });
-        const me = (a.artist ?? "").toLowerCase();
+        const me = (artist ?? "").toLowerCase();
         const myGenres = new Set(pairs.filter((p) => p.a === me).map((p) => p.g));
         const score = new Map<string, number>();
         for (const p of pairs) if (p.a !== me && myGenres.has(p.g)) score.set(p.a, (score.get(p.a) ?? 0) + 1);
-        const similar = listArtists(uid)
+        return listArtists(uid)
             .filter((x) => score.has((x.artist ?? "").toLowerCase()))
-            .sort((x, y) => score.get((y.artist ?? "").toLowerCase())! - score.get((x.artist ?? "").toLowerCase())! || y.song_count - x.song_count)
-            .slice(0, 10)
-            .map(artistCard);
+            .sort((x, y) => score.get((y.artist ?? "").toLowerCase())! - score.get((x.artist ?? "").toLowerCase())! || y.song_count - x.song_count);
+    }
 
-        return { artist: artistCard(a), albums, topTracks, similar };
+    /**
+     * Radio from a seed (`tr_`, `al_`, `ar_`): the seed first (when a track), then the seed artist's songs mixed
+     * with up to 12 similar artists (most-played first per artist), interleaved so no artist plays twice in a row
+     * when avoidable. Deterministic order apart from the per-artist shuffle (`rand` injectable for tests).
+     */
+    radio(seed: string, size?: number, rand: () => number = Math.random): { seed: string; tracks: TrackCard[] } {
+        const uid = this.userId();
+        const d = decodeId(seed);
+        if (!uid || !d || !["track", "album", "artist"].includes(d.kind)) throw new MusicError(404, "seed not found");
+        const seedTracks = tracksForId(uid, d);
+        if (seedTracks.length === 0) throw new MusicError(404, "seed not found");
+        const n = clampInt(size, 1, 200, 50);
+        const seedArtist = seedTracks[0]!.artist;
+        const artists = [seedArtist, ...this.similarArtists(uid, seedArtist).slice(0, 12).map((a) => a.artist)];
+        const counts = this.playCounts();
+        const shuffle = <T>(xs: T[]): T[] => {
+            const a = [...xs];
+            for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j]!, a[i]!]; }
+            return a;
+        };
+        const pools = artists.map((name) => {
+            const rows = this.lib().prepare(
+                `SELECT id FROM tracks WHERE user_id = ? AND COALESCE(is_hidden, 0) = 0 AND LOWER(COALESCE(artist,'')) = LOWER(COALESCE(?, ''))`,
+            ).all(uid, name) as { id: number }[];
+            const shuffled = shuffle(rows.map((r) => r.id));
+            return shuffled.sort((x, y) => (counts.get(y) ?? 0) - (counts.get(x) ?? 0));
+        });
+        const out: number[] = [];
+        const seen = new Set<number>();
+        if (d.kind === "track") { out.push(seedTracks[0]!.id); seen.add(seedTracks[0]!.id); }
+        for (let round = 0; out.length < n && pools.some((p) => p.length > 0); round++) {
+            for (const p of pools) {
+                while (p.length > 0) {
+                    const id = p.shift()!;
+                    if (seen.has(id)) continue;
+                    seen.add(id); out.push(id);
+                    break;
+                }
+                if (out.length >= n) break;
+            }
+        }
+        const byId = new Map(getTracks(uid, out).map((t) => [t.id, t]));
+        return { seed, tracks: out.map((i) => byId.get(i)).filter((t): t is TrackRow => !!t).map((t) => trackCard(t, counts.get(t.id) ?? 0)) };
+    }
+
+    /** All songs A–Z by title, paged (Library → Songs). */
+    tracks(opts: { offset?: number; limit?: number } = {}): Page<TrackCard> {
+        const offset = clampInt(opts.offset, 0, 1_000_000, 0);
+        const limit = clampInt(opts.limit, 1, 500, 100);
+        const uid = this.userId();
+        if (!uid) return { total: 0, offset, limit, items: [] };
+        const all = this.lib().prepare(
+            `SELECT id, COALESCE(title, filename) AS t FROM tracks WHERE user_id = ? AND COALESCE(is_hidden, 0) = 0`,
+        ).all(uid) as { id: number; t: string }[];
+        all.sort((x, y) => x.t.localeCompare(y.t, undefined, { sensitivity: "base" }) || x.id - y.id);
+        const page = all.slice(offset, offset + limit).map((r) => r.id);
+        const byId = new Map(getTracks(uid, page).map((t) => [t.id, t]));
+        return { total: all.length, offset, limit, items: page.map((i) => byId.get(i)).filter((t): t is TrackRow => !!t).map((t) => trackCard(t)) };
     }
 
     album(id: string): AlbumDetail {
@@ -602,6 +676,34 @@ export class MusicService {
                 : { trackId: id, synced: null, plain: sidecar, source: "sidecar" };
         }
         return { trackId: id, synced: null, plain: null, source: "none" };
+    }
+
+    /**
+     * `lyrics()` + on-demand LRCLIB when nothing is stored: a hit is written to `tracks.lyrics`/`synced_lyrics`
+     * (next call is `embedded`), a miss or error is remembered for 24 h. Needs artist + title on the track.
+     */
+    async lyricsAsync(rawTrackId: string): Promise<LyricsResult> {
+        const base = this.lyrics(rawTrackId);
+        if (base.source !== "none" || !this.fetchLyrics) return base;
+        const uid = this.userId();
+        const d = decodeId(base.trackId);
+        const t = uid && d?.num ? getTrack(uid, d.num) : null;
+        if (!t || !t.artist?.trim() || !t.title?.trim()) return base;
+        const missAt = this.lyricsMiss.get(t.id);
+        if (missAt !== undefined && this.now() - missAt < DAY_MS) return base;
+        let hit: { plainLyrics: string | null; syncedLyrics: string | null } | null = null;
+        try {
+            hit = await this.fetchLyrics(t.artist, t.title, t.album ?? null, t.duration ?? null);
+        } catch { hit = null; }
+        const synced = hit?.syncedLyrics?.trim() ? hit.syncedLyrics : null;
+        const plain = hit?.plainLyrics?.trim() ? hit.plainLyrics : null;
+        if (!synced && !plain) { this.lyricsMiss.set(t.id, this.now()); return base; }
+        try {
+            this.lib().prepare("UPDATE tracks SET lyrics = COALESCE(?, lyrics), synced_lyrics = COALESCE(?, synced_lyrics) WHERE id = ? AND user_id = ?")
+                .run(plain, synced, t.id, uid);
+        } catch { /* read-only DB: still answer */ }
+        const lines = synced ? parseLrc(synced) : null;
+        return { trackId: base.trackId, synced: lines, plain: plain ?? (lines ? lines.map((l) => l.text).join("\n") : null), source: "lrclib" };
     }
 }
 

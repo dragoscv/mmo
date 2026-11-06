@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.9.6
+  version: 3.10.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -5685,6 +5685,65 @@ paths:
               schema: { type: object, required: [tracks], properties: { tracks: { type: array, items: { $ref: '#/components/schemas/TrackCard' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /media/music/radio:
+    get:
+      operationId: musicRadio
+      tags: [music]
+      summary: Radio from a track, album or artist seed (seed artist + genre-similar artists, interleaved)
+      parameters:
+        - { name: seed, in: query, required: true, schema: { type: string }, description: "tr_, al_ or ar_ id" }
+        - { name: size, in: query, schema: { type: integer, default: 50, minimum: 1, maximum: 200 } }
+      responses:
+        '200':
+          description: Tracks (a track seed is first)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [seed, tracks]
+                properties:
+                  seed: { type: string }
+                  tracks: { type: array, items: { $ref: '#/components/schemas/TrackCard' } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/music/playlists:
+    get:
+      operationId: musicPlaylists
+      tags: [music]
+      summary: All playlists of the library owner
+      responses:
+        '200':
+          description: Playlists
+          content:
+            application/json:
+              schema: { type: object, required: [playlists], properties: { playlists: { type: array, items: { $ref: '#/components/schemas/PlaylistCard' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/music/tracks:
+    get:
+      operationId: musicTracks
+      tags: [music]
+      summary: All songs A-Z by title, paged
+      parameters:
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, default: 100, maximum: 500 } }
+      responses:
+        '200':
+          description: Page of tracks
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, offset, limit, items]
+                properties:
+                  total: { type: integer }
+                  offset: { type: integer }
+                  limit: { type: integer }
+                  items: { type: array, items: { $ref: '#/components/schemas/TrackCard' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /livetv/proxy/{channelId}:
     get:
       operationId: liveTvProxy
@@ -5744,7 +5803,7 @@ paths:
     get:
       operationId: musicLyrics
       tags: [music]
-      summary: "Synced (LRC) or plain lyrics"
+      summary: "Synced (LRC) or plain lyrics: stored, .lrc sidecar, else one LRCLIB lookup (hits persisted, misses cached 24 h)"
       parameters:
         - { name: trackId, in: path, required: true, schema: { type: string } }
       responses:

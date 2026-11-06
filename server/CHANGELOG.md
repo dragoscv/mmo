@@ -2,6 +2,16 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.10.0 — Music radio, songs list, playlists list, lyrics on demand (WP17-40)
+
+- `GET /media/music/radio?seed=tr_|al_|ar_&size=`: the seed track first, then the seed artist and up to 12
+	genre-similar artists interleaved (most played first per artist), no duplicates, hidden tracks excluded.
+- `GET /media/music/tracks` (songs A–Z, paged) and `GET /media/music/playlists` (all playlists) for the Library tabs.
+- `GET /media/music/lyrics/:trackId` asks LRCLIB once when a track has no stored or sidecar lyrics; hits are saved to
+	the track (later calls answer `embedded`), misses are remembered for 24 h. Before, lyrics existed only after the
+	analyzer had reached the track.
+- SDK 0.8.0, Models.kt and Models.swift regenerated.
+
 ## 3.9.6 — Trailers for non-English UI languages
 
 - TMDB title details now ask for `include_video_language=<ui>,en,null`. Without it TMDB returns only videos in
