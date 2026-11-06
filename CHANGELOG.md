@@ -10,6 +10,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — Web 3.1.7 + Server 3.9.6 (hero logo art, trailers in RO)
+
+- **Web Home hero prefers a title with logo art.** It probes up to 6 hero candidates (in-library first, cached
+  per title) and switches once to the first with a TMDB logo; the first candidate shows meanwhile and stays
+  when none has a logo.
+- **Server: trailers for non-English UI languages.** TMDB details now request `include_video_language=<ui>,en,null`;
+  with `ro-RO` TMDB had returned `videos: []` for almost every title, so no client could show a trailer. Media db
+  v5 marks cached titles stale so they refetch (stale rows stay as the offline fallback).
+
 ## 2026-11-05 — Web 3.1.6 (`/media` design pass, critic 37 → 51)
 
 - **The `/media` backdrop is visible.** The focus-following backdrop, the hero's muted trailer and the stills were

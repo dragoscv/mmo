@@ -19,8 +19,42 @@ import { MxTitleCard } from "./title-card";
 declare global { interface Window { __mixaiPerf?: Record<string, unknown> } }
 
 export function pickHero(rows: HomeRow[]): TitleCard | null {
+    return heroCandidates(rows)[0] ?? null;
+}
+
+/** Hero pool: titles with a backdrop outside `continue`, in-library first, unique, at most [n]. */
+export function heroCandidates(rows: HomeRow[], n = 6): TitleCard[] {
     const pool = rows.filter((r) => r.id !== "continue").flatMap((r) => r.items).filter((i) => i.backdropPath);
-    return pool.find((i) => i.inLibrary) ?? pool[0] ?? null;
+    const ordered = [...pool.filter((i) => i.inLibrary), ...pool.filter((i) => !i.inLibrary)];
+    const seen = new Set<string>();
+    return ordered.filter((i) => { const k = `${i.kind}:${i.tmdbId}`; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, n);
+}
+
+/**
+ * The billboard reads best with the title's logo art (critic: subject presence). Probe the candidates'
+ * details (cached per title by MediaClient) and switch once to the first with a logo; the first
+ * candidate shows meanwhile and stays when none has one.
+ */
+function usePreferredHero(rows: HomeRow[]): TitleCard | null {
+    const { clients } = useMmo();
+    const candidates = heroCandidates(rows);
+    const sig = candidates.map((c) => `${c.kind}:${c.tmdbId}`).join(",");
+    const [preferred, setPreferred] = useState<{ sig: string; key: string } | null>(null);
+    useEffect(() => {
+        if (!clients || !sig) return;
+        let alive = true;
+        void (async () => {
+            for (const k of sig.split(",")) {
+                const [kind, id] = k.split(":");
+                const r = await clients.media.mediaTitle(kind as TitleCard["kind"], Number(id)).catch(() => null);
+                if (!alive) return;
+                if (r?.title?.logoPath) { setPreferred({ sig, key: k }); return; }
+            }
+        })();
+        return () => { alive = false; };
+    }, [clients, sig]);
+    const hit = preferred?.sig === sig ? candidates.find((c) => `${c.kind}:${c.tmdbId}` === preferred.key) : undefined;
+    return hit ?? candidates[0] ?? null;
 }
 
 export function MediaHomeScreen() {
@@ -56,7 +90,7 @@ function HomeBody() {
     }, [clients]);
 
     const rows = home?.rows.filter((r) => r.items.length > 0) ?? [];
-    const hero = pickHero(rows);
+    const hero = usePreferredHero(rows);
 
     if (state === "loading" && !home) {
         return (
