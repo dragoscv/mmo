@@ -40,12 +40,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -56,6 +58,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import ro.mixai.tv.R
 import ro.mixai.tv.data.ApiException
@@ -305,10 +308,14 @@ private fun ServerHome(deps: ScreenDeps, nav: Navigator, home: MediaHome, rf: Re
     var busy by remember { mutableStateOf(false) }
 
     // Hero follows the focused card after a short settle; details (logo, runtime, files) load lazily.
-    LaunchedEffect(focused) {
-        if (focused.key != hero.key) delay(HERO_DEBOUNCE_MS)
-        hero = focused
-        backdrop.show(api.tmdbImageUrl(TmdbSize.backdrop(backdropPx), hero.card.backdropPath ?: hero.card.posterPath))
+    // `focused` is read only inside this flow, so a D-pad move does not recompose ServerHome (and with
+    // it every visible row) — only the debounced hero switch does (Chromecast: UI-thread jank).
+    LaunchedEffect(Unit) {
+        snapshotFlow { focused }.collectLatest { f ->
+            if (f.key != hero.key) delay(HERO_DEBOUNCE_MS)
+            hero = f
+            backdrop.show(api.tmdbImageUrl(TmdbSize.backdrop(backdropPx), f.card.backdropPath ?: f.card.posterPath))
+        }
     }
     LaunchedEffect(hero.key) {
         target = null
@@ -384,11 +391,16 @@ private fun ServerHome(deps: ScreenDeps, nav: Navigator, home: MediaHome, rf: Re
         if (enter.value < ENTER_TOTAL_MS) enter.animateTo(ENTER_TOTAL_MS.toFloat(), tween(ENTER_TOTAL_MS, easing = androidx.compose.animation.core.LinearEasing))
     }
     val shiftPx = with(density) { ENTER_SHIFT_DP.dp.toPx() }
-    val heroMod = if (PerfFlags.noEntrance) Modifier else Modifier.graphicsLayer {
-        val p = stage(enter.value, ENTER_HERO_DELAY, ENTER_HERO_MS)
-        alpha = p
-        translationY = (1f - p) * shiftPx
+    val heroMod = remember(shiftPx) {
+        if (PerfFlags.noEntrance) Modifier else Modifier.graphicsLayer {
+            val p = stage(enter.value, ENTER_HERO_DELAY, ENTER_HERO_MS)
+            alpha = p
+            translationY = (1f - p) * shiftPx
+        }
     }
+    // Stable per-row modifiers: a fresh graphicsLayer lambda per recomposition made every MediaRow
+    // (and its LazyRow) recompose whenever ServerHome did.
+    val rowMods = remember(shiftPx) { HashMap<Int, Modifier>() }
     fun rowMod(index: Int) = if (PerfFlags.noEntrance) Modifier else Modifier.graphicsLayer {
         val p = stage(enter.value, ENTER_ROWS_DELAY + ENTER_ROW_STAGGER * index.coerceAtMost(4), ENTER_ROW_MS)
         alpha = p
@@ -436,7 +448,7 @@ private fun ServerHome(deps: ScreenDeps, nav: Navigator, home: MediaHome, rf: Re
                         key = { cardKey(it) },
                         onFocusItem = { focused = HeroItem.Card(it, row.id) },
                         onClick = { c -> if (isContinue) openContinue(c) else nav.push(Route.Title(c.kind, c.tmdbId)) },
-                        modifier = rowMod(rowIndex),
+                        modifier = rowMods.getOrPut(rowIndex) { rowMod(rowIndex) },
                     ) { c, i, onFocus, onClick ->
                         val fk = "${row.id}:${cardKey(c)}"
                         val focusNow = { onFocus(); prefetchFrom(row, i) }
@@ -497,17 +509,22 @@ private fun CardHero(
     val c = item.card
     val t = details?.title
     val reduced = LocalReducedMotion.current
+    // One fade-in of the whole hero per title (ModulateAlpha: alpha per draw op, no offscreen buffer).
+    // It replaced an AnimatedContent cross-fade of the logo, which kept two overlapping full-size
+    // layers alive for 220 ms after every D-pad move (Chromecast: hero ≈ 20 ms of a 62 ms frame).
+    val heroAlpha = remember { Animatable(1f) }
+    LaunchedEffect(item.key) {
+        if (reduced) return@LaunchedEffect
+        heroAlpha.snapTo(0.35f)
+        heroAlpha.animateTo(1f, tween(200))
+    }
     Column(
-        Modifier.fillMaxSize().padding(start = MixaiFocus.overscan, end = MixaiFocus.overscan, top = MixaiFocus.overscanTop, bottom = 8.dp),
+        Modifier.fillMaxSize()
+            .graphicsLayer { alpha = heroAlpha.value; compositingStrategy = CompositingStrategy.ModulateAlpha }
+            .padding(start = MixaiFocus.overscan, end = MixaiFocus.overscan, top = MixaiFocus.overscanTop, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.Bottom),
     ) {
-        AnimatedContent(
-            targetState = item.key to t?.logoPath,
-            transitionSpec = { if (reduced) fadeIn(snap()) togetherWith fadeOut(snap()) else fadeIn(tween(220)) togetherWith fadeOut(tween(120)) },
-            label = "heroLogo",
-        ) { (_, logo) ->
-            TitleLogo(deps.api, logo, c.title, height = 96.dp)
-        }
+        TitleLogo(deps.api, t?.logoPath, c.title, height = 96.dp)
         MetaChips(
             year = yearOf(c.releaseDate),
             age = ageLabel(c.age ?: t?.age, t?.certification),

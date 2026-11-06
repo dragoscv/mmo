@@ -10,6 +10,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-06 — TV Android 2.1.2 (Home D-pad p50 57–61 → 36–40 ms on Chromecast)
+
+- **Backdrop scrims are baked strips.** The two multi-stop gradient shaders (left 70 %, bottom 55 % of the screen)
+  are now 256×1 / 1×256 bitmaps stretched with bilinear filtering, so the GPU stops evaluating gradients per pixel.
+- **Backdrop crossfade without per-child offscreen buffers.** The incoming image fades in over the opaque outgoing
+  one with `ModulateAlpha`, and the cached layer is bypassed while a fade runs.
+- **Hero.** One 200 ms `ModulateAlpha` fade per title replaces the logo `AnimatedContent` cross-fade. A D-pad move no
+  longer recomposes the whole Home: the focused card is read through `snapshotFlow`, and the row entrance modifiers are stable.
+- Measured on the Chromecast with Google TV (benchmark build, same 15-key D-pad script): HEAD p50 57/61/57/57 ms,
+  janky ~49 % → 2.1.2 p50 36/38/38/38/40/40 ms, janky 27–33 %. Home cached first frame is unchanged (735–759 ms).
+
 ## 2026-11-06 — Web 3.1.7 + Server 3.9.6 (hero logo art, trailers in RO)
 
 - **Web Home hero prefers a title with logo art.** It probes up to 6 hero candidates (in-library first, cached

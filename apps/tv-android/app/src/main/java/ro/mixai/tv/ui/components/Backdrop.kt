@@ -1,7 +1,8 @@
 package ro.mixai.tv.ui.components
 
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +12,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,9 +21,16 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Canvas
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.LinearGradientShader
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
@@ -119,53 +128,86 @@ fun BackdropLayer(state: BackdropState, modifier: Modifier = Modifier) {
             kenBurns.floatValue = 1f + (KEN_BURNS_SCALE - 1f) * eased
         }
     }
-    // Offscreen layer: HWUI keeps the rasterised backdrop + scrims as a texture and only redraws it
-    // when the image/crossfade changes, so focus moves elsewhere cost one textured quad, not two
-    // full-screen gradient passes (Chromecast: scrims alone were p50 73 → 38 ms).
+    // Crossfade: the outgoing image stays opaque and the incoming one is drawn over it with
+    // ModulateAlpha (no per-child offscreen buffer — Compose's Crossfade gives each fading child its
+    // own Auto layer, i.e. a full-screen offscreen pass each, every frame of the fade).
+    val target = if (PerfFlags.noBackdrop) null else state.url
+    val fade = updateTransition(target, label = "backdrop")
+    val fadeMs = if (PerfFlags.noCrossfade || reduced) 0 else 300
+    val inAlpha by fade.animateFloat(transitionSpec = { tween(fadeMs) }, label = "backdropIn") { if (it == fade.targetState) 1f else 0f }
+    val fading = fade.isRunning && fade.currentState != fade.targetState
+    // Offscreen layer while idle: HWUI keeps the rasterised backdrop + scrims as a texture, so focus
+    // moves elsewhere cost one textured quad, not two full-screen gradient passes (Chromecast: scrims
+    // alone were p50 73 → 38 ms). During a fade the texture would be re-rastered every frame and then
+    // composited (one extra full-screen pass), so the layer draws straight to the frame instead.
     Box(modifier.fillMaxSize().graphicsLayer {
-        compositingStrategy = if (PerfFlags.noLayerCache) CompositingStrategy.Auto else CompositingStrategy.Offscreen
+        compositingStrategy = if (PerfFlags.noLayerCache || fading) CompositingStrategy.Auto else CompositingStrategy.Offscreen
         val s = kenBurns.floatValue
         scaleX = s
         scaleY = s
         transformOrigin = KEN_BURNS_ORIGIN
     }.drawWithCache {
-        val left = Brush.horizontalGradient(
-            0f to Tokens.background,
-            0.5f to Tokens.background.copy(alpha = 0.85f),
-            1f to Color.Transparent,
-            startX = 0f, endX = size.width * 0.7f,
-        )
         val bottomTop = size.height * 0.45f
-        val bottom = Brush.verticalGradient(
-            0f to Color.Transparent,
-            0.25f to Tokens.background.copy(alpha = 0.3f),
-            0.65f to Tokens.background.copy(alpha = 0.85f),
-            1f to Tokens.background,
-            startY = bottomTop, endY = size.height,
-        )
+        // The scrims are baked once per size into small strips (256 px along the gradient, 1 px across)
+        // and stretched with bilinear filtering: a stretched texture is far cheaper on the Chromecast GPU
+        // than evaluating a multi-stop gradient shader per pixel over ~70 % of the screen every frame
+        // (fx4 A/B: noscrim p50 46 → 34 ms).
+        val left = scrimStrip(horizontal = true, stops = arrayOf(0f to Tokens.background, 0.5f to Tokens.background.copy(alpha = 0.85f), 1f to Color.Transparent))
+        val bottom = scrimStrip(horizontal = false, stops = arrayOf(0f to Color.Transparent, 0.25f to Tokens.background.copy(alpha = 0.3f), 0.65f to Tokens.background.copy(alpha = 0.85f), 1f to Tokens.background))
+        val leftDst = IntSize((size.width * 0.7f).toInt(), size.height.toInt())
+        val bottomDst = IntSize(size.width.toInt(), (size.height - bottomTop).toInt())
         onDrawWithContent {
             drawContent()
             if (PerfFlags.noScrim) return@onDrawWithContent
-            drawRect(left, size = Size(size.width * 0.7f, size.height))
-            drawRect(bottom, topLeft = Offset(0f, bottomTop), size = Size(size.width, size.height - bottomTop))
+            drawImage(left, srcSize = IntSize(left.width, left.height), dstSize = leftDst, filterQuality = FilterQuality.Low)
+            drawImage(bottom, srcSize = IntSize(bottom.width, bottom.height), dstOffset = IntOffset(0, bottomTop.toInt()), dstSize = bottomDst, filterQuality = FilterQuality.Low)
         }
     }) {
-        Crossfade(targetState = if (PerfFlags.noBackdrop) null else state.url, animationSpec = tween(if (PerfFlags.noCrossfade || reduced) 0 else 300), label = "backdrop") { u ->
-            if (u != null) {
+        // Dimming as a colour filter on the image instead of an extra translucent full-screen pass.
+        val filter = if (state.intensity < 0.999f) ColorFilter.tint(dim, BlendMode.SrcAtop) else null
+        val layers = if (fading) listOf(fade.currentState, fade.targetState) else listOf(fade.targetState)
+        layers.forEachIndexed { i, u ->
+            if (u == null) return@forEachIndexed
+            key(u) {
+                val incoming = fading && i == 1
+                // Fading to "no image": the outgoing one fades out instead (nothing to cover it).
+                val outgoingOnly = fading && i == 0 && fade.targetState == null
                 AsyncImage(
                     model = u,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    colorFilter = filter,
+                    modifier = Modifier.fillMaxSize().then(
+                        when {
+                            incoming -> Modifier.graphicsLayer { alpha = inAlpha; compositingStrategy = CompositingStrategy.ModulateAlpha }
+                            outgoingOnly -> Modifier.graphicsLayer { alpha = 1f - inAlpha; compositingStrategy = CompositingStrategy.ModulateAlpha }
+                            else -> Modifier
+                        },
+                    ),
                 )
-                // Dimming as part of the image layer instead of an extra translucent full-screen pass.
-                if (state.intensity < 0.999f) Box(Modifier.fillMaxSize().background(dim))
             }
         }
     }
 }
 
 private const val KEN_BURNS_MS = 36_000
+
+/** A 256×1 (or 1×256) bitmap of a linear gradient through [stops], for cheap stretched drawing. */
+private fun scrimStrip(horizontal: Boolean, stops: Array<Pair<Float, Color>>): ImageBitmap {
+    val n = 256
+    val bmp = ImageBitmap(if (horizontal) n else 1, if (horizontal) 1 else n)
+    val canvas = Canvas(bmp)
+    val paint = Paint().apply {
+        shader = LinearGradientShader(
+            from = Offset.Zero,
+            to = if (horizontal) Offset(n.toFloat(), 0f) else Offset(0f, n.toFloat()),
+            colors = stops.map { it.second },
+            colorStops = stops.map { it.first },
+        )
+    }
+    canvas.drawRect(0f, 0f, bmp.width.toFloat(), bmp.height.toFloat(), paint)
+    return bmp
+}
 private const val KEN_BURNS_STEP_MS = 80L
 private const val KEN_BURNS_IDLE_MS = 2_500L
 private const val KEN_BURNS_SCALE = 1.06f
