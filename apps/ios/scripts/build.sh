@@ -4,6 +4,7 @@
 #   scripts/build.sh test      swift test MixaiCore (no Simulator needed)
 #   scripts/build.sh build     generate project + compile for iphoneos, unsigned
 #   scripts/build.sh tvbuild   generate project + compile MixAI TV for appletvos, unsigned (WP17-24)
+#   scripts/build.sh tvupload  archive MixAI TV (tvOS, same bundle id ro.mixai.app), sign and upload to TestFlight
 #   scripts/build.sh devipa    archive + development-signed ro.mixai.app .ipa (registered devices) for a direct install
 #   scripts/build.sh upload    archive, sign (automatic, via App Store Connect API key) and upload to TestFlight
 #
@@ -85,13 +86,14 @@ restore_keychains() {
 
 archive() {
   : "${DEVELOPMENT_TEAM:?}" "${ASC_KEY_ID:?}" "${ASC_ISSUER_ID:?}" "${ASC_KEY_PATH:?}" "${BUILD_NUMBER:?}"
+  local scheme="${1:-MixAI}" dest="${2:-generic/platform=iOS}"
   generate
   build_keychain
   AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
   rm -rf "$OUT/MixAI.xcarchive" "$OUT/export"
-  log "archive (build $BUILD_NUMBER)"
-  xcodebuild -project MixAI.xcodeproj -scheme MixAI -configuration Release \
-    -destination 'generic/platform=iOS' -derivedDataPath "$OUT/dd" \
+  log "archive $scheme (build $BUILD_NUMBER)"
+  xcodebuild -project MixAI.xcodeproj -scheme "$scheme" -configuration Release \
+    -destination "$dest" -derivedDataPath "$OUT/dd" \
     -archivePath "$OUT/MixAI.xcarchive" "${AUTH[@]}" "${SPM_FLAGS[@]}" \
     DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
     OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN" archive -quiet
@@ -147,8 +149,15 @@ case "$MODE" in
     xcodebuild -exportArchive -archivePath "$OUT/MixAI.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}"
     log "UPLOADED build $BUILD_NUMBER (TestFlight processing takes ~5-15 min)"
     ;;
+  tvupload)
+    archive MixAITV 'generic/platform=tvOS'
+    export_plist app-store-connect upload
+    log "export + upload MixAI TV (tvOS) to App Store Connect"
+    xcodebuild -exportArchive -archivePath "$OUT/MixAI.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}"
+    log "UPLOADED tvOS build $BUILD_NUMBER (TestFlight processing takes ~5-15 min)"
+    ;;
   *)
-    echo "usage: $0 test|build|devipa|upload" >&2
+    echo "usage: $0 test|build|tvbuild|devipa|upload|tvupload" >&2
     exit 2
     ;;
 esac

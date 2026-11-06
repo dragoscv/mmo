@@ -17,10 +17,11 @@
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode build
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode devipa      # development-signed ro.mixai.app for registered devices
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode upload -Ref origin/main
+  pwsh -NoProfile -File scripts/ios-build.ps1 -Mode tvupload -Ref origin/main   # MixAI TV for Apple TV (WP17-24)
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('test', 'build', 'devipa', 'upload')] [string]$Mode = 'build',
+  [ValidateSet('test', 'build', 'tvbuild', 'devipa', 'upload', 'tvupload')] [string]$Mode = 'build',
   [string]$Ref = 'HEAD',
   [string]$GuestHost = '100.106.244.19',
   [int]$GuestPort = 10022,
@@ -42,7 +43,7 @@ function Invoke-Guest([string]$cmd) {
   if ($LASTEXITCODE -ne 0) { throw "guest command failed ($LASTEXITCODE): $($cmd.Split(';')[0])" }
 }
 
-$signed = $Mode -in @('upload', 'devipa')
+$signed = $Mode -in @('upload', 'devipa', 'tvupload')
 if ($signed) {
   $names = @(gcloud secrets list --project $Project --filter='name~apple-' --format='value(name)' 2>$null) | ForEach-Object { ($_ -split '/')[-1] }
   $missing = @('apple-asc-key-p8', 'apple-asc-key-id', 'apple-asc-issuer', 'apple-team-id') | Where-Object { $names -notcontains $_ }
