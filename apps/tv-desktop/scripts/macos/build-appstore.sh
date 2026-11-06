@@ -56,6 +56,12 @@ log "pkg identity: $PKG_ID"
 # Build (Tauri does not sign: no APPLE_SIGNING_IDENTITY). The UI reuses apps/tv-tizen/src, so its deps are needed too.
 VERCONF="$OUT/version.conf.json"
 printf '{"bundle":{"macOS":{"bundleVersion":"%s"}}}\n' "$BUILD_NUMBER" > "$VERCONF"
+# The lockfiles come from pnpm 10.0 (repo pin). The guest's global pnpm 12 turns ignored build scripts (esbuild,
+# core-js) into ERR_PNPM_IGNORED_BUILDS, so use the pinned version for these two apps.
+PNPM_PIN="$HOME/.pnpm-pin-10"
+[ -x "$PNPM_PIN/bin/pnpm" ] || npm i -g --prefix "$PNPM_PIN" pnpm@10.0.0 >/dev/null
+export PATH="$PNPM_PIN/bin:$PATH" npm_config_manage_package_manager_versions=false
+log "pnpm $(pnpm --version)"
 (cd "$APPDIR/../tv-tizen" && pnpm install --frozen-lockfile --ignore-workspace >/dev/null)
 cd "$APPDIR"
 pnpm install --frozen-lockfile --ignore-workspace >/dev/null
