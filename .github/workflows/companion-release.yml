@@ -221,11 +221,13 @@ jobs:
         run: pnpm rebuild audify electron better-sqlite3
 
       - name: Build renderer (Vite → ui/dist) + TypeScript
-        # `pnpm build` = `pnpm ui:build && tsc`. The renderer is a Vite +
-        # React app (server/ui, WP5) whose output `ui/dist/` is gitignored
-        # and packed into app.asar by electron-builder (`build.files`), so it
-        # MUST be built before the packaging steps below.
-        run: pnpm build
+        # `pnpm build` = `pnpm ui:build && tsc`; ui/dist is packed into app.asar, so it MUST exist before packaging.
+        # server/ui consumes @mmo/ui as SOURCE; its own imports (clsx, cva, tailwind-merge) resolve from
+        # packages/ui/node_modules, which only exists after this install (own lockfile).
+        shell: bash
+        run: |
+          pnpm -C ../packages/ui install --frozen-lockfile --ignore-workspace
+          pnpm build
 
       - name: Assert renderer bundle exists
         shell: bash
