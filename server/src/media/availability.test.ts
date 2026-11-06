@@ -148,6 +148,7 @@ describe("TmdbClient", () => {
         expect(t?.title).toBe("Five");
         expect(fetch.calls[2]).toContain("append_to_response=credits%2Ckeywords");
         expect(fetch.calls[2]).toContain("include_image_language=ro%2Cen%2Cnull");
+        expect(fetch.calls[2]).toContain("include_video_language=ro%2Cen%2Cnull");
         await c.getTitle("movie", 5);
         expect(fetch.calls).toHaveLength(3);
         expect(c.getCachedTitle("movie", 5)?.tmdbId).toBe(5);

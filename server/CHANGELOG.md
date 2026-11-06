@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.9.6 — Trailers for non-English UI languages
+
+- TMDB title details now ask for `include_video_language=<ui>,en,null`. Without it TMDB returns only videos in
+	the UI language, so with `ro-RO` almost every title had `videos: []` and no client could show a trailer
+	(checked against TMDB: Gumball tv/37606 0 → 2 videos, 1 trailer). Cached titles pick it up at their next refresh.
+
 ## 3.9.5 — Audio-only files play instead of HTTP 500
 
 - `/video/stream/:fileId` on an audio-only container (e.g. an mkv with only FLAC/AAC) answered 500: the HLS

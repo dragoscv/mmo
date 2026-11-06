@@ -195,6 +195,11 @@ const MIGRATIONS: string[] = [
         PRIMARY KEY (profile_id, kind, tmdb_id)
     );
     `,
+    // v5 (3.9.6): titles cached before `include_video_language` have `videos: []` for non-English UIs →
+    // mark them stale (getTitle refetches on next access; the stale row stays as the offline fallback).
+    // (CREATE IF NOT EXISTS first: partial test/legacy databases may lack the v1 table.)
+    `CREATE TABLE IF NOT EXISTS titles (kind TEXT NOT NULL, tmdb_id INTEGER NOT NULL, json TEXT NOT NULL, fetched_at INTEGER NOT NULL, PRIMARY KEY (kind, tmdb_id));
+    UPDATE titles SET fetched_at = 0;`,
 ];
 
 export const MEDIA_SCHEMA_VERSION = MIGRATIONS.length;

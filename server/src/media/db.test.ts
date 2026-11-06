@@ -27,6 +27,17 @@ describe("media db", () => {
         }
     });
 
+    it("v5 marks cached titles stale (refetch with trailers) but keeps the rows", () => {
+        const db = new Database(":memory:");
+        db.pragma(`user_version = 0`);
+        migrateMediaDb(db);
+        db.prepare("INSERT INTO titles (kind, tmdb_id, json, fetched_at) VALUES ('movie', 1, '{}', 12345)").run();
+        db.pragma(`user_version = ${MEDIA_SCHEMA_VERSION - 1}`);
+        expect(migrateMediaDb(db)).toBe(MEDIA_SCHEMA_VERSION);
+        expect(db.prepare("SELECT fetched_at, json FROM titles").get()).toEqual({ fetched_at: 0, json: "{}" });
+        db.close();
+    });
+
     it("recs_cache honours TTL", () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mmo-media-"));
         try {

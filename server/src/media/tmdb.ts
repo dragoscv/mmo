@@ -282,6 +282,8 @@ export class TmdbClient {
         const raw = await this.getJson<Raw>(`/${kind}/${tmdbId}`, {
             append_to_response: append,
             include_image_language: `${short},en,null`,
+            // Without this TMDB filters `videos` to the UI language only (ro-RO → almost never a trailer).
+            include_video_language: `${short},en,null`,
         });
         if (!raw) {
             if (row) { try { return JSON.parse(row.json) as TitleDetails; } catch { return null; } }
