@@ -150,7 +150,20 @@ case "$MODE" in
     log "UPLOADED build $BUILD_NUMBER (TestFlight processing takes ~5-15 min)"
     ;;
   tvupload)
-    archive MixAITV 'generic/platform=tvOS'
+    # No Apple TV is registered on the team, so automatic signing cannot create the tvOS DEVELOPMENT profile it
+    # wants while archiving ("Your team has no devices from which to generate a provisioning profile"). Archive
+    # unsigned and let the App Store Connect export apply cloud-managed distribution signing (no device needed).
+    : "${DEVELOPMENT_TEAM:?}" "${ASC_KEY_ID:?}" "${ASC_ISSUER_ID:?}" "${ASC_KEY_PATH:?}" "${BUILD_NUMBER:?}"
+    generate
+    build_keychain
+    AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+    rm -rf "$OUT/MixAI.xcarchive" "$OUT/export"
+    log "archive MixAITV unsigned (build $BUILD_NUMBER)"
+    xcodebuild -project MixAI.xcodeproj -scheme MixAITV -configuration Release \
+      -destination 'generic/platform=tvOS' -derivedDataPath "$OUT/dd" \
+      -archivePath "$OUT/MixAI.xcarchive" "${SPM_FLAGS[@]}" \
+      DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+      CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive -quiet
     export_plist app-store-connect upload
     log "export + upload MixAI TV (tvOS) to App Store Connect"
     xcodebuild -exportArchive -archivePath "$OUT/MixAI.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}"
