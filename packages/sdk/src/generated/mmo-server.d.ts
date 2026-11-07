@@ -3084,6 +3084,17 @@ export interface paths {
          *     `f=json` returns `{"subsonic-response": {...}}`, `f=jsonp` wraps it in
          *     `callback(...)`, the default is XML. `stream`, `download` and
          *     `getCoverArt` write the media bytes directly (range-aware).
+         *
+         *     `stream` honours `format` (case-insensitive): `mp3` (libmp3lame
+         *     256k, `audio/mpeg`), `opus` (libopus 160k in Ogg, `audio/ogg`),
+         *     `aac` (256k ADTS, `audio/aac`) and `flac` (`audio/flac`) are
+         *     transcoded through ffmpeg (no ranges, `Accept-Ranges: none`);
+         *     `raw`, an absent/unknown value, or the file's own suffix plays the
+         *     file directly with ranges. `timeOffset` (seconds) seeks — a seek
+         *     always transcodes (requested codec, else mp3). Without ffmpeg the
+         *     file is sent as is. `maxBitRate` is accepted and ignored. Both
+         *     paths send `X-Content-Duration` (seconds, minus the offset) when the
+         *     track duration is known, for DLNA renderers.
          */
         get: operations["subsonicCall"];
         put?: never;
@@ -3418,7 +3429,7 @@ export interface paths {
         put?: never;
         /**
          * Remote control — send a command to a device and wait for its ack (4 s)
-         * @description Actions: play {fileId,startSec,kind,tmdbId,season,episode,title} | pause | resume | seek {positionSec} | stop | next | previous | volume {level} | text {value} (search input) | navigate {to}.
+         * @description Actions: play {fileId,startSec,kind,tmdbId,season,episode,title} | play {trackIds[],index,positionSec,shuffle,repeat} (start a music queue of Subsonic track ids on a TV that advertises the `music` cap; repeat = off|all|one) | pause | resume | seek {positionSec} | stop | next | previous | volume {level} | text {value} (search input) | navigate {to}.
          */
         post: operations["hubCommand"];
         delete?: never;
@@ -3925,7 +3936,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** All songs A-Z by title, paged */
+        /**
+         * All songs A-Z by title, paged (or specific tracks by id)
+         * @description With `ids`, returns those tracks in the requested order (unknown ids skipped) as `{total: found, offset: 0, limit: number of ids, items}`; `offset`/`limit` are ignored. More than 500 ids answers 400.
+         */
         get: operations["musicTracks"];
         put?: never;
         post?: never;
@@ -5434,6 +5448,14 @@ export interface components {
             posterPath?: string | null;
             durationSec?: number;
             channelId?: string;
+            /** @description Music: Subsonic track id (tr_<n>). */
+            trackId?: string;
+            /** @description Music: track artist. */
+            artist?: string;
+            /** @description Music: album name. */
+            album?: string;
+            /** @description Music: cover path relative to the server origin (TrackCard.coverUrlPath). */
+            coverUrlPath?: string;
         };
         HubNowPlaying: {
             playing: boolean;
@@ -13563,6 +13585,8 @@ export interface operations {
             query?: {
                 offset?: number;
                 limit?: number;
+                /** @description Comma-separated Subsonic track ids (TrackCard.id, e.g. tr_12,tr_7), max 500. */
+                ids?: string;
             };
             header?: never;
             path?: never;
@@ -13584,6 +13608,7 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["ErrorJson"];
             401: components["responses"]["Unauthorized"];
         };
     };

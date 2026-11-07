@@ -151,6 +151,8 @@ export interface MusicServiceDeps {
 }
 
 export const MAX_QUEUE = 2000;
+/** Max ids per `GET /media/music/tracks?ids=` request. */
+export const MAX_TRACK_IDS = 500;
 const DAY_MS = 86_400_000;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -521,8 +523,13 @@ export class MusicService {
         return { seed, tracks: out.map((i) => byId.get(i)).filter((t): t is TrackRow => !!t).map((t) => trackCard(t, counts.get(t.id) ?? 0)) };
     }
 
-    /** All songs A–Z by title, paged (Library → Songs). */
-    tracks(opts: { offset?: number; limit?: number } = {}): Page<TrackCard> {
+    /**
+     * All songs A–Z by title, paged (Library → Songs). With `ids` (Subsonic `tr_<n>` ids, max
+     * {@link MAX_TRACK_IDS}): those tracks in the REQUESTED order, unknown ids skipped,
+     * `{total: found, offset: 0, limit: ids.length}` (queue hydration for output switching).
+     */
+    tracks(opts: { offset?: number; limit?: number; ids?: string[] } = {}): Page<TrackCard> {
+        if (opts.ids) return this.tracksByIds(opts.ids);
         const offset = clampInt(opts.offset, 0, 1_000_000, 0);
         const limit = clampInt(opts.limit, 1, 500, 100);
         const uid = this.userId();
@@ -534,6 +541,21 @@ export class MusicService {
         const page = all.slice(offset, offset + limit).map((r) => r.id);
         const byId = new Map(getTracks(uid, page).map((t) => [t.id, t]));
         return { total: all.length, offset, limit, items: page.map((i) => byId.get(i)).filter((t): t is TrackRow => !!t).map((t) => trackCard(t)) };
+    }
+
+    private tracksByIds(rawIds: string[]): Page<TrackCard> {
+        if (rawIds.length > MAX_TRACK_IDS) throw new MusicError(400, `at most ${MAX_TRACK_IDS} ids`);
+        const limit = rawIds.length;
+        const uid = this.userId();
+        if (!uid) return { total: 0, offset: 0, limit, items: [] };
+        const nums: number[] = [];
+        for (const raw of rawIds) {
+            const d = decodeId(raw.trim());
+            if (d && d.kind === "track" && d.num !== undefined) nums.push(d.num);
+        }
+        const byId = new Map(getTracks(uid, [...new Set(nums)]).map((t) => [t.id, t]));
+        const items = nums.map((n) => byId.get(n)).filter((t): t is TrackRow => !!t).map((t) => trackCard(t));
+        return { total: items.length, offset: 0, limit, items };
     }
 
     album(id: string): AlbumDetail {

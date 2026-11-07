@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="output_pick">Redă pe</string>
+    <string name="output_title">Redă pe</string>
+    <string name="output_refresh">Caută din nou</string>
+    <string name="output_this_device">Acest dispozitiv</string>
+    <string name="output_kind_local">Difuzor sau Bluetooth</string>
+    <string name="output_kind_cast">Google Cast</string>
+    <string name="output_kind_tv">MixAI TV</string>
+    <string name="output_kind_dlna">DLNA / UPnP</string>
+    <string name="output_kind_ha">Home Assistant</string>
+    <string name="output_group_tv">Televizoare MixAI</string>
+    <string name="output_group_cast">Google Cast</string>
+    <string name="output_group_dlna">Boxe și televizoare DLNA</string>
+    <string name="output_group_ha">Home Assistant</string>
+    <string name="output_none">Nu am găsit boxe sau televizoare în această rețea.</string>
+    <string name="output_note">Crossfade-ul și normalizarea volumului funcționează pe acest dispozitiv și pe televizoarele MixAI. Celelalte ieșiri redau fișierul original, convertit de MMO Server când nu îl pot reda.</string>
+    <string name="output_selected">Selectat</string>
+    <string name="output_volume">Volum</string>
+    <string name="output_playing_on">Se redă pe %1$s</string>
+    <string name="output_back_here">Redă pe acest dispozitiv</string>
+    <string name="output_continue_on">Continuă pe %1$s</string>
+    <string name="output_not_found">%1$s nu este disponibil acum</string>
+    <string name="output_lost">Conexiunea cu %1$s s-a pierdut. Se redă pe acest dispozitiv.</string>
+</resources>

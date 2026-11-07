@@ -5,7 +5,8 @@
  *  - `time {t0}` pings (3 × 1 s, then every 30 s) → `ClockEstimator` (sync-math.ts);
  *  - reconnect with exponential backoff 1 s → 30 s, rejoin the room after a reconnect;
  *  - incoming `cmd` → `commands` emitter (App routes them; reply with `ack(seq, ok)`);
- *  - forwards `playerBus` now-playing as `state` (≤ 1/s);
+ *  - forwards `playerBus` now-playing as `state` (≤ 1/s) — video, live and background music (the music engine
+ *    publishes `kind:"audio"` with `media.trackId/artist/album/coverUrlPath`; cap `music`, server 3.12);
  *  - Watch Together rooms (`room:*`).
  * Everything is safe to call while disconnected (messages are dropped).
  */
@@ -14,11 +15,12 @@ import { Emitter } from "./emitter";
 import { ServerHttp, enc } from "./http";
 import type { HubAck, HubDevice, HubMedia, HubRoom, HubRoomPhase } from "./media-types";
 import { playerBus, type NowPlaying } from "./player-bus";
+import { hubStatePayload } from "./music-remote";
 import { deviceLabel, pairPlatform, platformKind } from "../platform";
 import { ClockEstimator, expectedPosition, sampleFrom, type PlaybackAnchor } from "./sync-math";
 
 export const DEVICE_ID_KEY = "mixai-tv:device-id";
-export const HUB_CAPS = ["play", "pause", "seek", "stop", "next", "previous", "text", "navigate"];
+export const HUB_CAPS = ["play", "pause", "seek", "stop", "next", "previous", "text", "navigate", "music"];
 
 export type HubStatus = "disconnected" | "connecting" | "connected";
 
@@ -350,9 +352,7 @@ export class HubClient {
         const flush = () => {
             this.stateTimer = null;
             this.lastStateAt = Date.now();
-            const cur = playerBus.nowPlaying();
-            if (!cur) this.reportIdle();
-            else this.reportState(cur.playing, cur.positionSec, cur.durationSec, cur.media);
+            this.send(hubStatePayload(playerBus.nowPlaying()));
         };
         if (!np) { if (this.stateTimer) clearTimeout(this.stateTimer); flush(); return; }
         if (this.stateTimer) return;

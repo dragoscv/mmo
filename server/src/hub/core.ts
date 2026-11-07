@@ -44,6 +44,14 @@ export interface HubMedia {
     durationSec?: number;
     /** Live TV channel id, when the media is a channel. */
     channelId?: string;
+    /** Music: Subsonic track id (`tr_<n>`) of the playing track. */
+    trackId?: string;
+    /** Music: track artist. */
+    artist?: string;
+    /** Music: album name. */
+    album?: string;
+    /** Music: cover art path relative to the server origin (TrackCard.coverUrlPath). */
+    coverUrlPath?: string;
 }
 
 export interface DeviceInfo {
@@ -105,6 +113,7 @@ function cleanMedia(v: unknown): HubMedia | undefined {
     return {
         fileId: str(m.fileId, 64), kind: str(m.kind, 16), tmdbId: num(m.tmdbId), season: num(m.season), episode: num(m.episode),
         title: str(m.title, 200), posterPath: str(m.posterPath, 200) ?? null, durationSec: num(m.durationSec), channelId: str(m.channelId, 64),
+        trackId: str(m.trackId, 64), artist: str(m.artist, 200), album: str(m.album, 200), coverUrlPath: str(m.coverUrlPath, 300),
     };
 }
 

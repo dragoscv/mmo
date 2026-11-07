@@ -9,6 +9,7 @@ import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.DownloadDone
@@ -75,6 +76,8 @@ fun HomeScreen(
     onOpen: (ListSource) -> Unit,
     onProfiles: () -> Unit,
     onDisconnect: () -> Unit,
+    phoneOutput: ro.mixai.tv.data.WearHandoff.Output? = null,
+    onPhoneLocal: () -> Unit = {},
 ) {
     val state = rememberTransformingLazyColumnState()
     var home by remember { mutableStateOf<ro.mixai.tv.data.generated.MusicHome?>(null) }
@@ -92,6 +95,11 @@ fun HomeScreen(
     ScreenScaffold(scrollState = state) { padding ->
         TransformingLazyColumn(state = state, contentPadding = padding) {
             item { ListHeader { Text(stringResource(R.string.app_name)) } }
+            if (phoneOutput?.isRemote == true) {
+                item {
+                    RowButton(Icons.Outlined.Cast, stringResource(R.string.output_phone_on, phoneOutput.name), stringResource(R.string.output_back_to_phone), onClick = onPhoneLocal)
+                }
+            }
             if (nowPlaying != null) {
                 item { RowButton(Icons.Outlined.PlayArrow, nowPlaying.title, nowPlaying.artist, primary = true, onClick = onNowPlaying) }
             }

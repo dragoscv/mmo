@@ -17,8 +17,8 @@ android {
         minSdk = 31
         targetSdk = libs.versions.targetSdk.get().toInt()
         // Wear builds get their own versionCode range (phone 1.., wear 100001..) so both live in one Play listing.
-        versionCode = 100001
-        versionName = "0.1.0"
+        versionCode = 100002
+        versionName = "0.2.0"
     }
 
     buildTypes {

@@ -96,7 +96,8 @@ fun MusicRoot(app: MixaiMusicApp, conn: Connection, session: AccountSession, loc
     DisposableEffect(graph) {
         graph?.hub?.start()
         graph?.musicPlayback?.connect()
-        onDispose { graph?.hub?.stop(); graph?.musicPlayback?.release() }
+        graph?.outputs?.install()
+        onDispose { graph?.hub?.stop(); graph?.musicPlayback?.release(); graph?.outputs?.release() }
     }
 
     // Splash: health → profile picker or Home. Unreachable server → discovery with it preselected.

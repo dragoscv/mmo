@@ -595,6 +595,12 @@ export interface HubMedia {
     durationSec?: number;
     /** Live TV channel id, when the media is a channel. */
     channelId?: string;
+    /** Music track (`kind: "track"`, server 3.12): track id + display metadata for remotes. */
+    trackId?: string;
+    artist?: string;
+    album?: string;
+    /** Relative Subsonic cover path (sign with the device apiKey). */
+    coverUrlPath?: string;
 }
 
 export interface HubNowPlaying {

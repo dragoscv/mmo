@@ -5,6 +5,9 @@
     <!-- Background music (player/MusicService.kt, Media3 MediaLibraryService: browse tree for Android Auto / Assistant) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- DLNA/UPnP renderer discovery (cast/DlnaClient.kt: SSDP multicast with a MulticastLock). -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <application>
         <service

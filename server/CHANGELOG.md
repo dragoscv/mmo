@@ -2,6 +2,18 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.12.0 — Music output switching: Cast / DLNA / MixAI TVs (WP17-41h)
+
+- Subsonic `stream` honours `format`: `mp3` (256k), `opus` (160k Ogg), `aac` (256k ADTS) and `flac` transcode
+	through ffmpeg (from `timeOffset`, default 0), so Cast/DLNA renderers that cannot decode the file get a codec
+	they can. `raw`, absent or the file's own suffix still sends the file with ranges; without ffmpeg the file is
+	sent as is. Both paths send `X-Content-Duration` when the duration is known (DLNA renderers show a seek bar).
+- `GET /media/music/tracks?ids=tr_1,tr_2,…` (max 500) returns those tracks in the requested order, unknown ids
+	skipped — clients hydrate a queue handed over from another device in one call.
+- Hub `HubMedia` gains optional `trackId`, `artist`, `album`, `coverUrlPath` so a TV playing music reports it in
+	`state`; `/hub/command` documents `play {trackIds[], index, positionSec, shuffle, repeat}` for TVs with the
+	`music` cap. OpenAPI, Kotlin `Models.kt`, Swift `Models.swift` and the TS SDK (0.9.0) regenerated.
+
 ## 3.11.0 — Track loudness on music cards (WP17-41e)
 
 - `TrackCard` gains optional `loudnessLufs` (EBU R128 integrated) and `truePeakDbfs` from the analyzer, so players

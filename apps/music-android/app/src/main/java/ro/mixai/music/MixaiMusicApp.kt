@@ -16,11 +16,13 @@ import ro.mixai.mobile.auth.SessionVault
 import ro.mixai.music.data.MusicSettings
 import ro.mixai.music.downloads.MusicDownloadService
 import ro.mixai.music.downloads.MusicDownloads
+import ro.mixai.music.ui.output.CastOutputs
 import ro.mixai.music.widget.MusicWidgetBridge
 import ro.mixai.tv.data.ClientIdentity
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.Settings
 import ro.mixai.tv.data.WearHandoff
+import ro.mixai.music.wear.WearOutputBridge
 import ro.mixai.music.wear.WearPublisher
 import ro.mixai.tv.data.newMixaiImageLoader
 import ro.mixai.tv.player.AudioPrefs
@@ -62,6 +64,11 @@ class MixaiMusicApp : Application(), SingletonImageLoader.Factory {
         MusicService.dataSourceDecorator = { ctx, upstream -> MusicDownloads.dataSourceFactory(ctx, upstream) }
         // Home-screen widget (WP17-41f) follows the service player.
         MusicService.playerHook = { ctx, player -> MusicWidgetBridge.attach(ctx, player) }
+        // Output picker (WP17-41h): Google Cast wraps the service's local player; DLNA / HA / MixAI TVs are
+        // swapped in by the service through MusicOutputs.
+        CastOutputs.init(this, BuildConfig.CAST_APP_ID)
+        MusicService.basePlayerFactory = { ctx, exo -> CastOutputs.wrap(ctx, exo) }
+        WearOutputBridge.start(this, appScope)
         appScope.launch {
             settings.connection.collect { c -> MusicDownloads.api = if (c.isComplete) MmoApi(c.baseUrl, c.token) else null }
         }

@@ -18,6 +18,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import ro.mixai.tv.data.generated.MusicQueueInput
@@ -28,7 +30,13 @@ import ro.mixai.tv.player.TrackItems
 import kotlin.coroutines.resume
 
 /** off | all | one (server `MusicQueue.repeat`). */
-enum class RepeatMode(val key: String) { Off("off"), All("all"), One("one") }
+enum class RepeatMode(val key: String) {
+    Off("off"), All("all"), One("one");
+
+    val playerMode: Int get() = when (this) { Off -> Player.REPEAT_MODE_OFF; All -> Player.REPEAT_MODE_ALL; One -> Player.REPEAT_MODE_ONE }
+
+    companion object { fun of(key: String?): RepeatMode? = entries.firstOrNull { it.key == key } }
+}
 
 /** Snapshot of background music playback. */
 data class MusicState(
@@ -41,6 +49,9 @@ data class MusicState(
     val shuffle: Boolean = false,
     val repeat: RepeatMode = RepeatMode.Off,
     val buffering: Boolean = false,
+    /** Volume 0..max of a remote output (Cast, DLNA, ...); null while playing on this device. */
+    val remoteVolume: Int? = null,
+    val remoteVolumeMax: Int = 100,
 ) {
     val isActive: Boolean get() = track != null
 }
@@ -91,17 +102,32 @@ class MusicPlayback(
     }
 
     /** Replace the queue with [tracks] and start at [start]. */
-    fun play(tracks: List<TrackCard>, start: Int = 0, startPositionMs: Long = 0L) {
+    fun play(tracks: List<TrackCard>, start: Int = 0, startPositionMs: Long = 0L, shuffle: Boolean? = null, repeat: RepeatMode? = null) {
         if (tracks.isEmpty()) return
         queue = tracks
         scope.launch {
             val c = runCatching { ensureController() }.getOrElse { Log.w(TAG, "play: ${it.message}"); return@launch }
+            shuffle?.let { c.shuffleModeEnabled = it }
+            repeat?.let { c.repeatMode = it.playerMode }
             c.setMediaItems(tracks.map(::toItem), start.coerceIn(0, tracks.lastIndex), startPositionMs)
             c.prepare()
             c.play()
             playedKey = null
             scheduleSave()
         }
+    }
+
+    /**
+     * Hub `play {trackIds,index,positionSec,shuffle,repeat}` from a phone (WP17-41h: a MixAI TV as a music output).
+     * Returns the number of tracks started (0 = none found).
+     */
+    suspend fun playIds(ids: List<String>, index: Int, positionMs: Long, shuffle: Boolean?, repeat: RepeatMode?): Int {
+        val want = ids.getOrNull(index)
+        val tracks = music.tracksByIds(ids)
+        if (tracks.isEmpty()) return 0
+        val start = tracks.indexOfFirst { it.id == want }.takeIf { it >= 0 } ?: 0
+        play(tracks, start, if (tracks.getOrNull(start)?.id == want) positionMs else 0L, shuffle, repeat)
+        return tracks.size
     }
 
     /** Append to the queue (or start playing when idle). */
@@ -135,6 +161,10 @@ class MusicPlayback(
     fun next() { controller?.let { if (it.hasNextMediaItem()) it.seekToNextMediaItem() } }
     fun prev() { controller?.seekToPrevious() }
     fun seek(positionMs: Long) { controller?.seekTo(positionMs.coerceAtLeast(0)) }
+    /** Remote output volume (no-op on this device: the system volume applies). */
+    fun setRemoteVolume(level: Int) {
+        controller?.let { if (it.isCommandAvailable(Player.COMMAND_SET_DEVICE_VOLUME_WITH_FLAGS)) it.setDeviceVolume(level, 0) }
+    }
     fun skipTo(index: Int) { controller?.let { if (index in 0 until it.mediaItemCount) it.seekToDefaultPosition(index) } }
     fun stop() { controller?.let { it.stop(); it.clearMediaItems() }; queue = emptyList(); _state.value = MusicState() }
 
@@ -142,6 +172,30 @@ class MusicPlayback(
     fun setRepeat(mode: RepeatMode) {
         controller?.repeatMode = when (mode) { RepeatMode.Off -> Player.REPEAT_MODE_OFF; RepeatMode.All -> Player.REPEAT_MODE_ALL; RepeatMode.One -> Player.REPEAT_MODE_ONE }
         scheduleSave()
+    }
+
+    /**
+     * Music state for the hub (`state` with media.trackId), null when idle. Emits on track / play-state changes
+     * and every 5 s while playing (others extrapolate in between).
+     */
+    val hubNowPlaying: kotlinx.coroutines.flow.Flow<NowPlaying?> = state
+        .map { s ->
+            val t = s.track ?: return@map null
+            HubSnapshot(t.id, s.playing, s.positionMs / 5_000, NowPlaying(
+                playing = s.playing,
+                positionSec = s.positionMs / 1000.0,
+                durationSec = (s.durationMs / 1000.0).takeIf { it > 0 },
+                media = ro.mixai.tv.data.generated.HubMedia(
+                    kind = "track", trackId = t.id, title = t.title, artist = t.artist, album = t.album,
+                    coverUrlPath = t.coverUrlPath.takeIf { it.isNotBlank() }, durationSec = t.durationSec.takeIf { it > 0 },
+                ),
+            ))
+        }
+        .distinctUntilChanged { a, b -> a?.key == b?.key }
+        .map { it?.np }
+
+    private data class HubSnapshot(val id: String, val playing: Boolean, val bucket: Long, val np: NowPlaying) {
+        val key get() = Triple(id, playing, bucket)
     }
 
     /** Restore the server queue (paused) when nothing is playing. */
@@ -194,6 +248,9 @@ class MusicPlayback(
             shuffle = p.shuffleModeEnabled,
             repeat = when (p.repeatMode) { Player.REPEAT_MODE_ALL -> RepeatMode.All; Player.REPEAT_MODE_ONE -> RepeatMode.One; else -> RepeatMode.Off },
             buffering = p.playbackState == Player.STATE_BUFFERING,
+            remoteVolume = if (p.deviceInfo.playbackType == androidx.media3.common.DeviceInfo.PLAYBACK_TYPE_REMOTE &&
+                p.isCommandAvailable(Player.COMMAND_GET_DEVICE_VOLUME)) p.deviceVolume else null,
+            remoteVolumeMax = p.deviceInfo.maxVolume.takeIf { it > 0 } ?: 100,
         )
         maybePostPlay()
     }

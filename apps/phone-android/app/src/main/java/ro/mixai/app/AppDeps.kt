@@ -20,6 +20,7 @@ import ro.mixai.tv.data.Settings
 import ro.mixai.app.data.PhoneApi
 import ro.mixai.app.data.PhoneDeps
 import ro.mixai.music.ui.MusicDeps
+import ro.mixai.music.ui.output.OutputController
 
 /** Long-lived objects of one server connection (rebuilt when base URL / token change). Same wiring as the TV app. */
 class ConnectionGraph(
@@ -32,6 +33,7 @@ class ConnectionGraph(
     val hub: HubClient,
     val progressSync: ProgressSync,
     val phoneApi: PhoneApi,
+    val outputs: OutputController,
 )
 
 fun buildGraph(context: Context, conn: Connection, settings: Settings): ConnectionGraph {
@@ -40,6 +42,7 @@ fun buildGraph(context: Context, conn: Connection, settings: Settings): Connecti
     val profileId = { profiles.activeId }
     val media = MediaRepository(api, profileId, context.cacheDir)
     val music = MusicRepository(api, profileId)
+    val hub = HubClient(api, settings, profileId = { profiles.activeProfile.value?.id })
     return ConnectionGraph(
         api = api,
         profiles = profiles,
@@ -47,9 +50,11 @@ fun buildGraph(context: Context, conn: Connection, settings: Settings): Connecti
         music = music,
         musicPlayback = MusicPlayback(context.applicationContext, music, media),
         liveTv = LiveTvRepository(api, profileId),
-        hub = HubClient(api, settings) { profiles.activeProfile.value?.id },
+        hub = hub,
         progressSync = ProgressSync(media, settings),
         phoneApi = PhoneApi(api, profileId) { profiles.profileToken },
+        // Music output picker (WP17-41h): MixAI TVs, DLNA, Home Assistant. Cast stays with the video player.
+        outputs = OutputController(context, api, hub, castEnabled = false) { settings.deviceId() },
     )
 }
 
@@ -75,6 +80,7 @@ data class AppDeps(
     val localeTag: String,
     val session: AccountSession,
     val scope: CoroutineScope,
+    override val outputs: OutputController? = null,
     val onChangeServer: () -> Unit = {},
     val onSignOut: (() -> Unit)? = null,
 ) : MusicDeps {

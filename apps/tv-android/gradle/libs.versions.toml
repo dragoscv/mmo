@@ -43,6 +43,8 @@ wearPhoneInteractions = "1.1.1"
 wearRemoteInteractions = "1.2.0"
 wearInput = "1.2.0"
 playServicesWearable = "20.0.1"
+# MixAI Music output picker (WP17-41h): same MediaRouter media3-cast 1.11.1 pulls in at runtime.
+mediarouter = "1.8.1"
 
 # compose-bom 2026.09.00 / coil 3.6.2 AARs require compileSdk ≥ 37 (checkAarMetadata); targetSdk stays 36.
 compileSdk = "37"
@@ -63,6 +65,7 @@ androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscree
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 media3-ui-compose = { group = "androidx.media3", name = "media3-ui-compose", version.ref = "media3" }
 media3-cast = { group = "androidx.media3", name = "media3-cast", version.ref = "media3" }
+mediarouter = { group = "androidx.mediarouter", name = "mediarouter", version.ref = "mediarouter" }
 media3-exoplayer-workmanager = { group = "androidx.media3", name = "media3-exoplayer-workmanager", version.ref = "media3" }
 work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }

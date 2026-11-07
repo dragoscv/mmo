@@ -67,6 +67,23 @@ class MusicRepository(private val api: MmoApi, private val profileId: () -> Stri
     private suspend fun <T> listField(key: String, s: kotlinx.serialization.KSerializer<T>, path: String): List<T> =
         json.parseToJsonElement(api.getJson(path)).jsonObject[key]?.jsonArray?.map { json.decodeFromJsonElement(s, it) } ?: emptyList()
 
+    /** Tracks by id in the requested order (server >= 3.12; older servers ignore `ids` and the caller gets a page). */
+    suspend fun tracksByIds(ids: List<String>): List<TrackCard> {
+        if (ids.isEmpty()) return emptyList()
+        val out = ArrayList<TrackCard>(ids.size)
+        for (chunk in ids.chunked(200)) {
+            val body = api.getJson("/media/music/tracks?ids=" + api.encode(chunk.joinToString(",")))
+            val items = json.decodeFromString<TrackPage>(body).items
+            val byId = items.associateBy { it.id }
+            // Server < 3.12 returns the A-Z page instead: keep only the ids that were asked for.
+            chunk.mapNotNullTo(out) { byId[it] }
+        }
+        return out
+    }
+
+    @kotlinx.serialization.Serializable
+    private data class TrackPage(val items: List<TrackCard> = emptyList())
+
     suspend fun queue(): MusicQueue = json.decodeFromString(api.getJson("/media/music/queue?profile=${api.encode(profile)}"))
 
     suspend fun putQueue(input: MusicQueueInput): MusicQueue =

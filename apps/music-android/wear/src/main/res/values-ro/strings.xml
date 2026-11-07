@@ -39,4 +39,6 @@
     <string name="action_pause">Pauză</string>
     <string name="action_next">Piesa următoare</string>
     <string name="action_previous">Piesa anterioară</string>
+    <string name="output_phone_on">Telefon: %1$s</string>
+    <string name="output_back_to_phone">Redă pe telefon</string>
 </resources>

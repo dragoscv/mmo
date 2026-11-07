@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.11.0
+  version: 3.12.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -4630,6 +4630,17 @@ paths:
         `f=json` returns `{"subsonic-response": {...}}`, `f=jsonp` wraps it in
         `callback(...)`, the default is XML. `stream`, `download` and
         `getCoverArt` write the media bytes directly (range-aware).
+
+        `stream` honours `format` (case-insensitive): `mp3` (libmp3lame
+        256k, `audio/mpeg`), `opus` (libopus 160k in Ogg, `audio/ogg`),
+        `aac` (256k ADTS, `audio/aac`) and `flac` (`audio/flac`) are
+        transcoded through ffmpeg (no ranges, `Accept-Ranges: none`);
+        `raw`, an absent/unknown value, or the file's own suffix plays the
+        file directly with ranges. `timeOffset` (seconds) seeks — a seek
+        always transcodes (requested codec, else mp3). Without ffmpeg the
+        file is sent as is. `maxBitRate` is accepted and ignored. Both
+        paths send `X-Content-Duration` (seconds, minus the offset) when the
+        track duration is known, for DLNA renderers.
       security: []
       parameters:
         - { name: u, in: query, schema: { type: string }, description: Username (any value). }
@@ -5123,7 +5134,7 @@ paths:
       operationId: hubCommand
       tags: [hub]
       summary: Remote control — send a command to a device and wait for its ack (4 s)
-      description: 'Actions: play {fileId,startSec,kind,tmdbId,season,episode,title} | pause | resume | seek {positionSec} | stop | next | previous | volume {level} | text {value} (search input) | navigate {to}.'
+      description: 'Actions: play {fileId,startSec,kind,tmdbId,season,episode,title} | play {trackIds[],index,positionSec,shuffle,repeat} (start a music queue of Subsonic track ids on a TV that advertises the `music` cap; repeat = off|all|one) | pause | resume | seek {positionSec} | stop | next | previous | volume {level} | text {value} (search input) | navigate {to}.'
       requestBody:
         required: true
         content:
@@ -5725,10 +5736,12 @@ paths:
     get:
       operationId: musicTracks
       tags: [music]
-      summary: All songs A-Z by title, paged
+      summary: All songs A-Z by title, paged (or specific tracks by id)
+      description: 'With `ids`, returns those tracks in the requested order (unknown ids skipped) as `{total: found, offset: 0, limit: number of ids, items}`; `offset`/`limit` are ignored. More than 500 ids answers 400.'
       parameters:
         - { name: offset, in: query, schema: { type: integer, default: 0 } }
         - { name: limit, in: query, schema: { type: integer, default: 100, maximum: 500 } }
+        - { name: ids, in: query, schema: { type: string }, description: 'Comma-separated Subsonic track ids (TrackCard.id, e.g. tr_12,tr_7), max 500.' }
       responses:
         '200':
           description: Page of tracks
@@ -5742,6 +5755,7 @@ paths:
                   offset: { type: integer }
                   limit: { type: integer }
                   items: { type: array, items: { $ref: '#/components/schemas/TrackCard' } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /livetv/proxy/{channelId}:
@@ -7640,6 +7654,10 @@ components:
         posterPath: { type: [string, 'null'] }
         durationSec: { type: number }
         channelId: { type: string }
+        trackId: { type: string, maxLength: 64, description: 'Music: Subsonic track id (tr_<n>).' }
+        artist: { type: string, maxLength: 200, description: 'Music: track artist.' }
+        album: { type: string, maxLength: 200, description: 'Music: album name.' }
+        coverUrlPath: { type: string, maxLength: 300, description: 'Music: cover path relative to the server origin (TrackCard.coverUrlPath).' }
     HubNowPlaying:
       type: object
       required: [playing, positionSec, at]

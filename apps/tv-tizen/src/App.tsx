@@ -41,7 +41,8 @@ import { DiscoverScreen } from "./screens/Discover";
 import { PairScreen } from "./screens/Pair";
 import { ShowScreen } from "./screens/Show";
 import { PlayerScreen } from "./screens/Player";
-import { musicPlayer } from "./lib/music-player";
+import { musicPlayer, trackLookup } from "./lib/music-player";
+import { parseMusicPlayArgs, isMusicPlay } from "./lib/music-remote";
 import { Profiles } from "./screens/Profiles";
 import { Home } from "./screens/Home";
 import { Title } from "./screens/Title";
@@ -316,6 +317,7 @@ function Shell({ clients, cfg, lang, app, onboarding }: {
             try {
                 switch (cmd.action) {
                     case "play": {
+                        if (isMusicPlay(a)) { await playMusic(cmd); return; }
                         const fileId = str(a.fileId);
                         if (!fileId) { hub.ack(cmd.seq, false, "fileId_required"); return; }
                         const kind = a.kind === "tv" || a.kind === "movie" ? (a.kind as MediaKind) : undefined;
@@ -331,7 +333,9 @@ function Shell({ clients, cfg, lang, app, onboarding }: {
                             : cmd.action === "volume" ? (num(a.level) !== undefined ? { type: "volume", level: num(a.level)! } : null)
                             : { type: cmd.action } as PlayerCommand;
                         if (!pc) { hub.ack(cmd.seq, false, "bad_args"); return; }
-                        const ok = playerBus.send(pc);
+                        // Video/live player first (top bus handler), else the background music engine.
+                        let ok = playerBus.send(pc);
+                        if (!ok && musicPlayer.hasTrack) ok = musicPlayer.remote(pc);
                         hub.ack(cmd.seq, ok, ok ? undefined : "no_player");
                         return;
                     }
@@ -355,7 +359,23 @@ function Shell({ clients, cfg, lang, app, onboarding }: {
                 hub.ack(cmd.seq, false, (e as Error).message || "error");
             }
         }
-    }, [clients, nav, playFile, openRoute]);
+
+        /** `play {trackIds, index, positionSec?, shuffle?, repeat?}` → replace the music queue (server 3.12). */
+        async function playMusic(cmd: HubCommand): Promise<void> {
+            if (!clients || !cfg) { hub.ack(cmd.seq, false, "not_connected"); return; }
+            const p = parseMusicPlayArgs(cmd.args);
+            if (!p) { hub.ack(cmd.seq, false, "trackIds_required"); return; }
+            // A video/live player on top would pause the music on its next now-playing publish → close it.
+            const np = playerBus.nowPlaying();
+            if (np && np.kind !== "audio") playerBus.send({ type: "stop" });
+            musicPlayer.attach(clients.music, clients.media);
+            const n = await musicPlayer.playIds(p.trackIds, p.index, { shuffle: p.shuffle, startSec: p.positionSec, repeat: p.repeat },
+                trackLookup(cfg, () => clients.profiles.headers()));
+            if (n === 0) { hub.ack(cmd.seq, false, "tracks_not_found"); return; }
+            if (nav.current.name !== "nowPlaying") openRoute({ name: "nowPlaying" });
+            hub.ack(cmd.seq, true);
+        }
+    }, [clients, cfg, nav, playFile, openRoute]);
 
     // ─── e2e driver (debug builds only): `open:<kind>:<tmdbId>`, `play:<fileId>:<sec>` ──
     useEffect(() => {

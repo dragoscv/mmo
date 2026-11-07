@@ -38,6 +38,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import ro.mixai.core.R
+import ro.mixai.tv.cast.MusicOutputs
+import ro.mixai.tv.cast.OutputTarget
+import ro.mixai.tv.cast.RemoteFormat
+import ro.mixai.tv.cast.RemoteItem
 import ro.mixai.tv.data.ClientIdentity
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.MusicRepository
@@ -61,6 +65,10 @@ class MusicService : MediaLibraryService() {
     private var lib: Lib? = null
     private val searches = HashMap<String, List<MediaItem>>()
     private var crossfader: Crossfader? = null
+    private lateinit var exo: ExoPlayer
+    /** Local player as the session sees it: [exo] or the app's Cast wrapper around it. */
+    private lateinit var basePlayer: Player
+    private var renderer: RendererPlayer? = null
 
     /** Server-bound helpers, rebuilt when the saved connection or profile changes. */
     private class Lib(val key: String, val music: MusicRepository) {
@@ -102,10 +110,88 @@ class MusicService : MediaLibraryService() {
             audioPrefs.collect { gain.target = player.currentMediaItem?.let(::gainFor) ?: 1f }
         }
         crossfader = Crossfader(this, player, sources, { audioPrefs.value }, ::gainFor).also { it.start() }
-        playerHook?.invoke(this, player)
-        session = MediaLibrarySession.Builder(this, player, Callback())
+        exo = player
+        // Google Cast (WP17-41h): the app may wrap the local player (Media3 CastPlayer moves the queue to a
+        // Cast device and back); otherwise the session plays locally.
+        basePlayer = basePlayerFactory?.invoke(this, player) ?: player
+        playerHook?.invoke(this, basePlayer)
+        session = MediaLibrarySession.Builder(this, basePlayer, Callback())
             .setId(SESSION_ID)
             .build()
+        MusicOutputs.handler = ::switchOutput
+        MusicOutputs.takePending()?.let(::switchOutput)
+    }
+
+    // ─── output switching (WP17-41h) ──────────────────────────────────────
+
+    /** Moves the queue, position and play state to [target] (renderers) or back to this device. */
+    private fun switchOutput(target: OutputTarget) {
+        val s = session ?: return
+        val src = s.player
+        if (target is OutputTarget.Local) {
+            renderer?.let { handBack(it, null) }
+            return
+        }
+        val transport = MusicOutputs.transports?.invoke(target)
+        if (transport == null) { MusicOutputs.fail(target, getString(R.string.output_unsupported)); return }
+        val items = (0 until src.mediaItemCount).map { src.getMediaItemAt(it) }
+        val index = src.currentMediaItemIndex.coerceAtLeast(0)
+        val position = src.currentPosition.coerceAtLeast(0)
+        val play = src.playWhenReady && items.isNotEmpty()
+        val repeat = src.repeatMode
+        val shuffle = src.shuffleModeEnabled
+        MusicOutputs.setSwitching(target)
+        val old = renderer
+        val next = RendererPlayer(transport, ::remoteItem) { r, msg -> scope.launch { if (renderer === r) handBack(r, msg) } }
+        renderer = next
+        if (old != null) { old.stop(); old.release() } else { basePlayer.pause(); exo.stop() }
+        s.player = next
+        next.start(items, index, position, play, repeat, shuffle)
+        playerHook?.invoke(this, next)
+        MusicOutputs.setActive(target)
+    }
+
+    /** Renderer → local player, keeping queue and position. [error] set = the renderer was lost. */
+    private fun handBack(r: RendererPlayer, error: String?) {
+        val s = session ?: return
+        val items = (0 until r.mediaItemCount).map { r.getMediaItemAt(it) }
+        val index = r.currentMediaItemIndex.coerceAtLeast(0)
+        val position = r.currentPositionForHandoff
+        val play = r.playWhenReady && error == null
+        val repeat = r.repeatMode
+        val shuffle = r.shuffleModeEnabled
+        val target = MusicOutputs.active.value
+        renderer = null
+        r.stop()
+        r.release()
+        s.player = basePlayer
+        basePlayer.repeatMode = repeat
+        basePlayer.shuffleModeEnabled = shuffle
+        if (items.isNotEmpty()) {
+            basePlayer.setMediaItems(items, index.coerceIn(0, items.lastIndex), position)
+            basePlayer.prepare()
+            basePlayer.playWhenReady = play
+        }
+        MusicOutputs.setActive(OutputTarget.Local)
+        if (error != null) MusicOutputs.fail(target, error)
+    }
+
+    /** Queue item → what a renderer gets: a format it can decode (server-side conversion, server >= 3.12). */
+    private fun remoteItem(item: MediaItem, sink: Set<String>): RemoteItem? {
+        val card = TrackItems.fromItem(item) ?: return null
+        val uri = (item.localConfiguration?.uri ?: item.requestMetadata.mediaUri)?.toString() ?: return null
+        val format = RemoteFormat.choose(card.format, sink)
+        val m = item.mediaMetadata
+        return RemoteItem(
+            trackId = card.id,
+            url = RemoteFormat.withFormat(uri, format),
+            mime = RemoteFormat.mimeAfter(card.format, format),
+            title = m.title?.toString() ?: card.title,
+            artist = m.artist?.toString() ?: card.artist,
+            album = m.albumTitle?.toString() ?: card.album,
+            artUrl = m.artworkUri?.toString(),
+            durationMs = (card.durationSec * 1000).toLong().takeIf { it > 0 },
+        )
     }
 
     private fun gainFor(item: MediaItem): Float = AudioPlan.gainFor(TrackItems.fromItem(item), audioPrefs.value.normalize)
@@ -118,10 +204,16 @@ class MusicService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        MusicOutputs.handler = null
+        renderer?.let { it.stop(); it.release() }
+        renderer = null
+        if (MusicOutputs.active.value !is OutputTarget.Cast) MusicOutputs.setActive(OutputTarget.Local)
         scope.cancel()
         crossfader?.release()
         crossfader = null
-        session?.run { player.release(); release() }
+        session?.release()
+        if (basePlayer !== exo) basePlayer.release()
+        exo.release()
         session = null
         super.onDestroy()
     }
@@ -407,6 +499,12 @@ class MusicService : MediaLibraryService() {
          * main thread right after the player is built; the hook adds its own listener.
          */
         @Volatile var playerHook: ((android.content.Context, Player) -> Unit)? = null
+
+        /**
+         * Set once by an app to wrap the local ExoPlayer for the session (MixAI Music / phone: Media3 CastPlayer
+         * for Google Cast). Called on the main thread when the service starts. Null = the ExoPlayer itself.
+         */
+        @Volatile var basePlayerFactory: ((android.content.Context, ExoPlayer) -> Player)? = null
 
         /** Wear app: suppress playback on unsuitable outputs (watch speaker). Read when the service starts. */
         @Volatile var suppressOnUnsuitableOutput: Boolean = false

@@ -15,7 +15,7 @@ vi.mock("../sync", () => ({ enqueueSyncChange: vi.fn() }));
 import { __setSubsonicDbForTests } from "../subsonic/browse";
 import { albumId, artistId, trackId } from "../subsonic/ids";
 import { openMemoryMediaDb, type MediaDb } from "./db";
-import { MAX_QUEUE, MusicError, MusicService, fold, parseLrc, parseTrackKey, trackNumbersFromFilename } from "./music";
+import { MAX_QUEUE, MAX_TRACK_IDS, MusicError, MusicService, fold, parseLrc, parseTrackKey, trackNumbersFromFilename } from "./music";
 import { createMusicRouter } from "./music-routes";
 
 const DDL = `
@@ -329,6 +329,18 @@ describe("MusicService radio, songs, playlists", () => {
         expect(music.tracks({ offset: 5, limit: 3 }).items.map((t) => t.title)).toEqual(["Plain One"]);
         expect(music.playlistsList()).toEqual([expect.objectContaining({ id: "pl_1", name: "Party", songCount: 2 })]);
     });
+
+    it("tracks by ids: requested order, unknown/foreign/non-track ids skipped, max 500", () => {
+        const req = [`tr_${ids.galv}`, "tr_999999", `tr_${ids.omt}`, `tr_${ids.other}`, "al_0000000000000000", "junk", ` tr_${ids.funk} `, `tr_${ids.galv}`];
+        const p = music.tracks({ ids: req, offset: 3, limit: 1 });
+        expect(p.items.map((t) => t.id)).toEqual([`tr_${ids.galv}`, `tr_${ids.omt}`, `tr_${ids.funk}`, `tr_${ids.galv}`]);
+        expect(p).toMatchObject({ total: 4, offset: 0, limit: req.length });
+        expect(p.items[0]).toMatchObject({ title: "Galvanize", streamUrlPath: `/rest/stream.view?id=tr_${ids.galv}` });
+        expect(music.tracks({ ids: [] })).toMatchObject({ total: 0, items: [] });
+        // Explicit ids resolve every track of this library owner (hidden ones too: a queue may hold them), never another user's.
+        expect(music.tracks({ ids: Array.from({ length: MAX_TRACK_IDS }, (_, i) => `tr_${i + 1}`) }).total).toBe(7);
+        expect(() => music.tracks({ ids: Array.from({ length: MAX_TRACK_IDS + 1 }, (_, i) => `tr_${i + 1}`) })).toThrow(/at most 500/);
+    });
 });
 
 describe("music router (http)", () => {
@@ -368,6 +380,12 @@ describe("music router (http)", () => {
         expect(((await j(`/radio?seed=tr_${ids.omt}&size=3`)).body.tracks as unknown[]).length).toBe(3);
         expect((await j("/playlists")).body).toMatchObject({ playlists: [{ id: "pl_1" }] });
         expect((await j("/tracks?limit=2")).body).toMatchObject({ total: 6, limit: 2 });
+        const byIds = await j(`/tracks?ids=${encodeURIComponent(`tr_${ids.aero},tr_404404,tr_${ids.omt}`)}`);
+        expect(byIds.status).toBe(200);
+        expect(byIds.body).toMatchObject({ total: 2, offset: 0, limit: 3 });
+        expect((byIds.body.items as { id: string }[]).map((t) => t.id)).toEqual([`tr_${ids.aero}`, `tr_${ids.omt}`]);
+        const tooMany = Array.from({ length: 501 }, (_, i) => `tr_${i + 1}`).join(",");
+        expect((await j(`/tracks?ids=${tooMany}`)).status).toBe(400);
     });
 
     it("PUT/GET /queue with validation", async () => {

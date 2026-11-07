@@ -35,6 +35,9 @@ dependencies {
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.material.icons.extended)
     implementation(libs.androidx.activity.compose)
+    // Output picker (WP17-41h): Google Cast via Media3 CastPlayer + MediaRouter (brought in by media3-cast).
+    api(libs.media3.cast)
+    implementation(libs.mediarouter)
 
     testImplementation(libs.junit)
 }

@@ -10,6 +10,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-07 — MixAI Music 0.2.0 (play on Cast, DLNA, Home Assistant, MixAI TVs), TV Android 2.2.0, TV Tizen 2.4.0, phone 1.2.0
+
+- **Output picker in Now Playing (MixAI Music, phone app):** one sheet lists this device, MixAI TVs, Google Cast devices
+  (MixAI Music only; the phone app keeps Cast for video), DLNA/UPnP speakers and TVs found on the Wi-Fi, and Home
+  Assistant players known to MMO Server. The queue, position and play state move to the chosen output and back. The
+  notification, lock screen, Android Auto, the widget, the watch and the volume keys control the remote output
+  (remote volume slider in the sheet). DLNA renderers get the next track ahead of time for gapless playback where they
+  support it; tracks a renderer cannot decode are converted by MMO Server (3.12). If the output drops, playback
+  continues on the phone. "Continue on <last output>" chip per server.
+- **MixAI TVs as music outputs (TV Android 2.2.0, Tizen 2.4.0):** hub `play {trackIds, index, positionSec, shuffle,
+  repeat}` starts the queue in the TV's own music player (its crossfade and normalisation) and opens Now Playing; the
+  TV reports the track it plays, transport commands reach background music when no video plays.
+- **Watch (MixAI Music for Wear OS 0.2.0):** Home shows where the phone's music plays, with "Play on the phone".
+
+## 2026-11-07 — MixAI web 3.2.7 (Google Cast receiver for MixAI Music)
+
+- **Branded Cast receiver:** `https://mixai.ro/cast/receiver.html` (CAF v3, audio only) shows the blurred
+  album-art backdrop, cover crossfade, title/artist/album, progress, "Next" from the queue, paused/buffering
+  states and an idle "Ready to cast" screen on TVs and Nest Hub. Optional lyrics over
+  `urn:x-cast:ro.mixai.music`. Plus `https://mixai.ro/cast/styled.css` for a Styled Media Receiver
+  registration; console steps in `apps/web/public/cast/README.md`. `/cast/*` and the two logos are served
+  with `Cross-Origin-Resource-Policy: cross-origin`.
+
 ## 2026-11-06 — MixAI Music web 3.2.6 (radio, songs, playlists, offline-first), MMO Server 3.10.0–3.10.1
 
 - **Music on music.mixai.ro (web 3.2.6):** "Start radio" on albums, artists and Now Playing (seed + up to 12 similar

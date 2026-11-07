@@ -14,6 +14,8 @@ interface MusicDeps {
     val musicPlayback: MusicPlayback
     /** Track downloads; null = the host does not offer them (no download controls shown). */
     val offline: MusicOffline? get() = null
+    /** Output picker (Cast, DLNA, Home Assistant, MixAI TVs); null = no picker shown. */
+    val outputs: ro.mixai.music.ui.output.OutputController? get() = null
 }
 
 /** Navigation the music screens trigger; each host maps it onto its own back stack. */

@@ -14,6 +14,7 @@
  *   GET /media/music/radio?seed=tr_|al_|ar_&size=   → {seed, tracks: TrackCard[]}
  *   GET /media/music/playlists                     → {playlists: PlaylistCard[]}
  *   GET /media/music/tracks?offset=&limit=         → Page<TrackCard> (A–Z by title)
+ *   GET /media/music/tracks?ids=tr_1,tr_2          → Page<TrackCard> in the requested order (max 500)
  *
  * Ids are Subsonic ids; `coverUrlPath` / `streamUrlPath` are relative to the server origin
  * (client appends its auth). Auth is the caller's concern (mount behind authMiddleware).
@@ -98,6 +99,12 @@ export function createMusicRouter(deps: MusicRouterDeps): express.Router {
     }));
 
     router.get("/tracks", wrap((req, res) => {
+        const ids = qs(req.query.ids);
+        if (ids !== undefined) {
+            const list = ids.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+            res.json(music.tracks({ ids: list }));
+            return;
+        }
         res.json(music.tracks({ offset: qint(req.query.offset), limit: qint(req.query.limit) }));
     }));
 

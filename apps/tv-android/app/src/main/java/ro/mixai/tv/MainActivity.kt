@@ -31,6 +31,9 @@ import ro.mixai.tv.data.Connection
 import ro.mixai.tv.data.DiscoveredServer
 import ro.mixai.tv.data.HubClient
 import ro.mixai.tv.data.HubCommand
+import ro.mixai.tv.data.RepeatMode
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import ro.mixai.tv.data.LiveTvRepository
 import ro.mixai.tv.data.MediaRef
 import ro.mixai.tv.data.MediaRepository
@@ -185,14 +188,18 @@ private fun buildGraph(context: Context, conn: Connection, settings: Settings): 
     val profileId = { profiles.activeId }
     val media = MediaRepository(api, profileId, context.cacheDir)
     val music = MusicRepository(api, profileId)
+    val musicPlayback = MusicPlayback(context.applicationContext, music, media)
+    // `music` cap (WP17-41h): phones can send their queue here; the TV reports what it plays.
+    val hub = HubClient(api, settings, { profiles.activeProfile.value?.id }, extraCaps = listOf("music"))
+    hub.musicNowPlaying = musicPlayback.hubNowPlaying
     return ConnectionGraph(
         api = api,
         profiles = profiles,
         media = media,
         music = music,
-        musicPlayback = MusicPlayback(context.applicationContext, music, media),
+        musicPlayback = musicPlayback,
         liveTv = LiveTvRepository(api, profileId),
-        hub = HubClient(api, settings) { profiles.activeProfile.value?.id },
+        hub = hub,
         progressSync = ProgressSync(media, settings),
     )
 }
@@ -387,6 +394,32 @@ private fun ConnectedScreen(route: Route, nav: Navigator, d: ScreenDeps, progres
 }
 
 /**
+ * Hub `play {trackIds,index,positionSec,shuffle,repeat}` (WP17-41h): a phone sends its music queue; it plays in the
+ * TV's background music (own crossfade / normalisation). A video on screen is stopped first; Now Playing opens.
+ */
+private fun playMusicQueue(d: ScreenDeps, nav: Navigator, cmd: HubCommand, ids: List<String>, scope: CoroutineScope) {
+    val hub = d.hub
+    if (ids.isEmpty()) { hub.ack(cmd.seq, false, "trackIds_required"); return }
+    if (PlayerBus.hasPlayer) PlayerBus.send(PlayerCommand.Stop)
+    scope.launch {
+        try {
+            val n = d.musicPlayback.playIds(
+                ids.take(2000),
+                index = (cmd.args.argLong("index") ?: 0L).toInt().coerceIn(0, ids.lastIndex),
+                positionMs = ((cmd.args.argDouble("positionSec") ?: 0.0) * 1000).toLong().coerceAtLeast(0),
+                shuffle = (cmd.args["shuffle"] as? kotlinx.serialization.json.JsonPrimitive)?.booleanOrNull,
+                repeat = RepeatMode.of(cmd.args.argString("repeat")),
+            )
+            if (n == 0) { hub.ack(cmd.seq, false, "tracks_not_found"); return@launch }
+            if (nav.current != Route.NowPlaying) nav.push(Route.NowPlaying)
+            hub.ack(cmd.seq, true)
+        } catch (e: Exception) {
+            hub.ack(cmd.seq, false, e.message ?: "play_failed")
+        }
+    }
+}
+
+/**
  * Hub `cmd` actions (server/openapi.yaml `/hub/command`): play, pause, resume, seek, stop, next,
  * previous, text, navigate. Transport goes to the on-screen player (PlayerBus) or, when only
  * music is playing, to background music. Every command is acked.
@@ -404,6 +437,9 @@ private fun handleHubCommand(d: ScreenDeps, nav: Navigator, cmd: HubCommand, sco
     }
     when (cmd.action) {
         "play" -> {
+            val trackIds = (cmd.args["trackIds"] as? kotlinx.serialization.json.JsonArray)
+                ?.mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
+            if (trackIds != null) { playMusicQueue(d, nav, cmd, trackIds, scope); return }
             val fileId = cmd.args.argString("fileId")
             if (fileId == null) { transport(PlayerCommand.Resume) { music.resume() }; return }
             scope.launch {

@@ -20,10 +20,10 @@ import { authenticate } from "./auth";
 import {
     albumList, albumToBody, albumsOfArtist, artistToBody, findAlbumByHash, findArtistByHash, genres,
     getTrack, indexLetter, listArtists, randomSongs, resolveUserId, search, songToBody, songsByGenre,
-    songsOfAlbum, starredSongs, tracksForId, type AlbumListType, type TrackRow,
+    songsOfAlbum, starredSongs, suffixOf, tracksForId, type AlbumListType, type TrackRow,
 } from "./browse";
 import { decodeId } from "./ids";
-import { lyricsBody, sendCoverArt, sendFile, streamWithOffset } from "./media";
+import { lyricsBody, pickStreamFormat, sendCoverArt, sendFile, streamTranscoded, type StreamFormat } from "./media";
 import { createPlaylist, deletePlaylist, getPlaylist, listPlaylists, playlistToBody, updatePlaylist } from "./playlists";
 import { scrobble, setRating, setStarred } from "./annotate";
 import {
@@ -277,10 +277,16 @@ const methods: Record<string, Method> = {
         const t = getTrack(ctx.userId, d.num!);
         if (!t) throw new SubsonicError(ERR.NOT_FOUND, "Song not found");
         const offset = int(ctx.params, "timeOffset", 0, 0, 24 * 3600);
-        if (offset > 0) {
-            const fmt = (one(ctx.params, "format") ?? "").toLowerCase() === "opus" ? "opus" : "mp3";
-            if (streamWithOffset(ctx.res, t, offset, fmt)) return null;
+        const formatParam = one(ctx.params, "format");
+        const picked = pickStreamFormat(formatParam, suffixOf(t));
+        // A seek always needs ffmpeg: keep the requested codec when it is one we
+        // can encode (even if it equals the file's suffix), else mp3 as before.
+        let target: StreamFormat | null = picked === "raw" ? null : picked;
+        if (!target && offset > 0) {
+            const requested = pickStreamFormat(formatParam, "");
+            target = requested === "raw" ? "mp3" : requested;
         }
+        if (target && streamTranscoded(ctx.res, t, offset, target)) return null;
         sendFile(ctx.req, ctx.res, t, false);
         return null;
     },

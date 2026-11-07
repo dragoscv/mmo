@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="output_pick">Play on</string>
+    <string name="output_title">Play on</string>
+    <string name="output_refresh">Search again</string>
+    <string name="output_this_device">This device</string>
+    <string name="output_kind_local">Speaker or Bluetooth</string>
+    <string name="output_kind_cast">Google Cast</string>
+    <string name="output_kind_tv">MixAI TV</string>
+    <string name="output_kind_dlna">DLNA / UPnP</string>
+    <string name="output_kind_ha">Home Assistant</string>
+    <string name="output_group_tv">MixAI TVs</string>
+    <string name="output_group_cast">Google Cast</string>
+    <string name="output_group_dlna">DLNA speakers and TVs</string>
+    <string name="output_group_ha">Home Assistant</string>
+    <string name="output_none">No speakers or TVs found on this network.</string>
+    <string name="output_note">Crossfade and volume normalisation work on this device and on MixAI TVs. Other outputs play the original file, converted by MMO Server when they cannot play it.</string>
+    <string name="output_selected">Selected</string>
+    <string name="output_volume">Volume</string>
+    <string name="output_playing_on">Playing on %1$s</string>
+    <string name="output_back_here">Play on this device</string>
+    <string name="output_continue_on">Continue on %1$s</string>
+    <string name="output_not_found">%1$s is not available right now</string>
+    <string name="output_lost">Lost connection to %1$s. Playing on this device.</string>
+</resources>

@@ -73,7 +73,14 @@ class HubClient(
     private val api: MmoApi,
     private val settings: Settings,
     private val profileId: () -> String? = { null },
+    /** Caps beyond [CAPS] (TV app: `music` = accepts `play {trackIds}` into its background music). */
+    private val extraCaps: List<String> = emptyList(),
 ) {
+    /**
+     * Now-playing of background music, reported when no video player is on screen (WP17-41h: phones show what
+     * a MixAI TV plays). Set by the app; null = not reported.
+     */
+    @Volatile var musicNowPlaying: kotlinx.coroutines.flow.Flow<NowPlaying?>? = null
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true; explicitNulls = false }
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile private var ws: WebSocket? = null
@@ -134,7 +141,8 @@ class HubClient(
         // Forward the player's now-playing to the hub.
         stateJob = scope.launch {
             var last: NowPlaying? = null
-            PlayerBus.nowPlaying.collect { np ->
+            val music = musicNowPlaying ?: kotlinx.coroutines.flow.flowOf(null)
+            kotlinx.coroutines.flow.combine(PlayerBus.nowPlaying, music) { video, m -> video ?: m }.collect { np ->
                 if (np == null && last == null) return@collect
                 last = np
                 if (np == null) sendRaw(buildJsonObject { put("type", "state"); put("idle", true) })
@@ -209,7 +217,7 @@ class HubClient(
             put("deviceId", settings.deviceId())
             put("name", name)
             put("platform", identity.platform)
-            put("caps", JsonArray(CAPS.map { JsonPrimitive(it) }))
+            put("caps", JsonArray((CAPS + extraCaps).distinct().map { JsonPrimitive(it) }))
             profileId()?.let { put("profileId", it) }
             put("app", identity.appTag)
         })

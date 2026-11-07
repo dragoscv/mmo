@@ -5,6 +5,7 @@ import androidx.compose.runtime.Immutable
 import ro.mixai.music.downloads.MusicDownloads
 import ro.mixai.music.ui.MusicDeps
 import ro.mixai.music.ui.MusicOffline
+import ro.mixai.music.ui.output.OutputController
 import ro.mixai.tv.data.Connection
 import ro.mixai.tv.data.HubClient
 import ro.mixai.tv.data.MediaRepository
@@ -23,6 +24,7 @@ class MusicGraph(
     override val music: MusicRepository,
     override val musicPlayback: MusicPlayback,
     val hub: HubClient,
+    override val outputs: OutputController,
 ) : MusicDeps {
     override val offline: MusicOffline get() = MusicDownloads
 }
@@ -33,12 +35,14 @@ fun buildMusicGraph(context: Context, conn: Connection, settings: Settings): Mus
     val profileId = { profiles.activeId }
     val media = MediaRepository(api, profileId, context.cacheDir)
     val music = MusicRepository(api, profileId)
+    val hub = HubClient(api, settings, profileId = { profiles.activeProfile.value?.id })
     return MusicGraph(
         api = api,
         profiles = profiles,
         media = media,
         music = music,
         musicPlayback = MusicPlayback(context.applicationContext, music, media),
-        hub = HubClient(api, settings) { profiles.activeProfile.value?.id },
+        hub = hub,
+        outputs = OutputController(context, api, hub, castEnabled = true) { settings.deviceId() },
     )
 }

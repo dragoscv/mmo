@@ -39,4 +39,6 @@
     <string name="action_pause">Pause</string>
     <string name="action_next">Next track</string>
     <string name="action_previous">Previous track</string>
+    <string name="output_phone_on">Phone: %1$s</string>
+    <string name="output_back_to_phone">Play on the phone</string>
 </resources>

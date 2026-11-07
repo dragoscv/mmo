@@ -25,6 +25,9 @@ val mixaiOrigin: String = (project.findProperty("mixaiOrigin") as String?)?.trim
     ?.takeIf { it.isNotEmpty() } ?: "https://mixai.ro"
 val mixaiWebOrigin: String = (project.findProperty("mixaiWebOrigin") as String?)?.trim()?.trimEnd('/')
     ?.takeIf { it.isNotEmpty() } ?: "https://mixai.ro"
+// Google Cast receiver (WP17-41h): MixAI custom receiver id from the Cast Developer Console
+// (apps/web/public/cast/README.md); blank = Default Media Receiver.
+val castAppId: String = (project.findProperty("mixaiCastAppId") as String?)?.trim().orEmpty()
 val googleWebClientId: String = (project.findProperty("mixaiGoogleWebClientId") as String?)?.trim()?.takeIf { it.isNotEmpty() }
     ?: "622082681070-12mtrfam879ia4cc0mp8prcmslphs0vg.apps.googleusercontent.com"
 
@@ -36,12 +39,13 @@ android {
         applicationId = "ro.mixai.music"
         minSdk = 31
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "MIXAI_ORIGIN", "\"$mixaiOrigin\"")
         buildConfigField("String", "MIXAI_WEB_ORIGIN", "\"$mixaiWebOrigin\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        buildConfigField("String", "CAST_APP_ID", "\"$castAppId\"")
     }
 
     signingConfigs {

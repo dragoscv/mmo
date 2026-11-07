@@ -1,0 +1,49 @@
+/*
+ * MixAI Music — Google Cast Styled Media Receiver (SMR) stylesheet.
+ * Registered in the Cast SDK Developer Console as https://mixai.ro/cast/styled.css
+ * (spec: https://developers.google.com/cast/docs/styled_receiver — classes .background, .logo,
+ * .progressBar, .splash, .watermark).
+ *
+ * The SMR page is Google's, so CSS variables from /cast/tokens.css are not available here and
+ * URLs must be absolute. Colours are the sRGB values of the generated dark tokens
+ * (packages/design-tokens → Tokens.kt): background, brand violet/magenta, primary.
+ */
+
+.background {
+    background-color: rgb(7 6 15);
+    background-image:
+        radial-gradient(ellipse at 20% 10%, rgb(139 109 255 / 0.35) 0%, transparent 55%),
+        radial-gradient(ellipse at 85% 90%, rgb(239 98 243 / 0.25) 0%, transparent 55%);
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+.logo {
+    background-image: url("https://mixai.ro/logo.svg");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    width: 256px;
+    height: 256px;
+}
+
+.progressBar {
+    background-color: rgb(149 136 255);
+}
+
+.splash {
+    background-color: rgb(7 6 15);
+    background-image:
+        url("https://mixai.ro/wordmark-dark.svg"),
+        radial-gradient(ellipse at 50% 45%, rgb(139 109 255 / 0.3) 0%, transparent 60%);
+    background-position: center, center;
+    background-repeat: no-repeat, no-repeat;
+    background-size: 520px auto, cover;
+}
+
+.watermark {
+    background-image: url("https://mixai.ro/logo.svg");
+    background-repeat: no-repeat;
+    background-size: 57px 57px;
+    opacity: 0.7;
+}

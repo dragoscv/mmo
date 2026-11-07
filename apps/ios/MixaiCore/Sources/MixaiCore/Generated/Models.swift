@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.11.0); generator: server/scripts/openapi-swift.mjs
+// Source: server/openapi.yaml (info.version 3.12.0); generator: server/scripts/openapi-swift.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 // swiftlint:disable all
 
@@ -1629,6 +1629,14 @@ public struct HubMedia: Codable, Sendable, Hashable {
     public let posterPath: String?
     public let durationSec: Double?
     public let channelId: String?
+    /// Music: Subsonic track id (tr_<n>).
+    public let trackId: String?
+    /// Music: track artist.
+    public let artist: String?
+    /// Music: album name.
+    public let album: String?
+    /// Music: cover path relative to the server origin (TrackCard.coverUrlPath).
+    public let coverUrlPath: String?
 
     public init(
         fileId: String? = nil,
@@ -1639,7 +1647,11 @@ public struct HubMedia: Codable, Sendable, Hashable {
         title: String? = nil,
         posterPath: String? = nil,
         durationSec: Double? = nil,
-        channelId: String? = nil
+        channelId: String? = nil,
+        trackId: String? = nil,
+        artist: String? = nil,
+        album: String? = nil,
+        coverUrlPath: String? = nil
     ) {
         self.fileId = fileId
         self.kind = kind
@@ -1650,6 +1662,10 @@ public struct HubMedia: Codable, Sendable, Hashable {
         self.posterPath = posterPath
         self.durationSec = durationSec
         self.channelId = channelId
+        self.trackId = trackId
+        self.artist = artist
+        self.album = album
+        self.coverUrlPath = coverUrlPath
     }
 }
 

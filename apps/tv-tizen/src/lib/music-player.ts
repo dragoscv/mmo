@@ -3,6 +3,7 @@
  * screen change (browse while listening). Screens call `musicPlayer.attach(ctx.music, ctx.media)` on mount.
  *
  *   musicPlayer.play(tracks, index, {shuffle?})   new queue, start at index
+ *   musicPlayer.playIds(ids, index, {…}, lookup)  same from track ids (hub `play {trackIds}`, server 3.12)
  *   toggle / pause / resume / next / prev / seek(sec) / seekBy(d) / skipTo(i) / enqueue(tracks, "next"|"end")
  *   setShuffle(on) / cycleRepeat() / stop()
  *   useMusicState()      queue/index/current/playing/shuffle/repeat (re-renders on state changes only)
@@ -15,10 +16,13 @@
  * (paused) on first attach.
  */
 import { useSyncExternalStore } from "react";
+import type { ServerConfig } from "./config";
 import { Emitter } from "./emitter";
+import { ServerHttp, enc } from "./http";
 import type { MediaClient } from "./media";
 import type { MusicClient } from "./music";
 import type { RepeatMode, TrackCard } from "./media-types";
+import { orderTracks, resolvedIndex, trackHubMedia } from "./music-remote";
 import { playerBus, type PlayerCommand } from "./player-bus";
 import { keyFromEvent } from "./tv-keys";
 
@@ -41,7 +45,19 @@ export interface MusicProgress {
     duration: number;
 }
 
+export interface PlayOpts {
+    shuffle?: boolean;
+    /** Seconds into the first track. */
+    startSec?: number;
+    /** Repeat mode for the new queue (unchanged when omitted). */
+    repeat?: RepeatMode;
+}
+
+/** Batch track lookup (`GET /media/music/tracks?ids=`); null/throw = unsupported → Subsonic fallback. */
+export type TrackLookup = (ids: string[]) => Promise<TrackCard[] | null>;
+
 const MAX_QUEUE = 2000;
+const LOOKUP_CHUNK = 100;
 const SAVE_DEBOUNCE_MS = 1500;
 const SAVE_POSITION_EVERY_MS = 30_000;
 const PLAY_THRESHOLD_SEC = 240;
@@ -203,7 +219,7 @@ class MusicPlayer {
             playing: this.state.playing,
             positionSec: this.progress.position,
             durationSec: this.progress.duration || t.durationSec || undefined,
-            media: { kind: "track", fileId: t.id, title: t.title, durationSec: t.durationSec },
+            media: trackHubMedia(t),
             title: t.title,
             subtitle: [t.artist, t.album].filter(Boolean).join(" · ") || undefined,
             artUrl: this.music?.coverUrl(t, 200) ?? null,
@@ -284,7 +300,7 @@ class MusicPlayer {
         this.scheduleSave();
     }
 
-    play(tracks: TrackCard[], index = 0, opts: { shuffle?: boolean } = {}): void {
+    play(tracks: TrackCard[], index = 0, opts: PlayOpts = {}): void {
         if (tracks.length === 0) return;
         const list = tracks.slice(0, MAX_QUEUE);
         this.original = list.slice();
@@ -297,9 +313,55 @@ class MusicPlayer {
             queue = [head, ...shuffled(list.filter((_, i) => i !== first))];
             start = 0;
         }
-        this.set({ queue, shuffle, restoring: false });
-        this.load(start, true);
+        this.set({ queue, shuffle, restoring: false, ...(opts.repeat ? { repeat: opts.repeat } : {}) });
+        this.load(start, true, Math.max(0, opts.startSec ?? 0));
     }
+
+    /**
+     * Remote play (hub `play {trackIds, index, positionSec?, shuffle?, repeat?}`): resolves the ids — batch
+     * `lookup` first, Subsonic `getSong` for whatever it did not return — then replaces the queue and plays.
+     * With `shuffle` the requested track stays first. Resolves to the number of queued tracks (0 = nothing playable).
+     */
+    async playIds(ids: string[], index: number, opts: PlayOpts, lookup: TrackLookup | null): Promise<number> {
+        const m = this.music;
+        if (!m) throw new Error("music_unavailable");
+        const wanted = ids.slice(0, MAX_QUEUE);
+        const found: TrackCard[] = [];
+        if (lookup) {
+            for (let i = 0; i < wanted.length; i += LOOKUP_CHUNK) {
+                const r = await lookup(wanted.slice(i, i + LOOKUP_CHUNK)).catch(() => null);
+                if (!r) break; // older server: no batch route → fallback for the rest
+                found.push(...r);
+            }
+        }
+        const first = orderTracks(wanted, found);
+        let slots = first.tracks;
+        if (first.missing.length > 0) {
+            const extra = await this.resolveTracks(m, first.missing);
+            slots = orderTracks(wanted, [...found, ...extra]).tracks;
+        }
+        if (this.music !== m) throw new Error("music_unavailable");
+        const tracks = slots.filter((t): t is TrackCard => t !== null);
+        if (tracks.length === 0) return 0;
+        const start = resolvedIndex(slots, index);
+        const exact = slots[index] != null;
+        if (opts.shuffle) {
+            // Keep the requested track first (play() randomises the head only when index is 0).
+            const head = tracks[start]!;
+            this.original = tracks.slice();
+            const queue = [head, ...shuffled(tracks.filter((_, i) => i !== start))];
+            this.set({ queue, shuffle: true, restoring: false, ...(opts.repeat ? { repeat: opts.repeat } : {}) });
+            this.load(0, true, exact ? Math.max(0, opts.startSec ?? 0) : 0);
+        } else {
+            this.play(tracks, start, { repeat: opts.repeat, startSec: exact ? opts.startSec : 0 });
+        }
+        return tracks.length;
+    }
+
+    /** Hub transport fallback when no video player is on top; false when nothing is loaded. */
+    remote(cmd: PlayerCommand): boolean { return this.onBus(cmd); }
+
+    get hasTrack(): boolean { return this.state.current !== null; }
 
     toggle(): void { if (this.state.playing) this.pause(); else this.resume(); }
 
@@ -482,6 +544,16 @@ function songToCard(s: SubsonicSongBody): TrackCard {
 }
 
 export const musicPlayer = new MusicPlayer();
+
+/** `GET /media/music/tracks?ids=a,b` (server 3.12, `{items}` in request order). An older server ignores `ids`
+ *  and answers a page of unrelated tracks — `orderTracks` drops those and the Subsonic fallback fills in. */
+export function trackLookup(cfg: ServerConfig, headers: () => Record<string, string>): TrackLookup {
+    const http = new ServerHttp(cfg, headers);
+    return async (ids) => {
+        const r = await http.get<{ items?: TrackCard[] }>(`/media/music/tracks?ids=${ids.map(enc).join(",")}&limit=${ids.length}`, { allow404: true });
+        return Array.isArray(r?.items) ? r.items : null;
+    };
+}
 
 export function useMusicState(): MusicState {
     return useSyncExternalStore((fn) => musicPlayer.subscribeState(fn), () => musicPlayer.getState(), () => musicPlayer.getState());

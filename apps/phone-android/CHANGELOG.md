@@ -1,5 +1,13 @@
 # Changelog — MixAI for Android phones
 
+## 1.2.0 — 2026-11-07
+
+WP17-41h. versionCode 3.
+
+- Music Now Playing has a "Play on" picker: MixAI TVs (hub, server 3.12 + TV Android 2.2 / Tizen 2.4), DLNA/UPnP
+  renderers on the Wi-Fi and Home Assistant players. Queue and position move both ways; notification, lock screen and
+  volume keys control the remote output; lost output falls back to the phone. Google Cast stays on the video player.
+
 ## 1.1.0 — 2026-11-05
 
 Slice 2 (WP16-46, D38). versionCode 2.

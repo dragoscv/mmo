@@ -91,7 +91,7 @@ fun NowPlayingScreen(deps: MusicDeps, nav: MusicNav) {
                     stringResource(R.string.music_now_playing), style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
                 )
-                Spacer(Modifier.size(48.dp))
+                if (deps.outputs != null) ro.mixai.music.ui.output.OutputButton(deps) else Spacer(Modifier.size(48.dp))
             }
             val track = state.track
             if (track == null) {
@@ -212,6 +212,7 @@ private fun PlayerControls(deps: MusicDeps, state: MusicState) {
                 )
             }
         }
+        ro.mixai.music.ui.output.OutputStatus(deps)
     }
 }
 

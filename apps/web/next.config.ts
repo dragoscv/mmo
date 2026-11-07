@@ -276,6 +276,13 @@ const nextConfig: NextConfig = {
                     { key: "Cache-Control", value: "public, max-age=3600" },
                 ],
             },
+            // Google Cast receivers (public/cast/README.md): the Styled Media Receiver page lives on
+            // Google's origin and loads /cast/styled.css + the two logos cross-site, which the global
+            // CORP `same-site` would block. Later rules override the same header key.
+            ...["/cast/:path*", "/logo.svg", "/wordmark-dark.svg"].map((source) => ({
+                source,
+                headers: [{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" }],
+            })),
         ];
     },
 };

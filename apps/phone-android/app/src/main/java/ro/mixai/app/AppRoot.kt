@@ -110,7 +110,8 @@ fun AppRoot(conn: Connection, session: AccountSession, settings: Settings, local
         graph?.hub?.start()
         graph?.musicPlayback?.connect()
         graph?.let { app.progressFlusher.attach(it.media, settings) }
-        onDispose { graph?.hub?.stop(); graph?.musicPlayback?.release(); app.progressFlusher.detach() }
+        graph?.outputs?.install()
+        onDispose { graph?.hub?.stop(); graph?.musicPlayback?.release(); graph?.outputs?.release(); app.progressFlusher.detach() }
     }
     // Push token registration after sign-in / pairing (skipped without a MixAI account session).
     LaunchedEffect(session.userId, conn.baseUrl) { PushRegistrar.sync(context) }
@@ -131,7 +132,7 @@ fun AppRoot(conn: Connection, session: AccountSession, settings: Settings, local
                 api = g.api, media = g.media, profiles = g.profiles, music = g.music, musicPlayback = g.musicPlayback,
                 liveTv = g.liveTv, hub = g.hub, settings = settings, progressSync = g.progressSync,
                 phoneApi = g.phoneApi, phone = app.phone,
-                localeTag = localeTag, session = session, scope = scope,
+                localeTag = localeTag, session = session, scope = scope, outputs = g.outputs,
                 onChangeServer = { changeServer() },
                 onSignOut = if (session.isSignedIn) ({ signOut() }) else null,
             )

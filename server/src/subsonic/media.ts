@@ -2,7 +2,9 @@
  * stream / download / getCoverArt / getLyricsBySongId.
  *
  * `stream` mirrors `/library/tracks/:id/audio` (range support, direct
- * file). `maxBitRate` / `format` are accepted but ignored (direct play);
+ * file). `format` in {mp3, opus, aac, flac} transcodes through ffmpeg
+ * (see `pickStreamFormat`); `raw`, absent or the file's own suffix plays
+ * the file directly. `maxBitRate` is accepted but ignored.
  * `timeOffset` (OpenSubsonic transcodeOffset) spawns ffmpeg `-ss` when a
  * binary is resolvable, otherwise falls back to a plain stream.
  */
@@ -33,10 +35,40 @@ export function ffmpegAvailable(): boolean {
 
 // ─── stream / download ───────────────────────────────────────────────────────
 
+export type StreamFormat = "mp3" | "opus" | "aac" | "flac";
+
+const TRANSCODE: Record<StreamFormat, { args: string[]; mime: string }> = {
+    mp3: { args: ["-c:a", "libmp3lame", "-b:a", "256k", "-f", "mp3"], mime: "audio/mpeg" },
+    opus: { args: ["-c:a", "libopus", "-b:a", "160k", "-f", "ogg"], mime: "audio/ogg" },
+    aac: { args: ["-c:a", "aac", "-b:a", "256k", "-f", "adts"], mime: "audio/aac" },
+    flac: { args: ["-c:a", "flac", "-f", "flac"], mime: "audio/flac" },
+};
+
+/**
+ * Decide how `stream` serves a track for a Subsonic `format` param.
+ * Returns a transcode target, or `"raw"` for the direct file (absent,
+ * `raw`, unknown, or the same as the file's own suffix).
+ */
+export function pickStreamFormat(param: string | null | undefined, fileSuffix: string): StreamFormat | "raw" {
+    const f = (param ?? "").trim().toLowerCase();
+    if (!f || f === "raw") return "raw";
+    if (!(f in TRANSCODE)) return "raw";
+    if (f === fileSuffix.trim().toLowerCase()) return "raw";
+    return f as StreamFormat;
+}
+
+function setDurationHeader(res: express.Response, row: TrackRow, offsetSec = 0): void {
+    if (row.duration && row.duration > 0) {
+        const d = Math.max(0, row.duration - offsetSec);
+        res.setHeader("X-Content-Duration", d.toFixed(2));
+    }
+}
+
 export function sendFile(req: express.Request, res: express.Response, row: TrackRow, asAttachment: boolean): void {
     if (!row.filepath || !existsSync(row.filepath)) { res.status(404).end(); return; }
     const stat = statSync(row.filepath);
     res.setHeader("Content-Type", mimeOf(row));
+    setDurationHeader(res, row);
     res.setHeader("Accept-Ranges", "bytes");
     if (asAttachment) {
         const safe = row.filename.replace(/["\r\n]/g, "_");
@@ -64,17 +96,23 @@ export function sendFile(req: express.Request, res: express.Response, row: Track
     createReadStream(row.filepath).pipe(res);
 }
 
-/** Seek + transcode via ffmpeg. Returns false if ffmpeg is not usable so the caller can fall back. */
-export function streamWithOffset(res: express.Response, row: TrackRow, offsetSec: number, format: "mp3" | "opus"): boolean {
+/** ffmpeg argument list for a transcode (exported for tests). */
+export function transcodeArgs(filepath: string, offsetSec: number, format: StreamFormat): string[] {
+    const args = ["-hide_banner", "-loglevel", "error"];
+    if (offsetSec > 0) args.push("-ss", String(offsetSec));
+    args.push("-i", filepath, "-vn", "-map_metadata", "-1", ...TRANSCODE[format].args, "pipe:1");
+    return args;
+}
+
+/** Seek (optional) + transcode via ffmpeg. Returns false if ffmpeg is not usable so the caller can fall back. */
+export function streamTranscoded(res: express.Response, row: TrackRow, offsetSec: number, format: StreamFormat): boolean {
     if (!ffmpegAvailable() || !row.filepath || !existsSync(row.filepath)) return false;
-    const args = ["-hide_banner", "-loglevel", "error", "-ss", String(Math.max(0, offsetSec)), "-i", row.filepath, "-vn", "-map_metadata", "-1"];
-    if (format === "opus") args.push("-c:a", "libopus", "-b:a", "160k", "-f", "ogg");
-    else args.push("-c:a", "libmp3lame", "-b:a", "256k", "-f", "mp3");
-    args.push("pipe:1");
-    const child = spawn(FFMPEG_BIN, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const offset = Math.max(0, offsetSec);
+    const child = spawn(FFMPEG_BIN, transcodeArgs(row.filepath, offset, format), { stdio: ["ignore", "pipe", "pipe"] });
     res.status(200);
-    res.setHeader("Content-Type", format === "opus" ? "audio/ogg" : "audio/mpeg");
+    res.setHeader("Content-Type", TRANSCODE[format].mime);
     res.setHeader("Accept-Ranges", "none");
+    setDurationHeader(res, row, offset);
     child.stdout.pipe(res);
     let err = "";
     child.stderr.on("data", (d: Buffer) => { err += d.toString(); });

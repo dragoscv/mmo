@@ -81,6 +81,30 @@ describe("HubCore registry + remote", () => {
         await expect(core.command("ghost", "pause", {})).resolves.toMatchObject({ ok: false, error: "no_such_device" });
         await expect(core.command("tv-1", "pause", {}, 20)).resolves.toMatchObject({ ok: false, error: "timeout" });
     });
+
+    it("music now-playing (trackId/artist/album/coverUrlPath) round-trips into the device list, clamped", () => {
+        const { core, last } = mkCore();
+        core.connect("tv"); core.connect("phone");
+        core.message("tv", { type: "hello", deviceId: "tv-1", name: "TV", platform: "android-tv", caps: ["play", "music"] });
+        core.message("phone", { type: "hello", deviceId: "ph-1", name: "Phone", platform: "android-phone" });
+        core.message("phone", { type: "cmd", target: "tv-1", action: "play", args: { trackIds: ["tr_1", "tr_2"], index: 1, positionSec: 12, shuffle: false, repeat: "all" }, seq: "m1" });
+        expect(last("tv", "cmd")).toMatchObject({ action: "play", args: { trackIds: ["tr_1", "tr_2"], index: 1, positionSec: 12, repeat: "all" } });
+        core.message("tv", {
+            type: "state", playing: true, positionSec: 12, durationSec: 200,
+            media: { kind: "track", trackId: "tr_2", title: "Aerodynamic", artist: "Daft Punk", album: "Discovery", coverUrlPath: "/rest/getCoverArt.view?id=tr_2&size=400", durationSec: 200 },
+        });
+        const np = core.listDevices().find((d) => d.deviceId === "tv-1")?.nowPlaying;
+        expect(np).toMatchObject({
+            playing: true, positionSec: 12,
+            media: { kind: "track", trackId: "tr_2", title: "Aerodynamic", artist: "Daft Punk", album: "Discovery", coverUrlPath: "/rest/getCoverArt.view?id=tr_2&size=400" },
+        });
+        expect(last("phone", "devices")).toBeTruthy();
+        core.message("tv", { type: "state", playing: true, positionSec: 1, media: { trackId: "t".repeat(100), artist: 7, coverUrlPath: "c".repeat(400) } });
+        const m = core.listDevices().find((d) => d.deviceId === "tv-1")?.nowPlaying?.media;
+        expect(m?.trackId).toHaveLength(64);
+        expect(m?.artist).toBeUndefined();
+        expect(m?.coverUrlPath).toHaveLength(300);
+    });
 });
 
 describe("HubCore Watch Together", () => {

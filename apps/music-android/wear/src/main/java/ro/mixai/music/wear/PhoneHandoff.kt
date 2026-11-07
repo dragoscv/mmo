@@ -50,6 +50,39 @@ object PhoneHandoff {
         }
     }
 
+    /** Where the phone's MixAI Music plays (WP17-41h); null until the phone published it. */
+    fun phoneOutput(context: Context): Flow<WearHandoff.Output?> {
+        val app = context.applicationContext
+        if (GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(app) != ConnectionResult.SUCCESS) return emptyFlow()
+        fun read(item: DataItem): WearHandoff.Output? {
+            val map = DataMapItem.fromDataItem(item).dataMap
+            return WearHandoff.outputFromMap(map.keySet().associateWith { k -> map.getString(k) })
+        }
+        return callbackFlow {
+            val client = Wearable.getDataClient(app)
+            val listener = DataClient.OnDataChangedListener { events ->
+                events.forEach { e ->
+                    if (e.dataItem.uri.path == WearHandoff.OUTPUT_PATH) trySend(if (e.type == DataEvent.TYPE_DELETED) null else read(e.dataItem))
+                }
+                events.release()
+            }
+            client.addListener(listener)
+            client.dataItems.addOnSuccessListener { buf ->
+                buf.firstOrNull { it.uri.path == WearHandoff.OUTPUT_PATH }?.let { trySend(read(it)) }
+                buf.release()
+            }
+            awaitClose { client.removeListener(listener) }
+        }
+    }
+
+    /** Asks the phone to move its music back to the phone (all connected phones; the app ignores it when local). */
+    fun requestPhoneLocal(context: Context) {
+        val app = context.applicationContext
+        Wearable.getNodeClient(app).connectedNodes.addOnSuccessListener { nodes ->
+            nodes.forEach { n -> Wearable.getMessageClient(app).sendMessage(n.id, WearHandoff.MSG_OUTPUT_LOCAL, ByteArray(0)) }
+        }.addOnFailureListener { Log.w(TAG, "nodes: ${it.message}") }
+    }
+
     private fun decode(item: DataItem): WearHandoff.Payload? {
         val map = DataMapItem.fromDataItem(item).dataMap
         return WearHandoff.fromMap(map.keySet().associateWith { k -> map.getString(k) }).also {

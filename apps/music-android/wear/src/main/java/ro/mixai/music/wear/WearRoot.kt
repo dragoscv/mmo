@@ -85,6 +85,7 @@ private fun Connected(app: WearMusicApp, conn: Connection) {
     var listSource by remember { mutableStateOf<ListSource>(ListSource.Downloads) }
     val active by graph.profiles.activeProfile.collectAsState()
     val playing by graph.playback.state.collectAsState()
+    val phoneOutput by remember { PhoneHandoff.phoneOutput(context) }.collectAsState(initial = null)
     SwipeDismissableNavHost(navController = nav, startDestination = if (needsPicker) Routes.PROFILES else Routes.HOME) {
         composable(Routes.HOME) {
             HomeScreen(
@@ -94,6 +95,8 @@ private fun Connected(app: WearMusicApp, conn: Connection) {
                 onNowPlaying = { nav.navigate(Routes.PLAYER) },
                 onOpen = { listSource = it; nav.navigate(Routes.LIST) },
                 onProfiles = { nav.navigate(Routes.PROFILES) },
+                phoneOutput = phoneOutput,
+                onPhoneLocal = { PhoneHandoff.requestPhoneLocal(context) },
                 onDisconnect = {
                     scope.launch {
                         graph.playback.stop()

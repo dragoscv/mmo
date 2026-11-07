@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en" data-mode="dark" data-accent="violet" data-surface="glass" data-motion="full">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MixAI Music</title>
+    <!-- Generated token mirror (packages/design-tokens → apps/web/public/cast/tokens.css). -->
+    <link rel="stylesheet" href="/cast/tokens.css">
+    <link rel="stylesheet" href="/cast/receiver.css">
+    <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <script src="/cast/receiver.js" defer></script>
+</head>
+<body data-state="idle">
+    <!-- Audio only: CAF plays through this element (PlayerManager.setMediaElement), no video surface. -->
+    <audio id="media" preload="auto"></audio>
+
+    <div class="backdrop" aria-hidden="true">
+        <div class="backdrop__img" id="bg-a"></div>
+        <div class="backdrop__img" id="bg-b"></div>
+        <div class="backdrop__scrim"></div>
+    </div>
+
+    <main class="stage">
+        <section class="idle" id="idle">
+            <img class="idle__logo" src="/logo.svg" alt="" width="512" height="512">
+            <h1 class="idle__title">MixAI Music</h1>
+            <p class="idle__hint" id="idle-hint">Ready to cast</p>
+        </section>
+
+        <section class="now" id="now" aria-hidden="true">
+            <div class="cover">
+                <div class="cover__placeholder"><img src="/logo.svg" alt="" width="512" height="512"></div>
+                <img class="cover__img" id="cover-a" alt="">
+                <img class="cover__img" id="cover-b" alt="">
+                <div class="cover__status" aria-hidden="true">
+                    <span class="spinner"></span>
+                    <span class="pause-glyph"><span></span><span></span></span>
+                </div>
+            </div>
+
+            <div class="info">
+                <p class="info__state" id="state-label" role="status">Now playing</p>
+                <h2 class="info__title" id="title"></h2>
+                <p class="info__artist" id="artist"></p>
+                <p class="info__album" id="album"></p>
+
+                <div class="progress">
+                    <div class="progress__track"><div class="progress__fill" id="progress-fill"></div></div>
+                    <div class="progress__times">
+                        <span id="elapsed">0:00</span>
+                        <span id="duration">--:--</span>
+                    </div>
+                </div>
+
+                <p class="lyric" id="lyric" hidden></p>
+
+                <p class="next" id="next" hidden>
+                    <span class="next__label" id="next-label">Next</span>
+                    <span class="next__text" id="next-text"></span>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <img class="watermark" src="/wordmark-dark.svg" alt="MixAI" width="520" height="120">
+</body>
+</html>
