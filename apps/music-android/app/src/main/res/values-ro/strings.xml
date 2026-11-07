@@ -21,4 +21,25 @@
     <string name="settings_version">MixAI Music %1$s</string>
     <string name="settings_privacy">Politica de confidențialitate</string>
     <string name="settings_licenses">Fonturi: Inter și Space Grotesk (SIL Open Font License 1.1)</string>
+    <string name="tab_downloads">Descărcări</string>
+    <string name="downloads_title">Descărcări</string>
+    <string name="downloads_usage">%1$s pe acest dispozitiv</string>
+    <string name="downloads_usage_cap">%1$s din %2$d GB pe acest dispozitiv</string>
+    <string name="downloads_empty">Încă nu ai descărcări</string>
+    <string name="downloads_empty_hint">Apasă butonul de descărcare de la un album sau un playlist ca să asculți offline.</string>
+    <string name="downloads_play_all">Redă tot</string>
+    <string name="downloads_remove">Șterge</string>
+    <string name="downloads_remove_all">Șterge tot</string>
+    <string name="downloads_remove_all_confirm">Ștergi toate piesele descărcate de pe acest dispozitiv?</string>
+    <string name="downloads_channel">Descărcări</string>
+    <string name="downloads_channel_desc">Progresul descărcărilor de piese</string>
+    <string name="downloads_notification">Se descarcă muzică</string>
+    <string name="settings_dl_wifi">Descarcă doar pe Wi-Fi</string>
+    <string name="settings_dl_wifi_hint">Datele mobile nu sunt folosite pentru descărcări</string>
+    <string name="settings_dl_upcoming">Descarcă piesele următoare</string>
+    <string name="settings_dl_upcoming_off">Oprit</string>
+    <string name="settings_dl_upcoming_n">Următoarele %1$d piese din coadă</string>
+    <string name="settings_dl_cap">Limită de spațiu pentru descărcări</string>
+    <string name="settings_dl_cap_gb">%1$d GB</string>
+    <string name="settings_dl_cap_none">Fără limită</string>
 </resources>

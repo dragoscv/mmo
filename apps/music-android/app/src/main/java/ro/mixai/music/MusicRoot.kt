@@ -16,9 +16,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -34,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -54,6 +57,8 @@ import ro.mixai.mobile.onboarding.PairScreen
 import ro.mixai.mobile.onboarding.SignInScreen
 import ro.mixai.mobile.onboarding.WelcomeScreen
 import ro.mixai.mobile.profiles.ProfilePickerScreen
+import ro.mixai.music.downloads.DownloadsScreen
+import ro.mixai.music.downloads.MusicDownloads
 import ro.mixai.music.nav.Dest
 import ro.mixai.music.nav.MusicNavigator
 import ro.mixai.music.nav.Tab
@@ -75,6 +80,7 @@ private data class TabSpec(val tab: Tab, val label: Int, val icon: ImageVector, 
 private val TABS = listOf(
     TabSpec(Tab.Home, R.string.tab_home, Icons.Outlined.LibraryMusic, Icons.Filled.LibraryMusic),
     TabSpec(Tab.Search, R.string.tab_search, Icons.Outlined.Search, Icons.Filled.Search),
+    TabSpec(Tab.Downloads, R.string.tab_downloads, Icons.Outlined.DownloadForOffline, Icons.Filled.DownloadForOffline),
     TabSpec(Tab.Settings, R.string.tab_settings, Icons.Outlined.Settings, Icons.Filled.Settings),
 )
 
@@ -138,6 +144,13 @@ fun MusicRoot(app: MixaiMusicApp, conn: Connection, session: AccountSession, loc
     val current = nav.current
     val showChrome = graph != null && !current.isChromeless
     val music = graph?.musicPlayback?.state?.collectAsState()?.value
+
+    // "Download upcoming tracks" (setting, 0 = off): keep the next N queue tracks offline while playing.
+    val upcoming by app.musicSettings.upcoming.collectAsState(initial = 0)
+    LaunchedEffect(music?.track?.id, upcoming) {
+        val s = music ?: return@LaunchedEffect
+        if (upcoming > 0 && s.track != null) MusicDownloads.prefetch(s.queue, s.index, upcoming)
+    }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
@@ -238,6 +251,10 @@ private fun Screen(
                 is Dest.TabRoot -> when (dest.tab) {
                     Tab.Home -> MusicScreen(g, nav) { TabTitle(stringResource(R.string.tab_home)) }
                     Tab.Search -> MusicSearchScreen(g, nav) { TabTitle(stringResource(R.string.tab_search)) }
+                    Tab.Downloads -> {
+                        val cap by app.musicSettings.capGb.collectAsState(initial = 2)
+                        DownloadsScreen(g, cap)
+                    }
                     Tab.Settings -> SettingsScreen(
                         app = app, graph = g, conn = conn, session = session, localeTag = localeTag,
                         onProfiles = { nav.push(Dest.ProfilePicker) },

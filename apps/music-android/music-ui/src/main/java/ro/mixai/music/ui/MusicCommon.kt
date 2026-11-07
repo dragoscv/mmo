@@ -150,7 +150,7 @@ internal fun fmtSec(sec: Double): String = fmtDuration((sec * 1000).toLong())
 
 /** Square (or round) cover with an icon placeholder underneath. */
 @Composable
-internal fun Cover(url: String?, modifier: Modifier = Modifier, shape: Shape = MaterialTheme.shapes.small, icon: ImageVector = Icons.Outlined.Album) {
+fun Cover(url: String?, modifier: Modifier = Modifier, shape: Shape = MaterialTheme.shapes.small, icon: ImageVector = Icons.Outlined.Album) {
     Box(
         modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHighest),
         contentAlignment = Alignment.Center,
@@ -182,13 +182,14 @@ internal fun AlbumTile(cover: String?, album: AlbumCard, onClick: () -> Unit, mo
 
 /** Track row: number or cover, title/artist, lyrics badge, duration. */
 @Composable
-internal fun TrackRow(
+fun TrackRow(
     track: TrackCard,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     number: String? = null,
     cover: String? = null,
     current: Boolean = false,
+    offline: OfflineState? = null,
 ) {
     Row(
         modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
@@ -214,6 +215,7 @@ internal fun TrackRow(
                 Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+        OfflineBadge(offline)
         if (track.hasLyrics || track.hasSyncedLyrics) {
             Icon(
                 Icons.AutoMirrored.Outlined.Notes, contentDescription = stringResource(R.string.music_has_lyrics),

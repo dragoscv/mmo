@@ -17,12 +17,16 @@ import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Policy
+import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.Wifi
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,6 +54,8 @@ import ro.mixai.tv.data.Connection
 
 private val LANGUAGES = listOf("" to R.string.settings_language_system, "ro" to null, "en" to null)
 private val THEMES = listOf("system" to R.string.settings_theme_system, "dark" to R.string.settings_theme_dark, "light" to R.string.settings_theme_light)
+private val UPCOMING = listOf(0, 5, 10, 25)
+private val CAPS = listOf(1, 2, 5, 10, 25, 0)
 
 /** Server, account, profile, language, theme, about. */
 @Composable
@@ -67,6 +73,9 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val theme by app.musicSettings.theme.collectAsState(initial = "system")
+    val wifiOnly by app.musicSettings.wifiOnly.collectAsState(initial = true)
+    val upcoming by app.musicSettings.upcoming.collectAsState(initial = 0)
+    val capGb by app.musicSettings.capGb.collectAsState(initial = 2)
     val profile by graph.profiles.activeProfile.collectAsState()
     var dialog by rememberSaveable { mutableStateOf("") }
 
@@ -113,6 +122,22 @@ fun SettingsScreen(
                 Row(Icons.Outlined.DarkMode, stringResource(R.string.settings_theme), stringResource(THEMES.first { it.first == theme }.second), onClick = { dialog = "theme" })
             }
             item {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_dl_wifi)) },
+                    supportingContent = { Text(stringResource(R.string.settings_dl_wifi_hint)) },
+                    leadingContent = { Icon(Icons.Outlined.Wifi, contentDescription = null) },
+                    trailingContent = { Switch(checked = wifiOnly, onCheckedChange = { v -> scope.launch { app.musicSettings.setWifiOnly(v) } }) },
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                    modifier = Modifier.clickable { scope.launch { app.musicSettings.setWifiOnly(!wifiOnly) } },
+                )
+            }
+            item {
+                Row(Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.settings_dl_upcoming), upcomingLabel(upcoming), onClick = { dialog = "upcoming" })
+            }
+            item {
+                Row(Icons.Outlined.Storage, stringResource(R.string.settings_dl_cap), capLabel(capGb), onClick = { dialog = "cap" })
+            }
+            item {
                 Row(Icons.Outlined.Policy, stringResource(R.string.settings_privacy), null, onClick = {
                     runCatching {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${app.config.webOrigin}/privacy")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -143,8 +168,30 @@ fun SettingsScreen(
             onPick = { mode -> scope.launch { app.musicSettings.setTheme(mode) }; dialog = "" },
             onDismiss = { dialog = "" },
         )
+        "upcoming" -> ChoiceDialog(
+            title = stringResource(R.string.settings_dl_upcoming),
+            options = UPCOMING.map { it.toString() to upcomingLabel(it) },
+            selected = upcoming.toString(),
+            onPick = { n -> scope.launch { app.musicSettings.setUpcoming(n.toInt()) }; dialog = "" },
+            onDismiss = { dialog = "" },
+        )
+        "cap" -> ChoiceDialog(
+            title = stringResource(R.string.settings_dl_cap),
+            options = CAPS.map { it.toString() to capLabel(it) },
+            selected = capGb.toString(),
+            onPick = { gb -> scope.launch { app.musicSettings.setCapGb(gb.toInt()) }; dialog = "" },
+            onDismiss = { dialog = "" },
+        )
     }
 }
+
+@Composable
+private fun upcomingLabel(n: Int): String =
+    if (n <= 0) stringResource(R.string.settings_dl_upcoming_off) else stringResource(R.string.settings_dl_upcoming_n, n)
+
+@Composable
+private fun capLabel(gb: Int): String =
+    if (gb <= 0) stringResource(R.string.settings_dl_cap_none) else stringResource(R.string.settings_dl_cap_gb, gb)
 
 /** Language names are shown in their own language (not translated). */
 @Composable

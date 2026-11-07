@@ -43,6 +43,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -348,6 +349,7 @@ private fun PlaylistSheet(deps: MusicDeps, playlist: PlaylistCard, onDismiss: ()
     var tracks by remember(playlist.id) { mutableStateOf<List<TrackCard>?>(null) }
     var error by remember(playlist.id) { mutableStateOf<Throwable?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
+    val offline by (deps.offline?.states ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap()) }).collectAsState()
     LaunchedEffect(playlist.id, attempt) {
         error = null
         try { tracks = PhoneSubsonic.playlistTracks(deps.api, playlist.id) } catch (e: CancellationException) { throw e } catch (e: Exception) { error = e }
@@ -363,6 +365,7 @@ private fun PlaylistSheet(deps: MusicDeps, playlist: PlaylistCard, onDismiss: ()
                     )
                 }
                 val list = tracks.orEmpty()
+                DownloadListButton(deps, list)
                 IconButton(enabled = list.isNotEmpty(), onClick = { askNotif(); deps.musicPlayback.play(list.shuffled(), 0) }) {
                     Icon(Icons.Outlined.Shuffle, contentDescription = stringResource(R.string.music_shuffle))
                 }
@@ -380,7 +383,7 @@ private fun PlaylistSheet(deps: MusicDeps, playlist: PlaylistCard, onDismiss: ()
                 }
                 else -> LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 16.dp)) {
                     itemsIndexed(t, key = { i, tr -> "$i-${tr.id}" }) { i, tr ->
-                        TrackRow(tr, onClick = { askNotif(); deps.musicPlayback.play(t, i) }, cover = deps.music.coverUrl(tr))
+                        TrackRow(tr, onClick = { askNotif(); deps.musicPlayback.play(t, i) }, cover = deps.music.coverUrl(tr), offline = offline[tr.id])
                     }
                 }
             }

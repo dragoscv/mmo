@@ -50,4 +50,9 @@
     <string name="music_search_prompt">Scrie cel puțin două litere.</string>
     <string name="music_search_none">Nimic găsit pentru „%1$s”</string>
     <string name="music_search_tracks">Piese</string>
+    <string name="music_download">Descarcă</string>
+    <string name="music_download_remove">Șterge descărcarea</string>
+    <string name="music_downloaded">Descărcat</string>
+    <string name="music_download_failed">Descărcarea a eșuat</string>
+    <string name="music_download_full">Spațiul pentru descărcări e plin. Mărește limita în Setări sau șterge descărcări.</string>
 </resources>

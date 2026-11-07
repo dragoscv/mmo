@@ -13,14 +13,29 @@ import ro.mixai.mobile.auth.SessionBlobStore
 
 private val Context.musicStore: DataStore<Preferences> by preferencesDataStore(name = "mixai_music")
 
-/** Music-app preferences (separate from the shared core `Settings`): theme and the encrypted session blob. */
+/** Music-app preferences (separate from the shared core `Settings`): theme, downloads, encrypted session blob. */
 class MusicSettings(private val context: Context) : SessionBlobStore {
     private val kTheme = stringPreferencesKey("theme_mode")
     private val kSessionBlob = stringPreferencesKey("session_blob")
+    private val kWifiOnly = stringPreferencesKey("dl_wifi_only")
+    private val kUpcoming = stringPreferencesKey("dl_upcoming")
+    private val kCapGb = stringPreferencesKey("dl_cap_gb")
 
     /** "system" | "dark" | "light". */
     val theme: Flow<String> = context.musicStore.data.map { it[kTheme] ?: "system" }
     suspend fun setTheme(mode: String) { context.musicStore.edit { it[kTheme] = mode } }
+
+    /** Downloads only on unmetered networks (default on). */
+    val wifiOnly: Flow<Boolean> = context.musicStore.data.map { it[kWifiOnly] != "0" }
+    suspend fun setWifiOnly(v: Boolean) { context.musicStore.edit { it[kWifiOnly] = if (v) "1" else "0" } }
+
+    /** Auto-download the next N queue tracks while playing (0 = off, default 0). */
+    val upcoming: Flow<Int> = context.musicStore.data.map { it[kUpcoming]?.toIntOrNull()?.coerceIn(0, 50) ?: 0 }
+    suspend fun setUpcoming(n: Int) { context.musicStore.edit { it[kUpcoming] = n.coerceIn(0, 50).toString() } }
+
+    /** Storage limit for downloads in GB (0 = unlimited, default 2). */
+    val capGb: Flow<Int> = context.musicStore.data.map { it[kCapGb]?.toIntOrNull()?.coerceIn(0, 512) ?: 2 }
+    suspend fun setCapGb(gb: Int) { context.musicStore.edit { it[kCapGb] = gb.coerceIn(0, 512).toString() } }
 
     override suspend fun sessionBlob(): String = context.musicStore.data.first()[kSessionBlob] ?: ""
     override suspend fun setSessionBlob(v: String) {

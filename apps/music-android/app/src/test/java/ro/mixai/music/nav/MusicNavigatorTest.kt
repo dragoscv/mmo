@@ -10,6 +10,7 @@ class MusicNavigatorTest {
         assertEquals(Dest.Artist("ar 2"), MusicNavigator.parseLink("mixai-music", "artist", listOf("ar 2")))
         assertEquals(Dest.NowPlaying, MusicNavigator.parseLink("mixai-music", "now-playing", emptyList()))
         assertEquals(Dest.TabRoot(Tab.Search), MusicNavigator.parseLink("mixai-music", "search", emptyList()))
+        assertEquals(Dest.TabRoot(Tab.Downloads), MusicNavigator.parseLink("mixai-music", "downloads", emptyList()))
     }
 
     @Test fun playLinkCarriesTheQueryAndBlankMeansMix() {

@@ -7,7 +7,7 @@ import ro.mixai.music.ui.MusicNav
 import ro.mixai.tv.data.DiscoveredServer
 
 /** Bottom bar / rail destinations of MixAI Music. */
-enum class Tab { Home, Search, Settings }
+enum class Tab { Home, Search, Downloads, Settings }
 
 /** Navigation 3 back-stack keys. */
 sealed interface Dest {
@@ -77,6 +77,7 @@ class MusicNavigator(start: Dest) : MusicNav {
                 "artist" -> id?.let { Dest.Artist(it) }
                 "now-playing" -> Dest.NowPlaying
                 "search" -> Dest.TabRoot(Tab.Search)
+                "downloads" -> Dest.TabRoot(Tab.Downloads)
                 "play" -> Dest.PlaySearch(query("q").orEmpty())
                 else -> null
             }

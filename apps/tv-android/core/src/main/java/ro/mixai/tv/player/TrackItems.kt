@@ -15,11 +15,15 @@ object TrackItems {
     const val EXTRA_TRACK = "ro.mixai.track"
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
+    /** Cache key shared by track downloads and the player (`track:<id>`), so downloaded bytes play offline. */
+    fun cacheKey(trackId: String) = "track:$trackId"
+
     fun toItem(t: TrackCard, streamUrl: String, artwork: Uri?): MediaItem {
         val uri = Uri.parse(streamUrl)
         return MediaItem.Builder()
             .setMediaId(t.id)
             .setUri(uri)
+            .setCustomCacheKey(cacheKey(t.id))
             .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(uri).build())
             .setMediaMetadata(
                 MediaMetadata.Builder()

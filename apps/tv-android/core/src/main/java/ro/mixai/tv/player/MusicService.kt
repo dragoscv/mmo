@@ -11,6 +11,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -66,8 +67,9 @@ class MusicService : MediaLibraryService() {
         val http = DefaultHttpDataSource.Factory()
             .setUserAgent(ClientIdentity.current.userAgent)
             .setAllowCrossProtocolRedirects(true)
+        val source: DataSource.Factory = dataSourceDecorator?.invoke(this, http) ?: http
         val player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(http))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(source))
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
             .setHandleAudioBecomingNoisy(true)
             .build()
@@ -340,7 +342,8 @@ class MusicService : MediaLibraryService() {
 
     private fun MediaItem.withUri(): MediaItem {
         val uri = requestMetadata.mediaUri
-        return if (localConfiguration == null && uri != null) buildUpon().setUri(uri).build() else this
+        // localConfiguration (URI, cache key) never crosses the controller boundary: rebuild both.
+        return if (localConfiguration == null && uri != null) buildUpon().setUri(uri).setCustomCacheKey(TrackItems.cacheKey(mediaId)).build() else this
     }
 
     /** Browse id → its queue; otherwise a voice request (search query + Assistant focus extras). */
@@ -358,5 +361,11 @@ class MusicService : MediaLibraryService() {
         const val SESSION_ID = "music"
         private const val RECENT_ID = "recent"
         private const val TAG = "MusicService"
+
+        /**
+         * Set once by an app (MixAI Music, before the service starts) to read downloaded tracks from its
+         * cache: receives the network factory, returns the factory the player uses. Null = network only.
+         */
+        @Volatile var dataSourceDecorator: ((android.content.Context, DataSource.Factory) -> DataSource.Factory)? = null
     }
 }

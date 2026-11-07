@@ -2,7 +2,9 @@ package ro.mixai.music
 
 import android.content.Context
 import androidx.compose.runtime.Immutable
+import ro.mixai.music.downloads.MusicDownloads
 import ro.mixai.music.ui.MusicDeps
+import ro.mixai.music.ui.MusicOffline
 import ro.mixai.tv.data.Connection
 import ro.mixai.tv.data.HubClient
 import ro.mixai.tv.data.MediaRepository
@@ -21,7 +23,9 @@ class MusicGraph(
     override val music: MusicRepository,
     override val musicPlayback: MusicPlayback,
     val hub: HubClient,
-) : MusicDeps
+) : MusicDeps {
+    override val offline: MusicOffline get() = MusicDownloads
+}
 
 fun buildMusicGraph(context: Context, conn: Connection, settings: Settings): MusicGraph {
     val api = MmoApi(conn.baseUrl, conn.token)

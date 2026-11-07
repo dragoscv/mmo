@@ -22,4 +22,25 @@
     <string name="settings_version">MixAI Music %1$s</string>
     <string name="settings_privacy">Privacy policy</string>
     <string name="settings_licenses">Fonts: Inter and Space Grotesk (SIL Open Font License 1.1)</string>
+    <string name="tab_downloads">Downloads</string>
+    <string name="downloads_title">Downloads</string>
+    <string name="downloads_usage">%1$s on this device</string>
+    <string name="downloads_usage_cap">%1$s of %2$d GB on this device</string>
+    <string name="downloads_empty">No downloads yet</string>
+    <string name="downloads_empty_hint">Tap the download button on an album or a playlist to listen offline.</string>
+    <string name="downloads_play_all">Play all</string>
+    <string name="downloads_remove">Remove</string>
+    <string name="downloads_remove_all">Remove all</string>
+    <string name="downloads_remove_all_confirm">Delete every downloaded track from this device?</string>
+    <string name="downloads_channel">Downloads</string>
+    <string name="downloads_channel_desc">Progress of track downloads</string>
+    <string name="downloads_notification">Downloading music</string>
+    <string name="settings_dl_wifi">Download on Wi-Fi only</string>
+    <string name="settings_dl_wifi_hint">Mobile data is never used for downloads</string>
+    <string name="settings_dl_upcoming">Download upcoming tracks</string>
+    <string name="settings_dl_upcoming_off">Off</string>
+    <string name="settings_dl_upcoming_n">Next %1$d tracks in the queue</string>
+    <string name="settings_dl_cap">Download storage limit</string>
+    <string name="settings_dl_cap_gb">%1$d GB</string>
+    <string name="settings_dl_cap_none">No limit</string>
 </resources>

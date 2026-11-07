@@ -103,6 +103,8 @@ dependencies {
     implementation(libs.navigation3.ui)
 
     implementation(libs.bundles.media3)
+    implementation(libs.media3.exoplayer.workmanager)
+    implementation(libs.work.runtime.ktx)
     implementation(libs.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)

@@ -5,12 +5,21 @@ import android.os.Build
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 import ro.mixai.mobile.MobileConfig
 import ro.mixai.mobile.auth.SessionVault
 import ro.mixai.music.data.MusicSettings
+import ro.mixai.music.downloads.MusicDownloadService
+import ro.mixai.music.downloads.MusicDownloads
 import ro.mixai.tv.data.ClientIdentity
+import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.Settings
 import ro.mixai.tv.data.newMixaiImageLoader
+import ro.mixai.tv.player.MusicService
 
 class MixaiMusicApp : Application(), SingletonImageLoader.Factory {
     lateinit var settings: Settings
@@ -19,6 +28,7 @@ class MixaiMusicApp : Application(), SingletonImageLoader.Factory {
         private set
     lateinit var vault: SessionVault
         private set
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val config: MobileConfig by lazy {
         MobileConfig(
             origin = BuildConfig.MIXAI_ORIGIN,
@@ -29,6 +39,7 @@ class MixaiMusicApp : Application(), SingletonImageLoader.Factory {
         )
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
         ClientIdentity.current = ClientIdentity(
@@ -40,6 +51,19 @@ class MixaiMusicApp : Application(), SingletonImageLoader.Factory {
         settings = Settings(this)
         musicSettings = MusicSettings(this)
         vault = SessionVault(musicSettings)
+        // Downloads (WP17-41d): DownloadManager binds to the main looper; the player reads downloaded tracks.
+        MusicDownloadService.ensureChannel(this)
+        MusicDownloads.init(this)
+        MusicService.dataSourceDecorator = { ctx, upstream -> MusicDownloads.dataSourceFactory(ctx, upstream) }
+        appScope.launch {
+            settings.connection.collect { c -> MusicDownloads.api = if (c.isComplete) MmoApi(c.baseUrl, c.token) else null }
+        }
+        appScope.launch {
+            combine(musicSettings.wifiOnly, musicSettings.capGb) { w, gb -> w to gb }.collect { (w, gb) ->
+                MusicDownloads.capBytes = gb.toLong() * 1024 * 1024 * 1024
+                MusicDownloads.setWifiOnly(this@MixaiMusicApp, w)
+            }
+        }
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader = newMixaiImageLoader(context)

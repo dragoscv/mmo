@@ -12,6 +12,8 @@ interface MusicDeps {
     val api: MmoApi
     val music: MusicRepository
     val musicPlayback: MusicPlayback
+    /** Track downloads; null = the host does not offer them (no download controls shown). */
+    val offline: MusicOffline? get() = null
 }
 
 /** Navigation the music screens trigger; each host maps it onto its own back stack. */

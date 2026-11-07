@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -79,6 +80,7 @@ fun AlbumScreen(deps: MusicDeps, nav: MusicNav, id: String) {
     var error by remember(id) { mutableStateOf<Throwable?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
     val askNotif = rememberNotificationPermissionRequester()
+    val offline by (deps.offline?.states ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap()) }).collectAsState()
     LaunchedEffect(id, attempt) {
         error = null
         try { detail = deps.music.album(id) } catch (e: CancellationException) { throw e } catch (e: Exception) { error = e }
@@ -124,7 +126,10 @@ fun AlbumScreen(deps: MusicDeps, nav: MusicNav, id: String) {
                             ).joinToString(" · ")
                             Text(meta, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.size(4.dp))
-                            PlayShuffleButtons(onPlay = { playFrom(0) }, onShuffle = { playFrom(0, shuffle = true) }, enabled = tracks.isNotEmpty())
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                PlayShuffleButtons(onPlay = { playFrom(0) }, onShuffle = { playFrom(0, shuffle = true) }, enabled = tracks.isNotEmpty())
+                                DownloadListButton(deps, tracks)
+                            }
                             Spacer(Modifier.size(8.dp))
                         }
                     }
@@ -138,7 +143,7 @@ fun AlbumScreen(deps: MusicDeps, nav: MusicNav, id: String) {
                     }
                     itemsIndexed(tracks, key = { i, t -> "$i-${t.id}" }) { i, t ->
                         val n = t.track?.let { if (multiDisc && t.disc != null) "${t.disc}.$it" else "$it" } ?: "${i + 1}"
-                        TrackRow(t, onClick = { playFrom(i) }, number = n)
+                        TrackRow(t, onClick = { playFrom(i) }, number = n, offline = offline[t.id])
                     }
                 }
             }

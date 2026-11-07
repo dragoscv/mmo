@@ -50,4 +50,9 @@
     <string name="music_search_prompt">Type at least two letters.</string>
     <string name="music_search_none">Nothing found for “%1$s”</string>
     <string name="music_search_tracks">Tracks</string>
+    <string name="music_download">Download</string>
+    <string name="music_download_remove">Remove download</string>
+    <string name="music_downloaded">Downloaded</string>
+    <string name="music_download_failed">Download failed</string>
+    <string name="music_download_full">Download storage is full. Raise the limit in Settings or remove downloads.</string>
 </resources>
