@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MixAI Music</string>
+    <string name="connect_title">Connect</string>
+    <string name="connect_from_phone">Use phone connection</string>
+    <string name="connect_searching">Looking for MMO Server on this network…</string>
+    <string name="connect_manual">Enter address</string>
+    <string name="connect_manual_hint">Server address, e.g. 192.168.1.10</string>
+    <string name="pair_code">Approve this code</string>
+    <string name="pair_hint">In MixAI Music on your phone, on mixai.ro or in the companion</string>
+    <string name="pair_expired">The code expired</string>
+    <string name="pair_failed">Could not connect: %1$s</string>
+    <string name="action_retry">Try again</string>
+    <string name="home_mix">Start a mix</string>
+    <string name="home_search">Search by voice</string>
+    <string name="home_search_prompt">Artist, album or song</string>
+    <string name="home_downloads">Downloads</string>
+    <string name="home_recent">Recent albums</string>
+    <string name="home_playlists">Playlists</string>
+    <string name="tracks_count">%1$d tracks</string>
+    <string name="profiles_title">Profiles</string>
+    <string name="profiles_switch">Switch profile</string>
+    <string name="profiles_pin_on_phone">This profile has a PIN. Choose it on your phone first.</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="state_offline">Server unreachable. Downloads still play.</string>
+    <string name="state_empty">Nothing here</string>
+    <string name="downloads_empty">No downloads yet. Open an album or playlist and tap Download.</string>
+    <string name="downloads_remove_all">Remove all</string>
+    <string name="downloads_channel">Downloads</string>
+    <string name="downloads_channel_desc">Progress of music downloads to the watch</string>
+    <string name="downloads_notification">Downloading music</string>
+    <string name="play_all">Play all</string>
+    <string name="download_all">Download to watch</string>
+    <string name="download_full">Storage limit reached</string>
+    <string name="downloaded">On watch</string>
+    <string name="downloading">%1$d%%</string>
+    <string name="nothing_playing">Nothing playing</string>
+    <string name="action_play">Play</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_next">Next track</string>
+    <string name="action_previous">Previous track</string>
+</resources>

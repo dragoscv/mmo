@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import ro.mixai.mobile.MobileConfig
 import ro.mixai.mobile.auth.SessionVault
@@ -19,6 +20,8 @@ import ro.mixai.music.widget.MusicWidgetBridge
 import ro.mixai.tv.data.ClientIdentity
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.Settings
+import ro.mixai.tv.data.WearHandoff
+import ro.mixai.music.wear.WearPublisher
 import ro.mixai.tv.data.newMixaiImageLoader
 import ro.mixai.tv.player.AudioPrefs
 import ro.mixai.tv.player.MusicService
@@ -61,6 +64,12 @@ class MixaiMusicApp : Application(), SingletonImageLoader.Factory {
         MusicService.playerHook = { ctx, player -> MusicWidgetBridge.attach(ctx, player) }
         appScope.launch {
             settings.connection.collect { c -> MusicDownloads.api = if (c.isComplete) MmoApi(c.baseUrl, c.token) else null }
+        }
+        // Hand the connection to MixAI Music on a paired watch (WP17-41g, Data Layer; no-op without Play Services).
+        appScope.launch {
+            combine(settings.connection, settings.activeProfile) { c, p ->
+                if (c.isComplete) WearHandoff.Payload(c.baseUrl, c.token, c.userId, p.id) else null
+            }.distinctUntilChanged().collect { WearPublisher.publish(this@MixaiMusicApp, it) }
         }
         // Gapless / ReplayGain-style normalisation / crossfade (WP17-41e): read by the core MusicService.
         appScope.launch {

@@ -99,6 +99,7 @@ dependencies {
     implementation(libs.bundles.lifecycle)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.glance.appwidget)
+    implementation(libs.play.services.wearable)
 
     implementation(libs.navigation3.runtime)
     implementation(libs.navigation3.ui)

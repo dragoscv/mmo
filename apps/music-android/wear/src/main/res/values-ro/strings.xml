@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MixAI Music</string>
+    <string name="connect_title">Conectare</string>
+    <string name="connect_from_phone">Folosește conexiunea telefonului</string>
+    <string name="connect_searching">Caut MMO Server în această rețea…</string>
+    <string name="connect_manual">Introdu adresa</string>
+    <string name="connect_manual_hint">Adresa serverului, ex. 192.168.1.10</string>
+    <string name="pair_code">Aprobă acest cod</string>
+    <string name="pair_hint">În MixAI Music pe telefon, pe mixai.ro sau în companion</string>
+    <string name="pair_expired">Codul a expirat</string>
+    <string name="pair_failed">Conectarea a eșuat: %1$s</string>
+    <string name="action_retry">Reîncearcă</string>
+    <string name="home_mix">Pornește un mix</string>
+    <string name="home_search">Caută vocal</string>
+    <string name="home_search_prompt">Artist, album sau piesă</string>
+    <string name="home_downloads">Descărcări</string>
+    <string name="home_recent">Albume recente</string>
+    <string name="home_playlists">Playlisturi</string>
+    <string name="tracks_count">%1$d piese</string>
+    <string name="profiles_title">Profiluri</string>
+    <string name="profiles_switch">Schimbă profilul</string>
+    <string name="profiles_pin_on_phone">Profilul are PIN. Alege-l mai întâi pe telefon.</string>
+    <string name="disconnect">Deconectează</string>
+    <string name="state_offline">Serverul nu răspunde. Descărcările merg în continuare.</string>
+    <string name="state_empty">Nimic aici</string>
+    <string name="downloads_empty">Nicio descărcare. Deschide un album sau un playlist și apasă Descarcă.</string>
+    <string name="downloads_remove_all">Șterge tot</string>
+    <string name="downloads_channel">Descărcări</string>
+    <string name="downloads_channel_desc">Progresul descărcărilor de muzică pe ceas</string>
+    <string name="downloads_notification">Se descarcă muzică</string>
+    <string name="play_all">Redă tot</string>
+    <string name="download_all">Descarcă pe ceas</string>
+    <string name="download_full">Limita de spațiu a fost atinsă</string>
+    <string name="downloaded">Pe ceas</string>
+    <string name="downloading">%1$d%%</string>
+    <string name="nothing_playing">Nu se redă nimic</string>
+    <string name="action_play">Redă</string>
+    <string name="action_pause">Pauză</string>
+    <string name="action_next">Piesa următoare</string>
+    <string name="action_previous">Piesa anterioară</string>
+</resources>

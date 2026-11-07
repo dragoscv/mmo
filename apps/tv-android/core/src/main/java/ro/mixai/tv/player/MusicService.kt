@@ -91,6 +91,9 @@ class MusicService : MediaLibraryService() {
             .setMediaSourceFactory(sources)
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
             .setHandleAudioBecomingNoisy(true)
+            // Wear OS: no playback on the watch speaker unless the app allows it; Media3 then opens the
+            // output switcher so the user can connect Bluetooth headphones.
+            .setSuppressPlaybackOnUnsuitableOutput(suppressOnUnsuitableOutput)
             .build()
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { gain.target = mediaItem?.let(::gainFor) ?: 1f }
@@ -404,6 +407,9 @@ class MusicService : MediaLibraryService() {
          * main thread right after the player is built; the hook adds its own listener.
          */
         @Volatile var playerHook: ((android.content.Context, Player) -> Unit)? = null
+
+        /** Wear app: suppress playback on unsuitable outputs (watch speaker). Read when the service starts. */
+        @Volatile var suppressOnUnsuitableOutput: Boolean = false
 
         /** Crossfade / normalisation preferences, pushed by the app (MixAI Music settings); default off. */
         val audioPrefs = MutableStateFlow(AudioPrefs())

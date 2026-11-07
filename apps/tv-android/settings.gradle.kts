@@ -28,3 +28,6 @@ include(":music-ui")
 project(":music-ui").projectDir = file("../music-android/music-ui")
 include(":music")
 project(":music").projectDir = file("../music-android/app")
+// MixAI Music for Wear OS (WP17-41g, standalone; same applicationId as :music for Play pairing).
+include(":wear")
+project(":wear").projectDir = file("../music-android/wear")
