@@ -19,6 +19,7 @@ import ro.mixai.tv.data.ClientIdentity
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.Settings
 import ro.mixai.tv.data.newMixaiImageLoader
+import ro.mixai.tv.player.AudioPrefs
 import ro.mixai.tv.player.MusicService
 
 class MixaiMusicApp : Application(), SingletonImageLoader.Factory {
@@ -57,6 +58,11 @@ class MixaiMusicApp : Application(), SingletonImageLoader.Factory {
         MusicService.dataSourceDecorator = { ctx, upstream -> MusicDownloads.dataSourceFactory(ctx, upstream) }
         appScope.launch {
             settings.connection.collect { c -> MusicDownloads.api = if (c.isComplete) MmoApi(c.baseUrl, c.token) else null }
+        }
+        // Gapless / ReplayGain-style normalisation / crossfade (WP17-41e): read by the core MusicService.
+        appScope.launch {
+            combine(musicSettings.crossfadeSec, musicSettings.normalize) { s, n -> AudioPrefs(crossfadeMs = s * 1000, normalize = n) }
+                .collect { MusicService.audioPrefs.value = it }
         }
         appScope.launch {
             combine(musicSettings.wifiOnly, musicSettings.capGb) { w, gb -> w to gb }.collect { (w, gb) ->

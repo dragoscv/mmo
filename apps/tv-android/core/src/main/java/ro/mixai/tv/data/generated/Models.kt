@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.10.1); generator: server/scripts/openapi-kotlin.mjs
+// Source: server/openapi.yaml (info.version 3.11.0); generator: server/scripts/openapi-kotlin.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 @file:Suppress("unused")
 
@@ -689,6 +689,8 @@ data class TrackCard(
     val hasLyrics: Boolean = false,
     val hasSyncedLyrics: Boolean = false,
     val plays: Long? = null,
+    val loudnessLufs: Double? = null,
+    val truePeakDbfs: Double? = null,
     val coverArt: String = "",
     val coverUrlPath: String = "",
     val streamUrlPath: String = "",

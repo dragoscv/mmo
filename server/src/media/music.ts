@@ -61,6 +61,9 @@ export interface TrackCard {
     hasLyrics: boolean;
     hasSyncedLyrics: boolean;
     plays?: number;
+    /** EBU R128 integrated loudness (LUFS) and true peak (dBFS); present once analysed. Clients derive playback gain. */
+    loudnessLufs?: number;
+    truePeakDbfs?: number;
     coverArt: string;
     coverUrlPath: string;
     streamUrlPath: string;
@@ -270,6 +273,8 @@ function trackCard(r: TrackRow, plays?: number): TrackCard {
         streamUrlPath: streamUrlPath(id),
     };
     if (plays !== undefined) card.plays = plays;
+    if (typeof r.loudness_lufs === "number" && Number.isFinite(r.loudness_lufs)) card.loudnessLufs = r.loudness_lufs;
+    if (typeof r.loudness_true_peak_dbfs === "number" && Number.isFinite(r.loudness_true_peak_dbfs)) card.truePeakDbfs = r.loudness_true_peak_dbfs;
     return card;
 }
 

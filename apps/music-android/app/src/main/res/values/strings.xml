@@ -43,4 +43,9 @@
     <string name="settings_dl_cap">Download storage limit</string>
     <string name="settings_dl_cap_gb">%1$d GB</string>
     <string name="settings_dl_cap_none">No limit</string>
+    <string name="settings_crossfade">Crossfade</string>
+    <string name="settings_crossfade_off">Off (gapless)</string>
+    <string name="settings_crossfade_s">%1$d seconds</string>
+    <string name="settings_normalize">Volume normalisation</string>
+    <string name="settings_normalize_hint">Plays every track at a similar loudness, from the server analysis</string>
 </resources>

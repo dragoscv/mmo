@@ -23,7 +23,7 @@ CREATE TABLE tracks (
   artist TEXT, title TEXT, album TEXT, genre TEXT, year INTEGER, duration INTEGER, bpm REAL, file_size INTEGER,
   format TEXT, bitrate INTEGER, sample_rate INTEGER, added_at TEXT DEFAULT (datetime('now')), rating INTEGER,
   is_favorite INTEGER DEFAULT 0, lyrics TEXT, synced_lyrics TEXT, comment TEXT, artwork_url TEXT, musicbrainz_id TEXT,
-  is_hidden INTEGER DEFAULT 0, sha256 TEXT
+  is_hidden INTEGER DEFAULT 0, sha256 TEXT, loudness_lufs REAL, loudness_true_peak_dbfs REAL
 );
 CREATE TABLE playlists (
   id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT, type TEXT DEFAULT 'manual',

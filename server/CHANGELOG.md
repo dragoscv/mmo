@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.11.0 — Track loudness on music cards (WP17-41e)
+
+- `TrackCard` gains optional `loudnessLufs` (EBU R128 integrated) and `truePeakDbfs` from the analyzer, so players
+        can normalise volume without reading tags. Absent until a track is analysed. OpenAPI, Kotlin `Models.kt`, Swift
+        `Models.swift` and the TS SDK types regenerated.
+
 ## 3.10.1 — Desktop installers build again
 
 - Release packaging pins `node-abi` ≥ 4.40 through npm `overrides` (the packaging step reinstalls with npm, whose lock

@@ -42,4 +42,9 @@
     <string name="settings_dl_cap">Limită de spațiu pentru descărcări</string>
     <string name="settings_dl_cap_gb">%1$d GB</string>
     <string name="settings_dl_cap_none">Fără limită</string>
+    <string name="settings_crossfade">Tranziție între piese</string>
+    <string name="settings_crossfade_off">Oprită (fără pauză)</string>
+    <string name="settings_crossfade_s">%1$d secunde</string>
+    <string name="settings_normalize">Normalizare volum</string>
+    <string name="settings_normalize_hint">Redă fiecare piesă la un volum asemănător, pe baza analizei de pe server</string>
 </resources>

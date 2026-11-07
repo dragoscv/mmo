@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.10.1
+  version: 3.11.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -7865,6 +7865,8 @@ components:
         hasLyrics: { type: boolean }
         hasSyncedLyrics: { type: boolean }
         plays: { type: integer }
+        loudnessLufs: { type: number, description: EBU R128 integrated loudness in LUFS; absent until analysed }
+        truePeakDbfs: { type: number, description: True peak in dBFS; absent until analysed }
         coverArt: { type: string }
         coverUrlPath: { type: string }
         streamUrlPath: { type: string }

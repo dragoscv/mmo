@@ -20,6 +20,16 @@ class MusicSettings(private val context: Context) : SessionBlobStore {
     private val kWifiOnly = stringPreferencesKey("dl_wifi_only")
     private val kUpcoming = stringPreferencesKey("dl_upcoming")
     private val kCapGb = stringPreferencesKey("dl_cap_gb")
+    private val kCrossfade = stringPreferencesKey("pb_crossfade_s")
+    private val kNormalize = stringPreferencesKey("pb_normalize")
+
+    /** Crossfade between tracks in seconds (0 = gapless only, default 0). Album continuations stay gapless. */
+    val crossfadeSec: Flow<Int> = context.musicStore.data.map { it[kCrossfade]?.toIntOrNull()?.coerceIn(0, 12) ?: 0 }
+    suspend fun setCrossfadeSec(s: Int) { context.musicStore.edit { it[kCrossfade] = s.coerceIn(0, 12).toString() } }
+
+    /** Loudness normalisation from the server's EBU R128 analysis (default on). */
+    val normalize: Flow<Boolean> = context.musicStore.data.map { it[kNormalize] != "0" }
+    suspend fun setNormalize(v: Boolean) { context.musicStore.edit { it[kNormalize] = if (v) "1" else "0" } }
 
     /** "system" | "dark" | "light". */
     val theme: Flow<String> = context.musicStore.data.map { it[kTheme] ?: "system" }

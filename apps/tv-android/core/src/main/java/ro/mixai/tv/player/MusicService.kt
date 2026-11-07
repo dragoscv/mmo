@@ -1,5 +1,6 @@
 package ro.mixai.tv.player
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -10,10 +11,14 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaConstants
@@ -29,6 +34,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import ro.mixai.core.R
@@ -54,6 +60,7 @@ class MusicService : MediaLibraryService() {
     private lateinit var settings: Settings
     private var lib: Lib? = null
     private val searches = HashMap<String, List<MediaItem>>()
+    private var crossfader: Crossfader? = null
 
     /** Server-bound helpers, rebuilt when the saved connection or profile changes. */
     private class Lib(val key: String, val music: MusicRepository) {
@@ -68,15 +75,36 @@ class MusicService : MediaLibraryService() {
             .setUserAgent(ClientIdentity.current.userAgent)
             .setAllowCrossProtocolRedirects(true)
         val source: DataSource.Factory = dataSourceDecorator?.invoke(this, http) ?: http
-        val player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(source))
+        val sources = DefaultMediaSourceFactory(this).setDataSourceFactory(source)
+        // Loudness normalisation (WP17-41e): per-track gain in the audio pipeline, so quiet tracks can be
+        // boosted (true-peak capped) and the change lands on the track boundary, keeping gapless intact.
+        val gain = GainProcessor(::gainFor)
+        val renderers = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(ctx: Context, enableFloatOutput: Boolean, enableAudioOutputPlaybackParameters: Boolean): AudioSink =
+                DefaultAudioSink.Builder(ctx)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParameters)
+                    .setAudioProcessors(arrayOf(gain))
+                    .build()
+        }
+        val player = ExoPlayer.Builder(this, renderers)
+            .setMediaSourceFactory(sources)
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
             .setHandleAudioBecomingNoisy(true)
             .build()
+        player.addListener(object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { gain.target = mediaItem?.let(::gainFor) ?: 1f }
+        })
+        scope.launch {
+            audioPrefs.collect { gain.target = player.currentMediaItem?.let(::gainFor) ?: 1f }
+        }
+        crossfader = Crossfader(this, player, sources, { audioPrefs.value }, ::gainFor).also { it.start() }
         session = MediaLibrarySession.Builder(this, player, Callback())
             .setId(SESSION_ID)
             .build()
     }
+
+    private fun gainFor(item: MediaItem): Float = AudioPlan.gainFor(TrackItems.fromItem(item), audioPrefs.value.normalize)
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
 
@@ -87,6 +115,8 @@ class MusicService : MediaLibraryService() {
 
     override fun onDestroy() {
         scope.cancel()
+        crossfader?.release()
+        crossfader = null
         session?.run { player.release(); release() }
         session = null
         super.onDestroy()
@@ -367,5 +397,8 @@ class MusicService : MediaLibraryService() {
          * cache: receives the network factory, returns the factory the player uses. Null = network only.
          */
         @Volatile var dataSourceDecorator: ((android.content.Context, DataSource.Factory) -> DataSource.Factory)? = null
+
+        /** Crossfade / normalisation preferences, pushed by the app (MixAI Music settings); default off. */
+        val audioPrefs = MutableStateFlow(AudioPrefs())
     }
 }

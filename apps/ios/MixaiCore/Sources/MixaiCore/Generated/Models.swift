@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.10.1); generator: server/scripts/openapi-swift.mjs
+// Source: server/openapi.yaml (info.version 3.11.0); generator: server/scripts/openapi-swift.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 // swiftlint:disable all
 
@@ -1823,6 +1823,10 @@ public struct TrackCard: Codable, Sendable, Hashable {
     public let hasLyrics: Bool
     public let hasSyncedLyrics: Bool
     public let plays: Int?
+    /// EBU R128 integrated loudness in LUFS; absent until analysed
+    public let loudnessLufs: Double?
+    /// True peak in dBFS; absent until analysed
+    public let truePeakDbfs: Double?
     public let coverArt: String
     public let coverUrlPath: String
     public let streamUrlPath: String
@@ -1845,6 +1849,8 @@ public struct TrackCard: Codable, Sendable, Hashable {
         hasLyrics: Bool,
         hasSyncedLyrics: Bool,
         plays: Int? = nil,
+        loudnessLufs: Double? = nil,
+        truePeakDbfs: Double? = nil,
         coverArt: String,
         coverUrlPath: String,
         streamUrlPath: String
@@ -1866,6 +1872,8 @@ public struct TrackCard: Codable, Sendable, Hashable {
         self.hasLyrics = hasLyrics
         self.hasSyncedLyrics = hasSyncedLyrics
         self.plays = plays
+        self.loudnessLufs = loudnessLufs
+        self.truePeakDbfs = truePeakDbfs
         self.coverArt = coverArt
         self.coverUrlPath = coverUrlPath
         self.streamUrlPath = streamUrlPath

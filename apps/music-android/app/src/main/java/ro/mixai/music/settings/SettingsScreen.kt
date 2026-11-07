@@ -14,6 +14,8 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Policy
@@ -56,6 +58,7 @@ private val LANGUAGES = listOf("" to R.string.settings_language_system, "ro" to 
 private val THEMES = listOf("system" to R.string.settings_theme_system, "dark" to R.string.settings_theme_dark, "light" to R.string.settings_theme_light)
 private val UPCOMING = listOf(0, 5, 10, 25)
 private val CAPS = listOf(1, 2, 5, 10, 25, 0)
+private val CROSSFADES = listOf(0, 3, 6, 9, 12)
 
 /** Server, account, profile, language, theme, about. */
 @Composable
@@ -76,6 +79,8 @@ fun SettingsScreen(
     val wifiOnly by app.musicSettings.wifiOnly.collectAsState(initial = true)
     val upcoming by app.musicSettings.upcoming.collectAsState(initial = 0)
     val capGb by app.musicSettings.capGb.collectAsState(initial = 2)
+    val crossfade by app.musicSettings.crossfadeSec.collectAsState(initial = 0)
+    val normalize by app.musicSettings.normalize.collectAsState(initial = true)
     val profile by graph.profiles.activeProfile.collectAsState()
     var dialog by rememberSaveable { mutableStateOf("") }
 
@@ -120,6 +125,19 @@ fun SettingsScreen(
             }
             item {
                 Row(Icons.Outlined.DarkMode, stringResource(R.string.settings_theme), stringResource(THEMES.first { it.first == theme }.second), onClick = { dialog = "theme" })
+            }
+            item {
+                Row(Icons.Outlined.Tune, stringResource(R.string.settings_crossfade), crossfadeLabel(crossfade), onClick = { dialog = "crossfade" })
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_normalize)) },
+                    supportingContent = { Text(stringResource(R.string.settings_normalize_hint)) },
+                    leadingContent = { Icon(Icons.Outlined.GraphicEq, contentDescription = null) },
+                    trailingContent = { Switch(checked = normalize, onCheckedChange = { v -> scope.launch { app.musicSettings.setNormalize(v) } }) },
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                    modifier = Modifier.clickable { scope.launch { app.musicSettings.setNormalize(!normalize) } },
+                )
             }
             item {
                 ListItem(
@@ -175,6 +193,13 @@ fun SettingsScreen(
             onPick = { n -> scope.launch { app.musicSettings.setUpcoming(n.toInt()) }; dialog = "" },
             onDismiss = { dialog = "" },
         )
+        "crossfade" -> ChoiceDialog(
+            title = stringResource(R.string.settings_crossfade),
+            options = CROSSFADES.map { it.toString() to crossfadeLabel(it) },
+            selected = crossfade.toString(),
+            onPick = { s -> scope.launch { app.musicSettings.setCrossfadeSec(s.toInt()) }; dialog = "" },
+            onDismiss = { dialog = "" },
+        )
         "cap" -> ChoiceDialog(
             title = stringResource(R.string.settings_dl_cap),
             options = CAPS.map { it.toString() to capLabel(it) },
@@ -188,6 +213,10 @@ fun SettingsScreen(
 @Composable
 private fun upcomingLabel(n: Int): String =
     if (n <= 0) stringResource(R.string.settings_dl_upcoming_off) else stringResource(R.string.settings_dl_upcoming_n, n)
+
+@Composable
+private fun crossfadeLabel(s: Int): String =
+    if (s <= 0) stringResource(R.string.settings_crossfade_off) else stringResource(R.string.settings_crossfade_s, s)
 
 @Composable
 private fun capLabel(gb: Int): String =

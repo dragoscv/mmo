@@ -5622,6 +5622,10 @@ export interface components {
             hasLyrics: boolean;
             hasSyncedLyrics: boolean;
             plays?: number;
+            /** @description EBU R128 integrated loudness in LUFS; absent until analysed */
+            loudnessLufs?: number;
+            /** @description True peak in dBFS; absent until analysed */
+            truePeakDbfs?: number;
             coverArt: string;
             coverUrlPath: string;
             streamUrlPath: string;

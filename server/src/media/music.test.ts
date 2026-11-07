@@ -24,7 +24,7 @@ CREATE TABLE tracks (
   artist TEXT, title TEXT, album TEXT, genre TEXT, year INTEGER, duration INTEGER, bpm REAL, file_size INTEGER,
   format TEXT, bitrate INTEGER, sample_rate INTEGER, added_at TEXT DEFAULT (datetime('now')), rating INTEGER,
   is_favorite INTEGER DEFAULT 0, lyrics TEXT, synced_lyrics TEXT, comment TEXT, artwork_url TEXT, musicbrainz_id TEXT,
-  is_hidden INTEGER DEFAULT 0, sha256 TEXT
+  is_hidden INTEGER DEFAULT 0, sha256 TEXT, loudness_lufs REAL, loudness_true_peak_dbfs REAL
 );
 CREATE TABLE playlists (
   id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT, type TEXT DEFAULT 'manual',
@@ -151,6 +151,12 @@ describe("MusicService browse", () => {
             streamUrlPath: `/rest/stream.view?id=tr_${ids.omt}`,
         });
         expect(music.album(albumId("Homework", "Daft Punk")).tracks[0]).toMatchObject({ disc: 1, track: 3, hasSyncedLyrics: true });
+    });
+
+    it("track cards carry analyser loudness only once measured", () => {
+        expect(music.album(albumId("Discovery", "Daft Punk")).tracks[0]).not.toHaveProperty("loudnessLufs");
+        lib.prepare("UPDATE tracks SET loudness_lufs = -8.5, loudness_true_peak_dbfs = 0.4 WHERE id = ?").run(ids.omt);
+        expect(music.album(albumId("Discovery", "Daft Punk")).tracks[0]).toMatchObject({ loudnessLufs: -8.5, truePeakDbfs: 0.4 });
     });
 
     it("genres and genre albums", () => {

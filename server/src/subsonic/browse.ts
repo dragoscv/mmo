@@ -38,13 +38,16 @@ export interface TrackRow {
     comment: string | null;
     artwork_url: string | null;
     musicbrainz_id: string | null;
+    /** EBU R128 integrated loudness / true peak from the analyzer (null = not analysed yet). */
+    loudness_lufs?: number | null;
+    loudness_true_peak_dbfs?: number | null;
     play_count?: number | null;
     last_played?: string | null;
 }
 
 const TRACK_COLS = `id, user_id, filepath, filename, artist, title, album, genre, year, duration, bpm,
     file_size, format, bitrate, sample_rate, added_at, rating, is_favorite, lyrics, synced_lyrics,
-    comment, artwork_url, musicbrainz_id`;
+    comment, artwork_url, musicbrainz_id, loudness_lufs, loudness_true_peak_dbfs`;
 
 /** Hidden tracks never surface in Subsonic clients. */
 const VISIBLE = `COALESCE(is_hidden, 0) = 0`;
