@@ -9,6 +9,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import ro.mixai.mobile.auth.SessionBlobStore
 
 private val Context.phoneStore: DataStore<Preferences> by preferencesDataStore(name = "mixai_phone")
 
@@ -16,7 +17,7 @@ private val Context.phoneStore: DataStore<Preferences> by preferencesDataStore(n
  * Phone-only preferences (separate store from the shared core `Settings`): downloads, smart downloads,
  * data saver, player audio, push token state and the encrypted account session blob.
  */
-class PhoneSettings(private val context: Context) {
+class PhoneSettings(private val context: Context) : SessionBlobStore {
     private val kWifiOnly = stringPreferencesKey("dl_wifi_only")
     private val kSmart = stringPreferencesKey("dl_smart")
     private val kSmartCount = stringPreferencesKey("dl_smart_count")
@@ -79,8 +80,8 @@ class PhoneSettings(private val context: Context) {
     suspend fun setPushRegisteredFor(v: String) = put(kPushRegistered, v)
 
     // ─── session blob (AES-GCM ciphertext from SessionVault) ─────────────
-    suspend fun sessionBlob(): String = context.phoneStore.data.first()[kSessionBlob] ?: ""
-    suspend fun setSessionBlob(v: String) = if (v.isBlank()) context.phoneStore.edit { it.remove(kSessionBlob) }.let { } else put(kSessionBlob, v)
+    override suspend fun sessionBlob(): String = context.phoneStore.data.first()[kSessionBlob] ?: ""
+    override suspend fun setSessionBlob(v: String) = if (v.isBlank()) context.phoneStore.edit { it.remove(kSessionBlob) }.let { } else put(kSessionBlob, v)
 
     private suspend fun put(k: Preferences.Key<String>, v: String) { context.phoneStore.edit { it[k] = v } }
 }

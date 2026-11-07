@@ -63,10 +63,10 @@ import ro.mixai.app.AppDeps
 import ro.mixai.app.R
 import ro.mixai.app.nav.Dest
 import ro.mixai.app.nav.Navigator
-import ro.mixai.app.ui.components.EmptyState
-import ro.mixai.app.ui.components.ErrorState
+import ro.mixai.mobile.ui.EmptyState
+import ro.mixai.mobile.ui.ErrorState
 import ro.mixai.app.ui.components.PosterCard
-import ro.mixai.app.ui.components.SkeletonBox
+import ro.mixai.mobile.ui.SkeletonBox
 import ro.mixai.app.ui.components.TabHeader
 import ro.mixai.app.ui.media.genresOf
 import ro.mixai.tv.data.generated.LibraryIndexRow

@@ -88,11 +88,11 @@ import ro.mixai.app.nav.Dest
 import ro.mixai.app.nav.Navigator
 import ro.mixai.app.ui.components.CardRow
 import ro.mixai.app.ui.components.ChipRow
-import ro.mixai.app.ui.components.EmptyState
-import ro.mixai.app.ui.components.ErrorState
-import ro.mixai.app.ui.components.LoadingSkeleton
+import ro.mixai.mobile.ui.EmptyState
+import ro.mixai.mobile.ui.ErrorState
+import ro.mixai.mobile.ui.LoadingSkeleton
 import ro.mixai.app.ui.components.PosterCard
-import ro.mixai.app.ui.components.SkeletonBox
+import ro.mixai.mobile.ui.SkeletonBox
 import ro.mixai.app.ui.components.sharedPoster
 import ro.mixai.app.ui.media.PlayTarget
 import ro.mixai.app.ui.media.episodeTarget
@@ -104,7 +104,7 @@ import ro.mixai.app.ui.media.resolveTarget
 import ro.mixai.app.ui.media.startPlayback
 import ro.mixai.app.ui.media.trailerKey
 import ro.mixai.app.ui.media.yearOf
-import ro.mixai.app.ui.theme.Mixai
+import ro.mixai.mobile.theme.Mixai
 import ro.mixai.tv.data.ApiException
 import ro.mixai.tv.data.MediaRef
 import ro.mixai.tv.data.MmoApi

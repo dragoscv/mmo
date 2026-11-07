@@ -69,6 +69,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import ro.mixai.music.ui.R
+import ro.mixai.mobile.ui.EmptyState
+import ro.mixai.mobile.R as MobileR
 import ro.mixai.tv.data.MusicState
 import ro.mixai.tv.data.RepeatMode
 import ro.mixai.tv.data.generated.LyricLine
@@ -83,7 +85,7 @@ fun NowPlayingScreen(deps: MusicDeps, nav: MusicNav) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { nav.back() }) {
-                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = stringResource(R.string.music_action_close))
+                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = stringResource(MobileR.string.common_action_close))
                 }
                 Text(
                     stringResource(R.string.music_now_playing), style = MaterialTheme.typography.titleMedium,

@@ -62,13 +62,13 @@ import ro.mixai.music.ui.MiniPlayer
 import ro.mixai.music.ui.MusicScreen
 import ro.mixai.music.ui.NowPlayingScreen
 import ro.mixai.app.ui.components.TabHeader
-import ro.mixai.app.ui.onboarding.DiscoverScreen
-import ro.mixai.app.ui.onboarding.ManualServerScreen
-import ro.mixai.app.ui.onboarding.PairScreen
-import ro.mixai.app.ui.onboarding.SignInScreen
-import ro.mixai.app.ui.onboarding.WelcomeScreen
+import ro.mixai.mobile.onboarding.DiscoverScreen
+import ro.mixai.mobile.onboarding.ManualServerScreen
+import ro.mixai.mobile.onboarding.PairScreen
+import ro.mixai.mobile.onboarding.SignInScreen
+import ro.mixai.mobile.onboarding.WelcomeScreen
 import ro.mixai.app.ui.player.PlayerScreen
-import ro.mixai.app.ui.profiles.ProfilePickerScreen
+import ro.mixai.mobile.profiles.ProfilePickerScreen
 import ro.mixai.app.ui.search.SearchScreen
 import ro.mixai.app.ui.settings.SettingsScreen
 import ro.mixai.app.ui.title.TitleScreen
@@ -78,7 +78,7 @@ import ro.mixai.app.ui.family.FamilyStatsScreen
 import ro.mixai.app.ui.settings.PlexImportScreen
 import ro.mixai.app.ui.remote.RemoteScreen
 import ro.mixai.app.ui.together.TogetherScreen
-import ro.mixai.app.data.SessionVault
+import ro.mixai.mobile.auth.SessionVault
 import ro.mixai.tv.data.AccountSession
 import ro.mixai.tv.data.Connection
 import ro.mixai.tv.data.DiscoveredServer
@@ -209,7 +209,12 @@ fun AppRoot(conn: Connection, session: AccountSession, settings: Settings, local
 private fun Screen(dest: Dest, nav: Navigator, deps: AppDeps?, conn: Connection, settings: Settings, scope: kotlinx.coroutines.CoroutineScope) {
     val app = LocalContext.current.applicationContext as MixaiPhoneApp
     when (dest) {
-        Dest.Welcome -> WelcomeScreen(onSignIn = { nav.push(Dest.SignIn) }, onLocal = { nav.push(Dest.Discover()) })
+        Dest.Welcome -> WelcomeScreen(
+            appName = stringResource(R.string.app_name),
+            tagline = stringResource(R.string.welcome_tagline),
+            onSignIn = { nav.push(Dest.SignIn) },
+            onLocal = { nav.push(Dest.Discover()) },
+        )
         Dest.SignIn -> SignInScreen(
             onSignedIn = { body, picked ->
                 scope.launch {
@@ -253,7 +258,7 @@ private fun Screen(dest: Dest, nav: Navigator, deps: AppDeps?, conn: Connection,
 private fun Connected(dest: Dest, nav: Navigator, d: AppDeps) {
     when (dest) {
         Dest.Splash -> Loading()
-        Dest.ProfilePicker -> ProfilePickerScreen(d) {
+        Dest.ProfilePicker -> ProfilePickerScreen(d.profiles, onSelected = { d.media.invalidateHome(); d.hub.refreshHello() }) {
             if (nav.backStack.size > 1 && nav.backStack.none { it is Dest.Splash }) nav.pop() else nav.resetTo(Dest.TabRoot(Tab.Home))
         }
         is Dest.TabRoot -> when (dest.tab) {

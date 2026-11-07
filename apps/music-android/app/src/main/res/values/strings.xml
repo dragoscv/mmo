@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">MixAI Music</string>
+    <string name="welcome_tagline">The music on your own MMO Server: albums, playlists, radio and lyrics, everywhere.</string>
+    <string name="tab_home">Music</string>
+    <string name="tab_search">Search</string>
+    <string name="tab_settings">Settings</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_server">Server</string>
+    <string name="settings_change_server">Change server</string>
+    <string name="settings_account">MixAI account</string>
+    <string name="settings_signed_in_as">Signed in as %1$s</string>
+    <string name="settings_not_signed_in">Not signed in</string>
+    <string name="settings_sign_in">Sign in with MixAI</string>
+    <string name="settings_sign_out">Sign out</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_system">System</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_version">MixAI Music %1$s</string>
+    <string name="settings_privacy">Privacy policy</string>
+    <string name="settings_licenses">Fonts: Inter and Space Grotesk (SIL Open Font License 1.1)</string>
+</resources>

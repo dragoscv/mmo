@@ -7,11 +7,6 @@
     <string name="action_close">Închide</string>
     <string name="action_ok">OK</string>
     <string name="error_title">Ceva nu a mers</string>
-    <string name="error_generic">Eroare necunoscută.</string>
-    <string name="error_network">Serverul nu poate fi contactat. Verifică conexiunea.</string>
-    <string name="error_unauthorized">Serverul a refuzat acest dispozitiv. Asociază-l din nou.</string>
-    <string name="error_not_found">Nu există pe server.</string>
-    <string name="error_http">Serverul a răspuns cu eroarea %1$d.</string>
 
     <!-- tabs -->
     <string name="tab_home">Acasă</string>
@@ -23,62 +18,10 @@
 
     <!-- welcome -->
     <string name="welcome_tagline">Filmele, serialele și muzica ta de pe propriul MMO Server, oriunde.</string>
-    <string name="welcome_sign_in">Conectează-te cu MixAI</string>
-    <string name="welcome_local">Conectează-te la un server din această rețea</string>
-    <string name="welcome_hint">MixAI redă doar ce deții sau adaugi tu.</string>
 
     <!-- sign in -->
-    <string name="signin_title">Conectare</string>
-    <string name="signin_open">Aprobă acest dispozitiv pe %1$s.</string>
-    <string name="signin_requesting">Se cere un cod de la %1$s…</string>
-    <string name="signin_connecting">Conectat ca %1$s. Se caută serverul tău…</string>
-    <string name="signin_your_code">Codul tău</string>
-    <string name="signin_open_browser">Deschide browserul și aprobă</string>
-    <string name="signin_scan_other">Sau scanează codul cu alt dispozitiv conectat.</string>
-    <string name="signin_expires_in">Expiră în %1$d:%2$02d</string>
-    <string name="signin_waiting">Se așteaptă aprobarea…</string>
-    <string name="signin_expired">Codul a expirat.</string>
-    <string name="signin_new_code">Cere un cod nou</string>
-    <string name="signin_denied">Conectarea a fost refuzată.</string>
-    <string name="signin_err_network">%1$s nu poate fi contactat.</string>
-    <string name="signin_err_status">%1$s a răspuns cu eroarea %2$d.</string>
-    <string name="signin_err_invalid">%1$s a trimis un răspuns neașteptat.</string>
 
     <!-- discover / pair / manual -->
-    <string name="discover_title">Alege un server</string>
-    <string name="discover_subtitle">Servere MMO găsite în această rețea Wi-Fi.</string>
-    <string name="discover_searching">Se caută în rețea…</string>
-    <string name="discover_manual">Introdu adresa manual</string>
-    <string name="discover_manual_hint">De exemplu http://192.168.1.10:17899</string>
-    <string name="pair_title">Asociere cu %1$s</string>
-    <string name="pair_requesting">Se cere serverului un cod de asociere…</string>
-    <string name="pair_your_code">Cod de asociere</string>
-    <string name="pair_instructions">Aprobă acest cod în MixAI (Setări, Dispozitive) sau în aplicația MMO Server de pe calculator.</string>
-    <string name="pair_approve_here">Aprobă pe acest telefon</string>
-    <string name="pair_waiting">Se așteaptă aprobarea…</string>
-    <string name="pair_expired">Codul de asociere a expirat.</string>
-    <string name="pair_err_no_token">serverul nu a trimis niciun token</string>
-    <string name="pair_failed_hint">Verifică dacă serverul este actualizat și în aceeași rețea.</string>
-    <string name="connect_fail">Conectare eșuată: %1$s</string>
-    <string name="manual_title">Adresa serverului</string>
-    <string name="manual_host">Adresa serverului</string>
-    <string name="manual_token">Token de dispozitiv (opțional)</string>
-    <string name="manual_token_hint">Lasă câmpul gol ca să te asociezi cu un cod.</string>
-    <string name="manual_connect">Conectează</string>
-    <string name="manual_err_host">Introdu adresa serverului.</string>
-    <string name="manual_found">Am găsit %1$s (versiunea %2$s).</string>
-    <string name="manual_needs_pair">Acest dispozitiv nu este încă asociat.</string>
-    <string name="manual_quick_connect">Asociază cu un cod</string>
-    <string name="manual_needs_token">Acest server cere un token de dispozitiv.</string>
 
     <!-- profiles -->
-    <string name="profiles_title">Cine se uită?</string>
-    <string name="profiles_empty">Încă nu există profiluri</string>
-    <string name="profiles_empty_hint">Creează profiluri în MixAI pe web sau pe televizor.</string>
-    <string name="profiles_locked">Protejat cu PIN</string>
-    <string name="pin_title">Introdu PIN-ul pentru %1$s</string>
-    <string name="pin_wrong">PIN greșit.</string>
-    <string name="pin_wrong_left">PIN greșit. Mai ai %1$d încercări.</string>
-    <string name="pin_locked">Prea multe încercări. Reîncearcă peste %1$d:%2$02d.</string>
-    <string name="pin_delete">Șterge cifra</string>
 </resources>

@@ -1,5 +1,6 @@
 package ro.mixai.app.ui.components
 
+import ro.mixai.mobile.ui.ProfileAvatar
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper

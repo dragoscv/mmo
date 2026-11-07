@@ -14,7 +14,7 @@ import ro.mixai.app.cast.CastSupport
 import ro.mixai.app.data.PhoneDeps
 import ro.mixai.app.data.PhoneSettings
 import ro.mixai.app.data.ProgressFlusher
-import ro.mixai.app.data.SessionVault
+import ro.mixai.mobile.auth.SessionVault
 import ro.mixai.app.downloads.DownloadCenter
 import ro.mixai.app.downloads.SmartDownloadWorker
 import ro.mixai.app.push.Channels

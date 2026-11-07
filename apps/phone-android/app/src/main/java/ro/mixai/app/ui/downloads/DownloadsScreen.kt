@@ -68,7 +68,7 @@ import ro.mixai.app.downloads.SmartDownloadWorker
 import ro.mixai.app.nav.Dest
 import ro.mixai.app.nav.Navigator
 import ro.mixai.app.ui.components.Chip
-import ro.mixai.app.ui.components.EmptyState
+import ro.mixai.mobile.ui.EmptyState
 import ro.mixai.tv.data.MediaRef
 import java.util.Locale
 

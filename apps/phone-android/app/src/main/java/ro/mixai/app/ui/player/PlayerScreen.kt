@@ -172,9 +172,9 @@ import ro.mixai.app.PipController
 import ro.mixai.app.R
 import ro.mixai.app.nav.Dest
 import ro.mixai.app.nav.Navigator
-import ro.mixai.app.ui.components.ErrorState
+import ro.mixai.mobile.ui.ErrorState
 import ro.mixai.app.ui.components.findActivity
-import ro.mixai.app.ui.theme.Mixai
+import ro.mixai.mobile.theme.Mixai
 import ro.mixai.tv.data.ClientIdentity
 import ro.mixai.tv.data.MediaRef
 import ro.mixai.tv.data.MmoApi

@@ -37,7 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import ro.mixai.app.R
-import ro.mixai.app.ui.theme.Mixai
+import ro.mixai.mobile.theme.Mixai
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.TmdbSize
 import ro.mixai.tv.data.generated.Offer

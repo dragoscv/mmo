@@ -62,13 +62,13 @@ import ro.mixai.app.data.FamilyProfileStats
 import ro.mixai.app.data.FamilyStats
 import ro.mixai.app.data.ProfileUsage
 import ro.mixai.app.nav.Navigator
-import ro.mixai.app.ui.components.EmptyState
-import ro.mixai.app.ui.components.ErrorState
-import ro.mixai.app.ui.components.LoadingSkeleton
-import ro.mixai.app.ui.components.ProfileAvatar
+import ro.mixai.mobile.ui.EmptyState
+import ro.mixai.mobile.ui.ErrorState
+import ro.mixai.mobile.ui.LoadingSkeleton
+import ro.mixai.mobile.ui.ProfileAvatar
 import ro.mixai.app.ui.kids.CapUi
 import ro.mixai.app.ui.kids.capUiState
-import ro.mixai.app.ui.theme.Mixai
+import ro.mixai.mobile.theme.Mixai
 
 /** Localised "1 h 05 min" / "45 min". */
 @Composable

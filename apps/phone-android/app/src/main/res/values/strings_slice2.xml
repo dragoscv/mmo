@@ -10,9 +10,4 @@
     <string name="downloads_notification">Downloading for offline</string>
 
     <!-- native sign-in -->
-    <string name="signin_google">Continue with Google</string>
-    <string name="signin_google_working">Signing in with Google…</string>
-    <string name="signin_google_failed">Google sign-in failed: %1$s</string>
-    <string name="signin_google_no_account">No Google account on this phone. Use the code below instead.</string>
-    <string name="signin_or_code">Or sign in with a code</string>
 </resources>

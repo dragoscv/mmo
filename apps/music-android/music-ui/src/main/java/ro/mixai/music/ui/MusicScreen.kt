@@ -61,6 +61,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import ro.mixai.music.ui.R
+import ro.mixai.mobile.ui.EmptyState
+import ro.mixai.mobile.ui.ErrorState
+import ro.mixai.mobile.ui.LoadingSkeleton
+import ro.mixai.mobile.ui.errorText
+import ro.mixai.mobile.R as MobileR
 import ro.mixai.tv.data.generated.AlbumCard
 import ro.mixai.tv.data.generated.ArtistCard
 import ro.mixai.tv.data.generated.MusicHome
@@ -101,12 +106,12 @@ fun MusicScreen(deps: MusicDeps, nav: MusicNav, header: @Composable () -> Unit) 
         val h = home
         when {
             error != null -> ErrorState(error, onRetry = { reload++ })
-            h == null -> LoadingSkeleton(rows = 3, cardWidth = 140.dp)
+            h == null -> LoadingSkeleton(hero = false, rows = 3, cardWidth = 140.dp)
             emptyLibrary -> EmptyState(
                 icon = Icons.Outlined.LibraryMusic,
                 title = stringResource(R.string.music_empty_title),
                 hint = stringResource(R.string.music_empty_hint),
-            ) { Button(onClick = { reload++ }) { Text(stringResource(R.string.music_action_retry)) } }
+            ) { Button(onClick = { reload++ }) { Text(stringResource(MobileR.string.common_action_retry)) } }
             else -> {
                 PrimaryScrollableTabRow(selectedTabIndex = tab, edgePadding = 16.dp) {
                     MusicTab.entries.forEachIndexed { i, t ->
@@ -257,7 +262,7 @@ private fun ArtistsTab(deps: MusicDeps, nav: MusicNav) {
             if (error != null) item {
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(errorText(error), Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
-                    Button(onClick = { error = null; attempt++ }) { Text(stringResource(R.string.music_action_retry)) }
+                    Button(onClick = { error = null; attempt++ }) { Text(stringResource(MobileR.string.common_action_retry)) }
                 }
             }
         }

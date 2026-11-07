@@ -60,8 +60,8 @@ import ro.mixai.app.R
 import ro.mixai.app.nav.Dest
 import ro.mixai.app.nav.Navigator
 import ro.mixai.app.nav.Tab
-import ro.mixai.app.ui.components.EmptyState
-import ro.mixai.app.ui.components.ErrorState
+import ro.mixai.mobile.ui.EmptyState
+import ro.mixai.mobile.ui.ErrorState
 import ro.mixai.app.ui.components.TabHeader
 import ro.mixai.tv.data.LiveTvGroup
 import ro.mixai.tv.data.LiveTvNowNext

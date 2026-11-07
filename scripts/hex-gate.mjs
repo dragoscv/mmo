@@ -25,6 +25,8 @@ const DEFAULT_ROOTS = [
     "apps/tv-android/app/src/main/java",
     "apps/tv-android/core/src/main/java",
     "apps/phone-android/app/src/main/java",
+    "apps/mobile-android-common/src/main/java",
+    "apps/music-android",
 ];
 const EXT_RE = /\.(ts|tsx|css|kt)$/;
 const HEX_RE = /#[0-9a-f]{3,8}\b/gi;

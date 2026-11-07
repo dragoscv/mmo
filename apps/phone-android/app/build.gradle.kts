@@ -95,6 +95,7 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":mobile-common"))
     implementation(project(":music-ui"))
 
     implementation(platform(libs.compose.bom))

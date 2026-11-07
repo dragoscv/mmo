@@ -119,12 +119,3 @@ data class PlexImportResult(
 /** 403 body of the kids playback gate. */
 @Serializable
 data class DailyCapError(val error: String = "", val profileId: String? = null, val dailyCapMin: Long? = null, val watchMin: Long = 0L)
-
-/** `/api/auth/native/google` answer (subset). */
-@Serializable
-data class NativeSessionUser(val id: String = "", val name: String? = null, val email: String? = null, val image: String? = null)
-
-@Serializable
-data class NativeSession(val session_token: String = "", val sessionToken: String = "", val expires: String = "", val user: NativeSessionUser = NativeSessionUser()) {
-    val token: String get() = sessionToken.ifBlank { session_token }
-}

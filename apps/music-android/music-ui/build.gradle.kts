@@ -28,6 +28,7 @@ android {
 
 dependencies {
     api(project(":core"))
+    api(project(":mobile-common"))
 
     api(platform(libs.compose.bom))
     api(libs.bundles.compose)

@@ -70,9 +70,9 @@ import kotlinx.coroutines.delay
 import ro.mixai.app.AppDeps
 import ro.mixai.app.R
 import ro.mixai.app.nav.Navigator
-import ro.mixai.app.ui.components.errorText
+import ro.mixai.mobile.ui.errorText
 import ro.mixai.app.ui.components.findActivity
-import ro.mixai.app.ui.theme.Mixai
+import ro.mixai.mobile.theme.Mixai
 import ro.mixai.tv.data.LiveTvNowNext
 import ro.mixai.tv.data.generated.LiveTvChannel
 import kotlin.math.abs

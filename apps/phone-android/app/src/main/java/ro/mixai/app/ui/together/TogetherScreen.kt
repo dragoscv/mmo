@@ -83,7 +83,7 @@ import ro.mixai.app.BuildConfig
 import ro.mixai.app.R
 import ro.mixai.app.nav.Dest
 import ro.mixai.app.nav.Navigator
-import ro.mixai.app.ui.theme.Mixai
+import ro.mixai.mobile.theme.Mixai
 import ro.mixai.tv.data.HubClient
 import ro.mixai.tv.data.HubStatus
 import ro.mixai.tv.data.MediaRef

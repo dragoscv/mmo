@@ -70,7 +70,7 @@ import ro.mixai.app.downloads.DownloadCenter
 import ro.mixai.app.downloads.SmartDownloadWorker
 import ro.mixai.app.nav.Dest
 import ro.mixai.app.nav.Navigator
-import ro.mixai.app.ui.components.ProfileAvatar
+import ro.mixai.mobile.ui.ProfileAvatar
 import ro.mixai.app.ui.kids.capRemainingLabel
 import ro.mixai.app.ui.kids.capUiState
 import ro.mixai.tv.data.isKid

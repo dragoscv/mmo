@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import ro.mixai.music.ui.R
+import ro.mixai.mobile.ui.ErrorState
+import ro.mixai.mobile.R as MobileR
 import ro.mixai.tv.data.generated.AlbumDetail
 import ro.mixai.tv.data.generated.ArtistDetail
 
@@ -50,7 +52,7 @@ import ro.mixai.tv.data.generated.ArtistDetail
 internal fun BackBar(nav: MusicNav) {
     Box(Modifier.fillMaxWidth().statusBarsPadding().padding(4.dp)) {
         IconButton(onClick = { nav.back() }) {
-            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.music_action_back))
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(MobileR.string.common_action_back))
         }
     }
 }

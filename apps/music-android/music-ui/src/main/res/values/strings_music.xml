@@ -44,4 +44,10 @@
     <string name="music_queue_empty">The queue is empty.</string>
     <string name="music_no_lyrics">No lyrics for this track.</string>
     <string name="music_lyrics_error">Lyrics could not be loaded.</string>
+    <string name="music_search_hint">Artists, albums, tracks</string>
+    <string name="music_search_clear">Clear search</string>
+    <string name="music_search_title">Search your music</string>
+    <string name="music_search_prompt">Type at least two letters.</string>
+    <string name="music_search_none">Nothing found for “%1$s”</string>
+    <string name="music_search_tracks">Tracks</string>
 </resources>

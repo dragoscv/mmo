@@ -21,7 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import ro.mixai.app.ui.theme.MixaiTheme
+import ro.mixai.mobile.theme.MixaiTheme
+import ro.mixai.mobile.LocalMobileConfig
 import java.util.Locale
 
 /** PiP policy for the current screen (set by the player). */
@@ -48,15 +49,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             val localeTag by settings.locale.collectAsState(initial = "")
             LocalizedContent(localeTag) {
-                MixaiTheme {
+                MixaiTheme { CompositionLocalProvider(LocalMobileConfig provides (application as MixaiPhoneApp).phone.config) {
                     val conn by settings.connection.collectAsState(initial = null)
                     val session by settings.session.collectAsState(initial = null)
-                    val c = conn ?: return@MixaiTheme
-                    val s = session ?: return@MixaiTheme
+                    val c = conn ?: return@CompositionLocalProvider
+                    val s = session ?: return@CompositionLocalProvider
                     ready = true
                     val link by deepLink
                     AppRoot(c, s, settings, localeTag, link) { deepLink.value = null }
-                }
+                } }
             }
         }
     }

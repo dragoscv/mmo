@@ -70,7 +70,7 @@ import ro.mixai.app.R
 import ro.mixai.app.nav.Dest
 import ro.mixai.app.nav.Navigator
 import ro.mixai.app.ui.components.CardRow
-import ro.mixai.app.ui.components.ErrorState
+import ro.mixai.mobile.ui.ErrorState
 import ro.mixai.app.ui.components.PosterCard
 import ro.mixai.app.ui.components.TabHeader
 import ro.mixai.tv.data.generated.AlbumCard
@@ -208,7 +208,7 @@ fun SearchScreen(deps: AppDeps, nav: Navigator) {
                 SearchState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.TopCenter).padding(top = 48.dp))
                 is SearchState.Failed -> ErrorState(s.error, onRetry = { retry++ })
                 is SearchState.Loaded -> if (s.r.isEmpty) {
-                    ro.mixai.app.ui.components.EmptyState(
+                    ro.mixai.mobile.ui.EmptyState(
                         icon = Icons.Outlined.SearchOff,
                         title = stringResource(R.string.search_no_results, s.r.query),
                         hint = stringResource(R.string.search_no_results_hint),
@@ -224,7 +224,7 @@ fun SearchScreen(deps: AppDeps, nav: Navigator) {
 @Composable
 private fun RecentList(recent: List<String>, onPick: (String) -> Unit, onRemove: (String) -> Unit, onClear: () -> Unit) {
     if (recent.isEmpty()) {
-        ro.mixai.app.ui.components.EmptyState(
+        ro.mixai.mobile.ui.EmptyState(
             icon = Icons.Filled.Search,
             title = stringResource(R.string.search_empty_title),
             hint = stringResource(R.string.search_empty_hint),

@@ -72,7 +72,7 @@ import kotlinx.serialization.json.put
 import ro.mixai.app.AppDeps
 import ro.mixai.app.R
 import ro.mixai.app.nav.Navigator
-import ro.mixai.app.ui.components.EmptyState
+import ro.mixai.mobile.ui.EmptyState
 import ro.mixai.app.ui.playon.remoteTargets
 import ro.mixai.tv.data.HubStatus
 import ro.mixai.tv.data.generated.HubDevice

@@ -10,6 +10,8 @@ Work: tracker §12 WP17. Update this table in the same commit as any release, re
 | Web | `apps/web` | MixAI | — | 3.1.7 | Watching (`/media`) + organizer + DJ live + AI | Cloud Run, `mixai.ro` |
 | Android TV | `apps/tv-android` | MixAI TV | `ro.mixai.tv` | 2.1.2 | Watching | Sideload / CI artifact |
 | Phone Android | `apps/phone-android` | MixAI | `ro.mixai.app` | 1.1.0 | Watching, remote, downloads | **Google Play production, live 2026-11-06** |
+| Music Android | `apps/music-android/app` (`:music`) | MixAI Music | `ro.mixai.music` | 0.1.0 | Music: library, search, now playing, lyrics, queue | Debug builds; Play record pending (WP17-41i) |
+| Android shared libs | `apps/mobile-android-common` (`:mobile-common`), `apps/music-android/music-ui` (`:music-ui`) | — | `ro.mixai.mobile`, `ro.mixai.music.ui` | — | Theme/tokens, connect + sign-in, profiles; shared music screens (D50/D52) | Built into `:phone` and `:music` |
 | iPhone | `apps/ios` | MixAI | `ro.mixai.app` | 1.1.0 | Watching, remote, downloads, widgets | App Store, waiting for review |
 | Apple Watch | `apps/ios/MixAIWatch` | MixAI | `ro.mixai.app.watchkitapp` | 1.1.0 | Remote, now playing | Not embedded in 1.1.x |
 | Samsung TV | `apps/tv-tizen` | MixAI TV | `mXa1TvApp0` | 2.2.0 | Watching | Sideload (signed `.wgt`) |
