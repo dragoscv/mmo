@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_home">Home</string>
+    <string name="library_playlists">Playlists</string>
+    <string name="library_artists">Artists</string>
+    <string name="library_albums">Albums</string>
+    <string name="library_mix">Shuffle all</string>
+    <string name="library_mix_hint">A random mix from your library</string>
+    <string name="library_recent">Recently played</string>
+    <string name="library_newest">Recently added</string>
+    <string name="library_most_played">Most played</string>
+    <string name="library_discover">Discover</string>
+    <string name="library_top_tracks">Top tracks</string>
+    <string name="library_tracks_group">Tracks</string>
+    <string name="library_artist_radio">%1$s radio</string>
+    <string name="library_tracks">Tracks: %1$d</string>
+    <string name="library_sign_in">Open the app and connect to your MMO Server.</string>
+    <string name="library_error">The server could not be reached.</string>
+</resources>

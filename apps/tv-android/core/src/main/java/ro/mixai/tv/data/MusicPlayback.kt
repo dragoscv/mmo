@@ -24,6 +24,7 @@ import ro.mixai.tv.data.generated.MusicQueueInput
 import ro.mixai.tv.data.generated.TrackCard
 import ro.mixai.tv.data.generated.TrackPlayInput
 import ro.mixai.tv.player.MusicService
+import ro.mixai.tv.player.TrackItems
 import kotlin.coroutines.resume
 
 /** off | all | one (server `MusicQueue.repeat`). */
@@ -113,6 +114,21 @@ class MusicPlayback(
         scheduleSave()
     }
 
+    /**
+     * Voice / Assistant request: the service resolves [query] (blank = a mix) with [MusicResolver]
+     * and the resulting queue is mirrored back into [state] by the player listener.
+     */
+    fun playFromSearch(query: String?, extras: android.os.Bundle? = null) {
+        scope.launch {
+            val c = runCatching { ensureController() }.getOrElse { Log.w(TAG, "search: ${it.message}"); return@launch }
+            val request = MediaItem.RequestMetadata.Builder().setSearchQuery(query.orEmpty()).setExtras(extras).build()
+            c.setMediaItems(listOf(MediaItem.Builder().setRequestMetadata(request).build()))
+            c.prepare()
+            c.play()
+            playedKey = null
+        }
+    }
+
     fun toggle() { controller?.let { if (it.isPlaying) it.pause() else it.play() } }
     fun pause() { controller?.pause() }
     fun resume() { controller?.play() }
@@ -154,25 +170,17 @@ class MusicPlayback(
 
     // ─── internals ────────────────────────────────────────────────────────
 
-    private fun toItem(t: TrackCard): MediaItem {
-        val uri = Uri.parse(music.streamUrl(t))
-        return MediaItem.Builder()
-            .setMediaId(t.id)
-            .setUri(uri)
-            .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(uri).build())
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(t.title)
-                    .setArtist(t.artist)
-                    .setAlbumTitle(t.album)
-                    .setArtworkUri(music.coverUrl(t)?.let(Uri::parse))
-                    .setIsPlayable(true)
-                    .build(),
-            )
-            .build()
+    private fun toItem(t: TrackCard): MediaItem = TrackItems.toItem(t, music.streamUrl(t), music.coverUrl(t)?.let(Uri::parse))
+
+    /** Another controller (Android Auto, Assistant, the notification) replaced the queue → mirror the player. */
+    private fun syncQueueFrom(p: Player) {
+        val n = p.mediaItemCount
+        if (n == queue.size && (0 until n).all { p.getMediaItemAt(it).mediaId == queue[it].id }) return
+        queue = (0 until n).mapNotNull { TrackItems.fromItem(p.getMediaItemAt(it)) }
     }
 
     private fun publish(p: Player) {
+        syncQueueFrom(p)
         val idx = p.currentMediaItemIndex
         val id = p.currentMediaItem?.mediaId
         val track = queue.getOrNull(idx)?.takeIf { it.id == id } ?: queue.firstOrNull { it.id == id }

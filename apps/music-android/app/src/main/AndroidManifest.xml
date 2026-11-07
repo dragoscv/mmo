@@ -41,6 +41,11 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Assistant "play X on MixAI Music" (legacy voice action; Media3 routes it to MusicService). -->
+            <intent-filter>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
             <!-- mixai-music://album/<id>, mixai-music://artist/<id>, mixai-music://now-playing (D51, TV handoff). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -49,5 +54,13 @@
                 <data android:scheme="mixai-music" />
             </intent-filter>
         </activity>
+
+        <!-- Android Auto: this app is a media app; MusicService (from :core) serves the browse tree. -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+        <meta-data
+            android:name="com.google.android.gms.car.notification.SmallIcon"
+            android:resource="@drawable/ic_launcher_foreground" />
     </application>
 </manifest>

@@ -16,14 +16,18 @@ import ro.mixai.tv.data.generated.MusicQueueInput
 import ro.mixai.tv.data.generated.MusicSearch
 import ro.mixai.tv.data.generated.PlaylistCard
 import ro.mixai.tv.data.generated.TrackCard
+import ro.mixai.tv.player.MusicSource
 
 // Music JSON API (`/media/music/*`, WP16-11). Covers + streams are Subsonic URLs that need the
 // device token as `apiKey` (`MmoApi.withApiKey`) because Coil/Media3 cannot send headers per item.
-class MusicRepository(private val api: MmoApi, private val profileId: () -> String = { "default" }) {
+class MusicRepository(private val api: MmoApi, private val profileId: () -> String = { "default" }) : MusicSource {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true; explicitNulls = false }
+    // Request bodies: defaults must be written (an empty `trackIds` equals its default and was dropped →
+    // server 400 "trackIds must be an array"); nulls stay out.
+    private val bodyJson = Json { encodeDefaults = true; explicitNulls = false }
     private val profile: String get() = profileId().ifBlank { "default" }
 
-    suspend fun home(): MusicHome = json.decodeFromString(api.getJson("/media/music/home?profile=${api.encode(profile)}"))
+    override suspend fun home(): MusicHome = json.decodeFromString(api.getJson("/media/music/home?profile=${api.encode(profile)}"))
 
     /** Artists A–Z; `letter` = initial (`#` for non-letters as the server defines it). */
     suspend fun artists(letter: String? = null, offset: Int = 0, limit: Int = 200): ArtistPage {
@@ -34,9 +38,9 @@ class MusicRepository(private val api: MmoApi, private val profileId: () -> Stri
         return json.decodeFromString(api.getJson(qs))
     }
 
-    suspend fun artist(id: String): ArtistDetail = json.decodeFromString(api.getJson("/media/music/artists/${api.encode(id)}"))
+    override suspend fun artist(id: String): ArtistDetail = json.decodeFromString(api.getJson("/media/music/artists/${api.encode(id)}"))
 
-    suspend fun album(id: String): AlbumDetail = json.decodeFromString(api.getJson("/media/music/albums/${api.encode(id)}"))
+    override suspend fun album(id: String): AlbumDetail = json.decodeFromString(api.getJson("/media/music/albums/${api.encode(id)}"))
 
     suspend fun genres(): List<GenreCard> =
         json.parseToJsonElement(api.getJson("/media/music/genres")).jsonObject["genres"]?.jsonArray
@@ -45,12 +49,28 @@ class MusicRepository(private val api: MmoApi, private val profileId: () -> Stri
     suspend fun genre(name: String, offset: Int = 0, limit: Int = 100): GenreAlbums =
         json.decodeFromString(api.getJson("/media/music/genres/${api.encode(name)}?offset=$offset&limit=$limit"))
 
-    suspend fun search(q: String): MusicSearch = json.decodeFromString(api.getJson("/media/music/search?q=${api.encode(q)}"))
+    override suspend fun search(q: String): MusicSearch = json.decodeFromString(api.getJson("/media/music/search?q=${api.encode(q)}"))
+
+    /** `GET /media/music/playlists` (server 3.10+). */
+    suspend fun playlists(): List<PlaylistCard> = listField("playlists", PlaylistCard.serializer(), "/media/music/playlists")
+
+    /** `GET /media/music/playlists/{id}` tracks in order (server 3.10+). */
+    override suspend fun playlistTracks(id: String): List<TrackCard> = listField("tracks", TrackCard.serializer(), "/media/music/playlists/${api.encode(id)}")
+
+    /** `GET /media/music/random?size=` (1..500). */
+    override suspend fun random(size: Int): List<TrackCard> = listField("tracks", TrackCard.serializer(), "/media/music/random?size=${size.coerceIn(1, 500)}")
+
+    /** `GET /media/music/radio?seed=tr_|al_|ar_&size=` — a track seed comes first. */
+    override suspend fun radio(seed: String, size: Int): List<TrackCard> =
+        listField("tracks", TrackCard.serializer(), "/media/music/radio?seed=${api.encode(seed)}&size=${size.coerceIn(1, 200)}")
+
+    private suspend fun <T> listField(key: String, s: kotlinx.serialization.KSerializer<T>, path: String): List<T> =
+        json.parseToJsonElement(api.getJson(path)).jsonObject[key]?.jsonArray?.map { json.decodeFromJsonElement(s, it) } ?: emptyList()
 
     suspend fun queue(): MusicQueue = json.decodeFromString(api.getJson("/media/music/queue?profile=${api.encode(profile)}"))
 
     suspend fun putQueue(input: MusicQueueInput): MusicQueue =
-        json.decodeFromString(api.putJson("/media/music/queue?profile=${api.encode(profile)}", json.encodeToString(MusicQueueInput.serializer(), input)))
+        json.decodeFromString(api.putJson("/media/music/queue?profile=${api.encode(profile)}", bodyJson.encodeToString(MusicQueueInput.serializer(), input)))
 
     /** 404 → null (no lyrics). */
     suspend fun lyrics(trackId: String): Lyrics? = try {

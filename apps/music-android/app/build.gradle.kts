@@ -38,6 +38,7 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "MIXAI_ORIGIN", "\"$mixaiOrigin\"")
         buildConfigField("String", "MIXAI_WEB_ORIGIN", "\"$mixaiWebOrigin\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
@@ -108,4 +109,7 @@ dependencies {
     implementation(libs.bundles.coil)
 
     testImplementation(libs.junit)
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }

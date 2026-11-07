@@ -110,7 +110,19 @@ fun MusicRoot(app: MixaiMusicApp, conn: Connection, session: AccountSession, loc
     LaunchedEffect(link, graph, nav.current) {
         val l = link ?: return@LaunchedEffect
         if (graph == null || nav.current.isChromeless) return@LaunchedEffect
-        if (l is Dest.TabRoot) nav.selectTab(l.tab) else nav.resetTo(Dest.TabRoot(Tab.Home), l)
+        when (l) {
+            is Dest.TabRoot -> nav.selectTab(l.tab)
+            is Dest.PlaySearch -> {
+                val extras = android.os.Bundle().apply {
+                    l.focus?.let { putString(android.provider.MediaStore.EXTRA_MEDIA_FOCUS, it) }
+                    l.artist?.let { putString(android.provider.MediaStore.EXTRA_MEDIA_ARTIST, it) }
+                    l.album?.let { putString(android.provider.MediaStore.EXTRA_MEDIA_ALBUM, it) }
+                }
+                graph.musicPlayback.playFromSearch(l.query, extras)
+                nav.resetTo(Dest.TabRoot(Tab.Home), Dest.NowPlaying)
+            }
+            else -> nav.resetTo(Dest.TabRoot(Tab.Home), l)
+        }
         onLinkConsumed()
     }
 
@@ -237,7 +249,7 @@ private fun Screen(
                 is Dest.Album -> AlbumScreen(g, nav, dest.id)
                 is Dest.Artist -> ArtistScreen(g, nav, dest.id)
                 Dest.NowPlaying -> NowPlayingScreen(g, nav)
-                Dest.Welcome, Dest.SignIn, Dest.Manual, is Dest.Discover, is Dest.Pair -> Unit
+                Dest.Welcome, Dest.SignIn, Dest.Manual, is Dest.Discover, is Dest.Pair, is Dest.PlaySearch -> Unit
             }
         }
     }

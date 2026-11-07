@@ -1,7 +1,8 @@
 // Shared Android data layer (WP16-49): MMO Server / mixai.ro API client, repositories, generated
 // OpenAPI models, settings store, hub client and the background MusicService. Used by `:app`
 // (Google TV) and the phone app. Packages stay `ro.mixai.tv.*` so no call site changed; the
-// namespace differs from the app because android.nonTransitiveRClass is on. No resources, no R.
+// namespace differs from the app because android.nonTransitiveRClass is on. Only resources: the
+// browse-tree labels of MusicService (res/values*/strings_library.xml, RO + EN).
 // AGP 9 ships built-in Kotlin: no `org.jetbrains.kotlin.android` plugin, no kotlinOptions.
 plugins {
     alias(libs.plugins.android.library)

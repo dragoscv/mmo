@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_home">Acasă</string>
+    <string name="library_playlists">Playlisturi</string>
+    <string name="library_artists">Artiști</string>
+    <string name="library_albums">Albume</string>
+    <string name="library_mix">Amestecă tot</string>
+    <string name="library_mix_hint">Un mix aleatoriu din biblioteca ta</string>
+    <string name="library_recent">Ascultate recent</string>
+    <string name="library_newest">Adăugate recent</string>
+    <string name="library_most_played">Cele mai ascultate</string>
+    <string name="library_discover">Descoperă</string>
+    <string name="library_top_tracks">Piese de top</string>
+    <string name="library_tracks_group">Piese</string>
+    <string name="library_artist_radio">Radio %1$s</string>
+    <string name="library_tracks">Piese: %1$d</string>
+    <string name="library_sign_in">Deschide aplicația și conectează-te la MMO Server.</string>
+    <string name="library_error">Serverul nu poate fi contactat.</string>
+</resources>

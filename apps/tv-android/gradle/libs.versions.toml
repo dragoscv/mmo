@@ -31,6 +31,9 @@ googleid = "1.2.1"
 firebaseBom = "35.1.0"
 googleServices = "4.5.0"
 sentryAndroid = "8.63.0"
+# Instrumented tests (MixAI Music browse tree on device, WP17-41c), latest stable on Google Maven 2026-11-07.
+androidxTestRunner = "1.7.0"
+androidxTestExtJunit = "1.3.0"
 
 # compose-bom 2026.09.00 / coil 3.6.2 AARs require compileSdk ≥ 37 (checkAarMetadata); targetSdk stays 36.
 compileSdk = "37"
@@ -85,6 +88,8 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core", version.ref = "materialIcons" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
 
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 

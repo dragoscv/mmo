@@ -1,9 +1,11 @@
 package ro.mixai.music
 
+import android.app.SearchManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
+import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -62,8 +64,17 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun parse(intent: Intent?): Dest? {
+        if (intent?.action == MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) {
+            val x = intent.extras
+            return Dest.PlaySearch(
+                query = intent.getStringExtra(SearchManager.QUERY).orEmpty(),
+                focus = x?.getString(MediaStore.EXTRA_MEDIA_FOCUS),
+                artist = x?.getString(MediaStore.EXTRA_MEDIA_ARTIST),
+                album = x?.getString(MediaStore.EXTRA_MEDIA_ALBUM),
+            )
+        }
         val data = intent?.data ?: return null
-        return MusicNavigator.parseLink(data.scheme, data.host, data.pathSegments)
+        return MusicNavigator.parseLink(data.scheme, data.host, data.pathSegments) { data.getQueryParameter(it) }
     }
 }
 

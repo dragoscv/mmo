@@ -22,6 +22,8 @@ sealed interface Dest {
     data class Album(val id: String) : Dest
     data class Artist(val id: String) : Dest
     data object NowPlaying : Dest
+    /** Voice / Assistant request (`MEDIA_PLAY_FROM_SEARCH`, `mixai-music://play?q=`); blank = a mix. Opens Now Playing. */
+    data class PlaySearch(val query: String, val focus: String? = null, val artist: String? = null, val album: String? = null) : Dest
 
     /** Onboarding / full-screen destinations hide the bottom bar and the mini player. */
     val isChromeless: Boolean
@@ -67,7 +69,7 @@ class MusicNavigator(start: Dest) : MusicNav {
 
     companion object {
         /** `mixai-music://album/<id>` | `artist/<id>` | `now-playing` → destination on top of Home. */
-        fun parseLink(scheme: String?, host: String?, segments: List<String>): Dest? {
+        fun parseLink(scheme: String?, host: String?, segments: List<String>, query: (String) -> String? = { null }): Dest? {
             if (scheme != "mixai-music") return null
             val id = segments.firstOrNull()?.takeIf { it.isNotBlank() }
             return when (host) {
@@ -75,6 +77,7 @@ class MusicNavigator(start: Dest) : MusicNav {
                 "artist" -> id?.let { Dest.Artist(it) }
                 "now-playing" -> Dest.NowPlaying
                 "search" -> Dest.TabRoot(Tab.Search)
+                "play" -> Dest.PlaySearch(query("q").orEmpty())
                 else -> null
             }
         }
