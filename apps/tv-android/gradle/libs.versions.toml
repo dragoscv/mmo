@@ -34,6 +34,8 @@ sentryAndroid = "8.63.0"
 # Instrumented tests (MixAI Music browse tree on device, WP17-41c), latest stable on Google Maven 2026-11-07.
 androidxTestRunner = "1.7.0"
 androidxTestExtJunit = "1.3.0"
+# MixAI Music home-screen widget (WP17-41f), latest stable on Google Maven 2026-11-07 (1.3 is alpha).
+glance = "1.2.0"
 
 # compose-bom 2026.09.00 / coil 3.6.2 AARs require compileSdk ≥ 37 (checkAarMetadata); targetSdk stays 36.
 compileSdk = "37"
@@ -56,6 +58,7 @@ media3-ui-compose = { group = "androidx.media3", name = "media3-ui-compose", ver
 media3-cast = { group = "androidx.media3", name = "media3-cast", version.ref = "media3" }
 media3-exoplayer-workmanager = { group = "androidx.media3", name = "media3-exoplayer-workmanager", version.ref = "media3" }
 work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
+glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
 credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
 googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }

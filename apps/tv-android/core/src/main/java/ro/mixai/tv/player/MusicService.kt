@@ -99,6 +99,7 @@ class MusicService : MediaLibraryService() {
             audioPrefs.collect { gain.target = player.currentMediaItem?.let(::gainFor) ?: 1f }
         }
         crossfader = Crossfader(this, player, sources, { audioPrefs.value }, ::gainFor).also { it.start() }
+        playerHook?.invoke(this, player)
         session = MediaLibrarySession.Builder(this, player, Callback())
             .setId(SESSION_ID)
             .build()
@@ -397,6 +398,12 @@ class MusicService : MediaLibraryService() {
          * cache: receives the network factory, returns the factory the player uses. Null = network only.
          */
         @Volatile var dataSourceDecorator: ((android.content.Context, DataSource.Factory) -> DataSource.Factory)? = null
+
+        /**
+         * Set once by an app to observe the session player (MixAI Music home-screen widget): called on the
+         * main thread right after the player is built; the hook adds its own listener.
+         */
+        @Volatile var playerHook: ((android.content.Context, Player) -> Unit)? = null
 
         /** Crossfade / normalisation preferences, pushed by the app (MixAI Music settings); default off. */
         val audioPrefs = MutableStateFlow(AudioPrefs())

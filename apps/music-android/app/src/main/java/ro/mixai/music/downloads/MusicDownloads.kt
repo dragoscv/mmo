@@ -116,11 +116,16 @@ object MusicDownloads : MusicOffline {
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
     }
 
-    /** Unmetered-only (Wi-Fi) or any network. */
+    /**
+     * Unmetered-only (Wi-Fi) or any network. Set on the in-process manager, not via
+     * `DownloadService.sendSetRequirements`: that starts the service and throws
+     * BackgroundServiceStartNotAllowedException when the process was started in the background
+     * (widget broadcast, boot, media button).
+     */
     fun setWifiOnly(context: Context, wifiOnly: Boolean) {
         init(context)
         val req = Requirements(if (wifiOnly) Requirements.NETWORK_UNMETERED else Requirements.NETWORK)
-        DownloadService.sendSetRequirements(context, MusicDownloadService::class.java, req, false)
+        manager?.requirements = req
     }
 
     override fun download(tracks: List<TrackCard>): Boolean {

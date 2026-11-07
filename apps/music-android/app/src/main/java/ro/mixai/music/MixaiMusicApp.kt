@@ -15,6 +15,7 @@ import ro.mixai.mobile.auth.SessionVault
 import ro.mixai.music.data.MusicSettings
 import ro.mixai.music.downloads.MusicDownloadService
 import ro.mixai.music.downloads.MusicDownloads
+import ro.mixai.music.widget.MusicWidgetBridge
 import ro.mixai.tv.data.ClientIdentity
 import ro.mixai.tv.data.MmoApi
 import ro.mixai.tv.data.Settings
@@ -56,6 +57,8 @@ class MixaiMusicApp : Application(), SingletonImageLoader.Factory {
         MusicDownloadService.ensureChannel(this)
         MusicDownloads.init(this)
         MusicService.dataSourceDecorator = { ctx, upstream -> MusicDownloads.dataSourceFactory(ctx, upstream) }
+        // Home-screen widget (WP17-41f) follows the service player.
+        MusicService.playerHook = { ctx, player -> MusicWidgetBridge.attach(ctx, player) }
         appScope.launch {
             settings.connection.collect { c -> MusicDownloads.api = if (c.isComplete) MmoApi(c.baseUrl, c.token) else null }
         }

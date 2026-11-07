@@ -98,6 +98,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.bundles.lifecycle)
     implementation(libs.androidx.core.splashscreen)
+    implementation(libs.glance.appwidget)
 
     implementation(libs.navigation3.runtime)
     implementation(libs.navigation3.ui)
