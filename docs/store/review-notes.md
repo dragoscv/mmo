@@ -81,6 +81,20 @@ services: dataSync = "Other network processing" (offline downloads, video https:
 mediaPlayback = media playback (https://youtube.com/shorts/PG5bqbNpINk); both unlisted, personal notifications
 blurred. Store settings: Video Players & Editors, contact = developer account email, website = web origin.
 
+## MixAI Music (ro.mixai.music) — Google Play (WP17-41i, 2026-11-07)
+
+- Console app 4973783961074556020, phone + Wear OS in one listing (Wear opted in), Android Auto active.
+- Sign in details: same demo server steps as above, app name "MixAI Music"; profile "Reviewer". Music (artists,
+  albums, playlists, radio, downloads, Android Auto) is then available; MixAI account sign-in is optional.
+- Data safety: name, email, user IDs only (optional MixAI account), collected, not shared, encrypted, deletion
+  `https://mixai.ro/account/delete`. No push token and no cloud history sync in this app.
+- Foreground services: dataSync = "Other network processing" (offline downloads,
+  https://youtube.com/shorts/4O1Cke5C2rM), mediaPlayback (https://youtube.com/shorts/8txHuOnsSzU); recorded on an
+  emulator, unlisted.
+- IARC: All other app types, every answer No -> PEGI 3 / ESRB Everyone. Target audience 13+. Ads no, ad ID no.
+- Testers: internal list "MixAI internal"; closed tracks "Alpha" (phone) + "Wear closed" with the Google Group
+  mixai-music-testers@googlegroups.com (anyone can join), feedback support@mixai.ro.
+
 ## Content declarations (both stores)
 
 - No user-generated public content except Watch Together room chat (moderated: word filter, report, block —
