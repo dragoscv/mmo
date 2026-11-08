@@ -621,7 +621,7 @@ Fire TV Vega OS runs no APK; Apple 5.2.3/2.1 demo account), Plex/Jellyfin/Emby f
 
 | ID | Item | Status |
 |---|---|---|
-| WP18-01 | `mixai-listen` Rust crate: streaming BPM + beat phase, HPCP chroma + key (Camelot, confidence), A4 tuning, pitch/tuner, chords, LUFS momentary/short-term, energy; file mode; unit tests on synthetic + reference audio | todo |
+| WP18-01 | `mixai-listen` Rust crate: streaming BPM + beat phase, HPCP chroma + key (Camelot, confidence), A4 tuning, pitch/tuner, chords, LUFS momentary/short-term, energy; file mode; unit tests on synthetic + reference audio | doing (classic DSP core in `crates/mixai-listen`: log-flux onsets + autocorr/comb tempo with phase + lock, HPCP chroma + KK/Temperley key with provisional/locked/key-change, tuning, chord HMM, MPM tuner, EBU R128 + energy, Camelot/Open Key/musical + harmonic.ts port; 30 unit + 1 doc test, clippy clean; real-audio accuracy = WP18-15, CNN = WP18-16) |
 | WP18-02 | UniFFI bindings + build: Android (cargo-ndk arm64/armv7/x86_64 → `:listen-core` AAR) and Apple (xcframework iOS + watchOS via vmui-mac) | todo |
 | WP18-03 | Android phone app `ro.mixai.keybpm` (Compose, M3 Expressive morphing): live screen, Camelot wheel, tuner, chords/chromagram, loudness, file mode, history + CSV/share card, DJ booth mode, EN+RO | todo |
 | WP18-04 | Wear OS app (bundled): live key/BPM, haptic beat, tile + complication | todo |
@@ -660,9 +660,9 @@ Windows MIDI Services (25H2). DVS: xwax/Mixxx GPL; Serato CV02.5 = 1 kHz carrier
 
 | ID | Item | Status |
 |---|---|---|
-| WP19-01 | Rename MixAI DJ → **MixAI Decks** everywhere (apps/mixai productName, tauri.conf, MS Store listing 9P5P2WN26RMS, web products/landing `decks.mixai.ro` + `dj.mixai.ro` redirect, ADR-0013 ripple, app-inventory, docs/mixai/*, i18n RO+EN) | todo |
-| WP19-02 | Decks 1.x (Tauri) release pipeline: CI for apps/mixai (Win MSIX, macOS universal DMG notarised + Mac App Store, Linux AppImage/deb + Flathub manifest), updater, download links on decks.mixai.ro | todo |
-| WP19-03 | Core upgrade: Rust edition 2024, cpal 0.15 → 0.18, symphonia 0.5 → 0.6, rubato 5.0.1; audio thread realtime priority; xrun metrics; `cargo-deny` licence gate | todo |
+| WP19-01 | Rename MixAI DJ → **MixAI Decks** everywhere (apps/mixai productName, tauri.conf, MS Store listing 9P5P2WN26RMS, web products/landing `decks.mixai.ro` + `dj.mixai.ro` redirect, ADR-0013 ripple, app-inventory, docs/mixai/*, i18n RO+EN) | doing |
+| WP19-02 | Decks 1.x (Tauri) release pipeline: CI for apps/mixai (Win MSIX, macOS universal DMG notarised + Mac App Store, Linux AppImage/deb + Flathub manifest), updater, download links on decks.mixai.ro | doing |
+| WP19-03 | Core upgrade: Rust edition 2024, cpal 0.15 → 0.18, symphonia 0.5 → 0.6, rubato 5.0.1; audio thread realtime priority; xrun metrics; `cargo-deny` licence gate | done |
 | WP19-04 | `decks-core` crate split (engine, deck, mixer, routing, fx, sampler, recorder, library, mapping, dvs) with a stable command/event API; UniFFI 0.31 surface (Swift + Kotlin) + binary playhead/peaks channel | todo |
 | WP19-05 | Beat/phase sync + quantize + master clock (beatgrid model with downbeats, fluid/variable grids), key shift, slip, beat-jump, pad modes | todo |
 | WP19-06 | Routing matrix: master + headphone cue (split mono, 4-ch interfaces), cue mix/level, booth out, per-device latency compensation | todo |
@@ -692,8 +692,8 @@ Windows MIDI Services (25H2). DVS: xwax/Mixxx GPL; Serato CV02.5 = 1 kHz carrier
 |---|---|---|
 | WP20-01 | Node 24 LTS (`.nvmrc`, engines, Dockerfiles, CI) + pnpm 12 + pnpm catalogs | todo |
 | WP20-02 | TypeScript 7 everywhere it is unblocked (server, native, gateway, yjs-relay); web stays on TS 6 API dual install until typescript-eslint supports 7 | todo |
-| WP20-03 | apps/gateway: tsup → tsdown, vitest 5, @hono/node-server 2, Node 24 | todo |
-| WP20-04 | apps/native/android: AGP 9.4, Gradle 9.7.1, compileSdk 37, minSdk 26, JDK 21 alignment across CI | todo |
+| WP20-03 | apps/gateway: tsup → tsdown, vitest 5, @hono/node-server 2, Node 24 | done |
+| WP20-04 | apps/native/android: AGP 9.4, Gradle 9.7.1, compileSdk 37, minSdk 26, JDK 21 alignment across CI | done |
 | WP20-05 | Rust edition 2024 + Tauri 2.12.x across mixai/native/rbexport; aligned @tauri-apps/cli | todo |
 | WP20-06 | Web smaller majors: next-auth latest beta, jose 6, @octokit/rest, google-auth-library, react-markdown 10; retire remaining radix-ui primitives in web | todo |
 | WP20-07 | Python analyzer requirements pinned (uv lock); iOS VLCKit pin review; wrangler 4 in yjs-relay | todo |

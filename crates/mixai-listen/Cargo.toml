@@ -1,0 +1,12 @@
+[package]
+name = "mixai-listen"
+version = "0.1.0"
+description = "Streaming key, BPM, beat phase, tuning, chords, pitch and loudness analysis for MixAI (on-device, permissive deps only)"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+realfft = "3.5.1"
+ebur128 = "0.1.11"

@@ -1,0 +1,15 @@
+[workspace]
+resolver = "3"
+members = ["mixai-listen"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.85"
+repository = "https://github.com/dragoscv/mmo"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+opt-level = 3
+strip = true
