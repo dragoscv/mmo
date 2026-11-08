@@ -1,0 +1,15 @@
+MixAI Music plays the user's own music from their own MixAI server (self-hosted). For review we run a public demo server with legally licensed music (Elephants Dream soundtrack by Jan Morgenstern, CC BY 2.5; Tears of Steel soundtrack by Joram Letwory, CC BY-ND 3.0; tracks by Kevin MacLeod, incompetech.com, CC BY 4.0). No login is required.
+
+Steps:
+1. Open MixAI Music > Connect on this network > Enter address.
+2. Type https://34-118-46-71.nip.io (same server: https://34-118-46-71.sslip.io; demo.mixai.ro) > Continue.
+3. The 6-digit pairing code is approved automatically by the demo server within ~3 seconds.
+4. Choose the profile "Reviewer" (no PIN).
+5. Try: Home > Start a mix; Home > an album > Play (albums play gapless); open Now Playing from the mini player (lyrics, queue, sleep timer, AirPlay); the download button on an album page, then the Downloads tab; Settings > Crossfade / Volume levelling.
+6. Lock Screen / Control Center controls work while the app is in the background (background audio). The Home Screen widget and the Control Center control use the same play/pause.
+
+Siri: "Start a mix in MixAI Music" (App Shortcut) and "Play <album> in MixAI Music" (SiriKit media) play from the demo server.
+
+Accounts are optional: Settings > Account > Sign in with MixAI (web device code). Account deletion: https://mixai.ro/account/delete (also linked in Settings).
+
+No purchases, no ads, no tracking. Credits: ATTRIBUTION.md on the demo server.
