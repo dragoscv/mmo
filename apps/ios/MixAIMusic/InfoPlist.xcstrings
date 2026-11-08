@@ -1,0 +1,57 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "CFBundleDisplayName": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MixAI Music"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MixAI Music"
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MixAI Music finds and connects to your MixAI Server on this network to play your music."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MixAI Music găsește serverul MixAI din această rețea și se conectează la el ca să-ți redea muzica."
+          }
+        }
+      }
+    },
+    "NSSiriUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask Siri to play your albums, artists and mixes from your MixAI Server."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cere-i lui Siri să redea albumele, artiștii și mixurile de pe serverul tău MixAI."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

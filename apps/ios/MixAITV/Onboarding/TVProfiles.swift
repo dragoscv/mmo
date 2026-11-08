@@ -1,7 +1,6 @@
 import MixaiCore
 import SwiftUI
 
-extension Profile: @retroactive Identifiable {}
 
 /// "Who's watching?" row of large focusable avatars + a 4-digit PIN pad.
 struct TVProfilePicker: View {

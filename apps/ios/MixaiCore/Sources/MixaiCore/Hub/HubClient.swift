@@ -15,10 +15,13 @@ public enum HubStatus: Sendable { case disconnected, connecting, connected }
 /// receives remote commands and other devices. Reconnects with backoff 1 s → 30 s.
 public actor HubClient {
     public static let caps = ["play", "pause", "seek", "stop", "next", "previous", "text", "navigate", "playback"]
+    /// MixAI Music: a music output for other devices (hub queue handoff, D53) — no video playback.
+    public static let musicCaps = ["play", "pause", "seek", "stop", "next", "previous", "music"]
 
     private let client: MmoClient
     private let deviceId: String
     private let deviceName: String
+    private let caps: [String]
     private var profileId: String?
     private var task: URLSessionWebSocketTask?
     private var loop: Task<Void, Never>?
@@ -33,11 +36,12 @@ public actor HubClient {
     private var messageHandlers: [@Sendable (JSONValue) -> Void] = []
     private var deviceHandlers: [@Sendable ([HubDevice]) -> Void] = []
 
-    public init(client: MmoClient, deviceId: String, deviceName: String, profileId: String?) {
+    public init(client: MmoClient, deviceId: String, deviceName: String, profileId: String?, caps: [String] = HubClient.caps) {
         self.client = client
         self.deviceId = deviceId
         self.deviceName = deviceName
         self.profileId = profileId
+        self.caps = caps
     }
 
     public func onCommand(_ h: @escaping @Sendable (HubCommand) -> Void) { commandHandlers.append(h) }
@@ -121,7 +125,7 @@ public actor HubClient {
             "deviceId": .string(deviceId),
             "name": .string(deviceName),
             "platform": .string(ClientIdentity.current.platform),
-            "caps": .array(Self.caps.map { .string($0) }),
+            "caps": .array(caps.map { .string($0) }),
             "app": .string(ClientIdentity.current.appTag),
         ]
         if let p = profileId { o["profileId"] = .string(p) }

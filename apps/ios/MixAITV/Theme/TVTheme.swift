@@ -1,7 +1,8 @@
 import CoreText
+import MixaiCore
 import SwiftUI
 
-/// Ten-foot theme on the shared generated `Tokens` (packages/design-tokens → MixAI/Theme/Tokens.swift).
+/// Ten-foot theme on the shared generated `Tokens` (packages/design-tokens → MixaiCore/Theme/Tokens.swift).
 enum TVTheme {
     static let background = Tokens.Dark.background
     static let foreground = Tokens.Dark.foreground

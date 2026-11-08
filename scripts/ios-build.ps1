@@ -18,10 +18,12 @@
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode devipa      # development-signed ro.mixai.app for registered devices
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode upload -Ref origin/main
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode tvupload -Ref origin/main   # MixAI TV for Apple TV (WP17-24)
+  pwsh -NoProfile -File scripts/ios-build.ps1 -Mode musicbuild                  # MixAI Music, unsigned (WP17-42)
+  pwsh -NoProfile -File scripts/ios-build.ps1 -Mode musicupload -Ref origin/main  # MixAI Music to TestFlight
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('test', 'build', 'tvbuild', 'devipa', 'upload', 'tvupload')] [string]$Mode = 'build',
+  [ValidateSet('test', 'build', 'tvbuild', 'devipa', 'upload', 'tvupload', 'musicbuild', 'musicdevipa', 'musicupload')] [string]$Mode = 'build',
   [string]$Ref = 'HEAD',
   [string]$GuestHost = '100.106.244.19',
   [int]$GuestPort = 10022,
@@ -43,7 +45,7 @@ function Invoke-Guest([string]$cmd) {
   if ($LASTEXITCODE -ne 0) { throw "guest command failed ($LASTEXITCODE): $($cmd.Split(';')[0])" }
 }
 
-$signed = $Mode -in @('upload', 'devipa', 'tvupload')
+$signed = $Mode -in @('upload', 'devipa', 'tvupload', 'musicdevipa', 'musicupload')
 if ($signed) {
   $names = @(gcloud secrets list --project $Project --filter='name~apple-' --format='value(name)' 2>$null) | ForEach-Object { ($_ -split '/')[-1] }
   $missing = @('apple-asc-key-p8', 'apple-asc-key-id', 'apple-asc-issuer', 'apple-team-id') | Where-Object { $names -notcontains $_ }
@@ -108,7 +110,7 @@ if (-not $signed) {
   $cmd = "cd ~/$remote && chmod 600 .k.p8 && DEVELOPMENT_TEAM=$team ASC_KEY_ID=$kid ASC_ISSUER_ID=$iss ASC_KEY_PATH=`$PWD/.k.p8 BUILD_NUMBER=$build ./scripts/build.sh $Mode; rc=`$?; rm -f .k.p8; exit `$rc"
   & ssh @ssh $target $cmd *>&1 | Tee-Object -FilePath $log
   $rc = $LASTEXITCODE
-  if ($rc -eq 0 -and $Mode -eq 'devipa') {
+  if ($rc -eq 0 -and $Mode -in @('devipa', 'musicdevipa')) {
     $ipa = Join-Path $tmp 'mixai-dev.ipa'
     & scp -q -o BatchMode=yes -i $Key -P $GuestPort "${target}:$remote/build/mixai-dev.ipa" $ipa
     $rc = $LASTEXITCODE

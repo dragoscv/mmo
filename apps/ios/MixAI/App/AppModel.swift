@@ -33,6 +33,8 @@ final class AppModel {
     var origin: String = Prefs.origin
     let player = PlayerCoordinator()
     let music = MusicPlayer()
+    /// Shared music views (MixaiUI) read the store + player from here; no downloads in the video app.
+    let musicEnv: MusicEnvironment
     let offline = OfflineStore()
     let accountStore = AccountStore()
     let push = PushManager()
@@ -68,8 +70,10 @@ final class AppModel {
     @ObservationIgnored private var booting = false
 
     init() {
+        musicEnv = MusicEnvironment(player: music)
         offline.app = self
         together.app = self
+        music.willStart = { [weak self] in self?.player.stop() }
         startPathMonitor()
     }
 
@@ -136,6 +140,7 @@ final class AppModel {
 
     func rebuildProfileScoped() {
         guard let client else { return }
+        musicEnv.store = MusicStore(client: client, profile: profileId)
         progress = ProgressSync(store: MediaStore(client: client, profile: profileId),
                                 queueFile: Self.cacheDir.appendingPathComponent("progress-queue-\(HomeStore.fileName(for: profileId))"))
         Task { await hub?.setProfile(activeProfile?.id) }

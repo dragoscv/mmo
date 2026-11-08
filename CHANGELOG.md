@@ -10,6 +10,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-08 — MixAI Music for iPhone 0.1.0 (ro.mixai.music), shared MixaiUI package, design-tokens 1.2.2
+
+- **MixAI Music for iPhone (new App Store app `ro.mixai.music`, TestFlight):** connect on the Wi-Fi + Quick Connect or
+  with a MixAI account (device code), family profiles with PIN, Home (Start a mix, recent / newest / most played /
+  playlists / random albums), artists A-Z, albums, playlists, search, album / artist / playlist pages.
+- **Playback on AVAudioEngine** (AudioStreaming 1.4.5, MIT): albums continue gapless, equal-power crossfade 3-12 s
+  between other tracks, volume levelling from the server's EBU R128 loudness with a peak limiter (same rules as
+  Android), unsupported formats retried once as server-converted MP3. Synced lyrics, queue editor (play next, add to
+  queue, drag, swipe, clear upcoming), shuffle / repeat, sleep timer (15-60 min or end of track), AirPlay picker,
+  "Play on" MixAI TVs and other MixAI Music devices (hub queue handoff; this iPhone also takes queues), Lock Screen
+  with an animated cover (iOS 26), server queue sync and resume per profile.
+- **Offline:** album / playlist / track downloads (original files, background session, excluded from backup), Wi-Fi
+  only by default, storage limit 1-10 GB / none (automatic downloads evicted first), "download upcoming" 5-25.
+- **System:** Now Playing widget + Control Center play/pause (AudioPlaybackIntent, no app launch), App Shortcuts
+  ("Start a mix in MixAI Music", "Play <album> in MixAI Music"), Siri SiriKit media (INPlayMediaIntent) extension,
+  `mixai-music://` deep links (album, artist, nowplaying, mix, play?ids=). CarPlay audio scene is built in behind
+  `MIXAI_CARPLAY` until Apple grants the entitlement (requested 2026-11-08).
+- **Shared code:** new `apps/ios/MixaiUI` SwiftPM package (theme, components, connect + profile screens, music stack)
+  used by MixAI and MixAI Music; MixaiCore gains `AudioPlan`, `PlayQueue`, `SleepTimer`, `MusicOffline`,
+  `KeychainStore`, more `MusicStore` endpoints (radio, random, playlists, albums, tracks by id, queue) and 20 tests
+  (90 total). The MixAI iPhone app now uses the same music player (gains crossfade, normalisation, queue editor).
+- **design-tokens 1.2.2:** `Tokens.swift` mirror moved to `apps/ios/MixaiCore/Sources/MixaiCore/Theme/` (shared by
+  every Apple target); `tokens-drift` follows.
+
 ## 2026-11-07 — MixAI Music 0.2.0 (play on Cast, DLNA, Home Assistant, MixAI TVs), TV Android 2.2.0, TV Tizen 2.4.0, phone 1.2.0
 
 - **Output picker in Now Playing (MixAI Music, phone app):** one sheet lists this device, MixAI TVs, Google Cast devices

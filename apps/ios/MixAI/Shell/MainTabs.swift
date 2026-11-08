@@ -28,9 +28,10 @@ struct MainTabs: View {
         @Bindable var music = app.music
         styled(tabs($model.selectedTab))
             .fullScreenCover(isPresented: $player.presented) { PlayerView() }
-            .sheet(isPresented: $music.showNowPlaying) { NowPlayingView() }
+            .sheet(isPresented: $music.showNowPlaying) { NowPlayingView().environment(app.musicEnv) }
             .sheet(isPresented: $model.showPlayOn) { PlayOnSheet(request: app.playOnRequest) }
             .overlay(alignment: .top) { ToastBanner() }
+            .environment(app.musicEnv)
             .onAppear { RemoteCommands.install(app) }
     }
 
@@ -39,7 +40,11 @@ struct MainTabs: View {
             Tab("tab.home", systemImage: "house.fill", value: 0) { TabRoot(tab: 0) { HomeView(ns: $0) } }
             Tab("tab.search", systemImage: "magnifyingglass", value: 1, role: .search) { TabRoot(tab: 1) { SearchView(ns: $0) } }
             Tab("tab.library", systemImage: "square.grid.2x2.fill", value: 2) { TabRoot(tab: 2) { LibraryView(ns: $0) } }
-            Tab("tab.music", systemImage: "music.note", value: 3) { TabRoot(tab: 3) { _ in MusicHomeView() } }
+            Tab("tab.music", systemImage: "music.note", value: 3) {
+                TabRoot(tab: 3) { _ in
+                    MusicHomeView(reloadKey: app.profileId).navigationTitle("tab.music").toolbar { ProfileToolbar() }
+                }
+            }
             Tab("tab.live", systemImage: "dot.radiowaves.left.and.right", value: 4) { TabRoot(tab: 4) { _ in LiveView() } }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
@@ -82,6 +87,7 @@ struct TabRoot<Content: View>: View {
                     case .deleteAccount: DeleteAccountView()
                     }
                 }
+                .musicDestinations()
         }
         .onChange(of: app.pendingRoute, initial: true) { consume() }
         .onChange(of: app.selectedTab) { consume() }
@@ -145,28 +151,5 @@ struct ToastBanner: View {
                 }
                 .accessibilityAddTraits(.updatesFrequently)
         }
-    }
-}
-
-struct MiniPlayer: View {
-    @Environment(AppModel.self) private var app
-
-    var body: some View {
-        let m = app.music
-        HStack(spacing: 10) {
-            RemoteImage(url: app.musicStore?.coverURL(m.current?.coverUrlPath), aspect: 1).frame(width: 34, height: 34).clipShape(.rect(cornerRadius: 6))
-            VStack(alignment: .leading, spacing: 0) {
-                Text(m.current?.title ?? "").font(Theme.body(14, weight: .semibold)).lineLimit(1)
-                Text(m.current?.artist ?? "").font(Theme.body(12)).foregroundStyle(Theme.mutedForeground).lineLimit(1)
-            }
-            Spacer(minLength: 4)
-            Button { m.toggle() } label: { Image(systemName: m.playing ? "pause.fill" : "play.fill") }
-                .accessibilityLabel(Text(m.playing ? "player.pause" : "player.play"))
-            Button { m.next() } label: { Image(systemName: "forward.fill") }
-                .accessibilityLabel(Text("music.next"))
-        }
-        .padding(.horizontal, 14)
-        .contentShape(.rect)
-        .onTapGesture { m.showNowPlaying = true }
     }
 }

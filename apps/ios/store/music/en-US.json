@@ -1,0 +1,12 @@
+{
+  "name": "MixAI Music",
+  "subtitle": "Your own music server",
+  "promotionalText": "Stream your own music library from your MixAI server: gapless albums, crossfade, volume levelling, synced lyrics and offline downloads. No ads, no tracking.",
+  "keywords": "music player,self-hosted,subsonic,flac,offline,lyrics,crossfade,gapless,home server,library",
+  "supportUrl": "https://mixai.ro/",
+  "marketingUrl": "https://mixai.ro/",
+  "privacyPolicyUrl": "https://mixai.ro/privacy?lang=en",
+  "copyright": "2026 Dragos Catalin Vladulescu",
+  "description": "MixAI Music plays YOUR music: the albums on your own MixAI server at home. No ads, no subscription, no catalogue we sell you.\n\nCONNECT\n• Find your server on the Wi-Fi or type its address, then pair with a 6-digit code.\n• Or sign in to your MixAI account and connect to your server from anywhere.\n• Family profiles, each with its own history and queue.\n\nLISTEN\n• Albums play gapless; crossfade between other tracks (3 to 12 seconds).\n• Volume levelling from the loudness your server measured, so no track jumps out.\n• Start a mix: endless radio from your library, or from any song, album or artist.\n• Synced lyrics, queue editing (play next, add to queue, reorder), shuffle, repeat and a sleep timer.\n• Lock Screen, Control Center, AirPlay and Bluetooth controls, with an animated cover on the Lock Screen.\n\nOFFLINE\n• Download albums, playlists or single tracks for the road.\n• Wi-Fi only by default, a storage limit you choose, and automatic downloads of what is up next.\n\nEVERY SCREEN\n• Hand the queue to your MixAI TV in one tap.\n• Home Screen widget and Control Center control.\n• Siri and Shortcuts: \"Start a mix in MixAI Music\".\n\nMixAI Music needs a MixAI server (free, self-hosted) with your own music files.",
+  "whatsNew": "First release."
+}

@@ -7,6 +7,9 @@
 #   scripts/build.sh tvupload  archive MixAI TV (tvOS, same bundle id ro.mixai.app), sign and upload to TestFlight
 #   scripts/build.sh devipa    archive + development-signed ro.mixai.app .ipa (registered devices) for a direct install
 #   scripts/build.sh upload    archive, sign (automatic, via App Store Connect API key) and upload to TestFlight
+#   scripts/build.sh musicbuild   generate project + compile MixAI Music for iphoneos, unsigned (WP17-42)
+#   scripts/build.sh musicdevipa  development-signed ro.mixai.music .ipa for registered devices
+#   scripts/build.sh musicupload  archive MixAI Music (ro.mixai.music), sign and upload to TestFlight
 #
 # Env for devipa/upload (the Windows driver scripts/ios-build.ps1 sets these from Secret Manager and deletes the key
 # file afterwards; nothing is stored in the repo):
@@ -118,6 +121,29 @@ case "$MODE" in
     log "swift test MixaiCore"
     (cd MixaiCore && swift test)
     ;;
+  musicbuild)
+    generate
+    log "compile MixAI Music (iphoneos, unsigned)"
+    xcodebuild -project MixAI.xcodeproj -scheme MixAIMusic -configuration Release \
+      -destination 'generic/platform=iOS' -derivedDataPath "$OUT/dd" "${SPM_FLAGS[@]}" \
+      CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build -quiet
+    log "OK: $OUT/dd/Build/Products/Release-iphoneos/MixAIMusic.app"
+    ;;
+  musicdevipa)
+    archive MixAIMusic
+    export_plist "${EXPORT_METHOD:-debugging}" export
+    log "export MixAI Music (${EXPORT_METHOD:-debugging})"
+    xcodebuild -exportArchive -archivePath "$OUT/MixAI.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}"
+    cp "$OUT/export/"*.ipa "$OUT/mixai-dev.ipa"
+    log "OK: $OUT/mixai-dev.ipa ($(du -h "$OUT/mixai-dev.ipa" | cut -f1))"
+    ;;
+  musicupload)
+    archive MixAIMusic
+    export_plist app-store-connect upload
+    log "export + upload MixAI Music to App Store Connect"
+    xcodebuild -exportArchive -archivePath "$OUT/MixAI.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}"
+    log "UPLOADED MixAI Music build $BUILD_NUMBER (TestFlight processing takes ~5-15 min)"
+    ;;
   build)
     generate
     log "compile (iphoneos, unsigned)"
@@ -170,7 +196,7 @@ case "$MODE" in
     log "UPLOADED tvOS build $BUILD_NUMBER (TestFlight processing takes ~5-15 min)"
     ;;
   *)
-    echo "usage: $0 test|build|tvbuild|devipa|upload|tvupload" >&2
+    echo "usage: $0 test|build|tvbuild|devipa|upload|tvupload|musicbuild|musicdevipa|musicupload" >&2
     exit 2
     ;;
 esac

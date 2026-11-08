@@ -27,6 +27,9 @@ settings:
 packages:
   MixaiCore:
     path: MixaiCore
+  # Shared SwiftUI layer + music stack (WP17-42, D51); pulls AudioStreaming 1.4.5 (MIT) exact.
+  MixaiUI:
+    path: MixaiUI
   VLCKit:
     url: https://code.videolan.org/videolan/VLCKit.git
     exactVersion: 4.0.0-a25
@@ -42,6 +45,7 @@ targets:
       - path: Shared
     dependencies:
       - package: MixaiCore
+      - package: MixaiUI
       - package: VLCKit
       - package: Sentry
       - target: MixAIWidgets
@@ -185,7 +189,6 @@ targets:
     deploymentTarget: '26.0'
     sources:
       - path: MixAITV
-      - path: MixAI/Theme/Tokens.swift
       - path: MixAI/Localizable.xcstrings
       - path: MixAI/Resources/Fonts
         buildPhase: resources
@@ -221,6 +224,141 @@ targets:
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: MixAI TV finds and connects to your MixAI Server on this network to play your movies, shows and music.
         SWIFT_EMIT_LOC_STRINGS: NO
+  # MixAI Music for iPhone (WP17-42, D51): separate App Store app `ro.mixai.music` on the shared MixaiCore +
+  # MixaiUI music stack (AVAudioEngine engine, crossfade, loudness normalisation, downloads). App IDs
+  # ro.mixai.music (K48R6VH2S5) / .widgets (FP2G859TP2) / .intents (92Z2D9FY23), App Group group.ro.mixai.music
+  # (H579PJPC6H). CarPlay audio was requested 2026-11-08: when granted add `com.apple.developer.carplay-audio: true`
+  # to the entitlements, the CarPlay scene to UIApplicationSceneManifest and MIXAI_CARPLAY to
+  # SWIFT_ACTIVE_COMPILATION_CONDITIONS (MusicCarPlaySceneDelegate is compiled out until then).
+  MixAIMusic:
+    type: application
+    platform: iOS
+    sources:
+      - path: MixAIMusic
+      - path: MixAI/Localizable.xcstrings
+      - path: MixAI/Resources/Fonts
+        buildPhase: resources
+    dependencies:
+      - package: MixaiCore
+      - package: MixaiUI
+      - target: MixAIMusicWidgets
+        embed: true
+        codeSign: true
+      - target: MixAIMusicIntents
+        embed: true
+        codeSign: true
+      - sdk: AVFoundation.framework
+      - sdk: MediaPlayer.framework
+      - sdk: AppIntents.framework
+      - sdk: Intents.framework
+      - sdk: WidgetKit.framework
+      - sdk: Network.framework
+    info:
+      path: MixAIMusic/Info.plist
+      properties:
+        UIBackgroundModes: [audio, fetch]
+        NSBonjourServices: [_mmo-companion._tcp]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UIAppFonts: [SpaceGrotesk-Variable.ttf, Inter-Variable.ttf]
+        CFBundleURLTypes:
+          - CFBundleURLName: ro.mixai.music
+            CFBundleURLSchemes: [mixai-music]
+        UIUserInterfaceStyle: Dark
+        CFBundleLocalizations: [en, ro]
+        INIntentsSupported: [INPlayMediaIntent]
+        NSUserActivityTypes: [INPlayMediaIntent]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    entitlements:
+      path: MixAIMusic/MixAIMusic.entitlements
+      properties:
+        com.apple.developer.siri: true
+        com.apple.security.application-groups: [group.ro.mixai.music]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.music
+        PRODUCT_NAME: MixAIMusic
+        MARKETING_VERSION: '0.1.0'
+        TARGETED_DEVICE_FAMILY: '1'
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MixAI Music
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: MixAI Music finds and connects to your MixAI Server on this network to play your music.
+        INFOPLIST_KEY_NSSiriUsageDescription: Ask Siri to play your albums, artists and mixes from your MixAI Server.
+        SWIFT_EMIT_LOC_STRINGS: YES
+  MixAIMusicWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: MixAIMusicWidgets
+      - path: MixAIMusic/Shared
+      - path: MixAI/Localizable.xcstrings
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+      - sdk: AppIntents.framework
+    info:
+      path: MixAIMusicWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: MixAI Music
+        CFBundleLocalizations: [en, ro]
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: MixAIMusicWidgets/MixAIMusicWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.ro.mixai.music]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.music.widgets
+        PRODUCT_NAME: MixAIMusicWidgets
+        MARKETING_VERSION: '0.1.0'
+        TARGETED_DEVICE_FAMILY: '1'
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MixAI Music
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ''
+        ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME: ''
+        SWIFT_EMIT_LOC_STRINGS: NO
+  MixAIMusicIntents:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: MixAIMusicIntents
+      - path: MixAI/Localizable.xcstrings
+    dependencies:
+      - sdk: Intents.framework
+    info:
+      path: MixAIMusicIntents/Info.plist
+      properties:
+        CFBundleDisplayName: MixAI Music
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.intents-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).IntentHandler
+          NSExtensionAttributes:
+            IntentsSupported: [INPlayMediaIntent]
+            SupportedMediaCategories: [INMediaCategoryMusic]
+    entitlements:
+      path: MixAIMusicIntents/MixAIMusicIntents.entitlements
+      properties:
+        com.apple.security.application-groups: [group.ro.mixai.music]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.music.intents
+        PRODUCT_NAME: MixAIMusicIntents
+        MARKETING_VERSION: '0.1.0'
+        TARGETED_DEVICE_FAMILY: '1'
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MixAI Music
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SWIFT_EMIT_LOC_STRINGS: NO
 schemes:
   MixAI:
     build:
@@ -235,6 +373,16 @@ schemes:
     build:
       targets:
         MixAITV: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  MixAIMusic:
+    build:
+      targets:
+        MixAIMusic: all
+        MixAIMusicWidgets: all
+        MixAIMusicIntents: all
     run:
       config: Debug
     archive:

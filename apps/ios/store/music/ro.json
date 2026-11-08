@@ -1,0 +1,12 @@
+{
+  "name": "MixAI Music",
+  "subtitle": "Serverul tău de muzică",
+  "promotionalText": "Ascultă biblioteca ta de muzică de pe serverul MixAI: albume fără pauze, crossfade, volum egalizat, versuri sincronizate și descărcări offline. Fără reclame.",
+  "keywords": "player muzica,self-hosted,subsonic,flac,offline,versuri,crossfade,fara pauze,server acasa,biblioteca",
+  "supportUrl": "https://mixai.ro/",
+  "marketingUrl": "https://mixai.ro/",
+  "privacyPolicyUrl": "https://mixai.ro/privacy?lang=ro",
+  "copyright": "2026 Dragos Catalin Vladulescu",
+  "description": "MixAI Music redă muzica TA: albumele de pe propriul server MixAI de acasă. Fără reclame, fără abonament, fără un catalog pe care să ți-l vindem.\n\nCONECTARE\n• Găsește serverul în rețeaua Wi-Fi sau scrie-i adresa, apoi asociază-te cu un cod din 6 cifre.\n• Sau conectează-te la contul MixAI și ajungi la server de oriunde.\n• Profiluri de familie, fiecare cu istoricul și coada lui.\n\nASCULTARE\n• Albumele merg fără pauze; crossfade între celelalte melodii (3-12 secunde).\n• Volum egalizat după intensitatea măsurată de server, ca nicio melodie să nu sară în evidență.\n• Pornește un mix: radio fără sfârșit din biblioteca ta sau de la orice melodie, album ori artist.\n• Versuri sincronizate, editarea cozii (redă următoarea, adaugă în coadă, reordonare), amestecare, repetare și temporizator de somn.\n• Controale pe ecranul blocat, în Centrul de control, AirPlay și Bluetooth, cu copertă animată pe ecranul blocat.\n\nOFFLINE\n• Descarcă albume, playlisturi sau melodii pentru drum.\n• Doar pe Wi-Fi implicit, limită de spațiu aleasă de tine și descărcare automată a ce urmează.\n\nPE ORICE ECRAN\n• Trimite coada pe televizorul MixAI cu o atingere.\n• Widget pe ecranul principal și buton în Centrul de control.\n• Siri și Comenzi rapide: „Pornește un mix în MixAI Music”.\n\nMixAI Music are nevoie de un server MixAI (gratuit, găzduit de tine) cu fișierele tale de muzică.",
+  "whatsNew": "Prima versiune."
+}

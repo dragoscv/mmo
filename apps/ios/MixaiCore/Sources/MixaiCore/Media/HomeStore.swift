@@ -100,5 +100,6 @@ extension JSONValue {
     public var stringValue: String? { if case .string(let s) = self { return s } else { return nil } }
     public var doubleValue: Double? { if case .number(let n) = self { return n } else { return nil } }
     public var boolValue: Bool? { if case .bool(let b) = self { return b } else { return nil } }
+    public var arrayValue: [JSONValue]? { if case .array(let a) = self { return a } else { return nil } }
     public subscript(_ key: String) -> JSONValue? { if case .object(let o) = self { return o[key] } else { return nil } }
 }

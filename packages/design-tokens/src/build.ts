@@ -46,8 +46,9 @@ mkdirSync(dirname(phoneKt), { recursive: true });
 writeFileSync(phoneKt, lf(kotlinTokens("ro.mixai.mobile.theme", true)) + "\n", { encoding: "utf8" });
 console.log(`mirrored Tokens.kt → ${phoneKt.replace(repo, "")}`);
 
-// iOS app (WP16-47): SwiftUI tokens.
-const iosSwift = join(repo, "apps", "ios", "MixAI", "Theme", "Tokens.swift");
+// iOS / tvOS apps (WP16-47, WP17-42): SwiftUI tokens in the shared MixaiCore package (public, used by MixAI,
+// MixAI TV and MixAI Music).
+const iosSwift = join(repo, "apps", "ios", "MixaiCore", "Sources", "MixaiCore", "Theme", "Tokens.swift");
 mkdirSync(dirname(iosSwift), { recursive: true });
 writeFileSync(iosSwift, lf(swiftTokens()) + "\n", { encoding: "utf8" });
 console.log(`mirrored Tokens.swift → ${iosSwift.replace(repo, "")}`);
