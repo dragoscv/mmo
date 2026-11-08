@@ -82,6 +82,7 @@ _AVAILABLE = {
     "numpy": False,
     "pedalboard": False,
     "essentia": False,
+    "beat_this": False,
 }
 
 
@@ -137,6 +138,43 @@ def _try_import_essentia():
         import essentia.standard  # type: ignore
         _AVAILABLE["essentia"] = True
         return essentia.standard
+    except Exception:
+        return None
+
+
+_BEAT_THIS = None
+
+
+def _beat_this_model():
+    """Beat This! (CPJKU, ISMIR 2024; MIT code AND weights) — beats + DOWNBEATS from a transformer, no DBN.
+
+    Optional (`pip install beat-this` + torch). Loaded once per sidecar; the `final0` checkpoint is downloaded on first
+    use into the torch hub cache. CPU only (a few seconds per track). Returns None when unavailable — the analyzer
+    then keeps the librosa beats and the every-4th-beat downbeat heuristic.
+    """
+    global _BEAT_THIS
+    if _BEAT_THIS is not None:
+        return _BEAT_THIS or None
+    try:
+        from beat_this.inference import Audio2Beats  # type: ignore
+        _BEAT_THIS = Audio2Beats(checkpoint_path="final0", device="cpu", dbn=False)
+        _AVAILABLE["beat_this"] = True
+    except Exception:
+        _BEAT_THIS = False
+    return _BEAT_THIS or None
+
+
+def _beat_this_beats(y, sr: int) -> "tuple[list[float], list[float]] | None":
+    """(beats, downbeats) in seconds from Beat This!, or None when unavailable / failed."""
+    model = _beat_this_model()
+    if model is None:
+        return None
+    try:
+        import numpy as _np  # type: ignore
+        beats, downbeats = model(_np.asarray(y, dtype=_np.float32), sr)
+        b = [round(float(t), 4) for t in beats]
+        d = [round(float(t), 4) for t in downbeats]
+        return (b, d) if len(b) >= 4 else None
     except Exception:
         return None
 
@@ -801,9 +839,15 @@ def _dsp_analyze(
         else:
             out["bpmConfidence"] = 0.0
         out["beats"] = [float(t) for t in beat_times]
-        # Cheap 4/4 downbeat heuristic — same as the Essentia path.
-        if len(beat_times) >= 4:
+        # Downbeats: Beat This! (real bar starts, phrase-aligned automix) when installed, else the cheap 4/4 heuristic.
+        _step(0.24, "Downbeats…")
+        bt = _beat_this_beats(y, sr)
+        if bt is not None:
+            out["beats"], out["downbeats"] = bt[0], bt[1]
+            out["downbeatMethod"] = "beat_this"
+        elif len(beat_times) >= 4:
             out["downbeats"] = beat_times[::4]
+            out["downbeatMethod"] = "every4"
     except Exception as e:
         out["_rhythm_error"] = str(e)
 
@@ -1180,6 +1224,12 @@ def handle_ping(cmd: dict[str, Any]) -> None:
     _try_import_pyloudnorm()
     _try_import_pyacoustid()
     _try_import_audio_separator()
+    # Beat This! downbeats: import probe only (the model loads on the first DSP job).
+    try:
+        import importlib.util as _ilu
+        _AVAILABLE["beat_this"] = _ilu.find_spec("beat_this") is not None
+    except Exception:
+        _AVAILABLE["beat_this"] = False
     # Plugin host (pedalboard) availability — optional, only needed
     # when the user opens the plugin rack.
     try:

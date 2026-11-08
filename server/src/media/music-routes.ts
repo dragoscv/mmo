@@ -15,6 +15,9 @@
  *   GET /media/music/playlists                     → {playlists: PlaylistCard[]}
  *   GET /media/music/tracks?offset=&limit=         → Page<TrackCard> (A–Z by title)
  *   GET /media/music/tracks?ids=tr_1,tr_2          → Page<TrackCard> in the requested order (max 500)
+ *   GET /media/music/radio?...&order=harmonic      → radio in harmonic (Camelot + BPM) order
+ *   GET /media/music/beatgrid/:trackId             → BeatGrid (404 when not analysed)
+ *   POST /media/music/reorder {trackIds, start?}   → {tracks: TrackCard[]} harmonic order (max 500)
  *
  * Ids are Subsonic ids; `coverUrlPath` / `streamUrlPath` are relative to the server origin
  * (client appends its auth). Auth is the caller's concern (mount behind authMiddleware).
@@ -111,7 +114,21 @@ export function createMusicRouter(deps: MusicRouterDeps): express.Router {
     router.get("/radio", wrap((req, res) => {
         const seed = qs(req.query.seed);
         if (!seed) { res.status(400).json({ error: "seed required" }); return; }
-        res.json(music.radio(seed, qint(req.query.size)));
+        res.json(music.radio(seed, qint(req.query.size), Math.random, req.query.order === "harmonic" ? "harmonic" : "artist"));
+    }));
+
+    router.get("/beatgrid/:trackId", wrap((req, res) => {
+        res.json(music.beatgrid(String(req.params.trackId)));
+    }));
+
+    router.post("/reorder", wrap((req, res) => {
+        const body = (req.body ?? {}) as { trackIds?: unknown; start?: unknown };
+        if (!Array.isArray(body.trackIds) || !body.trackIds.every((x) => typeof x === "string")) {
+            res.status(400).json({ error: "trackIds must be an array of strings" });
+            return;
+        }
+        const start = typeof body.start === "number" && Number.isInteger(body.start) ? body.start : 0;
+        res.json(music.reorder(body.trackIds as string[], start));
     }));
 
     router.get("/random", wrap((req, res) => {

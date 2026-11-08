@@ -77,6 +77,7 @@ const ROOTS = [
     "MusicQueue",
     "MusicQueueInput",
     "Lyrics",
+    "BeatGrid",
     "MediaStats",
     "LiveTvChannel",
     "LiveTvProgramme",

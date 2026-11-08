@@ -81,6 +81,7 @@ fun SettingsScreen(
     val capGb by app.musicSettings.capGb.collectAsState(initial = 2)
     val crossfade by app.musicSettings.crossfadeSec.collectAsState(initial = 0)
     val normalize by app.musicSettings.normalize.collectAsState(initial = true)
+    val automix by app.musicSettings.automix.collectAsState(initial = true)
     val profile by graph.profiles.activeProfile.collectAsState()
     var dialog by rememberSaveable { mutableStateOf("") }
 
@@ -128,6 +129,18 @@ fun SettingsScreen(
             }
             item {
                 Row(Icons.Outlined.Tune, stringResource(R.string.settings_crossfade), crossfadeLabel(crossfade), onClick = { dialog = "crossfade" })
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_automix)) },
+                    supportingContent = { Text(stringResource(R.string.settings_automix_hint)) },
+                    leadingContent = { Icon(Icons.Outlined.GraphicEq, contentDescription = null) },
+                    trailingContent = {
+                        Switch(checked = automix, enabled = crossfade > 0, onCheckedChange = { v -> scope.launch { app.musicSettings.setAutomix(v) } })
+                    },
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+                    modifier = Modifier.clickable(enabled = crossfade > 0) { scope.launch { app.musicSettings.setAutomix(!automix) } },
+                )
             }
             item {
                 ListItem(

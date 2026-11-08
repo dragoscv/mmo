@@ -3673,6 +3673,40 @@
         }
       }
     },
+    "music.settings.automix": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automix (beat-matched)"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automix (pe ritm)"
+          }
+        }
+      }
+    },
+    "music.settings.automix_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With crossfade on: matches the tempo (up to 6%) and starts the next track on the beat"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cu crossfade pornit: potrivește tempoul (până la 6%) și pornește piesa următoare pe beat"
+          }
+        }
+      }
+    },
     "music.settings.playback_footer": {
       "extractionState": "manual",
       "localizations": {

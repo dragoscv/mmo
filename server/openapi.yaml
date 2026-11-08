@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.12.0
+  version: 3.13.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -5704,6 +5704,7 @@ paths:
       parameters:
         - { name: seed, in: query, required: true, schema: { type: string }, description: "tr_, al_ or ar_ id" }
         - { name: size, in: query, schema: { type: integer, default: 50, minimum: 1, maximum: 200 } }
+        - { name: order, in: query, schema: { type: string, enum: [artist, harmonic], default: artist }, description: 'harmonic = Camelot key + BPM order after the seed (automix)' }
       responses:
         '200':
           description: Tracks (a track seed is first)
@@ -5810,6 +5811,50 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MusicQueue' }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/music/beatgrid/{trackId}:
+    get:
+      operationId: musicBeatgrid
+      tags: [music]
+      summary: "Beat grid of an analysed track (automix): beats, downbeats, structure segments"
+      parameters:
+        - { name: trackId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeatGrid' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/ErrorJson' }
+
+  /media/music/reorder:
+    post:
+      operationId: musicReorder
+      tags: [music]
+      summary: "Harmonic order of a queue (Camelot key + BPM); keeps trackIds[start] first, unknown ids dropped"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trackIds]
+              properties:
+                trackIds: { type: array, maxItems: 500, items: { type: string } }
+                start: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tracks]
+                properties:
+                  tracks: { type: array, items: { $ref: '#/components/schemas/TrackCard' } }
         '400': { $ref: '#/components/responses/ErrorJson' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
@@ -7885,9 +7930,32 @@ components:
         plays: { type: integer }
         loudnessLufs: { type: number, description: EBU R128 integrated loudness in LUFS; absent until analysed }
         truePeakDbfs: { type: number, description: True peak in dBFS; absent until analysed }
+        bpm: { type: number, description: 'Tempo in BPM (file tag, Deezer or analyzer); absent when unknown' }
+        bpmConfidence: { type: number, minimum: 0, maximum: 1, description: Analyzer tempo confidence; absent for tag/Deezer BPM }
+        keyCamelot: { type: string, pattern: '^(?:[1-9]|1[0-2])[AB]$', description: 'Camelot key (analyzer or file tag), e.g. 8A' }
+        firstBeatSec: { type: number, description: 'First downbeat (else first beat) in seconds; present only when a beat grid was measured' }
         coverArt: { type: string }
         coverUrlPath: { type: string }
         streamUrlPath: { type: string }
+    BeatGrid:
+      type: object
+      required: [trackId, bpm, bpmConfidence, keyCamelot, beats, downbeats, segments]
+      properties:
+        trackId: { type: string }
+        bpm: { type: [number, 'null'] }
+        bpmConfidence: { type: [number, 'null'] }
+        keyCamelot: { type: [string, 'null'] }
+        beats: { type: array, items: { type: number }, description: Beat times in seconds }
+        downbeats: { type: array, items: { type: number }, description: Bar starts in seconds }
+        segments:
+          type: array
+          items:
+            type: object
+            required: [start, end, label]
+            properties:
+              start: { type: number }
+              end: { type: number }
+              label: { type: string, description: 'intro, verse, chorus, bridge, outro, break' }
     ArtistCard:
       type: object
       required: [id, name, albumCount, songCount, coverArt, coverUrlPath]

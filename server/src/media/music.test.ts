@@ -24,7 +24,8 @@ CREATE TABLE tracks (
   artist TEXT, title TEXT, album TEXT, genre TEXT, year INTEGER, duration INTEGER, bpm REAL, file_size INTEGER,
   format TEXT, bitrate INTEGER, sample_rate INTEGER, added_at TEXT DEFAULT (datetime('now')), rating INTEGER,
   is_favorite INTEGER DEFAULT 0, lyrics TEXT, synced_lyrics TEXT, comment TEXT, artwork_url TEXT, musicbrainz_id TEXT,
-  is_hidden INTEGER DEFAULT 0, sha256 TEXT, loudness_lufs REAL, loudness_true_peak_dbfs REAL
+    is_hidden INTEGER DEFAULT 0, sha256 TEXT, loudness_lufs REAL, loudness_true_peak_dbfs REAL,
+    key_camelot TEXT, bpm_confidence REAL, beats TEXT, downbeats TEXT, structure_segments TEXT
 );
 CREATE TABLE playlists (
   id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT, type TEXT DEFAULT 'manual',
@@ -157,6 +158,49 @@ describe("MusicService browse", () => {
         expect(music.album(albumId("Discovery", "Daft Punk")).tracks[0]).not.toHaveProperty("loudnessLufs");
         lib.prepare("UPDATE tracks SET loudness_lufs = -8.5, loudness_true_peak_dbfs = 0.4 WHERE id = ?").run(ids.omt);
         expect(music.album(albumId("Discovery", "Daft Punk")).tracks[0]).toMatchObject({ loudnessLufs: -8.5, truePeakDbfs: 0.4 });
+        // Playlist cards used a hand-written column list without loudness (WP17-44 fix).
+        expect(music.playlist("pl_1").tracks.find((t) => t.id === trackId(ids.omt))).toMatchObject({ loudnessLufs: -8.5 });
+    });
+
+    it("track cards carry automix fields: bpm (any source), key, confidence and first beat only once analysed", () => {
+        const card = () => music.album(albumId("Discovery", "Daft Punk")).tracks[0]!;
+        for (const k of ["bpm", "bpmConfidence", "keyCamelot", "firstBeatSec"]) expect(card()).not.toHaveProperty(k);
+        lib.prepare("UPDATE tracks SET bpm = 123.456, key_camelot = '8A' WHERE id = ?").run(ids.omt);
+        expect(card()).toMatchObject({ bpm: 123.46, keyCamelot: "8A" });
+        expect(card()).not.toHaveProperty("firstBeatSec");
+        lib.prepare("UPDATE tracks SET bpm_confidence = 1.7, beats = '[0.31,0.8]', downbeats = '[0.5123]' WHERE id = ?").run(ids.omt);
+        expect(card()).toMatchObject({ bpmConfidence: 1, firstBeatSec: 0.512 });
+        lib.prepare("UPDATE tracks SET downbeats = NULL WHERE id = ?").run(ids.omt);
+        expect(card().firstBeatSec).toBe(0.31);
+        // Malformed JSON / bad key never breaks the query.
+        lib.prepare("UPDATE tracks SET beats = '{oops', key_camelot = '13Z' WHERE id = ?").run(ids.omt);
+        expect(card()).not.toHaveProperty("firstBeatSec");
+        expect(card()).not.toHaveProperty("keyCamelot");
+    });
+
+    it("beat grid only for analysed tracks of this owner", () => {
+        expect(() => music.beatgrid(`tr_${ids.omt}`)).toThrow(/not analysed/);
+        lib.prepare(`UPDATE tracks SET bpm = 120, bpm_confidence = 0.9, key_camelot = '9A', beats = '[0.5,1,1.5,"x",-1]',
+            downbeats = '[0.5]', structure_segments = '[{"start":0,"end":30,"label":"intro"},{"bad":1}]' WHERE id = ?`).run(ids.omt);
+        expect(music.beatgrid(`tr_${ids.omt}`)).toEqual({
+            trackId: `tr_${ids.omt}`, bpm: 120, bpmConfidence: 0.9, keyCamelot: "9A", beats: [0.5, 1, 1.5], downbeats: [0.5],
+            segments: [{ start: 0, end: 30, label: "intro" }],
+        });
+        lib.prepare("UPDATE tracks SET beats = '[1]' WHERE id = ?").run(ids.other);
+        expect(() => music.beatgrid(`tr_${ids.other}`)).toThrow(/track not found/);
+        expect(() => music.beatgrid("al_0000000000000000")).toThrow(/track not found/);
+    });
+
+    it("reorder keeps the start track and walks the Camelot wheel; radio can be ordered harmonically", () => {
+        const set = lib.prepare("UPDATE tracks SET key_camelot = ?, bpm = ? WHERE id = ?");
+        set.run("8A", 124, ids.omt); set.run("3B", 90, ids.aero); set.run("9A", 125, ids.funk); set.run("8B", 124, ids.galv);
+        const r = music.reorder([`tr_${ids.omt}`, `tr_${ids.aero}`, `tr_${ids.funk}`, `tr_${ids.plain}`, `tr_${ids.galv}`, "tr_999"]);
+        expect(r.tracks.map((t) => t.id)).toEqual([`tr_${ids.omt}`, `tr_${ids.galv}`, `tr_${ids.funk}`, `tr_${ids.aero}`, `tr_${ids.plain}`]);
+        expect(music.reorder([`tr_${ids.omt}`, `tr_${ids.galv}`, `tr_${ids.funk}`], 2).tracks[0]!.id).toBe(`tr_${ids.funk}`);
+        expect(() => music.reorder(Array.from({ length: 501 }, (_, i) => `tr_${i + 1}`))).toThrow(/at most 500/);
+        const radio = music.radio(`tr_${ids.omt}`, 10, () => 0, "harmonic").tracks;
+        expect(radio[0]!.id).toBe(`tr_${ids.omt}`);
+        expect(radio.findIndex((t) => t.id === `tr_${ids.funk}`)).toBeLessThan(radio.findIndex((t) => t.id === `tr_${ids.aero}`));
     });
 
     it("genres and genre albums", () => {
@@ -386,6 +430,16 @@ describe("music router (http)", () => {
         expect((byIds.body.items as { id: string }[]).map((t) => t.id)).toEqual([`tr_${ids.aero}`, `tr_${ids.omt}`]);
         const tooMany = Array.from({ length: 501 }, (_, i) => `tr_${i + 1}`).join(",");
         expect((await j(`/tracks?ids=${tooMany}`)).status).toBe(400);
+    });
+
+    it("GET /beatgrid, POST /reorder, radio order=harmonic", async () => {
+        expect((await j(`/beatgrid/tr_${ids.omt}`)).status).toBe(404);
+        lib.prepare("UPDATE tracks SET beats = '[0.5,1]', bpm = 120 WHERE id = ?").run(ids.omt);
+        expect((await j(`/beatgrid/tr_${ids.omt}`)).body).toMatchObject({ beats: [0.5, 1], bpm: 120 });
+        expect((await j("/reorder", { method: "POST", body: JSON.stringify({ trackIds: "x" }) })).status).toBe(400);
+        const ro = await j("/reorder", { method: "POST", body: JSON.stringify({ trackIds: [`tr_${ids.omt}`, `tr_${ids.aero}`], start: 1 }) });
+        expect((ro.body.tracks as { id: string }[]).map((t) => t.id)).toEqual([`tr_${ids.aero}`, `tr_${ids.omt}`]);
+        expect(((await j(`/radio?seed=tr_${ids.omt}&size=3&order=harmonic`)).body.tracks as unknown[]).length).toBe(3);
     });
 
     it("PUT/GET /queue with validation", async () => {

@@ -56,6 +56,7 @@ import { getLibraryDb, getLibrarySqlite } from "./db";
 import { tracks } from "./schema";
 import { fetchAllMetadata } from "./metadata-services";
 import { enqueueSyncChange } from "../sync";
+import { lowerPriority } from "./ffmpeg-jobs";
 
 export type { Category };
 
@@ -444,6 +445,8 @@ class Worker extends EventEmitter {
             },
             detached: false,
         });
+        // Background work (also library-wide auto analysis after a scan): never compete with playback / the UI.
+        lowerPriority(this.proc.pid, "below-normal");
 
         this.proc.on("error", (err) => {
             this.parent.pushLog("error",
@@ -1642,6 +1645,19 @@ class Analyzer extends EventEmitter {
                         this.pushLog("warn", `[deps] stems install failed: ${e instanceof Error ? e.message : String(e)}`);
                     }
                 } else { setStep("stems", "done"); }
+
+                // 3b) Downbeats (Beat This!, MIT) for phrase-aligned automix — needs torch, which the stems engine
+                // already installed. Best-effort: without it the analyzer uses every 4th beat as a downbeat.
+                h = await this.health();
+                if (h.available?.["audio_separator"] && !h.available?.["beat_this"]) {
+                    emit(0.8, "Installing the downbeat model…");
+                    try {
+                        const res = await this.installDeps(["beat-this", "einops", "soxr", "rotary-embedding-torch"], (p) => emit(0.8 + p.pct * 0.02, p.msg));
+                        if (res.installed.length) changed = true;
+                    } catch (e) {
+                        this.pushLog("warn", `[deps] beat-this install failed (heuristic downbeats still work): ${e instanceof Error ? e.message : String(e)}`);
+                    }
+                }
 
                 // 4) GPU acceleration (only if CUDA GPU present + stems usable).
                 h = await this.health();

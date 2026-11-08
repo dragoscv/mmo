@@ -17,3 +17,9 @@ pyacoustid
 pedalboard
 audio-separator[cpu]
 # essentia            # optional: faster/extra key detection (Linux/macOS); librosa covers key otherwise
+# Downbeats for phrase-aligned automix (WP17-44). Beat This! (CPJKU, MIT code + weights; torch comes with
+# audio-separator). Optional: without it the analyzer uses every 4th beat as a downbeat.
+beat-this
+einops
+soxr
+rotary-embedding-torch

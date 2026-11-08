@@ -19,6 +19,11 @@ struct MusicSettingsView: View {
                     }
                 }
                 Toggle("music.settings.normalize", isOn: $player.prefs.normalize)
+                Toggle(isOn: $player.prefs.automix) {
+                    Text("music.settings.automix")
+                    Text("music.settings.automix_hint")
+                }
+                .disabled(player.prefs.crossfadeMs == 0)
                 Toggle("music.settings.animated_artwork", isOn: $player.animatedArtwork)
             } header: { Text("settings.playback") } footer: { Text("music.settings.playback_footer") }
 

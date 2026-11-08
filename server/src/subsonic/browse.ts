@@ -41,13 +41,28 @@ export interface TrackRow {
     /** EBU R128 integrated loudness / true peak from the analyzer (null = not analysed yet). */
     loudness_lufs?: number | null;
     loudness_true_peak_dbfs?: number | null;
+    /** Analyzer / tag key + tempo confidence and the first (down)beat in seconds (automix, WP17-44). */
+    key_camelot?: string | null;
+    bpm_confidence?: number | null;
+    first_beat?: number | null;
     play_count?: number | null;
     last_played?: string | null;
 }
 
-const TRACK_COLS = `id, user_id, filepath, filename, artist, title, album, genre, year, duration, bpm,
-    file_size, format, bitrate, sample_rate, added_at, rating, is_favorite, lyrics, synced_lyrics,
-    comment, artwork_url, musicbrainz_id, loudness_lufs, loudness_true_peak_dbfs`;
+/** Track columns every TrackRow query selects; `p` = table alias prefix (`"t."`). `first_beat` = first downbeat, else
+ *  first beat (JSON arrays in seconds, written by the DSP analyzer). */
+export function trackCols(p = ""): string {
+    const c = (n: string) => `${p}${n}`;
+    return [
+        "id", "user_id", "filepath", "filename", "artist", "title", "album", "genre", "year", "duration", "bpm",
+        "file_size", "format", "bitrate", "sample_rate", "added_at", "rating", "is_favorite", "lyrics", "synced_lyrics",
+        "comment", "artwork_url", "musicbrainz_id", "loudness_lufs", "loudness_true_peak_dbfs", "key_camelot", "bpm_confidence",
+    ].map(c).join(", ") +
+        `, COALESCE(CASE WHEN json_valid(${c("downbeats")}) THEN json_extract(${c("downbeats")}, '$[0]') END,` +
+        ` CASE WHEN json_valid(${c("beats")}) THEN json_extract(${c("beats")}, '$[0]') END) AS first_beat`;
+}
+
+const TRACK_COLS = trackCols();
 
 /** Hidden tracks never surface in Subsonic clients. */
 const VISIBLE = `COALESCE(is_hidden, 0) = 0`;

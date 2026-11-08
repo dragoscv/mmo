@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.12.0); generator: server/scripts/openapi-kotlin.mjs
+// Source: server/openapi.yaml (info.version 3.13.0); generator: server/scripts/openapi-kotlin.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 @file:Suppress("unused")
 
@@ -695,6 +695,10 @@ data class TrackCard(
     val plays: Long? = null,
     val loudnessLufs: Double? = null,
     val truePeakDbfs: Double? = null,
+    val bpm: Double? = null,
+    val bpmConfidence: Double? = null,
+    val keyCamelot: String? = null,
+    val firstBeatSec: Double? = null,
     val coverArt: String = "",
     val coverUrlPath: String = "",
     val streamUrlPath: String = "",
@@ -800,6 +804,17 @@ data class Lyrics(
     val synced: List<LyricLine>? = null,
     val plain: String? = null,
     val source: String = "",
+)
+
+@Serializable
+data class BeatGrid(
+    val trackId: String = "",
+    val bpm: Double? = null,
+    val bpmConfidence: Double? = null,
+    val keyCamelot: String? = null,
+    val beats: List<Double> = emptyList(),
+    val downbeats: List<Double> = emptyList(),
+    val segments: List<JsonObject> = emptyList(),
 )
 
 /** Minutes per local day for the last 7 days (oldest first), from live progress writes and music plays. */

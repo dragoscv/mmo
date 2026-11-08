@@ -68,6 +68,9 @@ public final class MusicPlayer {
     @ObservationIgnored private var fading: MusicDeck?
     @ObservationIgnored private var fadeStart: Date?
     @ObservationIgnored private var fadeLength: Double = 0
+    /// Automix: rate the incoming deck plays at during the overlap; glides back to 1 afterwards.
+    @ObservationIgnored private var mixRate: Float = 1
+    @ObservationIgnored private var glideStart: Date?
     /// Next track id pre-queued gapless on the active deck.
     @ObservationIgnored private var gaplessNextId: String?
     @ObservationIgnored private var ticker: Task<Void, Never>?
@@ -427,6 +430,7 @@ public final class MusicPlayer {
 
     private func tick() {
         if fading != nil { stepFade() }
+        stepGlide()
         guard playing else { return }
         let p = active.progress
         if p > 0 || !active.isPlaying { position = p }
@@ -453,14 +457,22 @@ public final class MusicPlayer {
         guard fading == nil, gaplessNextId == nil, sleep != .endOfTrack, let cur = current,
               let ni = queue.nextIndexAfterEnd(), ni != queue.index else { return }
         let next = queue.tracks[ni]
-        let f = fadeMs(cur, next)
-        guard f > 0, duration > 0, position >= duration - Double(f) / 1000, let u = url(for: next) else { return }
+        let plan = AudioPlan.mixPlan(prefs, fadeMs: fadeMs(cur, next), cur: cur, next: next)
+        let f = plan.fadeMs
+        guard f > 0, duration > 0 else { return }
+        let startAt = plan.beatMatched
+            ? Double(AudioPlan.fadeStartMs(curDurMs: Int(duration * 1000), cur: cur, fadeMs: f)) / 1000
+            : duration - Double(f) / 1000
+        guard position >= startAt, let u = url(for: next) else { return }
         reportPlay(completed: true)
         let incoming = active === deckA ? deckB : deckA
         incoming.stop()
         incoming.volume = 0
         incoming.gainDb = AudioPlan.gainDb(for: next, normalize: prefs.normalize)
-        incoming.play(u, trackId: next.id)
+        incoming.rate = plan.incomingRate
+        incoming.play(u, trackId: next.id, startAt: Double(plan.incomingStartMs) / 1000)
+        mixRate = plan.incomingRate
+        glideStart = nil
         fading = active
         active = incoming
         fadeStart = .now
@@ -488,16 +500,33 @@ public final class MusicPlayer {
             fading = nil
             fadeStart = nil
             active.volume = sleepF
+            if mixRate != 1 { glideStart = .now }
         }
+    }
+
+    /// After a tempo-matched transition: bring the new track back to its own tempo over 8 s (pitch kept).
+    private func stepGlide() {
+        guard let g = glideStart else { return }
+        let r = AudioPlan.glideRate(from: mixRate, elapsedMs: Int(Date().timeIntervalSince(g) * 1000), glideMs: 8000)
+        active.rate = r
+        if r == 1 { glideStart = nil; mixRate = 1 }
     }
 
     /// Pause / seek / skip during a fade: drop the outgoing deck at once.
     private func cancelFade(keepIncoming: Bool) {
+        resetRate()
         guard let out = fading else { return }
         out.stop()
         fading = nil
         fadeStart = nil
         if keepIncoming { active.volume = sleep.fadeFactor() }
+    }
+
+    private func resetRate() {
+        glideStart = nil
+        mixRate = 1
+        deckA.rate = 1
+        deckB.rate = 1
     }
 
     // MARK: server queue sync (debounced)
@@ -641,7 +670,7 @@ public final class MusicPlayer {
 
     private static func loadPrefs() -> AudioPrefs {
         UserDefaults.standard.data(forKey: "music.audioPrefs").flatMap { try? JSONDecoder().decode(AudioPrefs.self, from: $0) }
-            ?? AudioPrefs(crossfadeMs: 0, normalize: true)
+            ?? AudioPrefs(crossfadeMs: 0, normalize: true, automix: true)
     }
 
     private static func savePrefs(_ p: AudioPrefs) {

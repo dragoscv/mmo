@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: server/openapi.yaml (info.version 3.12.0); generator: server/scripts/openapi-swift.mjs
+// Source: server/openapi.yaml (info.version 3.13.0); generator: server/scripts/openapi-swift.mjs
 // Regenerate with: pnpm --dir server openapi:gen
 // swiftlint:disable all
 
@@ -1843,6 +1843,14 @@ public struct TrackCard: Codable, Sendable, Hashable {
     public let loudnessLufs: Double?
     /// True peak in dBFS; absent until analysed
     public let truePeakDbfs: Double?
+    /// Tempo in BPM (file tag, Deezer or analyzer); absent when unknown
+    public let bpm: Double?
+    /// Analyzer tempo confidence; absent for tag/Deezer BPM
+    public let bpmConfidence: Double?
+    /// Camelot key (analyzer or file tag), e.g. 8A
+    public let keyCamelot: String?
+    /// First downbeat (else first beat) in seconds; present only when a beat grid was measured
+    public let firstBeatSec: Double?
     public let coverArt: String
     public let coverUrlPath: String
     public let streamUrlPath: String
@@ -1867,6 +1875,10 @@ public struct TrackCard: Codable, Sendable, Hashable {
         plays: Int? = nil,
         loudnessLufs: Double? = nil,
         truePeakDbfs: Double? = nil,
+        bpm: Double? = nil,
+        bpmConfidence: Double? = nil,
+        keyCamelot: String? = nil,
+        firstBeatSec: Double? = nil,
         coverArt: String,
         coverUrlPath: String,
         streamUrlPath: String
@@ -1890,6 +1902,10 @@ public struct TrackCard: Codable, Sendable, Hashable {
         self.plays = plays
         self.loudnessLufs = loudnessLufs
         self.truePeakDbfs = truePeakDbfs
+        self.bpm = bpm
+        self.bpmConfidence = bpmConfidence
+        self.keyCamelot = keyCamelot
+        self.firstBeatSec = firstBeatSec
         self.coverArt = coverArt
         self.coverUrlPath = coverUrlPath
         self.streamUrlPath = streamUrlPath
@@ -2139,6 +2155,36 @@ public struct Lyrics: Codable, Sendable, Hashable {
         self.synced = synced
         self.plain = plain
         self.source = source
+    }
+}
+
+public struct BeatGrid: Codable, Sendable, Hashable {
+    public let trackId: String
+    public let bpm: Double?
+    public let bpmConfidence: Double?
+    public let keyCamelot: String?
+    /// Beat times in seconds
+    public let beats: [Double]
+    /// Bar starts in seconds
+    public let downbeats: [Double]
+    public let segments: [[String: JSONValue]]
+
+    public init(
+        trackId: String,
+        bpm: Double? = nil,
+        bpmConfidence: Double? = nil,
+        keyCamelot: String? = nil,
+        beats: [Double],
+        downbeats: [Double],
+        segments: [[String: JSONValue]]
+    ) {
+        self.trackId = trackId
+        self.bpm = bpm
+        self.bpmConfidence = bpmConfidence
+        self.keyCamelot = keyCamelot
+        self.beats = beats
+        self.downbeats = downbeats
+        self.segments = segments
     }
 }
 

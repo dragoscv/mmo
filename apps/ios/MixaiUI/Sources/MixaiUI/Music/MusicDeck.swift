@@ -51,11 +51,21 @@ final class MusicDeck {
         set { gain.globalGain = Float(max(-96, min(24, newValue))) }
     }
 
-    func play(_ url: URL, trackId: String) {
+    /// Playback rate (automix tempo match, pitch kept): AudioStreaming's built-in AVAudioUnitTimePitch, bypassed at 1.
+    var rate: Float {
+        get { player.rate }
+        set { player.rate = max(0.9, min(1.1, newValue)) }
+    }
+
+    /// Starts `url`; `startAt` > 0 seeks there once the entry plays (automix: the incoming first downbeat).
+    func play(_ url: URL, trackId: String, startAt: Double = 0) {
         entries = [url.absoluteString: trackId]
         queuedNext = nil
+        pendingSeek = startAt > 0 ? startAt : nil
         player.play(url: url)
     }
+
+    private var pendingSeek: Double?
 
     /// Gapless: the next entry starts on the same engine the instant the current one ends.
     func queue(_ url: URL, trackId: String) {
@@ -82,6 +92,12 @@ final class MusicDeck {
     }
 
     fileprivate func handle(_ e: Event) { onEvent?(e) }
+    /// First `started` after `play(startAt:)`: jump to the start offset (AudioStreaming seeks only a playing entry).
+    fileprivate func applyPendingSeek() {
+        guard let s = pendingSeek else { return }
+        pendingSeek = nil
+        player.seek(to: s)
+    }
     fileprivate func trackId(for entry: AudioEntryId) -> String? { entries[entry.id] }
     fileprivate func consumedQueued(_ entry: AudioEntryId) {
         if queuedNext?.absoluteString == entry.id { queuedNext = nil }
@@ -96,6 +112,7 @@ private final class DeckRelay: @preconcurrency AudioPlayerDelegate {
     func audioPlayerDidStartPlaying(player: AudioPlayer, with entryId: AudioEntryId) {
         guard let deck, let id = deck.trackId(for: entryId) else { return }
         deck.consumedQueued(entryId)
+        deck.applyPendingSeek()
         deck.handle(.started(id))
     }
 

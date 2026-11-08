@@ -27,6 +27,7 @@ import {
 } from "../subsonic/browse";
 import { getPlaylist, listPlaylists } from "../subsonic/playlists";
 import { albumId, artistId, decodeId, playlistId, trackId } from "../subsonic/ids";
+import { harmonicOrder } from "./harmonic";
 
 // ─── Public shapes ───────────────────────────────────────────────────────────
 
@@ -64,6 +65,12 @@ export interface TrackCard {
     /** EBU R128 integrated loudness (LUFS) and true peak (dBFS); present once analysed. Clients derive playback gain. */
     loudnessLufs?: number;
     truePeakDbfs?: number;
+    /** Automix (WP17-44): tempo (BPM; tag, Deezer or analyzer), its confidence 0..1 (analyzer only), Camelot key
+     *  (analyzer or file tag), first (down)beat in seconds (analyzer only — present ⇒ a beat grid exists). */
+    bpm?: number;
+    bpmConfidence?: number;
+    keyCamelot?: string;
+    firstBeatSec?: number;
     coverArt: string;
     coverUrlPath: string;
     streamUrlPath: string;
@@ -125,6 +132,19 @@ export interface MusicQueue {
 }
 
 export interface LyricLine { timeMs: number; text: string }
+
+/** Beat grid of one analysed track (`GET /media/music/beatgrid/:trackId`). Times in seconds. */
+export interface BeatGrid {
+    trackId: string;
+    bpm: number | null;
+    bpmConfidence: number | null;
+    keyCamelot: string | null;
+    beats: number[];
+    downbeats: number[];
+    segments: Array<{ start: number; end: number; label: string }>;
+}
+
+export const MAX_REORDER = 500;
 export interface LyricsResult {
     trackId: string;
     synced: LyricLine[] | null;
@@ -277,7 +297,20 @@ function trackCard(r: TrackRow, plays?: number): TrackCard {
     if (plays !== undefined) card.plays = plays;
     if (typeof r.loudness_lufs === "number" && Number.isFinite(r.loudness_lufs)) card.loudnessLufs = r.loudness_lufs;
     if (typeof r.loudness_true_peak_dbfs === "number" && Number.isFinite(r.loudness_true_peak_dbfs)) card.truePeakDbfs = r.loudness_true_peak_dbfs;
+    if (typeof r.bpm === "number" && Number.isFinite(r.bpm) && r.bpm > 0) card.bpm = Math.round(r.bpm * 100) / 100;
+    if (typeof r.bpm_confidence === "number" && Number.isFinite(r.bpm_confidence)) card.bpmConfidence = Math.max(0, Math.min(1, r.bpm_confidence));
+    if (typeof r.key_camelot === "string" && /^(?:[1-9]|1[0-2])[AB]$/.test(r.key_camelot)) card.keyCamelot = r.key_camelot;
+    if (typeof r.first_beat === "number" && Number.isFinite(r.first_beat) && r.first_beat >= 0) card.firstBeatSec = Math.round(r.first_beat * 1000) / 1000;
     return card;
+}
+
+/** JSON number array from a TEXT column (malformed / non-numeric entries dropped). */
+function numArray(raw: unknown): number[] {
+    if (typeof raw !== "string" || !raw) return [];
+    try {
+        const v: unknown = JSON.parse(raw);
+        return Array.isArray(v) ? v.filter((x): x is number => typeof x === "number" && Number.isFinite(x) && x >= 0) : [];
+    } catch { return []; }
 }
 
 const clampInt = (v: number | undefined, lo: number, hi: number, dflt: number): number =>
@@ -483,7 +516,7 @@ export class MusicService {
      * with up to 12 similar artists (most-played first per artist), interleaved so no artist plays twice in a row
      * when avoidable. Deterministic order apart from the per-artist shuffle (`rand` injectable for tests).
      */
-    radio(seed: string, size?: number, rand: () => number = Math.random): { seed: string; tracks: TrackCard[] } {
+    radio(seed: string, size?: number, rand: () => number = Math.random, order: "artist" | "harmonic" = "artist"): { seed: string; tracks: TrackCard[] } {
         const uid = this.userId();
         const d = decodeId(seed);
         if (!uid || !d || !["track", "album", "artist"].includes(d.kind)) throw new MusicError(404, "seed not found");
@@ -520,7 +553,50 @@ export class MusicService {
             }
         }
         const byId = new Map(getTracks(uid, out).map((t) => [t.id, t]));
-        return { seed, tracks: out.map((i) => byId.get(i)).filter((t): t is TrackRow => !!t).map((t) => trackCard(t, counts.get(t.id) ?? 0)) };
+        const tracks = out.map((i) => byId.get(i)).filter((t): t is TrackRow => !!t).map((t) => trackCard(t, counts.get(t.id) ?? 0));
+        return { seed, tracks: order === "harmonic" ? harmonicOrder(tracks, 0) : tracks };
+    }
+
+    /**
+     * Beat grid of an analysed track (automix, WP17-44). 404 when the track is unknown or has no measured beats
+     * (tag / Deezer BPM alone has no grid).
+     */
+    beatgrid(id: string): BeatGrid {
+        const d = decodeId(id);
+        const uid = this.userId();
+        if (!d || d.kind !== "track" || d.num === undefined || !uid) throw new MusicError(404, "track not found");
+        const row = this.lib().prepare(
+            `SELECT bpm, bpm_confidence, key_camelot, beats, downbeats, structure_segments FROM tracks
+             WHERE user_id = ? AND id = ? AND COALESCE(is_hidden, 0) = 0`,
+        ).get(uid, d.num) as { bpm: number | null; bpm_confidence: number | null; key_camelot: string | null; beats: string | null; downbeats: string | null; structure_segments: string | null } | undefined;
+        if (!row) throw new MusicError(404, "track not found");
+        const beats = numArray(row.beats);
+        if (beats.length === 0) throw new MusicError(404, "not analysed");
+        let segments: BeatGrid["segments"] = [];
+        try {
+            const v: unknown = row.structure_segments ? JSON.parse(row.structure_segments) : [];
+            if (Array.isArray(v)) {
+                segments = v.flatMap((s: unknown) => {
+                    const o = s as { start?: unknown; end?: unknown; label?: unknown };
+                    return typeof o?.start === "number" && typeof o.end === "number" && typeof o.label === "string" ? [{ start: o.start, end: o.end, label: o.label }] : [];
+                });
+            }
+        } catch { /* malformed segments → none */ }
+        return {
+            trackId: trackId(d.num), bpm: row.bpm ?? null, bpmConfidence: row.bpm_confidence ?? null,
+            keyCamelot: row.key_camelot ?? null, beats, downbeats: numArray(row.downbeats), segments,
+        };
+    }
+
+    /**
+     * Harmonic order of a queue (automix / Smart Reorder): keeps `trackIds[start]` first, then the best Camelot + BPM
+     * transition each step; unknown ids are dropped, tracks without key/BPM keep their order at the end.
+     */
+    reorder(rawIds: string[], start = 0): { tracks: TrackCard[] } {
+        if (rawIds.length > MAX_REORDER) throw new MusicError(400, `at most ${MAX_REORDER} ids`);
+        const cards = this.tracksByIds(rawIds).items;
+        const first = cards.findIndex((c) => c.id === rawIds[Math.max(0, Math.min(rawIds.length - 1, start))]);
+        return { tracks: harmonicOrder(cards, Math.max(0, first)) };
     }
 
     /**

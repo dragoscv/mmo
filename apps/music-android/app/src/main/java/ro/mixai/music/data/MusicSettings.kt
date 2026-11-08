@@ -31,6 +31,11 @@ class MusicSettings(private val context: Context) : SessionBlobStore {
     val normalize: Flow<Boolean> = context.musicStore.data.map { it[kNormalize] != "0" }
     suspend fun setNormalize(v: Boolean) { context.musicStore.edit { it[kNormalize] = if (v) "1" else "0" } }
 
+    private val kAutomix = stringPreferencesKey("pb_automix")
+    /** Beat-matched crossfades (WP17-44, D56): default on; only acts while crossfade > 0. */
+    val automix: Flow<Boolean> = context.musicStore.data.map { it[kAutomix] != "0" }
+    suspend fun setAutomix(v: Boolean) { context.musicStore.edit { it[kAutomix] = if (v) "1" else "0" } }
+
     /** "system" | "dark" | "light". */
     val theme: Flow<String> = context.musicStore.data.map { it[kTheme] ?: "system" }
     suspend fun setTheme(mode: String) { context.musicStore.edit { it[kTheme] = mode } }

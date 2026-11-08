@@ -47,6 +47,8 @@
     <string name="settings_crossfade_s">%1$d secunde</string>
     <string name="settings_normalize">Normalizare volum</string>
     <string name="settings_normalize_hint">Redă fiecare piesă la un volum asemănător, pe baza analizei de pe server</string>
+    <string name="settings_automix">Automix (pe ritm)</string>
+    <string name="settings_automix_hint">Cu crossfade pornit: potrivește tempoul (până la 6%) și pornește piesa următoare pe beat când serverul îi știe BPM-ul</string>
     <string name="widget_label">MixAI Music</string>
     <string name="widget_description">Ce se aude acum, cu redare, pauză și salt</string>
     <string name="widget_idle_title">MixAI Music</string>

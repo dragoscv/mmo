@@ -92,6 +92,9 @@ export interface CompanionSettings {
     allowVideoTranscode: boolean;
     /** Size cap of `<userData>/downloads-cache` (iOS MP4 remuxes), GB; LRU eviction above it. */
     downloadsCacheCapGb: number;
+    /** Queue DSP analysis (BPM, key, beat grid, loudness) for newly ingested tracks at idle priority (automix,
+     *  WP17-44). Default on, except on ARM Linux (Raspberry Pi: hours of CPU for a big library). */
+    autoAnalyzeOnScan: boolean;
 }
 
 const DEFAULTS: CompanionSettings = {
@@ -121,6 +124,7 @@ const DEFAULTS: CompanionSettings = {
     preRemuxAutoOnScan: false,
     allowVideoTranscode: false,
     downloadsCacheCapGb: 20,
+    autoAnalyzeOnScan: !(process.platform === "linux" && (process.arch === "arm64" || process.arch === "arm")),
 };
 
 /**
@@ -328,6 +332,7 @@ export function getSettings(): CompanionSettings {
         telemetryEnabled: (store.get("telemetryEnabled") as boolean | undefined) ?? DEFAULTS.telemetryEnabled,
         preRemuxAutoOnScan: (store.get("preRemuxAutoOnScan") as boolean | undefined) ?? DEFAULTS.preRemuxAutoOnScan,
         allowVideoTranscode: (store.get("allowVideoTranscode") as boolean | undefined) ?? DEFAULTS.allowVideoTranscode,
+        autoAnalyzeOnScan: (store.get("autoAnalyzeOnScan") as boolean | undefined) ?? DEFAULTS.autoAnalyzeOnScan,
         downloadsCacheCapGb: (() => {
             const v = Number(store.get("downloadsCacheCapGb"));
             return Number.isFinite(v) && v >= 1 && v <= 10_000 ? v : DEFAULTS.downloadsCacheCapGb;

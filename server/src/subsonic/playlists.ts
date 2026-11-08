@@ -4,7 +4,7 @@
  */
 
 import { enqueueSyncChange } from "../sync";
-import { db, songToBody, type TrackRow } from "./browse";
+import { db, songToBody, trackCols, type TrackRow } from "./browse";
 import { decodeId, playlistId } from "./ids";
 import { ERR, SubsonicError, type Body } from "./response";
 
@@ -72,9 +72,7 @@ export function getPlaylist(userId: string, rawId: string): { row: PlaylistRow; 
     const row = db().prepare(`${PL_SELECT} WHERE p.user_id = ? AND p.id = ?`).get(userId, d.num) as PlaylistRow | undefined;
     if (!row) throw new SubsonicError(ERR.NOT_FOUND, "Playlist not found");
     const songs = db().prepare(
-        `SELECT t.id, t.user_id, t.filepath, t.filename, t.artist, t.title, t.album, t.genre, t.year, t.duration, t.bpm,
-                t.file_size, t.format, t.bitrate, t.sample_rate, t.added_at, t.rating, t.is_favorite, t.lyrics, t.synced_lyrics,
-                t.comment, t.artwork_url, t.musicbrainz_id
+        `SELECT ${trackCols("t.")}
          FROM playlist_tracks pt JOIN tracks t ON t.id = pt.track_id AND t.user_id = ?
          WHERE pt.playlist_id = ? ORDER BY pt.position`,
     ).all(userId, d.num) as TrackRow[];

@@ -3987,6 +3987,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/music/beatgrid/{trackId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Beat grid of an analysed track (automix): beats, downbeats, structure segments */
+        get: operations["musicBeatgrid"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/music/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Harmonic order of a queue (Camelot key + BPM); keeps trackIds[start] first, unknown ids dropped */
+        post: operations["musicReorder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/media/music/lyrics/{trackId}": {
         parameters: {
             query?: never;
@@ -5648,9 +5682,33 @@ export interface components {
             loudnessLufs?: number;
             /** @description True peak in dBFS; absent until analysed */
             truePeakDbfs?: number;
+            /** @description Tempo in BPM (file tag, Deezer or analyzer); absent when unknown */
+            bpm?: number;
+            /** @description Analyzer tempo confidence; absent for tag/Deezer BPM */
+            bpmConfidence?: number;
+            /** @description Camelot key (analyzer or file tag), e.g. 8A */
+            keyCamelot?: string;
+            /** @description First downbeat (else first beat) in seconds; present only when a beat grid was measured */
+            firstBeatSec?: number;
             coverArt: string;
             coverUrlPath: string;
             streamUrlPath: string;
+        };
+        BeatGrid: {
+            trackId: string;
+            bpm: number | null;
+            bpmConfidence: number | null;
+            keyCamelot: string | null;
+            /** @description Beat times in seconds */
+            beats: number[];
+            /** @description Bar starts in seconds */
+            downbeats: number[];
+            segments: {
+                start: number;
+                end: number;
+                /** @description intro, verse, chorus, bridge, outro, break */
+                label: string;
+            }[];
         };
         ArtistCard: {
             id: string;
@@ -13533,6 +13591,8 @@ export interface operations {
                 /** @description tr_, al_ or ar_ id */
                 seed: string;
                 size?: number;
+                /** @description harmonic = Camelot key + BPM order after the seed (automix) */
+                order?: "artist" | "harmonic";
             };
             header?: never;
             path?: never;
@@ -13695,6 +13755,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MusicQueue"];
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicBeatgrid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trackId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BeatGrid"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["ErrorJson"];
+        };
+    };
+    musicReorder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    trackIds: string[];
+                    /** @default 0 */
+                    start?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        tracks: components["schemas"]["TrackCard"][];
+                    };
                 };
             };
             400: components["responses"]["ErrorJson"];

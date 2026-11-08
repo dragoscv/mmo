@@ -2,6 +2,20 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.13.0 — Automix data: BPM, key, beat grid, harmonic order (WP17-44)
+
+- `TrackCard` carries `bpm` (tag, Deezer or analyzer), `bpmConfidence`, `keyCamelot` and `firstBeatSec` (first
+	downbeat; present only when a beat grid was measured). Playlist track cards now also carry loudness (the
+	playlist query had its own column list).
+- `GET /media/music/beatgrid/{trackId}` → beats, downbeats and structure segments (404 until analysed).
+- `POST /media/music/reorder {trackIds, start}` and `GET /media/music/radio?order=harmonic` order tracks by Camelot
+	key + BPM (port of the DJ app's scorer, `media/harmonic.ts`).
+- Scans read the file's key tag ("Am", "8A", Open Key "1m") into `key_camelot` / `key_musical`.
+- New setting `autoAnalyzeOnScan` (default on; off on ARM Linux / Raspberry Pi): newly ingested tracks get DSP analysis
+	in the background. Analyzer workers run at below-normal OS priority.
+- Downbeats come from Beat This! (CPJKU, MIT code and weights) when installed — the analyzer setup installs it after
+	the stems engine — else every 4th beat as before.
+
 ## 3.12.0 — Music output switching: Cast / DLNA / MixAI TVs (WP17-41h)
 
 - Subsonic `stream` honours `format`: `mp3` (256k), `opus` (160k Ogg), `aac` (256k ADTS) and `flac` transcode

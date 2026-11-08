@@ -48,6 +48,8 @@
     <string name="settings_crossfade_s">%1$d seconds</string>
     <string name="settings_normalize">Volume normalisation</string>
     <string name="settings_normalize_hint">Plays every track at a similar loudness, from the server analysis</string>
+    <string name="settings_automix">Automix (beat-matched)</string>
+    <string name="settings_automix_hint">With crossfade on: matches the tempo (up to 6%) and starts the next track on the beat when the server knows its BPM</string>
     <string name="widget_label">MixAI Music</string>
     <string name="widget_description">Now playing with play, pause and skip</string>
     <string name="widget_idle_title">MixAI Music</string>

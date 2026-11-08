@@ -80,7 +80,9 @@ class MixaiMusicApp : Application(), SingletonImageLoader.Factory {
         }
         // Gapless / ReplayGain-style normalisation / crossfade (WP17-41e): read by the core MusicService.
         appScope.launch {
-            combine(musicSettings.crossfadeSec, musicSettings.normalize) { s, n -> AudioPrefs(crossfadeMs = s * 1000, normalize = n) }
+            combine(musicSettings.crossfadeSec, musicSettings.normalize, musicSettings.automix) { s, n, a ->
+                AudioPrefs(crossfadeMs = s * 1000, normalize = n, automix = a)
+            }
                 .collect { MusicService.audioPrefs.value = it }
         }
         appScope.launch {

@@ -27,6 +27,24 @@ import { createReadStream, statSync, existsSync } from "node:fs";
 import { copyFile, mkdir, stat as statAsync } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { toCamelot } from "../media/harmonic";
+import { getSettings } from "../store";
+
+/**
+ * Scan payload `key` (file tag: "Am", "8A", "1m"…) → `keyMusical` + `keyCamelot` (automix, WP17-44). The payload
+ * field `key` is not a column; analyzer results later overwrite both.
+ */
+export function scanTagFields<T extends { key?: unknown; keyCamelot?: unknown; keyMusical?: unknown }>(t: T): Omit<T, "key"> {
+    const { key, ...rest } = t;
+    if (typeof key !== "string" || !key.trim()) return rest;
+    const out = rest as Omit<T, "key"> & { keyCamelot?: unknown; keyMusical?: unknown };
+    if (out.keyMusical == null) out.keyMusical = key.trim().slice(0, 16);
+    if (out.keyCamelot == null) {
+        const cam = toCamelot(key);
+        if (cam) out.keyCamelot = cam;
+    }
+    return out;
+}
 
 // ─── Sync helpers ───────────────────────────────────────────────────────────
 //
@@ -480,10 +498,12 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
         const db = getLibraryDb();
         let inserted = 0;
         let skipped = 0;
+        const fresh: Array<{ id: number; filepath: string }> = [];
         for (const t of incoming) {
             if (!t?.filepath || !t?.filename) { skipped++; continue; }
             try {
-                db.insert(tracks).values({ ...t, userId }).run();
+            const r = db.insert(tracks).values({ ...scanTagFields(t as typeof t & { key?: unknown }), userId }).run();
+            fresh.push({ id: Number(r.lastInsertRowid), filepath: t.filepath });
                 inserted++;
                 db.insert(scanLogs).values({
                     userId,
@@ -495,7 +515,17 @@ export function createLibraryRouter(authMiddleware: express.RequestHandler): exp
                 skipped++; // UNIQUE(user_id, filepath) collision = already exists
             }
         }
-        res.json({ success: true, inserted, skipped, total: incoming.length });
+        // Automix needs BPM / key / beat grid for the whole library: analyse new tracks in the background (the DSP lane
+        // runs one job at a time at idle priority). Setting autoAnalyzeOnScan (off on ARM Linux by default).
+        let analyzing = 0;
+        if (fresh.length > 0 && getSettings().autoAnalyzeOnScan) {
+            const batch = { id: randomUUID(), label: "Auto analysis (new tracks)" };
+            for (const f of fresh) {
+                if (!existsSync(f.filepath)) continue;
+                try { analyzer.enqueue(f.id, f.filepath, { dsp: true }, batch); analyzing++; } catch { /* analyzer unavailable */ }
+            }
+        }
+        res.json({ success: true, inserted, skipped, total: incoming.length, analyzing });
     });
 
     // ── Genres / Keys / Tags ─────────────────────────────────────────────
