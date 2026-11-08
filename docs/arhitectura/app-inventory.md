@@ -37,7 +37,11 @@ Work: tracker §12 WP17. Update this table in the same commit as any release, re
 | MixAI TV | Android phone/tablet | Google Play | `apps/phone-android` (rename) | `ro.mixai.app` | WP17-28 |
 | MixAI TV | iPhone/iPad | App Store | `apps/ios` (rename, iPad) | `ro.mixai.app` | WP17-29 |
 | MixAI Music | Web | `music.mixai.ro` (PWA) | `apps/web` host routing | — | WP17-40 |
-| MixAI Music | Android, iOS, desktop, TV now-playing | Play, App Store, MS Store, Mac App Store, Flathub | `apps/music-android`, `apps/ios` target, `apps/tv-desktop` profile | `ro.mixai.music` | WP17-41..45 |
+| MixAI Music | Android phone + Wear + Auto | Google Play | `apps/music-android` | `ro.mixai.music` | WP17-41 |
+| MixAI Music | iPhone + CarPlay | App Store | `apps/ios` target `MixAIMusic` | `ro.mixai.music` | WP17-42 |
+| MixAI Music | Windows | Microsoft Store (MSIX) | `apps/music-desktop` (Tauri shell → music.mixai.ro) | `ro.mixai.music.desktop` | WP17-43 |
+| MixAI Music | macOS | Mac App Store + DMG | `apps/music-desktop` | `ro.mixai.music.desktop` | WP17-43 |
+| MixAI Music | Linux | Flathub | `apps/music-desktop` | `ro.mixai.music.desktop` | WP17-43 |
 | MixAI Studio | Web + desktop shell | `app.mixai.ro`, MS Store | `apps/web`, `apps/native` | `ro.mixai.studio` | WP17-11, WP17-50 |
 | MixAI DJ | Windows/macOS/Linux | MS Store, Mac App Store, Flathub, GH | `apps/mixai` | `ro.mixai.dj` | WP17-51 |
 | MixAI Server | Windows/macOS/Linux, Docker, Pi | GH Release, Docker Hub/GHCR, winget | `server` | `ro.mixai.companion` | WP17-52 |
@@ -61,7 +65,7 @@ Work: tracker §12 WP17. Update this table in the same commit as any release, re
 | Product | Store ID | Package identity |
 |---|---|---|
 | MixAI TV | `9P3WGV62ZRN5` | Name `DragosCatalin.MixAITV`, Publisher `CN=FE8B5839-E0F9-495F-854C-53165710EB07`, PFN `DragosCatalin.MixAITV_2n7wyqrzmk6fw` |
-| MixAI Music | `9PC31TGKW4FP` | read from Partner Center → Product identity when the package is built |
+| MixAI Music | `9PC31TGKW4FP` | Name `DragosCatalin.MixAIMusic`, Publisher `CN=FE8B5839-E0F9-495F-854C-53165710EB07`, PFN `DragosCatalin.MixAIMusic_2n7wyqrzmk6fw` |
 | MixAI Studio | `9NKKC4WGMX67` | idem |
 | MixAI DJ | `9P5P2WN26RMS` | idem |
 

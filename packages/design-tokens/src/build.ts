@@ -29,6 +29,7 @@ const mirrors: Array<[string, string]> = [
   ["tokens.plain.css", join(repo, "apps", "tv-tizen", "src", "tokens.css")],
   ["tokens.plain.css", join(repo, "apps", "extension", "tokens.css")],
   ["tokens.plain.css", join(repo, "apps", "native", "web", "tokens.css")],
+  ["tokens.plain.css", join(repo, "apps", "music-desktop", "web", "tokens.css")],
   ["prehydrate.js", join(repo, "apps", "web", "public", "prehydrate.js")],
   ["prehydrate.js", join(repo, "apps", "tv-tizen", "public", "prehydrate.js")],
   ["prehydrate.js", join(repo, "apps", "mixai", "public", "prehydrate.js")],

@@ -18,6 +18,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Download } from "lucide-react";
 import { useHaptics } from "@mmo/ui";
+import { isStandaloneEnv } from "./pwa-standalone";
 
 // `beforeinstallprompt` isn't in lib.dom.d.ts yet (still a Web App
 // Manifest WG draft). Narrow type rather than `any`.
@@ -38,10 +39,8 @@ export function PwaInstallButton({ className }: { className?: string }) {
     // The post-install case is then handled by the `appinstalled` event.
     const [installed, setInstalled] = useState<boolean>(() => {
         if (typeof window === "undefined") return false;
-        return (
-            window.matchMedia?.("(display-mode: standalone)").matches === true ||
-            (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-        );
+        // Also covers the native shells (MixAI Music / Studio desktop, Capacitor): never offer "install" there.
+        return isStandaloneEnv();
     });
 
     useEffect(() => {

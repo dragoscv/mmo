@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en" data-accent="violet">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="color-scheme" content="dark light" />
+        <title>MixAI Music</title>
+        <script>
+            // Pre-hydrate theme from the shared MixAI prefs blob (same key as the web app), else the OS scheme.
+            (function () {
+                var html = document.documentElement;
+                var mode = "system";
+                var accent = "violet";
+                try {
+                    var prefs = JSON.parse(localStorage.getItem("mixai:prefs:v1") || "null");
+                    if (prefs && typeof prefs === "object") {
+                        if (prefs.mode === "light" || prefs.mode === "dark") mode = prefs.mode;
+                        if (typeof prefs.accent === "string" && prefs.accent) accent = prefs.accent;
+                        if (prefs.motion === "reduced") html.setAttribute("data-motion", "reduced");
+                    }
+                } catch (e) {
+                    /* storage unavailable */
+                }
+                if (mode === "system") mode = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+                html.setAttribute("data-mode", mode);
+                html.classList.toggle("dark", mode === "dark");
+                html.setAttribute("data-accent", accent);
+            })();
+        </script>
+        <link rel="stylesheet" href="./tokens.css" />
+        <style>
+            html,
+            body {
+                margin: 0;
+                height: 100%;
+                overflow: hidden;
+                background: var(--background);
+                color: var(--foreground);
+                font-family: var(--font-sans);
+            }
+            .stage {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                box-sizing: border-box;
+                padding: 24px;
+                text-align: center;
+            }
+            h1 {
+                margin: 0;
+                font-family: var(--font-heading);
+                font-size: 22px;
+                font-weight: 700;
+                letter-spacing: -0.01em;
+            }
+            .wordmark span {
+                background: var(--brand-gradient);
+                -webkit-background-clip: text;
+                background-clip: text;
+                color: transparent;
+            }
+            p {
+                margin: 0;
+                color: var(--muted-foreground);
+                font-size: 13px;
+                max-width: 340px;
+                line-height: 1.5;
+            }
+            p.hint {
+                font-size: 12px;
+            }
+            .disc {
+                width: 56px;
+                height: 56px;
+                border-radius: 50%;
+                background: conic-gradient(from 0deg, var(--primary), var(--chart-2), var(--primary));
+                box-shadow: var(--surface-glow);
+                display: grid;
+                place-items: center;
+                animation: spin 2.4s linear infinite;
+            }
+            .disc::after {
+                content: "";
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                background: var(--background);
+            }
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .disc {
+                    animation: none;
+                }
+            }
+            [data-motion="reduced"] .disc {
+                animation: none;
+            }
+            button {
+                background: var(--primary);
+                color: var(--primary-foreground);
+                border: 0;
+                min-height: var(--control-h);
+                padding: 0 22px;
+                border-radius: var(--radius);
+                font: inherit;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                transition:
+                    filter var(--dur-fast) var(--ease-out),
+                    transform var(--dur-fast) var(--ease-out);
+            }
+            button:hover {
+                filter: brightness(1.08);
+            }
+            button:active {
+                transform: scale(0.98);
+            }
+            button:focus-visible {
+                outline: 2px solid var(--ring);
+                outline-offset: 2px;
+            }
+            button.secondary {
+                background: var(--secondary);
+                color: var(--secondary-foreground);
+                border: 1px solid var(--border);
+            }
+            .row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                justify-content: center;
+            }
+            .err {
+                color: var(--destructive);
+                font-size: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <main class="stage" id="stage" aria-live="polite">
+            <div class="disc" aria-hidden="true"></div>
+            <h1 class="wordmark">MixAI <span>Music</span></h1>
+            <p id="status">Loading…</p>
+        </main>
+        <script type="module">
+            import { SIGNED_IN_KEY, appUrl, bootstrapUrl, decide, pickLang, retryDelayMs, translator } from "./launcher.mjs";
+
+            const html = document.documentElement;
+            const lang = pickLang(localStorage.getItem("mixai:prefs:v1"), navigator.language);
+            html.setAttribute("lang", lang);
+            const t = translator(lang);
+            const stage = document.getElementById("stage");
+            document.getElementById("status").textContent = t("loading");
+
+            const invoke = window.__TAURI__?.core?.invoke;
+            let WEB = "https://music.mixai.ro";
+            let attempt = 0;
+
+            const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+            const render = (h) => {
+                stage.innerHTML = h;
+                stage.querySelector("button")?.focus();
+            };
+            const wordmark = `<h1 class="wordmark">MixAI <span>Music</span></h1>`;
+
+            async function pendingPath() {
+                try {
+                    return (await invoke?.("take_pending_path")) || "/";
+                } catch {
+                    return "/";
+                }
+            }
+
+            async function goToApp() {
+                window.location.replace(appUrl(WEB, await pendingPath()));
+            }
+
+            async function reachable() {
+                try {
+                    // DNS + TCP in Rust: a fetch from this origin is blocked by the web app's CORP same-site header.
+                    return (await invoke("web_reachable")) === true;
+                } catch {
+                    return false;
+                }
+            }
+
+            function offline() {
+                const delay = retryDelayMs(attempt++);
+                render(`
+                    <div class="disc" aria-hidden="true"></div>
+                    <h1>${t("offlineTitle")}</h1>
+                    <p>${t("offlineBody")}</p>
+                    <button id="retry">${t("offlineRetry")}</button>`);
+                const timer = setTimeout(boot, delay);
+                document.getElementById("retry").addEventListener("click", () => {
+                    clearTimeout(timer);
+                    boot();
+                });
+            }
+
+            async function signIn() {
+                render(`
+                    <div class="disc" aria-hidden="true"></div>
+                    <h1>${t("signingTitle")}</h1>
+                    <p>${t("signingBody")}</p>
+                    <p class="hint">${t("signingHint")}</p>
+                    <div class="row"><button id="cancel" class="secondary">${t("cancel")}</button></div>`);
+                document.getElementById("cancel").addEventListener("click", async () => {
+                    try {
+                        await invoke("desktop_auth_cancel");
+                    } catch {
+                        /* ignore */
+                    }
+                    render(`<h1>${t("cancelledTitle")}</h1><p>${t("cancelledBody")}</p><button id="again">${t("retry")}</button>`);
+                    document.getElementById("again").addEventListener("click", signIn);
+                });
+                try {
+                    const r = await invoke("desktop_auth", { webAppUrl: WEB });
+                    if (!r || !r.token) throw new Error(t("noToken"));
+                    localStorage.setItem(SIGNED_IN_KEY, "1");
+                    window.location.replace(bootstrapUrl(WEB, r.token, await pendingPath()));
+                } catch (e) {
+                    const msg = (e && (e.message || String(e))) || t("unknownError");
+                    render(`<h1>${t("failedTitle")}</h1><p class="err">${esc(msg)}</p><button id="again">${t("retry")}</button>`);
+                    document.getElementById("again").addEventListener("click", signIn);
+                }
+            }
+
+            function welcome() {
+                render(`
+                    <div class="disc" aria-hidden="true"></div>
+                    <h1>${t("welcomeTitle")}</h1>
+                    <p>${t("welcomeBody")}</p>
+                    <div class="row">
+                        <button id="signin">${t("signIn")}</button>
+                        <button id="go" class="secondary">${t("continueSignedIn")}</button>
+                    </div>`);
+                document.getElementById("signin").addEventListener("click", signIn);
+                document.getElementById("go").addEventListener("click", goToApp);
+            }
+
+            async function boot() {
+                render(`<div class="disc" aria-hidden="true"></div>${wordmark}<p>${t("loading")}</p>`);
+                if (typeof invoke !== "function") {
+                    window.location.replace(WEB);
+                    return;
+                }
+                try {
+                    const u = await invoke("get_web_app_url");
+                    if (typeof u === "string" && u) WEB = u;
+                } catch {
+                    /* keep default */
+                }
+                const action = decide({
+                    online: await reachable(),
+                    signinRequested: new URLSearchParams(location.search).get("signin") === "1",
+                    signedInBefore: localStorage.getItem(SIGNED_IN_KEY) === "1",
+                });
+                if (action === "offline") return offline();
+                attempt = 0;
+                if (action === "signin") return signIn();
+                if (action === "continue") return goToApp();
+                welcome();
+            }
+
+            boot();
+        </script>
+    </body>
+</html>

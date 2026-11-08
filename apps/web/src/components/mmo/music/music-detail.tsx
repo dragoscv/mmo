@@ -19,7 +19,7 @@ import { rowKeys } from "../row";
 import {
     AlbumTile, ArtistTile, DownloadAllButton, MusicError, MusicHero, MusicLoading, MusicNotFound, RadioButton, TileGrid, TrackList, artistHref, genreHref,
 } from "./common";
-import { useDownloadable, useLoad, useMusic } from "./use-music";
+import { useDownloadable, useLoad, useMusic, useMusicIntent } from "./use-music";
 
 function PlayActions({ tracks }: { tracks: TrackCard[] }) {
     const t = useTranslations("mx.music.actions");
@@ -192,6 +192,7 @@ export function GenreScreen({ name }: { name: string }) {
 export function MusicSearchScreen() {
     const t = useTranslations("mx.music");
     const { music } = useMusic();
+    useMusicIntent(music);
     const router = useRouter();
     const params = useSearchParams();
     const q = (params?.get("q") ?? "").trim();

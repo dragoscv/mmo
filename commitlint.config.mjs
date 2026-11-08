@@ -18,6 +18,7 @@ export default {
                 "tv-android",
                 "phone-android",
                 "music-android",
+                "music-desktop",
                 "ios",
                 "tv-tizen",
                 "gateway",

@@ -6,8 +6,11 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MusicClient } from "@/lib/mmo/music";
+import { parseMusicIntent, withoutIntent } from "@/lib/mmo/music-intent";
 import { scopeOf } from "@/lib/mmo/offline/keys";
 import { webMusicPlayer } from "@/lib/mmo/web-music-player";
+import { usePathname, useRouter } from "@/components/host/host-context";
+import { useSearchParams } from "next/navigation";
 import { useMmo } from "../mmo-provider";
 import { useOfflineList } from "../offline/use-offline";
 
@@ -66,5 +69,33 @@ export function useLoad<T>(key: string | null, fn: () => Promise<T>): Loaded<T> 
     const retry = useCallback(() => setTick((n) => n + 1), []);
     const stale = res.key !== reqKey;
     return { status: stale ? "loading" : res.status, data: stale ? null : res.data, retry };
+}
+
+/**
+ * Consumes a one-shot playback intent in the URL (`?mix=1`, `?play=ids&index=n`, search `?play=1`; from the
+ * desktop shell and `mixai-music://` links): plays, strips the params, then opens Now Playing.
+ */
+export function useMusicIntent(music: MusicClient | null): void {
+    const params = useSearchParams();
+    const pathname = usePathname() ?? "/media/music";
+    const router = useRouter();
+    const done = useRef<string | null>(null);
+    useEffect(() => {
+        const intent = parseMusicIntent(pathname, params);
+        const key = `${pathname}?${params?.toString() ?? ""}`;
+        if (!music || !intent || !params || done.current === key) return;
+        done.current = key;
+        const rest = withoutIntent(params);
+        router.replace(rest ? `${pathname}?${rest}` : pathname, { scroll: false });
+        void (async () => {
+            const tracks = intent.kind === "mix" ? await music.random(50)
+                : intent.kind === "play" ? await music.tracksByIds(intent.ids)
+                    : (await music.search(intent.q))?.tracks ?? [];
+            if (tracks.length === 0) return;
+            const index = intent.kind === "play" ? Math.max(0, tracks.findIndex((t) => t.id === intent.ids[intent.index])) : 0;
+            webMusicPlayer.play(tracks, index);
+            router.push("/media/music/now-playing");
+        })().catch(() => undefined);
+    }, [music, params, pathname, router]);
 }
 

@@ -15,7 +15,12 @@ import { currentHostKind, rootDomain } from "@/lib/host/server";
  */
 export default async function MediaLayout({ children }: { children: ReactNode }) {
     const session = await auth();
-    if (!session?.user?.id) redirect(centralLoginUrl(await currentHostKind(), "/media", rootDomain()) ?? "/login?from=/media");
+    if (!session?.user?.id) {
+        const kind = await currentHostKind();
+        // The layout has no pathname: send each product host back to its own home (music.mixai.ro → Music, not TV).
+        const home = kind === "music" ? "/media/music" : "/media";
+        redirect(centralLoginUrl(kind, home, rootDomain()) ?? `/login?from=${home}`);
+    }
     const { servers } = await getMmoConnections();
     return (
         <MmoProvider servers={servers}>

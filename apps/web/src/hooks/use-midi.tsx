@@ -12,6 +12,8 @@ import {
     EXTERNAL_DEVICE_PROFILES,
     BUILTIN_PRESETS,
 } from "@/lib/midi-engine";
+import { useHost } from "@/components/host/host-context";
+import { midiHostAllowed } from "@/lib/host/products";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -111,6 +113,7 @@ const MidiContext = createContext<MidiContextValue | null>(null);
 // ─── Provider ────────────────────────────────────────────────────────────
 
 export function MidiProvider({ children }: { children: ReactNode }) {
+    const { kind: hostKind } = useHost();
     const engineRef = useRef<MidiEngine | null>(null);
     const listenersRef = useRef<Set<MidiMessageListener>>(new Set());
 
@@ -122,6 +125,9 @@ export function MidiProvider({ children }: { children: ReactNode }) {
 
     // Initialize engine once
     useEffect(() => {
+        // TV / Music / suite hosts never use controllers: requesting Web MIDI there only shows a scary "control and
+        // reprogram your MIDI devices" prompt (MixAI Music desktop shell, login page). Studio, DJ and legacy keep it.
+        if (!midiHostAllowed(hostKind)) return;
         const engine = new MidiEngine();
         engineRef.current = engine;
 
@@ -151,7 +157,6 @@ export function MidiProvider({ children }: { children: ReactNode }) {
         setStatus("connecting");
         engine.init().then((success) => {
             if (success) {
-                // eslint-disable-next-line react-hooks/set-state-in-effect -- external MIDI engine init callback
                 setStatus("connected");
                 setDevices(engine.getDevices());
 
@@ -184,7 +189,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
             engine.destroy();
             engineRef.current = null;
         };
-    }, []);
+    }, [hostKind]);
 
     // Subscribe to MIDI messages
     const addMessageListener = useCallback((listener: MidiMessageListener) => {

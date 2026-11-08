@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  MixAI Music — Mac App Store build (WP17-43, guideline 2.4.5(i): sandboxed). TEAM_ID is filled in by
+  scripts/macos/build-appstore.sh, so the team id is not committed.
+  - network.client: the web UI (music.mixai.ro) and the user's MixAI Server (https, or http on the LAN).
+  No server, file, camera, microphone or hardware entitlements: MixAI Music only plays from the user's server.
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key>
+  <true/>
+  <key>com.apple.security.network.client</key>
+  <true/>
+  <key>com.apple.application-identifier</key>
+  <string>TEAM_ID.ro.mixai.music.desktop</string>
+  <key>com.apple.developer.team-identifier</key>
+  <string>TEAM_ID</string>
+</dict>
+</plist>

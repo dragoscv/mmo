@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=MixAI Music
+GenericName=Music player
+GenericName[ro]=Player muzical
+Comment=Play the music on your own MixAI Server
+Comment[ro]=Muzica de pe propriul tău MixAI Server
+Exec=mixai-music %u
+Icon=ro.mixai.music.desktop
+Terminal=false
+Categories=AudioVideo;Audio;Player;Music;
+Keywords=music;player;lyrics;playlist;radio;muzica;versuri;
+MimeType=x-scheme-handler/mixai-music;
+StartupWMClass=mixai-music

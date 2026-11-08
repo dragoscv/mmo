@@ -1,9 +1,28 @@
 "use client";
 
 import Image from "next/image";
+import { useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
+import { Button } from "@mmo/ui";
 import { LoginForm } from "@/components/login-form";
 import { useRenderCount } from "@/lib/dev-debugger";
+import { isMusicDesktop, openDesktopSignIn } from "@/lib/mmo/desktop-bridge";
+
+const noop = () => () => undefined;
+
+/** Inside the MixAI Music desktop shell (Tauri): Google blocks OAuth in embedded webviews → system browser. */
+function DesktopSignIn() {
+    const t = useTranslations("login");
+    const desktop = useSyncExternalStore(noop, isMusicDesktop, () => false);
+    if (!desktop) return null;
+    return (
+        <div className="rounded-xl border border-primary/40 bg-primary/5 p-4 text-center" data-testid="desktop-signin">
+            <p className="text-sm font-semibold">{t("desktopTitle")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("desktopBody")}</p>
+            <Button className="mt-3 w-full" onClick={() => void openDesktopSignIn()}>{t("desktopCta")}</Button>
+        </div>
+    );
+}
 
 export function LoginPageClient({ callbackUrl = "/", appleEnabled }: { callbackUrl?: string; appleEnabled?: boolean }) {
     useRenderCount("Page:/login");
@@ -31,6 +50,7 @@ export function LoginPageClient({ callbackUrl = "/", appleEnabled }: { callbackU
                 </div>
 
                 {/* Login Card */}
+                <DesktopSignIn />
                 <div className="rounded-xl border border-border bg-card p-6 shadow-lg">
                     <LoginForm callbackUrl={callbackUrl} appleEnabled={appleEnabled} />
                 </div>

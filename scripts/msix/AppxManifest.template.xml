@@ -32,6 +32,7 @@
                 Square44x44Logo="Assets\Square44x44Logo.png">
                 <uap:DefaultTile Wide310x150Logo="Assets\Square150x150Logo.png" Square310x310Logo="Assets\Square310x310Logo.png" />
             </uap:VisualElements>
+__EXTENSIONS__
         </Application>
     </Applications>
     <Capabilities>

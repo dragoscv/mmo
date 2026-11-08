@@ -1,0 +1,70 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "productName": "MixAI Music",
+    "version": "0.1.0",
+    "identifier": "ro.mixai.music.desktop",
+    "build": {
+        "frontendDist": "../web",
+        "beforeDevCommand": "",
+        "beforeBuildCommand": ""
+    },
+    "app": {
+        "withGlobalTauri": true,
+        "windows": [
+            {
+                "label": "main",
+                "title": "MixAI Music",
+                "width": 1280,
+                "height": 820,
+                "minWidth": 380,
+                "minHeight": 560,
+                "center": true,
+                "resizable": true,
+                "backgroundColor": "#0a0a0f"
+            }
+        ],
+        "security": {
+            "csp": {
+                "default-src": "'self'",
+                "script-src": "'self' 'unsafe-inline'",
+                "style-src": "'self' 'unsafe-inline'",
+                "img-src": "'self' data: https: http:",
+                "connect-src": "'self' ipc: http://ipc.localhost https://music.mixai.ro http://localhost:13789",
+                "font-src": "'self' data:"
+            },
+            "capabilities": ["launcher", "music-web", "login-web"]
+        }
+    },
+    "bundle": {
+        "active": true,
+        "targets": ["nsis", "dmg", "app", "deb", "appimage"],
+        "createUpdaterArtifacts": false,
+        "publisher": "MixAI",
+        "category": "Music",
+        "shortDescription": "Your MixAI Server's music on the desktop",
+        "longDescription": "MixAI Music plays the music on your own MixAI Server: albums, artists, playlists, radio, synced lyrics, downloads, crossfade and volume normalisation, with media keys, the system Now Playing controls, a tray mini player and global shortcuts.",
+        "copyright": "© 2026 MixAI",
+        "homepage": "https://music.mixai.ro",
+        "icon": [
+            "icons/32x32.png",
+            "icons/128x128.png",
+            "icons/128x128@2x.png",
+            "icons/icon.icns",
+            "icons/icon.ico"
+        ],
+        "windows": { "nsis": { "installMode": "currentUser" } },
+        "macOS": {
+            "minimumSystemVersion": "11.0",
+            "hardenedRuntime": true,
+            "exceptionDomain": "music.mixai.ro"
+        },
+        "linux": {
+            "deb": { "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"] }
+        }
+    },
+    "plugins": {
+        "deep-link": {
+            "desktop": { "schemes": ["mixai-music"] }
+        }
+    }
+}

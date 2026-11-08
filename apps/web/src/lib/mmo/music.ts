@@ -63,6 +63,14 @@ export class MusicClient {
         return this.http.get<TrackPage>(`/media/music/tracks?${qs(opts)}`, { allow404: true });
     }
 
+    /** Tracks by Subsonic id in the requested order, unknown ids skipped (server 3.12+; `[]` on older servers). */
+    async tracksByIds(ids: string[]): Promise<TrackCard[]> {
+        const list = ids.filter((i) => i.length > 0).slice(0, 200);
+        if (list.length === 0) return [];
+        const r = await this.http.get<TrackPage>(`/media/music/tracks?ids=${list.map(enc).join(",")}`, { allow404: true });
+        return r?.items ?? [];
+    }
+
     /** Radio from a track / album / artist id (server 3.10+): the seed first, then similar artists interleaved.
      *  `null` = the server has no radio route (older than 3.10) or the seed is gone. */
     async radio(seed: string, size = 50): Promise<TrackCard[] | null> {

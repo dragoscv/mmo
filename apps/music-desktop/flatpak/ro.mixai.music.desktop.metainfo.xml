@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>ro.mixai.music.desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-or-later</project_license>
+  <name>MixAI Music</name>
+  <summary>Play the music on your own MixAI Server</summary>
+  <summary xml:lang="ro">Muzica de pe propriul tău MixAI Server</summary>
+  <developer id="ro.mixai">
+    <name>MixAI</name>
+  </developer>
+  <description>
+    <p>MixAI Music plays the music library on your own MixAI Server, with a desktop interface and native controls.</p>
+    <ul>
+      <li>Albums, artists, playlists, genres and search</li>
+      <li>Radio and mixes from any track, album or artist</li>
+      <li>Synced lyrics, queue editing, crossfade and volume normalisation</li>
+      <li>Media keys and the system Now Playing controls (MPRIS)</li>
+      <li>Tray mini player and global shortcuts</li>
+    </ul>
+    <p>MixAI Music needs a MixAI Server (free, self-hosted) on your network or over the internet. Your music stays on
+      your server.</p>
+  </description>
+  <launchable type="desktop-id">ro.mixai.music.desktop.desktop</launchable>
+  <url type="homepage">https://music.mixai.ro</url>
+  <url type="bugtracker">https://github.com/dragoscv/mmo/issues</url>
+  <url type="contact">mailto:support@mixai.ro</url>
+  <url type="vcs-browser">https://github.com/dragoscv/mmo</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Music home on the demo server</caption>
+      <image>https://mixai.ro/store/music-desktop/1-home.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Now Playing with synced lyrics</caption>
+      <image>https://mixai.ro/store/music-desktop/2-now-playing.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <releases>
+    <release version="0.1.0" date="2026-11-08">
+      <description><p>First release of MixAI Music for the desktop.</p></description>
+    </release>
+  </releases>
+</component>

@@ -19,7 +19,7 @@ import { rowKeys } from "../row";
 import {
     AlbumTile, ArtistTile, MusicEmptyLibrary, MusicError, MusicLoading, NOW_PLAYING_HREF, PlaylistTile, TileGrid, TrackList, genreHref,
 } from "./common";
-import { useDownloadable, useLoad, useMusic } from "./use-music";
+import { useDownloadable, useLoad, useMusic, useMusicIntent } from "./use-music";
 
 type Tab = "home" | "artists" | "albums" | "songs" | "playlists";
 const TABS: readonly Tab[] = ["home", "artists", "albums", "songs", "playlists"];
@@ -28,6 +28,7 @@ const PAGE = 200;
 export function MusicHomeScreen() {
     const t = useTranslations("mx.music");
     const { music, profileKey } = useMusic();
+    useMusicIntent(music);
     const router = useRouter();
     const pathname = usePathname() ?? "/media/music";
     const params = useSearchParams();

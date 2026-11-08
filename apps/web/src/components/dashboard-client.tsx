@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, type ReactNode } from "react";
+import { useEffect, useState, useRef, useSyncExternalStore, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { useTranslations, useLocale } from "next-intl";
 import Link from "next/link";
@@ -595,6 +595,17 @@ function getGreeting(): Greeting {
     return { text: "Night owl mode", emoji: "🌙" };
 }
 
+// Snapshot by greeting text so the client snapshot is referentially stable between renders.
+const GREETINGS = new Map<string, Greeting>();
+function clientGreeting(): Greeting {
+    const g = getGreeting();
+    const hit = GREETINGS.get(g.text);
+    if (hit) return hit;
+    GREETINGS.set(g.text, g);
+    return g;
+}
+const noSubscribe = () => () => undefined;
+
 function formatTotalDuration(seconds: number) {
     if (!seconds) return "0h";
     const h = Math.floor(seconds / 3600);
@@ -608,8 +619,8 @@ function formatTotalDuration(seconds: number) {
 export function DashboardClient({ stats, recommendedCategories, recentScans, growth = [] }: DashboardClientProps) {
     useRenderCount("Page:/dashboard");
     useSyncRefresh();
-    const [greeting, setGreeting] = useState<Greeting>(NEUTRAL_GREETING);
-    useEffect(() => setGreeting(getGreeting()), []);
+    // Neutral on the server and during hydration, local-clock greeting afterwards (React #418-safe, no effect).
+    const greeting = useSyncExternalStore(noSubscribe, clientGreeting, () => NEUTRAL_GREETING);
     const locale = useLocale() as "ro" | "en";
     const tNav = useTranslations("nav");
 

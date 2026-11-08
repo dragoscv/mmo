@@ -164,6 +164,12 @@ export function internalPathname(publicPath: string, current: HostKind): string 
 /** What `app.mixai.ro/` renders (the launcher lives on the apex). */
 export const STUDIO_HOME = "/dashboard";
 
+/** Hosts whose pages use MIDI controllers (Studio mixer/DAW, DJ; legacy run.app/localhost serve everything).
+ *  TV / Music / suite never request Web MIDI, so no "control your MIDI devices" prompt there. */
+export function midiHostAllowed(kind: HostKind): boolean {
+    return kind === "studio" || kind === "dj" || kind === "legacy";
+}
+
 // ─── Request routing (proxy.ts) ──────────────────────────────────────────────────────────────────
 
 export type RouteDecision =

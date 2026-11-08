@@ -25,6 +25,7 @@ import {
 } from "./music-core";
 import { playerBus, type PlayerCommand } from "./player-bus";
 import { mediaUrl } from "./offline/keys";
+import { installDesktopBridge, toDesktopNowPlaying } from "./desktop-bridge";
 
 export interface WebMusicState {
     queue: TrackCard[];
@@ -131,6 +132,12 @@ class WebMusicPlayer {
             if (el instanceof HTMLVideoElement && !el.muted && this.state.playing) this.pause();
         }, true);
         this.installMediaSession();
+        // MixAI Music desktop shell: OS media controls / tray / mini player (no-op in browsers).
+        installDesktopBridge(
+            this,
+            (fn) => { const a = this.stateChanges.on(fn); const b = this.progressChanges.on(fn); return () => { a(); b(); }; },
+            () => toDesktopNowPlaying(this.state, this.progress, this.state.current ? this.music?.coverUrl(this.state.current, 512) ?? null : null),
+        );
     }
 
     /** Downloaded tracks of the current server + profile; those play from the device instead of the server. */

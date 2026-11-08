@@ -1,0 +1,10 @@
+{
+    "$schema": "../gen/schemas/remote-schema.json",
+    "identifier": "login-web",
+    "description": "The central sign-in page (mixai.ro/login, WP17-10) may only ask the shell for the system-browser sign-in (Google blocks OAuth in embedded webviews).",
+    "windows": ["main"],
+    "remote": {
+        "urls": ["https://mixai.ro/login*", "http://localhost:13789/login*"]
+    },
+    "permissions": ["allow-desktop-open-signin"]
+}

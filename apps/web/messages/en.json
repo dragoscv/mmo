@@ -852,7 +852,10 @@
         "formSubtitle": "Your settings and preferences will be synced across sessions",
         "formFooter": "By continuing, you agree to store your preferences securely in the app database.",
         "skipNoteLine1": "You can also use the app without signing in.",
-        "skipNoteLine2": "Settings will be stored locally in your browser."
+        "skipNoteLine2": "Settings will be stored locally in your browser.",
+        "desktopTitle": "Sign in from your browser",
+        "desktopBody": "Google does not allow signing in inside desktop apps. MixAI Music opens your browser, then continues here by itself.",
+        "desktopCta": "Sign in with your browser"
     },
     "home": {
         "title": "Home",

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="color-scheme" content="dark light" />
+        <title>MixAI Music</title>
+        <script>
+            (function () {
+                var html = document.documentElement;
+                var mode = "system";
+                try {
+                    var p = JSON.parse(localStorage.getItem("mixai:prefs:v1") || "null");
+                    if (p && (p.mode === "light" || p.mode === "dark")) mode = p.mode;
+                    if (p && typeof p.accent === "string") html.setAttribute("data-accent", p.accent);
+                } catch (e) {}
+                if (mode === "system") mode = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+                html.setAttribute("data-mode", mode);
+                html.classList.toggle("dark", mode === "dark");
+            })();
+        </script>
+        <link rel="stylesheet" href="./tokens.css" />
+        <style>
+            html,
+            body {
+                margin: 0;
+                height: 100%;
+                overflow: hidden;
+                background: var(--card);
+                color: var(--card-foreground);
+                font-family: var(--font-sans);
+                user-select: none;
+            }
+            .mini {
+                display: grid;
+                grid-template-columns: 80px 1fr;
+                gap: 12px;
+                align-items: center;
+                height: 100%;
+                padding: 16px;
+                box-sizing: border-box;
+            }
+            .cover {
+                width: 80px;
+                height: 80px;
+                border-radius: var(--radius);
+                background: var(--muted) center / cover no-repeat;
+                border: 0;
+                padding: 0;
+                cursor: pointer;
+            }
+            .meta {
+                min-width: 0;
+            }
+            .title,
+            .artist {
+                margin: 0;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .title {
+                font-weight: 600;
+                font-size: 14px;
+            }
+            .artist {
+                color: var(--muted-foreground);
+                font-size: 12px;
+                margin-top: 2px;
+            }
+            .bar {
+                height: 3px;
+                margin: 8px 0 6px;
+                border-radius: 2px;
+                background: var(--muted);
+                overflow: hidden;
+            }
+            .bar i {
+                display: block;
+                height: 100%;
+                width: 0;
+                background: var(--primary);
+            }
+            .row {
+                display: flex;
+                gap: 4px;
+            }
+            .row button {
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                border: 0;
+                background: transparent;
+                color: inherit;
+                cursor: pointer;
+                display: grid;
+                place-items: center;
+            }
+            .row button:hover {
+                background: var(--accent);
+            }
+            .row button:focus-visible,
+            .cover:focus-visible {
+                outline: 2px solid var(--ring);
+                outline-offset: 2px;
+            }
+            .row button.main {
+                background: var(--primary);
+                color: var(--primary-foreground);
+            }
+            svg {
+                width: 16px;
+                height: 16px;
+                fill: currentColor;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="mini" data-tauri-drag-region>
+            <button class="cover" id="cover" aria-label="Open"></button>
+            <div class="meta" data-tauri-drag-region>
+                <p class="title" id="title">MixAI Music</p>
+                <p class="artist" id="artist"></p>
+                <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+                <div class="row">
+                    <button id="prev" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg></button>
+                    <button id="toggle" class="main" aria-label="Play"><svg viewBox="0 0 24 24"><path id="toggleIcon" d="M8 5v14l11-7z" /></svg></button>
+                    <button id="next" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z" /></svg></button>
+                </div>
+            </div>
+        </div>
+        <script type="module">
+            const ro = /^ro\b/i.test(navigator.language || "");
+            const L = ro
+                ? { open: "Deschide MixAI Music", prev: "Piesa anterioară", next: "Următoarea piesă", play: "Redă", pause: "Pauză", idle: "Nu se redă nimic" }
+                : { open: "Open MixAI Music", prev: "Previous track", next: "Next track", play: "Play", pause: "Pause", idle: "Nothing playing" };
+            document.documentElement.lang = ro ? "ro" : "en";
+            const $ = (id) => document.getElementById(id);
+            $("cover").setAttribute("aria-label", L.open);
+            $("prev").setAttribute("aria-label", L.prev);
+            $("next").setAttribute("aria-label", L.next);
+            const invoke = window.__TAURI__?.core?.invoke;
+            const listen = window.__TAURI__?.event?.listen;
+            let np = null;
+            let at = 0;
+            const PLAY = "M8 5v14l11-7z";
+            const PAUSE = "M6 5h4v14H6zm8 0h4v14h-4z";
+            function paint(s) {
+                np = s;
+                at = performance.now();
+                const empty = !s || !s.title;
+                $("title").textContent = empty ? L.idle : s.title;
+                $("artist").textContent = empty ? "" : [s.artist, s.album].filter(Boolean).join(" · ");
+                $("cover").style.backgroundImage = !empty && s.artUrl && /^https?:/.test(s.artUrl) ? `url("${encodeURI(s.artUrl)}")` : "none";
+                $("toggleIcon").setAttribute("d", s && s.playing ? PAUSE : PLAY);
+                $("toggle").setAttribute("aria-label", s && s.playing ? L.pause : L.play);
+                tick();
+            }
+            function tick() {
+                if (!np || !(np.durationSec > 0)) return void ($("bar").style.width = "0");
+                const pos = np.positionSec + (np.playing ? (performance.now() - at) / 1000 : 0);
+                $("bar").style.width = `${Math.min(100, (pos / np.durationSec) * 100)}%`;
+            }
+            setInterval(tick, 500);
+            const cmd = (name) => invoke?.("mini_command", { name }).catch(() => {});
+            $("prev").onclick = () => cmd("previous");
+            $("next").onclick = () => cmd("next");
+            $("toggle").onclick = () => cmd("toggle");
+            $("cover").onclick = () => cmd("open");
+            invoke?.("mini_state").then(paint).catch(() => {});
+            listen?.("np", (e) => paint(e.payload));
+        </script>
+    </body>
+</html>

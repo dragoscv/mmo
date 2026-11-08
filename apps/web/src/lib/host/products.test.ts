@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { hostKind, hostRoutingEnabled, hrefFor, internalPathname, ownerOf, routeRequest, toInternal, toPublic } from "./products";
+import { hostKind, hostRoutingEnabled, hrefFor, internalPathname, midiHostAllowed, ownerOf, routeRequest, toInternal, toPublic } from "./products";
+import { MEDIA_NAV } from "@/components/mmo/media-shell";
+
+vi.mock("@/components/host/host-context", () => ({ default: () => null, usePathname: () => "/", useRouter: () => ({}), useHost: () => ({}) }));
+vi.mock("@/components/mmo/mmo-provider", () => ({ useMmo: () => ({}) }));
+vi.mock("@/components/mmo/profile-gate", () => ({ ProfileGate: () => null }));
+vi.mock("@/components/mmo/profile-menu", () => ({ ProfileMenu: () => null }));
+vi.mock("@/components/mmo/music/mini-player", () => ({ MusicMiniPlayer: () => null }));
+vi.mock("@mmo/ui", () => ({ Button: () => null, EmptyState: () => null }));
+vi.mock("next-intl", () => ({ useTranslations: () => (k: string) => k }));
 
 describe("hostRoutingEnabled", () => {
     afterEach(() => { vi.unstubAllEnvs(); });
@@ -30,6 +39,8 @@ describe("central login", () => {
         expect(centralLoginUrl("legacy", "/media")).toBeNull();
         expect(centralLoginUrl("tv", "/media")).toBe(`https://mixai.ro/login?callbackUrl=${encodeURIComponent("https://tv.mixai.ro/")}`);
         expect(centralLoginUrl("tv", "/media/music")).toBe(`https://mixai.ro/login?callbackUrl=${encodeURIComponent("https://music.mixai.ro/")}`);
+        // media layout on music.mixai.ro (desktop shell's start page) must come back to Music, not TV.
+        expect(centralLoginUrl("music", "/media/music")).toBe(`https://mixai.ro/login?callbackUrl=${encodeURIComponent("https://music.mixai.ro/")}`);
         expect(centralLoginUrl("studio", "https://app.mixai.ro/library")).toBe(`https://mixai.ro/login?callbackUrl=${encodeURIComponent("https://app.mixai.ro/library")}`);
     });
 });
@@ -90,6 +101,30 @@ describe("hrefFor", () => {
     it("leaves external and protocol-relative hrefs alone", () => {
         expect(hrefFor("https://x.y/z", "tv")).toBe("https://x.y/z");
         expect(hrefFor("//x.y/z", "tv")).toBe("//x.y/z");
+    });
+    it("TV nav's Music entry crosses to music.mixai.ro (WP17-45)", () => {
+        const music = MEDIA_NAV.find((n) => n.key === "music");
+        expect(music?.href).toBe("/media/music");
+        expect(hrefFor(music!.href, "tv")).toBe("https://music.mixai.ro/");
+        expect(hrefFor(music!.href, "suite")).toBe("https://music.mixai.ro/");
+        expect(hrefFor(music!.href, "music")).toBe("/");
+        expect(hrefFor(music!.href, "legacy")).toBe("/media/music");
+        expect(hrefFor(music!.href, "tv", "staging.mixai.ro")).toBe("https://music.staging.mixai.ro/");
+    });
+    it("keeps desktop / mixai-music:// intents when canonicalising (WP17-43)", () => {
+        expect(midiHostAllowed("music")).toBe(false);
+        expect(midiHostAllowed("tv")).toBe(false);
+        expect(midiHostAllowed("suite")).toBe(false);
+        expect(midiHostAllowed("studio")).toBe(true);
+        expect(midiHostAllowed("dj")).toBe(true);
+        expect(midiHostAllowed("legacy")).toBe(true);
+        expect(routeRequest("music.mixai.ro", "/media/music", "?play=tr_1,tr_2&index=1")).toEqual({
+            type: "redirect", url: "https://music.mixai.ro/?play=tr_1,tr_2&index=1", status: 308,
+        });
+        expect(routeRequest("music.mixai.ro", "/media/music/search", "?q=x&play=1")).toEqual({
+            type: "redirect", url: "https://music.mixai.ro/search?q=x&play=1", status: 308,
+        });
+        expect(routeRequest("music.mixai.ro", "/media/downloads")).toEqual({ type: "next" });
     });
     it("maps the public pathname back for active-nav checks", () => {
         expect(internalPathname("/browse/tv", "tv")).toBe("/media/browse/tv");

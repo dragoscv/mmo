@@ -1,0 +1,42 @@
+[package]
+name = "mixai-music"
+version = "0.1.0"
+description = "MixAI Music — your MixAI Server's music on Windows, macOS and Linux"
+authors = ["MixAI <support@mixai.ro>"]
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/dragoscv/mmo"
+edition = "2024"
+rust-version = "1.88"
+
+[lib]
+name = "mixai_music_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = ["tray-icon"] }
+tauri-plugin-single-instance = { version = "2.5", features = ["deep-link"] }
+tauri-plugin-deep-link = "2.6"
+tauri-plugin-window-state = "2.5"
+tauri-plugin-global-shortcut = "2.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# OS media controls: Windows SMTC, macOS MPNowPlayingInfoCenter/MPRemoteCommandCenter, Linux MPRIS (zbus = no libdbus).
+souvlaki = { version = "0.9", default-features = false, features = ["use_zbus"] }
+sys-locale = "0.3"
+url = "2.5"
+percent-encoding = "2.3"
+# Desktop sign-in (same flow as MixAI Studio): loopback listener for the system-browser callback.
+tiny_http = "0.12"
+uuid = { version = "1.26", features = ["v4"] }
+open = "5.4"
+tokio = { version = "1.53", features = ["sync", "time"] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

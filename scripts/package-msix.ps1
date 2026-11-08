@@ -22,6 +22,7 @@ param(
     [string]$Publisher = 'CN=FE8B5839-E0F9-495F-854C-53165710EB07',
     [string]$PublisherDisplay = 'Dragos Catalin',
     [string]$TargetDir = '',
+    [string]$Protocol = '',
     [switch]$LanServer,
     [switch]$TestSign
 )
@@ -52,6 +53,10 @@ foreach ($n in 'StoreLogo.png', 'Square150x150Logo.png', 'Square44x44Logo.png', 
     Copy-Item $src (Join-Path $layout "Assets\$n")
 }
 $lan = if ($LanServer) { '        <Capability Name="privateNetworkClientServer" />' } else { '' }
+if ($Protocol -and $Protocol -notmatch '^[a-z][a-z0-9-]{1,38}$') { throw "invalid -Protocol '$Protocol'" }
+$proto = if ($Protocol) {
+  "            <Extensions>`n                <uap:Extension Category=`"windows.protocol`">`n                    <uap:Protocol Name=`"$Protocol`" />`n                </uap:Extension>`n            </Extensions>"
+} else { '' }
 $manifest = Get-Content (Join-Path $PSScriptRoot 'msix\AppxManifest.template.xml') -Raw
 $map = @{
     '__IDENTITY_NAME__' = $IdentityName; '__PUBLISHER__' = $Publisher; '__PUBLISHER_DISPLAY__' = $PublisherDisplay
@@ -60,6 +65,7 @@ $map = @{
 }
 foreach ($k in $map.Keys) { $manifest = $manifest.Replace($k, [Security.SecurityElement]::Escape($map[$k])) }
   $manifest = $manifest.Replace('__LAN_CAPABILITY__', $lan)
+$manifest = $manifest.Replace('__EXTENSIONS__', $proto)
 [IO.File]::WriteAllText((Join-Path $layout 'AppxManifest.xml'), $manifest, [Text.UTF8Encoding]::new($false))
 
 $msix = Join-Path $out "${FilePrefix}_${msixVer}_x64.msix"

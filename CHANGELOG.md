@@ -10,6 +10,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-08 — MixAI Music desktop 0.1.0 (ro.mixai.music.desktop), web 3.2.8, design-tokens 1.2.3
+
+- **MixAI Music for Windows, macOS and Linux (new `apps/music-desktop`, Tauri 2):** desktop window for music.mixai.ro
+  with system-browser sign-in, offline screen with automatic retry, media keys and the system Now Playing controls
+  (Windows SMTC, macOS Now Playing, Linux MPRIS), tray menu, always-on-top mini player, global shortcuts
+  (Ctrl+Alt+Space / → / ← / M), `mixai-music://` links (single instance) and remembered window size. Packaging: Microsoft
+  Store MSIX (`9PC31TGKW4FP`, `mixai-music` protocol), Mac App Store + Developer ID DMG, Flathub manifest.
+- **Web 3.2.8:** the music player reports to the desktop shell (`desktop-bridge`); `?mix=1`, `?play=ids&index=` and
+  search `?play=1` start playback (desktop + `mixai-music://`); the login page offers browser sign-in inside the shell;
+  unauthenticated visits to music.mixai.ro return to Music after sign-in (were sent to TV); Web MIDI is no longer
+  requested on the TV / Music / suite hosts (no "control your MIDI devices" prompt); the PWA install button stays
+  hidden inside native shells.
+- **Shared MSIX packager:** optional `-Protocol` (uap:Protocol). **design-tokens 1.2.3:** mirror for the launcher.
+
 ## 2026-11-08 — MixAI Music for iPhone 0.1.0 (ro.mixai.music), shared MixaiUI package, design-tokens 1.2.2
 
 - **MixAI Music for iPhone (new App Store app `ro.mixai.music`, TestFlight):** connect on the Wi-Fi + Quick Connect or

@@ -1,0 +1,16 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "bundle": {
+        "targets": ["app"],
+        "createUpdaterArtifacts": false,
+        "category": "public.app-category.music",
+        "macOS": {
+            "minimumSystemVersion": "13.0",
+            "hardenedRuntime": true,
+            "entitlements": "macos/Entitlements.appstore.resolved.plist",
+            "files": {
+                "embedded.provisionprofile": "macos/embedded.provisionprofile"
+            }
+        }
+    }
+}
