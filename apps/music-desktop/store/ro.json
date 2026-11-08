@@ -1,0 +1,12 @@
+{
+  "name": "MixAI Music pentru Mac",
+  "subtitle": "Serverul tău de muzică",
+  "promotionalText": "Biblioteca ta de muzică de pe serverul MixAI, într-o fereastră pe Mac: albume fără pauze, automix, versuri sincronizate, taste media, mini player. Fără reclame.",
+  "keywords": "player muzica,self-hosted,subsonic,flac,versuri,crossfade,fara pauze,server acasa,biblioteca,automix",
+  "supportUrl": "https://mixai.ro/",
+  "marketingUrl": "https://music.mixai.ro/",
+  "privacyPolicyUrl": "https://mixai.ro/privacy?lang=ro",
+  "copyright": "2026 Dragos Catalin Vladulescu",
+  "description": "MixAI Music pentru Mac redă muzica TA: albumele de pe propriul server MixAI de acasă, într-o fereastră rapidă. Fără reclame, fără abonament, fără un catalog pe care să ți-l vindem.\n\nASCULTARE\n• Albumele merg fără pauze; automix face crossfade pe beat între celelalte melodii, cu tempoul potrivit.\n• Pornește un mix: radio fără sfârșit din biblioteca ta sau de la orice melodie, album ori artist.\n• Versuri sincronizate, editarea cozii, amestecare, repetare și ordine armonică (după tonalitate) la radio.\n\nFĂCUT PENTRU MAC\n• Tastele media și controalele Now Playing din Centrul de control.\n• Meniu în bara de meniuri și mini player mereu deasupra.\n• Scurtături globale: Control-Option-Spațiu redare/pauză, Control-Option-săgeți următoarea/anterioara.\n• Conectare din browser; fereastra își ține dimensiunea și muzica merge mai departe când o închizi.\n• Linkurile mixai-music:// deschid albume, artiști sau o coadă direct în aplicație.\n\nPE ORICE ECRAN\n• Aceeași bibliotecă și aceleași profiluri pe iPhone, Apple TV, Android, Windows și web.\n• Trimite coada pe televizorul MixAI cu un clic.\n\nMixAI Music are nevoie de un server MixAI (gratuit, găzduit de tine) cu fișierele tale de muzică.",
+  "whatsNew": "Prima versiune."
+}

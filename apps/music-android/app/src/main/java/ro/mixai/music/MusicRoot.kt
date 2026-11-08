@@ -119,7 +119,8 @@ fun MusicRoot(app: MixaiMusicApp, conn: Connection, session: AccountSession, loc
     // Deep link (TV handoff, widgets) on top of Home once startup settled.
     LaunchedEffect(link, graph, nav.current) {
         val l = link ?: return@LaunchedEffect
-        if (graph == null || nav.current.isChromeless) return@LaunchedEffect
+        // Wait for startup/onboarding only; Now Playing is chromeless too but must accept links (TV handoff).
+        if (graph == null || (nav.current.isChromeless && nav.current != Dest.NowPlaying)) return@LaunchedEffect
         when (l) {
             is Dest.TabRoot -> nav.selectTab(l.tab)
             is Dest.PlaySearch -> {

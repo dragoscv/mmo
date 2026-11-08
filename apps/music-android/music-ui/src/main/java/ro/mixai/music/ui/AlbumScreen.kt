@@ -2,21 +2,26 @@ package ro.mixai.music.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -37,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,8 +65,11 @@ internal fun BackBar(nav: MusicNav) {
 
 @Composable
 internal fun PlayShuffleButtons(onPlay: () -> Unit, onShuffle: () -> Unit, enabled: Boolean) {
+    // TV: land D-pad focus on Play when the page opens (otherwise focus stays in the rail).
+    val playFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    if (LocalTvMode.current && enabled) LaunchedEffect(Unit) { kotlinx.coroutines.delay(80); runCatching { playFocus.requestFocus() } }
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Button(onClick = onPlay, enabled = enabled) {
+        Button(onClick = onPlay, enabled = enabled, modifier = Modifier.focusRequester(playFocus)) {
             Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
             Text(stringResource(R.string.music_play))
@@ -100,38 +109,10 @@ fun AlbumScreen(deps: MusicDeps, nav: MusicNav, id: String) {
                     if (shuffle) deps.musicPlayback.play(tracks.shuffled(), 0) else deps.musicPlayback.play(tracks, i)
                 }
                 val multiDisc = tracks.mapNotNull { it.disc }.distinct().size > 1
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-                    item {
-                        Column(
-                            Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Cover(deps.music.coverUrl(d.album), Modifier.fillMaxWidth(0.7f).widthIn(max = 320.dp).aspectRatio(1f))
-                            Text(d.album.name, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
-                            val artist = d.album.artist
-                            if (!artist.isNullOrBlank()) {
-                                Text(
-                                    artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.focusClickable(enabled = !d.album.artistId.isNullOrBlank(), scaleOnFocus = false) {
-                                        d.album.artistId?.let { nav.openArtist(it) }
-                                    },
-                                )
-                            }
-                            val meta = listOfNotNull(
-                                d.album.year?.toString(),
-                                stringResource(R.string.music_tracks_count, tracks.size.takeIf { it > 0 } ?: d.album.songCount.toInt()),
-                                fmtSec(totalSec).takeIf { totalSec > 0 },
-                            ).joinToString(" · ")
-                            Text(meta, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.size(4.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                PlayShuffleButtons(onPlay = { playFrom(0) }, onShuffle = { playFrom(0, shuffle = true) }, enabled = tracks.isNotEmpty())
-                                DownloadListButton(deps, tracks)
-                            }
-                            Spacer(Modifier.size(8.dp))
-                        }
-                    }
+                val header: @Composable (Modifier) -> Unit = { m ->
+                    AlbumHeader(deps, nav, d, totalSec, m, onPlay = { playFrom(0) }, onShuffle = { playFrom(0, shuffle = true) })
+                }
+                val list: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
                     if (tracks.isEmpty()) {
                         item {
                             Text(
@@ -145,8 +126,61 @@ fun AlbumScreen(deps: MusicDeps, nav: MusicNav, id: String) {
                         TrackRow(t, onClick = { playFrom(i) }, number = n, offline = offline[t.id])
                     }
                 }
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    // Wide (TV, tablet landscape, desktop window): cover + actions on the left, tracks on the right,
+                    // so the list is visible without scrolling past a full-width cover (WP17-45 TV pass).
+                    if (maxWidth >= 600.dp && maxWidth > maxHeight) {
+                        Row(Modifier.fillMaxSize()) {
+                            header(Modifier.width(320.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp))
+                            LazyColumn(Modifier.weight(1f).fillMaxHeight(), contentPadding = PaddingValues(bottom = 24.dp), content = list)
+                        }
+                    } else {
+                        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+                            item { header(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) }
+                            list()
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun AlbumHeader(
+    deps: MusicDeps,
+    nav: MusicNav,
+    d: AlbumDetail,
+    totalSec: Double,
+    modifier: Modifier,
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+) {
+    val tracks = d.tracks
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Cover(deps.music.coverUrl(d.album), Modifier.fillMaxWidth(0.7f).widthIn(max = 320.dp).aspectRatio(1f))
+        Text(d.album.name, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+        val artist = d.album.artist
+        if (!artist.isNullOrBlank()) {
+            Text(
+                artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.focusClickable(enabled = !d.album.artistId.isNullOrBlank(), scaleOnFocus = false) {
+                    d.album.artistId?.let { nav.openArtist(it) }
+                },
+            )
+        }
+        val meta = listOfNotNull(
+            d.album.year?.toString(),
+            stringResource(R.string.music_tracks_count, tracks.size.takeIf { it > 0 } ?: d.album.songCount.toInt()),
+            fmtSec(totalSec).takeIf { totalSec > 0 },
+        ).joinToString(" · ")
+        Text(meta, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.size(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PlayShuffleButtons(onPlay = onPlay, onShuffle = onShuffle, enabled = tracks.isNotEmpty())
+            DownloadListButton(deps, tracks)
+        }
+        Spacer(Modifier.size(8.dp))
     }
 }
 

@@ -116,9 +116,11 @@ fun NowPlayingScreen(deps: MusicDeps, nav: MusicNav) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val wide = maxWidth > 720.dp && maxWidth > maxHeight
                 if (wide) {
+                    // Cover + title + seek bar + controls must fit the height (Google TV = ~540 dp): cover ≤ height - ~260 dp.
+                    val coverMax = (maxHeight - 260.dp).coerceIn(120.dp, 360.dp)
                     Row(Modifier.fillMaxSize()) {
                         Column(Modifier.weight(1f).fillMaxHeight().padding(24.dp), verticalArrangement = Arrangement.Center) {
-                            PlayerHeader(deps, nav, state)
+                            PlayerHeader(deps, nav, state, coverMax = coverMax)
                             PlayerControls(deps, state)
                         }
                         Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -142,10 +144,11 @@ fun NowPlayingScreen(deps: MusicDeps, nav: MusicNav) {
 }
 
 @Composable
-private fun PlayerHeader(deps: MusicDeps, nav: MusicNav, state: MusicState, compact: Boolean = false) {
+private fun PlayerHeader(deps: MusicDeps, nav: MusicNav, state: MusicState, compact: Boolean = false, coverMax: androidx.compose.ui.unit.Dp = 360.dp) {
     val t = state.track ?: return
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        val coverMod = if (compact) Modifier.size(120.dp) else Modifier.weight(1f).widthIn(max = 360.dp).aspectRatio(1f)
+        // fill = false: a filling weight fixes the width and silently overrides widthIn(max).
+        val coverMod = if (compact) Modifier.size(120.dp) else Modifier.weight(1f, fill = false).widthIn(max = coverMax).aspectRatio(1f)
         Cover(deps.music.coverUrl(t), coverMod, icon = Icons.Outlined.MusicNote)
         if (compact) TrackInfo(nav, state, Modifier.weight(1f))
     }
@@ -181,7 +184,7 @@ private fun PlayerControls(deps: MusicDeps, state: MusicState) {
     val pos = if (dragging) dragValue else state.positionMs.toFloat().coerceIn(0f, dur)
     val tv = LocalTvMode.current
     val playFocus = remember { FocusRequester() }
-    if (tv) LaunchedEffect(Unit) { runCatching { playFocus.requestFocus() } }
+    if (tv) LaunchedEffect(Unit) { kotlinx.coroutines.delay(120); runCatching { playFocus.requestFocus() } }
     Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
         if (tv) {
             TvSeekBar(state.positionMs, state.durationMs, onSeek = { pb.seek(it) })

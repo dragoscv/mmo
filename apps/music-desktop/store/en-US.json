@@ -1,0 +1,12 @@
+{
+  "name": "MixAI Music for Mac",
+  "subtitle": "Your own music server",
+  "promotionalText": "Your own music library from your MixAI server, in a Mac window: gapless albums, automix, synced lyrics, media keys, menu bar mini player. No ads, no tracking.",
+  "keywords": "music player,self-hosted,subsonic,flac,lyrics,crossfade,gapless,home server,library,automix",
+  "supportUrl": "https://mixai.ro/",
+  "marketingUrl": "https://music.mixai.ro/",
+  "privacyPolicyUrl": "https://mixai.ro/privacy?lang=en",
+  "copyright": "2026 Dragos Catalin Vladulescu",
+  "description": "MixAI Music for Mac plays YOUR music: the albums on your own MixAI server at home, in a fast desktop window. No ads, no subscription, no catalogue we sell you.\n\nLISTEN\n• Albums play gapless; automix crossfades other tracks on the beat, with tempo matched.\n• Start a mix: endless radio from your library, or from any song, album or artist.\n• Synced lyrics, queue editing, shuffle, repeat and harmonic (key-aware) radio order.\n\nMADE FOR THE MAC\n• Media keys and the macOS Now Playing controls in Control Center.\n• Menu bar menu and an always-on-top mini player.\n• Global shortcuts: Control-Option-Space play/pause, Control-Option-arrows next/previous.\n• Sign in with your browser; the window remembers its size and keeps playing when closed.\n• mixai-music:// links open albums, artists or a queue straight in the app.\n\nEVERY SCREEN\n• Same library and profiles on iPhone, Apple TV, Android, Windows and the web.\n• Hand the queue to your MixAI TV in one click.\n\nMixAI Music needs a MixAI server (free, self-hosted) with your own music files.",
+  "whatsNew": "First release."
+}
