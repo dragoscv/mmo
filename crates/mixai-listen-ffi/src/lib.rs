@@ -176,7 +176,8 @@ pub struct EngineConfig {
 
 #[derive(Debug, uniffi::Error)]
 pub enum ListenError {
-    Decode { message: String },
+    // Not `message`: Kotlin exceptions already have `Throwable.message`.
+    Decode { reason: String },
 }
 
 impl std::error::Error for ListenError {}
@@ -184,7 +185,7 @@ impl std::error::Error for ListenError {}
 impl std::fmt::Display for ListenError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ListenError::Decode { message } => write!(f, "{message}"),
+            ListenError::Decode { reason } => write!(f, "{reason}"),
         }
     }
 }
@@ -240,7 +241,7 @@ impl KeyBpmEngine {
 pub fn analyze_file(path: String, bpm_floor: f64) -> Result<ListenSnapshot, ListenError> {
     core::decode::analyze_file(Path::new(&path), bpm_floor)
         .map(Into::into)
-        .map_err(|message| ListenError::Decode { message })
+        .map_err(|reason| ListenError::Decode { reason })
 }
 
 /// All 24 keys (index order), for drawing the Camelot wheel.

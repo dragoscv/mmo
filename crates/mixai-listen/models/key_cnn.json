@@ -1,0 +1,11 @@
+{
+  "bins": 120,
+  "fps": 5.0,
+  "params": 219714,
+  "val_weighted": 0.8093457943925233,
+  "test_weighted": 0.7026490066225166,
+  "test_correct": 0.6307947019867549,
+  "train_tracks": 970,
+  "arch": "allconv nf=18",
+  "seed": 7
+}

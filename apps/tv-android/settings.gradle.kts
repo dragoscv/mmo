@@ -31,3 +31,6 @@ project(":music").projectDir = file("../music-android/app")
 // MixAI Music for Wear OS (WP17-41g, standalone; same applicationId as :music for Play pairing).
 include(":wear")
 project(":wear").projectDir = file("../music-android/wear")
+// MixAI Key & BPM (WP18, D58/D69): Rust engine crates/mixai-listen-ffi via UniFFI, phone + Wear apps.
+include(":listen-core")
+project(":listen-core").projectDir = file("../keybpm-android/listen-core")

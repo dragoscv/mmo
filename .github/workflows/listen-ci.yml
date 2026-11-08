@@ -1,0 +1,91 @@
+name: listen-ci
+
+# mixai-listen (WP18): Rust tests + clippy on every change, and the GiantSteps Key + Tempo benchmark as the
+# release gate (D69: key weighted >= 0.70, tempo Accuracy2 >= 0.90). The datasets are Beatport previews: they
+# are downloaded at run time into a PRIVATE actions cache, never committed, uploaded or redistributed.
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "crates/**"
+            - ".github/workflows/listen-ci.yml"
+    pull_request:
+        paths:
+            - "crates/**"
+            - ".github/workflows/listen-ci.yml"
+    workflow_dispatch:
+
+concurrency:
+    group: listen-ci-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+env:
+    CARGO_TERM_COLOR: always
+    CI: 1
+
+jobs:
+    test:
+        name: test + clippy
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        defaults:
+            run:
+                working-directory: crates
+        steps:
+            - uses: actions/checkout@v5
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: clippy
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: crates
+            - run: cargo clippy --release --workspace --all-targets --all-features -- -D warnings
+            - run: cargo test --release --workspace --all-features
+
+    giantsteps:
+        name: GiantSteps benchmark (release gate)
+        runs-on: ubuntu-latest
+        timeout-minutes: 45
+        needs: test
+        steps:
+            - uses: actions/checkout@v5
+            - uses: dtolnay/rust-toolchain@stable
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: crates
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+            - name: Dataset cache (private to this repo, never uploaded as an artifact)
+              uses: actions/cache@v4
+              with:
+                  path: ~/giantsteps
+                  key: giantsteps-v1
+            - name: Fetch GiantSteps Key + Tempo (md5-verified)
+              run: node crates/mixai-listen-bench/fetch-giantsteps.mjs ~/giantsteps
+            - name: Build bench
+              working-directory: crates
+              run: cargo build --release -p mixai-listen-bench --features mixai-listen/cnn
+            - name: Key (GiantSteps test set, 604 tracks)
+              working-directory: crates
+              run: |
+                  ./target/release/mixai-listen-bench --audio ~/giantsteps/key/audio \
+                    --keys ~/giantsteps/key/annotations/key --gate | tee "$RUNNER_TEMP/key.txt"
+            - name: Tempo (GiantSteps tempo, 664 tracks)
+              working-directory: crates
+              run: |
+                  ./target/release/mixai-listen-bench --audio ~/giantsteps/tempo/audio \
+                    --tempo ~/giantsteps/tempo/annotations_v2/tempo --gate | tee "$RUNNER_TEMP/tempo.txt"
+            - name: Summary
+              if: always()
+              run: |
+                  {
+                    echo "### mixai-listen GiantSteps"
+                    echo '```'
+                    cat "$RUNNER_TEMP/key.txt" "$RUNNER_TEMP/tempo.txt" 2>/dev/null || true
+                    echo '```'
+                  } >> "$GITHUB_STEP_SUMMARY"

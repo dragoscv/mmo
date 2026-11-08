@@ -45,6 +45,8 @@ wearInput = "1.2.0"
 playServicesWearable = "20.0.1"
 # MixAI Music output picker (WP17-41h): same MediaRouter media3-cast 1.11.1 pulls in at runtime.
 mediarouter = "1.8.1"
+# MixAI Key & BPM (WP18-02): UniFFI Kotlin bindings run on JNA; latest on Maven Central 2026-11-08.
+jna = "5.19.1"
 
 # compose-bom 2026.09.00 / coil 3.6.2 AARs require compileSdk ≥ 37 (checkAarMetadata); targetSdk stays 36.
 compileSdk = "37"
@@ -52,6 +54,7 @@ targetSdk = "36"
 minSdk = "26"
 
 [libraries]
+jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }

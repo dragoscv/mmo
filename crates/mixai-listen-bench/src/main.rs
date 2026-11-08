@@ -90,11 +90,12 @@ struct Args {
     limit: usize,
     report: Option<PathBuf>,
     gate: bool,
+    dump: Option<PathBuf>,
 }
 
 fn parse_args() -> Result<Args, String> {
     let mut it = std::env::args().skip(1);
-    let mut a = Args { audio: PathBuf::new(), keys: None, tempo: None, limit: usize::MAX, report: None, gate: false };
+    let mut a = Args { audio: PathBuf::new(), keys: None, tempo: None, limit: usize::MAX, report: None, gate: false, dump: None };
     while let Some(flag) = it.next() {
         let mut value = || it.next().ok_or(format!("{flag} needs a value"));
         match flag.as_str() {
@@ -104,6 +105,7 @@ fn parse_args() -> Result<Args, String> {
             "--limit" => a.limit = value()?.parse().map_err(|_| "--limit must be a number")?,
             "--report" => a.report = Some(value()?.into()),
             "--gate" => a.gate = true,
+            "--dump-features" => a.dump = Some(value()?.into()),
             other => return Err(format!("unknown argument {other}")),
         }
     }
@@ -128,7 +130,20 @@ fn parse_ref_key(text: &str) -> Option<Key> {
     Key::parse(&parts.join(" "))
 }
 
-fn evaluate(path: &Path, keys: &HashMap<String, String>, tempos: &HashMap<String, String>) -> Option<Row> {
+/// Writes `<id>.f32` (little-endian `[frames][BINS]`) and appends `<id>\t<key index>\t<frames>` to the index.
+fn dump_features(dir: &Path, id: &str, key: Key, samples: &[f32], sr: u32) -> Result<String, String> {
+    let spec = mixai_listen::features::log_spectrogram(samples, sr);
+    let mut bytes = Vec::with_capacity(spec.len() * mixai_listen::features::BINS * 4);
+    for frame in &spec {
+        for v in frame {
+            bytes.extend_from_slice(&v.to_le_bytes());
+        }
+    }
+    std::fs::write(dir.join(format!("{id}.f32")), bytes).map_err(|e| e.to_string())?;
+    Ok(format!("{id}\t{}\t{}\n", key.index(), spec.len()))
+}
+
+fn evaluate(path: &Path, keys: &HashMap<String, String>, tempos: &HashMap<String, String>, dump: Option<(&Path, &Mutex<String>)>) -> Option<Row> {
     let id = id_of(path)?;
     let ref_key = keys.get(&id).and_then(|k| parse_ref_key(k));
     let ref_bpm = tempos.get(&id).and_then(|t| t.split_whitespace().next()?.parse::<f64>().ok());
@@ -139,6 +154,12 @@ fn evaluate(path: &Path, keys: &HashMap<String, String>, tempos: &HashMap<String
     match decode_mono(path, None) {
         Err(e) => row.error = Some(e),
         Ok((samples, sr)) => {
+            if let (Some((dir, index)), Some(k)) = (dump, ref_key) {
+                match dump_features(dir, &row.id, k, &samples, sr) {
+                    Ok(line) => index.lock().unwrap_or_else(|e| e.into_inner()).push_str(&line),
+                    Err(e) => row.error = Some(e),
+                }
+            }
             let a = analyze_samples(&samples, sr, 88.0);
             row.est_key = a.key.map(|k| k.key);
             row.est_bpm = a.tempo.map(|t| t.bpm);
@@ -175,13 +196,21 @@ fn main() {
 
     let next = AtomicUsize::new(0);
     let rows = Mutex::new(Vec::with_capacity(files.len()));
+    let index = Mutex::new(String::new());
+    if let Some(dir) = &args.dump {
+        if let Err(e) = std::fs::create_dir_all(dir) {
+            eprintln!("--dump-features: {e}");
+            std::process::exit(2);
+        }
+    }
+    let dump = args.dump.as_deref().map(|d| (d, &index));
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
     std::thread::scope(|s| {
         for _ in 0..threads {
             s.spawn(|| loop {
                 let i = next.fetch_add(1, Ordering::Relaxed);
                 let Some(path) = files.get(i) else { break };
-                if let Some(row) = evaluate(path, &keys, &tempos) {
+                if let Some(row) = evaluate(path, &keys, &tempos, dump) {
                     rows.lock().unwrap_or_else(|e| e.into_inner()).push(row);
                 }
                 if (i + 1) % 50 == 0 {
@@ -192,6 +221,14 @@ fn main() {
     });
     let mut rows = rows.into_inner().unwrap_or_else(|e| e.into_inner());
     rows.sort_by(|a, b| a.id.cmp(&b.id));
+    if let Some(dir) = &args.dump {
+        let mut lines: Vec<String> = index.into_inner().unwrap_or_else(|e| e.into_inner()).lines().map(String::from).collect();
+        lines.sort();
+        let header = format!("# bins={} fps={}\n", mixai_listen::features::BINS, mixai_listen::features::FRAMES_PER_SEC);
+        if let Err(e) = std::fs::write(dir.join("index.tsv"), header + &lines.join("\n") + "\n") {
+            eprintln!("index: {e}");
+        }
+    }
 
     let key_rows: Vec<f64> = rows.iter().filter_map(|r| r.key_score).collect();
     let tempo_rows: Vec<(bool, bool)> = rows.iter().filter_map(|r| Some((r.acc1?, r.acc2?))).collect();
