@@ -1,14 +1,18 @@
-//! Key estimation from accumulated chroma: Pearson correlation against 24 rotated key profiles (a blend of
-//! Krumhansl–Kessler and Temperley, the same Temperley weights as `server/python/analyze.py`), a long-term
-//! profile for the locked key and a short-term one for key-change alerts. A trained CNN (WP18-16) replaces the
-//! final decision once it passes the GiantSteps gate; this classic path stays as the instant first guess.
+//! Key estimation from accumulated chroma: correlation against 24 rotated EDM key profiles (Faraldo et al.
+//! 2016) plus a minor-mode bias tuned on GiantSteps-MTG (the dev set; the GiantSteps key test set is never used
+//! for tuning), a long-term profile for the locked key and a short-term one for key-change alerts. A trained
+//! CNN (WP18-16) replaces the final decision once it passes the GiantSteps gate; this classic path stays as the
+//! instant first guess and the watch engine.
 
 use crate::notation::Key;
 
-const KK_MAJOR: [f64; 12] = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
-const KK_MINOR: [f64; 12] = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
-const TEMPERLEY_MAJOR: [f64; 12] = [5.0, 2.0, 3.5, 2.0, 4.5, 4.0, 2.0, 4.5, 2.0, 3.5, 1.5, 4.0];
-const TEMPERLEY_MINOR: [f64; 12] = [5.0, 2.0, 3.5, 4.5, 2.0, 4.0, 2.0, 4.5, 3.5, 2.0, 1.5, 4.0];
+/// EDM corpus profiles (Faraldo, Gómez, Jordà, Herrera, "Key Estimation in Electronic Dance Music", ECIR 2016).
+/// Values from the paper's published table; electronic music is mostly minor and these profiles reflect it.
+const EDMA_MAJOR: [f64; 12] = [1.00, 0.29, 0.50, 0.40, 0.60, 0.56, 0.32, 0.80, 0.31, 0.45, 0.42, 0.39];
+const EDMA_MINOR: [f64; 12] = [1.00, 0.31, 0.44, 0.58, 0.33, 0.49, 0.29, 0.78, 0.43, 0.29, 0.53, 0.32];
+/// Added to every minor correlation. Swept on GiantSteps-MTG (1077 confident tracks): 0 → 0.558,
+/// 0.04 → 0.600, 0.09 → 0.625, 0.12 → 0.626 weighted.
+const MINOR_BIAS: f64 = 0.09;
 
 fn normalise(p: [f64; 12]) -> [f64; 12] {
     let mean = p.iter().sum::<f64>() / 12.0;
@@ -18,15 +22,10 @@ fn normalise(p: [f64; 12]) -> [f64; 12] {
     out
 }
 
-fn blend(a: [f64; 12], b: [f64; 12]) -> [f64; 12] {
-    let (a, b) = (normalise(a), normalise(b));
-    normalise(std::array::from_fn(|i| a[i] + b[i]))
-}
-
 /// Correlation of `chroma` with every key (index = `Key::index`).
 pub fn key_correlations(chroma: &[f32; 12]) -> [f64; 24] {
-    let major = blend(KK_MAJOR, TEMPERLEY_MAJOR);
-    let minor = blend(KK_MINOR, TEMPERLEY_MINOR);
+    let major = normalise(EDMA_MAJOR);
+    let minor = normalise(EDMA_MINOR);
     let mean = chroma.iter().map(|&x| x as f64).sum::<f64>() / 12.0;
     let c: [f64; 12] = std::array::from_fn(|i| chroma[i] as f64 - mean);
     let norm = c.iter().map(|x| x * x).sum::<f64>().sqrt();
@@ -38,6 +37,9 @@ pub fn key_correlations(chroma: &[f32; 12]) -> [f64; 24] {
         let profile = if k < 12 { &major } else { &minor };
         let tonic = k % 12;
         *o = (0..12).map(|i| c[(i + tonic) % 12] * profile[i]).sum::<f64>() / norm;
+    }
+    for o in &mut out[12..] {
+        *o += MINOR_BIAS;
     }
     out
 }
@@ -173,10 +175,8 @@ mod tests {
 
     #[test]
     fn profiles_pick_their_own_key_on_every_tonic() {
-        let major = blend(KK_MAJOR, TEMPERLEY_MAJOR);
-        let minor = blend(KK_MINOR, TEMPERLEY_MINOR);
         for tonic in 0..12 {
-            for (profile, is_minor) in [(major, false), (minor, true)] {
+            for (profile, is_minor) in [(EDMA_MAJOR, false), (EDMA_MINOR, true)] {
                 let chroma: [f32; 12] = std::array::from_fn(|i| profile[(i + 12 - tonic) % 12] as f32 + 1.0);
                 let scores = key_correlations(&chroma);
                 let (best, _) = best_two(&scores);
@@ -188,6 +188,6 @@ mod tests {
     #[test]
     fn silence_has_no_correlation() {
         assert_eq!(key_correlations(&[0.0; 12]), [0.0; 24]);
-        assert_eq!(key_correlations(&[0.5; 12]), [0.0; 24]);
+        assert_eq!(key_correlations(&[0.5; 12]), [0.0; 24], "flat chroma has no key, not a minor bias");
     }
 }

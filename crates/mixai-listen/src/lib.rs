@@ -18,6 +18,8 @@
 
 mod chords;
 mod chroma;
+#[cfg(feature = "decode")]
+pub mod decode;
 mod fft;
 pub mod harmonic;
 mod key;

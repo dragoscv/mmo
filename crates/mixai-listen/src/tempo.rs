@@ -97,13 +97,14 @@ fn sample_at(x: &[f32], pos: f64) -> f64 {
     a + (b - a) * f
 }
 
-/// Best (bpm, beat offset) near `bpm0` by comb alignment over the whole envelope.
-fn refine(x: &[f32], rate: f64, bpm0: f64) -> (f64, f64) {
+/// Best (bpm, beat offset, contrast) near `bpm0` by comb alignment over the whole envelope. Contrast = mean
+/// onset strength on the beat grid divided by the envelope mean (1 = no alignment).
+fn refine(x: &[f32], rate: f64, bpm0: f64) -> (f64, f64, f64) {
     let end = (x.len() - 1) as f64;
     let mut best = (bpm0, 0.0, f64::MIN);
-    let steps = ((bpm0 * 0.06) / 0.05).round() as i64;
+    let steps = ((bpm0 * 0.04) / 0.1).round() as i64;
     for s in -steps / 2..=steps / 2 {
-        let bpm = bpm0 + s as f64 * 0.05;
+        let bpm = bpm0 + s as f64 * 0.1;
         let p = 60.0 * rate / bpm;
         let mut o = 0.0;
         while o < p {
@@ -122,7 +123,8 @@ fn refine(x: &[f32], rate: f64, bpm0: f64) -> (f64, f64) {
             o += 0.5;
         }
     }
-    (best.0, best.1)
+    let mean = x.iter().map(|&v| v as f64).sum::<f64>() / x.len() as f64;
+    (best.0, best.1, if mean > 0.0 { best.2 / mean } else { 1.0 })
 }
 
 /// Tempo of an onset envelope sampled at `rate` frames/s, folded into `[lo, hi)`. Needs ≥ 3 s.
@@ -140,7 +142,7 @@ pub(crate) fn estimate(env: &[f32], rate: f64, lo: f64, hi: f64) -> Option<Tempo
     if lag_hi <= lag_lo + 2 {
         return None;
     }
-    let max_lag = (2 * lag_hi).min(n - 1);
+    let max_lag = (4 * lag_hi).min(n - 1);
     let mut ac = vec![0.0f64; max_lag + 1];
     for (l, a) in ac.iter_mut().enumerate().skip(1) {
         let mut s = 0.0f64;
@@ -149,13 +151,16 @@ pub(crate) fn estimate(env: &[f32], rate: f64, lo: f64, hi: f64) -> Option<Tempo
         }
         *a = s / (n - l) as f64;
     }
+    // Comb over the first four lag multiples: at the true beat period every multiple lands on a kick, while a
+    // dotted/triplet period (2/3×, 4/3× tempo) only lands on one every other multiple.
+    let at = |l: usize| if l <= max_lag { ac[l] } else { 0.0 };
     let score: Vec<f64> = (lag_lo..=lag_hi)
         .map(|l| {
             let bpm = 60.0 * rate / l as f64;
             let z = (bpm / 120.0).log2();
             let prior = (-0.5 * z * z).exp();
-            let double = if 2 * l <= max_lag { ac[2 * l] } else { 0.0 };
-            (ac[l] + 0.5 * double) * prior
+            let comb = at(l) + at(2 * l) + at(3 * l) + at(4 * l);
+            comb * prior
         })
         .collect();
     let (bi, &best) = score.iter().enumerate().skip(1).take(score.len() - 2).max_by(|a, b| a.1.total_cmp(b.1))?;
@@ -168,7 +173,23 @@ pub(crate) fn estimate(env: &[f32], rate: f64, lo: f64, hi: f64) -> Option<Tempo
     let lag = (lag_lo + bi) as f64 + delta;
     let mean = score.iter().sum::<f64>() / score.len() as f64;
     let coarse = fold(60.0 * rate / lag, lo, hi);
-    let (bpm, beat_offset) = refine(&x, rate, coarse);
+    // Metrical-level check: the true beat grid lines up with onsets on every beat, a dotted / triplet grid
+    // (2/3, 3/4, 4/3, 3/2 of the tempo) only on some. Keep the candidate with the best grid contrast, with a
+    // small bias for the autocorrelation winner.
+    let mut pick = refine(&x, rate, coarse);
+    let mut pick_score = pick.2 * 1.05;
+    for ratio in [2.0 / 3.0, 3.0 / 4.0, 0.8, 1.25, 4.0 / 3.0, 1.5] {
+        let cand = coarse * ratio;
+        if cand < lo || cand >= hi.max(lo * 2.0) {
+            continue;
+        }
+        let r = refine(&x, rate, cand);
+        if r.2 > pick_score {
+            pick_score = r.2;
+            pick = r;
+        }
+    }
+    let (bpm, beat_offset, _) = pick;
     Some(TempoPeak { bpm: fold(bpm, lo, hi), strength: if mean > 0.0 { best / mean } else { 1.0 }, beat_offset })
 }
 

@@ -10,3 +10,9 @@ repository.workspace = true
 [dependencies]
 realfft = "3.5.1"
 ebur128 = "0.1.11"
+symphonia = { version = "0.5.5", optional = true, default-features = false, features = ["mp3", "aac", "isomp4", "flac", "wav", "pcm", "ogg", "vorbis", "adpcm"] }
+
+[features]
+default = []
+# File mode: decode mp3/aac/m4a/flac/wav/ogg to mono PCM (symphonia, MPL-2.0).
+decode = ["dep:symphonia"]

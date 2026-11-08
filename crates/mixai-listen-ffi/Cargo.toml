@@ -1,0 +1,25 @@
+[package]
+name = "mixai-listen-ffi"
+version = "0.1.0"
+description = "UniFFI bindings (Kotlin + Swift) for mixai-listen: MixAI Key & BPM on Android, Wear OS, iOS and watchOS"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+name = "mixai_listen_ffi"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+required-features = ["cli"]
+
+[features]
+cli = ["uniffi/cli"]
+
+[dependencies]
+mixai-listen = { path = "../mixai-listen", features = ["decode"] }
+uniffi = "0.32.2"

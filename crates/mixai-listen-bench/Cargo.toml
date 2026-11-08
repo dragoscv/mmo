@@ -1,0 +1,12 @@
+[package]
+name = "mixai-listen-bench"
+version = "0.1.0"
+description = "GiantSteps Key + Tempo benchmark and release gate for mixai-listen (WP18-15). Never ships in an app."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+mixai-listen = { path = "../mixai-listen", features = ["decode"] }

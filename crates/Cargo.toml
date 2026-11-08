@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["mixai-listen"]
+members = ["mixai-listen", "mixai-listen-bench", "mixai-listen-ffi"]
 
 [workspace.package]
 edition = "2024"
