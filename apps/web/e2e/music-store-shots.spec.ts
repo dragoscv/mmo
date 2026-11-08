@@ -58,10 +58,12 @@ test("music store shots (guest of demo)", async ({ browser }) => {
     if (await play.isVisible()) await play.click();
     await page.waitForTimeout(3000);
     await page.goto(`${ORIGIN}/media/music/now-playing`);
+    await passProfileGate(page);
     await page.waitForTimeout(3000);
     await page.screenshot({ path: `${DIR}/3-now-playing.png` });
 
     await page.goto(`${ORIGIN}/media/music/search?q=a`);
+    await passProfileGate(page);
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(2000);
     await page.screenshot({ path: `${DIR}/4-search.png` });
