@@ -33,6 +33,8 @@ test.describe("connect without an account", () => {
         // Profile gate (demo has Reviewer + Kids) → pick Reviewer when asked.
         const reviewer = page.getByRole("button", { name: /reviewer/i }).first();
         if (await reviewer.isVisible({ timeout: 10_000 }).catch(() => false)) await reviewer.click();
+        // The gate must close after the pick (bug: needsPicker() stayed true on servers with 2+ profiles).
+        await expect(page.locator("#mx-gate-title")).toHaveCount(0, { timeout: 15_000 });
         await expect(page.locator(".mx-topbar")).toBeVisible({ timeout: 20_000 });
         await page.reload();
         await expect(page.locator(".mx-topbar")).toBeVisible({ timeout: 20_000 });

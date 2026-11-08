@@ -113,6 +113,12 @@ export class ProfilesClient {
         return p.hasPin && this.token === "";
     }
 
+    /** True when an active profile is set and needs no PIN prompt (no PIN, or a valid token): the gate can close. */
+    activeUsable(): boolean {
+        const p = this.activeProfile;
+        return !!p && (!p.hasPin || this.token !== "");
+    }
+
     /** Activate a profile without a PIN (or whose token is still valid). */
     select(p: Profile): void {
         const keep = this.stored && this.stored.id === p.id && this.stored.expiresAt > Date.now() ? this.stored : null;

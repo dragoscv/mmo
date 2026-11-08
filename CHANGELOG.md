@@ -10,6 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-08 — web 3.3.1: profile picker closes after a pick
+
+- **Fix:** on a MixAI Server with two or more viewer profiles (the demo server has Reviewer + Kids), choosing a
+  profile in "Who's watching?" set it active but left the picker on screen, so Home never appeared. The gate now
+  closes as soon as the chosen profile is usable (no PIN, or a valid PIN token). Found by the store-screenshot run;
+  `e2e/connect-guest.spec.ts` asserts it, `profiles.test.ts` covers `activeUsable()`. Present since web 3.0.0.
+
 ## 2026-11-08 — Connect without an account: web 3.3.0, MixAI Music desktop 0.1.1
 
 - **Web 3.3.0 — `/connect` (D59):** music.mixai.ro and tv.mixai.ro no longer require a MixAI account. Type your

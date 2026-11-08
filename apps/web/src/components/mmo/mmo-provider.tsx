@@ -141,7 +141,8 @@ export function MmoProvider({ servers: accountServers, signedIn = true, children
         profileChanged() {
             if (!clients) return;
             setProfile(clients.profiles.active);
-            setNeedsPicker(clients.profiles.needsPicker());
+            // A pick closes the gate; needsPicker() alone stays true on any server with 2+ profiles.
+            setNeedsPicker(!clients.profiles.activeUsable());
             clients.media.invalidate();
             clients.hub.refreshHello();
         },
