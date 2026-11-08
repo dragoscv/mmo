@@ -61,6 +61,13 @@ final class MusicAppModel {
         account = MusicPrefs.account
         player.installRemoteCommands()
         if let s = MusicPrefs.server, let tok = keychain.get("device-token:\(s.baseURL)"), !tok.isEmpty {
+            // The server may have revoked this device (token rotated / device removed): 401 → connect again.
+            // Offline or unreachable keeps the stored connection (downloads still play).
+            if (try? await MmoClient(baseURL: s.baseURL, token: tok).checkToken()) == false {
+                disconnect()
+                toast = String(localized: "music.reconnect_needed \(s.name)")
+                return
+            }
             await connect(s, token: tok, persist: false)
         } else {
             phase = .onboarding

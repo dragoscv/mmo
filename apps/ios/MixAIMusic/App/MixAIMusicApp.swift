@@ -122,6 +122,7 @@ struct MusicRootView: View {
                 MusicTabs()
             }
         }
+        .overlay(alignment: .top) { if app.phase != .ready { MusicToast() } }
         .animation(.smooth(duration: 0.35), value: app.phase)
     }
 }

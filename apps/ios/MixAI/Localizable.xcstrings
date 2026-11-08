@@ -1276,6 +1276,23 @@
         }
       }
     },
+    "error.unauthorized": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device is no longer paired with the server. Connect again."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acest dispozitiv nu mai este asociat cu serverul. Conectează-te din nou."
+          }
+        }
+      }
+    },
     "family.cap": {
       "extractionState": "manual",
       "localizations": {
@@ -3397,6 +3414,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ascultate recent"
+          }
+        }
+      }
+    },
+    "music.reconnect_needed %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to %@ again: the server no longer knows this device."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conectează-te din nou la %@: serverul nu mai recunoaște acest dispozitiv."
           }
         }
       }

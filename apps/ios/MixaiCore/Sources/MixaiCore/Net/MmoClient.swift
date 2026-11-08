@@ -2,11 +2,15 @@ import Foundation
 import Synchronization
 
 /// HTTP status outside 2xx (message = first 200 chars of the body).
-public struct APIStatusError: Error, Sendable, CustomStringConvertible {
+public struct APIStatusError: LocalizedError, Sendable, CustomStringConvertible {
     public let status: Int
     public let body: String
     public init(status: Int, body: String) { self.status = status; self.body = body }
     public var description: String { "HTTP \(status): \(body)" }
+    /// Shown by `error.localizedDescription` (was the opaque "error 1").
+    public var errorDescription: String? {
+        status == 401 ? String(localized: "error.unauthorized") : "HTTP \(status)"
+    }
 }
 
 /// Codecs AVPlayer plays on iPhone (server copies these, converts only the rest; hvc1 tagged by the server).
