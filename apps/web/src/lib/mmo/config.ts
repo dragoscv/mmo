@@ -10,4 +10,14 @@ export interface ServerConfig {
     token: string;
     /** Forwarded as `x-user-id` / `?u=`. */
     userId: string;
+    /**
+     * Storage scope for per-server browser state (active profile, cached home). "" = the legacy unscoped keys
+     * (the account's server, so existing users keep their state); guest/other servers use their host (WP17-99).
+     */
+    scope?: string;
+}
+
+/** `base` for the legacy scope, `base@scope` otherwise. */
+export function scopedKey(base: string, scope: string | undefined): string {
+    return scope ? `${base}@${scope}` : base;
 }

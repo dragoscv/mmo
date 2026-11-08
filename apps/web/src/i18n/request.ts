@@ -15,7 +15,7 @@ import { SUPPORTED_LOCALES, DEFAULT_LOCALE, isAppLocale, type AppLocale } from "
 export { SUPPORTED_LOCALES, DEFAULT_LOCALE, isAppLocale, type AppLocale };
 
 /** Must match the files in `messages/wp16/` (checked by `scripts/i18n-parity.mjs`). */
-export const WP16_AREAS = ["shell", "profiles", "browse", "player", "music", "live", "offline", "account", "privacy", "suite"] as const;
+export const WP16_AREAS = ["shell", "profiles", "browse", "player", "music", "live", "offline", "account", "privacy", "suite", "connect"] as const;
 
 export default getRequestConfig(async ({ locale: override }) => {
     // An explicit `getTranslations({ locale })` (e.g. /privacy?lang=en for store reviewers) wins over the cookie.

@@ -1,6 +1,6 @@
 {
     "name": "@mmo/music-desktop",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "private": true,
     "description": "MixAI Music for Windows, macOS and Linux — Tauri 2 shell around music.mixai.ro with native media keys / OS Now Playing, tray mini-player, global shortcuts and mixai-music:// links. Microsoft Store (MSIX), Mac App Store, Flathub.",
     "type": "module",

@@ -17,6 +17,8 @@ $args2 = @{
     App = 'apps/music-desktop'; Exe = 'mixai-music.exe'; IdentityName = $IdentityName
     DisplayName = 'MixAI Music'; Description = 'Your MixAI Server music on the desktop'
     FilePrefix = 'MixAIMusic'; AppId = 'MixAIMusic'; Protocol = 'mixai-music'
+    # D59: the app reaches MMO Servers on the local network (loopback proxy + mDNS).
+    LanServer = $true
 }
 if ($TargetDir) { $args2.TargetDir = $TargetDir }
 if ($TestSign) { $args2.TestSign = $true }

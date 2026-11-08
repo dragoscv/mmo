@@ -1,10 +1,10 @@
 {
     "$schema": "../gen/schemas/remote-schema.json",
     "identifier": "music-web",
-    "description": "The remote web UI (music.mixai.ro; localhost:13789 for dev) may only report its player state and ask for the system-browser sign-in. No file, shell or window APIs.",
+    "description": "The remote web UI (music.mixai.ro; localhost:13789 for dev) may only report its player state, ask for the system-browser sign-in and reach http servers on the local network through the loopback proxy (D59). No file, shell or window APIs.",
     "windows": ["main"],
     "remote": {
         "urls": ["https://music.mixai.ro/*", "http://localhost:13789/*"]
     },
-    "permissions": ["allow-desktop-media-update", "allow-desktop-open-signin"]
+    "permissions": ["allow-desktop-media-update", "allow-desktop-open-signin", "allow-desktop-lan-proxy", "allow-desktop-lan-servers"]
 }

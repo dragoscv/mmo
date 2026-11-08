@@ -10,6 +10,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-08 — Connect without an account: web 3.3.0, MixAI Music desktop 0.1.1
+
+- **Web 3.3.0 — `/connect` (D59):** music.mixai.ro and tv.mixai.ro no longer require a MixAI account. Type your
+  MMO Server's address (or press **Try the demo**), approve the Quick Connect code in MMO Server, on your phone or
+  by scanning the QR code, and the browser keeps the connection. Several servers can be connected and switched from
+  the profile menu; **Disconnect** forgets one. Signed in, a server connected this way can be **added to your
+  account** (it then follows you to every device). The login page links to it ("Connect without an account").
+- **Fix:** the active profile and the cached Home are now kept per server, so switching servers no longer opens the
+  previous server's profile.
+- **MixAI Music desktop 0.1.1:** reaches `http://` MMO Servers on the local network from the secure web page
+  through a loopback proxy in the app, and lists the servers it finds on the network (mDNS) on the Connect page.
+
 ## 2026-11-08 — MixAI Music on Google TV (Android 0.3.0), MixAI TV Android 2.3.0, Music tab on Apple TV
 
 - **MixAI TV → MixAI Music handoff (Android TV / Google TV):** the Music rail, the hub "navigate music" command and

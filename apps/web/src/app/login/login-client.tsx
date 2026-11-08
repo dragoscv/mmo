@@ -10,6 +10,15 @@ import { isMusicDesktop, openDesktopSignIn } from "@/lib/mmo/desktop-bridge";
 
 const noop = () => () => undefined;
 
+/** `/connect` on the product host the user came from (guest servers live in that origin's localStorage). */
+export function connectHrefFor(callbackUrl: string): string {
+    try {
+        const u = new URL(callbackUrl);
+        if (u.protocol === "https:" && /(^|\.)mixai\.ro$/.test(u.hostname)) return `${u.origin}/connect`;
+    } catch { /* relative callback → same origin */ }
+    return "/connect";
+}
+
 /** Inside the MixAI Music desktop shell (Tauri): Google blocks OAuth in embedded webviews → system browser. */
 function DesktopSignIn() {
     const t = useTranslations("login");
@@ -56,10 +65,10 @@ export function LoginPageClient({ callbackUrl = "/", appleEnabled }: { callbackU
                 </div>
 
                 {/* Skip option */}
-                <p className="text-center text-xs text-muted-foreground/50">
+                <p className="text-center text-xs text-muted-foreground">
                     {t("skipNoteLine1")}
                     <br />
-                    {t("skipNoteLine2")}
+                    <a href={connectHrefFor(callbackUrl)} className="font-medium text-primary underline-offset-4 hover:underline" data-testid="login-connect">{t("skipNoteLine2")}</a>
                 </p>
             </div>
         </div>

@@ -5,7 +5,7 @@
  * `profileId` for `?profile=` and `headers()` for `x-profile-token`.
  */
 import { ApiError } from "./api";
-import type { ServerConfig } from "./config";
+import { scopedKey, type ServerConfig } from "./config";
 import { Emitter } from "./emitter";
 import { ServerHttp, enc } from "./http";
 import type { Profile, ProfileInput } from "./media-types";
@@ -21,9 +21,9 @@ export type UnlockResult =
 
 interface Stored { id: string; token: string; expiresAt: number }
 
-function readStored(): Stored | null {
+function readStored(key: string): Stored | null {
     try {
-        const raw = localStorage.getItem(PROFILE_KEY);
+        const raw = localStorage.getItem(key);
         if (!raw) return null;
         const j = JSON.parse(raw) as Partial<Stored>;
         if (typeof j.id !== "string" || !j.id) return null;
@@ -33,23 +33,26 @@ function readStored(): Stored | null {
     }
 }
 
-function writeStored(s: Stored | null): void {
+function writeStored(key: string, s: Stored | null): void {
     try {
-        if (s) localStorage.setItem(PROFILE_KEY, JSON.stringify(s));
-        else localStorage.removeItem(PROFILE_KEY);
+        if (s) localStorage.setItem(key, JSON.stringify(s));
+        else localStorage.removeItem(key);
     } catch { /* storage disabled */ }
 }
 
 export class ProfilesClient {
     private readonly http: ServerHttp;
+    private readonly storeKey: string;
     private list: Profile[] = [];
     private activeProfile: Profile | null = null;
-    private stored: Stored | null = readStored();
+    private stored: Stored | null;
     /** Fires on active-profile change and list refresh. */
     readonly changed = new Emitter<Profile | null>();
 
     constructor(cfg: ServerConfig) {
         this.http = new ServerHttp(cfg);
+        this.storeKey = scopedKey(PROFILE_KEY, cfg.scope);
+        this.stored = readStored(this.storeKey);
     }
 
     /** Last fetched list (sorted by `sort`, then `createdAt`). */
@@ -115,7 +118,7 @@ export class ProfilesClient {
         const keep = this.stored && this.stored.id === p.id && this.stored.expiresAt > Date.now() ? this.stored : null;
         this.stored = keep ?? { id: p.id, token: "", expiresAt: 0 };
         this.activeProfile = p;
-        writeStored(this.stored);
+        writeStored(this.storeKey, this.stored);
         this.changed.emit(p);
     }
 
@@ -125,7 +128,7 @@ export class ProfilesClient {
             const r = await this.http.must(this.http.post<{ token: string; expiresAt: number }>(`/media/profiles/${enc(p.id)}/unlock`, pin ? { pin } : {}));
             this.stored = { id: p.id, token: r.token, expiresAt: r.expiresAt };
             this.activeProfile = p;
-            writeStored(this.stored);
+            writeStored(this.storeKey, this.stored);
             this.changed.emit(p);
             return { ok: true, profile: p };
         } catch (e) {
@@ -163,7 +166,7 @@ export class ProfilesClient {
     signOut(): void {
         this.stored = null;
         this.activeProfile = null;
-        writeStored(null);
+        writeStored(this.storeKey, null);
         this.changed.emit(null);
     }
 }

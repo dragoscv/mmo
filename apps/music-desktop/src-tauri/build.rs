@@ -11,6 +11,8 @@ fn main() {
         "mini_state",
         "desktop_media_update",
         "desktop_open_signin",
+        "desktop_lan_proxy",
+        "desktop_lan_servers",
     ])))
     .expect("tauri build");
 }

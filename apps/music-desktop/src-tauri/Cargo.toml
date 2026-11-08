@@ -1,6 +1,6 @@
 [package]
 name = "mixai-music"
-version = "0.1.0"
+version = "0.1.1"
 description = "MixAI Music — your MixAI Server's music on Windows, macOS and Linux"
 authors = ["MixAI <support@mixai.ro>"]
 license = "AGPL-3.0-or-later"
@@ -33,6 +33,9 @@ tiny_http = "0.12"
 uuid = { version = "1.26", features = ["v4"] }
 open = "5.4"
 tokio = { version = "1.53", features = ["sync", "time"] }
+# LAN servers (D59, WP17-97/100): plain-http client for the loopback proxy (no TLS: LAN targets only) + mDNS browse.
+ureq = { version = "3.5", default-features = false }
+mdns-sd = "0.21"
 
 [profile.release]
 panic = "abort"

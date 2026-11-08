@@ -7,6 +7,7 @@
 
 mod auth;
 mod i18n;
+mod lan;
 mod links;
 mod media;
 mod tray;
@@ -81,9 +82,12 @@ pub fn run() {
             media::desktop_media_update,
             media::mini_state,
             media::mini_command,
+            lan::desktop_lan_proxy,
+            lan::desktop_lan_servers,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
+            app.manage(lan::start(&handle));
             if let Some(w) = app.get_webview_window("main") {
                 *app.state::<LauncherUrl>().0.lock().expect("launcher mutex") = w.url().ok();
                 let h = handle.clone();

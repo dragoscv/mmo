@@ -34,9 +34,9 @@ export function isActive(pathname: string, href: string, exact = false): boolean
     return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function MediaShell({ children }: { children: ReactNode }) {
+export function MediaShell({ children, loginHref = null }: { children: ReactNode; loginHref?: string | null }) {
     const t = useTranslations("mx.shell");
-    const { server, clients } = useMmo();
+    const { server, clients, signedIn } = useMmo();
     const pathname = usePathname() ?? "/media";
     const router = useRouter();
     const navRef = useRef<HTMLElement>(null);
@@ -76,9 +76,15 @@ export function MediaShell({ children }: { children: ReactNode }) {
             <div className="mx-shell">
                 <EmptyState
                     icon={<Clapperboard aria-hidden />}
-                    title={t("noServer.title")}
-                    description={t("noServer.body")}
-                    actions={<Button render={<Link href="/pair" />}>{t("noServer.cta")}</Button>}
+                    title={signedIn ? t("noServer.title") : t("noServer.guestTitle")}
+                    description={signedIn ? t("noServer.body") : t("noServer.guestBody")}
+                    actions={
+                        <div className="flex flex-wrap justify-center gap-2">
+                            <Button render={<Link href="/connect" />} data-testid="noserver-connect">{t("noServer.connect")}</Button>
+                            <Button variant="secondary" render={<Link href="/connect?demo=1" />}>{t("noServer.demo")}</Button>
+                            {loginHref ? <Button variant="outline" render={<a href={loginHref} />}>{t("noServer.signIn")}</Button> : null}
+                        </div>
+                    }
                 />
             </div>
         );

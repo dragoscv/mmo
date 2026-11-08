@@ -63,7 +63,7 @@ export function productOrigin(product: Product, rootDomain = ROOT_DOMAIN): strin
 /** Routes that render on EVERY product host (auth, legal, offline shell, assets, APIs). `/media/downloads` too:
  *  downloads live in the origin's IndexedDB + Cache Storage, so the list must open on the host that saved them. */
 const SHARED_PREFIXES = [
-    "/api", "/login", "/privacy", "/offline", "/activate", "/pair", "/account", "/status", "/get",
+    "/api", "/login", "/privacy", "/offline", "/activate", "/pair", "/connect", "/account", "/status", "/get",
     "/_next", "/.well-known", "/fonts", "/__offline", "/together", "/media/downloads",
 ];
 /** Files at the root of `public/` and framework metadata. */

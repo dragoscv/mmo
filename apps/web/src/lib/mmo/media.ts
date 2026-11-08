@@ -8,7 +8,7 @@
  * Reads return `null` on 404 so screens can fall back against an older server.
  */
 import { ApiError } from "./api";
-import type { ServerConfig } from "./config";
+import { scopedKey, type ServerConfig } from "./config";
 import type {
     LibraryIndex, MediaEtag, MediaHome, MediaKind, MediaSearchPage, MediaSeasonResponse, MediaStats, MediaStatus,
     MediaTitleResponse, ProgressEntry, ProgressInput, TrackPlayInput, WatchlistEntry, WatchlistResponse,
@@ -117,7 +117,7 @@ export class MediaClient {
 
     // ─── Home (persistent stale-while-revalidate) ────────────────────────
 
-    private homeKey(): string { return HOME_CACHE_PREFIX + this.profile; }
+    private homeKey(): string { return scopedKey(HOME_CACHE_PREFIX + this.profile, this.cfg.scope); }
 
     /** Last known `/media/home` for the active profile, synchronously (memory, then localStorage). */
     homeCached(): MediaHome | null {
