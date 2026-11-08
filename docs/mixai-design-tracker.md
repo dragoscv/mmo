@@ -67,6 +67,15 @@
 | D57 | WP17-81..89 plan | all nine as smallest-complete v1 on server + web + Android + iOS, order 82, 84, 89, 86, 88, 83, 87, 85, 81; scrobbling = ListenBrainz (user token) + Last.fm env-gated (owner registers the API key later → Secret Manager); embeddings (81) computed on the PC companion only; lyrics translations private per user (codai via web) | 2026-11-08 |
 | D58 | MixAI Key & BPM (new app, WP18) | owner 2026-11-08: standalone app `ro.mixai.keybpm` on Android phone + Wear OS (bundled) + iOS + watchOS; one Rust core crate `mixai-listen` (BPM from onset autocorr + comb phase reusing mixai-core analysis.rs, HPCP chroma + key profiles, tuning, chords, pitch, LUFS) via UniFFI → Kotlin + Swift; Compose (phone + Wear) + SwiftUI; MixAI tokens + M3 Expressive shape morphing / SwiftUI MeshGradient + KeyframeAnimator (key blob morphs across the Camelot wheel, BPM ring pulses on beat, reduced motion respected). v1: live key + Camelot wheel, live BPM (half/double, beat pulse, tap tempo), A4 tuning + chromatic tuner, chords + chromagram, loudness/energy, file mode, Song ID (ShazamKit), harmonic suggestions from the MixAI library, history + CSV/share card, MIDI clock + metronome (no Ableton Link: GPL), widgets / Live Activity / Wear tile + complication + haptic beat, DJ booth mode. Built after WP17-43..45, before WP17-81..89 | 2026-11-08 |
 | D59 | Connect to a server without a MixAI account (store reviewers + LAN users) | owner 2026-11-08: web `/connect` on music + tv hosts (address -> Quick Connect code + QR, poll, connection kept in the browser), "Try the demo" button (demo.mixai.ro auto-approve), http LAN servers reachable from the desktop shells via a local Rust proxy, after sign-in offer "Add to account"; also: copy fix "use without signing in", approve the browser from the phone (QR approveUrl), profile/home cache scoped per server, several servers + switcher, desktop LAN discovery (mDNS). Review notes for Mac/MS Store use "Connect -> Try the demo" | 2026-11-08 |
+| D60 | MixAI Decks name | owner 2026-11-08: the DJ app is renamed **MixAI Decks** everywhere (listings, site `decks.mixai.ro`, docs); id stays `ro.mixai.dj`, MS Store 9P5P2WN26RMS renamed; `dj.mixai.ro` redirects. ADR-0014 | 2026-11-08 |
+| D61 | Decks architecture | owner 2026-11-08: one Rust core `decks-core` (from mixai-core) + shared `mixai-listen`; **native UIs** over UniFFI 0.31: SwiftUI (macOS + iPadOS + iOS), Jetpack Compose (Android phone/tablet/ChromeOS), **Compose Multiplatform Desktop** (Windows + Linux, shared with Android); GPU views (waveforms, overview, platters) drawn once in Rust wgpu on native surfaces. Rejected WinUI+GTK, Slint, JUCE, Tauri-on-phones | 2026-11-08 |
+| D62 | Decks rollout | owner 2026-11-08: all platforms **in parallel**; the Tauri app ships now as Decks 1.x on Windows + macOS + Linux and is replaced in place by native 2.0 in the same listings | 2026-11-08 |
+| D63 | Decks v1 scope | owner 2026-11-08: beat/phase sync + quantize + master clock; local key + downbeats (mixai-listen); headphone cue / routing matrix (4-ch, mono split); GPU colour waveforms + beatgrid; on-device stems (ort ONNX: CoreML/DirectML/NNAPI/QNN) with server fallback; local library + rekordbox XML / Serato / Traktor NML / Engine import-export + OneLibrary; key shift, slip, colour FX (phaser/flanger), MIDI clock out; own controller mapping format (JSON + sandboxed script) + HID jog/screens; **DVS v1** (D65); streaming (D64) | 2026-11-08 |
+| D64 | Decks streaming = they pay us | owner 2026-11-08 after research (no public revenue share exists; affiliate is the real income): local files + OneLibrary; Apple Music catalogue + subscription sheet with our Performance Partner affiliate token + application for Apple's DJ entitlement; Beatport partner application asking for a per-trial bounty + co-marketing; SoundCloud + TIDAL behind feature flags pending B2B; Spotify / Deezer / Amazon after traction. We never pay for catalogue access | 2026-11-08 |
+| D65 | Decks DVS | owner 2026-11-08: clean-room MIT Rust decoder for Serato CV02.5 (relative + absolute), Phase (MWM) in audio mode, own MixAI timecode; never xwax/Mixxx code; patent freedom-to-operate check before launch; Phase HID partnership request; Traktor MK2 in v1.x | 2026-11-08 |
+| D66 | Decks controllers | owner 2026-11-08 (hardware: Pioneer DDJ-FLX4, Novation Circuit Tracks, USB + BLE MIDI keyboard): universal mapping JSON + script, MIDI learn on any control; FLX4 rekordbox + Serato mode profiles with auto-detect; Circuit Tracks clock master/slave, drum pads → samples/hot cues, macros → FX, **groove lane** (record Circuit patterns on the beatgrid); keyboard = scale-locked sampler/synth in the track key; BLE MIDI on every OS (Windows MIDI Services) | 2026-11-08 |
+| D67 | Decks ideas (all in) | owner 2026-11-08: AI Transition Designer; phone as remote/second screen + Party DJ (QR requests, TV visualiser); crate sync with MixAI Music; set recording + automatic tracklist + Mixcloud/server publish; voice/NL control via codai; fluid/variable beatgrids; own LAN sync (MIT, not Ableton Link); DMX/Art-Net lights on the beat; practice coach; stems over DVS; set-safety AI (32-bar look-ahead clip/key clash); crowd-energy mic (no audio stored); ISRC cue sheet for ORDA/UCMR-ADA + Mixcloud; one-click rekordbox/Serato/Traktor → OneLibrary migration; per-venue profiles by Wi-Fi; AI risers/loops in key (audio-gen); full accessibility + haptic beat; real-time shared b2b crates; spatial/multichannel output | 2026-11-08 |
+| D68 | This phase: other apps + repo | owner 2026-11-08: publish only with existing accounts (Play, Microsoft, Apple); MixAI TV on Play TV (WP17-20) + phone app renames; MixAI Music App Store + Mac App Store + Play production after 14-day test; MixAI Key & BPM (WP18); Apple Watch + iPad for MixAI TV (WP17-29); Studio on Mac App Store. Repo upgrade policy: latest stable everywhere, prerelease only where it unblocks something concrete and documented. Decks free now, Pro infra (flags + Stripe) prepared | 2026-11-08 |
 
 ## 1. Research summary (verified 2026-09-17)
 
@@ -605,7 +614,7 @@ Fire TV Vega OS runs no APK; Apple 5.2.3/2.1 demo account), Plex/Jellyfin/Emby f
 | WP17-98 | After sign-in: "Add this server to your account" for a guest connection (devices row) | done (de4b3647, actions/guest-server.ts: https only, dedupe by token hash) |
 | WP17-99 | Web: profile + home cache keys scoped per server; several servers + switcher in the profile menu | done (de4b3647) |
 | WP17-100 | Desktop shells: LAN discovery (mDNS `_mmo-companion._tcp`) in Rust, listed on /connect | done (music-desktop mdns-sd found "Dragos" .61 + homepi; tv-desktop keeps the Tizen /24 sweep, which runs through plugin-http) |
-| WP17-101 | Approve a browser from the phone: /connect QR = approveUrl, MixAI Music phone "Approve" deep link; copy fix "use without signing in" | done (phone 1.3.0: pair links -> approve dialog, PairLinkTest, emulator: approve on demo -> toast, other-server warning; copy fix in web 3.3.0) |
+| WP17-101 | Approve a browser from the phone: /connect QR = approveUrl, MixAI Music phone "Approve" deep link; copy fix "use without signing in" | done (phone 1.3.0: pair links -> approve dialog, PairLinkTest, emulator: approve on demo -> toast, other-server warning; copy fix in web 3.3.0; Play production vc4 1.3.0 (incl. 1.2.0 Play on) full rollout sent for review 2026-11-08 ~20:25, owner chose 100 %) |
 
 ### WP18 — MixAI Key & BPM (D58, 2026-11-08)
 
@@ -625,3 +634,56 @@ Fire TV Vega OS runs no APK; Apple 5.2.3/2.1 demo account), Plex/Jellyfin/Emby f
 | WP18-12 | Idea (in): compare two songs — mixability score + suggested transition (bars, rate %) | todo |
 | WP18-13 | Idea (in): room mode — MixAI TV shows live key/BPM from the phone mic via hub | todo |
 | WP18-14 | Idea (in): codai explanation of key/mode/chords ("why it sounds sad"), online only | todo |
+
+## 13. MixAI Decks — native DJ on every OS (D60–D68, ADR-0014, 2026-11-08)
+
+Research (verified 2026-11-08): cpal 0.18.2, symphonia 0.6.1, rubato 5.0.1, ort 2.0.0-rc.15 (ONNX Runtime 1.31),
+midir 0.11.1, hidapi 2.6.7, coremidi 0.9.2, UniFFI 0.31 (+ uniffi-bindgen-cs 0.11.1), Compose Multiplatform 1.12.1,
+Windows App SDK 2.5.1, Tauri 2.12.5, Bungee 2.4.39 (MPL), Signalsmith Stretch (MIT). Competitors: rekordbox 7.2.19,
+Traktor 4.5.1, VirtualDJ 2026 b9729, djay 5.6.10, Mixxx 2.5.6. Streaming: no service publishes a DJ revenue share;
+Apple Services Performance Partner pays per new Apple Music membership (affiliate token on `MusicSubscriptionOffer`);
+Spotify policy bans mixing outside partner deals; TIDAL public SDK = 30 s previews. Windows BLE MIDI first-class in
+Windows MIDI Services (25H2). DVS: xwax/Mixxx GPL; Serato CV02.5 = 1 kHz carrier + LFSR (documented publicly).
+
+### WP19 — MixAI Decks
+
+| ID | Item | Status |
+|---|---|---|
+| WP19-01 | Rename MixAI DJ → **MixAI Decks** everywhere (apps/mixai productName, tauri.conf, MS Store listing 9P5P2WN26RMS, web products/landing `decks.mixai.ro` + `dj.mixai.ro` redirect, ADR-0013 ripple, app-inventory, docs/mixai/*, i18n RO+EN) | todo |
+| WP19-02 | Decks 1.x (Tauri) release pipeline: CI for apps/mixai (Win MSIX, macOS universal DMG notarised + Mac App Store, Linux AppImage/deb + Flathub manifest), updater, download links on decks.mixai.ro | todo |
+| WP19-03 | Core upgrade: Rust edition 2024, cpal 0.15 → 0.18, symphonia 0.5 → 0.6, rubato 5.0.1; audio thread realtime priority; xrun metrics; `cargo-deny` licence gate | todo |
+| WP19-04 | `decks-core` crate split (engine, deck, mixer, routing, fx, sampler, recorder, library, mapping, dvs) with a stable command/event API; UniFFI 0.31 surface (Swift + Kotlin) + binary playhead/peaks channel | todo |
+| WP19-05 | Beat/phase sync + quantize + master clock (beatgrid model with downbeats, fluid/variable grids), key shift, slip, beat-jump, pad modes | todo |
+| WP19-06 | Routing matrix: master + headphone cue (split mono, 4-ch interfaces), cue mix/level, booth out, per-device latency compensation | todo |
+| WP19-07 | Time-stretch: Signalsmith Stretch (key lock) + Bungee (scrub/reverse); replaces WSOLA | todo |
+| WP19-08 | Analysis via `mixai-listen` (WP18-01): key, downbeats, tuning, LUFS, multi-band peaks; server analysis merged when available | todo |
+| WP19-09 | Stems on-device: ort 2 + HTDemucs ONNX (CoreML / DirectML / NNAPI / QNN / XNNPACK), background pre-separation cache, server fallback; stem mixer + stem FX | todo |
+| WP19-10 | FX: colour FX (filter, phaser, flanger, noise, dub echo), beat FX (echo, reverb FDN, roll, gate), FX chains, MIDI clock out | todo |
+| WP19-11 | Local library (SQLite): crates, smart crates, history; import/export rekordbox XML, Serato tags + crates, Traktor NML, Engine DB, OneLibrary; one-click migration with cue colours; CDJ USB export | todo |
+| WP19-12 | Controller runtime: mapping JSON + sandboxed script, MIDI learn, FLX4 rekordbox/Serato profiles + auto-detect, Circuit Tracks (clock, pads, macros, groove lane), scale-locked keyboard instrument, HID jog/screens, BLE MIDI (Windows MIDI Services, Android, CoreMIDI) | todo |
+| WP19-13 | DVS v1: clean-room MIT decoder Serato CV02.5 (relative + absolute), Phase audio mode, MixAI timecode; calibration UI; stems over DVS; patent FTO note | todo |
+| WP19-14 | wgpu renderer (Rust): scrolling colour waveforms + beatgrid, overview, spectral, platters, 120 Hz, embeddable in Metal/Vulkan/DX12 native surfaces | todo |
+| WP19-15 | Apple app (SwiftUI, macOS + iPadOS + iOS) in apps/ios: decks, mixer, library, FX, stems, settings, skins; AVAudioSession, CoreMIDI BLE; App Store + Mac App Store | todo |
+| WP19-16 | Android app (Compose, phone/tablet/ChromeOS) `ro.mixai.dj`: AAudio via cpal, AMidi + BLE MIDI, latency class badge; Google Play | todo |
+| WP19-17 | Desktop app (Compose Multiplatform, Windows + Linux) sharing Android UI; MSIX (replaces 1.x in 9P5P2WN26RMS), AppImage/deb/Flathub | todo |
+| WP19-18 | Design: skins = design-tokens surface presets + JSON layout, deck/mixer morphing, loading/progress states, reduced motion, full a11y + haptic beat | todo |
+| WP19-19 | Streaming: OneLibrary; Apple Music catalogue + affiliate subscription sheet + DJ entitlement application; Beatport partner application (bounty); SoundCloud/TIDAL behind flags | todo |
+| WP19-20 | AI: Transition Designer (next-track + editable EQ/stem/FX automation), set-safety 32-bar look-ahead, voice/NL control via codai, AI risers/loops in key (audio-gen) | todo |
+| WP19-21 | Connected: phone remote / second screen, Party DJ (QR requests, TV visualiser), crate sync with MixAI Music, real-time shared b2b crates, own LAN sync (MIT) | todo |
+| WP19-22 | Performance extras: set recording + automatic tracklist + ISRC cue sheet (ORDA/UCMR-ADA) + Mixcloud/server publish, crowd-energy mic, per-venue profiles by Wi-Fi, DMX/Art-Net, practice coach, spatial/multichannel out | todo |
+| WP19-23 | Pro infra (not enabled): feature flags + Stripe entitlement via MixAI account | todo |
+| WP19-24 | Stores: rename MS Store listing; Mac App Store + App Store + Google Play records `ro.mixai.dj`; listings EN+RO, screenshots, privacy (mic on-device), review notes | todo |
+| WP19-25 | Docs: docs/mixai → docs/decks (architecture, controllers, mapping format, DVS, streaming), CHANGELOG, app-inventory | todo |
+
+### WP20 — Repo-wide upgrade (D68, latest stable)
+
+| ID | Item | Status |
+|---|---|---|
+| WP20-01 | Node 24 LTS (`.nvmrc`, engines, Dockerfiles, CI) + pnpm 12 + pnpm catalogs | todo |
+| WP20-02 | TypeScript 7 everywhere it is unblocked (server, native, gateway, yjs-relay); web stays on TS 6 API dual install until typescript-eslint supports 7 | todo |
+| WP20-03 | apps/gateway: tsup → tsdown, vitest 5, @hono/node-server 2, Node 24 | todo |
+| WP20-04 | apps/native/android: AGP 9.4, Gradle 9.7.1, compileSdk 37, minSdk 26, JDK 21 alignment across CI | todo |
+| WP20-05 | Rust edition 2024 + Tauri 2.12.x across mixai/native/rbexport; aligned @tauri-apps/cli | todo |
+| WP20-06 | Web smaller majors: next-auth latest beta, jose 6, @octokit/rest, google-auth-library, react-markdown 10; retire remaining radix-ui primitives in web | todo |
+| WP20-07 | Python analyzer requirements pinned (uv lock); iOS VLCKit pin review; wrangler 4 in yjs-relay | todo |
+| WP20-08 | ESLint 10 for web when the plugin peers allow it (else documented block); oxlint fast gate | todo |
