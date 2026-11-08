@@ -8,7 +8,24 @@ vi.mock("../store", () => ({
 }));
 vi.mock("../sync", () => ({ enqueueSyncChange: vi.fn() }));
 
-import { pickStreamFormat, transcodeArgs } from "./media";
+import path from "node:path";
+import { findFolderArt, pickStreamFormat, transcodeArgs } from "./media";
+
+describe("findFolderArt", () => {
+    const dir = path.join("music", "Jan Morgenstern", "Elephants Dream");
+    const track = path.join(dir, "1-TheWires.mp3");
+    it("finds cover.jpg beside the track", () => {
+        expect(findFolderArt(track, (p) => p === path.join(dir, "cover.jpg"))).toBe(path.join(dir, "cover.jpg"));
+    });
+    it("prefers cover over folder and accepts capitalised names and png", () => {
+        const have = new Set([path.join(dir, "Folder.png"), path.join(dir, "cover.png")]);
+        expect(findFolderArt(track, (p) => have.has(p))).toBe(path.join(dir, "cover.png"));
+        expect(findFolderArt(track, (p) => p === path.join(dir, "Folder.png"))).toBe(path.join(dir, "Folder.png"));
+    });
+    it("returns null without folder art", () => {
+        expect(findFolderArt(track, () => false)).toBeNull();
+    });
+});
 
 describe("pickStreamFormat", () => {
     it("plays the file directly when format is absent or raw", () => {

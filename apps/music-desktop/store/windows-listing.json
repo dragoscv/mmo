@@ -1,0 +1,20 @@
+{
+  "en-us": {
+    "description": "MixAI Music plays YOUR music: the albums on your own MixAI Server at home, in a fast Windows window. No ads, no subscription, no catalogue we sell you.\n\nLISTEN\n• Albums play gapless; automix crossfades other tracks on the beat, with tempo matched.\n• Start a mix: endless radio from your library, or from any song, album or artist.\n• Synced lyrics, queue editing, shuffle, repeat and harmonic (key-aware) radio order.\n\nMADE FOR WINDOWS\n• Media keys and the Windows media overlay; tray icon with play/pause and next.\n• Always-on-top mini player; closing the window keeps the music playing.\n• Finds MixAI Servers on your Wi-Fi by itself and talks to them directly, even over plain http.\n• Use it without an account: connect to a server with a code, or try our demo server in one click.\n• mixai-music:// links open albums, artists or a queue straight in the app.\n\nEVERY SCREEN\n• Same library and profiles on Android, iPhone, Google TV, Apple TV, Mac and the web.\n• Hand the queue to your MixAI TV in one click.\n\nMixAI Music needs a MixAI Server (free, self-hosted on Windows, macOS, Linux, Docker or Raspberry Pi) with your own music files.",
+    "shortDescription": "Your own music library from your MixAI Server: gapless albums, automix, lyrics, media keys.",
+    "features": ["Gapless albums and beat-matched automix", "Endless mixes from your own library", "Synced lyrics and harmonic radio order", "Finds MixAI Servers on your Wi-Fi", "No account needed: connect with a code"],
+    "releaseNotes": "First Microsoft Store release. Connect without an account, local network servers and a one-click demo.",
+    "shortTitle": "MixAI Music",
+    "devStudio": "Dragos Catalin Vladulescu",
+    "keywords": ["music player", "self-hosted", "subsonic", "flac", "lyrics", "gapless", "automix"]
+  },
+  "ro-ro": {
+    "description": "MixAI Music redă muzica TA: albumele de pe propriul MixAI Server de acasă, într-o fereastră rapidă pe Windows. Fără reclame, fără abonament, fără un catalog pe care să ți-l vindem.\n\nASCULTARE\n• Albumele merg fără pauze; automix face crossfade pe beat între celelalte melodii, cu tempoul potrivit.\n• Pornește un mix: radio fără sfârșit din biblioteca ta sau de la orice melodie, album ori artist.\n• Versuri sincronizate, editarea cozii, amestecare, repetare și ordine armonică (după tonalitate) la radio.\n\nFĂCUT PENTRU WINDOWS\n• Tastele media și panoul media din Windows; pictogramă în bara de sistem cu redare/pauză și următoarea.\n• Mini player mereu deasupra; muzica merge mai departe când închizi fereastra.\n• Găsește singur serverele MixAI din rețeaua Wi-Fi și vorbește direct cu ele, chiar și prin http simplu.\n• Merge fără cont: te conectezi la un server cu un cod sau încerci serverul nostru demo dintr-un clic.\n• Linkurile mixai-music:// deschid albume, artiști sau o coadă direct în aplicație.\n\nPE ORICE ECRAN\n• Aceeași bibliotecă și aceleași profiluri pe Android, iPhone, Google TV, Apple TV, Mac și web.\n• Trimite coada pe televizorul MixAI cu un clic.\n\nMixAI Music are nevoie de un MixAI Server (gratuit, găzduit de tine pe Windows, macOS, Linux, Docker sau Raspberry Pi) cu fișierele tale de muzică.",
+    "shortDescription": "Biblioteca ta de muzică de pe MixAI Server: albume fără pauze, automix, versuri, taste media.",
+    "features": ["Albume fără pauze și automix pe beat", "Mixuri fără sfârșit din biblioteca ta", "Versuri sincronizate și ordine armonică", "Găsește serverele MixAI din Wi-Fi", "Fără cont: te conectezi cu un cod"],
+    "releaseNotes": "Prima lansare în Microsoft Store. Conectare fără cont, servere din rețeaua locală și demo dintr-un clic.",
+    "shortTitle": "MixAI Music",
+    "devStudio": "Dragos Catalin Vladulescu",
+    "keywords": ["player muzica", "self-hosted", "subsonic", "flac", "versuri", "fara pauze", "automix"]
+  }
+}

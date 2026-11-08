@@ -10,6 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-08 — web 3.3.2, server 3.13.1: covers
+
+- **Web 3.3.2:** a music cover that fails to load (track without art → the server answers a Subsonic error) shows the
+  disc/person icon instead of a broken image box.
+- **Server 3.13.1:** `getCoverArt` falls back to `cover.jpg` / `folder.jpg` (and png/webp) beside the track. Details:
+  `server/CHANGELOG.md`.
+
 ## 2026-11-08 — web 3.3.1: profile picker closes after a pick
 
 - **Fix:** on a MixAI Server with two or more viewer profiles (the demo server has Reviewer + Kids), choosing a

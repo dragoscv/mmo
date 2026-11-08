@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.13.1 — Folder cover art
+
+- `getCoverArt` falls back to folder art beside the track (`cover`, `folder`, `front`, `album` × `.jpg/.jpeg/.png/.webp`,
+  capitalised names too, max 15 MB) when no track carries an embedded picture. Albums ripped with a `cover.jpg`
+  (the demo server's Elephants Dream, most CD rips) had no cover on any client.
+
 ## 3.13.0 — Automix data: BPM, key, beat grid, harmonic order (WP17-44)
 
 - `TrackCard` carries `bpm` (tag, Deezer or analyzer), `bpmConfidence`, `keyCamelot` and `firstBeatSec` (first

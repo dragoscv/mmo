@@ -26,11 +26,14 @@ export const genreHref = (name: string) => `/media/music/genre/${encodeURICompon
 export const NOW_PLAYING_HREF = "/media/music/now-playing";
 
 export function Cover({ src, round, icon, className, eager }: { src: string | null; round?: boolean; icon?: ReactNode; className?: string; eager?: boolean }) {
+    // A track without art makes the server answer a Subsonic error (JSON) instead of an image: show the icon, not a broken box.
+    const [failed, setFailed] = useState<string | null>(null);
+    const show = src && failed !== src;
     return (
         <span className={`mu-cover${round ? " is-round" : ""}${className ? ` ${className}` : ""}`}>
-            {src
+            {show
                 // eslint-disable-next-line @next/next/no-img-element -- signed Subsonic cover from the user's MMO Server
-                ? <img src={src} alt="" loading={eager ? "eager" : "lazy"} decoding="async" />
+                ? <img src={src} alt="" loading={eager ? "eager" : "lazy"} decoding="async" onError={() => setFailed(src)} />
                 : <span className="mu-cover-ph" aria-hidden>{icon ?? <Music2 />}</span>}
         </span>
     );

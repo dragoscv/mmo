@@ -9,7 +9,8 @@
  * binary is resolvable, otherwise falls back to a plain stream.
  */
 
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import type express from "express";
 import { lazyEsm } from "../lib/esm-import";
@@ -137,14 +138,49 @@ async function readEmbeddedPicture(filepath: string): Promise<Picture | null> {
     }
 }
 
-/** Sends the embedded picture of the first track that has one. `size` is
- *  accepted but ignored: `sharp` is not a dependency of this package, and
- *  ADR-0005 forbids adding image deps for this surface. */
+/** Folder art next to the track (`cover.jpg`, `folder.png`, …), the common layout when tracks carry no embedded picture. */
+const FOLDER_ART = ["cover", "folder", "front", "album"].flatMap((n) => [`${n}.jpg`, `${n}.jpeg`, `${n}.png`, `${n}.webp`]);
+const MAX_FOLDER_ART = 15 * 1024 * 1024;
+
+export function findFolderArt(trackPath: string, exists: (p: string) => boolean = existsSync): string | null {
+    const dir = path.dirname(trackPath);
+    for (const name of FOLDER_ART) {
+        for (const n of [name, name[0]!.toUpperCase() + name.slice(1)]) {
+            const p = path.join(dir, n);
+            if (exists(p)) return p;
+        }
+    }
+    return null;
+}
+
+function readFolderArt(trackPath: string): Picture | null {
+    const p = findFolderArt(trackPath);
+    if (!p) return null;
+    try {
+        if (statSync(p).size > MAX_FOLDER_ART) return null;
+        const ext = path.extname(p).toLowerCase();
+        const format = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+        return { format, data: readFileSync(p) };
+    } catch {
+        return null;
+    }
+}
+
+/** Sends the embedded picture of the first track that has one, else folder art
+ *  (`cover.jpg` …) beside it. `size` is accepted but ignored: `sharp` is not a
+ *  dependency of this package, and ADR-0005 forbids adding image deps for this surface. */
 export async function sendCoverArt(res: express.Response, candidates: TrackRow[]): Promise<boolean> {
-    for (const row of candidates.slice(0, 5)) {
-        if (!row.filepath || !existsSync(row.filepath)) continue;
-        const pic = await readEmbeddedPicture(row.filepath);
-        if (!pic) continue;
+    const rows = candidates.slice(0, 5).filter((r) => r.filepath && existsSync(r.filepath));
+    let pic: Picture | null = null;
+    for (const row of rows) {
+        pic = await readEmbeddedPicture(row.filepath!);
+        if (pic) break;
+    }
+    for (const row of rows) {
+        if (pic) break;
+        pic = readFolderArt(row.filepath!);
+    }
+    if (pic) {
         res.status(200);
         res.setHeader("Content-Type", pic.format || "image/jpeg");
         res.setHeader("Content-Length", String(pic.data.byteLength));
