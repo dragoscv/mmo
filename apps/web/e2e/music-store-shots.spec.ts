@@ -8,9 +8,12 @@ import { test, expect, type Page } from "@playwright/test";
  */
 
 const ORIGIN = process.env.SHOTS_ORIGIN ?? "https://music.mixai.ro";
-const [W, H] = (process.env.SHOTS_SIZE ?? "1920x1080").split("x").map(Number);
-const SCALE = Number(process.env.SHOTS_SCALE ?? "1");
-const DIR = `test-results/music-store/${W * SCALE}x${H * SCALE}`;
+// Microsoft Store 1920x1080; Mac App Store APP_DESKTOP 2880x1800 (1440x900 @2x). SHOTS_SIZES="WxH@S,..." overrides.
+const SIZES = (process.env.SHOTS_SIZES ?? "1920x1080@1,1440x900@2").split(",").map((s) => {
+    const [wh, sc] = s.split("@");
+    const [w, h] = wh!.split("x").map(Number);
+    return { W: w!, H: h!, SCALE: Number(sc ?? "1") };
+});
 
 async function connectDemo(page: Page) {
     await page.goto(`${ORIGIN}/connect?demo=1`);
@@ -27,7 +30,8 @@ async function passProfileGate(page: Page) {
 
 test.use({ colorScheme: "dark" });
 
-test("music store shots (guest of demo)", async ({ browser }) => {
+for (const { W, H, SCALE } of SIZES) test(`music store shots ${W * SCALE}x${H * SCALE} (guest of demo)`, async ({ browser }) => {
+    const DIR = `test-results/music-store/${W * SCALE}x${H * SCALE}`;
     test.setTimeout(240_000);
     const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: SCALE, colorScheme: "dark" });
     await ctx.addInitScript(() => {
