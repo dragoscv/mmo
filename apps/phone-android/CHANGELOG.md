@@ -1,5 +1,14 @@
 # Changelog — MixAI for Android phones
 
+## 1.3.0 — 2026-11-08
+
+WP17-101 (D59). versionCode 4.
+
+- Approve a browser or TV from the phone: scanning the Quick Connect QR of music.mixai.ro/connect (or a TV) opens
+  MixAI with "Connect this device?" and the code; Approve calls the paired server's `/pair/approve`. Links:
+  `https://mixai.ro/pair?...`, `https://music.mixai.ro/pair?...`, `mixai://pair?...`. Warns when the code names
+  another server. `https://mixai.ro/media/...` links now auto-verify (assetlinks lists the Play signing key).
+
 ## 1.2.0 — 2026-11-07
 
 WP17-41h. versionCode 3.

@@ -91,10 +91,13 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Room id of the last `mixai://together/<roomId>` link (consumed by AppRoot). */
         @Volatile var pendingRoomId: String? = null
+        /** Quick Connect code from the last pair link (consumed by AppRoot's approve dialog). */
+        @Volatile var pendingPair: PairLink? = null
 
         fun parseDeepLink(intent: Intent?): Pair<String, Long>? {
             val data: Uri = intent?.data ?: return null
             val seg = data.pathSegments
+            parsePairLink(data.scheme, data.host, data.path, data::getQueryParameter)?.let { pendingPair = it; return "pair" to 0L }
             if (data.scheme == "mixai" && data.host == "downloads") return "downloads" to 0L
             if (data.scheme == "mixai" && data.host == "together") {
                 pendingRoomId = seg.firstOrNull()?.takeIf { it.isNotBlank() }

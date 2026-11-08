@@ -80,12 +80,26 @@
                 <data android:scheme="mixai" android:host="downloads" />
                 <data android:scheme="mixai" android:host="together" />
             </intent-filter>
-            <!-- https://mixai.ro/media/<kind>/<tmdbId> (autoVerify once assetlinks.json is published). -->
-            <intent-filter>
+            <!-- https://mixai.ro/media/<kind>/<tmdbId> (assetlinks.json lists the Play signing key). -->
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="mixai.ro" android:pathPrefix="/media/" />
+            </intent-filter>
+            <!-- Approve a browser / TV (D59): QR from /connect = https://mixai.ro/pair?host&port&code, or mixai://pair?... -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="mixai.ro" android:path="/pair" />
+                <data android:scheme="https" android:host="music.mixai.ro" android:path="/pair" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mixai" android:host="pair" />
             </intent-filter>
         </activity>
 

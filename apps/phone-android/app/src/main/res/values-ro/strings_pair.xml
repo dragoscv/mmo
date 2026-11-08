@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pair_approve_title">Conectezi acest dispozitiv?</string>
+    <string name="pair_approve_body">Un browser sau un televizor cere acces la serverul tău MixAI cu codul %1$s. Aprobă doar dacă tu ai pornit conectarea.</string>
+    <string name="pair_approve_other_server">Codul a fost creat pe %1$s, nu pe serverul folosit de acest telefon. Aprobarea de aici merge doar dacă este același server.</string>
+    <string name="pair_approve_confirm">Aprobă</string>
+    <string name="pair_approve_cancel">Anulează</string>
+    <string name="pair_approve_done">Aprobat. Celălalt dispozitiv se conectează imediat.</string>
+    <string name="pair_approve_failed">Nu am putut aproba: codul a expirat sau aparține altui server.</string>
+</resources>

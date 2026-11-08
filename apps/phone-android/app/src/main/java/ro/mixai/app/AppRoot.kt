@@ -25,9 +25,11 @@ import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
@@ -37,13 +39,16 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import android.widget.Toast
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
@@ -103,6 +108,7 @@ fun AppRoot(conn: Connection, session: AccountSession, settings: Settings, local
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val nav = remember { Navigator(if (conn.isComplete) Dest.Splash else Dest.Welcome) }
+    var pairToApprove by remember { mutableStateOf<PairLink?>(null) }
 
     val graph = remember(conn.baseUrl, conn.token) { if (conn.isComplete) buildGraph(context, conn, settings) else null }
     val app = context.applicationContext as MixaiPhoneApp
@@ -158,11 +164,40 @@ fun AppRoot(conn: Connection, session: AccountSession, settings: Settings, local
         val l = deepLink ?: return@LaunchedEffect
         if (deps == null || nav.current.isChromeless) return@LaunchedEffect
         when (l.first) {
+            "pair" -> pairToApprove = MainActivity.pendingPair.also { MainActivity.pendingPair = null }
             "downloads" -> nav.resetTo(Dest.TabRoot(Tab.Home), Dest.Downloads)
             "together" -> nav.resetTo(Dest.TabRoot(Tab.Home), Dest.Together(MainActivity.pendingRoomId.also { MainActivity.pendingRoomId = null }))
             else -> nav.resetTo(Dest.TabRoot(Tab.Home), Dest.Title(l.first, l.second))
         }
         onDeepLinkConsumed()
+    }
+
+    // Approve a browser / TV that showed a Quick Connect QR (D59). The code is approved on THIS phone's server.
+    pairToApprove?.let { p ->
+        val d = deps
+        if (d != null) {
+            val other = p.namesOtherServer(d.api.baseUrl)
+            AlertDialog(
+                onDismissRequest = { pairToApprove = null },
+                title = { Text(stringResource(R.string.pair_approve_title)) },
+                text = {
+                    Text(
+                        stringResource(R.string.pair_approve_body, p.code.chunked(3).joinToString(" ")) +
+                            if (other) "\n\n" + stringResource(R.string.pair_approve_other_server, p.host.orEmpty()) else ""
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        pairToApprove = null
+                        scope.launch {
+                            val ok = runCatching { d.api.postJson("/pair/approve", """{"code":"${p.code}"}""") }.isSuccess
+                            Toast.makeText(context, if (ok) R.string.pair_approve_done else R.string.pair_approve_failed, Toast.LENGTH_LONG).show()
+                        }
+                    }) { Text(stringResource(R.string.pair_approve_confirm)) }
+                },
+                dismissButton = { TextButton(onClick = { pairToApprove = null }) { Text(stringResource(R.string.pair_approve_cancel)) } },
+            )
+        }
     }
 
     val current = nav.current

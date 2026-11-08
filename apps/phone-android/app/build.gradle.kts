@@ -45,8 +45,8 @@ android {
         applicationId = "ro.mixai.app"
         minSdk = 31
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.3.0"
         buildConfigField("String", "MIXAI_ORIGIN", "\"$mixaiOrigin\"")
         buildConfigField("String", "MIXAI_WEB_ORIGIN", "\"$mixaiWebOrigin\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")

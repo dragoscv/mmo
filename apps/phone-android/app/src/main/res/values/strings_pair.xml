@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pair_approve_title">Connect this device?</string>
+    <string name="pair_approve_body">A browser or TV is asking to use your MixAI Server with code %1$s. Approve it only if you started the connection yourself.</string>
+    <string name="pair_approve_other_server">The code was created on %1$s, not on the server this phone uses. Approving here will only work if it is the same server.</string>
+    <string name="pair_approve_confirm">Approve</string>
+    <string name="pair_approve_cancel">Cancel</string>
+    <string name="pair_approve_done">Approved. The other device connects in a moment.</string>
+    <string name="pair_approve_failed">Could not approve: the code expired or belongs to another server.</string>
+</resources>

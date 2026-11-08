@@ -600,12 +600,12 @@ Fire TV Vega OS runs no APK; Apple 5.2.3/2.1 demo account), Plex/Jellyfin/Emby f
 | WP17-93 | Idea (in, D56): karaoke on TV (stems + synced lyrics), phone as lyrics remote | todo |
 | WP17-94 | Idea (in, D56): desktop global hotkeys + always-on-top mini-player (Music desktop) | todo |
 | WP17-95 | Idea (in, D56): "Continue on…" phone → TV → desktop keeps position via hub, same UX in every app (extends WP17-72) | todo |
-| WP17-96 | Web `/connect` without account (D59): address -> Quick Connect code + QR + poll, guest connection in localStorage, media gate lets guests in on music/tv, noServer CTA, Disconnect, "Try the demo" | todo |
-| WP17-97 | Desktop shells reach http LAN servers: local Rust proxy (music-desktop, tv-desktop) so an https page can talk to http://192.168.x servers | todo |
-| WP17-98 | After sign-in: "Add this server to your account" for a guest connection (devices row) | todo |
-| WP17-99 | Web: profile + home cache keys scoped per server; several servers + switcher in the profile menu | todo |
-| WP17-100 | Desktop shells: LAN discovery (mDNS `_mmo-companion._tcp`) in Rust, listed on /connect | todo |
-| WP17-101 | Approve a browser from the phone: /connect QR = approveUrl, MixAI Music phone "Approve" deep link; copy fix "use without signing in" | todo |
+| WP17-96 | Web `/connect` without account (D59): address -> Quick Connect code + QR + poll, guest connection in localStorage, media gate lets guests in on music/tv, noServer CTA, Disconnect, "Try the demo" | done (de4b3647, web 3.3.0; cloud e2e connect-guest 4/4 run 2611081651) |
+| WP17-97 | Desktop shells reach http LAN servers: local Rust proxy (music-desktop, tv-desktop) so an https page can talk to http://192.168.x servers | done (music-desktop 0.1.1 lan.rs, proxy verified on .61 /pair/info 200, MSIX declares privateNetworkClientServer; tv-desktop needs no proxy: bundled UI + plugin-http transport since WP17-25) |
+| WP17-98 | After sign-in: "Add this server to your account" for a guest connection (devices row) | done (de4b3647, actions/guest-server.ts: https only, dedupe by token hash) |
+| WP17-99 | Web: profile + home cache keys scoped per server; several servers + switcher in the profile menu | done (de4b3647) |
+| WP17-100 | Desktop shells: LAN discovery (mDNS `_mmo-companion._tcp`) in Rust, listed on /connect | done (music-desktop mdns-sd found "Dragos" .61 + homepi; tv-desktop keeps the Tizen /24 sweep, which runs through plugin-http) |
+| WP17-101 | Approve a browser from the phone: /connect QR = approveUrl, MixAI Music phone "Approve" deep link; copy fix "use without signing in" | done (phone 1.3.0: pair links -> approve dialog, PairLinkTest, emulator: approve on demo -> toast, other-server warning; copy fix in web 3.3.0) |
 
 ### WP18 — MixAI Key & BPM (D58, 2026-11-08)
 
