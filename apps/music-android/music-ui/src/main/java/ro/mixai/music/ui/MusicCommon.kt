@@ -1,7 +1,6 @@
 package ro.mixai.music.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -167,8 +166,8 @@ fun Cover(url: String?, modifier: Modifier = Modifier, shape: Shape = MaterialTh
 internal fun AlbumTile(cover: String?, album: AlbumCard, onClick: () -> Unit, modifier: Modifier = Modifier, width: Dp? = 148.dp) {
     Column(
         (if (width != null) modifier.width(width) else modifier.fillMaxWidth())
-            .clip(MaterialTheme.shapes.small)
-            .clickable(onClick = onClick),
+            .focusClickable(onClick = onClick)
+            .clip(MaterialTheme.shapes.small),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Cover(cover, Modifier.fillMaxWidth().aspectRatio(1f))
@@ -192,7 +191,7 @@ fun TrackRow(
     offline: OfflineState? = null,
 ) {
     Row(
-        modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier.fillMaxWidth().focusClickable(scaleOnFocus = false, onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

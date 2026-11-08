@@ -2,13 +2,16 @@ package ro.mixai.music.settings
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AccountCircle
@@ -31,6 +34,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import ro.mixai.mobile.ui.ProfileAvatar
@@ -51,6 +56,7 @@ import ro.mixai.music.BuildConfig
 import ro.mixai.music.MixaiMusicApp
 import ro.mixai.music.MusicGraph
 import ro.mixai.music.R
+import ro.mixai.music.ui.focusClickable
 import ro.mixai.tv.data.AccountSession
 import ro.mixai.tv.data.Connection
 
@@ -104,7 +110,7 @@ fun SettingsScreen(
                         headlineContent = { Text(p.name) },
                         leadingContent = { ProfileAvatar(p, 40.dp) },
                         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                        modifier = Modifier.clickable(onClick = onProfiles),
+                        modifier = Modifier.focusClickable(scaleOnFocus = false, onClick = onProfiles),
                     )
                 }
             }
@@ -131,36 +137,19 @@ fun SettingsScreen(
                 Row(Icons.Outlined.Tune, stringResource(R.string.settings_crossfade), crossfadeLabel(crossfade), onClick = { dialog = "crossfade" })
             }
             item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_automix)) },
-                    supportingContent = { Text(stringResource(R.string.settings_automix_hint)) },
-                    leadingContent = { Icon(Icons.Outlined.GraphicEq, contentDescription = null) },
-                    trailingContent = {
-                        Switch(checked = automix, enabled = crossfade > 0, onCheckedChange = { v -> scope.launch { app.musicSettings.setAutomix(v) } })
-                    },
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                    modifier = Modifier.clickable(enabled = crossfade > 0) { scope.launch { app.musicSettings.setAutomix(!automix) } },
-                )
+                ToggleRow(Icons.Outlined.GraphicEq, R.string.settings_automix, R.string.settings_automix_hint, automix, enabled = crossfade > 0) { v ->
+                    scope.launch { app.musicSettings.setAutomix(v) }
+                }
             }
             item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_normalize)) },
-                    supportingContent = { Text(stringResource(R.string.settings_normalize_hint)) },
-                    leadingContent = { Icon(Icons.Outlined.GraphicEq, contentDescription = null) },
-                    trailingContent = { Switch(checked = normalize, onCheckedChange = { v -> scope.launch { app.musicSettings.setNormalize(v) } }) },
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                    modifier = Modifier.clickable { scope.launch { app.musicSettings.setNormalize(!normalize) } },
-                )
+                ToggleRow(Icons.Outlined.GraphicEq, R.string.settings_normalize, R.string.settings_normalize_hint, normalize) { v ->
+                    scope.launch { app.musicSettings.setNormalize(v) }
+                }
             }
             item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_dl_wifi)) },
-                    supportingContent = { Text(stringResource(R.string.settings_dl_wifi_hint)) },
-                    leadingContent = { Icon(Icons.Outlined.Wifi, contentDescription = null) },
-                    trailingContent = { Switch(checked = wifiOnly, onCheckedChange = { v -> scope.launch { app.musicSettings.setWifiOnly(v) } }) },
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                    modifier = Modifier.clickable { scope.launch { app.musicSettings.setWifiOnly(!wifiOnly) } },
-                )
+                ToggleRow(Icons.Outlined.Wifi, R.string.settings_dl_wifi, R.string.settings_dl_wifi_hint, wifiOnly) { v ->
+                    scope.launch { app.musicSettings.setWifiOnly(v) }
+                }
             }
             item {
                 Row(Icons.AutoMirrored.Outlined.QueueMusic, stringResource(R.string.settings_dl_upcoming), upcomingLabel(upcoming), onClick = { dialog = "upcoming" })
@@ -251,7 +240,24 @@ private fun Row(icon: ImageVector, title: String, subtitle: String?, onClick: ((
         leadingContent = { Icon(icon, contentDescription = null) },
         trailingContent = trailing?.let { { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge) } },
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+        modifier = if (onClick != null) Modifier.focusClickable(scaleOnFocus = false, onClick = onClick) else Modifier,
+    )
+}
+
+/** Switch row = ONE focus stop (D-pad/TalkBack): the row is `toggleable`, the Switch only mirrors it. */
+@Composable
+private fun ToggleRow(icon: ImageVector, title: Int, hint: Int, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    val source = remember { MutableInteractionSource() }
+    val focused by source.collectIsFocusedAsState()
+    ListItem(
+        headlineContent = { Text(stringResource(title)) },
+        supportingContent = { Text(stringResource(hint)) },
+        leadingContent = { Icon(icon, contentDescription = null) },
+        trailingContent = { Switch(checked = checked, enabled = enabled, onCheckedChange = null) },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+        modifier = Modifier
+            .then(if (focused) Modifier.border(ro.mixai.mobile.theme.Tokens.FOCUS_RING_DP.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small) else Modifier)
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, interactionSource = source, indication = ripple(), onValueChange = onChange),
     )
 }
 
@@ -264,10 +270,10 @@ private fun ChoiceDialog(title: String, options: List<Pair<String, String>>, sel
             Column {
                 options.forEach { (key, label) ->
                     androidx.compose.foundation.layout.Row(
-                        Modifier.clickable { onPick(key) }.padding(vertical = 4.dp),
+                        Modifier.focusClickable(scaleOnFocus = false, role = Role.RadioButton) { onPick(key) }.padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(selected = key == selected, onClick = { onPick(key) })
+                        RadioButton(selected = key == selected, onClick = null)
                         Text(label)
                     }
                 }

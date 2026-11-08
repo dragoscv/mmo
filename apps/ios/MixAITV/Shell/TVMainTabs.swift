@@ -5,7 +5,7 @@ enum TVRoute: Hashable {
     case title(kind: MediaKind, tmdbId: Int)
 }
 
-/// Top tab bar (tvOS standard): Home, Library, Live TV, Search, Settings. Each tab owns a NavigationStack.
+/// Top tab bar (tvOS standard): Home, Library, Music, Live TV, Search, Settings. Each tab owns a NavigationStack.
 struct TVMainTabs: View {
     @Environment(TVModel.self) private var model
     @State private var tab = 0
@@ -14,6 +14,7 @@ struct TVMainTabs: View {
         TabView(selection: $tab) {
             Tab("tab.home", systemImage: "house", value: 0) { TVStack(consumesDeepLinks: true) { TVHomeView() } }
             Tab("tab.library", systemImage: "square.grid.2x2", value: 1) { TVStack { TVLibraryView() } }
+            Tab("tab.music", systemImage: "music.note", value: 5) { TVMusicTab() }
             Tab("tab.live", systemImage: "dot.radiowaves.left.and.right", value: 2) { TVStack { TVLiveView() } }
             Tab("tab.search", systemImage: "magnifyingglass", value: 3, role: .search) { TVStack { TVSearchView() } }
             Tab("settings.title", systemImage: "gearshape", value: 4) { TVStack { TVSettingsView() } }

@@ -33,6 +33,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -64,10 +65,12 @@ import ro.mixai.music.nav.MusicNavigator
 import ro.mixai.music.nav.Tab
 import ro.mixai.music.ui.AlbumScreen
 import ro.mixai.music.ui.ArtistScreen
+import ro.mixai.music.ui.LocalTvMode
 import ro.mixai.music.ui.MiniPlayer
 import ro.mixai.music.ui.MusicScreen
 import ro.mixai.music.ui.MusicSearchScreen
 import ro.mixai.music.ui.NowPlayingScreen
+import ro.mixai.music.ui.rememberIsTv
 import ro.mixai.music.settings.SettingsScreen
 import ro.mixai.tv.data.AccountSession
 import ro.mixai.tv.data.Connection
@@ -128,6 +131,11 @@ fun MusicRoot(app: MixaiMusicApp, conn: Connection, session: AccountSession, loc
                 graph.musicPlayback.playFromSearch(l.query, extras)
                 nav.resetTo(Dest.TabRoot(Tab.Home), Dest.NowPlaying)
             }
+            is Dest.PlayIds -> {
+                runCatching { graph.musicPlayback.playIds(l.ids, l.index, 0, null, null) }
+                    .onFailure { Log.w(TAG, "play ids: ${it.message}") }
+                nav.resetTo(Dest.TabRoot(Tab.Home), Dest.NowPlaying)
+            }
             else -> nav.resetTo(Dest.TabRoot(Tab.Home), l)
         }
         onLinkConsumed()
@@ -145,6 +153,7 @@ fun MusicRoot(app: MixaiMusicApp, conn: Connection, session: AccountSession, loc
     val current = nav.current
     val showChrome = graph != null && !current.isChromeless
     val music = graph?.musicPlayback?.state?.collectAsState()?.value
+    val tv = rememberIsTv()
 
     // "Download upcoming tracks" (setting, 0 = off): keep the next N queue tracks offline while playing.
     val upcoming by app.musicSettings.upcoming.collectAsState(initial = 0)
@@ -153,7 +162,9 @@ fun MusicRoot(app: MixaiMusicApp, conn: Connection, session: AccountSession, loc
         if (upcoming > 0 && s.track != null) MusicDownloads.prefetch(s.queue, s.index, upcoming)
     }
 
+    CompositionLocalProvider(LocalTvMode provides tv) {
     NavigationSuiteScaffold(
+        modifier = if (tv) Modifier.padding(horizontal = TV_OVERSCAN_H, vertical = TV_OVERSCAN_V) else Modifier,
         navigationSuiteItems = {
             TABS.forEach { t ->
                 val selected = nav.currentTab == t.tab
@@ -165,7 +176,11 @@ fun MusicRoot(app: MixaiMusicApp, conn: Connection, session: AccountSession, loc
                 )
             }
         },
-        layoutType = if (showChrome) NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo()) else NavigationSuiteType.None,
+        layoutType = when {
+            !showChrome -> NavigationSuiteType.None
+            tv -> NavigationSuiteType.NavigationRail // 10-foot: rail on the left, never a bottom bar
+            else -> NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
+        },
         containerColor = MaterialTheme.colorScheme.background,
     ) {
         Column(Modifier.fillMaxSize()) {
@@ -187,7 +202,12 @@ fun MusicRoot(app: MixaiMusicApp, conn: Connection, session: AccountSession, loc
             if (showChrome && graph != null && music?.isActive == true) MiniPlayer(graph, nav)
         }
     }
+    }
 }
+
+/** Google TV overscan-safe margins (same as MixAI TV `MixaiFocus`). */
+private val TV_OVERSCAN_H = 48.dp
+private val TV_OVERSCAN_V = 27.dp
 
 @Composable
 private fun Screen(
@@ -267,7 +287,7 @@ private fun Screen(
                 is Dest.Album -> AlbumScreen(g, nav, dest.id)
                 is Dest.Artist -> ArtistScreen(g, nav, dest.id)
                 Dest.NowPlaying -> NowPlayingScreen(g, nav)
-                Dest.Welcome, Dest.SignIn, Dest.Manual, is Dest.Discover, is Dest.Pair, is Dest.PlaySearch -> Unit
+                Dest.Welcome, Dest.SignIn, Dest.Manual, is Dest.Discover, is Dest.Pair, is Dest.PlaySearch, is Dest.PlayIds -> Unit
             }
         }
     }

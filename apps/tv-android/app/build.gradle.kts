@@ -33,8 +33,8 @@ android {
         applicationId = "ro.mixai.tv"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = versionCodeOverride ?: 13
-        versionName = "2.2.0"
+        versionCode = versionCodeOverride ?: 14
+        versionName = "2.3.0"
         buildConfigField("String", "MIXAI_ORIGIN", "\"$mixaiOrigin\"")
     }
 

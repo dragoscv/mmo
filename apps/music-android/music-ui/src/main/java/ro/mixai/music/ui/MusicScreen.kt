@@ -1,6 +1,5 @@
 package ro.mixai.music.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -184,7 +183,7 @@ private fun MusicHomeTab(deps: MusicDeps, nav: MusicNav, home: MusicHome, onPlay
                 SectionTitle(stringResource(R.string.music_row_playlists))
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(home.playlists.distinctBy { it.id }, key = { it.id }) { p ->
-                        Column(Modifier.size(width = 148.dp, height = 200.dp).clickable { onPlaylist(p) }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Column(Modifier.size(width = 148.dp, height = 200.dp).focusClickable { onPlaylist(p) }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Cover(deps.music.coverUrl(p), Modifier.size(148.dp), icon = Icons.AutoMirrored.Outlined.QueueMusic)
                             Text(p.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
@@ -256,7 +255,7 @@ private fun ArtistsTab(deps: MusicDeps, nav: MusicNav) {
                     supportingContent = { Text(stringResource(R.string.music_albums_count, a.albumCount.toInt())) },
                     leadingContent = { ArtistAvatar(deps.music.coverUrl(a), 48.dp) },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
-                    modifier = Modifier.clickable { nav.openArtist(a.id) },
+                    modifier = Modifier.focusClickable(scaleOnFocus = false) { nav.openArtist(a.id) },
                 )
             }
             if (loading) item { CenteredSpinner(Modifier.fillMaxWidth().height(64.dp)) }
@@ -336,7 +335,7 @@ private fun PlaylistsTab(deps: MusicDeps, playlists: List<PlaylistCard>, onPlayl
                 supportingContent = { Text(stringResource(R.string.music_tracks_duration, p.songCount.toInt(), fmtSec(p.durationSec))) },
                 leadingContent = { Cover(deps.music.coverUrl(p), Modifier.size(56.dp), icon = Icons.AutoMirrored.Outlined.QueueMusic) },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.clickable { onPlaylist(p) },
+                modifier = Modifier.focusClickable(scaleOnFocus = false) { onPlaylist(p) },
             )
         }
     }

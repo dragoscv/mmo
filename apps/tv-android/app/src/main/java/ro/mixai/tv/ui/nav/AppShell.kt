@@ -65,6 +65,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import ro.mixai.tv.R
+import ro.mixai.tv.data.MusicHandoff
 import ro.mixai.tv.data.MusicPlayback
 import ro.mixai.tv.data.MusicRepository
 import ro.mixai.tv.data.Settings
@@ -199,8 +200,11 @@ fun AppShell(
                         selected = i == currentIndex,
                         modifier = if (isCurrent) Modifier.focusRequester(railEntry) else Modifier,
                         onClick = {
-                            // Top-level destinations sit on top of Home so Back from them returns Home.
-                            if (!item.matches(route)) {
+                            // Music installed → hand off to MixAI Music (WP17-45); else built-in player.
+                            if (item.id == "music" && activity != null && MusicHandoff.openFromTv(activity, musicPlayback)) {
+                                // MixAI Music took over.
+                            } else if (!item.matches(route)) {
+                                // Top-level destinations sit on top of Home so Back from them returns Home.
                                 if (item.id == "home") nav.resetTo(Route.Home) else nav.resetTo(Route.Home, item.route)
                             }
                             runCatching { contentFocus.requestFocus() }

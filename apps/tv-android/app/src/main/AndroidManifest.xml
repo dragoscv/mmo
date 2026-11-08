@@ -24,6 +24,12 @@
         <package android:name="net.cme.voyo.ro.tvapp" />
         <package android:name="ro.antenaplay.app" />
         <package android:name="com.google.android.videos" />
+        <!-- MixAI Music handoff (WP17-45, data/MusicHandoff.kt). -->
+        <package android:name="ro.mixai.music" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="mixai-music" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />

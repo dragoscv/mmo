@@ -57,6 +57,8 @@ import kotlinx.serialization.json.longOrNull
 import okhttp3.Request
 import ro.mixai.tv.R
 import ro.mixai.tv.data.Http
+import androidx.compose.ui.platform.LocalContext
+import ro.mixai.tv.data.MusicHandoff
 import ro.mixai.tv.data.TmdbSize
 import ro.mixai.tv.data.generated.MediaStats
 import ro.mixai.tv.ui.components.ErrorState
@@ -149,6 +151,7 @@ internal fun subsonicTrackId(key: String): String? {
 @Composable
 fun StatsScreen(deps: ScreenDeps, nav: Navigator) {
     NoBackdrop()
+    val context = LocalContext.current
     val thisYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
     var year by rememberSaveable { mutableIntStateOf(thisYear) }
     var reload by remember { mutableIntStateOf(0) }
@@ -198,7 +201,9 @@ fun StatsScreen(deps: ScreenDeps, nav: Navigator) {
                     Text(stringResource(R.string.stats_empty_hint), style = MaterialTheme.typography.bodyMedium, color = Tokens.mutedForeground)
                     PrimaryButton(stringResource(R.string.wp16_nav_home), { nav.resetTo(Route.Home) })
                 }
-            } else StatsBody(s.stats, posters, tracks, nav)
+            } else StatsBody(s.stats, posters, tracks, nav) {
+                if (!MusicHandoff.openFromTv(context, deps.musicPlayback)) nav.push(Route.Music)
+            }
         }
     }
 }
@@ -220,7 +225,7 @@ private suspend fun fetchTrack(deps: ScreenDeps, id: String): TrackInfo? = withC
 private fun fmtHours(h: Double): String = if (h >= 10) String.format(Locale.ROOT, "%.0f", h) else String.format(Locale.ROOT, "%.1f", h)
 
 @Composable
-private fun StatsBody(s: YearStats, posters: Map<String, String?>, tracks: Map<String, TrackInfo?>, nav: Navigator) {
+private fun StatsBody(s: YearStats, posters: Map<String, String?>, tracks: Map<String, TrackInfo?>, nav: Navigator, openMusic: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         Row(Modifier.padding(horizontal = MixaiFocus.overscan), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             BigNumber(fmtHours(s.hours), stringResource(R.string.stats_hours), Tokens.chart1, Modifier.weight(1f))
@@ -290,7 +295,7 @@ private fun StatsBody(s: YearStats, posters: Map<String, String?>, tracks: Map<S
                             subtitle = listOfNotNull("#${i + 1}", info?.artist, stringResource(R.string.stats_plays, t.plays.toInt())).joinToString(" · "),
                             alwaysShowTitle = true,
                             width = 160.dp,
-                            onClick = { nav.push(Route.Music) },
+                            onClick = openMusic,
                         )
                     }
                 }

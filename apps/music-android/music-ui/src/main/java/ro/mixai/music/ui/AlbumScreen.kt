@@ -1,6 +1,5 @@
 package ro.mixai.music.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -114,7 +113,7 @@ fun AlbumScreen(deps: MusicDeps, nav: MusicNav, id: String) {
                             if (!artist.isNullOrBlank()) {
                                 Text(
                                     artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.clickable(enabled = !d.album.artistId.isNullOrBlank()) {
+                                    modifier = Modifier.focusClickable(enabled = !d.album.artistId.isNullOrBlank(), scaleOnFocus = false) {
                                         d.album.artistId?.let { nav.openArtist(it) }
                                     },
                                 )
@@ -217,7 +216,7 @@ fun ArtistScreen(deps: MusicDeps, nav: MusicNav, id: String) {
                         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             items(d.similar.distinctBy { it.id }, key = { it.id }) { s ->
                                 Column(
-                                    Modifier.widthIn(max = 96.dp).clickable { nav.openArtist(s.id) },
+                                    Modifier.widthIn(max = 96.dp).focusClickable { nav.openArtist(s.id) },
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {

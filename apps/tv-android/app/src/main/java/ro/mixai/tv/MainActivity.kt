@@ -38,6 +38,7 @@ import ro.mixai.tv.data.LiveTvRepository
 import ro.mixai.tv.data.MediaRef
 import ro.mixai.tv.data.MediaRepository
 import ro.mixai.tv.data.MmoApi
+import ro.mixai.tv.data.MusicHandoff
 import ro.mixai.tv.data.MusicPlayback
 import ro.mixai.tv.data.MusicRepository
 import ro.mixai.tv.data.PlayerBus
@@ -281,7 +282,7 @@ private fun App(
     // Remote control from the hub (phone/web → this TV).
     LaunchedEffect(deps) {
         val d = deps ?: return@LaunchedEffect
-        d.hub.incomingCommands.collect { cmd -> handleHubCommand(d, nav, cmd, scope) }
+        d.hub.incomingCommands.collect { cmd -> handleHubCommand(context, d, nav, cmd, scope) }
     }
 
     // Reduced motion: the active profile's choice, else Android's animator scale (read per launch).
@@ -424,7 +425,7 @@ private fun playMusicQueue(d: ScreenDeps, nav: Navigator, cmd: HubCommand, ids: 
  * previous, text, navigate. Transport goes to the on-screen player (PlayerBus) or, when only
  * music is playing, to background music. Every command is acked.
  */
-private fun handleHubCommand(d: ScreenDeps, nav: Navigator, cmd: HubCommand, scope: CoroutineScope) {
+private fun handleHubCommand(context: Context, d: ScreenDeps, nav: Navigator, cmd: HubCommand, scope: CoroutineScope) {
     val hub = d.hub
     val music = d.musicPlayback
     val musicActive = music.state.value.isActive
@@ -489,6 +490,7 @@ private fun handleHubCommand(d: ScreenDeps, nav: Navigator, cmd: HubCommand, sco
                 else -> null
             }
             if (target == null) hub.ack(cmd.seq, false, "unknown_target")
+            else if (target == Route.Music && MusicHandoff.openFromTv(context, d.musicPlayback)) hub.ack(cmd.seq, true)
             else {
                 if (target == Route.Home) nav.resetTo(Route.Home) else nav.resetTo(Route.Home, target)
                 hub.ack(cmd.seq, true)

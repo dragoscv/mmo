@@ -29,9 +29,12 @@ final class TVModel {
     var playing: TVPlayRequest?
     /// Deep link (Top Shelf, `mixai://title/...`) consumed by the Home tab's NavigationStack.
     var pendingRoute: TVRoute?
+    /// Built-in music player of the Music tab (WP17-45).
+    let musicPlayer = TVMusicPlayer()
 
     var profileId: String { activeProfile?.id ?? "default" }
     var media: MediaStore? { client.map { MediaStore(client: $0, profile: profileId) } }
+    var music: MusicStore? { client.map { MusicStore(client: $0, profile: profileId) } }
     var liveTv: LiveTvStore? { client.map { LiveTvStore(client: $0, profile: profileId) } }
     var lang: String { Locale.preferredLanguages.first.map { String($0.prefix(2)) } ?? "en" }
 
@@ -86,6 +89,7 @@ final class TVModel {
 
     func disconnect() {
         if let s = server { TVKeychain.delete("device-token:\(MmoClient.normalise(s.baseURL))") }
+        musicPlayer.stop()
         TVPrefs.server = nil
         TVPrefs.savedProfile = SavedProfile()
         playing = nil
@@ -108,10 +112,12 @@ final class TVModel {
     }
 
     func play(_ t: PlayTarget, title: String, subtitle: String?) {
+        musicPlayer.pause() // video takes over the audio
         playing = TVPlayRequest(source: .file(fileId: t.fileId, ref: t.ref, startSec: t.resumeSec ?? 0), title: title, subtitle: subtitle)
     }
 
     func playLive(_ channel: LiveTvChannel) {
+        musicPlayer.pause()
         playing = TVPlayRequest(source: .live(channelId: channel.id), title: channel.name, subtitle: nil)
     }
 }

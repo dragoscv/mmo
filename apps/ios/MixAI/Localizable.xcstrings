@@ -3078,6 +3078,23 @@
         }
       }
     },
+    "music.pause": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pauză"
+          }
+        }
+      }
+    },
     "music.no_artists": {
       "extractionState": "manual",
       "localizations": {

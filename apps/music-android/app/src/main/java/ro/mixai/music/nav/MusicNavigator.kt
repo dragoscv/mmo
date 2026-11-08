@@ -24,6 +24,8 @@ sealed interface Dest {
     data object NowPlaying : Dest
     /** Voice / Assistant request (`MEDIA_PLAY_FROM_SEARCH`, `mixai-music://play?q=`); blank = a mix. Opens Now Playing. */
     data class PlaySearch(val query: String, val focus: String? = null, val artist: String? = null, val album: String? = null) : Dest
+    /** `mixai-music://play?ids=a,b&index=n` (TV / desktop handoff): play these tracks, then Now Playing. */
+    data class PlayIds(val ids: List<String>, val index: Int = 0) : Dest
 
     /** Onboarding / full-screen destinations hide the bottom bar and the mini player. */
     val isChromeless: Boolean
@@ -68,17 +70,28 @@ class MusicNavigator(start: Dest) : MusicNav {
     override fun back() { pop() }
 
     companion object {
-        /** `mixai-music://album/<id>` | `artist/<id>` | `now-playing` → destination on top of Home. */
+        /**
+         * Canonical `mixai-music://` set (WP17-45; iOS `MusicDeepLink`, desktop `links.rs`): `album/<id>`, `artist/<id>`,
+         * `now-playing` | `nowplaying`, `search[?q=]`, `downloads`, `mix`, `play?ids=a,b&index=n` (ids win), `play?q=`
+         * (blank = mix).
+         */
         fun parseLink(scheme: String?, host: String?, segments: List<String>, query: (String) -> String? = { null }): Dest? {
             if (scheme != "mixai-music") return null
             val id = segments.firstOrNull()?.takeIf { it.isNotBlank() }
-            return when (host) {
+            return when (host?.lowercase()) {
+                "home" -> Dest.TabRoot(Tab.Home)
                 "album" -> id?.let { Dest.Album(it) }
                 "artist" -> id?.let { Dest.Artist(it) }
-                "now-playing" -> Dest.NowPlaying
+                "now-playing", "nowplaying" -> Dest.NowPlaying
                 "search" -> Dest.TabRoot(Tab.Search)
                 "downloads" -> Dest.TabRoot(Tab.Downloads)
-                "play" -> Dest.PlaySearch(query("q").orEmpty())
+                "mix" -> Dest.PlaySearch("")
+                "play" -> {
+                    val ids = query("ids").orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }.take(500)
+                    if (ids.isNotEmpty()) {
+                        Dest.PlayIds(ids, (query("index")?.toIntOrNull() ?: 0).coerceIn(0, ids.lastIndex))
+                    } else Dest.PlaySearch(query("q").orEmpty())
+                }
                 else -> null
             }
         }

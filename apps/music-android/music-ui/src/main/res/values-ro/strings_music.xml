@@ -46,6 +46,8 @@
     <string name="music_lyrics_error">Versurile nu au putut fi încărcate.</string>
     <string name="music_search_hint">Artiști, albume, piese</string>
     <string name="music_search_clear">Șterge căutarea</string>
+    <string name="music_search_voice">Caută vocal</string>
+    <string name="music_seek_bar">Poziția redării. Stânga și dreapta derulează 10 secunde</string>
     <string name="music_search_title">Caută în muzica ta</string>
     <string name="music_search_prompt">Scrie cel puțin două litere.</string>
     <string name="music_search_none">Nimic găsit pentru „%1$s”</string>

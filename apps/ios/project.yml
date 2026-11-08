@@ -197,6 +197,7 @@ targets:
     dependencies:
       - package: MixaiCore
       - sdk: AVKit.framework
+      - sdk: MediaPlayer.framework
       - sdk: Network.framework
     info:
       path: MixAITV/Info.plist

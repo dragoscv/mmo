@@ -40,7 +40,7 @@ pub fn web_path(link: &str) -> Option<String> {
         .unwrap_or_default();
     let id = seg.first().map(String::as_str).filter(|s| !s.is_empty());
     match host.as_str() {
-        "" => Some("/media/music".into()),
+        "" | "home" => Some("/media/music".into()),
         "album" => id.map(|i| format!("/media/music/album/{}", enc(i))),
         "artist" => id.map(|i| format!("/media/music/artist/{}", enc(i))),
         "now-playing" | "nowplaying" => Some("/media/music/now-playing".into()),
@@ -83,6 +83,7 @@ mod tests {
     #[test]
     fn maps_the_canonical_set() {
         assert_eq!(web_path("mixai-music://album/al_7").as_deref(), Some("/media/music/album/al_7"));
+        assert_eq!(web_path("mixai-music://home").as_deref(), Some("/media/music"));
         assert_eq!(web_path("mixai-music://artist/ar%201").as_deref(), Some("/media/music/artist/ar%201"));
         assert_eq!(web_path("mixai-music://now-playing").as_deref(), Some("/media/music/now-playing"));
         assert_eq!(web_path("mixai-music://nowplaying").as_deref(), Some("/media/music/now-playing"));

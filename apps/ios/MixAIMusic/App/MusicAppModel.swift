@@ -266,29 +266,34 @@ final class MusicAppModel {
         Task { await h.reportState(playing: playing, positionSec: pos, durationSec: t.durationSec, media: media) }
     }
 
-    // MARK: deep links (`mixai-music://album/<id>`, `artist/<id>`, `nowplaying`, `mix`, `downloads`)
+    // MARK: deep links — canonical set in MixaiCore `MusicDeepLink` (shared with Android + desktop, WP17-45)
 
     func handle(url: URL) {
-        guard url.scheme == "mixai-music" else { return }
-        let parts = url.pathComponents.filter { $0 != "/" }
-        switch url.host {
-        case "album": if let id = parts.first { selectedTab = 0; pendingRoute = .album(id) }
-        case "artist": if let id = parts.first { selectedTab = 0; pendingRoute = .artist(id) }
-        case "nowplaying": if player.current != nil { player.showNowPlaying = true }
-        case "downloads": selectedTab = 2
-        case "mix": if let s = env.store { Task { await player.startMix(store: s) } }
-        case "play":
-            // From MixAI TV / web: `mixai-music://play?ids=tr_1,tr_2&index=0`.
-            let q = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
-            let ids = q.first { $0.name == "ids" }?.value?.split(separator: ",").map(String.init) ?? []
-            let index = Int(q.first { $0.name == "index" }?.value ?? "0") ?? 0
-            if !ids.isEmpty, let s = env.store {
+        guard let link = MusicDeepLink.parse(url) else { return }
+        switch link {
+        case .home: selectedTab = 0
+        case .album(let id): selectedTab = 0; pendingRoute = .album(id)
+        case .artist(let id): selectedTab = 0; pendingRoute = .artist(id)
+        case .nowPlaying: if player.current != nil { player.showNowPlaying = true }
+        case .downloads: selectedTab = 2
+        case .search: selectedTab = 3
+        case .mix: if let s = env.store { Task { await player.startMix(store: s) } }
+        case .playIds(let ids, let index):
+            if let s = env.store {
                 Task {
                     let tracks = (try? await s.tracks(ids: ids)) ?? []
                     if !tracks.isEmpty { player.play(tracks, at: min(index, tracks.count - 1), store: s); player.showNowPlaying = true }
                 }
             }
-        default: break
+        case .playQuery(let q):
+            // Voice / handoff "play X": best track hit plays with the rest of the hits queued; no hit → mix.
+            if let s = env.store {
+                Task {
+                    let tracks = (try? await s.search(q))?.tracks ?? []
+                    if tracks.isEmpty { await player.startMix(store: s) } else { player.play(tracks, at: 0, store: s) }
+                    player.showNowPlaying = true
+                }
+            }
         }
     }
 }

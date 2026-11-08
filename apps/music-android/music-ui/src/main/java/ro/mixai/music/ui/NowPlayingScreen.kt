@@ -1,7 +1,10 @@
 package ro.mixai.music.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -59,7 +62,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -145,13 +160,13 @@ private fun TrackInfo(nav: MusicNav, state: MusicState, modifier: Modifier) {
         t.artist?.let { a ->
             Text(
                 a, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable(enabled = !t.artistId.isNullOrBlank()) { t.artistId?.let { nav.openArtist(it) } },
+                modifier = Modifier.focusClickable(enabled = !t.artistId.isNullOrBlank(), scaleOnFocus = false) { t.artistId?.let { nav.openArtist(it) } },
             )
         }
         t.album?.let { al ->
             Text(
                 al, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable(enabled = t.albumId.isNotBlank()) { nav.openAlbum(t.albumId) },
+                modifier = Modifier.focusClickable(enabled = t.albumId.isNotBlank(), scaleOnFocus = false) { nav.openAlbum(t.albumId) },
             )
         }
     }
@@ -164,14 +179,21 @@ private fun PlayerControls(deps: MusicDeps, state: MusicState) {
     var dragValue by remember { mutableFloatStateOf(0f) }
     val dur = state.durationMs.coerceAtLeast(1L).toFloat()
     val pos = if (dragging) dragValue else state.positionMs.toFloat().coerceIn(0f, dur)
+    val tv = LocalTvMode.current
+    val playFocus = remember { FocusRequester() }
+    if (tv) LaunchedEffect(Unit) { runCatching { playFocus.requestFocus() } }
     Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-        Slider(
-            value = pos,
-            onValueChange = { dragging = true; dragValue = it },
-            onValueChangeFinished = { pb.seek(dragValue.toLong()); dragging = false },
-            valueRange = 0f..dur,
-            enabled = state.durationMs > 0,
-        )
+        if (tv) {
+            TvSeekBar(state.positionMs, state.durationMs, onSeek = { pb.seek(it) })
+        } else {
+            Slider(
+                value = pos,
+                onValueChange = { dragging = true; dragValue = it },
+                onValueChangeFinished = { pb.seek(dragValue.toLong()); dragging = false },
+                valueRange = 0f..dur,
+                enabled = state.durationMs > 0,
+            )
+        }
         Row(Modifier.fillMaxWidth()) {
             Text(fmtDuration(pos.toLong()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
@@ -187,7 +209,7 @@ private fun PlayerControls(deps: MusicDeps, state: MusicState) {
             IconButton(onClick = { pb.prev() }) {
                 Icon(Icons.Outlined.SkipPrevious, contentDescription = stringResource(R.string.music_previous), modifier = Modifier.size(32.dp))
             }
-            FilledIconButton(onClick = { pb.toggle() }, modifier = Modifier.size(72.dp)) {
+            FilledIconButton(onClick = { pb.toggle() }, modifier = Modifier.size(72.dp).focusRequester(playFocus)) {
                 if (state.buffering && !state.playing) {
                     CircularProgressIndicator(Modifier.size(28.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 3.dp)
                 } else {
@@ -215,6 +237,46 @@ private fun PlayerControls(deps: MusicDeps, state: MusicState) {
         ro.mixai.music.ui.output.OutputStatus(deps)
     }
 }
+
+/** D-pad seek bar (TV): focusable progress line; Left/Right seek ∓/± [TV_SEEK_STEP_MS], Up/Down move focus on. */
+@Composable
+private fun TvSeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) {
+    val source = remember { MutableInteractionSource() }
+    val focused by source.collectIsFocusedAsState()
+    val label = stringResource(R.string.music_seek_bar)
+    val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(32.dp)
+            .onPreviewKeyEvent { e ->
+                if (e.type != KeyEventType.KeyDown || durationMs <= 0) return@onPreviewKeyEvent false
+                when (e.key) {
+                    Key.DirectionLeft -> { onSeek(tvSeekTarget(positionMs, durationMs, -1)); true }
+                    Key.DirectionRight -> { onSeek(tvSeekTarget(positionMs, durationMs, +1)); true }
+                    else -> false
+                }
+            }
+            .focusable(enabled = durationMs > 0, interactionSource = source)
+            .semantics { contentDescription = label; progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f) },
+        contentAlignment = Alignment.Center,
+    ) {
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier.fillMaxWidth().height(if (focused) 8.dp else 4.dp)
+                .then(if (focused) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.extraSmall) else Modifier),
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            drawStopIndicator = {},
+            gapSize = 0.dp,
+        )
+    }
+}
+
+internal const val TV_SEEK_STEP_MS = 10_000L
+
+/** Target of one D-pad seek step, clamped to [0, duration - 1 s]. */
+internal fun tvSeekTarget(positionMs: Long, durationMs: Long, direction: Int): Long =
+    (positionMs + direction * TV_SEEK_STEP_MS).coerceIn(0L, (durationMs - 1_000L).coerceAtLeast(0L))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -267,16 +329,21 @@ private fun LyricsPanel(deps: MusicDeps, state: MusicState) {
 private fun SyncedLyrics(lines: List<LyricLine>, positionMs: Long, onSeek: (Long) -> Unit) {
     val listState: LazyListState = rememberLazyListState()
     val active = remember(lines, positionMs) { lines.indexOfLast { it.timeMs <= positionMs }.coerceAtLeast(0) }
+    var browsing by remember { mutableStateOf(false) } // D-pad focus inside the lyrics: do not yank the list
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Top padding = a third of the viewport, so scrolling the active line to index 0 parks it there.
-        LaunchedEffect(active) { listState.animateScrollToItem(active) }
-        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = maxHeight / 3, bottom = maxHeight / 2)) {
+        LaunchedEffect(active, browsing) { if (!browsing) listState.animateScrollToItem(active) }
+        LazyColumn(
+            Modifier.fillMaxSize().onFocusChanged { browsing = it.hasFocus },
+            state = listState,
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = maxHeight / 3, bottom = maxHeight / 2),
+        ) {
             itemsIndexed(lines, key = { i, _ -> i }) { i, line ->
                 val isActive = i == active
                 val plain = remember(line.text) { Karaoke.plainText(line.text) }
                 val style = if (isActive) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium
                 val weight = if (isActive) FontWeight.Bold else FontWeight.Normal
-                val rowModifier = Modifier.fillMaxWidth().clickable { onSeek(line.timeMs) }.padding(vertical = 8.dp)
+                val rowModifier = Modifier.fillMaxWidth().focusClickable(scaleOnFocus = false) { onSeek(line.timeMs) }.padding(vertical = 8.dp)
                 if (isActive && Karaoke.hasWordTiming(line.text)) {
                     val nextStart = lines.getOrNull(i + 1)?.timeMs
                     val words = remember(line.text, line.timeMs, nextStart) { Karaoke.parse(line.text, line.timeMs, nextStart) }
@@ -334,7 +401,7 @@ fun MiniPlayer(deps: MusicDeps, nav: MusicNav) {
                 gapSize = 0.dp,
             )
             Row(
-                Modifier.fillMaxSize().clickable(onClickLabel = openLabel) { nav.openNowPlaying() }.padding(horizontal = 12.dp),
+                Modifier.fillMaxSize().focusClickable(onClickLabel = openLabel, scaleOnFocus = false) { nav.openNowPlaying() }.padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {

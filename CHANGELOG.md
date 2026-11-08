@@ -10,6 +10,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## 2026-11-08 — MixAI Music on Google TV (Android 0.3.0), MixAI TV Android 2.3.0, Music tab on Apple TV
+
+- **MixAI TV → MixAI Music handoff (Android TV / Google TV):** the Music rail, the hub "navigate music" command and
+  the Your Year top tracks open MixAI Music when it is installed; the built-in queue moves over
+  (`mixai-music://play?ids=&index=`) and the built-in player stops. Without Music the built-in player stays.
+- **MixAI Music Android 0.3.0 is also a Google TV app:** launcher banner + LEANBACK launcher, side rail and
+  overscan margins on TV, visible focus (accent ring + 1.06 scale) on every tile, row and link, a D-pad seek bar
+  (left/right = 10 s) on Now Playing with initial focus on Play, synced lyrics stop auto-scrolling while you browse
+  them, one focus stop per settings switch, search moves focus to the results, voice search (remote mic / Assistant).
+- **One `mixai-music://` link set** on Android, iPhone and desktop: `home`, `album/<id>`, `artist/<id>`,
+  `now-playing` | `nowplaying`, `search[?q=]`, `downloads`, `mix`, `play?ids=a,b&index=n` (ids win, index clamped),
+  `play?q=` (iPhone: best search hits, no hit → mix). iOS parser shared in MixaiCore (`MusicDeepLink`).
+- **MixAI TV on Apple TV: Music tab** — Start a mix, recent / newest / most played / playlists / discover rows,
+  album, artist (top tracks, radio, similar) and playlist pages, Now Playing with synced lyrics and the queue,
+  Siri Remote + Control Center controls; video playback pauses the music. Tizen / webOS keep their built-in player.
+
 ## 2026-11-08 — MixAI Music desktop 0.1.0 (ro.mixai.music.desktop), web 3.2.8, design-tokens 1.2.3
 
 - **MixAI Music for Windows, macOS and Linux (new `apps/music-desktop`, Tauri 2):** desktop window for music.mixai.ro

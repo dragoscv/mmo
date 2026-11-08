@@ -1,6 +1,5 @@
 package ro.mixai.music.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,6 +33,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -57,6 +59,8 @@ fun MusicSearchScreen(deps: MusicDeps, nav: MusicNav, header: @Composable () -> 
     var attempt by remember { mutableIntStateOf(0) }
     val keyboard = LocalSoftwareKeyboardController.current
     val askNotif = rememberNotificationPermissionRequester()
+    val focus = LocalFocusManager.current
+    val voice = rememberVoiceSearch { query = it }
 
     LaunchedEffect(query, attempt) {
         val q = query.trim()
@@ -75,13 +79,20 @@ fun MusicSearchScreen(deps: MusicDeps, nav: MusicNav, header: @Composable () -> 
             placeholder = { Text(stringResource(R.string.music_search_hint)) },
             leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
             trailingIcon = {
-                if (query.isNotEmpty()) IconButton(onClick = { query = "" }) {
-                    Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.music_search_clear))
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { query = "" }) {
+                        Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.music_search_clear))
+                    }
+                } else if (voice != null) {
+                    IconButton(onClick = voice) {
+                        Icon(Icons.Outlined.Mic, contentDescription = stringResource(R.string.music_search_voice))
+                    }
                 }
             },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+            // Hide the IME and move focus down to the results (a D-pad cannot leave a focused field otherwise).
+            keyboardActions = KeyboardActions(onSearch = { keyboard?.hide(); focus.moveFocus(FocusDirection.Down) }),
         )
         val r = result
         when {
@@ -96,7 +107,7 @@ fun MusicSearchScreen(deps: MusicDeps, nav: MusicNav, header: @Composable () -> 
                     item {
                         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             items(r.artists.distinctBy { it.id }, key = { it.id }) { a ->
-                                Column(Modifier.clickable { nav.openArtist(a.id) }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Column(Modifier.focusClickable { nav.openArtist(a.id) }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     ArtistAvatar(deps.music.coverUrl(a), 88.dp)
                                     Text(a.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
                                 }

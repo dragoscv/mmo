@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV / Google TV launcher banner (320x180 dp, WP17-45): the MixAI Music note + a tinted panel. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path android:fillColor="@color/bg" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="@color/accent" android:pathData="M0,0h320v180h-320z" android:fillAlpha="0.18" />
+    <group android:translateX="106" android:translateY="36" android:scaleX="1.0" android:scaleY="1.0">
+        <path android:fillColor="@color/accent" android:pathData="M48,32 L72,28 L72,36 L52,39.3 L52,32.6 Z" />
+        <path android:fillColor="@color/accent2" android:pathData="M48,32.6 L52,32 L52,68 C52,74 46.6,78 41,78 C36,78 33,75.3 33,71.5 C33,66.6 38,63 43.4,63 C45.2,63 46.8,63.4 48,64 Z" />
+        <path android:fillColor="@color/accent2" android:pathData="M68,30 L72,29.3 L72,62 C72,68 66.6,72 61,72 C56,72 53,69.3 53,65.5 C53,60.6 58,57 63.4,57 C65.2,57 66.8,57.4 68,58 Z" />
+    </group>
+    <path android:fillColor="@color/accent2" android:pathData="M110,150 h100 v5 h-100z" />
+</vector>
