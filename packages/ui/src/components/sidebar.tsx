@@ -172,7 +172,7 @@ export function SidebarGroupLabel({ className, ...props }: React.ComponentProps<
     <div
       data-slot="sidebar-group-label"
       className={cn(
-        "flex h-8 shrink-0 items-center px-2 text-xs font-medium text-sidebar-foreground/60 transition-opacity duration-(--dur-fast) group-data-[collapsed]/sidebar:h-2 group-data-[collapsed]/sidebar:overflow-hidden group-data-[collapsed]/sidebar:opacity-0",
+        "flex h-8 shrink-0 items-center px-2 text-xs font-medium text-muted-foreground transition-opacity duration-(--dur-fast) group-data-[collapsed]/sidebar:h-2 group-data-[collapsed]/sidebar:overflow-hidden group-data-[collapsed]/sidebar:opacity-0",
         className,
       )}
       {...props}

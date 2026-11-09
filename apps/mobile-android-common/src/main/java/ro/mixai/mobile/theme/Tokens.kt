@@ -79,7 +79,7 @@ object TokensLight {
     val cardForeground = Color(0xFF0C0C16)
     val popover = Color(0xFFFFFFFF)
     val popoverForeground = Color(0xFF0C0C16)
-    val primary = Color(0xFF7F6AFC)
+    val primary = Color(0xFF664CDD)
     val primaryForeground = Color(0xFFFCFCFC)
     val secondary = Color(0xFFF3F3F7)
     val secondaryForeground = Color(0xFF171721)

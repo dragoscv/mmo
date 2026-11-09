@@ -148,7 +148,7 @@ export const ROLES: Record<"light" | "dark", Record<RoleName, Oklch>> = {
     "card-foreground": { l: 0.16, c: 0.02, h: neutralHue },
     popover: { l: 1, c: 0, h: neutralHue },
     "popover-foreground": { l: 0.16, c: 0.02, h: neutralHue },
-    primary: { l: 0.62, c: 0.21, h: "accent" },
+    primary: { l: 0.53, c: 0.21, h: "accent" }, // WCAG AA: white text 5.6:1, violet text on bg 5.6:1 (was 0.62 = 3.8:1)
     "primary-foreground": { l: 0.99, c: 0, h: neutralHue },
     secondary: { l: 0.965, c: 0.006, h: neutralHue },
     "secondary-foreground": { l: 0.21, c: 0.02, h: neutralHue },

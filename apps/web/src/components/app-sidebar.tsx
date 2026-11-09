@@ -147,9 +147,9 @@ function SidebarBody({ onOpenSearch, onOpenLegend }: { onOpenSearch: () => void;
                 {!collapsed && (
                     <div className="flex min-w-0 flex-col leading-tight">
                         <span className="overflow-hidden font-heading text-[15px] font-bold tracking-tight whitespace-nowrap text-sidebar-foreground">
-                            Mix<span className="text-gradient-accent">AI</span> <span className="font-medium text-sidebar-foreground/70">Studio</span>
+                            Mix<span className="text-gradient-accent">AI</span> <span className="font-medium text-muted-foreground">Studio</span>
                         </span>
-                        <span className="text-[10px] whitespace-nowrap text-sidebar-foreground/40">
+                        <span className="text-[10px] whitespace-nowrap text-muted-foreground">
                             v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
                         </span>
                     </div>
@@ -162,7 +162,7 @@ function SidebarBody({ onOpenSearch, onOpenLegend }: { onOpenSearch: () => void;
                     type="button"
                     onClick={onOpenSearch}
                     className={cn(
-                        "flex w-full cursor-pointer items-center rounded-lg border border-sidebar-border/50 bg-sidebar-accent/30 text-sidebar-foreground/50 transition-colors duration-(--dur-fast) hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground/80 focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none",
+                        "flex w-full cursor-pointer items-center rounded-lg border border-sidebar-border/50 bg-sidebar-accent/30 text-muted-foreground transition-colors duration-(--dur-fast) hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none",
                         collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-2 text-sm"
                     )}
                     title={collapsed ? `${t("searchPlaceholder")} (⌘K)` : undefined}
@@ -374,7 +374,7 @@ function DrilledView(props: {
                     type="button"
                     onClick={onBack}
                     className={cn(
-                        "flex cursor-pointer items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors duration-(--dur-fast) hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none",
+                        "flex cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors duration-(--dur-fast) hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none",
                         collapsed ? "size-9" : "size-8"
                     )}
                     title={`${t("back")} (Esc)`}
@@ -465,7 +465,7 @@ function LeafRow(props: {
                 label={label}
                 onClick={onClick}
                 className={cn(
-                    "relative font-medium text-sidebar-foreground/60",
+                    "relative font-medium text-muted-foreground",
                     "data-[active]:bg-sidebar-accent data-[active]:text-sidebar-primary data-[active]:[&_svg]:text-sidebar-primary"
                 )}
             >
@@ -518,7 +518,7 @@ function ParentRow(props: {
                 active={isActive}
                 icon={<ParentChip parent={parent} size="sm" muted={!isActive} />}
                 label={label}
-                className="relative font-medium text-sidebar-foreground/60 data-[active]:bg-sidebar-accent data-[active]:text-sidebar-primary"
+                className="relative font-medium text-muted-foreground data-[active]:bg-sidebar-accent data-[active]:text-sidebar-primary"
             >
                 {isActive && <ActiveBar />}
                 {!collapsed && <ChevronRight className="size-3.5 opacity-50" aria-hidden />}
@@ -553,7 +553,7 @@ function ParentRow(props: {
                                         "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors duration-(--dur-fast)",
                                         active
                                             ? "bg-sidebar-accent text-sidebar-primary"
-                                            : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                                            : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
                                     )}
                                 >
                                     <leaf.icon className="size-3.5 shrink-0" aria-hidden />
@@ -615,7 +615,7 @@ function RecentProjects({ parentKey }: { parentKey: string }) {
         <SidebarGroup className="mt-4 border-t border-sidebar-border/50 pt-3">
             <SidebarGroupLabel className="uppercase tracking-wider text-[.65rem]">{t("recentProjects")}</SidebarGroupLabel>
             {items.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-sidebar-foreground/40 italic">{t("noRecentProjects")}</p>
+                <p className="px-3 py-2 text-xs text-muted-foreground italic">{t("noRecentProjects")}</p>
             ) : (
                 <SidebarMenu>
                     {items.map((p) => (
@@ -624,7 +624,7 @@ function RecentProjects({ parentKey }: { parentKey: string }) {
                                 render={<Link href={p.href} />}
                                 icon={<span className="size-1.5 rounded-full bg-sidebar-foreground/40" aria-hidden />}
                                 label={p.name}
-                                className="h-8 text-sidebar-foreground/60"
+                                className="h-8 text-muted-foreground"
                             />
                         </SidebarMenuItem>
                     ))}

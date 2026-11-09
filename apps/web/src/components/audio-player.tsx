@@ -136,9 +136,9 @@ export function AudioPlayer() {
                             </div>
                             <div className="text-left">
                                 <p className="text-xs font-medium group-hover:text-primary transition-colors">Now Playing</p>
-                                <p className="text-[10px] text-muted-foreground/60">No track loaded · Press N to open</p>
+                                <p className="text-[10px] text-muted-foreground">No track loaded · Press N to open</p>
                             </div>
-                            <ChevronUp className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors ml-1" />
+                            <ChevronUp className="h-4 w-4 text-muted-foreground group-hover:text-sidebar-foreground transition-colors ml-1" />
                         </button>
                     </div>
                 </div>
@@ -351,7 +351,7 @@ export function AudioPlayer() {
                             </m.div>
                             </AnimatePresence>
 
-                            <ChevronUp className="h-4 w-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 group-hover:text-muted-foreground transition-all duration-200 shrink-0" />
+                            <ChevronUp className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-muted-foreground transition-all duration-200 shrink-0" />
                         </button>
 
                         {/* ─── Center – Controls ──────────────────────────────── */}
@@ -646,7 +646,7 @@ function VideoNowPlayingBar() {
                         <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors">{v.title}</p>
                             {v.subtitle && <p className="text-[10px] text-muted-foreground truncate">{v.subtitle}</p>}
-                            <p className="text-[10px] text-muted-foreground/60 font-mono">
+                            <p className="text-[10px] text-muted-foreground font-mono">
                                 {formatDuration(player.videoCurrentTime)} / {formatDuration(player.videoDuration || (v.durationSec ?? 0))}
                             </p>
                         </div>

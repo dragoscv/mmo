@@ -58,7 +58,7 @@ export function UserCard({ collapsed }: UserCardProps) {
                 <button
                     onClick={() => setLoginOpen(true)}
                     className={cn(
-                        "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground/70 transition-all duration-200 w-full cursor-pointer",
+                        "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-200 w-full cursor-pointer",
                         collapsed && "justify-center px-2"
                     )}
                     title={collapsed ? "Sign In" : undefined}
@@ -108,12 +108,12 @@ export function UserCard({ collapsed }: UserCardProps) {
                             <p className="text-[13px] font-medium text-sidebar-foreground/80 truncate leading-tight">
                                 {session.user.name}
                             </p>
-                            <p className="text-[11px] text-sidebar-foreground/30 truncate leading-tight">
+                            <p className="text-[11px] text-muted-foreground truncate leading-tight">
                                 {session.user.email}
                             </p>
                         </div>
                         <ChevronUp className={cn(
-                            "h-3.5 w-3.5 shrink-0 text-sidebar-foreground/30 transition-transform duration-200",
+                            "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200",
                             menuOpen && "rotate-180"
                         )} />
                     </>
@@ -137,7 +137,7 @@ export function UserCard({ collapsed }: UserCardProps) {
                         <Link
                             href="/profile"
                             onClick={() => setMenuOpen(false)}
-                            className="flex items-center gap-2.5 px-3 py-2 text-sm text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+                            className="flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
                         >
                             <User className="h-3.5 w-3.5" />
                             Profile
@@ -147,7 +147,7 @@ export function UserCard({ collapsed }: UserCardProps) {
 
                         {/* Theme switcher */}
                         <div className="px-3 py-2">
-                            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-sidebar-foreground/40 mb-1.5">
+                            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
                                 <Palette className="h-3 w-3" />
                                 Theme
                             </div>
@@ -178,7 +178,7 @@ export function UserCard({ collapsed }: UserCardProps) {
 
                         {/* Locale switcher */}
                         <div className="px-3 py-2">
-                            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-sidebar-foreground/40 mb-1.5">
+                            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
                                 <Languages className="h-3 w-3" />
                                 Language
                             </div>

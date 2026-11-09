@@ -50,7 +50,7 @@ object TokenRoles {
         "cardForeground" to Oklch(0.16f, 0.02f, 285.0f, 1.0f),
         "popover" to Oklch(1.0f, 0.0f, 285.0f, 1.0f),
         "popoverForeground" to Oklch(0.16f, 0.02f, 285.0f, 1.0f),
-        "primary" to Oklch(0.62f, 0.21f, -1f, 1.0f),
+        "primary" to Oklch(0.53f, 0.21f, -1f, 1.0f),
         "primaryForeground" to Oklch(0.99f, 0.0f, 285.0f, 1.0f),
         "secondary" to Oklch(0.965f, 0.006f, 285.0f, 1.0f),
         "secondaryForeground" to Oklch(0.21f, 0.02f, 285.0f, 1.0f),
