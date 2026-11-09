@@ -203,6 +203,20 @@ describe("MusicService browse", () => {
         expect(radio.findIndex((t) => t.id === `tr_${ids.funk}`)).toBeLessThan(radio.findIndex((t) => t.id === `tr_${ids.aero}`));
     });
 
+    it("compatible ranks library tracks from a key and/or bpm (Key & BPM app)", () => {
+        const set = lib.prepare("UPDATE tracks SET key_camelot = ?, bpm = ? WHERE id = ?");
+        set.run("8A", 124, ids.omt); set.run("3B", 90, ids.aero); set.run("9A", 125, ids.funk); set.run("8B", 124, ids.galv);
+        const r = music.compatible({ key: "A minor", bpm: 124 });
+        expect(r.key).toBe("8A");
+        expect(r.tracks.map((t) => t.id)).toEqual([`tr_${ids.omt}`, `tr_${ids.galv}`, `tr_${ids.funk}`]);
+        expect(r.tracks[0]!.score).toBe(1);
+        expect(r.tracks.every((t) => t.score > 0)).toBe(true);
+        expect(music.compatible({ key: "1m", limit: 1 }).tracks.map((t) => t.id)).toEqual([`tr_${ids.omt}`]);
+        expect(music.compatible({ bpm: 62 }).tracks.map((t) => t.id)).toContain(`tr_${ids.omt}`);
+        expect(() => music.compatible({ key: "H minor" })).toThrow(/key or bpm required/);
+        expect(() => music.compatible({})).toThrow(/key or bpm required/);
+    });
+
     it("genres and genre albums", () => {
         const g = music.genres();
         expect(g.map((x) => x.name)).toEqual(["Big Beat", "House"]);
@@ -440,6 +454,12 @@ describe("music router (http)", () => {
         const ro = await j("/reorder", { method: "POST", body: JSON.stringify({ trackIds: [`tr_${ids.omt}`, `tr_${ids.aero}`], start: 1 }) });
         expect((ro.body.tracks as { id: string }[]).map((t) => t.id)).toEqual([`tr_${ids.aero}`, `tr_${ids.omt}`]);
         expect(((await j(`/radio?seed=tr_${ids.omt}&size=3&order=harmonic`)).body.tracks as unknown[]).length).toBe(3);
+        lib.prepare("UPDATE tracks SET key_camelot = '8A', bpm = 124 WHERE id = ?").run(ids.omt);
+        const c = await j("/compatible?key=8A&bpm=124&limit=5");
+        expect(c.status).toBe(200);
+        expect(c.body).toMatchObject({ key: "8A", bpm: 124 });
+        expect((c.body.tracks as { id: string }[])[0]!.id).toBe(`tr_${ids.omt}`);
+        expect((await j("/compatible")).status).toBe(400);
     });
 
     it("PUT/GET /queue with validation", async () => {

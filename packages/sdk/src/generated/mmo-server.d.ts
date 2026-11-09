@@ -4021,6 +4021,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media/music/compatible": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Library tracks that mix from a key and/or BPM (Camelot 70 % + tempo 30 %, best first; MixAI Key & BPM) */
+        get: operations["musicCompatible"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/media/music/lyrics/{trackId}": {
         parameters: {
             query?: never;
@@ -13810,6 +13827,40 @@ export interface operations {
                 content: {
                     "application/json": {
                         tracks: components["schemas"]["TrackCard"][];
+                    };
+                };
+            };
+            400: components["responses"]["ErrorJson"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    musicCompatible: {
+        parameters: {
+            query?: {
+                /** @description Camelot (8A), Open Key (1m) or musical name (A minor) */
+                key?: string;
+                bpm?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Normalised Camelot key, null when only bpm was given */
+                        key: string | null;
+                        bpm: number | null;
+                        tracks: (components["schemas"]["TrackCard"] & {
+                            score: number;
+                        })[];
                     };
                 };
             };

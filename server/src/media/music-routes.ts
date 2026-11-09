@@ -121,6 +121,12 @@ export function createMusicRouter(deps: MusicRouterDeps): express.Router {
         res.json(music.beatgrid(String(req.params.trackId)));
     }));
 
+    router.get("/compatible", wrap((req, res) => {
+        const bpmRaw = qs(req.query.bpm);
+        const bpm = bpmRaw === undefined ? undefined : Number(bpmRaw);
+        res.json(music.compatible({ key: qs(req.query.key), bpm, limit: qint(req.query.limit) }));
+    }));
+
     router.post("/reorder", wrap((req, res) => {
         const body = (req.body ?? {}) as { trackIds?: unknown; start?: unknown };
         if (!Array.isArray(body.trackIds) || !body.trackIds.every((x) => typeof x === "string")) {

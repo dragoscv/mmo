@@ -27,7 +27,7 @@ import {
 } from "../subsonic/browse";
 import { getPlaylist, listPlaylists } from "../subsonic/playlists";
 import { albumId, artistId, decodeId, playlistId, trackId } from "../subsonic/ids";
-import { harmonicOrder } from "./harmonic";
+import { harmonicOrder, parseCamelot, toCamelot, transitionScore } from "./harmonic";
 
 // ─── Public shapes ───────────────────────────────────────────────────────────
 
@@ -597,6 +597,40 @@ export class MusicService {
         const cards = this.tracksByIds(rawIds).items;
         const first = cards.findIndex((c) => c.id === rawIds[Math.max(0, Math.min(rawIds.length - 1, start))]);
         return { tracks: harmonicOrder(cards, Math.max(0, first)) };
+    }
+
+    /**
+     * Library tracks that mix from a key and/or tempo (MixAI Key & BPM "mix next from my library", WP18-24): same
+     * scorer as automix (key 70 % + BPM 30 %, ±6 % with half/double), best first, score > 0 only. `key` accepts
+     * Camelot / Open Key / musical names. 400 when neither key nor bpm is usable.
+     */
+    compatible(opts: { key?: string; bpm?: number; limit?: number }): { key: string | null; bpm: number | null; tracks: (TrackCard & { score: number })[] } {
+        const key = toCamelot(opts.key ?? null);
+        const bpm = typeof opts.bpm === "number" && Number.isFinite(opts.bpm) && opts.bpm > 0 ? opts.bpm : null;
+        if (!key && !bpm) throw new MusicError(400, "key or bpm required");
+        const limit = clampInt(opts.limit, 1, 200, 50);
+        const uid = this.userId();
+        if (!uid) return { key, bpm, tracks: [] };
+        const rows = this.lib().prepare(
+            `SELECT id, key_camelot, bpm FROM tracks WHERE user_id = ? AND COALESCE(is_hidden, 0) = 0
+             AND (key_camelot IS NOT NULL OR (bpm IS NOT NULL AND bpm > 0))`,
+        ).all(uid) as { id: number; key_camelot: string | null; bpm: number | null }[];
+        const from = { keyCamelot: key, bpm };
+        const scored = rows
+            .map((r) => ({
+                id: r.id,
+                score: transitionScore(from, { keyCamelot: parseCamelot(r.key_camelot) ? r.key_camelot : null, bpm: r.bpm }),
+            }))
+            .filter((r) => r.score > 0)
+            .sort((a, b) => b.score - a.score || a.id - b.id)
+            .slice(0, limit);
+        const counts = this.playCounts();
+        const byId = new Map(getTracks(uid, scored.map((s) => s.id)).map((t) => [t.id, t]));
+        const tracks = scored.flatMap((s) => {
+            const t = byId.get(s.id);
+            return t ? [{ ...trackCard(t, counts.get(t.id) ?? 0), score: Math.round(s.score * 1000) / 1000 }] : [];
+        });
+        return { key, bpm, tracks };
     }
 
     /**

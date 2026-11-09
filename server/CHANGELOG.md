@@ -2,6 +2,13 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.14.0 — Compatible tracks for MixAI Key & BPM (WP18-24)
+
+- `GET /media/music/compatible?key=&bpm=&limit=`: library tracks that mix from a detected key and/or tempo, best
+	first, with a 0..1 `score` — the same Camelot + BPM scorer as automix (`harmonic.ts`, key 70 % + BPM 30 %, ±6 %
+	with half/double tempo). `key` accepts Camelot (`8A`), Open Key (`1m`) or musical names (`A minor`); 400 when
+	neither key nor bpm is usable. OpenAPI, Kotlin/Swift models and SDK types regenerated (SDK 0.11.0).
+
 ## 3.13.2 — Pinned analyzer dependencies (WP20-07)
 
 - `python/requirements-analyzer.txt` pins exact versions (librosa 1.0.0, numpy 2.5.4, beat-this 1.1.0, audio-separator

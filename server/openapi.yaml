@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.13.2
+  version: 3.14.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -5855,6 +5855,38 @@ paths:
                 required: [tracks]
                 properties:
                   tracks: { type: array, items: { $ref: '#/components/schemas/TrackCard' } }
+        '400': { $ref: '#/components/responses/ErrorJson' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /media/music/compatible:
+    get:
+      operationId: musicCompatible
+      tags: [music]
+      summary: "Library tracks that mix from a key and/or BPM (Camelot 70 % + tempo 30 %, best first; MixAI Key & BPM)"
+      parameters:
+        - { name: key, in: query, schema: { type: string }, description: "Camelot (8A), Open Key (1m) or musical name (A minor)" }
+        - { name: bpm, in: query, schema: { type: number, exclusiveMinimum: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [key, bpm, tracks]
+                properties:
+                  key: { type: [string, 'null'], description: "Normalised Camelot key, null when only bpm was given" }
+                  bpm: { type: [number, 'null'] }
+                  tracks:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: '#/components/schemas/TrackCard' }
+                        - type: object
+                          required: [score]
+                          properties:
+                            score: { type: number, minimum: 0, maximum: 1 }
         '400': { $ref: '#/components/responses/ErrorJson' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
