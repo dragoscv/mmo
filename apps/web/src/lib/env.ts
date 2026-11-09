@@ -50,6 +50,7 @@ const baseSchema = z.object({
 
     // Entitlement feature flags (lib/entitlements.ts): only "1"/"true" enable. Unset = off.
     MIXAI_FLAG_DECKS_PRO: z.string().optional(),
+    MIXAI_FLAG_LIVE_PRO: z.string().optional(),
 
     // BYO-AI-keys at-rest crypto. Required only when a user actually
     // tries to store an AI key; we don't enforce here because read-only

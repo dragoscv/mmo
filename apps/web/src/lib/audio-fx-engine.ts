@@ -118,6 +118,83 @@ export const MUSICAL_SCALES: Record<number, { name: string; intervals: number[] 
     8: { name: "Harmonic Minor", intervals: [0, 2, 3, 5, 7, 8, 11] },
 };
 
+// ─── Pure parameter mapping (unit-tested; no Web Audio needed) ───────────
+
+function clamp(v: number, lo: number, hi: number): number {
+    return Math.min(hi, Math.max(lo, v));
+}
+
+function finiteOr(v: number | undefined, fallback: number): number {
+    return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+}
+
+/**
+ * Mid/side width as a 2×2 matrix: `L' = direct·L + cross·R`, `R' = cross·L + direct·R`.
+ * Mid = (L+R)/2 is kept, side = (L−R)/2 is scaled by `width` (0 = mono, 1 = unchanged, 2 = wide).
+ */
+export function stereoWidthMatrix(width: number): { direct: number; cross: number } {
+    const w = clamp(finiteOr(width, 1), 0, 2);
+    return { direct: 0.5 * (1 + w), cross: 0.5 * (1 - w) };
+}
+
+/** Split-band de-esser settings: crossover in the sibilance range, a compressor only on the top band. */
+export function deEsserSettings(p: Record<string, number>): { crossoverHz: number; threshold: number; ratio: number } {
+    return {
+        crossoverHz: clamp(finiteOr(p.frequency, FX_DEFAULTS.deEsser.frequency), 2000, 16000),
+        threshold: clamp(finiteOr(p.threshold, FX_DEFAULTS.deEsser.threshold), -100, 0),
+        ratio: clamp(finiteOr(p.ratio, FX_DEFAULTS.deEsser.ratio), 1, 20),
+    };
+}
+
+export const VOCODER_MIN_HZ = 120;
+export const VOCODER_MAX_HZ = 8000;
+
+/**
+ * Channel vocoder band layout: `bands` (clamped 4..32) centre frequencies spaced evenly on a log scale between
+ * VOCODER_MIN_HZ and VOCODER_MAX_HZ, with the band-pass Q that makes neighbouring bands meet at their −3 dB points.
+ */
+export function vocoderBands(bands: number): { centers: number[]; q: number } {
+    const n = Math.round(clamp(finiteOr(bands, FX_DEFAULTS.vocoderLite.bands), 4, 32));
+    const ratio = Math.pow(VOCODER_MAX_HZ / VOCODER_MIN_HZ, 1 / n);
+    const centers = Array.from({ length: n }, (_, i) => VOCODER_MIN_HZ * Math.pow(ratio, i + 0.5));
+    // Bandwidth of one band in octaves → Q = √(2^N) / (2^N − 1).
+    const pow = Math.pow(2, Math.log2(ratio));
+    return { centers, q: Math.sqrt(pow) / (pow - 1) };
+}
+
+/** Envelope-follower low-pass cutoff from the vocoder attack/release times (one-pole equivalent, 5..200 Hz). */
+export function vocoderEnvelopeHz(attack: number, release: number): number {
+    const tau = Math.max(1e-4, (finiteOr(attack, 0.005) + finiteOr(release, 0.02)) / 2);
+    return clamp(1 / (2 * Math.PI * tau), 5, 200);
+}
+
+export interface GateWorkletParams {
+    threshold: number;
+    range: number;
+    ratio: number;
+    attack: number;
+    hold: number;
+    release: number;
+    hysteresis: number;
+}
+
+/**
+ * Parameters for the `live-gate` worklet (`/worklets/live-gate-processor.js`, port of live-dsp `Gate`).
+ * `gate` is a hard gate (ratio 20, −80 dB range unless the insert carries `range`); `noiseSuppression` is a
+ * gentler 1:4 downward expander whose floor is `-reduction` dB.
+ */
+export function gateWorkletParams(type: "gate" | "noiseSuppression", p: Record<string, number>): GateWorkletParams {
+    const d = FX_DEFAULTS[type];
+    const threshold = clamp(finiteOr(p.threshold, d.threshold), -100, 0);
+    const attack = clamp(finiteOr(p.attack, d.attack), 0.00005, 1);
+    const release = clamp(finiteOr(p.release, d.release), 0.001, 5);
+    if (type === "gate") {
+        return { threshold, range: clamp(finiteOr(p.range, -80), -100, 0), ratio: 20, attack, hold: 0.04, release, hysteresis: 4 };
+    }
+    const reduction = clamp(finiteOr(p.reduction, d.reduction), 0, 100);
+    return { threshold, range: -reduction, ratio: 4, attack, hold: 0.02, release, hysteresis: 3 };
+}
+
 // ─── Pitch Detection (YIN Algorithm) ────────────────────────────────────
 
 const PITCH_MIN_HZ = 65;          // ~C2 — covers male vocals, bass instruments
@@ -272,6 +349,13 @@ export class AudioFxEngine {
     private pitchWorkletLoaded = false;
     private pitchWorkletLoading: Promise<boolean> | null = null;
     private pitchShifterNodes: Map<string, AudioWorkletNode> = new Map();
+
+    // Downward gate worklet (`live-gate`, port of live-dsp `Gate`) for gate / noiseSuppression inserts.
+    // Same lazy-load contract as the pitch worklet: pass-through until loaded, then the chain rebuilds.
+    private gateWorkletLoaded = false;
+    private gateWorkletLoading: Promise<boolean> | null = null;
+    /** Oscillators / noise sources owned by chain inserts (vocoder carrier); stopped on every rebuild. */
+    private fxSources: AudioScheduledSourceNode[] = [];
 
     // Built-in auto-correct (always-on insertion point between chainOutput
     // and outputNode). Lives outside the user-managed FX chain so the user
@@ -434,6 +518,24 @@ export class AudioFxEngine {
     }
 
     get isPitchWorkletReady(): boolean { return this.pitchWorkletLoaded; }
+
+    /** Loads the `live-gate` AudioWorklet. Idempotent; resolves to `true` on success. */
+    async ensureGateWorkletLoaded(): Promise<boolean> {
+        if (this.gateWorkletLoaded) return true;
+        if (this.gateWorkletLoading) return this.gateWorkletLoading;
+        this.gateWorkletLoading = (async () => {
+            try {
+                if (!this.ctx.audioWorklet) return false;
+                await this.ctx.audioWorklet.addModule("/worklets/live-gate-processor.js");
+                this.gateWorkletLoaded = true;
+                return true;
+            } catch (err) {
+                dlog("audio-fx", "gate worklet load failed", err);
+                return false;
+            }
+        })();
+        return this.gateWorkletLoading;
+    }
 
     /**
      * Returns the underlying AudioWorkletNode for a pitchShift / autotune
@@ -763,6 +865,7 @@ export class AudioFxEngine {
         }
         this.fxNodes.clear();
         this.pitchShifterNodes.clear();
+        this.stopFxSources();
         this.chain = inserts;
 
         // Build new chain
@@ -865,6 +968,7 @@ export class AudioFxEngine {
         }
         this.pitchListeners.clear();
         this.stopInput();
+        this.stopFxSources();
         try { this.chainInput.disconnect(); } catch { /* ok */ }
         try { this.chainOutput.disconnect(); } catch { /* ok */ }
         try { this.inputNode.disconnect(); } catch { /* ok */ }
@@ -882,6 +986,118 @@ export class AudioFxEngine {
     }
 
     // ─── Internal: Create Web Audio Nodes for each effect ────────────
+
+    private stopFxSources(): void {
+        for (const s of this.fxSources) {
+            try { s.stop(); } catch { /* never started / already stopped */ }
+            try { s.disconnect(); } catch { /* ok */ }
+        }
+        this.fxSources = [];
+    }
+
+    /** gate / noiseSuppression: true downward gate in the `live-gate` worklet; pass-through while it loads. */
+    private createGateNodes(type: "gate" | "noiseSuppression", p: Record<string, number>): AudioNode[] {
+        if (this.gateWorkletLoaded && typeof AudioWorkletNode !== "undefined") {
+            const node = new AudioWorkletNode(this.ctx, "live-gate", { numberOfInputs: 1, numberOfOutputs: 1 });
+            const values = gateWorkletParams(type, p);
+            for (const [name, value] of Object.entries(values)) {
+                const param = node.parameters.get(name);
+                if (param) param.value = value;
+            }
+            return [node];
+        }
+        if (!this.gateWorkletLoading) {
+            void this.ensureGateWorkletLoaded().then((ok) => {
+                if (ok) this.setChain(this.chain);
+            });
+        }
+        return [this.ctx.createGain()];
+    }
+
+    /**
+     * Channel vocoder (Web Audio nodes only). For each band the voice goes through a band-pass, a full-wave
+     * rectifier (WaveShaper |x|) and a low-pass envelope follower; that envelope drives the gain of the same band
+     * on an internal carrier (110 Hz sawtooth + a little white noise for consonants). Bands are summed, limited
+     * and blended with the dry voice by `mix`.
+     */
+    private createVocoderNodes(p: Record<string, number>): AudioNode[] {
+        const mix = clamp(finiteOr(p.mix, FX_DEFAULTS.vocoderLite.mix), 0, 1);
+        const { centers, q } = vocoderBands(p.bands);
+        const envHz = vocoderEnvelopeHz(p.attack, p.release);
+
+        const split = this.ctx.createGain();
+        const merge = this.ctx.createGain();
+        const dry = this.ctx.createGain();
+        dry.gain.value = 1 - mix;
+        split.connect(dry);
+        dry.connect(merge);
+
+        // Carrier: sawtooth (rich harmonics) + quiet looping white noise.
+        const carrier = this.ctx.createGain();
+        const saw = this.ctx.createOscillator();
+        saw.type = "sawtooth";
+        saw.frequency.value = 110;
+        saw.connect(carrier);
+        const noiseBuf = this.ctx.createBuffer(1, this.ctx.sampleRate, this.ctx.sampleRate);
+        const nd = noiseBuf.getChannelData(0);
+        for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = noiseBuf;
+        noise.loop = true;
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.value = 0.15;
+        noise.connect(noiseGain);
+        noiseGain.connect(carrier);
+        saw.start();
+        noise.start();
+        this.fxSources.push(saw, noise);
+
+        const rectCurve = new Float32Array(1025) as Float32Array<ArrayBuffer>;
+        for (let i = 0; i < rectCurve.length; i++) rectCurve[i] = Math.abs((i * 2) / (rectCurve.length - 1) - 1);
+
+        const bandSum = this.ctx.createGain();
+        // Per-band levels are small (narrow band of voice × narrow band of carrier); make up roughly for it.
+        bandSum.gain.value = 4 * Math.sqrt(centers.length);
+        for (const f of centers) {
+            const anaBp = this.ctx.createBiquadFilter();
+            anaBp.type = "bandpass";
+            anaBp.frequency.value = f;
+            anaBp.Q.value = q;
+            const rect = this.ctx.createWaveShaper();
+            rect.curve = rectCurve;
+            const env = this.ctx.createBiquadFilter();
+            env.type = "lowpass";
+            env.frequency.value = envHz;
+            env.Q.value = Math.SQRT1_2;
+            split.connect(anaBp);
+            anaBp.connect(rect);
+            rect.connect(env);
+
+            const synBp = this.ctx.createBiquadFilter();
+            synBp.type = "bandpass";
+            synBp.frequency.value = f;
+            synBp.Q.value = q;
+            const vca = this.ctx.createGain();
+            vca.gain.value = 0; // driven entirely by the envelope signal
+            carrier.connect(synBp);
+            synBp.connect(vca);
+            env.connect(vca.gain);
+            vca.connect(bandSum);
+        }
+
+        const limiter = this.ctx.createDynamicsCompressor();
+        limiter.threshold.value = -6;
+        limiter.knee.value = 0;
+        limiter.ratio.value = 20;
+        limiter.attack.value = 0.002;
+        limiter.release.value = 0.1;
+        const wet = this.ctx.createGain();
+        wet.gain.value = mix;
+        bandSum.connect(limiter);
+        limiter.connect(wet);
+        wet.connect(merge);
+        return [split, merge];
+    }
 
     private createFxNodes(insert: FxInsert): AudioNode[] {
         const p = insert.params;
@@ -931,14 +1147,7 @@ export class AudioFxEngine {
                 return [lim];
             }
             case "gate": {
-                // Simulated via fast compressor with high ratio below threshold
-                const gate = this.ctx.createDynamicsCompressor();
-                gate.threshold.value = p.threshold;
-                gate.ratio.value = 20;
-                gate.attack.value = p.attack;
-                gate.release.value = p.release;
-                gate.knee.value = 0;
-                return [gate];
+                return this.createGateNodes("gate", p);
             }
             case "reverb": {
                 const dry = this.ctx.createGain();
@@ -1101,20 +1310,33 @@ export class AudioFxEngine {
                 return [f];
             }
             case "deEsser": {
+                // Split-band de-esser: Linkwitz-Riley 4th-order crossover (two cascaded Butterworth sections per
+                // side, sums flat). Low band passes dry; only the sibilant top band goes through the compressor.
+                const s = deEsserSettings(p);
+                const split = this.ctx.createGain();
+                const merge = this.ctx.createGain();
+                const lp: BiquadFilterNode[] = [];
+                const hp: BiquadFilterNode[] = [];
+                for (let i = 0; i < 2; i++) {
+                    const l = this.ctx.createBiquadFilter();
+                    l.type = "lowpass"; l.frequency.value = s.crossoverHz; l.Q.value = Math.SQRT1_2;
+                    lp.push(l);
+                    const h = this.ctx.createBiquadFilter();
+                    h.type = "highpass"; h.frequency.value = s.crossoverHz; h.Q.value = Math.SQRT1_2;
+                    hp.push(h);
+                }
                 const comp = this.ctx.createDynamicsCompressor();
-                comp.threshold.value = p.threshold;
-                comp.ratio.value = p.ratio;
+                comp.threshold.value = s.threshold;
+                comp.ratio.value = s.ratio;
                 comp.attack.value = 0.001;
                 comp.release.value = 0.05;
                 comp.knee.value = 5;
-                const hpf = this.ctx.createBiquadFilter();
-                hpf.type = "highpass";
-                hpf.frequency.value = p.frequency;
-                // Route high frequencies to sidechain-like compression
-                const merge = this.ctx.createGain();
-                const split = this.ctx.createGain();
-                split.connect(hpf);
-                hpf.connect(comp);
+                split.connect(lp[0]);
+                lp[0].connect(lp[1]);
+                lp[1].connect(merge);
+                split.connect(hp[0]);
+                hp[0].connect(hp[1]);
+                hp[1].connect(comp);
                 comp.connect(merge);
                 return [split, merge];
             }
@@ -1153,10 +1375,25 @@ export class AudioFxEngine {
                 return [amGain];
             }
             case "stereoWidth": {
-                // Simple mid-side approach simulated with gain
-                const gain = this.ctx.createGain();
-                gain.gain.value = p.width;
-                return [gain];
+                // Mid/side width: L' = d·L + c·R, R' = c·L + d·R (see stereoWidthMatrix). The input is forced to
+                // stereo so a mono voice is up-mixed (L = R) instead of losing a channel.
+                const { direct, cross } = stereoWidthMatrix(p.width);
+                const input = this.ctx.createGain();
+                input.channelCount = 2;
+                input.channelCountMode = "explicit";
+                input.channelInterpretation = "speakers";
+                const splitter = this.ctx.createChannelSplitter(2);
+                const merger = this.ctx.createChannelMerger(2);
+                const ll = this.ctx.createGain(); ll.gain.value = direct;
+                const rl = this.ctx.createGain(); rl.gain.value = cross;
+                const lr = this.ctx.createGain(); lr.gain.value = cross;
+                const rr = this.ctx.createGain(); rr.gain.value = direct;
+                input.connect(splitter);
+                splitter.connect(ll, 0); splitter.connect(rl, 1);
+                splitter.connect(lr, 0); splitter.connect(rr, 1);
+                ll.connect(merger, 0, 0); rl.connect(merger, 0, 0);
+                lr.connect(merger, 0, 1); rr.connect(merger, 0, 1);
+                return [input, merger];
             }
             case "bitcrusher": {
                 // Simulated via WaveShaper (quantization)
@@ -1273,28 +1510,11 @@ export class AudioFxEngine {
                 return [this.ctx.createGain()];
             }
             case "noiseSuppression": {
-                // Gate-like noise suppression
-                const gate = this.ctx.createDynamicsCompressor();
-                gate.threshold.value = p.threshold;
-                gate.ratio.value = Math.max(2, p.reduction / 3);
-                gate.attack.value = p.attack;
-                gate.release.value = p.release;
-                gate.knee.value = 5;
-                return [gate];
+                // Downward expander (1:4) whose floor is `-reduction` dB, same worklet as the gate.
+                return this.createGateNodes("noiseSuppression", p);
             }
             case "vocoderLite": {
-                // Simplified vocoder effect using band filters
-                const dry = this.ctx.createGain();
-                dry.gain.value = 1 - p.mix;
-                const wet = this.ctx.createGain();
-                wet.gain.value = p.mix;
-                const merge = this.ctx.createGain();
-                const split = this.ctx.createGain();
-                split.connect(dry);
-                split.connect(wet);
-                dry.connect(merge);
-                wet.connect(merge);
-                return [split, merge];
+                return this.createVocoderNodes(p);
             }
             default:
                 return [];

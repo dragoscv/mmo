@@ -8,12 +8,13 @@
  *   app.mixai.ro     → MixAI Studio (organizer: library, AI, DJ live, settings, admin)
  *   decks.mixai.ro   → MixAI Decks landing (`/dj`; product key stays `dj`, ADR-0014 / D60)
  *   dj.mixai.ro      → old MixAI DJ host: 308 to `decks.mixai.ro` with path + query preserved
+ *   live.mixai.ro    → MixAI Live (ADR-0015): `/` = the browser vocal processor `/live` (moved out of Studio)
  *
  * Any other host (run.app, localhost, LAN, preview) is "legacy": every path works exactly as before, no
  * rewrites and no redirects, so the store builds that point at run.app keep working (D41).
  */
 
-export type Product = "suite" | "tv" | "music" | "studio" | "dj";
+export type Product = "suite" | "tv" | "music" | "studio" | "dj" | "live";
 export type HostKind = Product | "legacy";
 
 export const ROOT_DOMAIN = "mixai.ro";
@@ -27,8 +28,8 @@ export function hostRoutingEnabled(): boolean {
     return typeof process !== "undefined" && process.env.MIXAI_HOST_ROUTING === "1";
 }
 
-const SUB: Record<string, Product> = { tv: "tv", music: "music", app: "studio", decks: "dj", dj: "dj", www: "suite" };
-const PRODUCT_SUB: Record<Product, string | null> = { suite: null, tv: "tv", music: "music", studio: "app", dj: "decks" };
+const SUB: Record<string, Product> = { tv: "tv", music: "music", app: "studio", decks: "dj", dj: "dj", live: "live", www: "suite" };
+const PRODUCT_SUB: Record<Product, string | null> = { suite: null, tv: "tv", music: "music", studio: "app", dj: "decks", live: "live" };
 /** Retired product subdomains → their replacement. Every path (shared ones too) 308s there (D60: MixAI DJ → Decks). */
 const RENAMED_SUB: Record<string, string> = { dj: "decks" };
 
@@ -83,7 +84,7 @@ const SHARED_FILE = /^\/[^/]+\.(?:js|css|png|jpg|jpeg|svg|ico|webmanifest|json|t
 /** Studio-only (organizer) top-level segments. Everything that is not TV, Music, suite or shared. */
 const STUDIO_PREFIXES = [
     "/dashboard", "/library", "/playlists", "/analysis", "/drives", "/scanner", "/devices", "/remote", "/settings",
-    "/profile", "/profiles", "/generate", "/training", "/lora", "/maestro", "/voice-wizard", "/visualizations", "/live",
+    "/profile", "/profiles", "/generate", "/training", "/lora", "/maestro", "/voice-wizard", "/visualizations",
     "/dev", "/download", "/learn", "/watch", "/mixer", "/daw", "/editor", "/plugins", "/recordings", "/music",
 ];
 
@@ -104,6 +105,7 @@ export function ownerOf(internalPath: string): Product | null {
     if (under(internalPath, "/media/music")) return "music";
     if (under(internalPath, "/media")) return "tv";
     if (under(internalPath, "/dj")) return "dj";
+    if (under(internalPath, "/live")) return "live";
     if (internalPath === "/" || internalPath === "") return "suite";
     if (STUDIO_PREFIXES.some((p) => under(internalPath, p))) return "studio";
     return "studio";
@@ -112,12 +114,13 @@ export function ownerOf(internalPath: string): Product | null {
 // ─── Public ↔ internal path mapping ──────────────────────────────────────────────────────────────
 
 /** Internal route prefix that a product host mounts at its `/`. */
-const MOUNT: Partial<Record<Product, string>> = { tv: "/media", music: "/media/music", dj: "/dj" };
+const MOUNT: Partial<Record<Product, string>> = { tv: "/media", music: "/media/music", dj: "/dj", live: "/live" };
 /** First path segments that exist under each mount (the Next route tree). Anything else is foreign. */
 const MOUNT_SEGMENTS: Partial<Record<Product, ReadonlySet<string>>> = {
     tv: new Set(["movie", "tv", "browse", "collections", "downloads", "list", "live", "play", "search", "stats"]),
     music: new Set(["album", "artist", "genre", "now-playing", "playlist", "search"]),
     dj: new Set<string>(),
+    live: new Set<string>(),
 };
 
 function firstSegment(path: string): string {
@@ -175,10 +178,10 @@ export function internalPathname(publicPath: string, current: HostKind): string 
 /** What `app.mixai.ro/` renders (the launcher lives on the apex). */
 export const STUDIO_HOME = "/dashboard";
 
-/** Hosts whose pages use MIDI controllers (Studio mixer/DAW, DJ; legacy run.app/localhost serve everything).
+/** Hosts whose pages use MIDI controllers (Studio mixer/DAW, DJ, Live foot controllers; legacy serves everything).
  *  TV / Music / suite never request Web MIDI, so no "control your MIDI devices" prompt there. */
 export function midiHostAllowed(kind: HostKind): boolean {
-    return kind === "studio" || kind === "dj" || kind === "legacy";
+    return kind === "studio" || kind === "dj" || kind === "live" || kind === "legacy";
 }
 
 // ─── Request routing (proxy.ts) ──────────────────────────────────────────────────────────────────
@@ -205,8 +208,9 @@ export function routeRequest(host: string | null | undefined, pathname: string, 
     const go = (owner: Product, internal: string): RouteDecision =>
         ({ type: "redirect", url: `${productOrigin(owner, rootDomain)}${toPublic(owner, internal)}${search}`, status: 308 });
 
-    // Internal mount paths are never public on product hosts: canonicalise to the clean URL.
-    if (under(pathname, "/media") || under(pathname, "/dj")) {
+    // Internal mount paths are never public on product hosts: canonicalise to the clean URL. On tv.mixai.ro
+    // `/live/...` is TV's own clean Live TV path (→ `/media/live`), not MixAI Live.
+    if (under(pathname, "/media") || under(pathname, "/dj") || (under(pathname, "/live") && kind !== "tv")) {
         const owner = ownerOf(pathname);
         if (owner) return go(owner, pathname);
     }

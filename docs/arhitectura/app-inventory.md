@@ -17,6 +17,8 @@ Work: tracker §12 WP17. Update this table in the same commit as any release, re
 | Samsung TV | `apps/tv-tizen` | MixAI TV | `mXa1TvApp0` | 2.2.0 | Watching | Sideload (signed `.wgt`) |
 | Web shell | `apps/native` | MixAI | `ro.mixai.app` (clash) | 1.0.0 | Tauri/Capacitor wrapper that loads `mixai.ro` | GH Release |
 | Decks | `apps/mixai` | MixAI Decks (was MixAI DJ, D60) | `ro.mixai.dj` | 1.1.0 | DJ / creation. Rust crates in `apps/mixai/src-tauri/crates`: `mixai-core` (engine), `decks-analysis`, `decks-library`, `decks-mapping`, `decks-dvs`, `decks-render` + shared `crates/mixai-listen` — built and unit-tested; UniFFI facade + native UIs (2.0) todo. Docs: [`docs/decks/`](../decks/README.md) | 1.0.0 MSIX in MS Store certification (as MixAI DJ); 1.x Tauri on `decks-release.yml` |
+| Live (browser) | `apps/web` route `/live` | MixAI Live (web) | — | web | Browser vocal processor (Web Audio FX engine `lib/audio-fx-engine.ts`); host `live.mixai.ro` mounts it at `/` once host routing is on (ADR-0015) | Cloud Run (inside Studio today) |
+| Live (native) | `apps/live` | MixAI Live | `ro.mixai.live` | — | Realtime vocal processor: Rust engine (`apps/live/engine`), Tauri desktop, remote controllers (ADR-0015, WP21) | In development; no store records yet; tags `live-v*` |
 | Extension | `apps/extension` | MixAI downloader | `mixai-downloader@mixai.ro` | 3.0.1 | Download helper | Release workflow exists, not published |
 | Server | `server` | MixAI Companion — MMO Server | `ro.mixai.companion` | 3.9.6 | Server | GH Release, Docker, Pi |
 | Gateway | `apps/gateway` | — | — | 0.1.0 | Infra | Cloud Run |
@@ -44,6 +46,11 @@ Work: tracker §12 WP17. Update this table in the same commit as any release, re
 | MixAI Music | Linux | Flathub | `apps/music-desktop` | `ro.mixai.music.desktop` | WP17-43 |
 | MixAI Studio | Web + desktop shell | `app.mixai.ro`, MS Store | `apps/web`, `apps/native` | `ro.mixai.studio` | WP17-11, WP17-50 |
 | MixAI Decks | Windows/macOS/Linux, then iOS/iPadOS/Android (native 2.0, ADR-0014) | MS Store, Mac App Store, App Store, Google Play, Flathub, GH; site `decks.mixai.ro` (`dj.mixai.ro` → 308) | `apps/mixai` | `ro.mixai.dj` | WP17-51, WP19 |
+| MixAI Live | Windows/macOS/Linux desktop (Tauri 2 + Rust engine) | MS Store, Mac App Store, Flathub, GH (`live-v*`); site `live.mixai.ro`. Store records not created yet | `apps/live` | `ro.mixai.live` | WP21 |
+| MixAI Live | Android phone/tablet controller | Google Play (record not created yet) | `apps/live` Compose controller (shared Gradle build) | `ro.mixai.live` | WP21 |
+| MixAI Live | Wear OS controller | Google Play (Wear, same listing) | Wear module of the Android controller | `ro.mixai.live` | WP21 |
+| MixAI Live | iPhone + Apple Watch controller | App Store (record not created yet) | `apps/ios` targets | `ro.mixai.live`, `ro.mixai.live.watchkitapp` | WP21 |
+| MixAI Live | Web | `live.mixai.ro` (browser `/live`) | `apps/web` host routing | — | WP21-01, WP21-14 |
 | MixAI Server | Windows/macOS/Linux, Docker, Pi | GH Release, Docker Hub/GHCR, winget | `server` | `ro.mixai.companion` | WP17-52 |
 | MixAI Connector | Chrome/Firefox/Edge | CWS, AMO, Edge Add-ons | `apps/extension` | `mixai-downloader@mixai.ro` | WP17-53 |
 | Suite homepage | Web | `mixai.ro` | `apps/web` | — | WP17-12 |

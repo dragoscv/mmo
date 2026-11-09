@@ -32,4 +32,20 @@ describe("entitlements", () => {
     it("maps decks_pro to the paid Stripe plans only", () => {
         expect(ENTITLEMENTS.decks_pro.plans).toEqual(["pro_monthly", "pro_yearly"]);
     });
+
+    it("keeps live_pro disabled by default and independent of the decks flag", () => {
+        expect(isFlagEnabled("live_pro", {})).toBe(false);
+        expect(hasEntitlement(pro, "live_pro", on)).toBe(false);
+        expect(entitlementsFor(pro, on)).toEqual(["decks_pro"]);
+    });
+
+    it("grants live_pro to active Pro plans only once MIXAI_FLAG_LIVE_PRO is on", () => {
+        const liveOn = { MIXAI_FLAG_LIVE_PRO: "true" };
+        expect(ENTITLEMENTS.live_pro.flag).toBe("MIXAI_FLAG_LIVE_PRO");
+        expect(ENTITLEMENTS.live_pro.plans).toEqual(["pro_monthly", "pro_yearly"]);
+        expect(hasEntitlement(pro, "live_pro", liveOn)).toBe(true);
+        expect(hasEntitlement(free, "live_pro", liveOn)).toBe(false);
+        expect(hasEntitlement(lapsed, "live_pro", liveOn)).toBe(false);
+        expect(entitlementsFor(pro, { ...on, ...liveOn })).toEqual(["decks_pro", "live_pro"]);
+    });
 });

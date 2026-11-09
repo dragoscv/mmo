@@ -54,6 +54,7 @@ describe("hostKind", () => {
         expect(hostKind("app.mixai.ro")).toBe("studio");
         expect(hostKind("dj.mixai.ro")).toBe("dj");
         expect(hostKind("decks.mixai.ro")).toBe("dj");
+        expect(hostKind("live.mixai.ro")).toBe("live");
         expect(hostKind("demo.mixai.ro")).toBe("legacy");
         expect(hostKind("mixai-web-abc-ew.a.run.app")).toBe("legacy");
         expect(hostKind("localhost:13789")).toBe("legacy");
@@ -118,6 +119,7 @@ describe("hrefFor", () => {
         expect(midiHostAllowed("suite")).toBe(false);
         expect(midiHostAllowed("studio")).toBe(true);
         expect(midiHostAllowed("dj")).toBe(true);
+        expect(midiHostAllowed("live")).toBe(true);
         expect(midiHostAllowed("legacy")).toBe(true);
         expect(routeRequest("music.mixai.ro", "/media/music", "?play=tr_1,tr_2&index=1")).toEqual({
             type: "redirect", url: "https://music.mixai.ro/?play=tr_1,tr_2&index=1", status: 308,
@@ -197,6 +199,23 @@ describe("routeRequest", () => {
         expect(renamedHostOrigin("decks.mixai.ro")).toBeNull();
         expect(renamedHostOrigin("dj.evil.com")).toBeNull();
         expect(hrefFor("/dj", "suite")).toBe("https://decks.mixai.ro/");
+    });
+    it("serves MixAI Live at live.mixai.ro and keeps TV's clean /live paths (ADR-0015)", () => {
+        expect(productOrigin("live")).toBe("https://live.mixai.ro");
+        expect(ownerOf("/live")).toBe("live");
+        expect(routeRequest("live.mixai.ro", "/")).toEqual({ type: "rewrite", path: "/live" });
+        expect(routeRequest("live.mixai.ro", "/live")).toEqual({ type: "redirect", url: "https://live.mixai.ro/", status: 308 });
+        expect(routeRequest("mixai.ro", "/live")).toEqual({ type: "redirect", url: "https://live.mixai.ro/", status: 308 });
+        expect(routeRequest("app.mixai.ro", "/live")).toEqual({ type: "redirect", url: "https://live.mixai.ro/", status: 308 });
+        expect(routeRequest("live.mixai.ro", "/library")).toEqual({ type: "redirect", url: "https://app.mixai.ro/library", status: 308 });
+        expect(routeRequest("live.mixai.ro", "/login")).toEqual({ type: "next" });
+        expect(routeRequest("tv.mixai.ro", "/live")).toEqual({ type: "rewrite", path: "/media/live" });
+        expect(routeRequest("tv.mixai.ro", "/live/guide")).toEqual({ type: "rewrite", path: "/media/live/guide" });
+        expect(hrefFor("/live", "studio")).toBe("https://live.mixai.ro/");
+        expect(hrefFor("/live", "live")).toBe("/");
+        expect(hrefFor("/media/live", "tv")).toBe("/live");
+        expect(internalPathname("/", "live")).toBe("/live");
+        expect(renamedHostOrigin("live.mixai.ro")).toBeNull();
     });
 });
 

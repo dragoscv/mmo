@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## web 3.4.5 — MixAI Live: browser FX fixes + product registry (WP21-01/14/15)
+
+- `/live` FX engine (`lib/audio-fx-engine.ts`): the de-esser is now split-band (LR4 crossover at `frequency`; the low band passes dry, only the sibilant band is compressed — before, everything under the crossover was lost). `stereoWidth` is real mid/side (0 = mono, 1 = unchanged, 2 = wide). `vocoderLite` is a real channel vocoder (4–32 log-spaced bands, envelope followers on the voice driving a sawtooth + noise carrier; `bands`, `attack`, `release`, `mix`). `gate` and `noiseSuppression` use a true downward gate/expander worklet (`public/worklets/live-gate-processor.js`, port of live-dsp `Gate` with hold + hysteresis) instead of a compressor.
+- Host registry: product `live` → `live.mixai.ro`, mounted at `/live` (moved out of Studio); `tv.mixai.ro/live/*` stays TV's Live TV. Only active with `MIXAI_HOST_ROUTING=1` and a `live.mixai.ro` domain mapping (neither exists yet).
+- Entitlement `live_pro` (flag `MIXAI_FLAG_LIVE_PRO`, default off, paid plans only).
+
 ## design-tokens 1.4.5 — decks-remote tokens mirror
 
 - `pnpm tokens:build` now mirrors `tokens.plain.css` into `apps/mixai/src-tauri/crates/decks-remote/assets/tokens.css` (its byte-compare test failed on Windows decks-ci after the 3.4.x contrast token changes).

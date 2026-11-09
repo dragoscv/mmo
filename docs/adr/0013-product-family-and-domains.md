@@ -4,6 +4,9 @@
 - **Superseded naming (2026-11-08):** "MixAI DJ" is now **MixAI Decks** and its host is `decks.mixai.ro`
   (`dj.mixai.ro` answers 308). App id `ro.mixai.dj` unchanged. See [ADR-0014](0014-mixai-decks-native-dj.md) (D60).
   The tables below keep the 2026-11-06 wording as the historical decision.
+- **Amendment 2026-11-09: MixAI Live** (`live.mixai.ro`, app id `ro.mixai.live`, tags `live-v*`) joins the family as a
+  realtime vocal processor with remote controllers; the browser `/live` route moves from Studio to the `live` host.
+  See [ADR-0015](0015-mixai-live-performance.md).
 - Tracker: [`docs/mixai-design-tracker.md`](../mixai-design-tracker.md) §12 (D40–D49, WP17)
 - Inventory: [`docs/arhitectura/app-inventory.md`](../arhitectura/app-inventory.md)
 - Related: [ADR-0001](0001-naming-mixai-and-mmo-server.md) (brand), [ADR-0004](0004-tv-apps-compose-media3-and-tizen-web.md)

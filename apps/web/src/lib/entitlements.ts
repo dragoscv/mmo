@@ -9,11 +9,13 @@
  * Definitions live in code (no table, no migration): a new entitlement = one entry here.
  * `decks_pro` is the MixAI Decks Pro tier (ADR-0014 decision 10, tracker WP19-23): prepared,
  * not enabled, not exposed in any UI. See docs/decks/architecture.md "Pro infra".
+ * `live_pro` is the MixAI Live Pro tier (ADR-0015 decision 9, tracker WP21-15): voice conversion, plugin
+ * sandbox, multiple in-ear mixes. Same contract: flag off by default, paid plans only, no UI yet.
  */
 
 import type { Plan, SubscriptionState } from "./stripe";
 
-export type EntitlementKey = "decks_pro";
+export type EntitlementKey = "decks_pro" | "live_pro";
 
 export type EntitlementDefinition = {
     /** Env var that turns the entitlement on; anything but "1"/"true" keeps it off. */
@@ -28,6 +30,11 @@ export const ENTITLEMENTS: Readonly<Record<EntitlementKey, EntitlementDefinition
         flag: "MIXAI_FLAG_DECKS_PRO",
         plans: ["pro_monthly", "pro_yearly"],
         description: "MixAI Decks Pro features (stems cloud fallback, AI Transition Designer, …)",
+    },
+    live_pro: {
+        flag: "MIXAI_FLAG_LIVE_PRO",
+        plans: ["pro_monthly", "pro_yearly"],
+        description: "MixAI Live Pro features (voice conversion, plugin sandbox, multiple in-ear mixes)",
     },
 };
 

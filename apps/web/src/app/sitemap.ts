@@ -16,5 +16,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
         { url: `${productOrigin("tv", root)}/`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
         { url: `${productOrigin("music", root)}/`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
         { url: `${productOrigin("studio", root)}/`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+        { url: `${productOrigin("live", root)}/`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     ];
 }
