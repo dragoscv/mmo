@@ -186,13 +186,17 @@ function DockSlot({
                         key={id}
                         type="button"
                         role="tab"
+                        id={`dock-tab-${id}`}
+                        aria-controls="dock-panel"
                         aria-selected={id === current}
                         className="mixai-dock-tab"
                         onClick={() => setActive(id)}
                         onKeyDown={(e) => {
-                            if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
                             const i = tabs.indexOf(current);
-                            const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]!;
+                            const map: Record<string, number> = { ArrowRight: (i + 1) % tabs.length, ArrowLeft: (i + tabs.length - 1) % tabs.length, Home: 0, End: tabs.length - 1 };
+                            if (!(e.key in map)) return;
+                            e.preventDefault();
+                            const next = tabs[map[e.key]!]!;
                             setActive(next);
                             (e.currentTarget.parentElement?.children[tabs.indexOf(next)] as HTMLElement | undefined)?.focus();
                         }}
@@ -209,7 +213,7 @@ function DockSlot({
                     </button>
                 )}
             </div>
-            <div role="tabpanel" className="absolute inset-x-0 bottom-0" style={{ top: inner.y }}>
+            <div role="tabpanel" id="dock-panel" aria-labelledby={`dock-tab-${current}`} className="absolute inset-x-0 bottom-0" style={{ top: inner.y }}>
                 <PanelTierProvider tier={tier}>{renderPanel(current, layout, hydrated)}</PanelTierProvider>
             </div>
         </motion.div>

@@ -44,7 +44,8 @@ export function TryBanner() {
 
     const keep = () => void usePackStore.getState().keepTry();
     const revert = () => usePackStore.getState().endTry();
-    const fraction = trying ? Math.max(0, Math.min(1, (trying.endsAt - now) / TRY_MS)) : 0;
+    const extend = () => usePackStore.getState().extendTry();
+    const fraction = trying ? Math.max(0, Math.min(1, (trying.endsAt - now) / Math.max(TRY_MS, trying.endsAt - now))) : 0;
 
     return (
         <>
@@ -70,6 +71,9 @@ export function TryBanner() {
                         </p>
                         <Button size="sm" onClick={keep}>
                             <Check aria-hidden /> {t("pack.keep")}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={extend} aria-label={t("pack.extendAria")}>
+                            {t("pack.extend")}
                         </Button>
                         <Button size="sm" variant="outline" onClick={revert}>
                             <Undo2 aria-hidden /> {t("pack.revert")}

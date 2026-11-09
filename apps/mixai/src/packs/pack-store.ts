@@ -47,6 +47,8 @@ interface PackStore {
     remove: (id: string) => Promise<void>;
     startTry: (pack: PackInfo, bytes: Uint8Array | null, opts?: { fromMarket?: boolean }) => void;
     keepTry: () => Promise<void>;
+    /** Add another TRY_MS to the running try (timing adjustable, WCAG 2.2.1). */
+    extendTry: () => void;
     endTry: () => void;
     setProEntitled: (on: boolean) => void;
 }
@@ -176,6 +178,14 @@ export const usePackStore = create<PackStore>((set, get) => ({
         }
         set({ trying: null });
         get().setActiveSkin(t.pack.manifest.id);
+    },
+    extendTry: () => {
+        const t = get().trying;
+        if (!t) return;
+        if (tryTimer) clearTimeout(tryTimer);
+        const endsAt = Math.max(t.endsAt, Date.now()) + TRY_MS;
+        set({ trying: { ...t, endsAt } });
+        tryTimer = setTimeout(() => get().endTry(), endsAt - Date.now());
     },
     endTry: () => {
         const t = get().trying;

@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## design-tokens 1.4.5 — decks-remote tokens mirror
+
+- `pnpm tokens:build` now mirrors `tokens.plain.css` into `apps/mixai/src-tauri/crates/decks-remote/assets/tokens.css` (its byte-compare test failed on Windows decks-ci after the 3.4.x contrast token changes).
+- Decks: try-a-skin banner gets **+30 s** (WCAG 2.2.1); dock tabs support Home/End and link tab ↔ panel.
+
 ## web 3.4.4 — Decks marketplace catalogue + pack downloads (WP19-31)
 
 - `GET /api/decks/packs` serves the MixAI Decks marketplace catalogue (`MarketCatalog`, public, CORS `*`, `max-age=300`).

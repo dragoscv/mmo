@@ -30,6 +30,8 @@ const mirrors: Array<[string, string]> = [
   ["tokens.plain.css", join(repo, "apps", "extension", "tokens.css")],
   ["tokens.plain.css", join(repo, "apps", "native", "web", "tokens.css")],
   ["tokens.plain.css", join(repo, "apps", "music-desktop", "web", "tokens.css")],
+  // Decks connected mode pages (served by the decks-remote crate; byte-compared by its tests/assets.rs).
+  ["tokens.plain.css", join(repo, "apps", "mixai", "src-tauri", "crates", "decks-remote", "assets", "tokens.css")],
   ["prehydrate.js", join(repo, "apps", "web", "public", "prehydrate.js")],
   ["prehydrate.js", join(repo, "apps", "tv-tizen", "public", "prehydrate.js")],
   ["prehydrate.js", join(repo, "apps", "mixai", "public", "prehydrate.js")],
