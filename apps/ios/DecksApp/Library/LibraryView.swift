@@ -47,7 +47,7 @@ struct LibraryView: View {
                 List(selection: $cursor.selection) {
                     ForEach(library.tracks, id: \.rowId) { t in
                         TrackRow(track: t) { deck in load(t, deck: deck) }
-                            .tag(Optional(t.rowId))
+                            .tag(t.rowId)
                             .listRowBackground(DecksTheme.surface)
                             .contextMenu { rowMenu(t) }
                     }

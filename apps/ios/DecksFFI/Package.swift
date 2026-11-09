@@ -28,6 +28,9 @@ let package = Package(
                 // bundled SQLite, std (Security for getrandom fallbacks, SystemConfiguration-free).
                 .linkedLibrary("c++"),
                 .linkedLibrary("resolv"),
+                .linkedLibrary("iconv"),
+                .linkedLibrary("objc"),
+                .linkedFramework("AVFAudio"),
                 .linkedFramework("Foundation"),
                 .linkedFramework("CoreFoundation"),
                 .linkedFramework("Metal"),

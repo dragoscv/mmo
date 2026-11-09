@@ -104,7 +104,8 @@ build_target() { # target
   sysroot="$(xcrun --sdk "$sdk" --show-sdk-path)"
   local var="BINDGEN_EXTRA_CLANG_ARGS_${t//-/_}"
   log "cargo rustc decks-ffi --target $t (staticlib)"
-  (cd "$WS" && env "${PROFILE_ENV[@]}" "$var=--target=$clang_target -isysroot $sysroot" SDKROOT="$sysroot" \
+  # No SDKROOT export: it would also apply to the host (macOS) build scripts; cc-rs finds the SDK via xcrun.
+  (cd "$WS" && env "${PROFILE_ENV[@]}" "$var=--target=$clang_target -isysroot $sysroot" \
     cargo rustc -p decks-ffi --lib --release --target "$t" --crate-type staticlib -- --print native-static-libs)
 }
 

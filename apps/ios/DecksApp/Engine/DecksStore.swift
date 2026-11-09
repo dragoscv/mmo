@@ -8,9 +8,9 @@ import QuartzCore
 @MainActor
 @Observable
 final class DecksStore {
-    static let deckCount = 2
-    static let tempoRanges: [Double] = [0.06, 0.08, 0.16, 0.5]
-    static let loopSizes: [Double] = [0.25, 0.5, 1, 2, 4, 8, 16, 32]
+    nonisolated static let deckCount = 2
+    nonisolated static let tempoRanges: [Double] = [0.06, 0.08, 0.16, 0.5]
+    nonisolated static let loopSizes: [Double] = [0.25, 0.5, 1, 2, 4, 8, 16, 32]
 
     let engine: DecksEngine
 
