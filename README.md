@@ -22,6 +22,7 @@ MixAI este platforma media self-hosted care organizează, analizează și redă 
 | 🌐 **MixAI (web)** | Bibliotecă, filme, mixer, DAW, live, scanner, recordings, vizualizări | [`apps/web/`](apps/web/) |
 | 🖥️ **MMO Server** (MixAI Companion) | Server media self-hosted — audio local, transcodare, bridge nativ | [`server/`](server/) |
 | 🎛️ **MixAI Decks** | Aplicație nativă DJ (Tauri 2 + Rust audio), `decks.mixai.ro` | [`apps/mixai/`](apps/mixai/) |
+| 🎤 **MixAI Live** | Procesor vocal în timp real (motor Rust, monitorizare in-ear, telecomandă din telefon), `live.mixai.ro` — [documentație](docs/live/README.md) | [`apps/live/`](apps/live/) |
 | 📱 **MixAI Native** | Desktop (Tauri) + mobil/TV (Capacitor) | [`apps/native/`](apps/native/) |
 | 🧩 **Browser Extension** | Detectează & descarcă audio din 15+ platforme streaming | [`apps/extension/`](apps/extension/) |
 | ☁️ **Infrastructură** | Server TURN/STUN pe GCP pentru WebRTC remote | [`infra/terraform/`](infra/terraform/) |

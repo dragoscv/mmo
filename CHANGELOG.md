@@ -10,6 +10,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Live engine 0.1.0 — realtime vocal engine, LAN remote, docs + CI (WP21-02/03/05/17)
+
+- New product **MixAI Live** (`live.mixai.ro`, ADR-0015): Rust engine workspace `apps/live/engine` (own `Cargo.lock`), docs in [`docs/live/`](docs/live/README.md).
+- `live-dsp` (MIT OR Apache-2.0, zero dependencies): 13 allocation-free stereo effects with per-sample parameter smoothing and click-free bypass — gate, EQ, split-band de-esser, compressor, pitch correction (YIN + WSOLA + LPC formant), 4-voice harmonizer, saturator, doubler, chorus, delay (tempo sync, ping-pong, ducking), FDN reverb, zero-latency limiter, tuner.
+- `live-engine`: cpal duplex I/O with lock-free `rtrb` rings (commands in, garbage + meters out), main + in-ear monitor buses with a dry blend, scene swap with tail spill, 30 Hz meters, presets / songs / setlists (JSON v1, 7 factory presets), click-train loopback latency probe; optional `asio` / `pipewire` / `jack` features.
+- `live-remote`: HTTP + WebSocket control protocol v1, three token roles with QR pairing, OSC/UDP, mDNS `_mixai-live._tcp`, web remote page (RO/EN, design tokens).
+- `live-cli` (`mixai-live-engine`): `devices`, `presets`, `run`, `latency`, `render`, and `serve` (control server; prints one `ready` JSON line with the pairing URLs).
+- Browser `/live` fixes (split-band de-esser, real vocoder / stereo width / gate) shipped in web 3.4.5 below.
+- CI: `.github/workflows/live-ci.yml` (fmt, clippy `-D warnings`, tests on Linux / Windows / macOS, cargo-deny licences with `apps/live/engine/deny.toml`).
+
 ## web 3.4.7 — web-ci green again
 
 - `audio-fx-live-dsp.test.ts` evaluates the live gate worklet with `node:vm` instead of `new Function` (oxlint `no-implied-eval` error since 3.4.5).

@@ -13,6 +13,7 @@ export default {
                 "web",
                 "server",
                 "mixai",
+                "live",
                 "native",
                 "extension",
                 "tv-android",

@@ -1,0 +1,64 @@
+# cargo-deny config for the MixAI Live engine workspace (live-dsp, live-engine, live-remote, live-cli).
+# Run from the repo root:
+#   cargo deny --manifest-path apps/live/engine/Cargo.toml --workspace --all-features check licenses bans sources
+#
+# Licence policy (ADR-0014, ADR-0015 §8): same allow-list as apps/mixai/src-tauri/deny.toml. Only permissive /
+# weak-copyleft-file-level licences may link into the engine. GPL / AGPL / LGPL are banned outright — this keeps
+# Rubber Band, Seed-VC, Essentia, aubio and Mixxx code out. Every crate here is MIT OR Apache-2.0, so no
+# application-crate exception is needed. The ASIO SDK (GPLv3/proprietary) is not a crate: the opt-in `asio`
+# feature pulls cpal's asio-sys bindings (Apache-2.0), the SDK itself is fetched at build time.
+
+[graph]
+all-features = false
+no-default-features = false
+
+[licenses]
+confidence-threshold = 0.9
+# The allow-list is the project-wide policy; not every entry appears in today's graph.
+unused-allowed-license = "allow"
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "BSL-1.0",
+    "0BSD",
+    "CDLA-Permissive-2.0",
+]
+# cargo-deny (config v2) denies every licence NOT in `allow`, so GPL-2.0/3.0, AGPL-3.0 and LGPL-2.1/3.0
+# (any -only/-or-later form) are rejected. Never add them to `allow`.
+exceptions = []
+
+[licenses.private]
+ignore = false
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+deny = [
+    # ADR-0014 / ADR-0015: copyleft DSP code must never enter the dependency graph.
+    { crate = "rubberband", reason = "GPL (ADR-0014)" },
+    { crate = "rubberband-sys", reason = "GPL (ADR-0014)" },
+    { crate = "essentia", reason = "AGPL (ADR-0014)" },
+    { crate = "essentia-sys", reason = "AGPL (ADR-0014)" },
+    { crate = "aubio", reason = "GPL (ADR-0014)" },
+    { crate = "aubio-rs", reason = "GPL (ADR-0014)" },
+    { crate = "aubio-sys", reason = "GPL (ADR-0014)" },
+]
+
+[advisories]
+yanked = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

@@ -1,0 +1,89 @@
+name: live-ci
+
+# MixAI Live engine (apps/live/engine: live-dsp, live-engine, live-remote, live-cli) — fmt, clippy, tests on
+# Linux / Windows / macOS and cargo-deny licences. ADR-0015, WP21-17. Own Cargo workspace + lockfile.
+# Default features only for build/test: `asio` needs the Steinberg SDK (GPLv3/proprietary, opt-in) and
+# `pipewire` / `jack` need extra system libraries. cargo-deny still checks the --all-features graph.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/live/engine/**"
+      - ".github/workflows/live-ci.yml"
+  pull_request:
+    paths:
+      - "apps/live/engine/**"
+      - ".github/workflows/live-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: live-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  MANIFEST: apps/live/engine/Cargo.toml
+
+jobs:
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check --manifest-path "$MANIFEST"
+
+  rust:
+    name: clippy + test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Linux system deps (ALSA for cpal)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/live/engine -> target
+
+      - name: cargo clippy -D warnings
+        shell: bash
+        run: cargo clippy --manifest-path "$MANIFEST" --workspace --all-targets -- -D warnings
+
+      # Includes the assert_no_alloc tests (audio thread must not allocate) and the loopback WebSocket e2e.
+      - name: cargo test --workspace
+        shell: bash
+        run: cargo test --manifest-path "$MANIFEST" --workspace
+
+  licences:
+    name: licences (cargo-deny)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: apps/live/engine/Cargo.toml
+          # cargo-deny 0.20 reads the deny.toml next to the manifest (apps/live/engine/deny.toml).
+          arguments: --workspace --all-features
+          command: check
+          command-arguments: licenses bans sources
