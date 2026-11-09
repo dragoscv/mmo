@@ -43,6 +43,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   is arm64 only) and declares background audio under `UIBackgroundModes` (App Store rejected `WKBackgroundModes: audio`).
   New `scripts/ios-build.ps1 -Mode keybpmphonesim` captures 6.9" iPhone store screenshots from the Simulator through a
   `-KBShot` launch-argument hook.
+- **iOS crash fix**: the metronome built its AVAudioEngine graph when the Tempo tab was created (at launch, the tab
+  view builds every tab), which aborted the app where no audio output could start (seen in the Simulator:
+  `AURemoteIO::Initialize` RPC timeout). The graph is now built on the first click.
 
 ## web 3.4.1 · ui 1.0.2 · design-tokens 1.4.3 · extension 3.0.5 — WCAG AA contrast (axe gate)
 

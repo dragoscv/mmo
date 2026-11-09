@@ -143,8 +143,13 @@ final class Metronome: @unchecked Sendable {
     private let player = AVAudioPlayerNode()
     private var hi: AVAudioPCMBuffer?
     private var lo: AVAudioPCMBuffer?
+    private var wired = false
 
-    init() {
+    /// The graph is built on the first click: touching `mainMixerNode` initialises the output audio unit, which
+    /// must not happen at launch (the TabView builds TempoView eagerly; it aborted the app with no audio device).
+    private func wire() {
+        guard !wired else { return }
+        wired = true
         let fmt = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: fmt)
@@ -152,6 +157,7 @@ final class Metronome: @unchecked Sendable {
     }
 
     func click(downbeat: Bool, at host: UInt64) {
+        wire()
         if !engine.isRunning { try? engine.start(); player.play() }
         guard let b = downbeat ? hi : lo else { return }
         player.scheduleBuffer(b, at: AVAudioTime(hostTime: host), options: [])

@@ -63,6 +63,26 @@ struct RootView: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
+        if UserDefaults.standard.string(forKey: "KBShot") != nil {
+            // Store screenshots (-KBShot): the GPU-less build VM Simulator renders the glass tab bar as a smear, so
+            // the chosen screen is shown on its own.
+            Group {
+                switch nav.tab {
+                case 1: TunerView()
+                case 2: TempoView()
+                case 3: SetLogView()
+                case 4: PracticeView()
+                case 5: LibraryView()
+                default: LiveView(stage: $nav.stage)
+                }
+            }
+            .fullScreenCover(isPresented: $nav.stage) { StageView() }
+        } else {
+            tabs
+        }
+    }
+
+    private var tabs: some View {
         TabView(selection: $nav.tab) {
             Tab("kb.tab.live", systemImage: "waveform", value: 0) { LiveView(stage: $nav.stage) }
             Tab("kb.tab.tuner", systemImage: "tuningfork", value: 1) { TunerView() }
