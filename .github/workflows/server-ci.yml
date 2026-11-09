@@ -115,7 +115,7 @@ jobs:
             - name: Container answers /health
               run: |
                   docker run -d --name mmo -p 17899:17899 -e MMO_HEADLESS=1 mmo-server:ci
-                  for i in $(seq 1 30); do
+                  for _ in $(seq 1 30); do
                     if curl -fsS http://127.0.0.1:17899/health; then echo; echo "OK"; exit 0; fi
                     sleep 2
                   done

@@ -34,7 +34,7 @@ exclude = [
 ]
 
 # Anchors inside markdown are checked; missing fragments are errors.
-include_fragments = true
+include_fragments = "full"
 
 # Quiet, machine-friendly output.
 no_progress = true

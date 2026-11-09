@@ -111,7 +111,7 @@ jobs:
                       artifact_glob: |
                           apps/native/src-tauri/target/release/bundle/dmg/*.dmg
                           apps/native/src-tauri/target/release/bundle/macos/*.app.tar.gz
-                    - os: macos-13
+                    - os: macos-15-intel
                       rust_target: x86_64-apple-darwin
                       artifact_glob: |
                           apps/native/src-tauri/target/release/bundle/dmg/*.dmg
@@ -295,7 +295,7 @@ jobs:
               uses: r0adkll/upload-google-play@v1
               with:
                   serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
-                  packageName: ro.muzicai.app
+                  packageName: ro.mixai.app
                   releaseFiles: apps/native/android/app/build/outputs/bundle/release/app-release.aab
                   track: internal
                   status: draft
