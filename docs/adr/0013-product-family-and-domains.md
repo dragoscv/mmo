@@ -1,6 +1,9 @@
 # ADR-0013 — MixAI product family, domains and app identifiers
 
 - Status: Accepted · 2026-11-06 (owner decisions, two question rounds)
+- **Superseded naming (2026-11-08):** "MixAI DJ" is now **MixAI Decks** and its host is `decks.mixai.ro`
+  (`dj.mixai.ro` answers 308). App id `ro.mixai.dj` unchanged. See [ADR-0014](0014-mixai-decks-native-dj.md) (D60).
+  The tables below keep the 2026-11-06 wording as the historical decision.
 - Tracker: [`docs/mixai-design-tracker.md`](../mixai-design-tracker.md) §12 (D40–D49, WP17)
 - Inventory: [`docs/arhitectura/app-inventory.md`](../arhitectura/app-inventory.md)
 - Related: [ADR-0001](0001-naming-mixai-and-mmo-server.md) (brand), [ADR-0004](0004-tv-apps-compose-media3-and-tizen-web.md)

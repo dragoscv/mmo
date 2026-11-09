@@ -1,4 +1,10 @@
-# MixAI DJ — Native DJ Software · Architecture & Implementation Plan
+# MixAI Decks — Native DJ Software · Architecture & Implementation Plan
+
+> **Current home of the Decks docs: [`docs/decks/`](../decks/README.md)** (architecture, controllers, mapping
+> format, DVS, library interop, streaming). This file is kept as the history of the Tauri 1.x plan.
+
+> Renamed from "MixAI DJ" on 2026-11-08 (D60). The native 2.0 direction (Rust `decks-core` + native UIs) is in
+> [ADR-0014](../adr/0014-mixai-decks-native-dj.md); this plan describes the Tauri 1.x app.
 
 > The goal: the best DJ software on the planet for bedroom/hobbyist DJs first,
 > with pro-grade depth — combining the strengths of rekordbox, Serato, Traktor,
@@ -127,7 +133,7 @@ Cue: separate device/channel (full flexible routing matrix — any device, any c
 | BPM / beatgrid / key | **offline in companion/cloud** (aubio/Essentia/QM ok there) OR permissive Rust analyzer | GPL stays out of shipped binary | companion / worker |
 | Stems | companion/cloud (Demucs/BS-Roformer) + on-device ONNX (v0.2) | model-dependent | companion/cloud |
 
-**Licensing rule:** the shipped MixAI DJ binary links **only permissive** DSP.
+**Licensing rule:** the shipped MixAI Decks binary links **only permissive** DSP.
 Any GPL/AGPL analysis (aubio/Essentia/Rubber Band) runs as a **separate process**
 (companion or cloud) so it never statically links into the proprietary app.
 The repo itself is dual-licensed (AGPL + `COMMERCIAL-LICENSE.md`); the commercial
@@ -166,7 +172,7 @@ NI Traktor Kontrol, Hercules/Reloop, HID advanced.
 ## 6. Library & companion integration
 
 - **Local files:** companion (`server/`) already exposes local files + audio HW.
-  MixAI DJ talks to it over the existing local HTTP + device-token auth.
+  MixAI Decks talks to it over the existing local HTTP + device-token auth.
 - **mixai.ro:** unified browse, load, and (later) stream. Account-synced.
 - **Stems:** user choice — on-device model OR companion/cloud GPU (existing
   `cloud-gpu-stems.ts` / `stems-engine.ts` patterns). Taxonomy: vocals/drums/

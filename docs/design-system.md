@@ -1,6 +1,6 @@
 # MixAI Design System
 
-> Source of truth for how every MixAI surface looks and behaves — web (PWA), MixAI DJ (Tauri),
+> Source of truth for how every MixAI surface looks and behaves — web (PWA), MixAI Decks (Tauri),
 > Companion (Electron), native shell (Tauri/Capacitor), TV (Tizen web + Android Compose) and the
 > browser extension. Code lives in `packages/design-tokens` (data) and `packages/ui` (components).
 > Progress and decisions: `docs/mixai-design-tracker.md`.
@@ -35,7 +35,7 @@
 | `--brand-2` | `#e84ff0` | `#ef62f3` | second stop of the signature gradient |
 | `--brand-accent` | `#22d3ee` | `#38dcf2` | wordmark "AI", live indicators |
 | `--brand-gradient` | violet → magenta 135° | | hero, badges (`Badge variant="gradient"`) |
-| `--deck-a/b/c/d` | cyan / pink / lime / amber | | MixAI DJ deck colours (fixed, D9) |
+| `--deck-a/b/c/d` | cyan / pink / lime / amber | | MixAI Decks deck colours (fixed, D9) |
 
 Neutrals carry a faint indigo bias (hue 285, chroma 0.004–0.02) and dark-mode text is warm ivory
 (`oklch(0.96 0.01 80)`), never pure white.
@@ -56,7 +56,7 @@ Neutrals carry a faint indigo bias (hue 285, chroma 0.004–0.02) and dark-mode 
 Persisted shape (`ThemePrefs`): `{ mode, accent, surface, density, radius, motion, locale, feedback }`.
 `feedback` enables haptics + sound cues (`useHaptics()`).
 
-Migration: `theme` (web v1), `mixai-ui` (MixAI DJ zustand blob: `flat-pro`→flat, `studio-metal`→solid,
+Migration: `theme` (web v1), `mixai-ui` (MixAI Decks zustand blob: `flat-pro`→flat, `studio-metal`→solid,
 `minimal`→reduced) and the `mmo-locale` cookie are read once when `mixai:prefs:v1` is absent.
 
 ## 4. Generated artefacts

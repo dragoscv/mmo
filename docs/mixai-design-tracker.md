@@ -667,7 +667,7 @@ Windows MIDI Services (25H2). DVS: xwax/Mixxx GPL; Serato CV02.5 = 1 kHz carrier
 | WP19-05 | Beat/phase sync + quantize + master clock (beatgrid model with downbeats, fluid/variable grids), key shift, slip, beat-jump, pad modes | todo |
 | WP19-06 | Routing matrix: master + headphone cue (split mono, 4-ch interfaces), cue mix/level, booth out, per-device latency compensation | todo |
 | WP19-07 | Time-stretch: Signalsmith Stretch (key lock) + Bungee (scrub/reverse); replaces WSOLA | todo |
-| WP19-08 | Analysis via `mixai-listen` (WP18-01): key, downbeats, tuning, LUFS, multi-band peaks; server analysis merged when available | todo |
+| WP19-08 | Analysis: decks-analysis (beatgrid+downbeats, LUFS, peaks) + key/live from shared crates/mixai-listen (WP18-01) | todo |
 | WP19-09 | Stems on-device: ort 2 + HTDemucs ONNX (CoreML / DirectML / NNAPI / QNN / XNNPACK), background pre-separation cache, server fallback; stem mixer + stem FX | todo |
 | WP19-10 | FX: colour FX (filter, phaser, flanger, noise, dub echo), beat FX (echo, reverb FDN, roll, gate), FX chains, MIDI clock out | todo |
 | WP19-11 | Local library (SQLite): crates, smart crates, history; import/export rekordbox XML, Serato tags + crates, Traktor NML, Engine DB, OneLibrary; one-click migration with cue colours; CDJ USB export | todo |

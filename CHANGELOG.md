@@ -10,6 +10,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## Unreleased — MixAI DJ renamed to MixAI Decks (D60, ADR-0014) · web 3.3.3 · MixAI Decks 1.1.0
+
+- **MixAI DJ renamed to MixAI Decks** (D60, [ADR-0014](docs/adr/0014-mixai-decks-native-dj.md)): product name, window
+  title, store descriptions, suite landing, launcher, README(s) and docs. The app id stays `ro.mixai.dj`, the folder
+  `apps/mixai` and the crates keep their names, and the Microsoft Store record `9P5P2WN26RMS` is renamed in place.
+- **Web 3.3.3:** `decks.mixai.ro` is the canonical host of the Decks landing (`/dj` route); `dj.mixai.ro` answers a
+  permanent **308** to `decks.mixai.ro` with path and query preserved (`routeRequest` in `lib/host/products.ts`,
+  unit-tested). Sitemap/robots/metadata follow `productOrigin("dj")`. Needs the `decks` CNAME + Cloud Run domain
+  mapping before `MIXAI_HOST_ROUTING=1` serves it.
+- **MixAI Decks 1.1.0** (`apps/mixai`): `productName` / window title "MixAI Decks", homepage `decks.mixai.ro`.
+- **Web 3.3.4 — Decks Pro infra, not enabled** (WP19-23, ADR-0014 decision 10): `lib/entitlements.ts` defines the
+  `decks_pro` entitlement (Stripe plans `pro_monthly` / `pro_yearly`) behind the `MIXAI_FLAG_DECKS_PRO` flag, **off by
+  default**; no UI, no route, no DB migration (definitions in code, state from the existing `subscriptions` table).
+- **Docs:** `docs/decks/` is the new home of MixAI Decks docs — index, architecture (crates, threading, data flow,
+  native UIs, licence gate, CI, performance budgets, Pro infra), controllers guide (RO), streaming strategy with the
+  partner application checklist + draft emails, library interop matrix (WP19-25).
+
 ## 2026-11-08 — web 3.3.2, server 3.13.1: covers
 
 - **Web 3.3.2:** a music cover that fails to load (track without art → the server answers a Subsonic error) shows the

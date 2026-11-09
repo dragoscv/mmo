@@ -51,7 +51,7 @@
 Fereastra desktop este un renderer **Vite 8 + React 19** construit pe
 [`@mmo/ui`](../design-system.md) (Base UI) și pe token-urile `@mmo/design-tokens`:
 aceeași paletă OKLCH, aceleași dimensiuni de temă (mod, accent, suprafață,
-densitate, rază) ca web-ul și MixAI DJ; preferințele se salvează în
+densitate, rază) ca web-ul și MixAI Decks; preferințele se salvează în
 `mixai:prefs:v1` (localStorage-ul renderer-ului). Vechiul `index.html` vanilla
 de 1400 linii a dispărut — sursa e în `server/ui/src`, iar API-ul preload
 (`window.mmo`) a rămas identic.

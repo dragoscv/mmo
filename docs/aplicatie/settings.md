@@ -26,7 +26,7 @@ chei i18n sub `settings.<domeniu>` (RO + EN):
 ### 🎨 Appearance
 
 Randează `<ThemeSettings />` din [`@mmo/ui`](../design-system.md) — aceleași 7 dimensiuni ca pe
-MixAI DJ, Companion și TV: **mod** (light/dark/system), **accent** (6 presetări + hue custom +
+MixAI Decks, Companion și TV: **mod** (light/dark/system), **accent** (6 presetări + hue custom +
 „din cover art"), **suprafață** (glass/solid/flat), **densitate** (comfortable/compact), **rază**
 (sm/md/lg), **mișcare** (full/reduced) și **limbă** (RO/EN). Preferințele se salvează în
 `localStorage["mixai:prefs:v1"]`, se sincronizează pe cont (`PreferencesSync`) și se aplică

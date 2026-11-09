@@ -16,7 +16,7 @@ Work: tracker §12 WP17. Update this table in the same commit as any release, re
 | Apple Watch | `apps/ios/MixAIWatch` | MixAI | `ro.mixai.app.watchkitapp` | 1.1.0 | Remote, now playing | Not embedded in 1.1.x |
 | Samsung TV | `apps/tv-tizen` | MixAI TV | `mXa1TvApp0` | 2.2.0 | Watching | Sideload (signed `.wgt`) |
 | Web shell | `apps/native` | MixAI | `ro.mixai.app` (clash) | 1.0.0 | Tauri/Capacitor wrapper that loads `mixai.ro` | GH Release |
-| DJ | `apps/mixai` | MixAI DJ | `ro.mixai.dj` | 1.0.0 | DJ / creation | Not released |
+| Decks | `apps/mixai` | MixAI Decks (was MixAI DJ, D60) | `ro.mixai.dj` | 1.1.0 | DJ / creation. Rust crates in `apps/mixai/src-tauri/crates`: `mixai-core` (engine), `decks-analysis`, `decks-library`, `decks-mapping`, `decks-dvs`, `decks-render` + shared `crates/mixai-listen` — built and unit-tested; UniFFI facade + native UIs (2.0) todo. Docs: [`docs/decks/`](../decks/README.md) | 1.0.0 MSIX in MS Store certification (as MixAI DJ); 1.x Tauri on `decks-release.yml` |
 | Extension | `apps/extension` | MixAI downloader | `mixai-downloader@mixai.ro` | 3.0.1 | Download helper | Release workflow exists, not published |
 | Server | `server` | MixAI Companion — MMO Server | `ro.mixai.companion` | 3.9.6 | Server | GH Release, Docker, Pi |
 | Gateway | `apps/gateway` | — | — | 0.1.0 | Infra | Cloud Run |
@@ -43,7 +43,7 @@ Work: tracker §12 WP17. Update this table in the same commit as any release, re
 | MixAI Music | macOS | Mac App Store + DMG | `apps/music-desktop` | `ro.mixai.music.desktop` | WP17-43 |
 | MixAI Music | Linux | Flathub | `apps/music-desktop` | `ro.mixai.music.desktop` | WP17-43 |
 | MixAI Studio | Web + desktop shell | `app.mixai.ro`, MS Store | `apps/web`, `apps/native` | `ro.mixai.studio` | WP17-11, WP17-50 |
-| MixAI DJ | Windows/macOS/Linux | MS Store, Mac App Store, Flathub, GH | `apps/mixai` | `ro.mixai.dj` | WP17-51 |
+| MixAI Decks | Windows/macOS/Linux, then iOS/iPadOS/Android (native 2.0, ADR-0014) | MS Store, Mac App Store, App Store, Google Play, Flathub, GH; site `decks.mixai.ro` (`dj.mixai.ro` → 308) | `apps/mixai` | `ro.mixai.dj` | WP17-51, WP19 |
 | MixAI Server | Windows/macOS/Linux, Docker, Pi | GH Release, Docker Hub/GHCR, winget | `server` | `ro.mixai.companion` | WP17-52 |
 | MixAI Connector | Chrome/Firefox/Edge | CWS, AMO, Edge Add-ons | `apps/extension` | `mixai-downloader@mixai.ro` | WP17-53 |
 | Suite homepage | Web | `mixai.ro` | `apps/web` | — | WP17-12 |
@@ -67,7 +67,7 @@ Work: tracker §12 WP17. Update this table in the same commit as any release, re
 | MixAI TV | `9P3WGV62ZRN5` | Name `DragosCatalin.MixAITV`, Publisher `CN=FE8B5839-E0F9-495F-854C-53165710EB07`, PFN `DragosCatalin.MixAITV_2n7wyqrzmk6fw` |
 | MixAI Music | `9PC31TGKW4FP` | Name `DragosCatalin.MixAIMusic`, Publisher `CN=FE8B5839-E0F9-495F-854C-53165710EB07`, PFN `DragosCatalin.MixAIMusic_2n7wyqrzmk6fw` |
 | MixAI Studio | `9NKKC4WGMX67` | idem |
-| MixAI DJ | `9P5P2WN26RMS` | idem |
+| MixAI Decks (reserved as MixAI DJ; rename in Partner Center, D60) | `9P5P2WN26RMS` | idem |
 
 Reservations expire if nothing is submitted within 3 months (by 2027-02-06).
 `apps/tv-desktop/scripts/package-msix.ps1 -IdentityName DragosCatalin.MixAITV -Publisher 'CN=FE8B5839-E0F9-495F-854C-53165710EB07' -PublisherDisplay 'Dragos Catalin'`.

@@ -83,7 +83,7 @@ excepțiile (TS 7, ESLint 10 pe web) sunt notate cu motivul blocajului.
 
 ---
 
-## 🎛️ MixAI DJ, TV, Companion UI — surfețe Vite
+## 🎛️ MixAI Decks, TV, Companion UI — surfețe Vite
 
 | Dependență | Unde | De ce |
 |---|---|---|
@@ -117,7 +117,7 @@ excepțiile (TS 7, ESLint 10 pe web) sunt notate cu motivul blocajului.
 | Tehnologie | De ce |
 |---|---|
 | **Capacitor 8.5** | Ambalează PWA-ul web pentru Android/iOS; min/compile/target SDK 24/36/36, AGP 8.13; `AndroidManifest.xml` acum versionat |
-| **Tauri 2.11** (Rust 2021) | Desktop nativ pentru MixAI DJ + shell nativ; Tauri 3 e încă alpha. `reqwest` 0.13 (feature `rustls`), `cpal` 0.15 / `symphonia` 0.5 pinuite (0.16+/0.6 cer refactor) |
+| **Tauri 2.11** (Rust 2021) | Desktop nativ pentru MixAI Decks + shell nativ; Tauri 3 e încă alpha. `reqwest` 0.13 (feature `rustls`), `cpal` 0.15 / `symphonia` 0.5 pinuite (0.16+/0.6 cer refactor) |
 | Safe-area + `standalone` | `--safe-*` din tokens, variantă Tailwind `standalone`, `<html data-standalone>` setat de `pwa-standalone.tsx` pentru PWA/Capacitor/Tauri |
 
 ---
