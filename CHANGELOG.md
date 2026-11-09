@@ -10,6 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## web 3.3.8 — dependency majors (WP20-06)
+
+- next-auth `5.0.0-beta.32`, jose 6, @octokit/rest 22, google-auth-library 11, react-markdown 10 (no `className` prop used, nothing to migrate).
+- Removed the unused `radix-ui` dependency (0 imports; `@mmo/ui` is Base UI, ADR-0008).
+- Verified: typecheck 0 errors, vitest 691/691 (device-token flake under load passes 6/6 alone), Turbopack production build.
+- CI: web-ci runtime job now boots (`lib/env.ts` needed Google OAuth creds) and smokes public pages before Lighthouse; docs-ci, ci-lint and server-ci green again.
+
 ## server 3.14.2 · native 1.1.2 · yjs-relay 0.1.2 — TypeScript 7 (WP20-02)
 
 - server: `tsc` = TypeScript 7.0.2 via `@typescript/native`, TS 6 API kept for openapi-typescript; `moduleResolution: bundler` (commonjs emit unchanged).
