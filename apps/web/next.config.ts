@@ -62,6 +62,13 @@ const nextConfig: NextConfig = {
         ],
     },
 
+    // Decks marketplace (WP19-31): the routes read generated .mixaipack/preview files by
+    // catalogue id at runtime, which the tracer cannot see — include them explicitly.
+    outputFileTracingIncludes: {
+        "/api/decks/packs/[id]/download": ["./src/lib/decks-packs/files/*.mixaipack"],
+        "/api/decks/packs/[id]/preview": ["./src/lib/decks-packs/previews/*.png"],
+    },
+
     // Keep large local-only assets out of every serverless function bundle.
     // The recordings/import actions use dynamic path.join() which causes
     // Next's tracer to pull in the entire project (data/, public/samples/,

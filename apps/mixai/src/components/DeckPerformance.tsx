@@ -11,21 +11,43 @@ import { ToggleChip } from "./ToggleChip";
 /** Hold time that turns a SYNC tap into a sync-lock toggle. */
 const LONG_PRESS_MS = 450;
 
-const fieldStyle: React.CSSProperties = {
+export const fieldStyle: React.CSSProperties = {
     background: "var(--bg-elev-2)",
     color: "var(--fg)",
     border: "1px solid var(--border)",
     borderRadius: 6,
-    padding: "3px 4px",
+    padding: "0 4px",
+    minHeight: 24,
     fontSize: 10,
     fontWeight: 700,
 };
 
 /**
+ * Track key (from the library), the master deck's key and the playing key
+ * after key shift. Also keeps the engine's remembered key in step with the
+ * library metadata so KEY MATCH works for any deck pair. Call it exactly once
+ * per mounted deck (Deck.tsx does), whatever the tier.
+ */
+export function useDeckKey(deckId: DeckId) {
+    const perfShift = usePerfStore((s) => s.decks[deckId].keyShift);
+    const masterSource = usePerfStore((s) => s.clock?.source ?? null);
+    const trackKey = useMixerStore((s) => s.deckKeys[deckId]);
+    const masterKey = useMixerStore((s) =>
+        masterSource && masterSource !== "internal" && masterSource !== deckId ? s.deckKeys[masterSource] : null,
+    );
+    useEffect(() => {
+        void engine.setDeckKey(deckId, trackKey ? { keyName: trackKey } : null).catch(() => undefined);
+    }, [deckId, trackKey]);
+    const shift = Math.round(perfShift);
+    const playingKey = trackKey ? (shiftCamelot(trackKey, shift) ?? trackKey) : null;
+    return { trackKey: trackKey ?? null, masterKey: masterKey ?? null, shift, playingKey };
+}
+
+/**
  * SYNC: tap = one-shot phase sync to the master clock; long-press or
  * Shift+click / Shift+Enter = toggle continuous sync lock.
  */
-function SyncButton({ deckId, deck, accent }: { deckId: DeckId; deck: DeckState; accent: string }) {
+export function SyncButton({ deckId, deck, accent, style }: { deckId: DeckId; deck: DeckState; accent: string; style?: React.CSSProperties }) {
     const t = useT();
     const locked = usePerfStore((s) => s.decks[deckId].syncLock);
     const phaseSync = usePerfStore((s) => s.phaseSync);
@@ -73,7 +95,7 @@ function SyncButton({ deckId, deck, accent }: { deckId: DeckId; deck: DeckState;
                 if (e.shiftKey) setSyncLock(deckId, !locked);
                 else phaseSync(deckId);
             }}
-            style={{ padding: "6px 10px" }}
+            style={style}
         >
             {locked ? <Link2 size={12} aria-hidden /> : <RefreshCw size={12} aria-hidden />}
             {t("deck.sync")}
@@ -82,172 +104,165 @@ function SyncButton({ deckId, deck, accent }: { deckId: DeckId; deck: DeckState;
     );
 }
 
-/**
- * Decks 1.x performance controls under the transport: SYNC / MASTER / QUANTIZE /
- * SLIP / REVERSE, beat jump and the KEY section (shift, key match, Camelot).
- */
-export function DeckPerformance({ deckId, deck, accent }: { deckId: DeckId; deck: DeckState; accent: string }) {
+/** MASTER badge: shows (not sets) whether this deck drives the master clock. Text + border, never colour only. */
+export function MasterBadge({ deckId, accent }: { deckId: DeckId; accent: string }) {
+    const t = useT();
+    const isMaster = usePerfStore((s) => s.clock?.source === deckId);
+    return (
+        <span
+            role="img"
+            aria-label={t(isMaster ? "deck.masterOn" : "deck.masterOff", { id: deckId.toUpperCase() })}
+            title={t("deck.masterHint")}
+            className="inline-flex min-h-6 shrink-0 items-center justify-center rounded-md px-1.5"
+            style={{
+                fontSize: 9,
+                fontWeight: 800,
+                letterSpacing: "0.08em",
+                border: `1px ${isMaster ? "solid" : "dashed"} ${isMaster ? accent : "var(--border)"}`,
+                color: isMaster ? "var(--fg)" : "var(--fg-dim)",
+                opacity: isMaster ? 1 : 0.6,
+            }}
+        >
+            {t("deck.master")}
+        </span>
+    );
+}
+
+/** QUANT / SLIP / REV toggles. */
+export function ModeToggles({ deckId, deck, accent }: { deckId: DeckId; deck: DeckState; accent: string }) {
     const t = useT();
     const id = deckId.toUpperCase();
     const perf = usePerfStore((s) => s.decks[deckId]);
-    const isMaster = usePerfStore((s) => s.clock?.source === deckId);
-    const masterSource = usePerfStore((s) => s.clock?.source ?? null);
     const setQuantize = usePerfStore((s) => s.setQuantize);
     const setSlip = usePerfStore((s) => s.setSlip);
     const setReverse = usePerfStore((s) => s.setReverse);
+    return (
+        <>
+            <ToggleChip pressed={perf.quantize} accent={accent} onClick={() => setQuantize(deckId, !perf.quantize)} aria-label={t("deck.quantizeAria", { id })} title={t("deck.quantizeHint")}>
+                {t("deck.quantize")}
+            </ToggleChip>
+            <ToggleChip pressed={perf.slip} accent={accent} onClick={() => setSlip(deckId, !perf.slip)} aria-label={t("deck.slipAria", { id })} title={t("deck.slipHint")}>
+                {t("deck.slip")}
+            </ToggleChip>
+            <ToggleChip
+                pressed={perf.reverse}
+                accent={accent}
+                disabled={!deck.loaded}
+                onClick={() => setReverse(deckId, !perf.reverse)}
+                aria-label={t("deck.reverseAria", { id })}
+                title={t("deck.reverseHint")}
+            >
+                {t("deck.reverse")}
+            </ToggleChip>
+        </>
+    );
+}
+
+/** Beat jump: back / size / forward. */
+export function BeatJump({ deckId, deck }: { deckId: DeckId; deck: DeckState }) {
+    const t = useT();
+    const jumpSize = usePerfStore((s) => s.decks[deckId].jumpSize);
     const setJumpSize = usePerfStore((s) => s.setJumpSize);
     const beatJump = usePerfStore((s) => s.beatJump);
+    const disabled = !deck.loaded;
+    return (
+        <div role="group" aria-label={t("deck.beatJump")} className="flex min-w-0 items-center gap-0.5">
+            <ToggleChip size="xs" disabled={disabled} onClick={() => beatJump(deckId, -1)} aria-label={t("deck.jumpBack", { n: jumpSize })}>
+                <ChevronLeft size={12} aria-hidden />
+            </ToggleChip>
+            <select value={jumpSize} onChange={(e) => setJumpSize(deckId, Number(e.target.value))} aria-label={t("deck.jumpSize")} className="mono" style={fieldStyle}>
+                {BEAT_JUMP_SIZES.map((n) => (
+                    <option key={n} value={n}>
+                        {n}
+                    </option>
+                ))}
+            </select>
+            <ToggleChip size="xs" disabled={disabled} onClick={() => beatJump(deckId, 1)} aria-label={t("deck.jumpForward", { n: jumpSize })}>
+                <ChevronRight size={12} aria-hidden />
+            </ToggleChip>
+        </div>
+    );
+}
+
+/** KEY section: playing key, shift −/reset/+, key match. */
+export function KeyControls({
+    deckId,
+    deck,
+    keyInfo,
+    showKey = true,
+}: {
+    deckId: DeckId;
+    deck: DeckState;
+    keyInfo: ReturnType<typeof useDeckKey>;
+    showKey?: boolean;
+}) {
+    const t = useT();
+    const isMaster = usePerfStore((s) => s.clock?.source === deckId);
     const setKeyShift = usePerfStore((s) => s.setKeyShift);
     const keyMatch = usePerfStore((s) => s.keyMatch);
-    const trackKey = useMixerStore((s) => s.deckKeys[deckId]);
-    const masterKey = useMixerStore((s) =>
-        masterSource && masterSource !== "internal" && masterSource !== deckId ? s.deckKeys[masterSource] : null,
-    );
-
-    // Keep the engine's remembered key in step with the library metadata so
-    // KEY MATCH works for any deck pair.
-    useEffect(() => {
-        void engine.setDeckKey(deckId, trackKey ? { keyName: trackKey } : null).catch(() => undefined);
-    }, [deckId, trackKey]);
-
-    const shift = Math.round(perf.keyShift);
-    const playingKey = trackKey ? (shiftCamelot(trackKey, shift) ?? trackKey) : null;
-    const disabled = !deck.loaded;
-
+    const { shift, playingKey, trackKey, masterKey } = keyInfo;
     return (
-        <div style={{ display: "grid", gap: 6 }}>
-            <div role="group" aria-label={t("deck.perfGroup", { id })} style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-                <SyncButton deckId={deckId} deck={deck} accent={accent} />
-                <ToggleChip
-                    pressed={perf.quantize}
-                    accent={accent}
-                    onClick={() => setQuantize(deckId, !perf.quantize)}
-                    aria-label={t("deck.quantizeAria", { id })}
-                    title={t("deck.quantizeHint")}
-                >
-                    {t("deck.quantize")}
-                </ToggleChip>
-                <ToggleChip
-                    pressed={perf.slip}
-                    accent={accent}
-                    onClick={() => setSlip(deckId, !perf.slip)}
-                    aria-label={t("deck.slipAria", { id })}
-                    title={t("deck.slipHint")}
-                >
-                    {t("deck.slip")}
-                </ToggleChip>
-                <ToggleChip
-                    pressed={perf.reverse}
-                    accent={accent}
-                    disabled={disabled}
-                    onClick={() => setReverse(deckId, !perf.reverse)}
-                    aria-label={t("deck.reverseAria", { id })}
-                    title={t("deck.reverseHint")}
-                >
-                    {t("deck.reverse")}
-                </ToggleChip>
+        <div role="group" aria-label={t("deck.keySection")} className="flex min-w-0 items-center gap-0.5">
+            {showKey && (
                 <span
+                    className="mono"
+                    title={t("deck.trackKeyHint")}
+                    aria-label={playingKey ? t("deck.trackKey", { key: playingKey }) : t("deck.unknownKey")}
                     role="img"
-                    aria-label={t(isMaster ? "deck.masterOn" : "deck.masterOff", { id })}
-                    title={t("deck.masterHint")}
-                    style={{
-                        marginLeft: "auto",
-                        fontSize: 9,
-                        fontWeight: 800,
-                        letterSpacing: "0.08em",
-                        padding: "3px 6px",
-                        borderRadius: 6,
-                        border: `1px solid ${isMaster ? accent : "var(--border)"}`,
-                        color: isMaster ? "var(--fg)" : "var(--fg-dim)",
-                        opacity: isMaster ? 1 : 0.5,
-                    }}
+                    style={{ fontSize: 11, fontWeight: 700, minWidth: 26, textAlign: "center" }}
                 >
-                    {t("deck.master")}
+                    {playingKey ?? "—"}
                 </span>
+            )}
+            <ToggleChip size="xs" onClick={() => setKeyShift(deckId, shift - 1)} disabled={shift <= -12} aria-label={t("deck.keyDown")}>
+                <Minus size={11} aria-hidden />
+            </ToggleChip>
+            <button
+                type="button"
+                className="mono min-h-6 min-w-6 rounded"
+                onClick={() => setKeyShift(deckId, 0)}
+                aria-label={t("deck.keyShift", { n: formatSemitones(shift) })}
+                title={t("deck.keyReset")}
+                style={{ fontSize: 10, fontWeight: 700 }}
+            >
+                {formatSemitones(shift)}
+            </button>
+            <ToggleChip size="xs" onClick={() => setKeyShift(deckId, shift + 1)} disabled={shift >= 12} aria-label={t("deck.keyUp")}>
+                <Plus size={11} aria-hidden />
+            </ToggleChip>
+            <ToggleChip size="xs" disabled={!deck.loaded || isMaster} onClick={() => void keyMatch(deckId, trackKey, masterKey)} title={t("deck.keyMatchHint")}>
+                {t("deck.keyMatch")}
+            </ToggleChip>
+        </div>
+    );
+}
+
+/**
+ * Decks 1.x performance controls (stacked form, used inside popovers of the
+ * smaller tiers): SYNC / QUANT / SLIP / REV / MASTER, beat jump and KEY.
+ */
+export function DeckPerformance({
+    deckId,
+    deck,
+    accent,
+    keyInfo,
+}: {
+    deckId: DeckId;
+    deck: DeckState;
+    accent: string;
+    keyInfo: ReturnType<typeof useDeckKey>;
+}) {
+    const t = useT();
+    return (
+        <div className="grid gap-1.5">
+            <div role="group" aria-label={t("deck.perfGroup", { id: deckId.toUpperCase() })} className="flex flex-wrap items-center gap-1">
+                <SyncButton deckId={deckId} deck={deck} accent={accent} />
+                <ModeToggles deckId={deckId} deck={deck} accent={accent} />
+                <MasterBadge deckId={deckId} accent={accent} />
             </div>
-
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <div role="group" aria-label={t("deck.beatJump")} style={{ display: "flex", gap: 3, alignItems: "center" }}>
-                    <ToggleChip
-                        size="xs"
-                        disabled={disabled}
-                        onClick={() => beatJump(deckId, -1)}
-                        aria-label={t("deck.jumpBack", { n: perf.jumpSize })}
-                    >
-                        <ChevronLeft size={12} aria-hidden />
-                    </ToggleChip>
-                    <select
-                        value={perf.jumpSize}
-                        onChange={(e) => setJumpSize(deckId, Number(e.target.value))}
-                        aria-label={t("deck.jumpSize")}
-                        className="mono"
-                        style={fieldStyle}
-                    >
-                        {BEAT_JUMP_SIZES.map((n) => (
-                            <option key={n} value={n}>
-                                {n}
-                            </option>
-                        ))}
-                    </select>
-                    <ToggleChip
-                        size="xs"
-                        disabled={disabled}
-                        onClick={() => beatJump(deckId, 1)}
-                        aria-label={t("deck.jumpForward", { n: perf.jumpSize })}
-                    >
-                        <ChevronRight size={12} aria-hidden />
-                    </ToggleChip>
-                </div>
-
-                <div
-                    role="group"
-                    aria-label={t("deck.keySection")}
-                    style={{ display: "flex", gap: 3, alignItems: "center", marginLeft: "auto" }}
-                >
-                    <span
-                        className="mono"
-                        title={t("deck.trackKeyHint")}
-                        aria-label={playingKey ? t("deck.trackKey", { key: playingKey }) : t("deck.unknownKey")}
-                        role="img"
-                        style={{ fontSize: 11, fontWeight: 700, minWidth: 26, textAlign: "center" }}
-                    >
-                        {playingKey ?? "—"}
-                    </span>
-                    <ToggleChip
-                        size="xs"
-                        onClick={() => setKeyShift(deckId, shift - 1)}
-                        disabled={shift <= -12}
-                        aria-label={t("deck.keyDown")}
-                    >
-                        <Minus size={11} aria-hidden />
-                    </ToggleChip>
-                    <button
-                        type="button"
-                        className="mono"
-                        onClick={() => setKeyShift(deckId, 0)}
-                        aria-label={t("deck.keyShift", { n: formatSemitones(shift) })}
-                        title={t("deck.keyReset")}
-                        style={{ fontSize: 10, fontWeight: 700, minWidth: 22, borderRadius: 4 }}
-                    >
-                        {formatSemitones(shift)}
-                    </button>
-                    <ToggleChip
-                        size="xs"
-                        onClick={() => setKeyShift(deckId, shift + 1)}
-                        disabled={shift >= 12}
-                        aria-label={t("deck.keyUp")}
-                    >
-                        <Plus size={11} aria-hidden />
-                    </ToggleChip>
-                    <ToggleChip
-                        size="xs"
-                        disabled={disabled || isMaster}
-                        onClick={() => void keyMatch(deckId, trackKey, masterKey)}
-                        title={t("deck.keyMatchHint")}
-                    >
-                        {t("deck.keyMatch")}
-                    </ToggleChip>
-                </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <BeatJump deckId={deckId} deck={deck} />
+                <KeyControls deckId={deckId} deck={deck} keyInfo={keyInfo} />
             </div>
         </div>
     );

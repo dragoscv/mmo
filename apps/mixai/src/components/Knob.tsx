@@ -14,6 +14,8 @@ interface KnobProps {
     /** Accessible name (defaults to `label`). */
     ariaLabel?: string;
     disabled?: boolean;
+    /** Render the formatted value line under the knob (aria-valuetext is kept either way). */
+    showValue?: boolean;
 }
 
 /**
@@ -34,6 +36,7 @@ export function Knob({
     format,
     ariaLabel,
     disabled = false,
+    showValue = true,
 }: KnobProps) {
     const startY = useRef(0);
     const startVal = useRef(0);
@@ -155,11 +158,11 @@ export function Knob({
                 <line x1={cx} y1={cy} x2={px} y2={py} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
             </svg>
             {label && (
-                <span style={{ fontSize: 9, letterSpacing: "0.08em", color: "var(--fg-dim)", textTransform: "uppercase" }}>
+                <span style={{ fontSize: 9, lineHeight: "11px", letterSpacing: "0.08em", color: "var(--fg-dim)", textTransform: "uppercase", whiteSpace: "nowrap" }}>
                     {label}
                 </span>
             )}
-            {format && <span className="mono" style={{ fontSize: 10 }}>{format(value)}</span>}
+            {format && showValue && <span className="mono" style={{ fontSize: 10, lineHeight: "12px", whiteSpace: "nowrap" }}>{format(value)}</span>}
         </div>
     );
 }

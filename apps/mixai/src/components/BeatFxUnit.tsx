@@ -15,17 +15,22 @@ const KINDS: readonly { kind: Unit["kind"]; label: MessageKey }[] = [
 /**
  * Beat FX unit (WP19-10), synced to the master clock: type, beat fraction
  * (1/8..4), wet/dry, on/off and the deck it is assigned to.
+ * Laid out to fit 150 px (the mixer's inline slot); `bare` drops the title row
+ * when a popover already shows the heading.
  */
-export function BeatFxUnit({ decks }: { decks: DeckId[] }) {
+export function BeatFxUnit({ decks, bare = false }: { decks: DeckId[]; bare?: boolean }) {
     const t = useT();
     const fx = usePerfStore((s) => s.beatFx);
     const patch = usePerfStore((s) => s.patchBeatFx);
     const deckOptions = [...decks].sort();
 
     return (
-        <section aria-label={t("fx.beat.title")} style={{ display: "grid", gap: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+        <section
+            aria-label={t("fx.beat.title")}
+            style={{ display: "grid", gap: 6, alignContent: "start", ...(bare ? {} : { borderTop: "1px solid var(--border)", paddingTop: 6 }) }}
+        >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                <span style={{ fontSize: 10, color: "var(--fg-dim)", letterSpacing: "0.12em" }}>{t("fx.beat.title")}</span>
+                {!bare && <span style={{ fontSize: 10, color: "var(--fg-dim)", letterSpacing: "0.12em" }}>{t("fx.beat.title")}</span>}
                 <ToggleChip size="xs" pressed={fx.on} onClick={() => patch({ on: !fx.on })} aria-label={t("fx.beat.onAria")}>
                     {fx.on ? t("fx.beat.on") : t("fx.beat.off")}
                 </ToggleChip>
@@ -46,8 +51,8 @@ export function BeatFxUnit({ decks }: { decks: DeckId[] }) {
                 ))}
             </div>
 
-            <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
-                <label style={{ display: "grid", gap: 3, fontSize: 9, color: "var(--fg-dim)" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center" }}>
+                <label style={{ display: "grid", gap: 2, fontSize: 9, color: "var(--fg-dim)" }}>
                     {t("fx.beat.beats")}
                     <select
                         value={fx.beats}
@@ -58,7 +63,8 @@ export function BeatFxUnit({ decks }: { decks: DeckId[] }) {
                             color: "var(--fg)",
                             border: "1px solid var(--border)",
                             borderRadius: 6,
-                            padding: "3px 4px",
+                            padding: "0 4px",
+                            minHeight: 24,
                             fontSize: 11,
                             fontWeight: 700,
                         }}
@@ -70,7 +76,7 @@ export function BeatFxUnit({ decks }: { decks: DeckId[] }) {
                         ))}
                     </select>
                 </label>
-                <label style={{ display: "grid", gap: 3, fontSize: 9, color: "var(--fg-dim)" }}>
+                <label style={{ display: "grid", gap: 2, fontSize: 9, color: "var(--fg-dim)" }}>
                     {t("fx.beat.deck")}
                     <select
                         value={fx.deck}
@@ -80,7 +86,8 @@ export function BeatFxUnit({ decks }: { decks: DeckId[] }) {
                             color: "var(--fg)",
                             border: "1px solid var(--border)",
                             borderRadius: 6,
-                            padding: "3px 4px",
+                            padding: "0 4px",
+                            minHeight: 24,
                             fontSize: 11,
                             fontWeight: 700,
                         }}
@@ -93,7 +100,7 @@ export function BeatFxUnit({ decks }: { decks: DeckId[] }) {
                     </select>
                 </label>
                 <Knob
-                    size={40}
+                    size={32}
                     value={fx.wet}
                     min={0}
                     max={1}

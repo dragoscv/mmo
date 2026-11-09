@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## web 3.4.4 — Decks marketplace catalogue + pack downloads (WP19-31)
+
+- `GET /api/decks/packs` serves the MixAI Decks marketplace catalogue (`MarketCatalog`, public, CORS `*`, `max-age=300`).
+- `GET /api/decks/packs/[id]/download` serves official `.mixaipack` files (ETag = sha256); Pro packs need `Authorization: Bearer <device token>` of a user with `decks_pro`, else 401/402 `{ error: "pro_required" }`. `GET /api/decks/packs/[id]/preview` serves the build-time preview PNG. Ids resolve only through the catalogue.
+- Four official packs signed with `mixai-official-2026` (Neon Club, Vinyl Warm, Radio Host layouts, Festival Pro bundle), built by the new Skin SDK (`node apps/mixai/sdk/mixaipack.mjs`, sources in `apps/mixai/packs-src/`, `node apps/mixai/packs-src/build.mjs`). `next.config.ts` traces the pack files into the standalone image.
+
 ## web 3.4.3 · design-tokens 1.4.4 · extension 3.0.6 — axe gate green
 
 - `sidebar-primary` (active sidebar item) light lightness 0.62 → 0.53, same WCAG AA fix as `primary` (3.8:1 → 5.0:1 on the sidebar accent).

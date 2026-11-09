@@ -9,7 +9,7 @@ import { useT } from "@/i18n";
 
 /**
  * Global command palette (Ctrl/⌘ K). Navigation + actions + theme quick
- * switches. Open state is mirrored into the ui-store so the TopBar button and
+ * switches. Open state is mirrored into the ui-store so the title bar button and
  * the shortcut share one source of truth.
  */
 export function CommandPalette() {
@@ -26,7 +26,7 @@ export function CommandPalette() {
     const toggleRecording = useRecordingStore((s) => s.toggle);
     const { prefs, setPrefs, resolvedMode } = useThemePrefs();
 
-    // TopBar button → palette
+    // title bar button → palette
     useEffect(() => {
         if (commandOpen) {
             setOpen(true);

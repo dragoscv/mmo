@@ -1,0 +1,16 @@
+{
+  "v": 1,
+  "id": "radio-compact",
+  "name": "Radio compact",
+  "columns": [5, 2, 5],
+  "rows": [1, 7, 2, 4],
+  "gap": 8,
+  "areas": [
+    { "panel": "deckA", "col": 0, "row": 0, "rowSpan": 3 },
+    { "panel": "clock", "col": 1, "row": 0 },
+    { "panel": "mixer", "col": 1, "row": 1 },
+    { "panel": "crossfader", "col": 1, "row": 2 },
+    { "panel": "deckB", "col": 2, "row": 0, "rowSpan": 3 },
+    { "panel": "library", "col": 0, "row": 3, "colSpan": 3 }
+  ]
+}

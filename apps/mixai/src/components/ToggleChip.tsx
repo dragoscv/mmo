@@ -13,7 +13,8 @@ interface ToggleChipProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
 /**
  * Small DJ-style button. When `pressed` is given it is a toggle and exposes
  * `aria-pressed`; colours come only from token variables. Focus ring is the
- * global `:focus-visible` outline from @mmo/ui.
+ * global `:focus-visible` outline from @mmo/ui. Never smaller than 24×24 CSS px
+ * (WCAG 2.2 2.5.8), so it can sit in the tightest panel tier.
  */
 export function ToggleChip({ pressed, accent = "var(--accent)", size = "sm", style, children, disabled, ...rest }: ToggleChipProps) {
     const on = pressed === true;
@@ -25,7 +26,9 @@ export function ToggleChip({ pressed, accent = "var(--accent)", size = "sm", sty
             disabled={disabled}
             {...rest}
             style={{
-                padding: size === "xs" ? "3px 7px" : "6px 9px",
+                padding: size === "xs" ? "0 7px" : "0 9px",
+                minHeight: 24,
+                minWidth: 24,
                 borderRadius: size === "xs" ? 6 : 8,
                 fontSize: size === "xs" ? 9 : 10,
                 fontWeight: 700,
@@ -40,6 +43,7 @@ export function ToggleChip({ pressed, accent = "var(--accent)", size = "sm", sty
                 justifyContent: "center",
                 gap: 4,
                 whiteSpace: "nowrap",
+                flexShrink: 0,
                 ...style,
             }}
         >

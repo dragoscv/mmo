@@ -6,13 +6,13 @@
 import { useCallback, type ReactNode } from "react";
 import { useThemePrefs } from "@mmo/ui/theme";
 import { UiI18nProvider, format, uiMessages, type UiLocale, type UiMessageKey } from "@mmo/ui/i18n";
-import { appMessages, type AppMessageKey } from "./messages";
+import { mergedMessages, type AppMessageKey } from "./catalog";
 
 export type MessageKey = AppMessageKey | UiMessageKey;
 export type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
 function lookup(locale: UiLocale, key: string): string | undefined {
-    const app = appMessages[locale] as Record<string, string>;
+    const app = (mergedMessages as Record<string, Record<string, string>>)[locale] ?? {};
     const ui = uiMessages[locale] as Record<string, string>;
     return app[key] ?? ui[key];
 }
@@ -25,7 +25,7 @@ export function translate(locale: UiLocale, key: MessageKey, vars?: Record<strin
 /** Current locale from theme prefs, narrowed to a supported catalogue. */
 export function useLocale(): UiLocale {
     const { prefs } = useThemePrefs();
-    return (prefs.locale in appMessages ? prefs.locale : "en") as UiLocale;
+    return (prefs.locale in mergedMessages ? prefs.locale : "en") as UiLocale;
 }
 
 export function useT(): Translate {

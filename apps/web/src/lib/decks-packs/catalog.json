@@ -1,0 +1,86 @@
+{
+  "v": 1,
+  "generatedAt": "2026-11-09T00:00:00.000Z",
+  "packs": [
+    {
+      "id": "ro.mixai.bundle.festival-pro",
+      "name": "Festival Pro",
+      "version": "1.0.0",
+      "kind": "bundle",
+      "author": "MixAI",
+      "description": "Dark gold main-stage skin with a four-deck festival layout. Decks Pro.",
+      "pro": true,
+      "trust": "official",
+      "size": 6042,
+      "sha256": "eaf0746100b2cf7c87da31bb34ca903d9ccd0f1fd446b3d7f64172a3129b9c33",
+      "previewUrl": "/api/decks/packs/ro.mixai.bundle.festival-pro/preview",
+      "tags": [
+        "bundle",
+        "dark",
+        "gold",
+        "4-decks"
+      ],
+      "updatedAt": "2026-11-09T00:00:00.000Z"
+    },
+    {
+      "id": "ro.mixai.layout.radio-host",
+      "name": "Radio Host",
+      "version": "1.0.0",
+      "kind": "layout",
+      "author": "MixAI",
+      "description": "Library-first layout for radio shows and long sets, plus a compact two-deck layout for small screens.",
+      "pro": false,
+      "trust": "official",
+      "size": 4612,
+      "sha256": "7621f661c09472ad45ab6c878bda81dfb60eaee4e2220f7c892d50ea0a0cde32",
+      "previewUrl": "/api/decks/packs/ro.mixai.layout.radio-host/preview",
+      "tags": [
+        "layout",
+        "radio",
+        "library",
+        "compact"
+      ],
+      "updatedAt": "2026-11-09T00:00:00.000Z"
+    },
+    {
+      "id": "ro.mixai.skin.neon-club",
+      "name": "Neon Club",
+      "version": "1.0.0",
+      "kind": "skin",
+      "author": "MixAI",
+      "description": "Vivid magenta and cyan glass on near-black, for dark booths.",
+      "pro": false,
+      "trust": "official",
+      "size": 4427,
+      "sha256": "e391264c34f5cda0c6474b4a7b4107ab6a9251cc87c89cdf4b2adc7bfcdd410b",
+      "previewUrl": "/api/decks/packs/ro.mixai.skin.neon-club/preview",
+      "tags": [
+        "skin",
+        "dark",
+        "neon",
+        "club"
+      ],
+      "updatedAt": "2026-11-09T00:00:00.000Z"
+    },
+    {
+      "id": "ro.mixai.skin.vinyl-warm",
+      "name": "Vinyl Warm",
+      "version": "1.0.0",
+      "kind": "skin",
+      "author": "MixAI",
+      "description": "Warm cream and brown light theme for daylight sets, WCAG AA contrast.",
+      "pro": false,
+      "trust": "official",
+      "size": 4439,
+      "sha256": "9de40279a7b6ced2b108530a4c5c95578075168381c51677ac55f97652458dd6",
+      "previewUrl": "/api/decks/packs/ro.mixai.skin.vinyl-warm/preview",
+      "tags": [
+        "skin",
+        "light",
+        "warm",
+        "daylight"
+      ],
+      "updatedAt": "2026-11-09T00:00:00.000Z"
+    }
+  ]
+}

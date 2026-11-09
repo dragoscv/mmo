@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "id": "ro.mixai.skin.vinyl-warm",
+  "name": "Vinyl Warm",
+  "version": "1.0.0",
+  "kind": "skin",
+  "author": "MixAI",
+  "description": "Warm cream and brown light theme for daylight sets, WCAG AA contrast.",
+  "pro": false,
+  "tokens": "tokens.json",
+  "preview": "assets/preview.png"
+}

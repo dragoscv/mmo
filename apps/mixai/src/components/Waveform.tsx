@@ -5,6 +5,7 @@ import { useMixerStore } from "@/state/mixer-store";
 interface WaveformProps {
     deck: DeckState;
     accent: string;
+    className?: string;
 }
 
 /**
@@ -12,10 +13,16 @@ interface WaveformProps {
  * (stored per deck in the mixer store) with a played/unplayed split, the loop
  * region, hot-cue markers, and a playhead. Falls back to a faint procedural
  * pattern when no track is loaded so the layout reads during design.
+ *
+ * Fills its parent box (the deck gives it the flexible row), follows size
+ * changes with a ResizeObserver, and runs ONE animation loop that reads the
+ * latest deck snapshot from a ref (no effect teardown on every 30 Hz update).
  */
-export function Waveform({ deck, accent }: WaveformProps) {
+export function Waveform({ deck, accent, className }: WaveformProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const peaks = useMixerStore((s) => s.waveforms[deck.id]);
+    const live = useRef({ deck, peaks, accent });
+    live.current = { deck, peaks, accent };
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -23,16 +30,29 @@ export function Waveform({ deck, accent }: WaveformProps) {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        const dpr = window.devicePixelRatio || 1;
+        let dpr = window.devicePixelRatio || 1;
+        // Canvas cannot parse `var(--deck-a)`: resolve it through the element's computed colour.
+        let accentKey = "";
+        let accentColor = "";
+        const resolveAccent = (a: string) => {
+            if (a === accentKey) return accentColor;
+            canvas.style.color = a;
+            accentKey = a;
+            accentColor = getComputedStyle(canvas).color || a;
+            return accentColor;
+        };
         const resize = () => {
+            dpr = window.devicePixelRatio || 1;
             const { clientWidth, clientHeight } = canvas;
-            canvas.width = clientWidth * dpr;
-            canvas.height = clientHeight * dpr;
+            canvas.width = Math.max(1, Math.round(clientWidth * dpr));
+            canvas.height = Math.max(1, Math.round(clientHeight * dpr));
         };
         resize();
 
         let raf = 0;
         const draw = () => {
+            const { deck, peaks } = live.current;
+            const accent = resolveAccent(live.current.accent);
             const w = canvas.width;
             const h = canvas.height;
             ctx.clearRect(0, 0, w, h);
@@ -103,19 +123,25 @@ export function Waveform({ deck, accent }: WaveformProps) {
         };
         draw();
 
+        const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(resize) : null;
+        ro?.observe(canvas);
         window.addEventListener("resize", resize);
         return () => {
             cancelAnimationFrame(raf);
+            ro?.disconnect();
             window.removeEventListener("resize", resize);
         };
-    }, [deck, peaks, accent]);
+    }, []);
 
     return (
         <canvas
             ref={canvasRef}
+            aria-hidden
+            className={className}
             style={{
                 width: "100%",
-                height: 60,
+                height: "100%",
+                minHeight: 0,
                 display: "block",
                 borderRadius: 10,
                 background: "var(--bg-elev)",

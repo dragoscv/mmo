@@ -25,6 +25,8 @@ import { useHidStore } from "@/state/hid-store";
 import { useKeybindStore } from "@/state/keybind-store";
 import { usePluginStore } from "@/plugins/plugin-store";
 import { exportProfile, importProfile } from "@/lib/profile";
+import { useLayoutStore } from "@/layout/layout-store";
+import { useProfilesStore } from "@/settings/profiles-store";
 import { PREFS_CHANGED_EVENT, applyPrefs, emitPrefsChanged, loadPrefs, savePrefs } from "@mmo/ui/theme";
 
 /** Serialize the live app state into a portable profile JSON string. */
@@ -44,6 +46,8 @@ export async function buildProfileJson(): Promise<string> {
         hidPreset: useHidStore.getState().preset,
         externalPlugins: usePluginStore.getState().externalSpecs,
         keybinds: useKeybindStore.getState().overrides,
+        layout: useLayoutStore.getState().snapshot(),
+        settingsProfiles: useProfilesStore.getState().snapshot(),
     });
 }
 
@@ -80,6 +84,8 @@ export async function applyProfileJson(
         }
     }
     if (parsed.keybinds) useKeybindStore.getState().setOverrides(parsed.keybinds);
+    if (parsed.layout) useLayoutStore.getState().restore(parsed.layout);
+    if (parsed.settingsProfiles) useProfilesStore.getState().restore(parsed.settingsProfiles);
     return true;
 }
 
@@ -168,6 +174,8 @@ export function startCloudAutoSync(): () => void {
     unsubs.push(useHidStore.subscribe(schedulePush));
     unsubs.push(useKeybindStore.subscribe(schedulePush));
     unsubs.push(usePluginStore.subscribe(schedulePush));
+    unsubs.push(useLayoutStore.subscribe(schedulePush));
+    unsubs.push(useProfilesStore.subscribe(schedulePush));
     // Appearance prefs live outside zustand (shared ThemeProvider store).
     window.addEventListener(PREFS_CHANGED_EVENT, schedulePush);
     unsubs.push(() => window.removeEventListener(PREFS_CHANGED_EVENT, schedulePush));

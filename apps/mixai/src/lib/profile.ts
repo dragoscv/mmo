@@ -17,6 +17,8 @@ import type { ExternalPluginSpec } from "@/plugins/external";
 import { parseExternalSpec } from "@/plugins/external";
 import type { KeybindOverrides } from "@/state/keybind-store";
 import { SHORTCUTS_BY_ID } from "@/lib/shortcuts";
+import { parseLayoutState, type PersistedLayout } from "@/layout/layout-store";
+import { normalizeProfiles, type ProfilesState } from "@/settings/profiles-core";
 
 export interface ProfileSnapshot {
     /** Shared appearance prefs (mode / accent / surface / density / …). */
@@ -33,6 +35,10 @@ export interface ProfileSnapshot {
     externalPlugins: ExternalPluginSpec[];
     /** User keyboard-shortcut overrides (stable id → KeyboardEvent.code). */
     keybinds: KeybindOverrides;
+    /** Shell layouts, snapshots and per-controller layouts (added after v1; optional). */
+    layout?: PersistedLayout;
+    /** Settings profiles (Home / Club / Streaming …), never containing the library token. */
+    settingsProfiles?: ProfilesState;
 }
 
 /** Serialize a profile to a versioned, shareable JSON string. */
@@ -111,6 +117,8 @@ export function importProfile(json: string): Partial<ProfileSnapshot> | null {
         }
         if (Object.keys(kb).length > 0) out.keybinds = kb;
     }
+    if (data.layout && typeof data.layout === "object") out.layout = parseLayoutState(data.layout);
+    if (data.settingsProfiles && typeof data.settingsProfiles === "object") out.settingsProfiles = normalizeProfiles(data.settingsProfiles);
 
     // Nothing recognizable → treat as malformed.
     if (Object.keys(out).length === 0) return null;

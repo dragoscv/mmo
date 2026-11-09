@@ -207,8 +207,11 @@ export const engine = {
     },
 
     /** Connect to the first input whose name contains `name`. Returns the port. */
-    midiConnect(name: string): Promise<string | null> {
-        return call<string>("midi_connect", { name });
+    async midiConnect(name: string): Promise<string | null> {
+        const port = await call<string>("midi_connect", { name });
+        // Lets the shell apply the layout mapped to this controller.
+        if (port && typeof window !== "undefined") window.dispatchEvent(new CustomEvent("mixai:midi-connected", { detail: port }));
+        return port;
     },
 
     midiDisconnect(): Promise<null> {

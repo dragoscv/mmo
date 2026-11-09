@@ -1,0 +1,19 @@
+{
+  "v": 1,
+  "id": "festival-4",
+  "name": "Festival 4 decks",
+  "columns": [4, 4, 3, 4, 4],
+  "rows": [1, 9, 2, 5],
+  "areas": [
+    { "panel": "deckC", "col": 0, "row": 0, "rowSpan": 3 },
+    { "panel": "deckA", "col": 1, "row": 0, "rowSpan": 3 },
+    { "panel": "clock", "col": 2, "row": 0 },
+    { "panel": "mixer", "col": 2, "row": 1 },
+    { "panel": "crossfader", "col": 2, "row": 2 },
+    { "panel": "deckB", "col": 3, "row": 0, "rowSpan": 3 },
+    { "panel": "deckD", "col": 4, "row": 0, "rowSpan": 3 },
+    { "panel": "library", "col": 0, "row": 3, "colSpan": 2 },
+    { "panel": "sampler", "col": 2, "row": 3 },
+    { "panel": "automix", "col": 3, "row": 3, "colSpan": 2 }
+  ]
+}

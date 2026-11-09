@@ -13,8 +13,12 @@ const pct = (v: number) => `${Math.round(v * 100)}%`;
  * Headphone / booth routing (WP19-06): cue mix (cue ↔ master), headphone
  * level, split-mono, 4-channel mapping (only when the device has ≥4 outputs)
  * and booth level. Per-output latency offsets live in Settings.
+ *
+ * `variant="inline"` = the mixer's bottom row: just the three knobs at 26 px
+ * with their labels (fits a 42 px row); SPLIT / 4-CH stay in the full form
+ * (mixer popover).
  */
-export function RoutingPanel() {
+export function RoutingPanel({ variant = "full" }: { variant?: "full" | "inline" }) {
     const t = useT();
     const routing = usePerfStore((s) => s.routing);
     const channels = usePerfStore((s) => s.outputChannels);
@@ -35,8 +39,19 @@ export function RoutingPanel() {
         ? t("routing.fourChHint")
         : t("routing.fourChUnavailable", { n: channels ?? "?" });
 
+    if (variant === "inline") {
+        const s = 26;
+        return (
+            <div role="group" aria-label={t("routing.title")} className="flex min-w-0 items-start justify-center gap-2">
+                <Knob size={s} value={routing.cueMix} min={0} max={1} center={0.5} label={t("routing.cueMix")} ariaLabel={t("routing.cueMixAria")} format={(v) => `${pct(1 - v)}·${pct(v)}`} showValue={false} onChange={(v) => patchRouting({ cueMix: v })} />
+                <Knob size={s} value={routing.headphoneLevel} min={0} max={1.5} center={0.7} label={t("routing.phones")} ariaLabel={t("routing.phonesAria")} format={pct} showValue={false} onChange={(v) => patchRouting({ headphoneLevel: v })} />
+                <Knob size={s} value={routing.boothLevel} min={0} max={1.5} center={0} label={t("routing.booth")} ariaLabel={t("routing.boothAria")} format={(v) => (v <= 0.001 ? t("routing.off") : pct(v))} showValue={false} onChange={(v) => patchRouting({ boothLevel: v })} />
+            </div>
+        );
+    }
+
     return (
-        <section aria-label={t("routing.title")} style={{ display: "grid", gap: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+        <section aria-label={t("routing.title")} style={{ display: "grid", gap: 8 }}>
             <span style={{ fontSize: 10, color: "var(--fg-dim)", letterSpacing: "0.12em", textAlign: "center" }}>
                 {t("routing.title")}
             </span>

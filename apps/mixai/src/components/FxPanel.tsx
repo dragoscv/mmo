@@ -1,13 +1,15 @@
 import { engine } from "@/bridge/engine";
 import type { DeckId, DeckState } from "@/bridge/types";
 import { useMixerStore } from "@/state/mixer-store";
+import { useT, type MessageKey } from "@/i18n";
+import { cn } from "@mmo/ui";
 
 /** FX kinds, matching the Rust `FxKind` enum (0=off, 1=echo, 2=reverb). */
-const FX = [
-    { kind: 0, label: "OFF", title: "No effect" },
-    { kind: 1, label: "ECHO", title: "Beat-synced feedback echo" },
-    { kind: 2, label: "REVERB", title: "Schroeder reverb tail" },
-] as const;
+const FX: readonly { kind: number; label: MessageKey; title: MessageKey }[] = [
+    { kind: 0, label: "deckui.fxOff", title: "deckui.fxOffHint" },
+    { kind: 1, label: "deckui.fxEcho", title: "deckui.fxEchoHint" },
+    { kind: 2, label: "deckui.fxReverb", title: "deckui.fxReverbHint" },
+];
 
 /** Beat divisions for the echo time. */
 const BEATS = [
@@ -17,12 +19,16 @@ const BEATS = [
     { value: 2, label: "2" },
 ] as const;
 
+const chip =
+    "inline-flex min-h-6 min-w-6 items-center justify-center rounded-md px-2 text-[9px] font-bold tracking-[0.04em] transition-colors duration-100 focus-visible:outline-2 focus-visible:outline-[var(--ring)] disabled:opacity-40";
+
 /**
  * Per-deck FX unit: a beat-synced echo or a reverb tail with a wet/dry blend.
  * The effect is a post-fader insert in the audio engine, so tails follow the
  * channel fader. Wet is smoothed in the engine for click-free toggling.
  */
-export function FxPanel({ deckId, deck, accent }: { deckId: DeckId; deck: DeckState; accent: string }) {
+export function FxPanel({ deckId, deck, accent, className }: { deckId: DeckId; deck: DeckState; accent: string; className?: string }) {
+    const t = useT();
     const patchDeck = useMixerStore((s) => s.patchDeck);
 
     const kind = deck.fxKind ?? 0;
@@ -34,92 +40,71 @@ export function FxPanel({ deckId, deck, accent }: { deckId: DeckId; deck: DeckSt
         patchDeck(deckId, { fxKind: next });
         void engine.setFxKind(deckId, next);
     };
-
     const setWet = (next: number) => {
         patchDeck(deckId, { fxWet: next });
         void engine.setFxWet(deckId, next);
     };
-
     const setBeats = (next: number) => {
         patchDeck(deckId, { fxBeats: next });
         void engine.setFxBeats(deckId, next);
     };
 
     return (
-        <div style={{ display: "grid", gap: 6 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 10, color: "var(--fg-dim)", letterSpacing: "0.12em" }}>FX</span>
-                <div style={{ display: "flex", gap: 3 }}>
+        <div className={cn("grid min-w-0 content-start gap-1.5", className)}>
+            <div className="flex flex-wrap items-center justify-between gap-1">
+                <span className="text-[10px] tracking-[0.12em] text-[var(--fg-dim)]">{t("deckui.fx")}</span>
+                <div role="radiogroup" aria-label={t("deckui.fxType")} className="flex gap-0.5">
                     {FX.map(({ kind: k, label, title }) => (
                         <button
                             key={k}
+                            type="button"
+                            role="radio"
+                            aria-checked={kind === k}
                             onClick={() => setKind(k)}
-                            title={title}
-                            style={{
-                                padding: "3px 8px",
-                                borderRadius: 8,
-                                fontSize: 9,
-                                fontWeight: 700,
-                                letterSpacing: "0.04em",
-                                background: kind === k ? accent : "var(--bg-elev-2)",
-                                color: kind === k ? "var(--accent-fg)" : "var(--fg-dim)",
-                                transition: "background 120ms ease, color 120ms ease",
-                            }}
+                            title={t(title)}
+                            className={chip}
+                            style={{ background: kind === k ? accent : "var(--bg-elev-2)", color: kind === k ? "var(--accent-fg)" : "var(--fg-dim)" }}
                         >
-                            {label}
+                            {t(label)}
                         </button>
                     ))}
                 </div>
             </div>
-
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: 8,
-                    alignItems: "center",
-                    opacity: on ? 1 : 0.4,
-                    transition: "opacity 150ms ease",
-                }}
-            >
-                {/* Wet/dry blend. */}
-                <div style={{ display: "grid", gap: 3 }}>
+            <div className="grid min-w-0 items-center gap-2" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", opacity: on ? 1 : 0.4 }}>
+                <label className="flex min-w-0 items-center gap-1.5">
+                    <span className="mono w-14 shrink-0 text-[9px] text-[var(--fg-dim)]">{t("deckui.fxWet", { n: Math.round(wet * 100) })}</span>
                     <input
                         type="range"
                         min={0}
                         max={1}
                         step={0.01}
                         value={wet}
-                        title="Wet / dry mix"
+                        aria-label={t("deckui.fxWetAria")}
                         disabled={!on}
                         onChange={(e) => setWet(Number(e.target.value))}
-                        style={{ width: "100%", accentColor: accent }}
+                        className="min-w-0 flex-1"
+                        style={{ minHeight: 24, accentColor: accent }}
                     />
-                    <span className="mono" style={{ fontSize: 9, color: "var(--fg-dim)" }}>
-                        WET {Math.round(wet * 100)}%
-                    </span>
-                </div>
-
-                {/* Echo beat division (only meaningful for echo, but harmless for reverb). */}
-                <div style={{ display: "flex", gap: 2 }}>
-                    {BEATS.map(({ value, label }) => (
-                        <button
-                            key={value}
-                            onClick={() => setBeats(value)}
-                            disabled={!on}
-                            title={`Echo time: ${label} beat`}
-                            style={{
-                                padding: "2px 6px",
-                                borderRadius: 5,
-                                fontSize: 9,
-                                fontWeight: 700,
-                                background: Math.abs(beats - value) < 1e-6 ? accent : "var(--bg-elev-2)",
-                                color: Math.abs(beats - value) < 1e-6 ? "var(--accent-fg)" : "var(--fg-dim)",
-                            }}
-                        >
-                            {label}
-                        </button>
-                    ))}
+                </label>
+                <div role="radiogroup" aria-label={t("deckui.fxBeats")} className="flex gap-0.5">
+                    {BEATS.map(({ value, label }) => {
+                        const sel = Math.abs(beats - value) < 1e-6;
+                        return (
+                            <button
+                                key={value}
+                                type="button"
+                                role="radio"
+                                aria-checked={sel}
+                                onClick={() => setBeats(value)}
+                                disabled={!on}
+                                title={t("deckui.fxBeatHint", { n: label })}
+                                className={cn(chip, "px-1.5")}
+                                style={{ background: sel ? accent : "var(--bg-elev-2)", color: sel ? "var(--accent-fg)" : "var(--fg-dim)" }}
+                            >
+                                {label}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
         </div>

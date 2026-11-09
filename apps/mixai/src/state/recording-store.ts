@@ -1,5 +1,5 @@
 /**
- * Master-mix recording state, shared by the TopBar REC button and the command
+ * Master-mix recording state, shared by the title bar REC button and the command
  * palette so both surfaces toggle the same session.
  */
 import { create } from "zustand";

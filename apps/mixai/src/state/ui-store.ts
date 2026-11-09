@@ -15,6 +15,21 @@ const STORAGE_KEY = "mixai-ui";
 
 export type DeckCount = 2 | 4;
 
+/** Settings modal tabs (vertical, left). Order = display order. */
+export const SETTINGS_TABS = [
+    "appearance",
+    "layout",
+    "audio",
+    "controllers",
+    "keyboard",
+    "library",
+    "plugins",
+    "marketplace",
+    "profiles",
+    "about",
+] as const;
+export type SettingsTab = (typeof SETTINGS_TABS)[number];
+
 interface PersistedUi {
     deckCount: DeckCount;
 }
@@ -44,12 +59,20 @@ function persist(ui: PersistedUi): void {
 
 interface UiStore extends PersistedUi {
     settingsOpen: boolean;
+    /** Active settings tab (kept while the modal is closed). */
+    settingsTab: SettingsTab;
     shortcutsOpen: boolean;
     commandOpen: boolean;
+    /** Stage mode: only decks + mixer, big waveforms (not persisted). */
+    stage: boolean;
     setDeckCount: (n: DeckCount) => void;
     setSettingsOpen: (open: boolean) => void;
+    /** Open the settings modal on a tab. */
+    openSettings: (tab?: SettingsTab) => void;
+    setSettingsTab: (tab: SettingsTab) => void;
     setShortcutsOpen: (open: boolean) => void;
     setCommandOpen: (open: boolean) => void;
+    setStage: (on: boolean) => void;
     /** Restore layout preferences from a profile backup. */
     restoreProfile: (patch: { deckCount?: DeckCount }) => void;
 }
@@ -57,15 +80,20 @@ interface UiStore extends PersistedUi {
 export const useUiStore = create<UiStore>((set, get) => ({
     ...load(),
     settingsOpen: false,
+    settingsTab: "appearance",
     shortcutsOpen: false,
     commandOpen: false,
+    stage: false,
     setDeckCount: (deckCount) => {
         set({ deckCount });
         persist({ deckCount });
     },
     setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+    openSettings: (tab) => set((s) => ({ settingsOpen: true, settingsTab: tab ?? s.settingsTab })),
+    setSettingsTab: (settingsTab) => set({ settingsTab }),
     setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
     setCommandOpen: (commandOpen) => set({ commandOpen }),
+    setStage: (stage) => set({ stage }),
     restoreProfile: (patch) => {
         const deckCount = patch.deckCount ?? get().deckCount;
         set({ deckCount });

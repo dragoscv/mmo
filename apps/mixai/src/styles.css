@@ -78,12 +78,12 @@ body {
 }
 
 /*
- * Fluid from 1024 px. Below that the root scrolls as one block instead of
- * letting panels overlap (browser preview / tiny windows).
+ * Zero scroll (WP19-30): the root never scrolls. The layout solver degrades
+ * panels (full -> compact -> icon -> dock) and the native window has a minimum
+ * size derived from the active layout, so nothing ever needs scrolling.
  */
 #root {
-    min-width: 64rem;
-    overflow: auto;
+    overflow: hidden;
 }
 
 /* Decorative background gradient: glass surface + full motion only. */
@@ -116,14 +116,13 @@ button {
  * Deck card = the hero (design-critic Rx 4). `--deck` is set inline by Deck.tsx
  * to the fixed per-deck colour (--deck-a/b/c/d). While playing: deck-colour
  * ring + soft glow; a 2 px top-edge gradient line on the card always hints the
- * colour. Scale only under full motion; reduced motion keeps the ring.
+ * colour. No scale on play: the card fills an exact solver rect, so scaling it
+ * would push it out of its box (zero-scroll shell).
  */
 .deck-card {
     position: relative;
     overflow: hidden;
-    transition:
-        box-shadow var(--dur-base) var(--ease-out),
-        transform var(--dur-base) var(--ease-out);
+    transition: box-shadow var(--dur-base) var(--ease-out);
 }
 .deck-card::before {
     content: "";
@@ -150,9 +149,6 @@ button {
 }
 .deck-card[data-playing="true"]::before {
     opacity: 1;
-}
-:root[data-motion="full"] .deck-card[data-playing="true"] {
-    transform: scale(1.015);
 }
 
 input[type="range"] {
@@ -205,8 +201,204 @@ input[type="range"] {
 .mixai-shell {
     height: 100%;
     display: grid;
-    grid-template-rows: auto minmax(0, 2.1fr) minmax(0, 1fr);
-    gap: 0.75rem;
-    padding: 0.75rem;
+    grid-template-rows: 40px minmax(0, 1fr);
+    gap: 0;
+    padding: 0 0.5rem 0.5rem;
     overflow: hidden;
+}
+
+/* ── shell: title bar, workspace, dock (WP19-30) ── */
+.mixai-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 40px;
+    padding-left: 0.5rem;
+    -webkit-user-select: none;
+    user-select: none;
+    position: relative;
+}
+/* Thin brand line under the bar; pulses with the beat when the accent is on. */
+.mixai-titlebar::after {
+    content: "";
+    position: absolute;
+    inset: auto 0.5rem 0 0.5rem;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--primary) 55%, transparent), transparent);
+    opacity: calc(0.45 + var(--beat, 0) * 0.55);
+    transform: scaleY(calc(1 + var(--beat, 0) * 1.5));
+}
+.mixai-titlebar > * {
+    flex-shrink: 0;
+}
+.mixai-winbtns {
+    display: flex;
+    align-self: stretch;
+    margin-left: 0.25rem;
+    margin-right: -0.5rem;
+}
+.mixai-winbtn {
+    width: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted-foreground);
+    transition: background-color var(--dur-fast, 120ms) var(--ease-out), color var(--dur-fast, 120ms) var(--ease-out);
+}
+.mixai-winbtn svg {
+    width: 14px;
+    height: 14px;
+}
+.mixai-winbtn:hover {
+    background: color-mix(in oklch, var(--foreground) 10%, transparent);
+    color: var(--foreground);
+}
+.mixai-winbtn[data-close]:hover {
+    background: var(--destructive);
+    color: var(--destructive-foreground, white);
+}
+.mixai-winbtn:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+}
+
+.mixai-workspace {
+    position: relative;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+.mixai-panel-box {
+    position: absolute;
+    overflow: hidden;
+    border-radius: var(--card-radius);
+    contain: layout paint;
+}
+.mixai-panel-box > :first-child {
+    height: 100%;
+    width: 100%;
+}
+:root[data-beat-accent="on"] .mixai-panel-box[data-panel^="deck"] {
+    box-shadow: 0 0 calc(var(--beat, 0) * 18px) -6px color-mix(in oklch, var(--primary) 70%, transparent);
+}
+.mixai-dock {
+    background-color: var(--panel-bg);
+    border: 1px solid color-mix(in oklch, var(--foreground) calc(var(--surface-border-alpha) * 100%), transparent);
+}
+.mixai-dock > [role="tabpanel"] > :first-child {
+    height: 100%;
+}
+.mixai-dock-tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px 4px 0;
+    overflow: hidden;
+}
+.mixai-dock-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 0.6rem;
+    border-radius: calc(var(--radius-md) - 2px);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+}
+.mixai-dock-tab[aria-selected="true"] {
+    color: var(--foreground);
+}
+.mixai-dock-tab:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+}
+.mixai-dock-tab-bg {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: color-mix(in oklch, var(--foreground) 9%, transparent);
+}
+.mixai-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 1.25rem;
+    translate: -50% 0;
+    z-index: 60;
+    padding: 0.5rem 0.9rem;
+    border-radius: 999px;
+    font-size: 13px;
+    background: color-mix(in oklch, var(--popover) 92%, transparent);
+    color: var(--popover-foreground);
+    border: 1px solid var(--border);
+    box-shadow: var(--surface-shadow);
+    pointer-events: none;
+}
+
+/* Touch mode: 44 px targets for touch screens / tablets (WCAG 2.5.5 AAA). */
+:root[data-touch="on"] :where(button, [role="button"], [role="tab"], [role="option"], input[type="range"]) {
+    min-height: 44px;
+    min-width: 44px;
+}
+:root[data-touch="on"] .mixai-winbtn {
+    min-width: 52px;
+}
+
+/* High contrast: solid panels, visible borders, foreground for muted text. */
+:root[data-contrast="high"] {
+    --muted-foreground: var(--foreground);
+    --surface-border-alpha: 0.6;
+    --surface-alpha: 1;
+    --surface-blur: 0px;
+}
+
+/* Colour-blind deck palettes (Okabe–Ito based) independent of the skin. */
+:root[data-deck-palette="deuteranopia"],
+:root[data-deck-palette="protanopia"] {
+    --deck-a: oklch(0.75 0.11 237);
+    --deck-b: oklch(0.77 0.16 70);
+    --deck-c: oklch(0.86 0.17 100);
+    --deck-d: oklch(0.64 0.13 260);
+}
+:root[data-deck-palette="tritanopia"] {
+    --deck-a: oklch(0.67 0.2 25);
+    --deck-b: oklch(0.72 0.12 195);
+    --deck-c: oklch(0.8 0.02 280);
+    --deck-d: oklch(0.6 0.2 350);
+}
+:root[data-deck-palette="mono"] {
+    --deck-a: oklch(0.92 0 0);
+    --deck-b: oklch(0.72 0 0);
+    --deck-c: oklch(0.58 0 0);
+    --deck-d: oklch(0.46 0 0);
+}
+
+/* ── panel tiers (deck/mixer) ── */
+/* Every tiered panel fills the absolutely positioned box the shell gives it and
+   is a size container, so @container rules can fine-tune without media queries.
+   Overflow is clipped as a last resort only: the components size themselves to
+   fit (src/components/panel-fit.ts + the PANEL_SPECS minimums). */
+.deck-tier,
+.mixer-tier {
+    container-type: size;
+    box-sizing: border-box;
+}
+.deck-tier :where(button, select, input) {
+    flex-shrink: 0;
+}
+/* Deck compact: very low cards hide the tab caption (icons stay). */
+@container (max-height: 360px) {
+    .deck-tier[data-tier="compact"] [role="toolbar"] > span:last-child {
+        display: none;
+    }
+}
+/* Mixer: tighter knob labels in narrow 4-channel strips. */
+@container (max-width: 260px) {
+    .mixer-tier [role="slider"] > span {
+        font-size: 8px;
+        letter-spacing: 0.02em;
+    }
 }

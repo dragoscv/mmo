@@ -7,46 +7,98 @@ import { usePluginStore } from "./plugin-store";
 import type { MixaiPlugin } from "./sdk";
 import { useEffect, useState } from "react";
 import { Package, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger, cn } from "@mmo/ui";
+import { usePanelTier } from "@/layout/panel-tier";
+import { useT } from "@/i18n";
 import { PluginBuilder } from "./builder";
 import { PLUGIN_CATALOG } from "./catalog";
 import { hotkeyFromEvent, runMacro, readMetric, triggerMet } from "./external";
 import type { MacroTrigger } from "./external";
 
-/** Renders the panels of all enabled plugins that declare `hasPanel`. Mounted
- *  in the app's right rail. Renders nothing when no panel plugins are on. */
+/** Renders the panels of all enabled plugins that declare `hasPanel` inside the
+ *  box the shell gives it, without ever scrolling: one plugin is shown at a time
+ *  (tabs when several are on). In the icon tier (and when the body is clipped)
+ *  the plugin opens in a popover. Renders nothing when no panel plugins are on. */
 export function PluginDock({ accent = "var(--accent)" }: { accent?: string }) {
+    const t = useT();
+    const tier = usePanelTier();
     const plugins = usePluginStore((s) => s.plugins);
     const enabled = usePluginStore((s) => s.enabled);
     const contextFor = usePluginStore((s) => s.contextFor);
+    const [selected, setSelected] = useState<string | null>(null);
 
     const active = plugins.filter((p) => p.hasPanel && p.Panel && enabled.includes(p.id));
     if (active.length === 0) return null;
+    const current = active.find((p) => p.id === selected) ?? active[0]!;
+    const Panel = current.Panel!;
+    const body = (p: MixaiPlugin) => {
+        const P = p.Panel!;
+        return <P ctx={contextFor(p.id)} accent={accent} />;
+    };
+    const tabBtn = "inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center gap-1 rounded-md px-1.5 text-[11px] font-bold focus-visible:outline-2 focus-visible:outline-[var(--ring)]";
+
+    if (tier === "icon") {
+        return (
+            <div className="panel flex h-full w-full min-h-0 min-w-0 items-center gap-1 overflow-hidden p-1">
+                {active.map((p) => (
+                    <Popover key={p.id}>
+                        <PopoverTrigger aria-label={t("deckui.pluginOpen", { name: p.name })} title={p.name} className={cn(tabBtn, "bg-[var(--bg-elev-2)] text-[16px]")}>
+                            <span aria-hidden>{p.icon}</span>
+                        </PopoverTrigger>
+                        <PopoverContent side="top" className="w-80 max-w-[92vw]">
+                            <div className="mb-2 flex items-center gap-2 text-[13px] font-bold">
+                                <span aria-hidden>{p.icon}</span>
+                                {p.name}
+                                <span className="ml-auto text-[10px] font-normal text-[var(--fg-dim)]">v{p.version}</span>
+                            </div>
+                            {body(p)}
+                        </PopoverContent>
+                    </Popover>
+                ))}
+            </div>
+        );
+    }
 
     return (
-        <>
-            {active.map((p) => {
-                const Panel = p.Panel!;
-                return (
-                    <div key={p.id} className="panel" style={{ padding: 12 }}>
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 8,
-                                marginBottom: 10,
-                            }}
+        <div className={cn("panel grid h-full w-full min-h-0 min-w-0 overflow-hidden", tier === "full" ? "gap-2 p-3" : "gap-1.5 p-2")} style={{ gridTemplateRows: "24px minmax(0, 1fr)" }}>
+            <div role={active.length > 1 ? "tablist" : undefined} aria-label={t("deckui.plugins")} className="flex min-w-0 items-center gap-1">
+                {active.length > 1 ? (
+                    active.map((p) => (
+                        <button
+                            key={p.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={p.id === current.id}
+                            aria-label={p.name}
+                            title={p.name}
+                            onClick={() => setSelected(p.id)}
+                            className={tabBtn}
+                            style={p.id === current.id ? { background: accent, color: "var(--accent-fg)" } : { background: "var(--bg-elev-2)" }}
                         >
-                            <span style={{ fontSize: 16 }}>{p.icon}</span>
-                            <span style={{ fontSize: 13, fontWeight: 700 }}>{p.name}</span>
-                            <span style={{ fontSize: 10, color: "var(--fg-dim)", marginLeft: "auto" }}>
-                                v{p.version}
-                            </span>
-                        </div>
-                        <Panel ctx={contextFor(p.id)} accent={accent} />
-                    </div>
-                );
-            })}
-        </>
+                            <span aria-hidden className="text-[14px]">{p.icon}</span>
+                            {tier === "full" && p.id === current.id && <span className="max-w-24 truncate">{p.name}</span>}
+                        </button>
+                    ))
+                ) : (
+                    <>
+                        <span aria-hidden className="text-[16px]">{current.icon}</span>
+                        <span className="min-w-0 truncate text-[13px] font-bold">{current.name}</span>
+                    </>
+                )}
+                <span className="ml-auto shrink-0 text-[10px] text-[var(--fg-dim)]">v{current.version}</span>
+                <Popover>
+                    <PopoverTrigger aria-label={t("deckui.pluginOpen", { name: current.name })} title={t("deckui.pluginOpen", { name: current.name })} className={cn(tabBtn, "bg-[var(--bg-elev-2)] text-[var(--fg-dim)]")}>
+                        <Package size={13} aria-hidden />
+                    </PopoverTrigger>
+                    <PopoverContent side="left" className="w-80 max-w-[92vw]">
+                        {body(current)}
+                    </PopoverContent>
+                </Popover>
+            </div>
+            <div role={active.length > 1 ? "tabpanel" : undefined} className="min-h-0 min-w-0 overflow-hidden">
+                <Panel ctx={contextFor(current.id)} accent={accent} />
+            </div>
+        </div>
     );
 }
 

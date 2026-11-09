@@ -1,5 +1,5 @@
 /**
- * Keyboard shortcuts cheat-sheet + keybind editor. Toggled with `?`, the TopBar
+ * Keyboard shortcuts cheat-sheet + keybind editor. Toggled with `?`, the title bar
  * button or the command palette. Each row shows the *effective* key (default
  * or user override) and can be clicked to capture a new key. Overrides live in
  * the keybind store (persisted + profile-synced).

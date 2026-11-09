@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "id": "ro.mixai.layout.radio-host",
+  "name": "Radio Host",
+  "version": "1.0.0",
+  "kind": "layout",
+  "author": "MixAI",
+  "description": "Library-first layout for radio shows and long sets, plus a compact two-deck layout for small screens.",
+  "pro": false,
+  "layouts": ["layouts/radio-host.json", "layouts/radio-compact.json"],
+  "preview": "assets/preview.png"
+}

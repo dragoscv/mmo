@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "id": "ro.mixai.bundle.festival-pro",
+  "name": "Festival Pro",
+  "version": "1.0.0",
+  "kind": "bundle",
+  "author": "MixAI",
+  "description": "Dark gold main-stage skin with a four-deck festival layout. Decks Pro.",
+  "pro": true,
+  "tokens": "tokens.json",
+  "layouts": ["layouts/festival-4.json"],
+  "preview": "assets/preview.png"
+}

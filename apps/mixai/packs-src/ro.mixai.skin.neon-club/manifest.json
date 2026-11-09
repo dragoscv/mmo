@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "id": "ro.mixai.skin.neon-club",
+  "name": "Neon Club",
+  "version": "1.0.0",
+  "kind": "skin",
+  "author": "MixAI",
+  "description": "Vivid magenta and cyan glass on near-black, for dark booths.",
+  "pro": false,
+  "tokens": "tokens.json",
+  "preview": "assets/preview.png"
+}

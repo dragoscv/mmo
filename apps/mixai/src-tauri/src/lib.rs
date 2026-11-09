@@ -25,6 +25,9 @@ use hid::HidState;
 mod companion;
 use companion::CompanionState;
 
+mod pack;
+mod window_ctl;
+
 /// Tauri-managed engine handle. `Option` so a device failure doesn't crash the
 /// whole app — the UI degrades to "UI preview" mode.
 pub struct EngineState(pub Mutex<Option<Engine>>);
@@ -954,7 +957,17 @@ pub fn run() {
         .manage(BleMidiState::new())
         .manage(HidState::new())
         .manage(CompanionState::default())
+        .manage(pack::PackState::default())
         .setup(|app| {
+            // Custom HTML title bar: drop the native frame on Windows/Linux only. macOS keeps
+            // `decorations: true` + Overlay title bar from tauri.conf.json (native traffic lights).
+            #[cfg(not(target_os = "macos"))]
+            if let Some(main) = app.get_webview_window("main")
+                && let Err(e) = main.set_decorations(false)
+            {
+                log::warn!("could not remove native window decorations: {e}");
+            }
+
             // Start the audio engine; degrade gracefully on failure.
             match Engine::start() {
                 Ok(engine) => {
@@ -1074,6 +1087,13 @@ pub fn run() {
             hid_disconnect,
             hid_open_path,
             hid_write_report,
+            window_ctl::window_show_snap_overlay,
+            window_ctl::window_pop_out,
+            pack::pack_inspect,
+            pack::pack_install,
+            pack::pack_list,
+            pack::pack_remove,
+            pack::pack_pick_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MIXAI");

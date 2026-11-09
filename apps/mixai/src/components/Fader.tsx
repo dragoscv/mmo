@@ -4,7 +4,9 @@ interface FaderProps {
     value: number;
     min?: number;
     max?: number;
-    height?: number;
+    /** CSS length; "100%" lets the fader fill a sized grid/flex cell. */
+    height?: number | string;
+    width?: number | string;
     color?: string;
     onChange: (v: number) => void;
     /** Accessible name. */
@@ -18,6 +20,7 @@ export function Fader({
     min = 0,
     max = 1,
     height = 160,
+    width = 36,
     color = "var(--accent)",
     onChange,
     ariaLabel,
@@ -86,8 +89,10 @@ export function Fader({
             onDoubleClick={() => onChange(max)}
             style={{
                 position: "relative",
-                width: 36,
+                width,
                 height,
+                minHeight: 48,
+                minWidth: 18,
                 background: "var(--bg-elev-2)",
                 border: "1px solid var(--border)",
                 borderRadius: 8,

@@ -690,6 +690,11 @@ Windows MIDI Services (25H2). DVS: xwax/Mixxx GPL; Serato CV02.5 = 1 kHz carrier
 | WP19-27 | Idea (owner 2026-11-09): Mixcloud OAuth upload of a recorded set with its tracklist (decks-setlog export already produces the Mixcloud sections JSON) | todo |
 | WP19-28 | Idea (owner 2026-11-09): crate sync through the MMO Server (decks-library change feed; star on phone -> crate + cue points; complements WP17-86) | todo |
 | WP19-29 | Idea (owner 2026-11-09): own MIT LAN tempo sync between Decks instances (beat/phase over UDP multicast; Ableton Link is GPL) | todo |
+| WP19-30 | Decks 1.3.0 zero-scroll shell (owner 2026-11-09): own title bar (Win snap overlay, macOS overlay), layout solver with full/compact/icon tiers + dock, 5 layouts + editor, Alt+1..8 snapshots, controller auto-layout, stage mode, pop-out windows, scrollless library, per-tier decks/mixer, motion governor, beat accent, touch / high-contrast / colour-blind palettes, onboarding | done - docs/decks/layouts.md; solver sweep 1024..3840 x 640..2160 tests; probe 1024x700..3440x1440 = 0 scrollers, 0 clipped |
+| WP19-31 | Decks settings modal + skins marketplace (owner 2026-11-09): vertical-tab settings modal with search, versioned export/import with diff, profiles Home/Club/Streaming, reset + undo; .mixaipack (zip + manifest + DTCG tokens + layouts + assets, Ed25519, verified in Rust), 30 s try, built-in skins, Skin SDK CLI (apps/mixai/sdk: init/validate/import-dtcg/pack/catalog), 4 official packs, mixai.ro /api/decks/packs (free + decks_pro) | done - docs/decks/packs.md; Rust sdk_built_packs_verify cross-check; web 3.4.4. OPEN: deploy web so the in-app Marketplace catalogue loads (route not live yet) |
+| WP19-32 | Idea (owner 2026-11-09): creator marketplace - third-party packs with 70/30 revenue share via Brivio payments, ratings, verified creators, review queue | todo |
+| WP19-33 | Idea (owner 2026-11-09): public skins gallery on decks.mixai.ro with live browser preview of each pack | todo |
+| WP19-34 | Port the layout/skin pack format to Compose (decks-ui) and SwiftUI (DecksApp): read layouts/*.json + tokens.json, same solver | todo |
 
 ### WP20 — Repo-wide upgrade (D68, latest stable)
 

@@ -12,6 +12,8 @@ the Tauri 1.x plan is kept for history in [`docs/mixai/`](../mixai/00-architectu
 | [mapping-format.md](mapping-format.md) | Controller mapping format v1, action vocabulary, scripts, MIDI clock, groove lane, BLE MIDI |
 | [dvs.md](dvs.md) | Digital vinyl decoder: support matrix, API, MixAI timecode, measured results |
 | [skins.md](skins.md) | Skins: token-derived palettes, layouts, contrast gate, persistence |
+| [layouts.md](layouts.md) | Zero-scroll shell: layout JSON, solver + tiers, panel contract, title bar, stage mode, snapshots, pop-out |
+| [packs.md](packs.md) | `.mixaipack` format: manifest, DTCG tokens, layouts, assets, Ed25519 signing, trust levels, Marketplace |
 | [stems.md](stems.md) | On-device stem separation: HT-Demucs ONNX, accelerators, cache, server fallback |
 | [remote.md](remote.md) | Connected mode: phone remote, second screen, Party DJ requests (LAN, QR pairing, security model) |
 | [transitions.md](transitions.md) | AI Transition Designer: next-track ranking, phrase-aligned plans, editable automation, set safety, RO/EN commands, risers |
