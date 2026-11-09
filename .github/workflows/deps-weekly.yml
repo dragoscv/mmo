@@ -55,7 +55,7 @@ jobs:
                     [ -f "$dir/pnpm-lock.yaml" ] || { echo "skip $dir (no lockfile)"; continue; }
                     echo "== $dir"
                     label="$dir"; [ "$dir" = "." ] && label="root (husky/commitlint)"
-                    json=$(cd "$dir" && pnpm outdated --format json --ignore-workspace 2>/dev/null)
+                    json=$(cd "$dir" && pnpm outdated --format json 2>/dev/null)
                     rc=$?
                     {
                       echo "## $label"
@@ -75,7 +75,7 @@ jobs:
                     } >> "$out"
                   done
                   echo "---" >> "$out"
-                  echo "_Per-app lockfiles: bump inside the app with \`pnpm add --ignore-workspace <pkg>@latest\`, then run that surface's CI._" >> "$out"
+                  echo "_Per-app lockfiles: bump inside the app with \`pnpm add <pkg>@latest\`, then run that surface's CI._" >> "$out"
                   wc -l "$out"
 
             - uses: actions/upload-artifact@v4

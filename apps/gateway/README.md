@@ -45,10 +45,10 @@ Next.js app (Vercel)  ──►  same Postgres
 
 ## Local dev
 
-Node 24+. Per-app lockfile: install inside `apps/gateway` with `--ignore-workspace`.
+Node 24+. Per-app lockfile: run `pnpm install` inside `apps/gateway` (its own `pnpm-workspace.yaml` makes it standalone).
 
 ```pwsh
-pnpm install --ignore-workspace
+pnpm install
 pnpm build                      # tsdown → dist/server.js (@mmo/db bundled, runtime deps external)
 node --env-file=../web/.env.local dist/server.js   # or: pnpm dev (tsx watch)
 pnpm typecheck; pnpm test       # tsc --noEmit, vitest

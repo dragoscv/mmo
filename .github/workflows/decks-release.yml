@@ -178,8 +178,8 @@ jobs:
 
             - name: Install Node deps (apps/mixai + packages/ui, consumed from source)
               run: |
-                  pnpm install --frozen-lockfile --ignore-workspace
-                  pnpm -C ../../packages/ui install --frozen-lockfile --ignore-workspace
+                  pnpm install --frozen-lockfile
+                  pnpm -C ../../packages/ui install --frozen-lockfile
 
             # src-tauri/icons is gitignored; generated from the shared brand PNG (same as native-release.yml).
             - name: Generate Tauri icons

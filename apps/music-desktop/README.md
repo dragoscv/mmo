@@ -30,7 +30,7 @@ media controls, not a copy of the web code. Tracker: `docs/mixai-design-tracker.
 
 | Command | What |
 |---|---|
-| `pnpm install --ignore-workspace` | own lockfile (repo convention) |
+| `pnpm install` | own lockfile + `pnpm-workspace.yaml` (repo convention) |
 | `pnpm tauri:icon` | `src-tauri/icons` from the MixAI Music app icon (gitignored) |
 | `pnpm test:launcher` | launcher unit tests (node --test) |
 | `cargo test` / `cargo clippy -- -D warnings` in `src-tauri` | Rust unit tests (links, commands, i18n, auth) |

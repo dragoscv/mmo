@@ -13,23 +13,23 @@ ARG NODE_IMAGE=node:24-bookworm-slim
 FROM ${NODE_IMAGE} AS deps
 ENV npm_config_manage_package_manager_versions=false \
     NEXT_TELEMETRY_DISABLED=1
-# Root pin (package.json packageManager). Newer pnpm 10.x makes ignored build scripts fatal and
-# pnpm 12 ignores package.json `pnpm.overrides` → lockfile config mismatch.
-RUN npm i -g pnpm@10.0.0 && pnpm --version
+# Root pin (package.json packageManager). Settings/overrides/allowBuilds live in each project's
+# pnpm-workspace.yaml (pnpm 11+ ignores .npmrc settings and package.json#pnpm).
+RUN npm i -g pnpm@12.18.0 && pnpm --version
 WORKDIR /repo
-COPY package.json pnpm-workspace.yaml .npmrc ./
-COPY apps/web/package.json apps/web/pnpm-lock.yaml apps/web/
-COPY packages/ai/package.json packages/ai/pnpm-lock.yaml packages/ai/
-COPY packages/ai-mcp/package.json packages/ai-mcp/pnpm-lock.yaml packages/ai-mcp/
-COPY packages/audio-gen/package.json packages/audio-gen/pnpm-lock.yaml packages/audio-gen/
-COPY packages/db/package.json packages/db/pnpm-lock.yaml packages/db/
-COPY packages/design-tokens/package.json packages/design-tokens/pnpm-lock.yaml packages/design-tokens/
-COPY packages/sdk/package.json packages/sdk/pnpm-lock.yaml packages/sdk/
-COPY packages/ui/package.json packages/ui/pnpm-lock.yaml packages/ui/
+COPY package.json pnpm-workspace.yaml ./
+COPY apps/web/package.json apps/web/pnpm-lock.yaml apps/web/pnpm-workspace.yaml apps/web/
+COPY packages/ai/package.json packages/ai/pnpm-lock.yaml packages/ai/pnpm-workspace.yaml packages/ai/
+COPY packages/ai-mcp/package.json packages/ai-mcp/pnpm-lock.yaml packages/ai-mcp/pnpm-workspace.yaml packages/ai-mcp/
+COPY packages/audio-gen/package.json packages/audio-gen/pnpm-lock.yaml packages/audio-gen/pnpm-workspace.yaml packages/audio-gen/
+COPY packages/db/package.json packages/db/pnpm-lock.yaml packages/db/pnpm-workspace.yaml packages/db/
+COPY packages/design-tokens/package.json packages/design-tokens/pnpm-lock.yaml packages/design-tokens/pnpm-workspace.yaml packages/design-tokens/
+COPY packages/sdk/package.json packages/sdk/pnpm-lock.yaml packages/sdk/pnpm-workspace.yaml packages/sdk/
+COPY packages/ui/package.json packages/ui/pnpm-lock.yaml packages/ui/pnpm-workspace.yaml packages/ui/
 RUN set -eu; \
     for d in apps/web packages/ai packages/ai-mcp packages/audio-gen packages/db packages/design-tokens packages/sdk packages/ui; do \
       echo "== install $d"; \
-      (cd "$d" && pnpm install --frozen-lockfile --ignore-workspace --reporter=append-only); \
+      (cd "$d" && pnpm install --frozen-lockfile --reporter=append-only); \
     done
 
 # ---------- build ----------

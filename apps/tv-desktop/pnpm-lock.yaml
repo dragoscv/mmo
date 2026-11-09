@@ -8,18 +8,12 @@ importers:
 
   .:
     dependencies:
-      '-':
-        specifier: 0.0.1-security.1
-        version: 0.0.1-security.1
       '@tauri-apps/api':
         specifier: ~2.12.4
         version: 2.12.4
       '@tauri-apps/plugin-http':
         specifier: ~2.8.3
         version: 2.8.3
-      D:
-        specifier: ^1.0.0
-        version: 1.0.0
     devDependencies:
       '@tauri-apps/cli':
         specifier: ^2.12.4
@@ -38,9 +32,6 @@ importers:
         version: 8.3.6(@types/node@24.19.2)
 
 packages:
-
-  '-@0.0.1-security.1':
-    resolution: {integrity: sha512-3Zy+2t+L0IAXtep/9JfiCrWiqWbfEjbIwJUQHeTAcZglnAmHugb+5/f3Qg9K3hLTykJ4SK/s1G+mymranjR/kA==}
 
   '@oxc-project/types@0.156.0':
     resolution: {integrity: sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw==}
@@ -354,10 +345,6 @@ packages:
       oxc-transform-react:
         optional: true
 
-  D@1.0.0:
-    resolution: {integrity: sha512-nQvrCBu7K2pSSEtIM0EEF03FVjcczCXInMt3moLNFbjlWx6bZrX72uT6/1uAXDbnzGUAx9gTyDiQ+vrFi663oA==}
-    deprecated: Package no longer supported. Contact support@npmjs.com for more info.
-
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
@@ -527,8 +514,6 @@ packages:
         optional: true
 
 snapshots:
-
-  '-@0.0.1-security.1': {}
 
   '@oxc-project/types@0.156.0': {}
 
@@ -700,8 +685,6 @@ snapshots:
     dependencies:
       '@rolldown/pluginutils': 1.0.1
       vite: 8.3.6(@types/node@24.19.2)
-
-  D@1.0.0: {}
 
   detect-libc@2.1.2: {}
 

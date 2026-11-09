@@ -62,9 +62,9 @@ PNPM_PIN="$HOME/.pnpm-pin-10"
 [ -x "$PNPM_PIN/bin/pnpm" ] || npm i -g --prefix "$PNPM_PIN" pnpm@10.0.0 >/dev/null
 export PATH="$PNPM_PIN/bin:$PATH" npm_config_manage_package_manager_versions=false
 log "pnpm $(pnpm --version)"
-(cd "$APPDIR/../tv-tizen" && pnpm install --frozen-lockfile --ignore-workspace >/dev/null)
+(cd "$APPDIR/../tv-tizen" && pnpm install --frozen-lockfile >/dev/null)
 cd "$APPDIR"
-pnpm install --frozen-lockfile --ignore-workspace >/dev/null
+pnpm install --frozen-lockfile >/dev/null
 [ -d src-tauri/icons ] || pnpm tauri icon ../web/public/icon-512.png >/dev/null
 (
   unset APPLE_SIGNING_IDENTITY APPLE_CERTIFICATE

@@ -1,6 +1,6 @@
 {
   "name": "mmo-server",
-  "version": "3.14.3",
+  "version": "3.14.4",
   "description": "MMO Server (MixAI Companion) — serves local music and video files to the MixAI web app",
   "main": "dist/main.js",
   "author": {
@@ -302,18 +302,6 @@
       "!**/mmo-hls-*/**"
     ],
     "logLevel": "quiet"
-  },
-  "pnpm": {
-    "overrides": {
-      "vite": "^8.3.0",
-      "node-abi": "^4.35.0"
-    },
-    "onlyBuiltDependencies": [
-      "audify",
-      "better-sqlite3",
-      "electron",
-      "electron-winstaller"
-    ]
   },
   "overrides": {
     "node-abi": "^4.40.0"

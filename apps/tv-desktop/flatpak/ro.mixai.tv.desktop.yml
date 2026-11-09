@@ -27,9 +27,9 @@ modules:
         XDG_CACHE_HOME: /run/build/mixai-tv/flatpak-node/cache
     build-commands:
       # Shared TV UI (apps/tv-tizen) + desktop shell, from the offline pnpm store the generator pre-fills.
-      - npm i -g --offline --prefix /run/build/mixai-tv/pnpm pnpm@10.0.0
-      - cd apps/tv-tizen && /run/build/mixai-tv/pnpm/bin/pnpm install --offline --frozen-lockfile --ignore-workspace --ignore-scripts
-      - cd apps/tv-desktop && /run/build/mixai-tv/pnpm/bin/pnpm install --offline --frozen-lockfile --ignore-workspace --ignore-scripts
+      - npm i -g --offline --prefix /run/build/mixai-tv/pnpm pnpm@12.18.0
+      - cd apps/tv-tizen && /run/build/mixai-tv/pnpm/bin/pnpm install --offline --frozen-lockfile --ignore-scripts
+      - cd apps/tv-desktop && /run/build/mixai-tv/pnpm/bin/pnpm install --offline --frozen-lockfile --ignore-scripts
       - cd apps/tv-desktop && /run/build/mixai-tv/pnpm/bin/pnpm exec vite build
       - cd apps/tv-desktop/src-tauri && cargo --offline build --release --features tauri/custom-protocol
       - install -Dm755 apps/tv-desktop/src-tauri/target/release/mixai-tv /app/bin/mixai-tv

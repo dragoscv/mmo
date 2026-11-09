@@ -2,6 +2,11 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.14.4 — pnpm 12 (WP20-01)
+
+- pnpm 12.18.0: settings moved from `.npmrc` / `package.json#pnpm` (no longer read by pnpm 11+) to `server/pnpm-workspace.yaml` — `nodeLinker: hoisted` (electron-builder), `overrides`, `allowBuilds` (audify, better-sqlite3, electron, electron-winstaller, ffmpeg-static; register-scheme denied), `minimumReleaseAge: 1440`.
+- Dockerfile corepack pin `PNPM_VERSION=12.18.0`, copies `pnpm-workspace.yaml` instead of `.npmrc`; CI/companion-release install without `--ignore-workspace` (it would skip that file).
+
 ## 3.14.3 — Linux CI fix
 
 - `showHintFor` resolves Windows library paths (`D:\TV\…`) with `path.win32` on every OS; server-ci on Linux used posix `path.relative` and returned `null` (pre-existing failure since 3.9.0).

@@ -1,6 +1,6 @@
 {
   "name": "@mmo/ai",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "MMO shared AI core. Providers, models, agents, tools, prompts, RAG. Consumed by app/, server/, apps/native, apps/extension and exposed externally via @mmo/ai-mcp and @mmo/sdk.",
   "type": "module",

@@ -20,9 +20,9 @@ PNPM_PIN="$HOME/.pnpm-pin-10"
 export PATH="$PNPM_PIN/bin:$HOME/.cargo/bin:$PATH" npm_config_manage_package_manager_versions=false
 log "pnpm $(pnpm --version), $(rustc --version)"
 
-(cd "$APPDIR/../tv-tizen" && pnpm install --frozen-lockfile --ignore-workspace >/dev/null)
+(cd "$APPDIR/../tv-tizen" && pnpm install --frozen-lockfile >/dev/null)
 cd "$APPDIR"
-pnpm install --frozen-lockfile --ignore-workspace >/dev/null
+pnpm install --frozen-lockfile >/dev/null
 [ -d src-tauri/icons ] || pnpm tauri icon ../web/public/icon-512.png >/dev/null
 # Keep cargo output on the Linux filesystem (building on /mnt/e is ~5x slower and breaks file locks).
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$HOME/.cache/mixai-tv-target}"

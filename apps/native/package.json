@@ -29,8 +29,6 @@
         "typescript": "^7.0.2"
     },
     "dependencies": {
-        "-": "0.0.1-security.1",
-        "@tauri-apps/api": "^2.12.4",
-        "D": "^1.0.0"
+        "@tauri-apps/api": "^2.12.4"
     }
 }

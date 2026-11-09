@@ -38,7 +38,7 @@ scripts/package-wgt.ps1 build → .wgt (signed via Tizen Studio, or unsigned zip
 
 ```powershell
 cd apps/tv-tizen
-pnpm install --ignore-workspace   # own lockfile (repo uses shared-workspace-lockfile=false)
+pnpm install   # own lockfile + pnpm-workspace.yaml (standalone project)
 pnpm typecheck               # tsc --noEmit
 pnpm build                   # tsc + vite → dist/
 pnpm package                 # dist/MixAITV.wgt (+ -Install to push via sdb)

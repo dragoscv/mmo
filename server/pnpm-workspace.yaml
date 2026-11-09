@@ -1,0 +1,26 @@
+# pnpm 11+ reads settings only from pnpm-workspace.yaml (not .npmrc / package.json#pnpm).
+# This file also makes the project standalone: plain `pnpm install` here uses its own lockfile.
+
+# 24 h supply-chain quarantine for newly published versions.
+minimumReleaseAge: 1440
+
+# electron-builder packs a flat node_modules (see README: ee-first missing in app.asar otherwise).
+nodeLinker: hoisted
+shamefullyHoist: true
+hoistPattern:
+  - '*'
+publicHoistPattern:
+  - '*'
+
+# Dependencies allowed (true) or explicitly denied (false) to run install scripts.
+allowBuilds:
+  audify: true
+  better-sqlite3: true
+  electron: true
+  electron-winstaller: true
+  ffmpeg-static: true
+  register-scheme: false
+
+overrides:
+  vite: "^8.3.0"
+  node-abi: "^4.35.0"

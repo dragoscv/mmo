@@ -1,0 +1,28 @@
+# pnpm 11+ reads settings only from pnpm-workspace.yaml (not .npmrc / package.json#pnpm).
+# This file also makes the project standalone: plain `pnpm install` here uses its own lockfile.
+
+# 24 h supply-chain quarantine for newly published versions.
+minimumReleaseAge: 1440
+
+# Dependencies allowed (true) or explicitly denied (false) to run install scripts.
+allowBuilds:
+  "@parcel/watcher": false
+  "@swc/core": false
+  better-sqlite3: true
+  esbuild: true
+  leveldown: false
+  sharp: true
+  unrs-resolver: false
+
+overrides:
+  postcss: "^8.5.9"
+  "@typescript-eslint/parser": "^8.70.0"
+  "@typescript-eslint/typescript-estree": "^8.70.0"
+  "@typescript-eslint/eslint-plugin": "^8.70.0"
+  vite: "^8.3.0"
+  typescript-eslint: "^8.70.0"
+  "@typescript-eslint/utils": "^8.70.0"
+  "@typescript-eslint/scope-manager": "^8.70.0"
+  "@typescript-eslint/type-utils": "^8.70.0"
+  "@typescript-eslint/visitor-keys": "^8.70.0"
+  "@typescript-eslint/types": "^8.70.0"

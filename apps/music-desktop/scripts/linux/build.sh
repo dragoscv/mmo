@@ -21,7 +21,7 @@ export PATH="$PNPM_PIN/bin:$HOME/.cargo/bin:$PATH" npm_config_manage_package_man
 log "pnpm $(pnpm --version), $(rustc --version)"
 
 cd "$APPDIR"
-pnpm install --frozen-lockfile --ignore-workspace >/dev/null
+pnpm install --frozen-lockfile >/dev/null
 [ -d src-tauri/icons ] || pnpm tauri:icon >/dev/null
 # Keep cargo output on the Linux filesystem (building on /mnt/e is ~5x slower and breaks file locks).
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$HOME/.cache/mixai-music-target}"

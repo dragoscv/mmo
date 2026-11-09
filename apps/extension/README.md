@@ -52,7 +52,7 @@ bibliotecă) e în aplicația web.
 1. Chrome → `chrome://extensions` → **Developer mode** → **Load unpacked** → folderul `apps/extension/`
    (Firefox: `about:debugging` → *Load Temporary Add-on* → `manifest.json`).
 2. Reload după modificări: iconul ↻ pe cardul extensiei.
-3. `pnpm install --ignore-workspace` + `pnpm vendor:polyfill` doar dacă actualizezi `webextension-polyfill`.
+3. `pnpm install` + `pnpm vendor:polyfill` doar dacă actualizezi `webextension-polyfill`.
 
 Orice commit care atinge `apps/extension/**` trebuie să bumpeze `version` în **ambele** fișiere
 `manifest.json` și `package.json` (`scripts/check-version.mjs`, rulat de husky și de `extension-ci.yml`).

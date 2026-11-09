@@ -67,7 +67,7 @@ jobs:
                   node-version: 24
                   cache: pnpm
                   cache-dependency-path: packages/${{ matrix.pkg }}/pnpm-lock.yaml
-            - run: pnpm install --frozen-lockfile --ignore-workspace
+            - run: pnpm install --frozen-lockfile
             - run: pnpm typecheck
             - run: pnpm test
             - name: Generated tokens are committed
@@ -99,11 +99,11 @@ jobs:
                   cache-dependency-path: |
                       apps/web/pnpm-lock.yaml
                       packages/*/pnpm-lock.yaml
-            - run: pnpm install --frozen-lockfile --ignore-workspace
+            - run: pnpm install --frozen-lockfile
             # packages/* are consumed through tsconfig paths and import their own deps (Base UI, AI SDK, ...);
             # install them like apps/web/Dockerfile does.
             - name: Install packages/* (tsconfig-path consumers)
-              run: for d in ../../packages/*/; do (cd "$d" && pnpm install --frozen-lockfile --ignore-workspace --reporter=append-only); done
+              run: for d in ../../packages/*/; do (cd "$d" && pnpm install --frozen-lockfile --reporter=append-only); done
             - name: Lint (baseline-aware)
               run: pnpm lint:check
             - run: pnpm typecheck
@@ -150,11 +150,11 @@ jobs:
                   cache-dependency-path: |
                       apps/web/pnpm-lock.yaml
                       packages/*/pnpm-lock.yaml
-            - run: pnpm install --frozen-lockfile --ignore-workspace
+            - run: pnpm install --frozen-lockfile
             # packages/* are consumed through tsconfig paths and import their own deps (Base UI, AI SDK, ...);
             # install them like apps/web/Dockerfile does.
             - name: Install packages/* (tsconfig-path consumers)
-              run: for d in ../../packages/*/; do (cd "$d" && pnpm install --frozen-lockfile --ignore-workspace --reporter=append-only); done
+              run: for d in ../../packages/*/; do (cd "$d" && pnpm install --frozen-lockfile --reporter=append-only); done
             - name: Build (production)
               run: pnpm build
             # LHCI hides the server output; probe the pages first so a 500 shows its stack trace.
@@ -222,7 +222,7 @@ jobs:
                   node-version: 24
                   cache: pnpm
                   cache-dependency-path: apps/web/pnpm-lock.yaml
-            - run: pnpm install --frozen-lockfile --ignore-workspace
+            - run: pnpm install --frozen-lockfile
             # Report-only until the baseline is triaged (WP13-06); then drop --no-exit-code.
             - name: knip
               run: pnpm dlx knip@6 --reporter compact --no-exit-code | tee knip-report.txt

@@ -253,7 +253,7 @@ for offline; reconcile on login. Reuse `apps/web` auth/session + a `mixer_setups
 
 ## 10. Repo conventions (must follow)
 - New app: `apps/mixai`, package `@mmo/mixai`, own `pnpm-lock.yaml`
-  (`.npmrc shared-workspace-lockfile=false`).
+  + `pnpm-workspace.yaml` (pnpm 12, standalone project).
 - Rust crate `mixai-core` under `apps/mixai/src-tauri` (or a `packages/` crate).
 - Add `apps/mixai` to `pnpm-workspace.yaml` (already covered by `apps/*`).
 - Version bump + CHANGELOG entry on every shippable change.

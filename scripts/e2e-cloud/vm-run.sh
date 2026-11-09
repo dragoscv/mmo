@@ -94,7 +94,7 @@ as_runner "pnpm config set store-dir /home/runner/.pnpm-store" || true
 INST_FAIL=0
 for d in apps/web packages/*; do
   [ -f "$W/$d/pnpm-lock.yaml" ] || continue
-  as_runner "cd $d && pnpm install --frozen-lockfile --ignore-workspace --prefer-offline --reporter=silent" > "/tmp/install-$(basename "$d").log" 2>&1 &
+  as_runner "cd $d && pnpm install --frozen-lockfile --prefer-offline --reporter=silent" > "/tmp/install-$(basename "$d").log" 2>&1 &
 done
 for j in $(jobs -p); do [ "$j" = "$SYNC_PID" ] && continue; wait "$j" || INST_FAIL=1; done
 tail -n 3 /tmp/install-*.log

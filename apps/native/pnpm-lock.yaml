@@ -8,15 +8,9 @@ importers:
 
   .:
     dependencies:
-      '-':
-        specifier: 0.0.1-security.1
-        version: 0.0.1-security.1
       '@tauri-apps/api':
         specifier: ^2.12.4
         version: 2.12.4
-      D:
-        specifier: ^1.0.0
-        version: 1.0.0
     devDependencies:
       '@capacitor/android':
         specifier: ^8.5.2
@@ -38,9 +32,6 @@ importers:
         version: 7.0.2
 
 packages:
-
-  '-@0.0.1-security.1':
-    resolution: {integrity: sha512-3Zy+2t+L0IAXtep/9JfiCrWiqWbfEjbIwJUQHeTAcZglnAmHugb+5/f3Qg9K3hLTykJ4SK/s1G+mymranjR/kA==}
 
   '@capacitor/android@8.5.2':
     resolution: {integrity: sha512-rtiaz78egCcS+vs29wkWCL3C+RhazKMSygXcjutwWP8NmO6r5UBxOvGf3Wjz5+ahobyQ723tn9gCePwRwcNDZQ==}
@@ -303,10 +294,6 @@ packages:
     resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
     engines: {node: '>=14.6'}
     deprecated: this version has critical issues, please update to the latest version
-
-  D@1.0.0:
-    resolution: {integrity: sha512-nQvrCBu7K2pSSEtIM0EEF03FVjcczCXInMt3moLNFbjlWx6bZrX72uT6/1uAXDbnzGUAx9gTyDiQ+vrFi663oA==}
-    deprecated: Package no longer supported. Contact support@npmjs.com for more info.
 
   ansi-regex@5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
@@ -634,8 +621,6 @@ packages:
 
 snapshots:
 
-  '-@0.0.1-security.1': {}
-
   '@capacitor/android@8.5.2(@capacitor/core@8.5.2)':
     dependencies:
       '@capacitor/core': 8.5.2
@@ -871,8 +856,6 @@ snapshots:
     optional: true
 
   '@xmldom/xmldom@0.9.10': {}
-
-  D@1.0.0: {}
 
   ansi-regex@5.0.1: {}
 

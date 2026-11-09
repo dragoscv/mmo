@@ -10,6 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## pnpm 12 — web 3.3.9 · server 3.14.4 · extension 3.0.4 · ui 1.0.1 · design-tokens 1.4.1 · sdk 0.11.1 · ai 0.0.3 (WP20-01)
+
+- Root `packageManager: pnpm@12.18.0`. Every project (17) has its own `pnpm-workspace.yaml` (pnpm 11+ reads settings only there): `minimumReleaseAge: 1440`, explicit `allowBuilds` (replaces `onlyBuiltDependencies`), web/server `overrides`, server `nodeLinker: hoisted`. Root `.npmrc` + `server/.npmrc` removed; root yaml keeps `sharedWorkspaceLockfile: false`.
+- `--ignore-workspace` dropped from CI, Dockerfiles, flatpak, desktop build scripts and docs: under pnpm 12 it skips the project yaml (verified: build scripts refused, hoisting lost). Root tooling: `pnpm install --filter mmo-monorepo`.
+- Removed the junk `-` / `D` dependencies from mixai, native, tv-desktop and music-desktop (pnpm 12 refuses the `-` alias).
+- Lockfiles stay v9; only projects whose dependencies changed were re-resolved.
+
 ## web 3.3.8 — dependency majors (WP20-06)
 
 - next-auth `5.0.0-beta.32`, jose 6, @octokit/rest 22, google-auth-library 11, react-markdown 10 (no `className` prop used, nothing to migrate).

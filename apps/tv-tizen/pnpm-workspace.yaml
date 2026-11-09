@@ -1,0 +1,10 @@
+# pnpm 11+ reads settings only from pnpm-workspace.yaml (not .npmrc / package.json#pnpm).
+# This file also makes the project standalone: plain `pnpm install` here uses its own lockfile.
+
+# 24 h supply-chain quarantine for newly published versions.
+minimumReleaseAge: 1440
+
+# Dependencies allowed (true) or explicitly denied (false) to run install scripts.
+allowBuilds:
+  core-js: false
+  esbuild: true

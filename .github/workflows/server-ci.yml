@@ -44,9 +44,9 @@ jobs:
                   cache: pnpm
                   cache-dependency-path: server/pnpm-lock.yaml
             - name: Install (server)
-              run: pnpm install --frozen-lockfile --ignore-workspace
+              run: pnpm install --frozen-lockfile
             - name: Install (packages/ui, imported by the renderer through tsconfig paths)
-              run: pnpm -C ../packages/ui install --frozen-lockfile --ignore-workspace
+              run: pnpm -C ../packages/ui install --frozen-lockfile
             - name: Typecheck headless core (tsc)
               run: pnpm build:headless
             - name: Typecheck renderer
@@ -90,7 +90,7 @@ jobs:
                   node-version: 24
                   cache: pnpm
                   cache-dependency-path: packages/sdk/pnpm-lock.yaml
-            - run: pnpm install --frozen-lockfile --ignore-workspace
+            - run: pnpm install --frozen-lockfile
             - run: pnpm typecheck
             - run: pnpm test
 

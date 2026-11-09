@@ -14,10 +14,8 @@
         "msix": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-msix.ps1"
     },
     "dependencies": {
-        "-": "0.0.1-security.1",
         "@tauri-apps/api": "~2.12.4",
-        "@tauri-apps/plugin-http": "~2.8.3",
-        "D": "^1.0.0"
+        "@tauri-apps/plugin-http": "~2.8.3"
     },
     "devDependencies": {
         "@tauri-apps/cli": "^2.12.4",

@@ -15,7 +15,7 @@ codebase for Samsung Tizen, LG webOS and desktop (ADR-0013 D46). Tracker: `docs/
 
 | Command | What |
 |---|---|
-| `pnpm install --ignore-workspace` | own lockfile (repo convention) |
+| `pnpm install` | own lockfile + `pnpm-workspace.yaml` (repo convention) |
 | `pnpm typecheck` | TS for the entry + the shared UI graph |
 | `pnpm tauri icon ../web/public/icon-512.png` | generate `src-tauri/icons` (gitignored) |
 | `pnpm tauri dev` | dev window on Vite :13795 |

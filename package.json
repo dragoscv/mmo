@@ -47,5 +47,5 @@
         "docs/mixai-design-tracker.md": "node scripts/tracker-drift.mjs",
         "{server,packages/ui,packages/design-tokens,packages/sdk,packages/ai}/**": "node scripts/check-version-generic.mjs --staged"
     },
-    "packageManager": "pnpm@10.0.0"
+    "packageManager": "pnpm@12.18.0"
 }

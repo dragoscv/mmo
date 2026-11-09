@@ -169,9 +169,8 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
-          # Same pnpm as the lockfile and the server Docker image. server/package.json has no packageManager,
-          # so this exact pin does not collide with the root `packageManager` check (which failed every run).
-          version: 10.0.0
+          # Same pnpm as the root packageManager pin, the lockfiles and the server Docker image.
+          version: 12.18.0
           package_json_file: server/package.json
           run_install: false
 
@@ -206,9 +205,9 @@ jobs:
       - name: Install dependencies
         # The `pnpm.onlyBuiltDependencies` array in server/package.json already
         # whitelists `audify`, so prebuild-install runs automatically.
-        # --ignore-workspace: server/ has its own lockfile; workspace mode pulls in all 16 projects and dies
+        #: server/ has its own lockfile; workspace mode pulls in all 16 projects and dies
         # (repo rule, AGENTS.md "per-app lockfiles").
-        run: pnpm install --frozen-lockfile --ignore-workspace
+        run: pnpm install --frozen-lockfile
 
       - name: Approve native build scripts (audify, electron)
         # pnpm v10 requires explicit approval for postinstall scripts even
@@ -226,7 +225,7 @@ jobs:
         # packages/ui/node_modules, which only exists after this install (own lockfile).
         shell: bash
         run: |
-          pnpm -C ../packages/ui install --frozen-lockfile --ignore-workspace
+          pnpm -C ../packages/ui install --frozen-lockfile
           pnpm build
 
       - name: Assert renderer bundle exists

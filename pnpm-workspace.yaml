@@ -1,14 +1,18 @@
-# pnpm workspace declaration.
+# pnpm workspace declaration (pnpm 12).
 #
-# We keep `shared-workspace-lockfile=false` in .npmrc so each sub-package
-# retains its own pnpm-lock.yaml. That way:
-#   - Vercel (root = app/) keeps using app/pnpm-lock.yaml.
-#   - The companion-release workflow keeps using server/pnpm-lock.yaml.
-#   - We can still run cross-workspace commands like
-#       `pnpm -r --filter @mmo/extension run check-version`.
-# A future PR can flip the flag and consolidate lockfiles in one go.
+# Every project below ALSO has its own pnpm-workspace.yaml + pnpm-lock.yaml, so it is standalone:
+# run plain `pnpm install` inside it (never --ignore-workspace — pnpm 11+ then skips that file's
+# allowBuilds/overrides/nodeLinker). This root file only serves cross-project commands such as
+# `pnpm -r --if-present run typecheck` and the root tooling install
+# (`pnpm install --filter mmo-monorepo`). A future ADR can consolidate lockfiles + catalogs.
 
 packages:
     - "server"
     - "apps/*"
     - "packages/*"
+
+# Per-project lockfiles (was .npmrc shared-workspace-lockfile=false; pnpm 11+ reads settings only here).
+sharedWorkspaceLockfile: false
+autoInstallPeers: true
+minimumReleaseAge: 1440
+allowBuilds: {}

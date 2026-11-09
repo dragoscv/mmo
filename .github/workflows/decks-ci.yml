@@ -45,8 +45,8 @@ jobs:
                   cache-dependency-path: apps/mixai/pnpm-lock.yaml
             - name: Install deps (apps/mixai + packages/ui, consumed from source)
               run: |
-                  pnpm install --frozen-lockfile --ignore-workspace
-                  pnpm -C ../../packages/ui install --frozen-lockfile --ignore-workspace
+                  pnpm install --frozen-lockfile
+                  pnpm -C ../../packages/ui install --frozen-lockfile
             - run: pnpm typecheck
             - run: pnpm exec vite build
 
@@ -98,7 +98,7 @@ jobs:
               working-directory: apps/mixai
               shell: bash
               run: |
-                  pnpm install --frozen-lockfile --ignore-workspace
+                  pnpm install --frozen-lockfile
                   pnpm tauri:icon
                   mkdir -p dist
                   test -f dist/index.html || echo '<!doctype html><title>ci</title>' > dist/index.html

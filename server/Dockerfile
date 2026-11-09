@@ -35,7 +35,7 @@ RUN --mount=type=cache,id=ffmpeg-dl,target=/dl \
 
 # ---------- deps + build ----------
 FROM ${NODE_IMAGE} AS build
-ARG PNPM_VERSION=10.0.0
+ARG PNPM_VERSION=12.18.0
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH \
     ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
     CI=1
@@ -50,7 +50,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
  && corepack enable \
  && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
-COPY package.json pnpm-lock.yaml .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     --mount=type=cache,id=prebuilds,target=/root/.npm/_prebuilds \
     pnpm config set store-dir /pnpm/store \
