@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## web 3.4.3 · design-tokens 1.4.4 · extension 3.0.6 — axe gate green
+
+- `sidebar-primary` (active sidebar item) light lightness 0.62 → 0.53, same WCAG AA fix as `primary` (3.8:1 → 5.0:1 on the sidebar accent).
+- a11y spec emulates `prefers-reduced-motion: reduce` so axe scans the settled landing (hero cards were measured mid-fade in dark mode).
+
 ## Web 3.4.2 — privacy policy covers MixAI Key & BPM (WP18-09)
 
 - `/privacy` (RO/EN) gains a MixAI Key & BPM section: microphone only while listening, key/BPM on device, only an audio fingerprint goes to Apple's Shazam service on Identify/auto-identify, offline queue, on-device set log, phone↔watch link, Apple Music export on request, Android Shazam token request without personal data. Store privacy URLs for both stores point here.

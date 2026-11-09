@@ -1,6 +1,6 @@
 {
   "name": "@mmo/design-tokens",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "private": true,
   "description": "MixAI design tokens — single source of truth (OKLCH palette, theme dimensions, spacing, radius, motion, breakpoints). Generates CSS (Tailwind v4 @theme), JSON, Kotlin and plain-CSS bundles for every surface.",
   "type": "module",

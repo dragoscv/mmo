@@ -97,7 +97,7 @@ object TokensLight {
     val ring = Color(0xFF7F6AFC)
     val sidebar = Color(0xFFF8F8FC)
     val sidebarForeground = Color(0xFF0C0C16)
-    val sidebarPrimary = Color(0xFF7F6AFC)
+    val sidebarPrimary = Color(0xFF664CDD)
     val sidebarPrimaryForeground = Color(0xFFFCFCFC)
     val sidebarAccent = Color(0xFFEFEFF7)
     val sidebarAccentForeground = Color(0xFF171721)

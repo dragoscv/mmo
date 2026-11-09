@@ -166,7 +166,7 @@ export const ROLES: Record<"light" | "dark", Record<RoleName, Oklch>> = {
     ring: { l: 0.62, c: 0.21, h: "accent" },
     sidebar: { l: 0.98, c: 0.005, h: neutralHue },
     "sidebar-foreground": { l: 0.16, c: 0.02, h: neutralHue },
-    "sidebar-primary": { l: 0.62, c: 0.21, h: "accent" },
+    "sidebar-primary": { l: 0.53, c: 0.21, h: "accent" }, // same WCAG AA fix as primary
     "sidebar-primary-foreground": { l: 0.99, c: 0, h: neutralHue },
     "sidebar-accent": { l: 0.955, c: 0.01, h: "accent" },
     "sidebar-accent-foreground": { l: 0.21, c: 0.02, h: neutralHue },

@@ -68,7 +68,7 @@ object TokenRoles {
         "ring" to Oklch(0.62f, 0.21f, -1f, 1.0f),
         "sidebar" to Oklch(0.98f, 0.005f, 285.0f, 1.0f),
         "sidebarForeground" to Oklch(0.16f, 0.02f, 285.0f, 1.0f),
-        "sidebarPrimary" to Oklch(0.62f, 0.21f, -1f, 1.0f),
+        "sidebarPrimary" to Oklch(0.53f, 0.21f, -1f, 1.0f),
         "sidebarPrimaryForeground" to Oklch(0.99f, 0.0f, 285.0f, 1.0f),
         "sidebarAccent" to Oklch(0.955f, 0.01f, -1f, 1.0f),
         "sidebarAccentForeground" to Oklch(0.21f, 0.02f, 285.0f, 1.0f),

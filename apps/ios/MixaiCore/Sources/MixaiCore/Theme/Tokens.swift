@@ -68,7 +68,7 @@ public enum Tokens {
         public static let ring = Color(.sRGB, red: 0.4980, green: 0.4157, blue: 0.9882, opacity: 1.0000)
         public static let sidebar = Color(.sRGB, red: 0.9725, green: 0.9725, blue: 0.9882, opacity: 1.0000)
         public static let sidebarForeground = Color(.sRGB, red: 0.0471, green: 0.0471, blue: 0.0863, opacity: 1.0000)
-        public static let sidebarPrimary = Color(.sRGB, red: 0.4980, green: 0.4157, blue: 0.9882, opacity: 1.0000)
+        public static let sidebarPrimary = Color(.sRGB, red: 0.4000, green: 0.2980, blue: 0.8667, opacity: 1.0000)
         public static let sidebarPrimaryForeground = Color(.sRGB, red: 0.9882, green: 0.9882, blue: 0.9882, opacity: 1.0000)
         public static let sidebarAccent = Color(.sRGB, red: 0.9373, green: 0.9373, blue: 0.9686, opacity: 1.0000)
         public static let sidebarAccentForeground = Color(.sRGB, red: 0.0902, green: 0.0902, blue: 0.1294, opacity: 1.0000)

@@ -50,6 +50,9 @@ for (const mode of MODES) {
             expect(width, "spec must run under a w<width> project").toBeGreaterThan(0);
 
             await setMode(page, mode);
+            // Entrance animations (hero cards fade in over ~1 s) would let axe measure half-faded
+            // text; reduced motion renders every element in its final state (hero-stage.tsx).
+            await page.emulateMedia({ reducedMotion: "reduce" });
             const response = await page.goto(route);
             expect(response, `expected response for ${route}`).not.toBeNull();
             expect(response!.status(), `${route} status`).toBeLessThan(400);
