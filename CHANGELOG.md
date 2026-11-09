@@ -39,6 +39,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   service permission and the phone/storage permissions implied by the ShazamKit AAR are removed from both manifests
   (microphone is the only foreground service type). Identify now starts listening by itself on Android and iOS, and a
   key change no longer cancels a Song ID that is already running.
+- **watchOS**: the watch app now requires watchOS 27 (App Store asks for an arm64_32 slice below 27 and the Rust engine
+  is arm64 only) and declares background audio under `UIBackgroundModes` (App Store rejected `WKBackgroundModes: audio`).
+  New `scripts/ios-build.ps1 -Mode keybpmphonesim` captures 6.9" iPhone store screenshots from the Simulator through a
+  `-KBShot` launch-argument hook.
 
 ## web 3.4.1 · ui 1.0.2 · design-tokens 1.4.3 · extension 3.0.5 — WCAG AA contrast (axe gate)
 

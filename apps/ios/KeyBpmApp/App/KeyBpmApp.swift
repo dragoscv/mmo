@@ -15,6 +15,7 @@ struct KeyBpmApp: App {
         WatchBridge.shared.activate()
         ListenSession.shared.onPublish = { WatchBridge.shared.publish($0) }
         KeyBpmShortcuts.updateAppShortcutParameters()
+        ListenSession.shared.applyScreenshotHook()
     }
 
     var body: some Scene {

@@ -60,6 +60,42 @@ final class ListenSession {
         pendingIds = songIdEngine.pendingCount
     }
 
+    /// Store screenshots from the iOS Simulator (scripts/keybpm-phone-shots.sh): `-KBShot live|songid` with
+    /// `-KBShotKey <0-23>` `-KBShotBpm <bpm>` seeds a locked reading (and a demo set log) without a microphone.
+    /// No effect unless the launch argument is present.
+    func applyScreenshotHook() {
+        let d = UserDefaults.standard
+        guard let mode = d.string(forKey: "KBShot") else { return }
+        let k = d.object(forKey: "KBShotKey") == nil ? 21 : d.integer(forKey: "KBShotKey")
+        let b = d.object(forKey: "KBShotBpm") == nil ? 124.0 : d.double(forKey: "KBShotBpm")
+        var r = Reading()
+        r.keyIndex = k; r.keyLocked = true; r.keyConfidence = 0.82; r.alternativeIndex = (k + 3) % 24
+        r.bpm = b; r.tempoLocked = true; r.tempoConfidence = 0.97; r.chord = "Am"
+        r.tuningA4 = 440.4; r.tuningCents = 2; r.lufs = -9.8; r.energy = 7.4; r.levelDbfs = -14
+        r.chroma = [0.92, 0.18, 0.41, 0.22, 0.86, 0.35, 0.12, 0.71, 0.2, 0.95, 0.15, 0.38]
+        reading = r
+        listening = true
+        saved = true
+        startedAt = Date().addingTimeInterval(-1500)
+        let demo: [(Int, Double, String, String)] = [
+            (21, 124.0, "Endless Summer", "The Midnight"), (16, 123.5, "Midnight City", "M83"),
+            (11, 122.0, "Strobe", "deadmau5"), (14, 124.0, "Opus", "Eric Prydz"),
+        ]
+        if log.entries.isEmpty {
+            for (i, e) in demo.enumerated().reversed() {
+                var entry = LogEntry(at: Date().addingTimeInterval(Double(-300 * i)), camelot: Harmony.camelot(e.0),
+                                     keyName: Notation.musical.label(e.0), bpm: e.1, keyConfidence: 0.8, source: .mic, title: e.2)
+                entry.artist = e.3
+                log.add(entry)
+            }
+        }
+        if mode == "songid" {
+            songId = .found(SongMatch(title: "Endless Summer", artist: "The Midnight"), queued: false)
+        }
+        if d.object(forKey: "KBShotTab") != nil { Nav.shared.tab = d.integer(forKey: "KBShotTab") }
+        if mode == "stage" { Nav.shared.stage = true }
+    }
+
     // MARK: listening
     func start() async {
         guard !listening else { return }

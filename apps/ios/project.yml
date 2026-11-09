@@ -570,10 +570,11 @@ targets:
   # Independent watch app (owner 2026-11-09): own mic + Rust engine (aarch64 watchOS = Series 9+ / Ultra 2+), iPhone
   # mirror over WatchConnectivity, haptic beat, Double Tap tap tempo, complications. Background audio mode keeps the
   # mic while the wrist is down (started in the foreground; no runtime / workout session).
+  # watchOS 27 minimum (owner 2026-11-09): App Store requires an arm64_32 slice below 27, the Rust engine is arm64 only.
   MixAIKeyBpmWatch:
     type: application
     platform: watchOS
-    deploymentTarget: '11.0'
+    deploymentTarget: '27.0'
     sources:
       - path: KeyBpmWatch
       - path: KeyBpmApp/Shared
@@ -594,7 +595,8 @@ targets:
         WKApplication: true
         WKCompanionAppBundleIdentifier: ro.mixai.keybpm
         WKRunsIndependentlyOfCompanionApp: true
-        WKBackgroundModes: [audio]
+        # `audio` is a UIBackgroundModes value on watchOS (WKBackgroundModes only takes workout/session types).
+        UIBackgroundModes: [audio]
         CFBundleLocalizations: [en, ro]
     entitlements:
       path: KeyBpmWatch/MixAIKeyBpmWatch.entitlements
@@ -603,8 +605,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.keybpm.watchkitapp
-        # D69: aarch64 watches only (Series 9+ / Ultra 2+); the Rust engine has no arm64_32 slice yet.
+        # D69: aarch64 watches only (Series 9+ / Ultra 2+); the Rust engine has no arm64_32 slice.
         ARCHS[sdk=watchos*]: arm64
+        WATCHOS_DEPLOYMENT_TARGET: '27.0'
         PRODUCT_NAME: MixAIKeyBpmWatch
         MARKETING_VERSION: '0.4.0'
         GENERATE_INFOPLIST_FILE: YES
@@ -618,7 +621,7 @@ targets:
   MixAIKeyBpmWatchWidgets:
     type: app-extension
     platform: watchOS
-    deploymentTarget: '11.0'
+    deploymentTarget: '27.0'
     sources:
       - path: KeyBpmWatchWidgets
       - path: KeyBpmApp/Shared/Harmony.swift
@@ -642,6 +645,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.keybpm.watchkitapp.widgets
         ARCHS[sdk=watchos*]: arm64
+        WATCHOS_DEPLOYMENT_TARGET: '27.0'
         PRODUCT_NAME: MixAIKeyBpmWatchWidgets
         MARKETING_VERSION: '0.4.0'
         GENERATE_INFOPLIST_FILE: YES

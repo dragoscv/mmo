@@ -15,6 +15,7 @@
 #     (both need the Rust sources: DECKS_RUST_ROOT = a tree holding apps/mixai/src-tauri + crates/; ios-build.ps1 ships it)
 #   scripts/build.sh keybpmbuild     Rust mixai-listen-ffi (iOS + watchOS device) + compile MixAI Key & BPM, unsigned (WP18-05)
 #   scripts/build.sh keybpmwatchsim  Rust Simulator slices + Key & BPM watch app in the watchOS Simulator + screenshots
+#   scripts/build.sh keybpmphonesim  Key & BPM iPhone app in the iOS Simulator + App Store screenshots (6.9")
 #   scripts/build.sh keybpmdevipa    development-signed ro.mixai.keybpm .ipa (with the watch app) for registered devices
 #   scripts/build.sh keybpmupload    archive MixAI Key & BPM (iOS + embedded watchOS), sign and upload to TestFlight
 #     (all need crates/: KEYBPM_RUST_ROOT = a tree holding crates/mixai-listen*; ios-build.ps1 ships it)
@@ -169,6 +170,11 @@ case "$MODE" in
     generate
     ./scripts/keybpm-watch-shots.sh
     ;;
+  keybpmphonesim)
+    [ -d KeyBpmFFI/KeyBpmFFI.xcframework/ios-arm64_x86_64-simulator ] || ./scripts/build-keybpm-xcframework.sh sim
+    generate
+    ./scripts/keybpm-phone-shots.sh
+    ;;
   keybpmdevipa)
     [ -d KeyBpmFFI/KeyBpmFFI.xcframework ] || ./scripts/build-keybpm-xcframework.sh device
     archive MixAIKeyBpm
@@ -254,7 +260,7 @@ case "$MODE" in
     log "UPLOADED tvOS build $BUILD_NUMBER (TestFlight processing takes ~5-15 min)"
     ;;
   *)
-    echo "usage: $0 test|build|tvbuild|devipa|upload|tvupload|musicbuild|musicdevipa|musicupload|decksbuild|decksmacbuild|keybpmbuild|keybpmwatchsim|keybpmdevipa|keybpmupload" >&2
+    echo "usage: $0 test|build|tvbuild|devipa|upload|tvupload|musicbuild|musicdevipa|musicupload|decksbuild|decksmacbuild|keybpmbuild|keybpmwatchsim|keybpmphonesim|keybpmdevipa|keybpmupload" >&2
     exit 2
     ;;
 esac

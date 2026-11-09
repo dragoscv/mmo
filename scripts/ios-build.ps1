@@ -24,11 +24,12 @@
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode decksmacbuild               # MixAI Decks macOS, unsigned (WP19-15)
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode keybpmbuild                 # MixAI Key & BPM iOS + watchOS, unsigned (WP18-05)
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode keybpmwatchsim              # Key & BPM watch app in the watchOS Simulator + store shots
+  pwsh -NoProfile -File scripts/ios-build.ps1 -Mode keybpmphonesim              # Key & BPM iPhone app in the iOS Simulator + store shots
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode keybpmupload -Ref origin/main # Key & BPM (iOS + watch) to TestFlight
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('test', 'build', 'tvbuild', 'devipa', 'upload', 'tvupload', 'musicbuild', 'musicdevipa', 'musicupload', 'decksbuild', 'decksmacbuild', 'keybpmbuild', 'keybpmwatchsim', 'keybpmdevipa', 'keybpmupload')] [string]$Mode = 'build',
+  [ValidateSet('test', 'build', 'tvbuild', 'devipa', 'upload', 'tvupload', 'musicbuild', 'musicdevipa', 'musicupload', 'decksbuild', 'decksmacbuild', 'keybpmbuild', 'keybpmwatchsim', 'keybpmphonesim', 'keybpmdevipa', 'keybpmupload')] [string]$Mode = 'build',
   [string]$Ref = 'HEAD',
   [string]$GuestHost = '100.106.244.19',
   [int]$GuestPort = 10022,
@@ -117,11 +118,12 @@ $build = (git -C $repo rev-list --count $sha).Trim()
 if (-not $signed) {
   & ssh @ssh $target "cd ~/$remote && ${rustEnv}BUILD_NUMBER=$build ./scripts/build.sh $Mode" *>&1 | Tee-Object -FilePath $log
   $rc = $LASTEXITCODE
-  if ($rc -eq 0 -and $Mode -eq 'keybpmwatchsim') {
-    $shots = Join-Path $tmp 'watch-shots'
+  if ($rc -eq 0 -and $Mode -in 'keybpmwatchsim', 'keybpmphonesim') {
+    $kind = if ($Mode -eq 'keybpmwatchsim') { 'watch-shots' } else { 'phone-shots' }
+    $shots = Join-Path $tmp $kind
     New-Item -ItemType Directory -Force -Path $shots | Out-Null
-    & scp -q -o BatchMode=yes -i $Key -P $GuestPort "${target}:$remote/build/watch-shots/*.png" $shots
-    Write-Host "watch shots: $shots"
+    & scp -q -o BatchMode=yes -i $Key -P $GuestPort "${target}:$remote/build/$kind/*.png" $shots
+    Write-Host ('{0}: {1}' -f $kind, $shots)
   }
 } else {
   $p8 = Join-Path $tmp 'k.p8'
