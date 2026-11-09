@@ -36,6 +36,10 @@ packages:
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
     exactVersion: 9.33.0
+  # MixAI Decks Rust core (WP19-15): DecksFFI.xcframework + generated Swift bindings, built by
+  # scripts/build-decks-xcframework.sh (gitignored artefacts; Package.swift committed).
+  DecksFFI:
+    path: DecksFFI
 targets:
   MixAI:
     type: application
@@ -360,6 +364,95 @@ targets:
         SKIP_INSTALL: YES
         APPLICATION_EXTENSION_API_ONLY: YES
         SWIFT_EMIT_LOC_STRINGS: NO
+  # MixAI Decks (WP19-15, ADR-0014 D61): native DJ app on the Rust core (decks-ffi). One SwiftUI source tree
+  # (DecksApp/) for iPhone + iPad (MixAIDecks) and macOS 15+ (MixAIDecksMac), bundle id ro.mixai.dj for both.
+  # The ro.mixai.dj App ID does NOT exist in the Apple portal yet (ASC bundleIds/apps empty, 2026-11-09):
+  # unsigned compiles work; signed / TestFlight modes need the App ID + app records first (tracker WP19-24).
+  MixAIDecks:
+    type: application
+    platform: iOS
+    deploymentTarget: '26.0'
+    sources:
+      - path: DecksApp
+        excludes: [Info-iOS.plist, Info-macOS.plist, '*.entitlements']
+    dependencies:
+      - package: MixaiCore
+      - package: DecksFFI
+      - sdk: AVFoundation.framework
+      - sdk: CoreMIDI.framework
+      - sdk: CoreAudioKit.framework
+      - sdk: Metal.framework
+      - sdk: QuartzCore.framework
+    info:
+      path: DecksApp/Info-iOS.plist
+      properties:
+        UIBackgroundModes: [audio]
+        UIUserInterfaceStyle: Dark
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        CFBundleLocalizations: [en, ro]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.dj
+        PRODUCT_NAME: MixAIDecks
+        MARKETING_VERSION: '2.0.0'
+        TARGETED_DEVICE_FAMILY: '1,2'
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MixAI Decks
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIRequiresFullScreen: NO
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: MixAI Decks connects to Bluetooth MIDI DJ controllers you choose.
+        SWIFT_EMIT_LOC_STRINGS: YES
+  MixAIDecksMac:
+    type: application
+    platform: macOS
+    deploymentTarget: '15.0'
+    sources:
+      - path: DecksApp
+        excludes: [Info-iOS.plist, Info-macOS.plist, '*.entitlements']
+    dependencies:
+      - package: MixaiCore
+      - package: DecksFFI
+      - sdk: CoreMIDI.framework
+      - sdk: Metal.framework
+      - sdk: QuartzCore.framework
+    info:
+      path: DecksApp/Info-macOS.plist
+      properties:
+        CFBundleLocalizations: [en, ro]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    # App Sandbox: user-selected folders read-write (library + security-scoped bookmarks), no microphone
+    # (DVS input off in the MVP), outgoing network for the MixAI companion / server.
+    entitlements:
+      path: DecksApp/MixAIDecksMac.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.bookmarks.app-scope: true
+        com.apple.security.device.audio-input: false
+        com.apple.security.device.usb: true
+        com.apple.security.device.bluetooth: true
+        com.apple.security.network.client: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.dj
+        PRODUCT_NAME: MixAIDecks
+        MARKETING_VERSION: '2.0.0'
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MixAI Decks
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
+        INFOPLIST_KEY_NSHumanReadableCopyright: © 2026 Dragos Catalin Vladulescu
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
 schemes:
   MixAI:
     build:
@@ -384,6 +477,22 @@ schemes:
         MixAIMusic: all
         MixAIMusicWidgets: all
         MixAIMusicIntents: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  MixAIDecks:
+    build:
+      targets:
+        MixAIDecks: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  MixAIDecksMac:
+    build:
+      targets:
+        MixAIDecksMac: all
     run:
       config: Debug
     archive:

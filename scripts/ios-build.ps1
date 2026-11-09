@@ -20,10 +20,12 @@
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode tvupload -Ref origin/main   # MixAI TV for Apple TV (WP17-24)
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode musicbuild                  # MixAI Music, unsigned (WP17-42)
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode musicupload -Ref origin/main  # MixAI Music to TestFlight
+  pwsh -NoProfile -File scripts/ios-build.ps1 -Mode decksbuild                  # MixAI Decks iOS/iPadOS, unsigned (WP19-15)
+  pwsh -NoProfile -File scripts/ios-build.ps1 -Mode decksmacbuild               # MixAI Decks macOS, unsigned (WP19-15)
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('test', 'build', 'tvbuild', 'devipa', 'upload', 'tvupload', 'musicbuild', 'musicdevipa', 'musicupload')] [string]$Mode = 'build',
+  [ValidateSet('test', 'build', 'tvbuild', 'devipa', 'upload', 'tvupload', 'musicbuild', 'musicdevipa', 'musicupload', 'decksbuild', 'decksmacbuild')] [string]$Mode = 'build',
   [string]$Ref = 'HEAD',
   [string]$GuestHost = '100.106.244.19',
   [int]$GuestPort = 10022,
@@ -87,10 +89,21 @@ Invoke-Guest "rm -rf ~/$remote && mkdir -p ~/$remote"
 if ($LASTEXITCODE -ne 0) { throw 'scp failed' }
 Invoke-Guest "cd ~/$remote && tar -xf ios.tar && rm ios.tar && chmod +x scripts/*.sh"
 
+# MixAI Decks modes also need the committed Rust core (decks-ffi workspace + the shared crates/ it path-depends on).
+$rustEnv = ''
+if ($Mode -like 'decks*') {
+  $rtar = Join-Path $tmp 'rust.tar'
+  git -C $repo -c core.autocrlf=false archive --format=tar -o $rtar $sha -- apps/mixai/src-tauri crates
+  & scp -q -o BatchMode=yes -i $Key -P $GuestPort $rtar "${target}:$remote/rust.tar"
+  if ($LASTEXITCODE -ne 0) { throw 'scp rust.tar failed' }
+  Invoke-Guest "cd ~/$remote && mkdir -p rust && tar -xf rust.tar -C rust && rm rust.tar"
+  $rustEnv = 'DECKS_RUST_ROOT=$HOME/' + $remote + '/rust '
+}
+
 $log = Join-Path $tmp "$Mode.log"
 $build = (git -C $repo rev-list --count $sha).Trim()
 if (-not $signed) {
-  & ssh @ssh $target "cd ~/$remote && BUILD_NUMBER=$build ./scripts/build.sh $Mode" *>&1 | Tee-Object -FilePath $log
+  & ssh @ssh $target "cd ~/$remote && ${rustEnv}BUILD_NUMBER=$build ./scripts/build.sh $Mode" *>&1 | Tee-Object -FilePath $log
   $rc = $LASTEXITCODE
 } else {
   $p8 = Join-Path $tmp 'k.p8'

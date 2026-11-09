@@ -10,6 +10,9 @@
 #   scripts/build.sh musicbuild   generate project + compile MixAI Music for iphoneos, unsigned (WP17-42)
 #   scripts/build.sh musicdevipa  development-signed ro.mixai.music .ipa for registered devices
 #   scripts/build.sh musicupload  archive MixAI Music (ro.mixai.music), sign and upload to TestFlight
+#   scripts/build.sh decksbuild     Rust decks-ffi (iOS device slice) + compile MixAI Decks for iphoneos, unsigned (WP19-15)
+#   scripts/build.sh decksmacbuild  Rust decks-ffi (universal macOS) + compile MixAI Decks for macOS, unsigned (WP19-15)
+#     (both need the Rust sources: DECKS_RUST_ROOT = a tree holding apps/mixai/src-tauri + crates/; ios-build.ps1 ships it)
 #
 # Env for devipa/upload (the Windows driver scripts/ios-build.ps1 sets these from Secret Manager and deletes the key
 # file afterwards; nothing is stored in the repo):
@@ -129,6 +132,24 @@ case "$MODE" in
       CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build -quiet
     log "OK: $OUT/dd/Build/Products/Release-iphoneos/MixAIMusic.app"
     ;;
+  decksbuild)
+    ./scripts/build-decks-xcframework.sh ios-device
+    generate
+    log "compile MixAI Decks (iphoneos, unsigned)"
+    xcodebuild -project MixAI.xcodeproj -scheme MixAIDecks -configuration Release \
+      -destination 'generic/platform=iOS' -derivedDataPath "$OUT/dd" "${SPM_FLAGS[@]}" \
+      CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build -quiet
+    log "OK: $OUT/dd/Build/Products/Release-iphoneos/MixAIDecks.app"
+    ;;
+  decksmacbuild)
+    ./scripts/build-decks-xcframework.sh macos
+    generate
+    log "compile MixAI Decks (macOS, unsigned)"
+    xcodebuild -project MixAI.xcodeproj -scheme MixAIDecksMac -configuration Release \
+      -destination 'generic/platform=macOS' -derivedDataPath "$OUT/dd" "${SPM_FLAGS[@]}" \
+      CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build -quiet
+    log "OK: $OUT/dd/Build/Products/Release/MixAIDecks.app"
+    ;;
   musicdevipa)
     archive MixAIMusic
     export_plist "${EXPORT_METHOD:-debugging}" export
@@ -196,7 +217,7 @@ case "$MODE" in
     log "UPLOADED tvOS build $BUILD_NUMBER (TestFlight processing takes ~5-15 min)"
     ;;
   *)
-    echo "usage: $0 test|build|tvbuild|devipa|upload|tvupload|musicbuild|musicdevipa|musicupload" >&2
+    echo "usage: $0 test|build|tvbuild|devipa|upload|tvupload|musicbuild|musicdevipa|musicupload|decksbuild|decksmacbuild" >&2
     exit 2
     ;;
 esac
