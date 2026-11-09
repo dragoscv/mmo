@@ -2,7 +2,7 @@
  * Auth.js session cookie per host (WP17-10, D41). Pure.
  *
  * On `mixai.ro` and every `*.mixai.ro` host the session cookie is scoped to `.mixai.ro` so one sign-in covers
- * MixAI, TV, Music, Studio and DJ. It also gets a NEW name: the pre-WP17 host-only `__Secure-authjs.session-token`
+ * MixAI, TV, Music, Studio and Decks. It also gets a NEW name: the pre-WP17 host-only `__Secure-authjs.session-token`
  * on `mixai.ro` would otherwise shadow (or outlive a sign-out of) the domain cookie with the same name. The cost
  * is one re-login on the apex (owner accepted, 2026-11-06).
  *

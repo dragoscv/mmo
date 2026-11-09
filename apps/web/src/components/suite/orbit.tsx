@@ -2,7 +2,7 @@ import { Server } from "lucide-react";
 import { SUITE_PRODUCTS } from "./products";
 
 /**
- * Hero subject (WP17-12): the MixAI Server as a breathing core with TV / Music / Studio / DJ orbiting on two
+ * Hero subject (WP17-12): the MixAI Server as a breathing core with TV / Music / Studio / Decks orbiting on two
  * tilted rings. Pure CSS (transform + opacity only, GPU-cheap); reduced motion freezes it (suite.css).
  */
 export function SuiteOrbit({ label }: { label: string }) {

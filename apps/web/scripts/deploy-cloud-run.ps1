@@ -29,7 +29,7 @@ param(
   [string]$EnvFile,
   [switch]$NoSecretSync,
   [switch]$SkipBuild,
-  # WP17-10: turn on tv./music./app./dj. host routing + the .mixai.ro session cookie. Only after the domain
+  # WP17-10: turn on tv./music./app./decks. host routing (dj. 308s to decks., D60) + the .mixai.ro session cookie. Only after the domain
   # mappings for every product host have a certificate (otherwise 308s point at hosts without TLS).
   [switch]$HostRouting
 )

@@ -6,7 +6,8 @@
  *   tv.mixai.ro      → MixAI TV: clean URLs, `/browse/movie` is served by the `/media/browse/movie` route
  *   music.mixai.ro   → MixAI Music: `/` = `/media/music`, `/album/x` = `/media/music/album/x`
  *   app.mixai.ro     → MixAI Studio (organizer: library, AI, DJ live, settings, admin)
- *   dj.mixai.ro      → MixAI DJ landing (`/dj`)
+ *   decks.mixai.ro   → MixAI Decks landing (`/dj`; product key stays `dj`, ADR-0014 / D60)
+ *   dj.mixai.ro      → old MixAI DJ host: 308 to `decks.mixai.ro` with path + query preserved
  *
  * Any other host (run.app, localhost, LAN, preview) is "legacy": every path works exactly as before, no
  * rewrites and no redirects, so the store builds that point at run.app keep working (D41).
@@ -18,7 +19,7 @@ export type HostKind = Product | "legacy";
 export const ROOT_DOMAIN = "mixai.ro";
 
 /**
- * Host routing is switched on per deploy with `MIXAI_HOST_ROUTING=1`, only once tv./music./app./dj. resolve and
+ * Host routing is switched on per deploy with `MIXAI_HOST_ROUTING=1`, only once tv./music./app./decks. resolve and
  * have certificates; until then every host behaves as legacy (no redirects to hosts that do not exist yet).
  * Server-side only (proxy, RSC, Auth.js); the client receives the resolved kind via HostProvider.
  */
@@ -26,8 +27,10 @@ export function hostRoutingEnabled(): boolean {
     return typeof process !== "undefined" && process.env.MIXAI_HOST_ROUTING === "1";
 }
 
-const SUB: Record<string, Product> = { tv: "tv", music: "music", app: "studio", dj: "dj", www: "suite" };
-const PRODUCT_SUB: Record<Product, string | null> = { suite: null, tv: "tv", music: "music", studio: "app", dj: "dj" };
+const SUB: Record<string, Product> = { tv: "tv", music: "music", app: "studio", decks: "dj", dj: "dj", www: "suite" };
+const PRODUCT_SUB: Record<Product, string | null> = { suite: null, tv: "tv", music: "music", studio: "app", dj: "decks" };
+/** Retired product subdomains → their replacement. Every path (shared ones too) 308s there (D60: MixAI DJ → Decks). */
+const RENAMED_SUB: Record<string, string> = { dj: "decks" };
 
 /** Strips the port and lowercases (`Tv.MixAI.ro:443` → `tv.mixai.ro`). */
 export function normalizeHost(host: string | null | undefined): string {
@@ -45,6 +48,14 @@ export function hostKind(host: string | null | undefined, rootDomain = ROOT_DOMA
     if (!h.endsWith(`.${rootDomain}`)) return "legacy";
     const sub = h.slice(0, -(rootDomain.length + 1));
     return SUB[sub] ?? "legacy";
+}
+
+/** `https://decks.mixai.ro` when `host` is a renamed product subdomain (`dj.mixai.ro`), else `null`. */
+export function renamedHostOrigin(host: string | null | undefined, rootDomain = ROOT_DOMAIN): string | null {
+    const h = normalizeHost(host);
+    if (!h.endsWith(`.${rootDomain}`)) return null;
+    const target = RENAMED_SUB[h.slice(0, -(rootDomain.length + 1))];
+    return target ? `https://${target}.${rootDomain}` : null;
 }
 
 /** True for the apex and every `*.mixai.ro` host (cookie domain + redirect allow-list). */
@@ -187,6 +198,8 @@ export type RouteDecision =
  *  - any other path owned by another product → 308 to that host; unknown paths → next (404 here).
  */
 export function routeRequest(host: string | null | undefined, pathname: string, search = "", rootDomain = ROOT_DOMAIN): RouteDecision {
+    const renamed = renamedHostOrigin(host, rootDomain);
+    if (renamed) return { type: "redirect", url: `${renamed}${pathname || "/"}${search}`, status: 308 };
     const kind = hostKind(host, rootDomain);
     if (kind === "legacy" || isSharedPath(pathname)) return { type: "next" };
     const go = (owner: Product, internal: string): RouteDecision =>

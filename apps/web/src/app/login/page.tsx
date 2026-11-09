@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     if (session?.user) {
         redirect(callbackUrl);
     }
-    // OAuth redirect URIs are registered for the apex: tv./music./app./dj. sign in there.
+    // OAuth redirect URIs are registered for the apex: tv./music./app./decks. sign in there.
     const central = centralLoginUrl(kind, callbackUrl, rootDomain());
     if (central) redirect(central);
 

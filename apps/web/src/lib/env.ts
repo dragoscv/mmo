@@ -48,6 +48,9 @@ const baseSchema = z.object({
     STRIPE_PRICE_PRO_MONTHLY: z.string().optional(),
     STRIPE_PRICE_PRO_YEARLY: z.string().optional(),
 
+    // Entitlement feature flags (lib/entitlements.ts): only "1"/"true" enable. Unset = off.
+    MIXAI_FLAG_DECKS_PRO: z.string().optional(),
+
     // BYO-AI-keys at-rest crypto. Required only when a user actually
     // tries to store an AI key; we don't enforce here because read-only
     // deployments without that feature wired up shouldn't be blocked.

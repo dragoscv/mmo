@@ -22,6 +22,8 @@ $want = @()
 foreach ($ip in '216.239.32.21','216.239.34.21','216.239.36.21','216.239.38.21') { $want += @{ type='A'; name='mixai.ro'; content=$ip } }
 foreach ($ip in '2001:4860:4802:32::15','2001:4860:4802:34::15','2001:4860:4802:36::15','2001:4860:4802:38::15') { $want += @{ type='AAAA'; name='mixai.ro'; content=$ip } }
 $want += @{ type='CNAME'; name='www.mixai.ro';  content='ghs.googlehosted.com' }
+# product hosts (WP17 suite; decks = MixAI Decks, dj kept for the 308 redirect, D60)
+foreach ($sub in 'app','music','tv','dj','decks') { $want += @{ type='CNAME'; name="$sub.mixai.ro"; content='ghs.googlehosted.com' } }
 $want += @{ type='A';     name='demo.mixai.ro'; content='34.118.46.71' }
 $existing = (Invoke-RestMethod "$base/zones/$($zone.id)/dns_records?per_page=200" -Headers $h).result
 $managedNames = $want | ForEach-Object { $_.name } | Sort-Object -Unique

@@ -11,7 +11,8 @@ export async function generateMetadata(): Promise<Metadata> {
     return { title: { absolute: t("title") }, description: t("subtitle") };
 }
 
-/** `dj.mixai.ro` (WP17-51) — MixAI DJ landing + downloads. Public, server-rendered. */
+/** `decks.mixai.ro` (WP17-51, renamed D60 / ADR-0014) — MixAI Decks landing + downloads. Public, server-rendered.
+ *  The old `dj.mixai.ro` host 308s here (`routeRequest`). Route stays `/dj` (internal mount). */
 export default async function DjLanding() {
     const t = await getTranslations("mx.suite.dj");
     const features = [

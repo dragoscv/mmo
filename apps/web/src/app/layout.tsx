@@ -138,11 +138,11 @@ const baseMetadata: Metadata = {
 
 /** WP17-10: product name, description, manifest and canonical origin per host (legacy hosts keep the suite). */
 const PRODUCT_META: Record<Exclude<HostKind, "legacy">, { name: string; description: string; manifest: string }> = {
-    suite: { name: "MixAI", description: "MixAI — TV, Music, Studio and DJ on every screen, powered by your own MixAI Server.", manifest: "/manifest-suite.webmanifest" },
+    suite: { name: "MixAI", description: "MixAI — TV, Music, Studio and Decks on every screen, powered by your own MixAI Server.", manifest: "/manifest-suite.webmanifest" },
     tv: { name: "MixAI TV", description: "Movies, series, Live TV and Watch Together from your own MixAI Server, on every screen.", manifest: "/manifest-tv.webmanifest" },
     music: { name: "MixAI Music", description: "Albums, artists, playlists, radio and synced lyrics from your own MixAI Server.", manifest: "/manifest-music.webmanifest" },
     studio: { name: "MixAI Studio", description: "Organize, analyze, tag and mix your music library with AI. Server admin and dashboard.", manifest: "/manifest-studio.webmanifest" },
-    dj: { name: "MixAI DJ", description: "Pro DJ desktop app with a Rust audio engine, AI stems and beat-matched automix.", manifest: "/manifest-suite.webmanifest" },
+    dj: { name: "MixAI Decks", description: "Pro DJ app with a Rust audio engine, AI stems and beat-matched automix.", manifest: "/manifest-suite.webmanifest" },
 };
 
 export async function generateMetadata(): Promise<Metadata> {

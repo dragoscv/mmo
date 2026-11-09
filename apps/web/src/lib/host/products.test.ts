@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { hostKind, hostRoutingEnabled, hrefFor, internalPathname, midiHostAllowed, ownerOf, routeRequest, toInternal, toPublic } from "./products";
+import { hostKind, hostRoutingEnabled, hrefFor, internalPathname, midiHostAllowed, ownerOf, productOrigin, renamedHostOrigin, routeRequest, toInternal, toPublic } from "./products";
 import { MEDIA_NAV } from "@/components/mmo/media-shell";
 
 vi.mock("@/components/host/host-context", () => ({ default: () => null, usePathname: () => "/", useRouter: () => ({}), useHost: () => ({}) }));
@@ -53,6 +53,7 @@ describe("hostKind", () => {
         expect(hostKind("music.mixai.ro")).toBe("music");
         expect(hostKind("app.mixai.ro")).toBe("studio");
         expect(hostKind("dj.mixai.ro")).toBe("dj");
+        expect(hostKind("decks.mixai.ro")).toBe("dj");
         expect(hostKind("demo.mixai.ro")).toBe("legacy");
         expect(hostKind("mixai-web-abc-ew.a.run.app")).toBe("legacy");
         expect(hostKind("localhost:13789")).toBe("legacy");
@@ -182,6 +183,20 @@ describe("routeRequest", () => {
     it("honours a staging root domain", () => {
         expect(routeRequest("tv.staging.mixai.ro", "/", "", "staging.mixai.ro")).toEqual({ type: "rewrite", path: "/media" });
         expect(routeRequest("staging.mixai.ro", "/library", "", "staging.mixai.ro")).toEqual({ type: "redirect", url: "https://app.staging.mixai.ro/library", status: 308 });
+    });
+    it("serves MixAI Decks at decks.mixai.ro and 308s the old dj.mixai.ro host (D60, ADR-0014)", () => {
+        expect(productOrigin("dj")).toBe("https://decks.mixai.ro");
+        expect(routeRequest("decks.mixai.ro", "/")).toEqual({ type: "rewrite", path: "/dj" });
+        expect(routeRequest("decks.mixai.ro", "/dj")).toEqual({ type: "redirect", url: "https://decks.mixai.ro/", status: 308 });
+        expect(routeRequest("mixai.ro", "/dj")).toEqual({ type: "redirect", url: "https://decks.mixai.ro/", status: 308 });
+        expect(routeRequest("decks.mixai.ro", "/library")).toEqual({ type: "redirect", url: "https://app.mixai.ro/library", status: 308 });
+        expect(routeRequest("dj.mixai.ro", "/")).toEqual({ type: "redirect", url: "https://decks.mixai.ro/", status: 308 });
+        expect(routeRequest("DJ.mixai.ro:443", "/get", "?p=windows&x=1")).toEqual({ type: "redirect", url: "https://decks.mixai.ro/get?p=windows&x=1", status: 308 });
+        expect(routeRequest("dj.mixai.ro", "/privacy")).toEqual({ type: "redirect", url: "https://decks.mixai.ro/privacy", status: 308 });
+        expect(routeRequest("dj.staging.mixai.ro", "/a", "", "staging.mixai.ro")).toEqual({ type: "redirect", url: "https://decks.staging.mixai.ro/a", status: 308 });
+        expect(renamedHostOrigin("decks.mixai.ro")).toBeNull();
+        expect(renamedHostOrigin("dj.evil.com")).toBeNull();
+        expect(hrefFor("/dj", "suite")).toBe("https://decks.mixai.ro/");
     });
 });
 

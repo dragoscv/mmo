@@ -1,7 +1,7 @@
 {
     "meta": {
-        "title": "MixAI — TV, Music, Studio and DJ on every screen",
-        "description": "One self-hosted server, apps for every screen: watch on MixAI TV, listen on MixAI Music, organize in MixAI Studio, perform with MixAI DJ."
+        "title": "MixAI — TV, Music, Studio and Decks on every screen",
+        "description": "One self-hosted server, apps for every screen: watch on MixAI TV, listen on MixAI Music, organize in MixAI Studio, perform with MixAI Decks."
     },
     "hero": {
         "eyebrow": "The MixAI suite",
@@ -17,7 +17,7 @@
         "tv": { "name": "MixAI TV", "tagline": "Watch", "body": "Movies, series, Live TV with catch-up and Watch Together. Cinematic on Android TV, Samsung, LG, Apple TV, Fire TV, phones and desktop." },
         "music": { "name": "MixAI Music", "tagline": "Listen", "body": "Albums, artists, playlists, radio and synced lyrics. Offline downloads, beat-matched automix, CarPlay and Android Auto." },
         "studio": { "name": "MixAI Studio", "tagline": "Organize", "body": "AI tagging, BPM and key analysis, smart playlists, downloads and server admin with a live dashboard." },
-        "dj": { "name": "MixAI DJ", "tagline": "Perform", "body": "A pro DJ desktop app with a Rust audio engine, AI stems, beat sync and controller support." },
+        "dj": { "name": "MixAI Decks", "tagline": "Perform", "body": "Pro DJ software with a Rust audio engine, AI stems, beat sync and controller support." },
         "server": { "name": "MixAI Server", "tagline": "The brain", "body": "Self-hosted on Windows, macOS, Linux, Docker or a Raspberry Pi. Your library never leaves home." }
     },
     "sections": {
@@ -73,9 +73,9 @@
         "rights": "© {year} MixAI"
     },
     "dj": {
-        "title": "MixAI DJ",
+        "title": "MixAI Decks",
         "subtitle": "Pro DJ software with a Rust audio engine, AI stems and beat-matched automix. Free for Windows, macOS and Linux.",
-        "cta": "Download MixAI DJ",
+        "cta": "Download MixAI Decks",
         "features": {
             "engine": { "title": "Low-latency engine", "body": "Native Rust audio with sub-10 ms latency, key lock and time-stretching." },
             "stems": { "title": "AI stems", "body": "Split vocals, drums, bass and melody live, on your own machine." },

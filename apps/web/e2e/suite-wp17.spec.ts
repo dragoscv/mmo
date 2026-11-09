@@ -131,7 +131,7 @@ test.describe("signed in", () => {
         }
     }
 
-    for (const [host, marker] of [["tv", "main"], ["music", "main"], ["app", "main"], ["dj", "main"]] as const) {
+    for (const [host, marker] of [["tv", "main"], ["music", "main"], ["app", "main"], ["decks", "main"]] as const) {
         test(`${host}.${ROOT} signed in`, async ({ page }) => {
             const errors: string[] = [];
             page.on("pageerror", (e) => errors.push(String(e)));
@@ -151,9 +151,13 @@ test.describe("signed in", () => {
 });
 
 test("legacy paths 308 to the product hosts", async ({ request }) => {
-    for (const [from, to] of [["/media", "https://tv.mixai.ro/"], ["/media/music", "https://music.mixai.ro/"], ["/library", "https://app.mixai.ro/library"], ["/dj", "https://dj.mixai.ro/"]] as const) {
+    for (const [from, to] of [["/media", "https://tv.mixai.ro/"], ["/media/music", "https://music.mixai.ro/"], ["/library", "https://app.mixai.ro/library"], ["/dj", "https://decks.mixai.ro/"]] as const) {
         const r = await request.get(`https://${ROOT}${from}`, { maxRedirects: 0 });
         expect(r.status(), from).toBe(308);
         expect(r.headers().location, from).toBe(to);
     }
+    // D60: the old MixAI DJ host keeps path + query on its way to MixAI Decks.
+    const old = await request.get("https://dj.mixai.ro/get?x=1", { maxRedirects: 0 });
+    expect(old.status()).toBe(308);
+    expect(old.headers().location).toBe("https://decks.mixai.ro/get?x=1");
 });
