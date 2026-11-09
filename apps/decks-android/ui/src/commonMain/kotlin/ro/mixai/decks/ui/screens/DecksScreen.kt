@@ -69,6 +69,8 @@ fun DecksScreen(
     onScanFolder: (() -> Unit)? = null,
     autoFocus: Boolean = true,
     skins: SkinState? = null,
+    recordPath: (() -> String)? = null,
+    onExport: (String, String) -> Unit = { _, _ -> },
 ) {
     val reduced = LocalReducedMotion.current
     val layout = LocalDecksSkin.current.layout
@@ -83,6 +85,7 @@ fun DecksScreen(
     var zoom by remember { mutableStateOf(8f) }
     var showConnect by remember { mutableStateOf(false) }
     var showAi by remember { mutableStateOf(false) }
+    var showSet by remember { mutableStateOf(false) }
 
     BoxWithConstraints(
         Modifier.fillMaxSize()
@@ -101,9 +104,10 @@ fun DecksScreen(
         val peaks = ctl.controls.map { it.peaks }
         val frame = ctl.waveFrame(zoom, reduced)
         Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusBar(ctl, skins, { showAi = !showAi }) { showConnect = !showConnect }
+            StatusBar(ctl, skins, if (recordPath != null) ({ showSet = !showSet }) else null, { showAi = !showAi }) { showConnect = !showConnect }
             if (showConnect) ConnectPanel(ctl, Modifier.fillMaxWidth())
             if (showAi) AiPanel(ctl, Modifier.fillMaxWidth())
+            if (showSet && recordPath != null) SetPanel(ctl, recordPath, onExport, Modifier.fillMaxWidth())
             val waveLabel = str(Str.Waveform)
             val waveH = when {
                 !wide -> 110.dp
@@ -157,7 +161,7 @@ fun DecksScreen(
 }
 
 @Composable
-private fun StatusBar(ctl: DecksController, skins: SkinState?, onAi: () -> Unit, onConnect: () -> Unit) {
+private fun StatusBar(ctl: DecksController, skins: SkinState?, onSet: (() -> Unit)?, onAi: () -> Unit, onConnect: () -> Unit) {
     val type = LocalDecksType.current
     val clock = ctl.engine.clock
     Panel(Modifier.fillMaxWidth()) {
@@ -191,6 +195,12 @@ private fun StatusBar(ctl: DecksController, skins: SkinState?, onAi: () -> Unit,
             )
             ConnectChip(ctl, onConnect)
             PadButton(str(Str.AiTitle), str(Str.AiTitle), active = ctl.mixProgress != null, onClick = onAi)
+            if (onSet != null) {
+                PadButton(
+                    if (ctl.recordingOn) "● ${Format.time(ctl.recordElapsed).substringBefore('.')}" else str(Str.SetRecord),
+                    str(Str.SetTitle), active = ctl.recordingOn, accent = DecksColors.danger, onClick = onSet,
+                )
+            }
             if (skins != null) {
                 val name = skinName(skins.skin)
                 PadButton(str(Str.Skin, name), "${str(Str.SkinNext)} · ${str(Str.Skin, name)}") { skins.cycle() }

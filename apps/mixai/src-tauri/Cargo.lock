@@ -1392,6 +1392,7 @@ dependencies = [
  "decks-mapping",
  "decks-remote",
  "decks-render",
+ "decks-setlog",
  "decks-transition",
  "hound",
  "mixai-core",
@@ -1456,6 +1457,14 @@ dependencies = [
  "raw-window-handle",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "decks-setlog"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

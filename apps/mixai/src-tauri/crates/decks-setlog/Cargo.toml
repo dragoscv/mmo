@@ -1,0 +1,17 @@
+[package]
+name = "decks-setlog"
+version = "0.1.0"
+description = "MixAI Decks set recording companion (WP19-22): automatic tracklist from deck audibility, CUE sheet with ISRC, ORDA / UCMR-ADA broadcast report CSV, Mixcloud sections, M3U8"
+authors = ["mwrty <vladulescu.catalin@gmail.com>"]
+license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.87"
+publish = false
+
+[lib]
+name = "decks_setlog"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"

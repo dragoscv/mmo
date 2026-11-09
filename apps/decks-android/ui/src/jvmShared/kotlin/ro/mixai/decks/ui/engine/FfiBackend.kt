@@ -272,6 +272,9 @@ class FfiBackend(libraryDbPath: String?) : DecksBackend {
     private val transitionPort by lazy { FfiTransition(engine) }
     override fun transitions(): TransitionPort? = transitionPort
 
+    private val setRecordPort by lazy { FfiSetRecord(engine) }
+    override fun setRecorder(): SetRecordPort? = setRecordPort
+
     override fun close() {
         runCatching { engine.stop() }
         runCatching { engine.close() }

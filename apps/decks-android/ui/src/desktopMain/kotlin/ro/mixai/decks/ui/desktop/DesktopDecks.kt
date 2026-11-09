@@ -44,6 +44,21 @@ object DesktopDecks {
 
     fun language(): String = System.getProperty("decks.lang") ?: Locale.getDefault().language
 
+    /** Recordings and tracklist exports: `~/Music/MixAI Decks` (`-Ddecks.recordDir` overrides). */
+    fun recordDir(): File =
+        File(System.getProperty("decks.recordDir") ?: File(System.getProperty("user.home"), "Music/MixAI Decks").path).apply { mkdirs() }
+
+    fun newRecordPath(): String {
+        val stamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm"))
+        return File(recordDir(), "set_$stamp.wav").absolutePath
+    }
+
+    /** Writes the export next to the latest recording (`set_<stamp>.<ext>`); returns the file. */
+    fun saveExport(wavPath: String?, ext: String, content: String): File {
+        val base = wavPath?.let { File(it).nameWithoutExtension } ?: "tracklist"
+        return File(recordDir(), "$base.$ext").apply { writeText(content, Charsets.UTF_8) }
+    }
+
     /** Skin persisted in java.util.prefs (`ro/mixai/decks` → `skin`); `-Ddecks.skin=<id>` overrides. */
     fun skinState(): SkinState {
         val prefs = java.util.prefs.Preferences.userRoot().node("ro/mixai/decks")
@@ -91,6 +106,8 @@ fun DecksDesktopRoot(
                 },
                 onScanFolder = onScanFolder,
                 skins = state,
+                recordPath = DesktopDecks::newRecordPath,
+                onExport = { ext, content -> DesktopDecks.saveExport(ctl.lastSetWav, ext, content) },
             )
         }
     }

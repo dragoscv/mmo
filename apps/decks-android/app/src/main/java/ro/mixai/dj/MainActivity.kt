@@ -48,7 +48,11 @@ class MainActivity : ComponentActivity() {
         val skins = AndroidDecks.skinState(this)
         setContent {
             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                DecksAndroidRoot(ctl, strings, reduced, ::scanFolder, skins)
+                DecksAndroidRoot(
+                    ctl, strings, reduced, ::scanFolder, skins,
+                    recordPath = { AndroidDecks.newRecordPath(this@MainActivity) },
+                    onExport = { ext, content -> AndroidDecks.shareExport(this@MainActivity, ext, content) },
+                )
             }
         }
     }

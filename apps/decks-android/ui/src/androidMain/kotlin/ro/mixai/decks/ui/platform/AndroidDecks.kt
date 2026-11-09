@@ -36,10 +36,30 @@ object AndroidDecks {
         val prefs = context.getSharedPreferences("decks", Context.MODE_PRIVATE)
         return SkinState(DecksSkin.decode(prefs.getString("skin", null))) { prefs.edit().putString("skin", it.encode()).apply() }
     }
+
+    /** New WAV path in the app's Music dir (no storage permission needed). */
+    fun newRecordPath(context: Context): String {
+        val dir = (context.getExternalFilesDir(android.os.Environment.DIRECTORY_MUSIC) ?: context.filesDir).resolve("sets").apply { mkdirs() }
+        val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm", java.util.Locale.ROOT).format(java.util.Date())
+        return dir.resolve("set_$stamp.wav").absolutePath
+    }
+
+    /** Share a tracklist export as text (Mixcloud / notes / email / ORDA submission). */
+    fun shareExport(context: Context, ext: String, content: String) {
+        val mime = when (ext) { "csv" -> "text/csv"; "json" -> "application/json"; else -> "text/plain" }
+        val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+            .setType(mime)
+            .putExtra(android.content.Intent.EXTRA_TEXT, content)
+            .putExtra(android.content.Intent.EXTRA_SUBJECT, "tracklist.$ext")
+        context.startActivity(android.content.Intent.createChooser(send, null).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
 }
 
 @Composable
-fun DecksAndroidRoot(ctl: DecksController, strings: StringTable, reducedMotion: Boolean, onScanFolder: () -> Unit, skins: SkinState? = null) {
+fun DecksAndroidRoot(
+    ctl: DecksController, strings: StringTable, reducedMotion: Boolean, onScanFolder: () -> Unit, skins: SkinState? = null,
+    recordPath: (() -> String)? = null, onExport: (String, String) -> Unit = { _, _ -> },
+) {
     val backend = ctl.backend
     val state = skins ?: remember { SkinState(DecksSkin.default) }
     CompositionLocalProvider(LocalStrings provides strings) {
@@ -52,6 +72,8 @@ fun DecksAndroidRoot(ctl: DecksController, strings: StringTable, reducedMotion: 
                 },
                 onScanFolder = onScanFolder,
                 skins = state,
+                recordPath = recordPath,
+                onExport = onExport,
             )
         }
     }

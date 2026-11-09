@@ -13,6 +13,7 @@
 //! * [`DecksRenderer`] — wgpu deck views (`decks-render`), headless or on a native surface.
 //! * [`DecksRemote`] — phone remote, second screen and Party DJ over the LAN (`decks-remote`).
 //! * [`TransitionRunner`] + `transition_*` functions — AI Transition Designer (`decks-transition`).
+//! * [`SetRecorder`] + `tracklist_export` — set recording with automatic tracklist (`decks-setlog`).
 //!
 //! Conventions (same as `crates/mixai-listen-ffi`): proc-macro UniFFI, **polling instead of
 //! callbacks** (every foreign call happens on a thread the app owns), objects are `Send + Sync`
@@ -30,6 +31,7 @@ mod library;
 mod mapping;
 mod remote;
 mod render;
+mod setlog;
 mod transition;
 
 pub use dvs::*;
@@ -38,6 +40,7 @@ pub use library::*;
 pub use mapping::*;
 pub use remote::*;
 pub use render::*;
+pub use setlog::*;
 pub use transition::*;
 
 uniffi::setup_scaffolding!();

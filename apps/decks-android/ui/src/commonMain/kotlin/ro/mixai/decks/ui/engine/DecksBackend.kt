@@ -93,4 +93,7 @@ interface DecksBackend : AutoCloseable {
 
     /** AI Transition Designer (WP19-20); null when unavailable (demo engine). */
     fun transitions(): TransitionPort? = null
+
+    /** Set recording + automatic tracklist (WP19-22); null when unavailable (demo engine). */
+    fun setRecorder(): SetRecordPort? = null
 }

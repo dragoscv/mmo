@@ -32,6 +32,7 @@ decks-dvs = { path = "../decks-dvs" }
 decks-render = { path = "../decks-render" }
 decks-remote = { path = "../decks-remote" }
 decks-transition = { path = "../decks-transition" }
+decks-setlog = { path = "../decks-setlog" }
 uniffi = "0.32.2"
 thiserror = "2.0.21"
 serde_json = "1.0.154"

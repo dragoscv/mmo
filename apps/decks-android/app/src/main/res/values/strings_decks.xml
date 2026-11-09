@@ -113,4 +113,13 @@
     <string name="decks_ai_warning" formatted="false">Heads-up: %1</string>
     <string name="decks_ai_command_hint" formatted="false">Type a command, e.g. mix next in 16 bars with a bass swap</string>
     <string name="decks_ai_run" formatted="false">Run</string>
+    <string name="decks_set_title" formatted="false">Set recording</string>
+    <string name="decks_set_record" formatted="false">REC</string>
+    <string name="decks_set_stop" formatted="false">Stop recording</string>
+    <string name="decks_set_record_failed" formatted="false">Recording could not start (engine stopped or folder not writable).</string>
+    <string name="decks_set_empty" formatted="false">The tracklist fills in by itself: a track is added after 20 s on air.</string>
+    <string name="decks_set_remove" formatted="false">Remove from tracklist</string>
+    <string name="decks_set_export" formatted="false">Export</string>
+    <string name="decks_set_export_text" formatted="false">Text</string>
+    <string name="decks_set_default_name" formatted="false">MixAI Decks set</string>
 </resources>

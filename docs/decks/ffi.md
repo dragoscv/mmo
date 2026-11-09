@@ -218,6 +218,14 @@ automation_json, reasons}`, `transition_check_safety(playing, position_sec, temp
 start_beat)`: `tick(engine, master_beat) -> TransitionTick{applied, errors, done, progress}`, `is_done()`.
 `DecksEngine` gained `set_stems_active(deck, on)` and `set_stem_gain(deck, stem, gain)`.
 
+### Set recording
+
+([set-recording.md](set-recording.md)) `SetRecorder.start(engine, wav_path)` (records the master + logs the
+tracklist; `NotRunning` when the engine is stopped): `set_label(deck, SetTrackLabel?)`, `observe(engine)` (UI tick),
+`entries() -> [TracklistEntry{id, title, artist, isrc?, deck, start_sec, played_sec}]`, `remove_entry(index)`,
+`elapsed_sec()`, `wav_path()`, `stop(engine) -> [TracklistEntry]` (idempotent). Free function
+`tracklist_export(entries, TracklistFormat{Text, Cue, OrdaUcmrCsv, MixcloudSections, M3u8}, wav_file, set_title, dj)`.
+
 ## Limits (2026-11-09)
 
 * Device / config: `mixai_core::Engine::start_with(device, sample_rate, buffer_frames)` applies

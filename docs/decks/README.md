@@ -15,6 +15,7 @@ the Tauri 1.x plan is kept for history in [`docs/mixai/`](../mixai/00-architectu
 | [stems.md](stems.md) | On-device stem separation: HT-Demucs ONNX, accelerators, cache, server fallback |
 | [remote.md](remote.md) | Connected mode: phone remote, second screen, Party DJ requests (LAN, QR pairing, security model) |
 | [transitions.md](transitions.md) | AI Transition Designer: next-track ranking, phrase-aligned plans, editable automation, set safety, RO/EN commands, risers |
+| [set-recording.md](set-recording.md) | Set recording with automatic tracklist; text / CUE + ISRC / ORDA–UCMR-ADA CSV / Mixcloud / M3U8 exports |
 | [dvs-clean-room.md](dvs-clean-room.md) | Clean-room provenance statement for the DVS decoder |
 | [library-interop.md](library-interop.md) | rekordbox / Traktor / Serato / Engine / PDB / JSON read-write matrix, migration, key and colour mapping |
 | [streaming.md](streaming.md) | Streaming strategy (D64), partner applications checklist, draft emails |

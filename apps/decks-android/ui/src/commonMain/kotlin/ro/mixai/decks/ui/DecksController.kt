@@ -15,8 +15,11 @@ import ro.mixai.decks.ui.engine.RemotePort
 import ro.mixai.decks.ui.engine.RemoteRoleUi
 import ro.mixai.decks.ui.engine.RequestStateUi
 import ro.mixai.decks.ui.engine.SafetyUi
+import ro.mixai.decks.ui.engine.SetRecording
 import ro.mixai.decks.ui.engine.SongRequestUi
 import ro.mixai.decks.ui.engine.SuggestionUi
+import ro.mixai.decks.ui.engine.TracklistEntryUi
+import ro.mixai.decks.ui.engine.TracklistFormatUi
 import ro.mixai.decks.ui.engine.TransitionRun
 import ro.mixai.decks.ui.engine.TransitionStyleUi
 import ro.mixai.decks.ui.engine.TransitionTrackUi
@@ -125,6 +128,19 @@ class DecksController(val backend: DecksBackend) {
     private var planBars: Int? = null
     private var planStyle: TransitionStyleUi? = null
 
+    // Set recording (WP19-22)
+    private var recording: SetRecording? = null
+    var recordingOn by mutableStateOf(false)
+        private set
+    var recordElapsed by mutableStateOf(0.0)
+        private set
+    var tracklist by mutableStateOf<List<TracklistEntryUi>>(emptyList())
+        private set
+    var lastSetWav by mutableStateOf<String?>(null)
+        private set
+    var recordError by mutableStateOf(false)
+        private set
+
     private val loadTickets = LongArray(EngineState.DECKS) { -1L }
     private var scanId = -1L
     private var frame = 0L
@@ -151,7 +167,65 @@ class DecksController(val backend: DecksBackend) {
             if (done) { mixRun = null; mixProgress = null; plan = null }
         }
         if (frame % 30L == 0L) refreshSafety()
+        recording?.let { r ->
+            if (frame % 15L == 0L) {
+                r.observe()
+                recordElapsed = r.elapsedSec()
+                tracklist = r.entries()
+            }
+        }
     }
+
+    // ---- Set recording -------------------------------------------------------------------
+
+    /** Start recording the master to [wavPath] with an automatic tracklist. */
+    fun startRecording(wavPath: String): Boolean {
+        if (recording != null) return true
+        val r = backend.setRecorder()?.start(wavPath)
+        recordError = r == null
+        if (r == null) return false
+        recording = r
+        recordingOn = true
+        tracklist = emptyList()
+        lastSetWav = wavPath
+        for (d in controls.indices) labelForRecording(d)
+        return true
+    }
+
+    fun stopRecording() {
+        val r = recording ?: return
+        tracklist = r.stop()
+        recording = null
+        recordingOn = false
+    }
+
+    fun removeTracklistEntry(index: Int) {
+        val r = recording
+        if (r != null) { r.remove(index); tracklist = r.entries() }
+        else if (index in tracklist.indices) {
+            val l = tracklist.toMutableList()
+            val gone = l.removeAt(index)
+            if (index > 0) l[index - 1] = l[index - 1].copy(playedSec = l[index - 1].playedSec + gone.playedSec)
+            tracklist = l
+        }
+    }
+
+    /** Export the current tracklist; empty when unavailable. */
+    fun exportTracklist(format: TracklistFormatUi, title: String, dj: String): String {
+        val port = backend.setRecorder() ?: return ""
+        val wav = lastSetWav?.substringAfterLast('/')?.substringAfterLast('\\') ?: "set.wav"
+        return port.export(tracklist, format, wav, title, dj)
+    }
+
+    private fun labelForRecording(d: Int) {
+        val r = recording ?: return
+        val s = deck(d) ?: return
+        if (!s.loaded) return
+        val row = deckRows[d]
+        r.label(d, row?.id ?: "deck$d:${s.title}", controls[d].meta?.title ?: row?.title ?: s.title ?: "", row?.artist ?: "", null, row?.path)
+    }
+
+    private val deckRows = arrayOfNulls<TrackRow>(EngineState.DECKS)
 
     // ---- AI Transition Designer ----------------------------------------------------------
 
@@ -352,6 +426,7 @@ class DecksController(val backend: DecksBackend) {
                     c.peaksVersion++
                     c.loadPhase = null
                     labelDeck(d)
+                    labelForRecording(d)
                 }
                 LoadPhase.FAILED, LoadPhase.CANCELLED -> loadTickets[d] = -1
                 else -> Unit
@@ -403,6 +478,7 @@ class DecksController(val backend: DecksBackend) {
         c.tempoFader = 0f
         c.keyShift = 0.0
         deckArtists[deck] = row.artist
+        deckRows[deck] = row
         loadTickets[deck] = backend.load(deck, row.path)
         if (loadTickets[deck] < 0) {
             c.loadPhase = LoadPhase.FAILED

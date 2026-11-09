@@ -113,4 +113,13 @@
     <string name="decks_ai_warning" formatted="false">Atenție: %1</string>
     <string name="decks_ai_command_hint" formatted="false">Scrie o comandă, de ex. mixează următoarea în 16 măsuri cu schimb de bas</string>
     <string name="decks_ai_run" formatted="false">Execută</string>
+    <string name="decks_set_title" formatted="false">Înregistrare set</string>
+    <string name="decks_set_record" formatted="false">REC</string>
+    <string name="decks_set_stop" formatted="false">Oprește înregistrarea</string>
+    <string name="decks_set_record_failed" formatted="false">Înregistrarea nu a pornit (motor oprit sau dosar fără drept de scriere).</string>
+    <string name="decks_set_empty" formatted="false">Lista de piese se completează singură: o piesă apare după 20 s în difuzare.</string>
+    <string name="decks_set_remove" formatted="false">Scoate din listă</string>
+    <string name="decks_set_export" formatted="false">Exportă</string>
+    <string name="decks_set_export_text" formatted="false">Text</string>
+    <string name="decks_set_default_name" formatted="false">Set MixAI Decks</string>
 </resources>
