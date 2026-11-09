@@ -23,20 +23,20 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@base-ui/react": "^1.8.0",
-    "@tanstack/react-table": "^9.2.4",
+    "@base-ui/react": "^1.9.0",
+    "@tanstack/react-table": "^9.3.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.70.0",
     "motion": "^13.4.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
-    "@base-ui/react": "^1.8.0",
-    "@tanstack/react-table": "^9.2.4",
+    "@base-ui/react": "^1.9.0",
+    "@tanstack/react-table": "^9.3.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
     "@types/react": "^19.2.17",
@@ -45,12 +45,12 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "jsdom": "^29.1.1",
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.70.0",
     "motion": "^13.4.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tailwind-merge": "^3.7.0",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.1"
+    "vitest": "^5.1.0"
   }
 }
