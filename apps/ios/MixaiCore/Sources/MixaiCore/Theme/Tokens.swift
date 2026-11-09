@@ -104,5 +104,11 @@ public enum Tokens {
         public static let amber: Double = 75
         public static let rose: Double = 15
     }
+
+    /// Camelot wheel key colours (index 0 = 1A/1B … 11 = 12A/12B), fixed.
+    public enum Key {
+        public static let minor: [Color] = [Color(.sRGB, red: 0.0000, green: 0.6863, blue: 0.5882, opacity: 1.0000), Color(.sRGB, red: 0.2431, green: 0.6706, blue: 0.3686, opacity: 1.0000), Color(.sRGB, red: 0.5294, green: 0.6235, blue: 0.0941, opacity: 1.0000), Color(.sRGB, red: 0.7137, green: 0.5490, blue: 0.0000, opacity: 1.0000), Color(.sRGB, red: 0.8275, green: 0.4706, blue: 0.0706, opacity: 1.0000), Color(.sRGB, red: 0.8745, green: 0.4157, blue: 0.3490, opacity: 1.0000), Color(.sRGB, red: 0.8510, green: 0.4000, blue: 0.5569, opacity: 1.0000), Color(.sRGB, red: 0.7686, green: 0.4275, blue: 0.7412, opacity: 1.0000), Color(.sRGB, red: 0.6314, green: 0.4784, blue: 0.8745, opacity: 1.0000), Color(.sRGB, red: 0.4353, green: 0.5451, blue: 0.9294, opacity: 1.0000), Color(.sRGB, red: 0.0235, green: 0.6118, blue: 0.8941, opacity: 1.0000), Color(.sRGB, red: 0.0000, green: 0.6627, blue: 0.7686, opacity: 1.0000)]
+        public static let major: [Color] = [Color(.sRGB, red: 0.2118, green: 0.8235, blue: 0.7294, opacity: 1.0000), Color(.sRGB, red: 0.4627, green: 0.8118, blue: 0.5412, opacity: 1.0000), Color(.sRGB, red: 0.6784, green: 0.7647, blue: 0.3686, opacity: 1.0000), Color(.sRGB, red: 0.8471, green: 0.7020, blue: 0.2863, opacity: 1.0000), Color(.sRGB, red: 0.9569, green: 0.6353, blue: 0.3608, opacity: 1.0000), Color(.sRGB, red: 1.0000, green: 0.5882, blue: 0.5216, opacity: 1.0000), Color(.sRGB, red: 0.9843, green: 0.5765, blue: 0.7059, opacity: 1.0000), Color(.sRGB, red: 0.9020, green: 0.5961, blue: 0.8745, opacity: 1.0000), Color(.sRGB, red: 0.7686, green: 0.6431, blue: 0.9961, opacity: 1.0000), Color(.sRGB, red: 0.5922, green: 0.7020, blue: 1.0000, opacity: 1.0000), Color(.sRGB, red: 0.3765, green: 0.7608, blue: 1.0000, opacity: 1.0000), Color(.sRGB, red: 0.1333, green: 0.8039, blue: 0.8980, opacity: 1.0000)]
+    }
 }
 

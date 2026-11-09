@@ -29,7 +29,9 @@ class EngineTest {
         val sr = 48_000
         KeyBpmEngine(EngineConfig(sr.toUInt(), 88.0, 440.0)).use { engine ->
             val block = FloatArray(sr / 2) { i -> (0.3 * sin(2 * PI * 440.0 * i / sr)).toFloat() }
-            engine.pushPcm(block.toList())
+            val bb = java.nio.ByteBuffer.allocate(block.size * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            bb.asFloatBuffer().put(block)
+            engine.pushPcmBytes(bb.array())
             val s = engine.snapshot()
             assertEquals(0.5, s.elapsedSecs, 1e-9)
             assertEquals("A4", s.pitch!!.noteName)

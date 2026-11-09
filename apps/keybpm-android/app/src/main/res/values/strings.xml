@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MixAI Key &amp; BPM</string>
+    <string name="tab_live">Live</string>
+    <string name="tab_tuner">Tuner</string>
+    <string name="listen_start">Listen</string>
+    <string name="listen_stop">Stop</string>
+    <string name="listen_again">Listen again</string>
+    <string name="listening">Listening…</string>
+    <string name="idle_hint">Hold your phone near the music. Audio is analysed on your device and never recorded.</string>
+    <string name="mic_rationale_title">Microphone access</string>
+    <string name="mic_rationale">MixAI listens to the music around you to show its key, BPM and tuning. Audio is analysed on your device and never recorded.</string>
+    <string name="mic_allow">Allow</string>
+    <string name="mic_denied">Microphone access is off. Turn it on in Settings to detect key and BPM.</string>
+    <string name="open_settings">Open settings</string>
+    <string name="key_label">Key</string>
+    <string name="bpm_label">BPM</string>
+    <string name="provisional">provisional</string>
+    <string name="locked">locked</string>
+    <string name="confidence">%1$d%% sure</string>
+    <string name="alternative">or %1$s</string>
+    <string name="half_tempo">½×</string>
+    <string name="double_tempo">2×</string>
+    <string name="chord_label">Chord</string>
+    <string name="no_chord">—</string>
+    <string name="tuning_label">Tuning</string>
+    <string name="tuning_value">A4 = %1$.1f Hz (%2$+d ¢)</string>
+    <string name="energy_label">Energy</string>
+    <string name="loudness_label">Loudness</string>
+    <string name="lufs_value">%1$.0f LUFS</string>
+    <string name="key_changed">Key change: %1$s</string>
+    <string name="compatible_keys">Mixes well with</string>
+    <string name="notation">Notation</string>
+    <string name="notation_camelot">Camelot</string>
+    <string name="notation_open_key">Open Key</string>
+    <string name="notation_musical">Musical</string>
+    <string name="tuner_hint">Play a single note</string>
+    <string name="tuner_reference">Reference A4 = %1$d Hz</string>
+    <string name="level_low">Too quiet — move closer to the speaker</string>
+    <string name="cd_wheel">Camelot wheel, %1$s highlighted</string>
+    <string name="cd_beat">Beat indicator</string>
+</resources>

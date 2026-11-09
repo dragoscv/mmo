@@ -34,3 +34,5 @@ project(":wear").projectDir = file("../music-android/wear")
 // MixAI Key & BPM (WP18, D58/D69): Rust engine crates/mixai-listen-ffi via UniFFI, phone + Wear apps.
 include(":listen-core")
 project(":listen-core").projectDir = file("../keybpm-android/listen-core")
+include(":keybpm")
+project(":keybpm").projectDir = file("../keybpm-android/app")

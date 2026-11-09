@@ -18,7 +18,10 @@ path = "uniffi-bindgen.rs"
 required-features = ["cli"]
 
 [features]
+default = ["cnn"]
 cli = ["uniffi/cli"]
+# Key CNN (tract). Phones + desktop; the watchOS build disables default features.
+cnn = ["mixai-listen/cnn"]
 
 [dependencies]
 mixai-listen = { path = "../mixai-listen", features = ["decode"] }

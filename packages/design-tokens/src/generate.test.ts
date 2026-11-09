@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { kotlinTokens, oklchToHex, plainCss, prehydrateScript, swiftTokens, tailwindCss } from "./generate";
-import { ACCENTS, DATA_ATTRS, PREFS_STORAGE_KEY, normalizePrefs, parseAccent } from "./tokens";
+import { kotlinTokens, oklchToHex, plainCss, prehydrateScript, swiftTokens, tailwindCss, tokensJson } from "./generate";
+import { ACCENTS, CAMELOT, DATA_ATTRS, PREFS_STORAGE_KEY, camelotColors, normalizePrefs, parseAccent } from "./tokens";
+
+describe("camelot key colours", () => {
+  it("has 24 distinct keys, A darker than B, and emits them to json, kotlin and swift (not css yet)", () => {
+    const c = camelotColors();
+    expect(Object.keys(c)).toHaveLength(24);
+    expect(new Set(Object.values(c)).size).toBe(24);
+    expect(CAMELOT.minor.l).toBeLessThan(CAMELOT.major.l);
+    expect(plainCss()).not.toContain("--key-8a");
+    expect(JSON.parse(tokensJson()).camelot["8A"]).toBe(c["8A"]);
+    const kt = kotlinTokens();
+    expect(kt.match(/val keyMinor = listOf\((.*)\)/)?.[1]?.split("Color(").length).toBe(13);
+    expect(kt).toContain("val keyMajor = listOf(");
+    expect(swiftTokens()).toContain("public static let minor: [Color]");
+  });
+});
 
 describe("tokens css", () => {
   const css = tailwindCss();

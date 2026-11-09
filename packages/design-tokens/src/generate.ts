@@ -6,6 +6,7 @@ import {
   ACCENT_HUE_VAR,
   BRAND,
   BREAKPOINTS,
+  CAMELOT,
   CONTENT_WIDTHS,
   DATA_ATTRS,
   DEFAULT_PREFS,
@@ -19,6 +20,7 @@ import {
   SURFACE_VARS,
   TV,
   Z_INDEX,
+  camelotColors,
   oklchCss,
 } from "./tokens.ts";
 
@@ -202,6 +204,7 @@ export function tokensJson(): string {
       accents: ACCENTS,
       roles: ROLES,
       brand: BRAND,
+      camelot: camelotColors(),
       surface: SURFACE_VARS,
       density: DENSITY_VARS,
       radius: RADIUS_VARS,
@@ -267,6 +270,9 @@ export function kotlinTokens(pkg = "ro.mixai.tv.ui.theme", withLight = false): s
   }
   lines.push(``, `    // Accent hues (OKLCH) — for runtime re-tinting if ever needed`);
   for (const [k, v] of Object.entries(ACCENTS)) lines.push(`    const val ACCENT_HUE_${k.toUpperCase()} = ${v.hue}`);
+  lines.push(``, `    // Camelot wheel key colours (index 0 = 1A/1B … 11 = 12A/12B), fixed`);
+  lines.push(`    val keyMinor = listOf(${CAMELOT.hues.map((h) => `Color(0x${oklchToHex(CAMELOT.minor.l, CAMELOT.minor.c, h)})`).join(", ")})`);
+  lines.push(`    val keyMajor = listOf(${CAMELOT.hues.map((h) => `Color(0x${oklchToHex(CAMELOT.major.l, CAMELOT.major.c, h)})`).join(", ")})`);
   lines.push(``, `    // 10-foot layout`);
   lines.push(`    const val ROOT_FONT_SP = ${parseInt(TV.rootFontSize, 10)}`);
   lines.push(`    const val FOCUS_RING_DP = ${parseInt(TV.focusRingWidth, 10)}`);
@@ -323,6 +329,9 @@ export function swiftTokens(): string {
   }
   lines.push(`    }`, ``, `    /// Accent hues (OKLCH degrees).`, `    public enum AccentHue {`);
   for (const [k, v] of Object.entries(ACCENTS)) lines.push(`        public static let ${k}: Double = ${v.hue}`);
+  lines.push(`    }`, ``, `    /// Camelot wheel key colours (index 0 = 1A/1B … 11 = 12A/12B), fixed.`, `    public enum Key {`);
+  lines.push(`        public static let minor: [Color] = [${CAMELOT.hues.map((h) => rgba(oklchToHex(CAMELOT.minor.l, CAMELOT.minor.c, h))).join(", ")}]`);
+  lines.push(`        public static let major: [Color] = [${CAMELOT.hues.map((h) => rgba(oklchToHex(CAMELOT.major.l, CAMELOT.major.c, h))).join(", ")}]`);
   lines.push(`    }`, `}`, ``);
   return lines.join("\n");
 }

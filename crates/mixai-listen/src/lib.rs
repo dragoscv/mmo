@@ -124,6 +124,8 @@ struct CnnState {
     hop: usize,
     frames: std::collections::VecDeque<[f32; features::BINS]>,
     since_run: usize,
+    /// Frames between periodic runs (live: 2 s; file mode: never, one run in `finish`).
+    run_every: usize,
     last: Option<cnn::CnnKey>,
 }
 
@@ -142,6 +144,7 @@ impl CnnState {
             hop: (sr as f64 / features::FRAMES_PER_SEC) as usize,
             frames: std::collections::VecDeque::with_capacity(Self::MAX_FRAMES),
             since_run: 0,
+            run_every: Self::RUN_EVERY,
             last: None,
         })
     }
@@ -154,7 +157,7 @@ impl CnnState {
         }
         self.frames.push_back(f);
         self.since_run += 1;
-        if self.frames.len() >= Self::MIN_FRAMES && self.since_run >= Self::RUN_EVERY {
+        if self.frames.len() >= Self::MIN_FRAMES && self.since_run >= self.run_every {
             self.since_run = 0;
             let frames: Vec<[f32; features::BINS]> = self.frames.iter().copied().collect();
             if let Some(k) = self.model.predict(&frames) {
@@ -254,7 +257,10 @@ impl Listener {
                 continue;
             }
             if s % self.onset_hop == 0 {
+                // Below -60 dBFS (room noise, mic hiss) there is no music to beat-track: feed zero onsets so the
+                // tracker never locks onto noise (seen on the emulator mic: "174 BPM locked" at -79 LUFS).
                 let flux = self.onset.step(&self.ring);
+                let flux = if self.level_dbfs < -60.0 { 0.0 } else { flux };
                 self.tempo.push(flux);
                 self.energy.push(10f64.powf(self.level_dbfs.max(-120.0) / 20.0) as f32, flux);
             }
@@ -329,6 +335,14 @@ impl Listener {
         }
     }
 
+    /// File mode: skip periodic CNN runs while pushing; `finish` runs it once on the whole buffer.
+    fn file_mode(&mut self) {
+        #[cfg(feature = "cnn")]
+        if let Some(c) = self.cnn.as_mut() {
+            c.run_every = usize::MAX;
+        }
+    }
+
     /// Start over (new song, "listen again").
     pub fn reset(&mut self) {
         self.ring.clear();
@@ -358,6 +372,7 @@ pub fn analyze_samples(samples: &[f32], sample_rate: u32, bpm_floor: f64) -> Ana
     cfg.bpm_floor = bpm_floor;
     cfg.tempo_window_secs = 30.0;
     let mut l = Listener::new(cfg);
+    l.file_mode();
     for block in samples.chunks(4096) {
         l.push(block);
     }
@@ -468,5 +483,16 @@ mod tests {
         l.push(&[f32::NAN, f32::INFINITY, -7.0, 3.0]);
         l.push(&[]);
         let _ = l.snapshot();
+    }
+
+    #[test]
+    fn quiet_noise_never_reports_a_tempo() {
+        let sr = 48_000;
+        let mut l = Listener::new(ListenerConfig::new(sr));
+        let mut rng = Lcg(11);
+        let noise: Vec<f32> = (0..sr as usize * 12).map(|_| rng.next() * 0.0005).collect();
+        l.push(&noise);
+        let a = l.snapshot();
+        assert!(a.tempo.is_none(), "tempo on -66 dBFS noise: {:?}", a.tempo);
     }
 }

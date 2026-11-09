@@ -61,6 +61,10 @@ object Tokens {
     const val ACCENT_HUE_AMBER = 75
     const val ACCENT_HUE_ROSE = 15
 
+    // Camelot wheel key colours (index 0 = 1A/1B … 11 = 12A/12B), fixed
+    val keyMinor = listOf(Color(0xFF00AF96), Color(0xFF3EAB5E), Color(0xFF879F18), Color(0xFFB68C00), Color(0xFFD37812), Color(0xFFDF6A59), Color(0xFFD9668E), Color(0xFFC46DBD), Color(0xFFA17ADF), Color(0xFF6F8BED), Color(0xFF069CE4), Color(0xFF00A9C4))
+    val keyMajor = listOf(Color(0xFF36D2BA), Color(0xFF76CF8A), Color(0xFFADC35E), Color(0xFFD8B349), Color(0xFFF4A25C), Color(0xFFFF9685), Color(0xFFFB93B4), Color(0xFFE698DF), Color(0xFFC4A4FE), Color(0xFF97B3FF), Color(0xFF60C2FF), Color(0xFF22CDE5))
+
     // 10-foot layout
     const val ROOT_FONT_SP = 24
     const val FOCUS_RING_DP = 4

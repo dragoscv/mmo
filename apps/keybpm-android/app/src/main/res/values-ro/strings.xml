@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MixAI Tonalitate &amp; BPM</string>
+    <string name="tab_live">Live</string>
+    <string name="tab_tuner">Acordor</string>
+    <string name="listen_start">Ascultă</string>
+    <string name="listen_stop">Stop</string>
+    <string name="listen_again">Ascultă din nou</string>
+    <string name="listening">Ascult…</string>
+    <string name="idle_hint">Ține telefonul lângă muzică. Sunetul e analizat pe dispozitiv și nu e înregistrat.</string>
+    <string name="mic_rationale_title">Acces la microfon</string>
+    <string name="mic_rationale">MixAI ascultă muzica din jur ca să afișeze tonalitatea, BPM-ul și acordajul. Sunetul e analizat pe dispozitiv și nu e înregistrat.</string>
+    <string name="mic_allow">Permite</string>
+    <string name="mic_denied">Accesul la microfon e oprit. Pornește-l din Setări ca să detectezi tonalitatea și BPM-ul.</string>
+    <string name="open_settings">Deschide setările</string>
+    <string name="key_label">Tonalitate</string>
+    <string name="bpm_label">BPM</string>
+    <string name="provisional">provizoriu</string>
+    <string name="locked">fixat</string>
+    <string name="confidence">sigur %1$d%%</string>
+    <string name="alternative">sau %1$s</string>
+    <string name="half_tempo">½×</string>
+    <string name="double_tempo">2×</string>
+    <string name="chord_label">Acord</string>
+    <string name="no_chord">—</string>
+    <string name="tuning_label">Acordaj</string>
+    <string name="tuning_value">La4 = %1$.1f Hz (%2$+d ¢)</string>
+    <string name="energy_label">Energie</string>
+    <string name="loudness_label">Volum</string>
+    <string name="lufs_value">%1$.0f LUFS</string>
+    <string name="key_changed">Schimbare de tonalitate: %1$s</string>
+    <string name="compatible_keys">Se mixează bine cu</string>
+    <string name="notation">Notație</string>
+    <string name="notation_camelot">Camelot</string>
+    <string name="notation_open_key">Open Key</string>
+    <string name="notation_musical">Muzicală</string>
+    <string name="tuner_hint">Cântă o singură notă</string>
+    <string name="tuner_reference">Referință La4 = %1$d Hz</string>
+    <string name="level_low">Prea încet — apropie-te de boxă</string>
+    <string name="cd_wheel">Roata Camelot, %1$s evidențiat</string>
+    <string name="cd_beat">Indicator de bătaie</string>
+</resources>

@@ -211,6 +211,13 @@ impl KeyBpmEngine {
         self.lock().push(&samples);
     }
 
+    /// Mono little-endian f32 samples as raw bytes. Preferred from Kotlin/Swift: `ByteArray`/`Data` cross the FFI
+    /// as one buffer, while `Vec<f32>` boxes every element (and crashed ART's JIT on Android, WP18-03).
+    pub fn push_pcm_bytes(&self, le_f32: Vec<u8>) {
+        let samples: Vec<f32> = le_f32.chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+        self.lock().push(&samples);
+    }
+
     /// Mono 16-bit samples (Android AudioRecord PCM_16BIT, ShazamKit shares the same buffer).
     pub fn push_pcm16(&self, samples: Vec<i16>) {
         let f: Vec<f32> = samples.iter().map(|&s| s as f32 / 32768.0).collect();
@@ -307,8 +314,9 @@ mod tests {
     fn engine_round_trip_through_the_ffi_types() {
         let e = KeyBpmEngine::new(EngineConfig { sample_rate: 48_000, bpm_floor: 88.0, a4_hz: 440.0 });
         e.push_pcm16(vec![0; 48_000]);
+        e.push_pcm_bytes(0.25f32.to_le_bytes().repeat(24_000));
         let s = e.snapshot();
-        assert!((s.elapsed_secs - 1.0).abs() < 1e-9);
+        assert!((s.elapsed_secs - 1.5).abs() < 1e-9);
         assert_eq!(s.chroma.len(), 12);
         assert!(s.key.is_none());
         e.reset();

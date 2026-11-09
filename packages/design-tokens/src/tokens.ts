@@ -1,6 +1,6 @@
 /**
  * MixAI design tokens — the single source of truth for every surface
- * (web, MixAI DJ desktop, Companion, native shell, TV apps, extension).
+ * (web, MixAI Decks desktop, Companion, native shell, TV apps, extension).
  *
  * Everything here is plain data. `build.ts` turns it into:
  *   dist/tokens.css        Tailwind v4 `@theme` + `data-*` dimension selectors (web, mixai, companion)
@@ -227,12 +227,34 @@ export const BRAND = {
   cyanDark: "#38dcf2",
   gradient: "linear-gradient(135deg, #7c5cff 0%, #e84ff0 100%)",
   gradientDark: "linear-gradient(135deg, #8b6dff 0%, #ef62f3 100%)",
-  /** Deck colours for MixAI DJ — kept regardless of accent (D9). */
+  /** Deck colours for MixAI Decks — kept regardless of accent (D9). */
   deckA: "#22d3ee",
   deckB: "#ff4fa3",
   deckC: "#a3ff4f",
   deckD: "#ffb14f",
 } as const;
+
+/**
+ * Camelot wheel key colours (MixAI Key & BPM, WP18, D69): one OKLCH hue per wheel position, walking the hue circle
+ * in Camelot order so neighbours (compatible keys) sit next to each other in colour too. A (minor) is a step darker
+ * than B (major). Fixed — not re-hued by the accent preset.
+ */
+export const CAMELOT = {
+  /** Hue (OKLCH degrees) for wheel positions 1..12 (index 0 = 1A/1B). */
+  hues: [180, 150, 120, 90, 60, 30, 0, 330, 300, 270, 240, 210],
+  minor: { l: 0.66, c: 0.15 },
+  major: { l: 0.78, c: 0.13 },
+} as const;
+
+/** `{ "1A": "oklch(...)", ..., "12B": "oklch(...)" }` */
+export function camelotColors(): Record<string, string> {
+  const out: Record<string, string> = {};
+  CAMELOT.hues.forEach((h, i) => {
+    out[`${i + 1}A`] = `oklch(${CAMELOT.minor.l} ${CAMELOT.minor.c} ${h})`;
+    out[`${i + 1}B`] = `oklch(${CAMELOT.major.l} ${CAMELOT.major.c} ${h})`;
+  });
+  return out;
+}
 
 // ─── Surface presets (glass / solid / flat) ─────────────────────────────────
 
