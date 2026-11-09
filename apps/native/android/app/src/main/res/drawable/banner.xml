@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Android TV launcher banner (320x180 dp). Brand gradient violet -> magenta
-     from packages/design-tokens (--brand / --brand-2, dark) with the wordmark. -->
+    from packages/design-tokens (brand / brand-2 tokens, dark) with the wordmark. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="320dp"
