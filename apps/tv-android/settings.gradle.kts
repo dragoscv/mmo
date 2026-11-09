@@ -36,6 +36,8 @@ include(":listen-core")
 project(":listen-core").projectDir = file("../keybpm-android/listen-core")
 include(":keybpm")
 project(":keybpm").projectDir = file("../keybpm-android/app")
+include(":keybpm-wear")
+project(":keybpm-wear").projectDir = file("../keybpm-android/wear")
 // MixAI Decks (WP19-16/17, D61): Rust decks-ffi via UniFFI, shared Compose Multiplatform UI, Android + Desktop apps.
 include(":decks-core")
 project(":decks-core").projectDir = file("../decks-android/core")

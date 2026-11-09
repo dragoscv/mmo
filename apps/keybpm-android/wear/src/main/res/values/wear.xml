@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wearable Data Layer capability: the phone app streams the live reading to nodes that declare it (WP18-04). -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities">
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>mixai_keybpm_watch</item>
+    </string-array>
+</resources>

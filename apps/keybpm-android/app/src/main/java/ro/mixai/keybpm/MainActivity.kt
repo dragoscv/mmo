@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -49,6 +50,9 @@ import ro.mixai.keybpm.ui.LibraryScreen
 import ro.mixai.keybpm.ui.StageScreen
 import ro.mixai.keybpm.ui.TempoScreen
 import ro.mixai.keybpm.ui.TunerScreen
+import ro.mixai.keybpm.ui.drawTimeline
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.withTransform
 import ro.mixai.keybpm.data.SetLog
 import ro.mixai.mobile.theme.MixaiTheme
 
@@ -56,6 +60,8 @@ class MainActivity : ComponentActivity() {
     private val model: ListenModel by viewModels()
     /** Set by the Identify widget; consumed once the permission check in [App] can start listening. */
     private val identifyRequest = androidx.compose.runtime.mutableIntStateOf(0)
+    /** Set by the Quick Settings tile. */
+    private val listenRequest = androidx.compose.runtime.mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -77,6 +83,10 @@ class MainActivity : ComponentActivity() {
     private fun handleAudioIntent(intent: Intent?) {
         if (intent?.action == IdentifyWidget.ACTION_IDENTIFY) {
             identifyRequest.intValue++
+            return
+        }
+        if (intent?.action == ListenTileService.ACTION_LISTEN) {
+            listenRequest.intValue++
             return
         }
         val uri: Uri? = when (intent?.action) {
@@ -123,6 +133,12 @@ class MainActivity : ComponentActivity() {
             if (!ui.listening) start()
             model.identify()
         }
+        val listenReq by listenRequest
+        androidx.compose.runtime.LaunchedEffect(listenReq) {
+            if (listenReq == 0) return@LaunchedEffect
+            tab = 0
+            if (!ui.listening) start()
+        }
         // Keep the screen on while listening (stage use).
         DisposableEffect(ui.listening) {
             if (ui.listening) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -140,6 +156,7 @@ class MainActivity : ComponentActivity() {
                     NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Filled.Tune, null) }, label = { Text(stringResource(R.string.tab_tuner)) })
                     NavigationBarItem(tab == 4, { tab = 4 }, { Icon(Icons.Filled.Speed, null) }, label = { Text(stringResource(R.string.tab_tempo)) })
                     NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Filled.History, null) }, label = { Text(stringResource(R.string.tab_history)) })
+                    NavigationBarItem(tab == 5, { tab = 5 }, { Icon(Icons.Filled.MusicNote, null) }, label = { Text(stringResource(R.string.tab_practice)) })
                     NavigationBarItem(tab == 3, { tab = 3 }, { Icon(Icons.Filled.LibraryMusic, null) }, label = { Text(stringResource(R.string.tab_library)) })
                 }
             },
@@ -176,7 +193,12 @@ class MainActivity : ComponentActivity() {
                     )
                     1 -> TunerScreen(ui, start, model::stop, model::setA4)
                     2 -> HistoryScreen(entries, ui.notation, { format -> shareExport(entries, format) }, model::deleteEntry, model::clearLog)
-                    4 -> TempoScreen((application as KeyBpmApp).midi, ui.bpm)
+                    4 -> TempoScreen(
+                        (application as KeyBpmApp).midi, ui.bpm,
+                        drift = ro.mixai.keybpm.ui.DriftState(ui.driftAlarm, ui.driftReference, ui.drift),
+                        onDriftAlarm = model::setDriftAlarm, onDriftReference = model::setDriftReference,
+                    )
+                    5 -> ro.mixai.keybpm.ui.PracticeScreen(ui, entries, start, model::stop, model::setAnnounceKey, onShareTimeline = ::shareTimeline)
                     else -> LibraryScreen(
                         settings = (application as KeyBpmApp).settings,
                         camelot = ui.snapshot?.key?.key?.camelot ?: entries.firstOrNull()?.camelot,
@@ -207,5 +229,38 @@ class MainActivity : ComponentActivity() {
         // Plain text also goes in EXTRA_TEXT so it pastes straight into a description field.
         if (format == ro.mixai.keybpm.ui.ExportFormat.TEXT) send.putExtra(Intent.EXTRA_TEXT, body)
         startActivity(Intent.createChooser(send, getString(R.string.history_export)))
+    }
+
+    /** Set timeline as a 1080x1350 PNG (key colour band + BPM line + header), shared through the share sheet. */
+    private fun shareTimeline() {
+        val points = model.log.entries.value.sortedBy { it.atMillis }.takeLast(60)
+        if (points.size < 2) return
+        val w = 1080
+        val h = 1350
+        val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = androidx.compose.ui.graphics.Canvas(bmp.asImageBitmap())
+        val draw = androidx.compose.ui.graphics.drawscope.CanvasDrawScope()
+        val density = androidx.compose.ui.unit.Density(resources.displayMetrics.density)
+        draw.draw(density, androidx.compose.ui.unit.LayoutDirection.Ltr, canvas, androidx.compose.ui.geometry.Size(w.toFloat(), h.toFloat())) {
+            drawRect(ro.mixai.mobile.theme.Tokens.background)
+            withTransform({ translate(60f, 320f) }) {
+                drawTimeline(points, ro.mixai.mobile.theme.Tokens.foreground, androidx.compose.ui.geometry.Size(w - 120f, h - 480f))
+            }
+        }
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = 64f; isFakeBoldText = true }
+        val c = android.graphics.Canvas(bmp)
+        c.drawText(getString(R.string.timeline_title), 60f, 140f, paint)
+        paint.textSize = 40f; paint.isFakeBoldText = false; paint.alpha = 190
+        val first = points.first()
+        val last = points.last()
+        c.drawText("${first.camelot} → ${last.camelot} · ${"%.0f".format(first.bpm)} → ${"%.0f".format(last.bpm)} BPM · ${points.size}", 60f, 220f, paint)
+        c.drawText("MixAI Key & BPM", 60f, h - 70f, paint)
+        val dir = java.io.File(cacheDir, "exports").apply { mkdirs() }
+        val f = java.io.File(dir, "mixai-timeline-${java.time.LocalDate.now()}.png")
+        f.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        bmp.recycle()
+        val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.files", f)
+        val send = Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivity(Intent.createChooser(send, getString(R.string.timeline_share)))
     }
 }

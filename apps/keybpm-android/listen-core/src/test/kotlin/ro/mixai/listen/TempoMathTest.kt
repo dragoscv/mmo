@@ -1,4 +1,4 @@
-package ro.mixai.keybpm.midi
+package ro.mixai.listen
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

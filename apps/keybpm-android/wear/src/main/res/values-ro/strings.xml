@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MixAI Key &amp; BPM</string>
+    <string name="app_short">Key &amp; BPM</string>
+    <string name="listen">Ascultă</string>
+    <string name="listen_watch">Ascultă pe ceas</string>
+    <string name="listening">Ascult…</string>
+    <string name="stop">Oprește</string>
+    <string name="bpm_label">BPM</string>
+    <string name="bpm_value">%1$.1f BPM</string>
+    <string name="bpm_tapped">BPM · bătut</string>
+    <string name="from_phone">BPM · de pe telefon</string>
+    <string name="level_low">Prea încet, apropie-te</string>
+    <string name="tap_hint">Atinge în ritm ca să setezi BPM-ul</string>
+    <string name="tap_tempo">Tempo prin atingere</string>
+    <string name="tap_clear">Șterge BPM-ul bătut</string>
+    <string name="key_changed">Tonalitatea s-a schimbat în %1$s</string>
+    <string name="mic_failed">Microfon indisponibil</string>
+    <string name="haptic_beat">Bătaie prin vibrație</string>
+    <string name="haptic_beat_hint">Simți fiecare bătaie, mai puternic pe timpul 1</string>
+    <string name="phone_listening">Telefonul ascultă: citirea lui apare aici când ceasul nu ascultă.</string>
+    <string name="phone_hint">Pornește ascultarea în aplicația de pe telefon ca să apară aici.</string>
+    <string name="version">Versiunea %1$s</string>
+    <string name="channel_listen">Ascultare</string>
+    <string name="tile_label">Key &amp; BPM</string>
+    <string name="tile_desc">Ultima tonalitate și BPM detectate, atinge ca să asculți</string>
+    <string name="tile_empty">Atinge Ascultă</string>
+    <string name="complication_label">Key &amp; BPM</string>
+    <string name="cd_complication">Tonalitate %1$s, %2$s BPM</string>
+    <string name="cd_live">Tonalitate %1$s, %2$s BPM. Atinge în ritm ca să setezi tempoul.</string>
+</resources>

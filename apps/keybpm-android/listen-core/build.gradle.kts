@@ -17,7 +17,8 @@ val ndkVer = "28.2.13676358"
 
 fun abis(release: Boolean): List<String> =
     providers.gradleProperty(if (release) "mixai.rustAbis.release" else "mixai.rustAbis.debug")
-        .getOrElse(if (release) "arm64-v8a,armeabi-v7a,x86_64" else "arm64-v8a,x86_64")
+        // Debug includes armeabi-v7a: the Galaxy Watch8 (:keybpm-wear test device) is 32-bit only.
+        .getOrElse(if (release) "arm64-v8a,armeabi-v7a,x86_64" else "arm64-v8a,armeabi-v7a,x86_64")
         .split(',').map { it.trim() }.filter { it.isNotEmpty() }
 
 val os: OperatingSystem = OperatingSystem.current()

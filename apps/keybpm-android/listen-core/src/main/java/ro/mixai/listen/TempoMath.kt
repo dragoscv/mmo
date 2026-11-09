@@ -1,4 +1,4 @@
-package ro.mixai.keybpm.midi
+package ro.mixai.listen
 
 /** Pure tempo helpers (unit-tested): MIDI clock tick period and tap tempo. */
 object TempoMath {

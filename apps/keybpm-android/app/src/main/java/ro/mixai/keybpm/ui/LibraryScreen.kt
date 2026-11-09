@@ -137,6 +137,9 @@ fun LibraryScreen(
                             Column(Modifier.weight(1f)) {
                                 Text(t.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(t.artist ?: "", style = MaterialTheme.typography.bodySmall, color = Mixai.colors.muted, maxLines = 1)
+                                mixAdviceText(camelot, bpm, t.keyCamelot, t.bpm, notation)?.let {
+                                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                                }
                             }
                             Text(
                                 listOfNotNull(t.keyCamelot?.let { c -> parseKey(c)?.let { keyLabel(it.index, notation) } }, t.bpm?.let { "%.0f".format(it) }).joinToString(" · "),
@@ -149,5 +152,25 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * One-line mix advice for a candidate track (WP18 round 2): beat-match rate, the key it lands on without key lock,
+ * or the key-lock transpose that fixes a clash. Null when key or BPM is missing on either side.
+ */
+@Composable
+fun mixAdviceText(liveCamelot: String?, liveBpm: Double?, trackCamelot: String?, trackBpm: Double?, notation: KeyNotation): String? {
+    val live = liveCamelot?.let { parseKey(it) }?.index?.toInt() ?: return null
+    val track = trackCamelot?.let { parseKey(it) }?.index?.toInt() ?: return null
+    if (liveBpm == null || trackBpm == null) return null
+    val a = ro.mixai.listen.Harmony.mixAdvice(live, liveBpm, track, trackBpm)
+    val rate = "%+.1f %%".format(a.ratePercent)
+    val label = { idx: Int -> keyLabel(idx.toUByte(), notation) }
+    val atRate = a.keyAtRate
+    return when {
+        atRate != null -> stringResource(R.string.advice_lands, rate, label(atRate))
+        a.transpose != 0 -> stringResource(R.string.advice_transpose, rate, "%+d".format(a.transpose), label(a.keyAfterTranspose))
+        else -> stringResource(R.string.advice_rate, rate)
     }
 }

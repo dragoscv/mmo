@@ -51,6 +51,11 @@ data class ListenUi(
     val tracklistMode: Boolean = false,
     /** Fingerprints waiting for a network. */
     val pendingIds: Int = 0,
+    val driftAlarm: Boolean = false,
+    val driftReference: Double? = null,
+    /** Current drift alert in percent (sustained), null when in range. */
+    val drift: Double? = null,
+    val announceKey: Boolean = false,
 ) {
     /** BPM after the user's half/double override, null before a tempo reading. */
     val bpm: Double? get() = snapshot?.tempo?.let { it.bpm * tempoFactor }
@@ -77,4 +82,7 @@ class ListenModel(app: Application) : AndroidViewModel(app) {
     fun identify() = session.identify()
     fun setTracklistMode(on: Boolean) = session.setTracklistMode(on)
     fun addToQueue() = session.addFoundToQueue()
+    fun setDriftAlarm(on: Boolean) = session.setDriftAlarm(on)
+    fun setDriftReference() = session.setDriftReference()
+    fun setAnnounceKey(on: Boolean) = session.setAnnounceKey(on)
 }

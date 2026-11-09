@@ -110,4 +110,45 @@
     <string name="export_rekordbox">rekordbox XML</string>
     <string name="widget_identify">Identify song</string>
     <string name="widget_desc">Start listening and identify the song with one tap.</string>
+    <!-- Mix advice + mix next (WP18 round 2). -->
+    <string name="advice_rate">%1$s to match</string>
+    <string name="advice_lands">%1$s · lands on %2$s without key lock</string>
+    <string name="advice_transpose">%1$s · key lock %2$s → %3$s</string>
+    <string name="mix_next_title">Mix next</string>
+    <string name="mix_same">Same key</string>
+    <string name="mix_relative">Relative</string>
+    <string name="mix_up">+1 energy up</string>
+    <string name="mix_down">−1 calmer</string>
+    <string name="mix_boost">+2 energy boost</string>
+    <string name="mix_diagonal">Mood change</string>
+    <!-- Quick Settings tile. -->
+    <string name="qs_listen">Key &amp; BPM</string>
+    <string name="qs_listening">%1$s · %2$s BPM</string>
+    <!-- Drift alarm. -->
+    <string name="drift_title">Drift alarm</string>
+    <string name="drift_hint">Warn when the tempo drifts more than 0.5 % from the reference (bands, drummers).</string>
+    <string name="drift_reference">Reference %1$.1f BPM</string>
+    <string name="drift_set_ref">Use current BPM</string>
+    <string name="drift_alert">Tempo drift %1$+.1f %%</string>
+    <!-- Singer + guitar helper. -->
+    <string name="tab_practice">Practice</string>
+    <string name="sing_title">Singer transpose</string>
+    <string name="sing_hint">Hum or sing a comfortable phrase for a few seconds, then stop.</string>
+    <string name="sing_start">Hum test</string>
+    <string name="sing_stop">Done</string>
+    <string name="sing_centre">Your comfortable centre: %1$s</string>
+    <string name="sing_result">Transpose %1$s → sing in %2$s</string>
+    <string name="sing_need_key">Detect a song key first (Live tab).</string>
+    <string name="capo_title">Guitar capo</string>
+    <string name="capo_result">Capo %1$d, play %2$s shapes</string>
+    <string name="capo_open">No capo, play %1$s</string>
+    <string name="key_notes">Scale: %1$s</string>
+    <string name="key_chords">Chords in key: %1$s</string>
+    <!-- Set timeline. -->
+    <string name="timeline_title">Set timeline</string>
+    <string name="timeline_empty">Saved readings appear here as a key / BPM timeline.</string>
+    <string name="timeline_share">Share image</string>
+    <string name="a11y_announce">Announce key changes</string>
+    <string name="a11y_announce_hint">Speak and vibrate when the key changes (TalkBack or eyes-off use).</string>
+    <string name="a11y_key_now">Key now %1$s</string>
 </resources>

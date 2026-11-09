@@ -30,13 +30,15 @@ import kotlin.math.sin
  * Camelot wheel: outer ring = B (major), inner ring = A (minor), 12 o'clock = 12. The detected key glows, compatible
  * keys (same, relative, ±1, energy boost) are drawn at full colour, the rest dimmed. Colours come from the generated
  * design tokens (Tokens.keyMinor / keyMajor); `heat` (24 values, key index order) tints by likelihood while listening.
+ * [beatPulse] is read only in the draw phase so the beat animation never recomposes the caller (A51 jank, 2026-11-09);
+ * the 24 ring labels are measured once per colour set, not on every frame.
  */
 @Composable
 fun CamelotWheel(
     camelotNumber: Int?,
     minor: Boolean,
     compatible: Set<String>,
-    beatPulse: Float,
+    beatPulse: () -> Float,
     label: String,
     modifier: Modifier = Modifier,
 ) {
@@ -44,8 +46,15 @@ fun CamelotWheel(
     val onBg = MaterialTheme.colorScheme.onBackground
     val glow by animateFloatAsState(if (camelotNumber != null) 1f else 0f, spring(dampingRatio = 0.6f), label = "glow")
     val ringStyle = remember { TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+    val labels = remember(measurer, onBg) {
+        val codes = (0..1).flatMap { ring -> (1..12).map { "$it${if (ring == 1) "A" else "B"}" } }
+        codes.associateWith { code ->
+            measurer.measure(code, ringStyle.copy(color = onBg.copy(alpha = 0.85f))) to measurer.measure(code, ringStyle.copy(color = Color.Black))
+        }
+    }
     Box(modifier.aspectRatio(1f).semantics { contentDescription = label }) {
         Canvas(Modifier.fillMaxSize()) {
+            val pulse = beatPulse()
             val r = size.minDimension / 2f
             val c = Offset(size.width / 2f, size.height / 2f)
             val seg = 360f / 12f
@@ -74,10 +83,11 @@ fun CamelotWheel(
                         useCenter = false,
                         topLeft = Offset(c.x - radius, c.y - radius),
                         size = Size(radius * 2, radius * 2),
-                        style = Stroke(width = if (active) width * (1f + 0.12f * glow + 0.06f * beatPulse) else width),
+                        style = Stroke(width = if (active) width * (1f + 0.12f * glow + 0.06f * pulse) else width),
                     )
                     val a = Math.toRadians((number * seg - 90f).toDouble())
-                    val t = measurer.measure(code, ringStyle.copy(color = if (active) Color.Black else onBg.copy(alpha = 0.85f)))
+                    val pair = labels.getValue(code)
+                    val t = if (active) pair.second else pair.first
                     drawText(
                         t,
                         topLeft = Offset(
@@ -88,7 +98,7 @@ fun CamelotWheel(
                 }
             }
             // Beat dot in the centre.
-            drawCircle(onBg.copy(alpha = 0.10f + 0.5f * beatPulse), radius = r * (0.12f + 0.04f * beatPulse), center = c)
+            drawCircle(onBg.copy(alpha = 0.10f + 0.5f * pulse), radius = r * (0.12f + 0.04f * pulse), center = c)
         }
     }
 }

@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import ro.mixai.keybpm.audio.MicCapture
+import ro.mixai.listen.MicCapture
 import ro.mixai.keybpm.data.KeyBpmPrefs
 import ro.mixai.keybpm.data.LogEntry
 import ro.mixai.keybpm.data.SetLog
@@ -54,11 +54,18 @@ class ListenSession(private val app: Application) {
     @Volatile private var currentEntryAt: Long? = null
     /** Match made before the reading locked: applied by the next [save]. */
     @Volatile private var unsavedMatch: SongIdUi.Found? = null
+    private val watch = WatchBridge(app)
+    private val drift = ro.mixai.listen.DriftMonitor()
+    private val announcer = KeyAnnouncer(app)
 
     init {
         scope.launch { log.load() }
         _ui.value = _ui.value.copy(songIdAvailable = songId.available, pendingIds = if (songId.available) pending.all().size else 0)
         scope.launch { prefs.tracklistMode.collect { on -> _ui.value = _ui.value.copy(tracklistMode = on) } }
+        scope.launch { prefs.driftAlarm.collect { on -> _ui.value = _ui.value.copy(driftAlarm = on, drift = null) } }
+        scope.launch { prefs.announceKey.collect { on -> _ui.value = _ui.value.copy(announceKey = on) } }
+        // Mirror to a paired Wear OS watch (WP18-04); the bridge throttles to changes + a 2 s heartbeat.
+        scope.launch { _ui.collect { watch.publish(it) } }
     }
 
     /** Caller must hold RECORD_AUDIO and be in the foreground (FGS microphone start rule). */
@@ -85,14 +92,16 @@ class ListenSession(private val app: Application) {
         }
         currentEntryAt = null
         unsavedMatch = null
+        drift.setReference(null)
         _ui.value = _ui.value.copy(
             listening = true, snapshot = null, micFailed = false, keyChange = null, tempoFactor = 1.0,
             fileName = null, fileError = false, saved = false, startedAtMillis = System.currentTimeMillis(),
-            songId = SongIdUi.Idle,
+            songId = SongIdUi.Idle, driftReference = null, drift = null,
         )
         ContextCompat.startForegroundService(app, ListenService.intent(app))
         retryPending()
         poll = scope.launch {
+            var lastEmit = 0L
             while (isActive) {
                 val s = engine?.snapshot() ?: break
                 val change = if (s.keyChanged) s.key?.key?.camelot else null
@@ -101,12 +110,29 @@ class ListenSession(private val app: Application) {
                     currentEntryAt = null
                     unsavedMatch = null
                     identifyJob?.cancel()
+                    if (_ui.value.announceKey) s.key?.key?.let { announcer.keyChanged(it.name) }
                 }
-                _ui.value = _ui.value.copy(
-                    snapshot = s, keyChange = change ?: _ui.value.keyChange, saved = _ui.value.saved && change == null,
-                    songId = if (change != null) SongIdUi.Idle else _ui.value.songId,
-                )
-                if (!_ui.value.saved && s.key?.locked == true && s.tempo?.locked == true) save("mic")
+                // Drift alarm: reference = first locked tempo (or "Use current BPM").
+                val t = s.tempo
+                val driftNow = if (_ui.value.driftAlarm && t?.locked == true) drift.update(t.bpm * _ui.value.tempoFactor, now()) else null
+                val alertChanged = (driftNow != null) != (_ui.value.drift != null)
+                val refChanged = drift.reference != _ui.value.driftReference
+                if (alertChanged || refChanged) {
+                    if (driftNow != null && _ui.value.drift == null) announcer.drift()
+                    _ui.value = _ui.value.copy(drift = driftNow, driftReference = drift.reference)
+                }
+                // UI gets at most 10 snapshots/s (each one recomposes the live screen; 20/s janked the A51), but a key
+                // change or a fresh lock is pushed at once.
+                val now = android.os.SystemClock.uptimeMillis()
+                val lockNow = !_ui.value.saved && s.key?.locked == true && s.tempo?.locked == true
+                if (change != null || lockNow || now - lastEmit >= UI_EMIT_MS) {
+                    lastEmit = now
+                    _ui.value = _ui.value.copy(
+                        snapshot = s, keyChange = change ?: _ui.value.keyChange, saved = _ui.value.saved && change == null,
+                        songId = if (change != null) SongIdUi.Idle else _ui.value.songId,
+                    )
+                }
+                if (lockNow) save("mic")
                 delay(50)
             }
         }
@@ -178,6 +204,22 @@ class ListenSession(private val app: Application) {
         scope.launch { prefs.setTracklistMode(on) }
         if (on && _ui.value.listening && _ui.value.saved && currentEntryAt != null && _ui.value.songId is SongIdUi.Idle) identify()
     }
+
+    fun setDriftAlarm(on: Boolean) {
+        scope.launch { prefs.setDriftAlarm(on) }
+        drift.setReference(null)
+    }
+
+    fun setDriftReference() {
+        drift.setReference(_ui.value.bpm)
+        _ui.value = _ui.value.copy(driftReference = drift.reference, drift = null)
+    }
+
+    fun setAnnounceKey(on: Boolean) {
+        scope.launch { prefs.setAnnounceKey(on) }
+    }
+
+    private fun now() = android.os.SystemClock.uptimeMillis()
 
     /** "Add to MixAI queue" for the identified library track. */
     fun addFoundToQueue() {
@@ -310,5 +352,6 @@ class ListenSession(private val app: Application) {
         const val MIN_ID_SECONDS = 8.0
         const val ID_SECONDS = 12.0
         const val TRACKLIST_GAP_MS = 45_000L
+        const val UI_EMIT_MS = 100L
     }
 }

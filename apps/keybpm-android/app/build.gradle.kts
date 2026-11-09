@@ -34,8 +34,8 @@ android {
         applicationId = "ro.mixai.keybpm"
         minSdk = 31
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SHAZAM_TOKEN_URL", "\"$shazamTokenUrl\"")
         buildConfigField("boolean", "HAS_SHAZAM", hasShazam.toString())
@@ -108,6 +108,9 @@ dependencies {
         implementation(libs.retrofit)
         implementation(libs.retrofit.converter.gson)
     }
+    // Watch mirror (WP18-04): Wearable Data Layer to :keybpm-wear.
+    implementation(libs.play.services.wearable)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)
 }

@@ -35,21 +35,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ro.mixai.keybpm.R
 import ro.mixai.keybpm.midi.MidiClock
-import ro.mixai.keybpm.midi.TempoMath
+import ro.mixai.listen.TempoMath
 import ro.mixai.mobile.theme.Mixai
 
 /**
  * Tempo tools (WP18-08): MIDI clock out to a USB/BLE device, metronome click, tap tempo. "Follow" keeps the clock
  * on the detected BPM while listening; tapping or nudging switches to manual.
  */
+data class DriftState(val enabled: Boolean, val reference: Double?, val drift: Double?)
+
 @Composable
-fun TempoScreen(clock: MidiClock, detectedBpm: Double?, modifier: Modifier = Modifier) {
+fun TempoScreen(
+    clock: MidiClock,
+    detectedBpm: Double?,
+    modifier: Modifier = Modifier,
+    drift: DriftState = DriftState(false, null, null),
+    onDriftAlarm: (Boolean) -> Unit = {},
+    onDriftReference: () -> Unit = {},
+) {
     val st by clock.state.collectAsState()
     var follow by remember { mutableStateOf(true) }
     val taps = remember { mutableStateListOf<Long>() }
@@ -116,5 +126,31 @@ fun TempoScreen(clock: MidiClock, detectedBpm: Double?, modifier: Modifier = Mod
         if (st.running) Button(onClick = clock::stop) { Text(stringResource(R.string.tempo_stop)) }
         else Button(onClick = clock::start) { Text(stringResource(R.string.tempo_start)) }
         Text(stringResource(R.string.tempo_hint), style = MaterialTheme.typography.bodySmall, color = Mixai.colors.muted, modifier = Modifier.padding(top = 8.dp))
+        Spacer(Modifier.height(24.dp))
+        // Drift alarm (bands, drummers): reference = first locked tempo, warns on a sustained > 0.5 % drift.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.drift_title), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.drift_hint), style = MaterialTheme.typography.bodySmall, color = Mixai.colors.muted)
+            }
+            Switch(checked = drift.enabled, onCheckedChange = onDriftAlarm)
+        }
+        if (drift.enabled) {
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    drift.reference?.let { stringResource(R.string.drift_reference, it) } ?: "—",
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedButton(onClick = onDriftReference, enabled = detectedBpm != null) { Text(stringResource(R.string.drift_set_ref)) }
+            }
+            drift.drift?.let {
+                Text(
+                    stringResource(R.string.drift_alert, it),
+                    color = Mixai.colors.warning, style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        .semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Assertive },
+                )
+            }
+        }
     }
 }

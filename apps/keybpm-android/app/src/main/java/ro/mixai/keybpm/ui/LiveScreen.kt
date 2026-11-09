@@ -93,7 +93,7 @@ fun LiveScreen(
             camelotNumber = key?.key?.camelotNumber?.toInt(),
             minor = key?.key?.minor == true,
             compatible = compatible,
-            beatPulse = pulse.value,
+            beatPulse = { pulse.value },
             label = stringResource(R.string.cd_wheel, keyText),
             modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
         )
@@ -143,6 +143,7 @@ fun LiveScreen(
             }
             Spacer(Modifier.height(8.dp))
             ChromaStrip(s.chroma)
+            key?.let { MixNextRow(it.key.index, ui.notation) }
         } else if (ui.analysing) {
             Text(stringResource(R.string.analysing), color = Mixai.colors.muted)
             LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
@@ -223,21 +224,60 @@ private fun DetailRow(label: String, value: String) {
 
 @Composable
 private fun ChromaStrip(chroma: List<Float>) {
-    val names = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        chroma.forEachIndexed { i, v ->
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    Modifier.fillMaxWidth().height(36.dp),
-                    contentAlignment = Alignment.BottomCenter,
-                ) {
-                    LinearProgressIndicator(
-                        progress = { v.coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth().height((4 + 32 * v.coerceIn(0f, 1f)).dp),
-                    )
-                }
-                Text(names[i], fontSize = 10.sp, color = Mixai.colors.muted)
+    ChromaBars(chroma)
+}
+
+/** "Mix next" (WP18 round 2): the keys that mix from the live key, labelled by what they do to the set. */
+@Composable
+private fun MixNextRow(index: UByte, notation: KeyNotation) {
+    val items = remember(index, notation) {
+        val here = ro.mixai.listen.Harmony.camelotNumber(index.toInt())
+        compatibleKeys(index).filter { it.relation != "same" && it.relation != "clash" }.take(5).map {
+            val rel = if (it.relation == "adjacent" && (it.key.camelotNumber.toInt() - here).mod(12) == 11) "adjacent_down" else it.relation
+            rel to keyLabel(it.key.index, notation)
+        }
+    }
+    if (items.isEmpty()) return
+    Spacer(Modifier.height(12.dp))
+    Text(stringResource(R.string.mix_next_title), style = MaterialTheme.typography.titleSmall, modifier = Modifier.fillMaxWidth())
+    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        items(items.size) { i ->
+            val (rel, label) = items[i]
+            val what = when (rel) {
+                "relative" -> R.string.mix_relative
+                "adjacent" -> R.string.mix_up
+                "adjacent_down" -> R.string.mix_down
+                "energy_boost" -> R.string.mix_boost
+                "diagonal", "whole_step" -> R.string.mix_diagonal
+                else -> R.string.mix_same
             }
+            androidx.compose.material3.SuggestionChip(onClick = {}, label = { Text("$label · ${stringResource(what)}") })
+        }
+    }
+}
+
+@Composable
+private fun ChromaBars(chroma: List<Float>) {
+    val names = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+    // One Canvas for the 12 bars: changing values only redraws, never relayouts (was 12 progress indicators).
+    val bar = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.surfaceVariant
+    val latest = androidx.compose.runtime.rememberUpdatedState(chroma)
+    Column(Modifier.fillMaxWidth()) {
+        androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(36.dp)) {
+            val values = latest.value
+            val gap = 3.dp.toPx()
+            val w = (size.width - gap * 11) / 12f
+            for (i in 0 until 12) {
+                val v = values.getOrElse(i) { 0f }.coerceIn(0f, 1f)
+                val x = i * (w + gap)
+                drawRect(track, androidx.compose.ui.geometry.Offset(x, size.height - 4.dp.toPx()), androidx.compose.ui.geometry.Size(w, 4.dp.toPx()))
+                val h = 4.dp.toPx() + (size.height - 4.dp.toPx()) * v
+                drawRect(bar, androidx.compose.ui.geometry.Offset(x, size.height - h), androidx.compose.ui.geometry.Size(w, h))
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            names.forEach { Text(it, fontSize = 10.sp, color = Mixai.colors.muted, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
         }
     }
 }

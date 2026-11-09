@@ -110,4 +110,45 @@
     <string name="export_rekordbox">rekordbox XML</string>
     <string name="widget_identify">Identifică piesa</string>
     <string name="widget_desc">Pornește ascultarea și identifică piesa dintr-o atingere.</string>
+    <!-- Sfat de mixaj + mixează în continuare (WP18 runda 2). -->
+    <string name="advice_rate">%1$s ca să se potrivească</string>
+    <string name="advice_lands">%1$s · ajunge în %2$s fără key lock</string>
+    <string name="advice_transpose">%1$s · key lock %2$s → %3$s</string>
+    <string name="mix_next_title">Mixează în continuare</string>
+    <string name="mix_same">Aceeași tonalitate</string>
+    <string name="mix_relative">Relativă</string>
+    <string name="mix_up">+1 mai multă energie</string>
+    <string name="mix_down">−1 mai calm</string>
+    <string name="mix_boost">+2 boost de energie</string>
+    <string name="mix_diagonal">Schimbare de stare</string>
+    <!-- Dală Setări rapide. -->
+    <string name="qs_listen">Key &amp; BPM</string>
+    <string name="qs_listening">%1$s · %2$s BPM</string>
+    <!-- Alarmă de derivă. -->
+    <string name="drift_title">Alarmă de derivă</string>
+    <string name="drift_hint">Avertizează când tempoul se abate cu peste 0,5 % de la referință (trupe, toboșari).</string>
+    <string name="drift_reference">Referință %1$.1f BPM</string>
+    <string name="drift_set_ref">Folosește BPM-ul curent</string>
+    <string name="drift_alert">Derivă de tempo %1$+.1f %%</string>
+    <!-- Ajutor pentru solist + chitară. -->
+    <string name="tab_practice">Exersare</string>
+    <string name="sing_title">Transpunere pentru voce</string>
+    <string name="sing_hint">Fredonează sau cântă o frază comodă câteva secunde, apoi oprește.</string>
+    <string name="sing_start">Test de voce</string>
+    <string name="sing_stop">Gata</string>
+    <string name="sing_centre">Centrul tău comod: %1$s</string>
+    <string name="sing_result">Transpune %1$s → cântă în %2$s</string>
+    <string name="sing_need_key">Detectează mai întâi tonalitatea piesei (fila Live).</string>
+    <string name="capo_title">Capodastru la chitară</string>
+    <string name="capo_result">Capodastru %1$d, cântă forme de %2$s</string>
+    <string name="capo_open">Fără capodastru, cântă în %1$s</string>
+    <string name="key_notes">Gamă: %1$s</string>
+    <string name="key_chords">Acorduri în tonalitate: %1$s</string>
+    <!-- Cronologia setului. -->
+    <string name="timeline_title">Cronologia setului</string>
+    <string name="timeline_empty">Citirile salvate apar aici ca o cronologie de tonalitate / BPM.</string>
+    <string name="timeline_share">Distribuie imaginea</string>
+    <string name="a11y_announce">Anunță schimbările de tonalitate</string>
+    <string name="a11y_announce_hint">Vorbește și vibrează când se schimbă tonalitatea (TalkBack sau fără să te uiți).</string>
+    <string name="a11y_key_now">Tonalitatea acum %1$s</string>
 </resources>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MixAI Key &amp; BPM</string>
+    <string name="app_short">Key &amp; BPM</string>
+    <string name="listen">Listen</string>
+    <string name="listen_watch">Listen on watch</string>
+    <string name="listening">Listening…</string>
+    <string name="stop">Stop</string>
+    <string name="bpm_label">BPM</string>
+    <string name="bpm_value">%1$.1f BPM</string>
+    <string name="bpm_tapped">BPM · tapped</string>
+    <string name="from_phone">BPM · from phone</string>
+    <string name="level_low">Too quiet, move closer</string>
+    <string name="tap_hint">Tap in time to set the BPM</string>
+    <string name="tap_tempo">Tap tempo</string>
+    <string name="tap_clear">Clear tapped BPM</string>
+    <string name="key_changed">Key changed to %1$s</string>
+    <string name="mic_failed">Microphone unavailable</string>
+    <string name="haptic_beat">Haptic beat</string>
+    <string name="haptic_beat_hint">Feel every beat, stronger on the downbeat</string>
+    <string name="phone_listening">The phone is listening: its reading shows here when the watch is not listening.</string>
+    <string name="phone_hint">Start listening in the phone app to mirror it here.</string>
+    <string name="version">Version %1$s</string>
+    <string name="channel_listen">Listening</string>
+    <string name="tile_label">Key &amp; BPM</string>
+    <string name="tile_desc">Last detected key and BPM, tap to listen</string>
+    <string name="tile_empty">Tap Listen</string>
+    <string name="complication_label">Key &amp; BPM</string>
+    <string name="cd_complication">Key %1$s, %2$s BPM</string>
+    <string name="cd_live">Key %1$s, %2$s BPM. Tap in time to set the tempo.</string>
+</resources>
