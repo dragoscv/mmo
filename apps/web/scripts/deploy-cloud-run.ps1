@@ -178,7 +178,7 @@ if (-not $SkipBuild) {
   $tar = "$ctx.tar"
   # autocrlf=false: ship the LF blobs as stored (core.autocrlf=true on this machine would CRLF the
   # Dockerfile and every script inside the Linux image).
-  git -C $repoRoot -c core.autocrlf=false archive --format=tar -o $tar $sha -- package.json pnpm-workspace.yaml .npmrc .dockerignore apps/web packages docs ':(exclude)apps/web/public/samples' ':(exclude)apps/web/data'
+  git -C $repoRoot -c core.autocrlf=false archive --format=tar -o $tar $sha -- package.json pnpm-workspace.yaml .dockerignore apps/web packages docs ':(exclude)apps/web/public/samples' ':(exclude)apps/web/data'
   if ($LASTEXITCODE -ne 0) { throw 'git archive failed' }
   tar -xf $tar -C $ctx; if ($LASTEXITCODE -ne 0) { throw 'tar extract failed' }
   Remove-Item $tar -Force
