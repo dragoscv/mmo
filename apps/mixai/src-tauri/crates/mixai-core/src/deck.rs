@@ -1,6 +1,6 @@
 //! A single playback deck: holds decoded stereo samples and runs the per-deck
-//! DSP chain (EQ → filter → colour FX → [PFL tap] → volume → FX → beat FX) in
-//! the audio callback.
+//! DSP chain (trim → EQ → filter → colour FX → [PFL tap] → volume → FX → beat FX)
+//! in the audio callback.
 //!
 //! Without key lock or key shift the deck plays varispeed (tempo bends pitch).
 //! With key lock and/or a key shift it pulls from a [`Stretcher`] (Signalsmith
@@ -20,6 +20,22 @@ pub const TEMPO_MIN: f64 = 0.5;
 pub const TEMPO_MAX: f64 = 2.0;
 /// Key shift range in semitones.
 pub const KEY_SHIFT_MAX: f64 = 12.0;
+/// Channel trim ceiling in dB.
+pub const TRIM_MAX_DB: f32 = 12.0;
+/// Trim at or below this is silence (−∞ dB); also the value reported for −∞.
+pub const TRIM_MIN_DB: f32 = -96.0;
+/// Trim smoothing time constant.
+const TRIM_SMOOTH_MS: f32 = 15.0;
+
+/// Linear gain for a trim in dB: ≤ [`TRIM_MIN_DB`] (incl. −∞) or NaN → 0, capped at
+/// [`TRIM_MAX_DB`].
+pub fn trim_gain(db: f32) -> f32 {
+    if db.is_nan() || db <= TRIM_MIN_DB {
+        0.0
+    } else {
+        db_to_lin(db.min(TRIM_MAX_DB))
+    }
+}
 
 /// One rendered frame: post-fader main output and the pre-fader cue (PFL) tap.
 #[derive(Clone, Copy, Debug, Default)]
@@ -110,6 +126,8 @@ pub struct Deck {
 
     // Mixer params (smoothed).
     volume: Smoothed,
+    /// Channel trim (linear gain, pre-EQ), separate from the fader.
+    trim: Smoothed,
     eq_low_db: f32,
     eq_mid_db: f32,
     eq_high_db: f32,
@@ -201,6 +219,7 @@ impl Deck {
             tempo: 1.0,
             key_lock: true,
             volume: Smoothed::new(0.85, sr, 12.0),
+            trim: Smoothed::new(1.0, sr, TRIM_SMOOTH_MS),
             eq_low_db: 0.0,
             eq_mid_db: 0.0,
             eq_high_db: 0.0,
@@ -289,6 +308,44 @@ impl Deck {
 
     pub fn loaded(&self) -> bool {
         self.track.is_some()
+    }
+
+    /// Move the deck to a new device sample rate (off the audio thread: rebuilds the
+    /// sample-rate dependent DSP and keeps track, playhead, cues, loops and settings).
+    pub fn set_sample_rate(&mut self, sr: f32) {
+        if !sr.is_finite() || sr <= 0.0 || (sr - self.sr).abs() < f32::EPSILON {
+            return;
+        }
+        self.sr = sr;
+        if let Some(t) = &self.track {
+            self.rate_ratio = t.sample_rate as f64 / sr as f64;
+        }
+        self.volume.set_rate(sr, 12.0);
+        self.trim.set_rate(sr, TRIM_SMOOTH_MS);
+        for g in self.stem_gain.iter_mut() {
+            g.set_rate(sr, 20.0);
+        }
+        self.eq_dirty = true;
+        self.filter_dirty = true;
+        self.stretcher = make_stretcher(stretcher_kind_from_env(), sr);
+        self.stretcher.reset(self.play_pos);
+        self.stretching = false;
+        let (ck, cp) = (self.color.kind(), self.color.param());
+        self.color = ColorFx::new(sr);
+        self.color.set(ck, cp);
+        let (bk, bw, bb, bf) = self.beat.settings();
+        self.beat = BeatFx::new(sr);
+        self.beat.set(bk, bw, bb, bf);
+        let (fw, ffb) = (self.fx.wet_target(), self.fx.feedback());
+        self.fx = Fx::new(sr);
+        self.fx.set_kind(self.fx_kind);
+        self.fx.set_wet(fw);
+        self.fx.set_feedback(ffb);
+        self.recompute_fx_time();
+    }
+
+    pub fn sample_rate(&self) -> f32 {
+        self.sr
     }
 
     pub fn play(&mut self) {
@@ -465,6 +522,16 @@ impl Deck {
         self.slip
     }
 
+    /// True while slip is holding a shadow playhead (slip on + loop or reverse running).
+    pub fn slip_engaged(&self) -> bool {
+        self.slip_engaged
+    }
+
+    /// Shadow playhead in seconds while slip is engaged, else `None`.
+    pub fn slip_shadow_secs(&self) -> Option<f64> {
+        (self.slip_engaged && self.loaded()).then(|| self.slip_pos / self.track_sr())
+    }
+
     /// Reverse playback (censor when combined with slip).
     pub fn set_reverse(&mut self, on: bool) {
         self.reverse = on;
@@ -499,6 +566,16 @@ impl Deck {
 
     pub fn set_volume(&mut self, v: f32) {
         self.volume.set_target(v.clamp(0.0, 1.0));
+    }
+
+    /// Channel trim in dB (−∞..+12, 0 = unity), applied pre-EQ and separate from the fader.
+    pub fn set_trim_db(&mut self, db: f32) {
+        self.trim.set_target(trim_gain(db));
+    }
+
+    /// Target trim as linear gain.
+    pub fn trim_gain(&self) -> f32 {
+        self.trim.target()
     }
 
     pub fn set_tempo(&mut self, t: f64) {
@@ -770,6 +847,7 @@ impl Deck {
         }
 
         let vol = self.volume.next();
+        let trim = self.trim.next();
 
         // Advance per-stem smoothed gains every frame (cheap, keeps mute/blend
         // click-free). Captured into locals so the disjoint borrow below can
@@ -881,7 +959,9 @@ impl Deck {
             }
         }
 
-        // EQ chain.
+        // Trim (pre-EQ), then the EQ chain.
+        l *= trim;
+        r *= trim;
         l = self.eq_high[0].process(self.eq_mid[0].process(self.eq_low[0].process(l)));
         r = self.eq_high[1].process(self.eq_mid[1].process(self.eq_low[1].process(r)));
         // Filter.

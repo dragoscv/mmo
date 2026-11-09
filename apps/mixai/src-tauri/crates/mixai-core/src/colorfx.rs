@@ -175,6 +175,11 @@ impl ColorFx {
         self.kind
     }
 
+    /// Target knob value (−1..1).
+    pub fn param(&self) -> f32 {
+        self.param.target()
+    }
+
     pub fn set(&mut self, kind: ColorFxKind, param: f32) {
         if kind != self.kind {
             self.flange.clear();

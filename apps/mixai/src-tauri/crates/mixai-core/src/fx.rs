@@ -209,6 +209,16 @@ impl Fx {
         self.kind
     }
 
+    /// Target wet mix (0..1).
+    pub fn wet_target(&self) -> f32 {
+        self.wet.target()
+    }
+
+    /// Echo feedback (0..0.95).
+    pub fn feedback(&self) -> f32 {
+        self.feedback
+    }
+
     /// Set the target wet mix (0..1). The active flag gates it: `off` forces 0.
     pub fn set_wet(&mut self, wet: f32) {
         self.wet.set_target(wet.clamp(0.0, 1.0));

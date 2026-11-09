@@ -47,9 +47,8 @@ fn finite(name: &str, v: f64) -> Result<f64, DecksError> {
 
 // ---- records ----------------------------------------------------------------------------
 
-/// Requested engine configuration. `mixai-core` currently opens the system default output
-/// device with its default config; values it cannot honour are reported in
-/// [`EngineStartInfo::notes`].
+/// Requested engine configuration (all optional: `None` = device / system default). Values the
+/// device cannot honour fall back to its default and are reported in [`EngineStartInfo::notes`].
 #[derive(Debug, Clone, Default, PartialEq, uniffi::Record)]
 pub struct DecksEngineConfig {
     pub sample_rate: Option<u32>,
@@ -73,10 +72,16 @@ pub struct EngineStartInfo {
     pub sample_rate: u32,
     pub channels: u16,
     pub latency_ms: f32,
-    /// Id of the device in use (the system default).
+    /// Id of the device in use (`host:id`).
     pub device_id: Option<String>,
-    /// Requested settings that were not honoured, one line each.
+    /// Requested settings that fell back to a default, one line each (empty = all honoured).
     pub notes: Vec<String>,
+    /// Frames per audio callback (`None` = backend default, not yet observed).
+    #[uniffi(default = None)]
+    pub buffer_frames: Option<u32>,
+    /// Human-readable name of the device in use.
+    #[uniffi(default = None)]
+    pub device_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -409,7 +414,7 @@ pub struct DeckSnapshot {
     pub loop_start_sec: f64,
     pub loop_end_sec: f64,
     pub slip: bool,
-    /// Slip shadow playhead; `None` until mixai-core exposes it (see docs/decks/ffi.md).
+    /// Slip shadow playhead while slip holds one (slip on + loop or reverse running).
     pub slip_shadow_sec: Option<f64>,
     pub quantize: bool,
     pub sync_lock: bool,
@@ -421,6 +426,7 @@ pub struct DeckSnapshot {
     pub hot_cues: Vec<Option<f64>>,
     /// Channel fader 0..1.
     pub volume: f32,
+    /// Channel trim in dB (pre-EQ, separate from the fader; −96 = −∞).
     pub gain_db: f32,
     /// Post-fader peak level 0..1.
     pub vu: f32,
@@ -454,6 +460,15 @@ pub struct EngineSnapshot {
     pub recording: bool,
     pub clock: ClockSnapshot,
     pub decks: Vec<DeckSnapshot>,
+    /// Output channels of the open stream (0 when stopped).
+    #[uniffi(default = 0)]
+    pub channels: u16,
+    /// Frames per audio callback (fixed or observed; `None` until known / stopped).
+    #[uniffi(default = None)]
+    pub buffer_frames: Option<u32>,
+    /// Output device in use (`host:id`).
+    #[uniffi(default = None)]
+    pub output_device_id: Option<String>,
 }
 
 // ---- state ------------------------------------------------------------------------------
@@ -516,6 +531,13 @@ impl Shared {
             s.error = error;
         }
     }
+}
+
+/// Push the stored fader + trim of a deck into a (new) engine.
+fn send_levels(e: &Engine, id: DeckId, d: &DeckData) {
+    e.mirror().decks[id.index()].volume = d.fader;
+    e.send(Command::Volume(id, d.fader));
+    e.set_trim(id, d.gain_db);
 }
 
 fn send_load(e: &Engine, deck: DeckId, p: PendingLoad) {
@@ -681,11 +703,17 @@ pub fn list_output_devices() -> Vec<AudioOutputDevice> {
         .collect()
 }
 
-fn default_device_id() -> Option<String> {
-    list_output_devices()
-        .into_iter()
-        .find(|d| d.is_default)
-        .map(|d| d.id)
+fn start_info(e: &Engine) -> EngineStartInfo {
+    let o = e.output_info();
+    EngineStartInfo {
+        sample_rate: o.sample_rate,
+        channels: o.channels,
+        latency_ms: o.latency_ms,
+        device_id: o.device_id,
+        notes: o.notes,
+        buffer_frames: o.buffer_frames,
+        device_name: o.device_name,
+    }
 }
 
 impl DecksEngine {
@@ -697,12 +725,6 @@ impl DecksEngine {
     fn deck_cmd(&self, deck: u8, f: impl FnOnce(DeckId) -> Command) -> Result<(), DecksError> {
         let id = deck_id(deck)?;
         self.with(|e| e.send(f(id)))
-    }
-
-    fn send_volume(e: &Engine, id: DeckId, d: &DeckData) {
-        let gain = 10f32.powf(d.gain_db / 20.0);
-        e.mirror().decks[id.index()].volume = d.fader;
-        e.send(Command::Volume(id, (d.fader * gain).clamp(0.0, 1.0)));
     }
 }
 
@@ -725,29 +747,44 @@ impl DecksEngine {
         list_output_devices()
     }
 
-    /// Choose the output device (`None` = system default). Returns whether the engine can use
-    /// it: `mixai-core` opens only the system default device today, so any other id is stored
-    /// but not honoured (`false`). Unknown ids fail with `NotFound`.
+    /// Choose the output device (`None` = system default). While running the stream moves to
+    /// it at once (decks, routing and FX are kept); while stopped it is used by the next
+    /// `start()`. Returns `true` when the device is in use (or will be). Unknown ids fail with
+    /// `NotFound`; a device that cannot be opened fails with `Audio` and the previous device
+    /// keeps playing.
     pub fn set_output_device(&self, device_id: Option<String>) -> Result<bool, DecksError> {
-        let default = default_device_id();
         if let Some(id) = &device_id
             && !list_output_devices().iter().any(|d| &d.id == id)
+            && mixai_core::find_output_device(id).is_none()
         {
             return Err(DecksError::NotFound {
                 reason: format!("output device {id}"),
             });
         }
-        let honoured = device_id.is_none() || device_id == default;
-        lock(&self.shared).config.output_device_id = device_id;
-        Ok(honoured)
+        let mut s = lock(&self.shared);
+        if let Some(e) = s.engine.as_mut() {
+            e.switch_output_device(device_id.as_deref())
+                .map_err(|e| DecksError::Audio {
+                    reason: e.to_string(),
+                })?;
+        }
+        s.config.output_device_id = device_id;
+        Ok(true)
     }
 
     /// Open the audio device and start the audio thread. Tracks loaded while stopped are sent
-    /// to the engine now. Idempotent.
+    /// to the engine now. Honours `DecksEngineConfig` (device, sample rate, buffer frames);
+    /// fallbacks are listed in `notes`. Idempotent.
     pub fn start(&self) -> Result<EngineStartInfo, DecksError> {
         let mut s = lock(&self.shared);
         if s.engine.is_none() {
-            let engine = Engine::start().map_err(|e| DecksError::Audio {
+            let c = s.config.clone();
+            let engine = Engine::start_with(
+                c.output_device_id.as_deref(),
+                c.sample_rate,
+                c.buffer_frames,
+            )
+            .map_err(|e| DecksError::Audio {
                 reason: e.to_string(),
             })?;
             let Shared {
@@ -756,44 +793,14 @@ impl DecksEngine {
                 ..
             } = &mut *s;
             for (i, d) in decks.iter_mut().enumerate() {
+                send_levels(&engine, DeckId::ALL[i], d);
                 if let Some(p) = d.pending.take() {
                     send_load(&engine, DeckId::ALL[i], p);
                 }
             }
             *slot = Some(engine);
         }
-        let e = s.engine()?;
-        let snap = e.snapshot_state();
-        let device_id = default_device_id();
-        let mut notes = Vec::new();
-        let c = &s.config;
-        if let Some(sr) = c.sample_rate.filter(|sr| *sr != e.sample_rate()) {
-            notes.push(format!(
-                "sample_rate {sr} not applied: the device default {} Hz is used",
-                e.sample_rate()
-            ));
-        }
-        if let Some(b) = c.buffer_frames {
-            notes.push(format!(
-                "buffer_frames {b} not applied: the device default buffer is used"
-            ));
-        }
-        if let Some(id) = c
-            .output_device_id
-            .as_ref()
-            .filter(|id| Some(*id) != device_id.as_ref())
-        {
-            notes.push(format!(
-                "output device {id} not applied: the system default device is used"
-            ));
-        }
-        Ok(EngineStartInfo {
-            sample_rate: e.sample_rate(),
-            channels: e.channels(),
-            latency_ms: snap.latency_ms,
-            device_id,
-            notes,
-        })
+        Ok(start_info(s.engine()?))
     }
 
     /// Close the audio device. Decks are unloaded (reload after the next `start()`).
@@ -1113,30 +1120,37 @@ impl DecksEngine {
         })
     }
 
-    /// Channel trim in dB (−24..+12). Applied as fader × gain, capped at unity by the engine.
+    /// Channel trim in dB (−∞..+12; ≤ −96 = silence), applied pre-EQ by the engine's trim stage,
+    /// independent of the channel fader. Stored while stopped and applied on `start()`.
     pub fn set_gain(&self, deck: u8, db: f32) -> Result<(), DecksError> {
         let id = deck_id(deck)?;
-        if !db.is_finite() {
-            return Err(DecksError::invalid("db must be finite"));
+        if db.is_nan() || db == f32::INFINITY {
+            return Err(DecksError::invalid("db must be a number below +inf"));
         }
         let mut s = lock(&self.shared);
-        let Shared { engine, decks, .. } = &mut *s;
-        let e = engine.as_ref().ok_or_else(not_running)?;
-        let d = &mut decks[id.index()];
-        d.gain_db = db.clamp(-24.0, 12.0);
-        Self::send_volume(e, id, d);
+        let d = &mut s.decks[id.index()];
+        d.gain_db = db.clamp(mixai_core::deck::TRIM_MIN_DB, mixai_core::deck::TRIM_MAX_DB);
+        let g = d.gain_db;
+        if let Some(e) = &s.engine {
+            e.set_trim(id, g);
+        }
         Ok(())
     }
 
-    /// Channel fader 0..1.
+    /// Channel fader 0..1. Stored while stopped and applied on `start()`.
     pub fn set_volume(&self, deck: u8, value: f32) -> Result<(), DecksError> {
         let id = deck_id(deck)?;
+        if !value.is_finite() {
+            return Err(DecksError::invalid("value must be finite"));
+        }
         let mut s = lock(&self.shared);
-        let Shared { engine, decks, .. } = &mut *s;
-        let e = engine.as_ref().ok_or_else(not_running)?;
-        let d = &mut decks[id.index()];
+        let d = &mut s.decks[id.index()];
         d.fader = value.clamp(0.0, 1.0);
-        Self::send_volume(e, id, d);
+        let f = d.fader;
+        if let Some(e) = &s.engine {
+            e.mirror().decks[id.index()].volume = f;
+            e.send(Command::Volume(id, f));
+        }
         Ok(())
     }
 
@@ -1259,7 +1273,7 @@ impl DecksEngine {
                 loop_start_sec: ms.map_or(0.0, |m| m.loop_start),
                 loop_end_sec: ms.map_or(0.0, |m| m.loop_end),
                 slip: dc.is_some_and(|c| c.slip),
-                slip_shadow_sec: None,
+                slip_shadow_sec: ms.and_then(|m| m.slip_shadow),
                 quantize: dc.is_some_and(|c| c.quantize),
                 sync_lock: dc.is_some_and(|c| c.sync_lock),
                 pfl: ms.is_some_and(|m| m.cue),
@@ -1302,6 +1316,9 @@ impl DecksEngine {
             recording: live.as_ref().is_some_and(|l| l.0.is_recording()),
             clock,
             decks,
+            channels: live.as_ref().map_or(0, |l| l.1.channels),
+            buffer_frames: live.as_ref().and_then(|l| l.1.buffer_frames),
+            output_device_id: live.as_ref().and_then(|l| l.0.output_info().device_id),
         }
     }
 }

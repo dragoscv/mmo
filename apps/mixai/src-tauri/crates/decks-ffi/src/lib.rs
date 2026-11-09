@@ -25,6 +25,8 @@ mod engine;
 mod library;
 mod mapping;
 mod render;
+#[cfg(target_os = "android")]
+mod android;
 
 pub use dvs::*;
 pub use engine::*;

@@ -15,6 +15,7 @@ pub mod engine;
 pub mod error;
 pub mod fx;
 pub mod keys;
+pub mod output;
 pub mod recorder;
 pub mod routing;
 pub mod sampler;
@@ -27,6 +28,10 @@ pub use beatgrid::{BeatGrid, GridAnchor};
 pub use colorfx::ColorFxKind;
 pub use engine::{ClockSource, ClockState, Command, DeckClock, Engine, list_output_devices};
 pub use error::CoreError;
+pub use output::{
+    BufferChoice, ConfigChoice, ConfigRange, DefaultConfig, OutputInfo, choose_config,
+    find_output_device,
+};
 pub use routing::{OutputMode, RoutingConfig};
 pub use state::{AudioDevice, CrossfaderAssign, CrossfaderCurve, DeckId, DeckState, MixerState};
 pub use stretch::{Stretcher, StretcherKind};

@@ -145,6 +145,11 @@ impl BeatFx {
         self.kind
     }
 
+    /// Current (kind, wet target, beats, feedback) — enough to rebuild at another rate.
+    pub fn settings(&self) -> (BeatFxKind, f32, f64, f32) {
+        (self.kind, self.wet.target(), self.beats, self.feedback)
+    }
+
     /// Select the effect, wet/dry (0..1), beat fraction (1/32..8) and feedback /
     /// depth (0..1; echo feedback, reverb decay, gate depth).
     pub fn set(&mut self, kind: BeatFxKind, wet: f32, beats: f64, feedback: f32) {

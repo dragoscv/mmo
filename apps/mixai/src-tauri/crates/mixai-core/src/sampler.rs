@@ -83,6 +83,20 @@ impl Sampler {
         }
     }
 
+    /// Re-target to a new engine rate (pads keep their samples and gains).
+    pub fn set_sample_rate(&mut self, sr: f32) {
+        if !sr.is_finite() || sr <= 0.0 {
+            return;
+        }
+        self.sr = sr;
+        for p in self.pads.iter_mut() {
+            p.gain.set_rate(sr, 12.0);
+            if let Some(b) = &p.buffer {
+                p.rate = b.sample_rate as f64 / sr as f64;
+            }
+        }
+    }
+
     /// Load (or replace) a pad's sample. Stops the pad first.
     pub fn load(&mut self, idx: usize, buffer: TrackBuffer) {
         if let Some(p) = self.pads.get_mut(idx) {

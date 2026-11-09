@@ -68,6 +68,9 @@ pub struct DeckState {
     pub tempo: f64,
     pub key_lock: bool,
     pub volume: f32,
+    /// Channel trim in dB (pre-EQ, separate from `volume`); −96 = −∞ (silence), max +12.
+    #[serde(default)]
+    pub trim_db: f32,
     pub eq_low: f32,
     pub eq_mid: f32,
     pub eq_high: f32,
@@ -80,6 +83,9 @@ pub struct DeckState {
     pub loop_active: bool,
     pub loop_start: f64,
     pub loop_end: f64,
+    /// Slip shadow playhead in seconds while slip is engaged (loop / reverse running).
+    #[serde(default)]
+    pub slip_shadow: Option<f64>,
     /// Beatgrid anchor: time of the first detected beat, in seconds.
     pub first_beat: f64,
     /// True when separated stems are loaded for this deck.
@@ -115,6 +121,7 @@ impl DeckState {
             tempo: 1.0,
             key_lock: true,
             volume: 0.85,
+            trim_db: 0.0,
             eq_low: 0.0,
             eq_mid: 0.0,
             eq_high: 0.0,
@@ -126,6 +133,7 @@ impl DeckState {
             loop_active: false,
             loop_start: 0.0,
             loop_end: 0.0,
+            slip_shadow: None,
             first_beat: 0.0,
             has_stems: false,
             stems_active: false,
@@ -148,6 +156,12 @@ pub struct MixerState {
     pub decks: Vec<DeckState>,
     pub sample_rate: u32,
     pub latency_ms: f32,
+    /// Output channels of the open stream.
+    #[serde(default)]
+    pub channels: u16,
+    /// Frames per audio callback (fixed or observed; `None` until known).
+    #[serde(default)]
+    pub buffer_frames: Option<u32>,
 }
 
 impl MixerState {
@@ -161,6 +175,8 @@ impl MixerState {
             decks: DeckId::ALL.iter().map(|&id| DeckState::empty(id)).collect(),
             sample_rate,
             latency_ms: 0.0,
+            channels: 0,
+            buffer_frames: None,
         }
     }
 }

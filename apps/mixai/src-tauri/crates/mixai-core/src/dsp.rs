@@ -27,6 +27,17 @@ impl Smoothed {
         self.target = target;
     }
 
+    /// Re-derive the coefficient for a new sample rate, keeping value and target.
+    pub fn set_rate(&mut self, sample_rate: f32, ms: f32) {
+        let tau = (ms / 1000.0).max(0.0001);
+        self.coeff = (-1.0 / (tau * sample_rate)).exp();
+    }
+
+    #[inline]
+    pub fn target(&self) -> f32 {
+        self.target
+    }
+
     #[inline]
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> f32 {

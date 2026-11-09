@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use mixai_core::{
     AudioDevice, BeatFxKind, BeatGrid, ClockSource, ClockState, ColorFxKind, Command, DeckId,
-    Engine, MixerState, RoutingConfig, list_output_devices,
+    Engine, MixerState, OutputInfo, RoutingConfig, list_output_devices,
 };
 use serde::Deserialize;
 use tauri::{Emitter, Manager, State};
@@ -202,6 +202,16 @@ fn deck_set_volume(deck: String, value: f32, state: State<'_, EngineState>) -> R
     Ok(())
 }
 
+/// Channel trim in dB (−∞..+12, 0 = unity), pre-EQ and independent of the fader.
+#[tauri::command]
+fn deck_set_trim(deck: String, db: f32, state: State<'_, EngineState>) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    if db.is_nan() {
+        return Err("trim must be a number".into());
+    }
+    with_engine(&state, |e| e.set_trim(deck, db))
+}
+
 #[tauri::command]
 fn deck_set_tempo(deck: String, value: f64, state: State<'_, EngineState>) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
@@ -294,11 +304,31 @@ fn set_master_volume(value: f32, state: State<'_, EngineState>) -> Result<(), St
     Ok(())
 }
 
+/// Move the master output to `device_id` (`host:id` from `list_audio_devices`; empty = system
+/// default). Decks keep playing state, routing and FX. If no engine is running yet (startup
+/// failed) this tries to start one on that device.
 #[tauri::command]
-fn set_output_device(_device_id: String) -> Result<(), String> {
-    // Device switching rebuilds the cpal stream; implemented in a follow-up.
-    // The settings UI is wired so this lands without UI changes.
-    Ok(())
+fn set_output_device(
+    device_id: String,
+    state: State<'_, EngineState>,
+) -> Result<OutputInfo, String> {
+    let id = Some(device_id.as_str()).filter(|s| !s.is_empty());
+    let mut guard = state.0.lock().unwrap();
+    match guard.as_mut() {
+        Some(engine) => engine.switch_output_device(id).map_err(|e| e.to_string()),
+        None => {
+            let engine = Engine::start_with(id, None, None).map_err(|e| e.to_string())?;
+            let info = engine.output_info();
+            *guard = Some(engine);
+            Ok(info)
+        }
+    }
+}
+
+/// Device, sample rate, channels and buffer size actually in use (with fallback notes).
+#[tauri::command]
+fn audio_output_info(state: State<'_, EngineState>) -> Option<OutputInfo> {
+    state.0.lock().unwrap().as_ref().map(|e| e.output_info())
 }
 
 #[tauri::command]
@@ -934,6 +964,7 @@ pub fn run() {
             deck_pause,
             deck_seek,
             deck_set_volume,
+            deck_set_trim,
             deck_set_tempo,
             deck_set_key_lock,
             deck_set_eq,
@@ -942,6 +973,7 @@ pub fn run() {
             set_crossfader,
             set_master_volume,
             set_output_device,
+            audio_output_info,
             set_cue_device,
             deck_set_hot_cue,
             deck_jump_hot_cue,

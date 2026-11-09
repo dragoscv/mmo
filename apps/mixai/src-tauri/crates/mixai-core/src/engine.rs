@@ -8,9 +8,13 @@
 //!     at the top of each callback — no locks in the RT path.
 //!   - A shared `Arc<AtomicSnapshot>` lets the UI poll cheap meter/transport
 //!     state at ~30 Hz without touching the RT mixer.
+//!   - The mixer lives in a [`MixerHome`] inside the callback; when cpal drops the
+//!     callback (stream stopped) the home hands the mixer back, so an output device
+//!     switch rebuilds the stream around the same decks, routing and queued commands.
 
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Stream, StreamConfig};
@@ -23,6 +27,7 @@ use crate::colorfx::ColorFxKind;
 use crate::deck::{Deck, TEMPO_MAX, TEMPO_MIN, TrackBuffer};
 use crate::dsp::{crossfader_gain, soft_clip};
 use crate::error::CoreError;
+use crate::output::{self, BufferChoice, OutputInfo};
 use crate::routing::{CompDelay, RoutingConfig, write_frame};
 use crate::state::{AudioDevice, CrossfaderAssign, DeckId, MixerState};
 
@@ -91,6 +96,10 @@ pub struct ClockState {
     /// Output frame counter at which `beat` was sampled.
     pub frame: u64,
     pub sample_rate: u32,
+    /// Output channels of the open stream.
+    pub channels: u16,
+    /// Frames per audio callback (fixed or observed; `None` until known).
+    pub buffer_frames: Option<u32>,
     pub decks: Vec<DeckClock>,
 }
 
@@ -108,6 +117,8 @@ pub enum Command {
     Pause(DeckId),
     Seek(DeckId, f64),
     Volume(DeckId, f32),
+    /// Channel trim in dB (−∞..+12), pre-EQ, independent of the fader.
+    Trim(DeckId, f32),
     Tempo(DeckId, f64),
     KeyLock(DeckId, bool),
     Eq(DeckId, String, f32),
@@ -206,6 +217,10 @@ pub struct Snapshot {
     pub deck_bar_phase: [AtomicU64; 4],
     /// Live tempo ratio (fader × sync nudge); sync lock changes it on the RT side.
     pub deck_tempo: [AtomicU64; 4],
+    /// Slip shadow playhead in seconds (f64 bits); `u64::MAX` = slip not engaged.
+    pub deck_slip_pos: [AtomicU64; 4],
+    /// Frames in the last audio callback (0 = no callback yet).
+    pub buffer_frames: AtomicU32,
 }
 
 impl Snapshot {
@@ -219,6 +234,8 @@ impl Snapshot {
             deck_bpm: Default::default(),
             deck_bar_phase: Default::default(),
             deck_tempo: std::array::from_fn(|_| AtomicU64::new(1f64.to_bits())),
+            deck_slip_pos: std::array::from_fn(|_| AtomicU64::new(u64::MAX)),
+            buffer_frames: AtomicU32::new(0),
             master_vu: AtomicU32::new(0),
             deck_vu: Default::default(),
             deck_pos_ms: Default::default(),
@@ -234,8 +251,7 @@ impl Snapshot {
 
 /// The real-time mixer state. Lives inside the audio callback only.
 struct Mixer {
-    // Reserved for cue-bus + per-deck resampling work (v0.1 follow-ups).
-    #[allow(dead_code)]
+    /// Device sample rate (changes only between streams, see `set_sample_rate`).
     sr: f32,
     decks: Vec<Deck>,
     crossfader: f32,
@@ -299,6 +315,27 @@ impl Mixer {
         }
     }
 
+    /// Re-target the mixer to a new device rate (called off the audio thread, between streams).
+    fn set_sample_rate(&mut self, sr: f32) {
+        if !sr.is_finite() || sr <= 0.0 || (sr - self.sr).abs() < f32::EPSILON {
+            return;
+        }
+        self.sr = sr;
+        for d in self.decks.iter_mut() {
+            d.set_sample_rate(sr);
+        }
+        let mv = self.master_vol.target();
+        self.master_vol = crate::dsp::Smoothed::new(mv, sr, 15.0);
+        self.comp_master = CompDelay::new(sr);
+        self.comp_phones = CompDelay::new(sr);
+        self.comp_booth = CompDelay::new(sr);
+        self.comp_master.set_ms(self.routing.master_latency_ms, sr);
+        self.comp_phones
+            .set_ms(self.routing.headphone_latency_ms, sr);
+        self.comp_booth.set_ms(self.routing.booth_latency_ms, sr);
+        self.sampler.set_sample_rate(sr);
+    }
+
     fn drain_commands(&mut self) {
         while let Ok(cmd) = self.rx.try_recv() {
             match cmd {
@@ -317,6 +354,7 @@ impl Mixer {
                 Command::Pause(d) => self.decks[d.index()].pause(),
                 Command::Seek(d, s) => self.decks[d.index()].seek_secs(s),
                 Command::Volume(d, v) => self.decks[d.index()].set_volume(v),
+                Command::Trim(d, db) => self.decks[d.index()].set_trim_db(db),
                 Command::Tempo(d, t) => self.decks[d.index()].set_tempo(t),
                 Command::KeyLock(d, on) => self.decks[d.index()].set_key_lock(on),
                 Command::Eq(d, band, db) => self.decks[d.index()].set_eq(&band, db),
@@ -521,6 +559,9 @@ impl Mixer {
         if channels == 0 {
             return;
         }
+        self.snapshot
+            .buffer_frames
+            .store((out.len() / channels) as u32, Ordering::Relaxed);
         self.begin_block();
 
         for frame in out.chunks_mut(channels) {
@@ -624,6 +665,11 @@ impl Mixer {
             let bar = deck.bar_phase().map(f64::to_bits).unwrap_or(u64::MAX);
             s.deck_bar_phase[i].store(bar, Ordering::Relaxed);
             s.deck_tempo[i].store(deck.tempo.to_bits(), Ordering::Relaxed);
+            let slip = deck
+                .slip_shadow_secs()
+                .map(f64::to_bits)
+                .unwrap_or(u64::MAX);
+            s.deck_slip_pos[i].store(slip, Ordering::Relaxed);
         }
         let (master, bpm, beat) = self.master_now();
         s.clock_bpm.store(bpm.to_bits(), Ordering::Relaxed);
@@ -638,12 +684,24 @@ impl Mixer {
 /// UI-side handle. Owns the stream + command sender + a mirror of UI-set params
 /// (so `get_state` can report values the RT thread doesn't echo back cheaply).
 pub struct Engine {
-    _stream: Stream,
+    /// The open output stream (`None` only after a failed device switch that could not
+    /// restore the previous device; the mixer is then parked in `parked`).
+    stream: Option<Stream>,
+    /// Mixer hand-back channel: the callback's [`MixerHome`] sends the mixer here when cpal
+    /// drops it (stream dropped or build failed).
+    home_tx: Sender<Mixer>,
+    home_rx: Receiver<Mixer>,
+    parked: Option<Mixer>,
     tx: Sender<Command>,
     snapshot: Arc<Snapshot>,
     sample_rate: u32,
     channels: u16,
-    latency_ms: f32,
+    /// Device / config actually opened, with fallback notes.
+    output: OutputInfo,
+    /// Requested device (`None` = system default), sample rate and buffer size.
+    want_device: Option<String>,
+    want_rate: Option<u32>,
+    want_buffer: Option<u32>,
     /// UI-visible mirror of params (metadata, knob values) guarded by a mutex;
     /// only touched on the UI thread, never in the audio callback.
     mirror: Mutex<MixerState>,
@@ -673,60 +731,337 @@ pub struct PerfMirror {
 unsafe impl Send for Engine {}
 unsafe impl Sync for Engine {}
 
-impl Engine {
-    /// Build the default output stream and start the audio thread.
-    pub fn start() -> Result<Self, CoreError> {
-        let host = cpal::default_host();
-        let device = host
-            .default_output_device()
-            .ok_or_else(|| CoreError::Device("no default output device".into()))?;
-        let supported = device
-            .default_output_config()
-            .map_err(|e| CoreError::Device(format!("default config: {e}")))?;
+/// Owns the mixer inside the audio callback and hands it back when cpal drops the callback.
+struct MixerHome {
+    mixer: Option<Mixer>,
+    back: Sender<Mixer>,
+}
 
-        // cpal 0.17+: `SampleRate` is a plain `u32` alias.
-        let sample_rate = supported.sample_rate();
-        let channels = supported.channels();
-        let config: StreamConfig = supported.config();
+impl Drop for MixerHome {
+    fn drop(&mut self) {
+        if let Some(m) = self.mixer.take() {
+            let _ = self.back.try_send(m);
+        }
+    }
+}
+
+/// How long to wait for cpal to drop a callback (the backend thread joins on stream drop).
+const RECLAIM_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// A failed stream open: the error plus the mixer when cpal released the callback in time.
+type Failed = Box<(CoreError, Option<Mixer>)>;
+
+fn resolve_device(id: Option<&str>) -> Result<cpal::Device, CoreError> {
+    match id {
+        Some(id) => output::find_output_device(id)
+            .ok_or_else(|| CoreError::Device(format!("output device {id} not found"))),
+        None => cpal::default_host()
+            .default_output_device()
+            .ok_or_else(|| CoreError::Device("no default output device".into())),
+    }
+}
+
+/// Pick the config for `device` (pure fallback rules in [`output::choose_config`]).
+fn plan(
+    device: &cpal::Device,
+    rate: Option<u32>,
+    buffer: Option<u32>,
+) -> Result<output::ConfigChoice, CoreError> {
+    let (ranges, default) = output::device_ranges(device).map_err(CoreError::Device)?;
+    Ok(output::choose_config(&ranges, &default, rate, buffer))
+}
+
+/// Build + start one stream around `mixer`. On failure the mixer comes back (when cpal
+/// released the callback in time).
+fn open_stream(
+    device: &cpal::Device,
+    config: StreamConfig,
+    mixer: Mixer,
+    home_tx: &Sender<Mixer>,
+    home_rx: &Receiver<Mixer>,
+) -> Result<Stream, Failed> {
+    let ch = config.channels as usize;
+    let mut home = MixerHome {
+        mixer: Some(mixer),
+        back: home_tx.clone(),
+    };
+    let err_fn = |e: cpal::Error| log::error!("mixai audio stream error: {e}");
+    let reclaim = || home_rx.recv_timeout(RECLAIM_TIMEOUT).ok();
+    // cpal 0.18: `StreamConfig` is `Copy` and passed by value; streams no longer
+    // auto-start, so the explicit `play()` below is required on every backend.
+    let built = device.build_output_stream(
+        config,
+        move |data: &mut [f32], _| {
+            if let Some(m) = home.mixer.as_mut() {
+                m.render(data, ch);
+            }
+        },
+        err_fn,
+        None,
+    );
+    match built {
+        Ok(stream) => match stream.play() {
+            Ok(()) => Ok(stream),
+            Err(e) => {
+                drop(stream);
+                Err(Box::new((
+                    CoreError::Device(format!("play stream: {e}")),
+                    reclaim(),
+                )))
+            }
+        },
+        Err(e) => Err(Box::new((
+            CoreError::Device(format!("build stream: {e}")),
+            reclaim(),
+        ))),
+    }
+}
+
+/// Open `device` with `choice`; a rejected fixed buffer is retried with the default buffer.
+fn launch(
+    device: &cpal::Device,
+    choice: output::ConfigChoice,
+    mut mixer: Mixer,
+    home_tx: &Sender<Mixer>,
+    home_rx: &Receiver<Mixer>,
+    mut notes: Vec<String>,
+) -> Result<(Stream, OutputInfo), Failed> {
+    mixer.set_sample_rate(choice.sample_rate as f32);
+    notes.extend(choice.notes.iter().cloned());
+    let mut config = StreamConfig {
+        channels: choice.channels,
+        sample_rate: choice.sample_rate,
+        buffer_size: match choice.buffer {
+            BufferChoice::Fixed(n) => cpal::BufferSize::Fixed(n),
+            BufferChoice::Default => cpal::BufferSize::Default,
+        },
+    };
+    let stream = match open_stream(device, config, mixer, home_tx, home_rx) {
+        Ok(s) => s,
+        Err(failed) => match (*failed, choice.buffer) {
+            ((e, Some(m)), BufferChoice::Fixed(n)) => {
+                notes.push(format!(
+                    "buffer_frames {n} rejected by the device ({e}); using the device default buffer"
+                ));
+                config.buffer_size = cpal::BufferSize::Default;
+                open_stream(device, config, m, home_tx, home_rx)?
+            }
+            (failed, _) => return Err(Box::new(failed)),
+        },
+    };
+    let buffer_frames = match config.buffer_size {
+        cpal::BufferSize::Fixed(n) => Some(n),
+        cpal::BufferSize::Default => None,
+    };
+    let info = OutputInfo {
+        device_id: output::device_id_of(device),
+        device_name: output::device_name_of(device),
+        sample_rate: config.sample_rate,
+        channels: config.channels,
+        buffer_frames,
+        latency_ms: buffer_frames.map_or(0.0, |n| n as f32 / config.sample_rate as f32 * 1000.0),
+        notes,
+    };
+    Ok((stream, info))
+}
+
+impl Engine {
+    /// Build the default output stream with the device's default config.
+    pub fn start() -> Result<Self, CoreError> {
+        Self::start_with(None, None, None)
+    }
+
+    /// Open `device_id` (`host:id` from [`list_output_devices`]; `None` = system default) with
+    /// the requested sample rate and frames per callback. Unsupported values fall back to the
+    /// device default; an unknown device falls back to the system default. Every fallback is
+    /// listed in [`Engine::output_info`]`.notes`.
+    pub fn start_with(
+        device_id: Option<&str>,
+        sample_rate: Option<u32>,
+        buffer_frames: Option<u32>,
+    ) -> Result<Self, CoreError> {
+        let mut notes = Vec::new();
+        let device = match device_id.map(output::find_output_device) {
+            Some(Some(d)) => d,
+            Some(None) => {
+                notes.push(format!(
+                    "output device {} not found; using the system default device",
+                    device_id.unwrap_or_default()
+                ));
+                resolve_device(None)?
+            }
+            None => resolve_device(None)?,
+        };
+        let choice = plan(&device, sample_rate, buffer_frames)?;
 
         let (tx, rx) = bounded::<Command>(1024);
         let snapshot = Arc::new(Snapshot::new());
         let (recorder, rec_tx) = crate::recorder::Recorder::spawn();
-        let mut mixer = Mixer::new(sample_rate as f32, rx, snapshot.clone(), rec_tx);
-
-        let ch = channels as usize;
-        let err_fn = |e: cpal::Error| log::error!("mixai audio stream error: {e}");
-        // cpal 0.18: `StreamConfig` is `Copy` and passed by value; streams no longer
-        // auto-start, so the explicit `play()` below is required on every backend.
-        let stream = device
-            .build_output_stream(
-                config,
-                move |data: &mut [f32], _| mixer.render(data, ch),
-                err_fn,
-                None,
-            )
-            .map_err(|e| CoreError::Device(format!("build stream: {e}")))?;
-        stream
-            .play()
-            .map_err(|e| CoreError::Device(format!("play stream: {e}")))?;
-
-        // Rough latency estimate from buffer size when available.
-        let latency_ms = match config.buffer_size {
-            cpal::BufferSize::Fixed(frames) => frames as f32 / sample_rate as f32 * 1000.0,
-            cpal::BufferSize::Default => 0.0,
-        };
+        let mixer = Mixer::new(choice.sample_rate as f32, rx, snapshot.clone(), rec_tx);
+        let (home_tx, home_rx) = bounded::<Mixer>(1);
+        let (stream, info) =
+            launch(&device, choice, mixer, &home_tx, &home_rx, notes).map_err(|f| f.0)?;
 
         Ok(Engine {
-            _stream: stream,
+            stream: Some(stream),
+            home_tx,
+            home_rx,
+            parked: None,
             tx,
             snapshot,
-            sample_rate,
-            channels,
-            latency_ms,
-            mirror: Mutex::new(MixerState::initial(sample_rate)),
+            sample_rate: info.sample_rate,
+            channels: info.channels,
+            want_device: device_id.map(str::to_owned),
+            want_rate: sample_rate,
+            want_buffer: buffer_frames,
+            mirror: Mutex::new(MixerState::initial(info.sample_rate)),
+            output: info,
             recorder: Mutex::new(recorder),
             perf: Mutex::new(PerfMirror::default()),
         })
+    }
+
+    /// Move playback to another output device (`None` = system default), keeping decks,
+    /// routing, FX and queued commands. The requested sample rate / buffer size from
+    /// [`Engine::start_with`] are re-applied with the same fallback rules. On failure the
+    /// previous device is reopened and the error is returned.
+    pub fn switch_output_device(
+        &mut self,
+        device_id: Option<&str>,
+    ) -> Result<OutputInfo, CoreError> {
+        let device = resolve_device(device_id)?;
+        let choice = plan(&device, self.want_rate, self.want_buffer)?;
+        let mixer = self.take_mixer()?;
+        let mut notes = Vec::new();
+        if choice.sample_rate != self.sample_rate && self.is_recording() {
+            self.stop_recording();
+            notes.push(format!(
+                "recording stopped: the sample rate changed from {} to {} Hz",
+                self.sample_rate, choice.sample_rate
+            ));
+        }
+        match launch(&device, choice, mixer, &self.home_tx, &self.home_rx, notes) {
+            Ok((stream, info)) => {
+                self.want_device = device_id.map(str::to_owned);
+                self.install(stream, info);
+                Ok(self.output_info())
+            }
+            Err(failed) => {
+                let (e, mixer) = *failed;
+                let Some(mixer) = mixer else {
+                    return Err(CoreError::Device(format!(
+                        "{e}; the audio callback was not released, engine stopped"
+                    )));
+                };
+                self.restore(mixer);
+                Err(e)
+            }
+        }
+    }
+
+    /// Reopen the previous device after a failed switch (parks the mixer if that fails too).
+    fn restore(&mut self, mixer: Mixer) {
+        let prev = self.want_device.clone();
+        let reopened = resolve_device(prev.as_deref()).and_then(|d| {
+            let choice = plan(&d, self.want_rate, self.want_buffer)?;
+            Ok((d, choice))
+        });
+        let (device, choice) = match reopened {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("mixai: previous output device unavailable: {e}");
+                self.parked = Some(mixer);
+                return;
+            }
+        };
+        match launch(
+            &device,
+            choice,
+            mixer,
+            &self.home_tx,
+            &self.home_rx,
+            Vec::new(),
+        ) {
+            Ok((stream, info)) => self.install(stream, info),
+            Err(failed) => {
+                let (e, m) = *failed;
+                log::error!("mixai: could not reopen the previous output device: {e}");
+                self.parked = m;
+            }
+        }
+    }
+
+    /// Stop the current stream and get the mixer back.
+    fn take_mixer(&mut self) -> Result<Mixer, CoreError> {
+        if let Some(m) = self.parked.take() {
+            return Ok(m);
+        }
+        let stream = self
+            .stream
+            .take()
+            .ok_or_else(|| CoreError::Device("engine has no stream".into()))?;
+        // Dropping the stream drops the callback, whose MixerHome sends the mixer back.
+        drop(stream);
+        self.home_rx
+            .recv_timeout(RECLAIM_TIMEOUT)
+            .map_err(|_| CoreError::Device("audio callback did not release the mixer".into()))
+    }
+
+    fn install(&mut self, stream: Stream, info: OutputInfo) {
+        self.stream = Some(stream);
+        self.sample_rate = info.sample_rate;
+        self.channels = info.channels;
+        self.snapshot.buffer_frames.store(0, Ordering::Relaxed);
+        self.mirror().sample_rate = info.sample_rate;
+        self.output = info;
+    }
+
+    /// True while an output stream is open.
+    pub fn is_streaming(&self) -> bool {
+        self.stream.is_some()
+    }
+
+    /// Device and stream config actually in use, with fallback notes.
+    pub fn output_info(&self) -> OutputInfo {
+        let mut info = self.output.clone();
+        if info.buffer_frames.is_none() {
+            info.buffer_frames = self.observed_buffer_frames();
+        }
+        info.latency_ms = self.latency_ms();
+        info
+    }
+
+    fn observed_buffer_frames(&self) -> Option<u32> {
+        Some(self.snapshot.buffer_frames.load(Ordering::Relaxed)).filter(|n| *n > 0)
+    }
+
+    /// Frames per audio callback: the fixed size, else the last observed callback size.
+    pub fn buffer_frames(&self) -> Option<u32> {
+        self.output
+            .buffer_frames
+            .or_else(|| self.observed_buffer_frames())
+    }
+
+    /// Output buffer latency in ms (0 until the buffer size is known).
+    pub fn latency_ms(&self) -> f32 {
+        self.buffer_frames()
+            .map_or(0.0, |n| n as f32 / self.sample_rate.max(1) as f32 * 1000.0)
+    }
+
+    /// Channel trim in dB (−∞..+12; ≤ −96 dB = silence), pre-EQ and separate from the fader.
+    pub fn set_trim(&self, deck: DeckId, db: f32) {
+        if db.is_nan() {
+            return;
+        }
+        let db = db.min(crate::deck::TRIM_MAX_DB);
+        self.mirror().decks[deck.index()].trim_db = db.max(crate::deck::TRIM_MIN_DB);
+        self.send(Command::Trim(deck, db));
+    }
+
+    /// Slip shadow playhead in seconds while slip is engaged (published by the audio thread).
+    pub fn slip_shadow_secs(&self, deck: DeckId) -> Option<f64> {
+        let bits = self.snapshot.deck_slip_pos[deck.index()].load(Ordering::Relaxed);
+        (bits != u64::MAX).then(|| f64::from_bits(bits))
     }
 
     // ---- WP19-05 sync / clock ---------------------------------------------
@@ -885,6 +1220,8 @@ impl Engine {
             beats_per_bar: INTERNAL_BPB as u32,
             frame: s.clock_frame.load(Ordering::Relaxed),
             sample_rate: self.sample_rate,
+            channels: self.channels,
+            buffer_frames: self.buffer_frames(),
             decks,
         }
     }
@@ -1048,7 +1385,9 @@ impl Engine {
     pub fn snapshot_state(&self) -> MixerState {
         let mut state = self.mirror().clone();
         state.sample_rate = self.sample_rate;
-        state.latency_ms = self.latency_ms;
+        state.latency_ms = self.latency_ms();
+        state.channels = self.channels;
+        state.buffer_frames = self.buffer_frames();
         let s = &self.snapshot;
         state.master_vu = s.master_vu.load(Ordering::Relaxed) as f32 / 1000.0;
         for (i, deck) in state.decks.iter_mut().enumerate() {
@@ -1069,6 +1408,8 @@ impl Engine {
             deck.loop_end = s.deck_loop_end_ms[i].load(Ordering::Relaxed) as f64 / 1000.0;
             // Sync lock moves the tempo on the RT side; report the live value.
             deck.tempo = f64::from_bits(s.deck_tempo[i].load(Ordering::Relaxed));
+            let slip = s.deck_slip_pos[i].load(Ordering::Relaxed);
+            deck.slip_shadow = (slip != u64::MAX).then(|| f64::from_bits(slip));
         }
         state
     }
@@ -1300,5 +1641,103 @@ mod tests {
         }
         assert!(peak[0] < 1e-6 && peak[1] < 1e-6, "{peak:?}");
         assert!(peak[2] > 0.05 && peak[3] > 0.05, "{peak:?}");
+    }
+
+    fn sine_track(secs: f64) -> TrackBuffer {
+        let n = (secs * SR as f64) as usize;
+        let left: Vec<f32> = (0..n)
+            .map(|i| (std::f32::consts::TAU * 440.0 * i as f32 / SR).sin() * 0.2)
+            .collect();
+        TrackBuffer {
+            right: left.clone(),
+            left,
+            sample_rate: SR as u32,
+        }
+    }
+
+    /// RMS of deck `d`'s main output over frames 9600..28800 (after the trim ramp settled).
+    fn deck_rms(m: &mut Mixer, d: usize) -> f64 {
+        let mut acc = 0.0f64;
+        let mut n = 0usize;
+        for f in 0..28_800 {
+            let o = m.decks[d].render_frame().main.0 as f64;
+            if f >= 9_600 {
+                acc += o * o;
+                n += 1;
+            }
+        }
+        (acc / n as f64).sqrt()
+    }
+
+    #[test]
+    fn trim_plus_6db_doubles_amplitude() {
+        let (mut m, tx) = mixer();
+        for d in [DeckId::A, DeckId::B] {
+            let deck = &mut m.decks[d.index()];
+            deck.load(sine_track(2.0), (None, None, None, 0.0));
+            deck.set_key_lock(false);
+            deck.play();
+        }
+        tx.send(Command::Trim(DeckId::B, 6.0)).unwrap();
+        m.drain_commands();
+        let a = deck_rms(&mut m, 0);
+        let b = deck_rms(&mut m, 1);
+        let ratio = b / a;
+        assert!((ratio - 2.0).abs() < 0.02, "ratio {ratio} (a {a}, b {b})");
+        // Trim is independent of the fader: the fader still scales on top.
+        assert!((m.decks[1].trim_gain() - crate::dsp::db_to_lin(6.0)).abs() < 1e-6);
+        // −∞ silences, the ceiling is +12 dB.
+        assert_eq!(crate::deck::trim_gain(f32::NEG_INFINITY), 0.0);
+        assert!((crate::deck::trim_gain(40.0) - crate::dsp::db_to_lin(12.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn slip_shadow_position_is_published_while_looping() {
+        let (mut m, tx) = mixer();
+        load(&mut m, DeckId::A, 120.0, 0.0);
+        m.decks[0].seek_secs(2.0);
+        tx.send(Command::SetSlip(DeckId::A, true)).unwrap();
+        tx.send(Command::Play(DeckId::A)).unwrap();
+        let mut out = vec![0.0f32; 512];
+        m.render(&mut out, 2);
+        let slot = |m: &Mixer| m.snapshot.deck_slip_pos[0].load(Ordering::Relaxed);
+        assert_eq!(slot(&m), u64::MAX, "no shadow before a loop");
+        tx.send(Command::Beatloop(DeckId::A, 1.0)).unwrap(); // 0.5 s loop
+        for _ in 0..188 {
+            m.render(&mut out, 2); // 188 × 256 frames ≈ 1 s inside the loop
+        }
+        let shadow = f64::from_bits(slot(&m));
+        let pos = m.snapshot.deck_pos_ms[0].load(Ordering::Relaxed) as f64 / 1000.0;
+        assert!(pos < 2.51, "loop holds the playhead: {pos}");
+        assert!(shadow > 2.9 && shadow < 3.1, "shadow {shadow}");
+        for _ in 0..10 {
+            m.render(&mut out, 2);
+        }
+        assert!(f64::from_bits(slot(&m)) > shadow, "shadow keeps running");
+        tx.send(Command::LoopExit(DeckId::A)).unwrap();
+        m.render(&mut out, 2);
+        assert_eq!(slot(&m), u64::MAX, "cleared on release");
+    }
+
+    #[test]
+    fn sample_rate_change_keeps_deck_state() {
+        let (mut m, tx) = mixer();
+        load(&mut m, DeckId::A, 120.0, 0.0);
+        m.decks[0].seek_secs(3.0);
+        m.decks[0].set_hot_cue(2);
+        tx.send(Command::Trim(DeckId::A, -6.0)).unwrap();
+        m.drain_commands();
+        m.set_sample_rate(44_100.0);
+        let d = &m.decks[0];
+        assert!((d.position_secs() - 3.0).abs() < 1e-9);
+        assert!((d.hot_cue_secs()[2].unwrap() - 3.0).abs() < 1e-9);
+        assert!((d.trim_gain() - crate::dsp::db_to_lin(-6.0)).abs() < 1e-6);
+        assert_eq!(d.sample_rate(), 44_100.0);
+        // Track at 48 kHz played on 44.1 kHz: 1 s of output advances 1 s of track.
+        m.decks[0].play();
+        for _ in 0..44_100 {
+            m.decks[0].render_frame();
+        }
+        assert!((m.decks[0].position_secs() - 4.0).abs() < 1e-3);
     }
 }

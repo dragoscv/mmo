@@ -142,6 +142,80 @@ fn engine_snapshot_after_load_shows_bpm_and_duration() {
 }
 
 #[test]
+fn slip_shadow_reported_while_slip_and_loop_active() {
+    let dir = tempfile::tempdir().unwrap();
+    let wav = dir.path().join("click-120-slip.wav");
+    write_test_wav(&wav, 12.0);
+    let e = DecksEngine::new(DecksEngineConfig {
+        sample_rate: Some(48_000),
+        buffer_frames: Some(512),
+        output_device_id: None,
+    });
+    // Trim works while stopped (stored, applied on start) and is reported in dB.
+    e.set_gain(0, 6.0).unwrap();
+    e.set_gain(1, f32::NEG_INFINITY).unwrap();
+    assert!(e.set_gain(0, f32::NAN).is_err());
+    let s = e.snapshot();
+    assert_eq!(s.decks[0].gain_db, 6.0);
+    assert_eq!(s.decks[1].gain_db, -96.0);
+    assert!(s.decks[0].slip_shadow_sec.is_none());
+    assert!(matches!(
+        e.set_output_device(Some("nohost:missing".into())),
+        Err(DecksError::NotFound { .. })
+    ));
+
+    let st = wait_load(&e, e.load(0, wav.display().to_string()).unwrap());
+    assert_eq!(st.state, LoadState::Ready, "{:?}", st.error);
+    let info = match e.start() {
+        Ok(info) => info,
+        Err(err) => {
+            eprintln!("no audio output, live slip part skipped: {err}");
+            return;
+        }
+    };
+    assert!(info.sample_rate > 0 && info.channels > 0);
+    // Notes appear only for genuine fallbacks.
+    if info.sample_rate == 48_000 {
+        assert!(
+            info.notes.iter().all(|n| !n.contains("sample_rate")),
+            "{:?}",
+            info.notes
+        );
+    } else {
+        assert!(!info.notes.is_empty(), "fallback must be noted");
+    }
+    e.seek(0, 2.0).unwrap();
+    e.set_slip(0, true).unwrap();
+    e.play(0).unwrap();
+    std::thread::sleep(Duration::from_millis(100));
+    e.loop_auto(0, 1.0).unwrap();
+    let t0 = Instant::now();
+    let shadow = loop {
+        let d = &e.snapshot().decks[0];
+        if d.loop_active
+            && let Some(sh) = d.slip_shadow_sec
+            && sh > d.loop_end_sec
+        {
+            break sh;
+        }
+        assert!(t0.elapsed() < Duration::from_secs(5), "{d:?}");
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let d = &e.snapshot().decks[0];
+    assert!(d.slip && d.loop_active);
+    assert!(d.playhead_sec <= d.loop_end_sec + 0.05, "{d:?}");
+    assert!(shadow > 2.0);
+    e.loop_exit(0).unwrap();
+    std::thread::sleep(Duration::from_millis(100));
+    assert!(e.snapshot().decks[0].slip_shadow_sec.is_none());
+    // Device switch to the current/default device keeps the decks.
+    assert!(e.set_output_device(None).unwrap());
+    let s = e.snapshot();
+    assert!(s.running && s.decks[0].loaded && s.channels > 0);
+    e.stop();
+}
+
+#[test]
 fn library_roundtrip_via_ffi_types() {
     let dir = tempfile::tempdir().unwrap();
     let lib = DecksLibrary::open(dir.path().join("lib.db").display().to_string()).unwrap();

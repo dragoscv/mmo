@@ -70,12 +70,12 @@ Constructor `DecksEngine(config: DecksEngineConfig{sample_rate?, buffer_frames?,
 
 | Group | Methods |
 |---|---|
-| Device | `list_output_devices()`, `set_output_device(id?) -> Bool` (true = honoured), `start() -> EngineStartInfo`, `stop()`, `is_running()` |
+| Device | `list_output_devices()`, `set_output_device(id?) -> Bool` (switches the running stream at once, keeping decks / routing / FX; stored for the next `start()` while stopped; `true` on success, `NotFound` / `Audio` errors otherwise), `start() -> EngineStartInfo` (honours `sample_rate`, `buffer_frames`, `output_device_id`), `stop()`, `is_running()` |
 | Load | `load(deck, path) -> ticket`, `load_status(ticket) -> LoadStatus?`, `track_info(deck)`, `peaks(deck) -> WaveformPeaks?`, `beatgrid(deck) -> BeatGridInfo?`, `set_beatgrid(deck, grid)` |
 | Transport | `play`, `pause`, `seek(deck, sec)`, `cue(deck, pressed)` (CDJ behaviour), `set_cue_point(deck, sec)`, `hot_cue_set/jump/delete(deck, slot)` |
 | Loops | `loop_in`, `loop_out`, `loop_auto(deck, beats)`, `loop_halve`, `loop_double`, `loop_toggle`, `loop_exit`, `beat_jump(deck, beats)` |
 | Tempo / key / sync | `set_tempo(deck, ratio)`, `set_key_lock`, `set_key_shift(deck, semitones)`, `key_match(deck) -> shift`, `set_slip`, `set_quantize`, `phase_sync(deck, lock)`, `set_sync_lock`, `set_reverse` |
-| Mixer | `set_eq(deck, EqBand, dB)`, `set_filter(deck, -1..1)`, `set_gain(deck, dB)`, `set_volume(deck, 0..1)`, `set_crossfader(-1..1)`, `set_master_volume`, `set_pfl(deck, on)` |
+| Mixer | `set_eq(deck, EqBand, dB)`, `set_filter(deck, -1..1)`, `set_gain(deck, dB)` (trim −∞..+12 dB, pre-EQ, independent of the fader), `set_volume(deck, 0..1)`, `set_crossfader(-1..1)`, `set_master_volume`, `set_pfl(deck, on)` |
 | Routing / clock / FX | `routing_set(Routing)`, `routing_get()`, `set_master_clock(MasterClockSource, bpm?)`, `set_color_fx(deck, ColorFx, param)`, `set_beat_fx(deck, BeatFx, wet, beats, feedback)` |
 | Recording | `record_start(path)`, `record_stop()` |
 | Poll | `snapshot() -> EngineSnapshot` |
@@ -85,12 +85,16 @@ Loads work while the engine is stopped: decoded audio is parked and handed to th
 `Cancelled`.
 
 `EngineSnapshot` = `{running, sample_rate, latency_ms, master_vu, master_volume, crossfader,
-recording, clock: ClockSnapshot, decks: [DeckSnapshot; 4]}`.
+recording, clock: ClockSnapshot, decks: [DeckSnapshot; 4], channels, buffer_frames?,
+output_device_id?}` (the last three were added with defaults, so older generated bindings keep
+compiling).
 
 * `DeckSnapshot`: `deck, loaded, loading, title, playhead_sec, duration_sec, playing, bpm,
   effective_bpm, tempo, key_lock, key_shift_semitones, key_camelot, effective_key_camelot, beat,
   bar_phase, loop_active, loop_start_sec, loop_end_sec, slip, slip_shadow_sec, quantize,
-  sync_lock, pfl, cue_point_sec, hot_cues[8], volume, gain_db, vu`.
+  sync_lock, pfl, cue_point_sec, hot_cues[8], volume, gain_db, vu`. `slip_shadow_sec` is the
+  shadow playhead published by the audio thread while slip holds one (slip on + loop or
+  reverse running), `None` otherwise. `gain_db` is the trim (−96 = −∞).
 * `ClockSnapshot`: `configured, source_deck?, bpm, beat, beat_phase, bar_phase?,
   beats_per_bar, frame` (extrapolate between polls with `bpm` and `sample_rate`).
 
@@ -98,7 +102,7 @@ recording, clock: ClockSnapshot, decks: [DeckSnapshot; 4]}`.
 1 ms per call in the test (1000 calls), fine for 60–120 Hz polling.
 
 Records / enums: `DecksEngineConfig`, `AudioOutputDevice`, `EngineStartInfo{sample_rate, channels,
-latency_ms, device_id?, notes[]}`, `LoadState{Queued, Decoding, Analysing, Ready, Failed,
+latency_ms, device_id?, notes[], buffer_frames?, device_name?}`, `LoadState{Queued, Decoding, Analysing, Ready, Failed,
 Cancelled}`, `LoadStatus`, `TrackInfo` (path, title, duration, rate, channels, bpm, first beat,
 key Camelot / Open Key / name / confidence, LUFS, true peak, gain to −14), `WaveformPeaks` (9 u8
 lanes low/mid/high × min/max/rms, `points_per_second` = 150), `BeatGridInfo` + `TempoAnchorInfo`,
@@ -193,15 +197,19 @@ alive. Null / zero handles are rejected with `InvalidArgument`; anything else is
 
 ## Limits (2026-11-09)
 
-* `mixai-core` opens only the system default output device with its default config.
-  `sample_rate`, `buffer_frames` and non-default `output_device_id` are stored and reported in
-  `EngineStartInfo.notes` / `set_output_device() == false`, not applied. Needs a
-  `mixai_core::Engine::start_with(device, config)` accessor.
-* `slip_shadow_sec` is always `None`: `mixai-core` keeps the slip position on the RT deck and
-  does not publish it in its atomic `Snapshot`. Needs a `deck_slip_pos_ms` atomic in mixai-core.
-* `set_gain` is applied as fader × trim into the single engine volume (clamped at unity), so
-  positive trim only helps when the fader is below full. A real per-channel trim stage belongs in
-  `mixai-core`.
+* Device / config: `mixai_core::Engine::start_with(device, sample_rate, buffer_frames)` applies
+  the request; anything the device does not support falls back to its default and is listed in
+  `EngineStartInfo.notes` (unsupported rate, rate only available with another channel count,
+  buffer clamped into the device range or rejected by the backend, unknown device at `start()`
+  → system default). `notes` is empty when everything was honoured. Only f32 stream formats are
+  opened. When the backend reports no buffer range and the default buffer is used,
+  `buffer_frames` is the size observed in the first audio callback (`None` until then).
+* `set_output_device` while running rebuilds the cpal stream around the same mixer (a short
+  dropout, ~one buffer plus device open time). If the new device fails the previous one is
+  reopened and `Audio` is returned. A switch that changes the sample rate stops an active
+  recording (WAV files have one rate).
+* The engine opens one output stream; headphones / booth are channel pairs of that device
+  (`Routing`). A separate cue device is not supported.
 * Hot cues are positions only; colours / labels live in `DecksLibrary` cues.
 * Analysis runs on the whole decoded file in memory (≈ 0.9 s for 3 min stereo in release).
 * No callbacks: hosts poll. MIDI / BLE / audio-input transport stays in the host (CoreMIDI,
