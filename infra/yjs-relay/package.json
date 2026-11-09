@@ -1,19 +1,21 @@
 {
   "name": "mmo-yjs-relay",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev"
   },
   "dependencies": {
+    "-": "0.0.1-security.1",
+    "D": "^1.0.0",
     "lib0": "^0.2.99",
     "y-protocols": "^1.0.6",
     "yjs": "^13.6.20"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250115.0",
-    "wrangler": "^3.99.0",
-    "typescript": "^5.9.3"
+    "@cloudflare/workers-types": "^5.20261108.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.158.0"
   }
 }

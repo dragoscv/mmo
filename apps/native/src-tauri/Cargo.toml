@@ -1,23 +1,23 @@
 [package]
 name = "mmo-native"
-version = "1.1.0"
+version = "1.1.1"
 description = "MixAI Studio desktop shell"
 authors = ["mwrty <vladulescu.catalin@gmail.com>"]
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/dragoscv/mmo"
-edition = "2021"
-rust-version = "1.88"
+edition = "2024"
+rust-version = "1.90"
 
 [lib]
 name = "mmo_native_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6", features = [] }
+tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
-tauri = { version = "2.11", features = [] }
-tauri-plugin-shell = "2.3"
+tauri = { version = "2.12.5", features = [] }
+tauri-plugin-shell = "2.6.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # Desktop auth flow: tiny local HTTP listener captures the OAuth

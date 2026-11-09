@@ -7,12 +7,22 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '-':
+        specifier: 0.0.1-security.1
+        version: 0.0.1-security.1
+      D:
+        specifier: ^1.0.0
+        version: 1.0.0
     devDependencies:
       '@tauri-apps/cli':
         specifier: ^2.12.4
         version: 2.12.4
 
 packages:
+
+  '-@0.0.1-security.1':
+    resolution: {integrity: sha512-3Zy+2t+L0IAXtep/9JfiCrWiqWbfEjbIwJUQHeTAcZglnAmHugb+5/f3Qg9K3hLTykJ4SK/s1G+mymranjR/kA==}
 
   '@tauri-apps/cli-darwin-arm64@2.12.4':
     resolution: {integrity: sha512-OxqKSckIkoJ6vX2AjifIJpTasFC0Hbdoo7gEiCmAjauABO3U8m2MRsLWe+QTiBwDx1mIrvgA+rvI7tvDnbnHVg==}
@@ -85,7 +95,13 @@ packages:
     engines: {node: '>= 10'}
     hasBin: true
 
+  D@1.0.0:
+    resolution: {integrity: sha512-nQvrCBu7K2pSSEtIM0EEF03FVjcczCXInMt3moLNFbjlWx6bZrX72uT6/1uAXDbnzGUAx9gTyDiQ+vrFi663oA==}
+    deprecated: Package no longer supported. Contact support@npmjs.com for more info.
+
 snapshots:
+
+  '-@0.0.1-security.1': {}
 
   '@tauri-apps/cli-darwin-arm64@2.12.4':
     optional: true
@@ -133,3 +149,5 @@ snapshots:
       '@tauri-apps/cli-win32-arm64-msvc': 2.12.4
       '@tauri-apps/cli-win32-ia32-msvc': 2.12.4
       '@tauri-apps/cli-win32-x64-msvc': 2.12.4
+
+  D@1.0.0: {}

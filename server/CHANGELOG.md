@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.13.2 — Pinned analyzer dependencies (WP20-07)
+
+- `python/requirements-analyzer.txt` pins exact versions (librosa 1.0.0, numpy 2.5.4, beat-this 1.1.0, audio-separator
+	0.48.0, …) and `requirements-analyzer.lock.txt` (uv, Python 3.12, 89 packages incl. torch 2.15.0) makes installs
+	reproducible. `native/rbexport` moves to Rust edition 2024 (rust-version 1.90). No runtime behaviour change.
+
 ## 3.13.1 — Folder cover art
 
 - `getCoverArt` falls back to folder art beside the track (`cover`, `folder`, `front`, `album` × `.jpg/.jpeg/.png/.webp`,

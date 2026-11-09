@@ -21,6 +21,14 @@ via `child_process.spawn` and speaks line-delimited JSON over stdin/stdout.
 
 ### CPU (default — works everywhere)
 
+Pinned, reproducible (every transitive version locked with `uv pip compile`, Python 3.12, all platforms):
+
+```bash
+pip install -r requirements-analyzer.lock.txt
+```
+
+Unpinned equivalent:
+
 ```bash
 pip install --upgrade pip
 pip install "audio-separator[cpu]" essentia pyloudnorm pyacoustid soundfile numpy pedalboard
@@ -148,7 +156,7 @@ Recommended:
             "loudnessLufs": -8.4, "loudnessTruePeakDbfs": -0.6, "loudnessRangeLu": 5.2,
             "beats": [...], "downbeats": [...],
             "chordProgression": [{"start":0.0,"end":2.0,"chord":"Cm"}, ...],
-            "acoustidFingerprint": "AQAA...", 
+            "acoustidFingerprint": "AQAA...",
             "stems": { "vocals":"...", "drums":"...", "bass":"...", "other":"...", "instrumental":"..." },
             "stemsModel": "model_bs_roformer_ep_317_sdr_12.9755" } }
 { "kind": "result",   "id": "...", "ok": false, "error": "..." }
