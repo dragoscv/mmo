@@ -1,10 +1,10 @@
-# MuzicAI Gateway — Hono control plane on Cloud Run.
+# MixAI Gateway — Hono control plane on Cloud Run.
 #
-# The bundle is built locally by deploy.ps1 (tsup bundles @mmo/db from the
+# The bundle is built locally by deploy.ps1 (tsdown bundles @mmo/db from the
 # monorepo, which isn't in this build context). The image ships the prebuilt
 # dist + production runtime deps (ws, postgres, hono, @hono/node-server).
 
-FROM node:22-slim AS runtime
+FROM node:24-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 RUN npm install -g pnpm@10

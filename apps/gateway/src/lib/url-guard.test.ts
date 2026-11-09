@@ -21,7 +21,7 @@ describe("validateDeviceLanUrl", () => {
     it("rejects public + cloud metadata + link-local", () => {
         expect(validateDeviceLanUrl("http://8.8.8.8")).toBeNull();
         expect(validateDeviceLanUrl("http://169.254.169.254")).toBeNull();
-        expect(validateDeviceLanUrl("https://muzicai.ro")).toBeNull();
+        expect(validateDeviceLanUrl("https://mixai.ro")).toBeNull();
     });
 
     it("rejects non-http(s) + junk", () => {

@@ -1,4 +1,4 @@
-# @mmo/gateway — MuzicAI Companion Gateway
+# @mmo/gateway — MixAI Companion Gateway
 
 Hono service on **GCP Cloud Run** that owns the companion **control plane**,
 keeping the chatty device heartbeat + command channel off the Vercel (web app)
@@ -7,7 +7,7 @@ serverless hot path.
 ## Why
 
 Previously the Electron companion posted its heartbeat directly to the Next.js
-app on Vercel (`muzicai.ro/api/devices/announce`) every ~10s. On a bursty
+app on Vercel (`mixai.ro/api/devices/announce`) every ~10s. On a bursty
 serverless platform that caused cold-start timeouts (`AbortError`) and stale
 `last_seen_at`, which surfaced as the analyzer modal getting stuck on
 "Reconnecting to companion…". A dedicated long-lived service is the correct
@@ -36,18 +36,22 @@ companion (Electron)
 api gateway (Hono, Cloud Run)  ──►  Postgres (shared)
                                     Cloudflare tunnel provisioning
 
-browser (muzicai.ro on Vercel)
+browser (mixai.ro on Vercel)
    │  data plane: /api/sync, library, audio  (unchanged — Phase 2 will move sync)
    ▼
 Next.js app (Vercel)  ──►  same Postgres
-   │  browser → companion via per-device Cloudflare tunnel (device-*.muzicai.ro)
+   │  browser → companion via per-device Cloudflare tunnel (device-*.mixai.ro)
 ```
 
 ## Local dev
 
+Node 24+. Per-app lockfile: install inside `apps/gateway` with `--ignore-workspace`.
+
 ```pwsh
-pnpm install
-node --env-file=../web/.env.local dist/server.js   # or: pnpm dev
+pnpm install --ignore-workspace
+pnpm build                      # tsdown → dist/server.js (@mmo/db bundled, runtime deps external)
+node --env-file=../web/.env.local dist/server.js   # or: pnpm dev (tsx watch)
+pnpm typecheck; pnpm test       # tsc --noEmit, vitest
 ```
 
 ## Deploy
@@ -57,13 +61,15 @@ pwsh deploy.ps1                 # Cloud Build + Cloud Run (project mmo-mw-prod, 
 pwsh deploy.ps1 -SkipBuild      # redeploy current image
 ```
 
-Live: `https://api.muzicai.ro` (Cloud Run custom domain) /
-`https://muzicai-gateway-f2aflobeva-ez.a.run.app` (origin).
+Live: `https://api.mixai.ro` (Cloud Run custom domain; `api.muzicai.ro` stays
+mapped during the rebrand transition) /
+`https://muzicai-gateway-f2aflobeva-ez.a.run.app` (origin — the Cloud Run
+service keeps its historical `muzicai-gateway` resource name).
 
 ## Roadmap
 
 - ✅ **Phase 2 done**: `/api/sync` runs here via shared `@mmo/db`.
 - ✅ Companion WebSocket heartbeat client (HTTP fallback retained).
-- ✅ `api.muzicai.ro` mapped (Cloud Run domain mapping + Cloudflare CNAME).
+- ✅ `api.mixai.ro` mapped (Cloud Run domain mapping + Cloudflare CNAME).
 - Next: move the remaining `device_commands` requester half + library reads
    off Vercel; consider LISTEN/NOTIFY for fully event-driven WS command push.
