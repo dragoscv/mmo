@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Decks UI strings (keys = ro.mixai.decks.ui.i18n.Str). Same texts as DesktopStrings.kt; StringsParityTest checks both. -->
+<resources>
+    <string name="decks_app_name" formatted="false">MixAI Decks</string>
+    <string name="decks_deck_a" formatted="false">Deck A</string>
+    <string name="decks_deck_b" formatted="false">Deck B</string>
+    <string name="decks_play" formatted="false">Play</string>
+    <string name="decks_pause" formatted="false">Pause</string>
+    <string name="decks_cue" formatted="false">Cue</string>
+    <string name="decks_hot_cue" formatted="false">Hot cue %1</string>
+    <string name="decks_hot_cue_empty" formatted="false">Set hot cue %1</string>
+    <string name="decks_hot_cue_delete" formatted="false">Delete hot cues</string>
+    <string name="decks_loop" formatted="false">Loop %1 beats</string>
+    <string name="decks_loop_exit" formatted="false">Exit loop</string>
+    <string name="decks_loop_halve" formatted="false">Halve loop</string>
+    <string name="decks_loop_double" formatted="false">Double loop</string>
+    <string name="decks_beat_jump_back" formatted="false">Jump back %1 beats</string>
+    <string name="decks_beat_jump_forward" formatted="false">Jump forward %1 beats</string>
+    <string name="decks_tempo" formatted="false">Tempo</string>
+    <string name="decks_tempo_range" formatted="false">Tempo range ±%1%</string>
+    <string name="decks_tempo_reset" formatted="false">Reset tempo</string>
+    <string name="decks_key_lock" formatted="false">Key lock</string>
+    <string name="decks_key_shift_up" formatted="false">Key up</string>
+    <string name="decks_key_shift_down" formatted="false">Key down</string>
+    <string name="decks_key_match" formatted="false">Key match</string>
+    <string name="decks_key" formatted="false">Key</string>
+    <string name="decks_sync" formatted="false">Sync</string>
+    <string name="decks_sync_lock" formatted="false">Sync lock</string>
+    <string name="decks_quantize" formatted="false">Quantize</string>
+    <string name="decks_slip" formatted="false">Slip</string>
+    <string name="decks_master" formatted="false">Master</string>
+    <string name="decks_master_clock" formatted="false">Master clock</string>
+    <string name="decks_internal_clock" formatted="false">Internal</string>
+    <string name="decks_gain" formatted="false">Gain</string>
+    <string name="decks_eq_high" formatted="false">High</string>
+    <string name="decks_eq_mid" formatted="false">Mid</string>
+    <string name="decks_eq_low" formatted="false">Low</string>
+    <string name="decks_filter" formatted="false">Filter</string>
+    <string name="decks_volume" formatted="false">Volume</string>
+    <string name="decks_crossfader" formatted="false">Crossfader</string>
+    <string name="decks_headphone_cue" formatted="false">Headphone cue</string>
+    <string name="decks_headphone_mix" formatted="false">Cue / master</string>
+    <string name="decks_headphone_level" formatted="false">Headphones</string>
+    <string name="decks_master_volume" formatted="false">Master volume</string>
+    <string name="decks_library" formatted="false">Library</string>
+    <string name="decks_search" formatted="false">Search title, artist, key</string>
+    <string name="decks_all_tracks" formatted="false">All tracks</string>
+    <string name="decks_crates" formatted="false">Crates</string>
+    <string name="decks_scan_folder" formatted="false">Scan folder</string>
+    <string name="decks_scanning" formatted="false">Scanning %1 / %2</string>
+    <string name="decks_scan_done" formatted="false">Scan done: %1 added</string>
+    <string name="decks_load_to_a" formatted="false">Load to deck A</string>
+    <string name="decks_load_to_b" formatted="false">Load to deck B</string>
+    <string name="decks_no_tracks" formatted="false">No tracks yet. Scan a music folder to start.</string>
+    <string name="decks_no_track" formatted="false">Load a track</string>
+    <string name="decks_loading" formatted="false">Analysing…</string>
+    <string name="decks_load_failed" formatted="false">Could not load: %1</string>
+    <string name="decks_waveform" formatted="false">Waveform</string>
+    <string name="decks_overview" formatted="false">Track overview</string>
+    <string name="decks_phase_meter" formatted="false">Phase against master</string>
+    <string name="decks_jog_wheel" formatted="false">Jog wheel, drag to nudge</string>
+    <string name="decks_midi" formatted="false">MIDI</string>
+    <string name="decks_midi_none" formatted="false">No controller</string>
+    <string name="decks_midi_connected" formatted="false">%1 · %2</string>
+    <string name="decks_demo_engine" formatted="false">Demo engine (native library unavailable)</string>
+    <string name="decks_engine_error" formatted="false">Audio engine: %1</string>
+    <string name="decks_bpm" formatted="false">BPM</string>
+    <string name="decks_elapsed" formatted="false">Elapsed</string>
+    <string name="decks_remaining" formatted="false">Remaining</string>
+    <string name="decks_on" formatted="false">on</string>
+    <string name="decks_off" formatted="false">off</string>
+    <string name="decks_mixer" formatted="false">Mixer</string>
+    <string name="decks_shortcuts" formatted="false">Keys: Space/Enter play A/B · Q/W cue · 1–4 / 7–0 hot cues · S/K sync · ↑↓ browse · ←/→ load</string>
+</resources>

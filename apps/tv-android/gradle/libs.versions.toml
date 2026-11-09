@@ -47,6 +47,9 @@ playServicesWearable = "20.0.1"
 mediarouter = "1.8.1"
 # MixAI Key & BPM (WP18-02): UniFFI Kotlin bindings run on JNA; latest on Maven Central 2026-11-08.
 jna = "5.19.1"
+# MixAI Decks (WP19-16/17): Compose Multiplatform for the shared Android + Desktop UI, latest stable on
+# Maven Central 2026-11-09 (1.13 is beta). Coroutines core/swing = same `coroutines` version.
+composeMultiplatform = "1.12.2"
 
 # compose-bom 2026.09.00 / coil 3.6.2 AARs require compileSdk ≥ 37 (checkAarMetadata); targetSdk stays 36.
 compileSdk = "37"
@@ -55,6 +58,12 @@ minSdk = "26"
 
 [libraries]
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
+# MixAI Decks (WP19-16/17) — Compose Multiplatform (on Android these resolve to androidx.compose).
+cmp-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime", version.ref = "composeMultiplatform" }
+cmp-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "composeMultiplatform" }
+cmp-ui = { group = "org.jetbrains.compose.ui", name = "ui", version.ref = "composeMultiplatform" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "coroutines" }
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
@@ -135,3 +144,4 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+jetbrains-compose = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
