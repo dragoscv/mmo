@@ -72,19 +72,26 @@ function inTauri(): boolean {
     return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
+async function invoke<T>(cmd: string, args?: Record<string, unknown> | Uint8Array): Promise<T | null> {
     if (!inTauri()) return null;
     const { invoke: inv } = await import("@tauri-apps/api/core");
     return inv<T>(cmd, args);
 }
 
+/** `pack_pick_file` answers a raw ArrayBuffer; empty = dialog cancelled. */
+export function pickedBytes(buf: ArrayBuffer | null): Uint8Array | null {
+    return buf && buf.byteLength > 0 ? new Uint8Array(buf) : null;
+}
+
+// Pack bytes go over IPC as a raw binary body, never as a JSON number array (a 25 MB pack would
+// be ~100 MB of text). Rust refuses a JSON body for these commands.
 export const packs = {
     /** Validate + verify a pack from bytes without installing it (used for the 30 s try). */
-    inspect: (bytes: Uint8Array) => invoke<PackInfo>("pack_inspect", { bytes: Array.from(bytes) }),
+    inspect: (bytes: Uint8Array) => invoke<PackInfo>("pack_inspect", bytes),
     /** Validate, verify and store a pack in the app data dir. Throws a readable error string on refusal. */
-    install: (bytes: Uint8Array) => invoke<PackInfo>("pack_install", { bytes: Array.from(bytes) }),
+    install: (bytes: Uint8Array) => invoke<PackInfo>("pack_install", bytes),
     list: () => invoke<PackInfo[]>("pack_list"),
     remove: (id: string) => invoke<void>("pack_remove", { id }),
     /** Pick a .mixaipack file from disk and return its bytes. */
-    pickFile: () => invoke<number[] | null>("pack_pick_file").then((b) => (b ? new Uint8Array(b) : null)),
+    pickFile: () => invoke<ArrayBuffer>("pack_pick_file").then(pickedBytes),
 };

@@ -13,6 +13,7 @@ import { create } from "zustand";
 import { BUILTIN_LAYOUTS, CLASSIC } from "./presets.ts";
 import { validateLayout } from "./solver.ts";
 import { PANEL_IDS, type LayoutDoc } from "./types.ts";
+import { remapLegacyRef } from "../packs/pack-layouts.ts";
 
 const KEY = "mixai-layout";
 
@@ -56,6 +57,15 @@ function save(s: PersistedLayout): void {
     } catch {
         // storage unavailable: non-fatal
     }
+}
+
+/** Move bare pack-layout refs (Decks 1.3.0) to `<packId>/<id>` given the current pack layouts. */
+export function remapRefs(s: PersistedLayout, packLayouts: readonly LayoutDoc[]): PersistedLayout {
+    if (packLayouts.length === 0) return s;
+    const own = new Set([...BUILTIN_LAYOUTS, ...s.user].map((l) => l.id));
+    const fix = (ref: string) => remapLegacyRef(ref, own, packLayouts);
+    const fixMap = (m: Record<string, string>) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, fix(v)]));
+    return { ...s, activeId: fix(s.activeId), snapshots: fixMap(s.snapshots), controllerLayouts: fixMap(s.controllerLayouts) };
 }
 
 interface LayoutStore extends PersistedLayout {
@@ -106,8 +116,15 @@ export const useLayoutStore = create<LayoutStore>((set, get) => {
             else delete controllerLayouts[device];
             commit({ controllerLayouts });
         },
-        setPackLayouts: (packLayouts) => set({ packLayouts }),
-        restore: (s) => commit(parseLayoutState(s)),
+        setPackLayouts: (packLayouts) => {
+            set({ packLayouts });
+            // Decks 1.3.0 referenced pack layouts by their bare id; move refs to `<packId>/<id>`.
+            const cur = get().snapshot();
+            const next = remapRefs(cur, packLayouts);
+            if (JSON.stringify(next) !== JSON.stringify(cur)) commit(next);
+        },
+        // Imports / cloud profiles from 1.3.0 may carry bare pack-layout refs too.
+        restore: (s) => commit(remapRefs(parseLayoutState(s), get().packLayouts)),
         snapshot: () => {
             const { activeId, user, snapshots, controllerLayouts } = get();
             return { activeId, user, snapshots, controllerLayouts };

@@ -1,5 +1,16 @@
 # MixAI Decks changelog
 
+## 1.3.1 — 2026-11-09
+
+- **Safer webview**: a strict Content Security Policy replaces the empty one: only the app's own
+  scripts run, and the network is limited to Tauri and mixai.ro (Marketplace).
+- **Faster pack install**: `.mixaipack` bytes travel to the Rust core as raw binary instead of a
+  JSON number array (a 25 MB pack was ~100 MB of text).
+- **Pack layouts can not clash**: layouts from packs are now named `<pack id>/<layout>`, so a pack
+  can never replace a built-in or your own layout, and two packs can share a layout name. Choices
+  saved by 1.3.0 (and 1.3.0 settings files) move over automatically. With cloud sync on, update
+  every device to 1.3.1: a 1.3.0 device does not know the new names and falls back to Classic.
+
 ## 1.3.0 — 2026-11-09
 
 - **No scrolling, anywhere.** A new layout engine fits every panel into the window: panels step

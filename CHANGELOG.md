@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## web 3.4.6 — Decks marketplace previews load in the app (WP19-35)
+
+- `/api/decks/packs/*` sends `Cross-Origin-Resource-Policy: cross-origin` (public, CORS `*`): the global `same-site` blocked pack preview images in the Decks webview (found by the Decks 1.3.1 CSP smoke).
+- Decks 1.3.1: strict webview CSP, pack bytes over raw IPC, pack layouts namespaced `<packId>/<layoutId>` (apps/mixai/CHANGELOG.md).
+
 ## web 3.4.5 — MixAI Live: browser FX fixes + product registry (WP21-01/14/15)
 
 - `/live` FX engine (`lib/audio-fx-engine.ts`): the de-esser is now split-band (LR4 crossover at `frequency`; the low band passes dry, only the sibilant band is compressed — before, everything under the crossover was lost). `stereoWidth` is real mid/side (0 = mono, 1 = unchanged, 2 = wide). `vocoderLite` is a real channel vocoder (4–32 log-spaced bands, envelope followers on the voice driving a sawtooth + noise carrier; `bands`, `attack`, `release`, `mix`). `gate` and `noiseSuppression` use a true downward gate/expander worklet (`public/worklets/live-gate-processor.js`, port of live-dsp `Gate` with hold + hysteresis) instead of a compressor.

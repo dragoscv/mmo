@@ -48,6 +48,8 @@ jobs:
                   pnpm install --frozen-lockfile
                   pnpm -C ../../packages/ui install --frozen-lockfile
             - run: pnpm typecheck
+            - name: unit tests (node --test, Node strips TS types)
+              run: node --test 'src/**/*.test.ts'
             - run: pnpm exec vite build
 
     rust:

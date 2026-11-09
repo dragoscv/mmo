@@ -16,10 +16,9 @@ import { create } from "zustand";
 import { packs, type PackInfo } from "@/bridge/packs";
 import { applyPrefs, emitPrefsChanged, loadPrefs, savePrefs } from "@mmo/ui/theme";
 import { useLayoutStore } from "@/layout/layout-store";
-import { validateLayout } from "@/layout/solver";
-import { PANEL_IDS, type LayoutDoc } from "@/layout/types";
 import { tokensToCss } from "./apply-tokens";
 import { BUILTIN_SKINS } from "./builtin-skins";
+import { packLayouts } from "./pack-layouts";
 
 const KEY = "mixai-skin";
 export const TRY_MS = 30_000;
@@ -81,12 +80,6 @@ export function renderSkin(pack: PackInfo | null, opts: { persist?: boolean } = 
         applyPrefs(next);
         emitPrefsChanged(next);
     }
-}
-
-function packLayouts(list: PackInfo[]): LayoutDoc[] {
-    const out: LayoutDoc[] = [];
-    for (const p of list) for (const l of p.layouts ?? []) if (validateLayout(l, PANEL_IDS).length === 0) out.push(l as LayoutDoc);
-    return out;
 }
 
 function readActive(): string | null {

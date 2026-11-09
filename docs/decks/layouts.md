@@ -26,6 +26,8 @@ layout engine and the panels. Code: `apps/mixai/src/layout/` (model, solver, pre
   Each at most once; no overlaps; `deckA`, `deckB` and `mixer` are required.
 - The same schema is shipped in `.mixaipack` packs (`layouts/*.json`, see [packs.md](packs.md)) and is
   meant for the Compose and SwiftUI apps too.
+  Installed pack layouts are addressed as `<packId>/<layoutId>` (see packs.md § Layout ids).
+  Editing a pack layout forks it as the user layout `<layoutId>-custom`.
 
 ## Solver
 

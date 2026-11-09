@@ -142,10 +142,26 @@ longer pass validation or no longer match the indexed hash. `pack_remove` delete
 
 | Command | Args | Returns |
 |---|---|---|
-| `pack_inspect` | `bytes: number[]` | `PackInfo` (validate + verify, nothing stored; used for the 30 s try) |
-| `pack_install` | `bytes: number[]` | `PackInfo` with `installedAt` |
+| `pack_inspect` | raw body (`invoke(cmd, Uint8Array)`) | `PackInfo` (validate + verify, nothing stored; used for the 30 s try) |
+| `pack_install` | raw body (`invoke(cmd, Uint8Array)`) | `PackInfo` with `installedAt` |
 | `pack_list` | — | `PackInfo[]` |
 | `pack_remove` | `id` | — |
-| `pack_pick_file` | — | `number[] \| null` (native file dialog, `.mixaipack`, ≤ 25 MB) |
+| `pack_pick_file` | — | raw `ArrayBuffer`; empty = cancelled (native file dialog, `.mixaipack`, ≤ 25 MB) |
 
 Errors are plain English strings meant to be shown to the user.
+
+Pack bytes never cross IPC as a JSON number array (since Decks 1.3.1); a JSON body is refused.
+
+## Layout ids
+
+A layout inside a pack keeps its own slug id; in the app it becomes `<packId>/<layoutId>`
+(e.g. `ro.mixai.bundle.festival-pro/festival-4`). The `/` can not occur in built-in or user
+layout ids, so a pack can not shadow a built-in, overwrite a user layout, or collide with another
+pack. Bare refs saved by 1.3.0 (active layout, snapshots, controller bindings) are remapped when
+exactly one pack layout matches. Code: `apps/mixai/src/packs/pack-layouts.ts`.
+
+## Webview CSP
+
+`tauri.conf.json` sets a CSP (since 1.3.1): scripts `'self'` only, network `ipc:` + `https://mixai.ro`,
+images/fonts `'self' data:` (+ marketplace previews), no frames/objects. `style-src` keeps
+`'unsafe-inline'` (skins inject a `<style>`), so Tauri's nonce injection is disabled for it only.

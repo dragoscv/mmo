@@ -286,7 +286,9 @@ const nextConfig: NextConfig = {
             // Google Cast receivers (public/cast/README.md): the Styled Media Receiver page lives on
             // Google's origin and loads /cast/styled.css + the two logos cross-site, which the global
             // CORP `same-site` would block. Later rules override the same header key.
-            ...["/cast/:path*", "/logo.svg", "/wordmark-dark.svg"].map((source) => ({
+            // Decks marketplace (public, CORS *): the Decks app webview (tauri.localhost) shows pack
+            // previews as <img>, which CORP same-site blocks.
+            ...["/cast/:path*", "/logo.svg", "/wordmark-dark.svg", "/api/decks/packs/:path*"].map((source) => ({
                 source,
                 headers: [{ key: "Cross-Origin-Resource-Policy", value: "cross-origin" }],
             })),
