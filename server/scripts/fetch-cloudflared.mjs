@@ -69,7 +69,13 @@ async function main() {
     const url = asset.browser_download_url;
     console.log(`[fetch-cloudflared] downloading ${url}`);
 
-    const dl = await fetch(url, { headers: { "User-Agent": "mmo-companion-build" } });
+    let dl;
+    for (let attempt = 1; ; attempt++) {
+        dl = await fetch(url, { headers: { "User-Agent": "mmo-companion-build" } });
+        if (dl.ok || attempt >= 4 || (dl.status < 500 && dl.status !== 429)) break;
+        console.log(`[fetch-cloudflared] HTTP ${dl.status}, retry ${attempt}/3`);
+        await new Promise((r) => setTimeout(r, 5000 * attempt));
+    }
     if (!dl.ok || !dl.body) throw new Error(`Download failed: HTTP ${dl.status}`);
 
     if (assetName.endsWith(".tgz")) {

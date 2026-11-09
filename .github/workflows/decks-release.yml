@@ -141,6 +141,8 @@ jobs:
               working-directory: .
               run: |
                   sudo apt-get update
+                  # ubuntu-22.04 image ships libunwind-14-dev, which conflicts with libunwind-dev (gstreamer dep).
+                  sudo apt-get remove -y libunwind-14-dev || true
                   sudo apt-get install -y --no-install-recommends \
                     libwebkit2gtk-4.1-dev \
                     libasound2-dev \

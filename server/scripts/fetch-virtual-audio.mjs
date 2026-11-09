@@ -85,7 +85,13 @@ async function sha256File(p) {
 
 async function download(url, dest) {
     process.stdout.write(`  ↓ ${url}\n`);
-    const res = await fetch(url, { redirect: "follow" });
+    let res;
+    for (let attempt = 1; ; attempt++) {
+        res = await fetch(url, { redirect: "follow" });
+        if (res.ok || attempt >= 4 || (res.status < 500 && res.status !== 429)) break;
+        process.stdout.write(`  … HTTP ${res.status}, retry ${attempt}/3\n`);
+        await new Promise((r) => setTimeout(r, 5000 * attempt));
+    }
     if (!res.ok || !res.body) {
         throw new Error(`HTTP ${res.status} fetching ${url}`);
     }
