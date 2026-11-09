@@ -295,6 +295,18 @@ export interface KeyMatchRequest {
 /** Output mapping mode (matches Rust `OutputMode`). */
 export type OutputMode = "auto" | "stereo" | "fourChannel";
 
+/** Opened output stream (matches Rust `mixai_core::OutputInfo`, camelCase over IPC). */
+export interface OutputInfo {
+    deviceId: string | null;
+    deviceName: string | null;
+    sampleRate: number;
+    channels: number;
+    bufferFrames: number | null;
+    latencyMs: number;
+    /** Requested settings that fell back, one line each (empty = all honoured). */
+    notes: string[];
+}
+
 /** Output routing matrix (matches Rust `RoutingConfig`). */
 export interface RoutingConfig {
     mode: OutputMode;

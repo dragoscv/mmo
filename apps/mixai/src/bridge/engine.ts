@@ -29,6 +29,7 @@ import type {
     ClockState,
     ColorFxKind,
     KeyMatchRequest,
+    OutputInfo,
     RoutingConfig,
 } from "./types";
 
@@ -67,8 +68,19 @@ export const engine = {
         return call<AudioDevice[]>("list_audio_devices");
     },
 
-    setOutputDevice(deviceId: string): Promise<null> {
-        return call<null>("set_output_device", { deviceId });
+    /** Switch the output device ("" = system default); returns what was actually opened (+ fallback notes). */
+    setOutputDevice(deviceId: string): Promise<OutputInfo | null> {
+        return call<OutputInfo>("set_output_device", { deviceId });
+    },
+
+    /** Opened device, sample rate, channels, buffer and latency of the running engine. */
+    audioOutputInfo(): Promise<OutputInfo | null> {
+        return call<OutputInfo>("audio_output_info");
+    },
+
+    /** Per-deck trim (pre-EQ), dB in −∞..+12; −96 or lower = silence. */
+    setDeckTrim(deck: DeckId, db: number): Promise<null> {
+        return call<null>("deck_set_trim", { deck, db });
     },
 
     setCueDevice(deviceId: string): Promise<null> {
