@@ -21,7 +21,7 @@ rubato = "5.0.1"
 # WAV cache read/write (Apache-2.0), already in the workspace graph.
 hound = "3.5.1"
 # Cache keys (MIT/Apache), already in the workspace graph.
-sha2 = "0.10.9"
+sha2 = "0.11.0"
 # ONNX Runtime (MIT/Apache). `load-dynamic`: the app bundles the onnxruntime library for its platform
 # (onnxruntime-directml.dll on Windows, the CoreML build on Apple, the NNAPI AAR .so on Android), so the
 # build never downloads binaries and CI stays offline.
