@@ -170,6 +170,9 @@ impl Processor for Autotune {
     fn latency(&self) -> usize {
         Shifter::latency()
     }
+    fn tune_status(&self) -> Option<TuneStatus> {
+        Some(self.status)
+    }
 }
 
 // ─── Harmonizer ─────────────────────────────────────────────────────────────
@@ -405,6 +408,18 @@ impl Processor for Tuner {
     fn reset(&mut self) {
         self.yin.reset();
         self.last = PitchInfo::default();
+    }
+    fn tune_status(&self) -> Option<TuneStatus> {
+        let info = self.info();
+        Some(TuneStatus {
+            input: info,
+            target: if info.voiced() {
+                info.midi.round() as i32
+            } else {
+                -1
+            },
+            correction_cents: 0.0,
+        })
     }
 }
 

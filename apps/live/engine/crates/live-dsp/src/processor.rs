@@ -1,6 +1,7 @@
 //! The common interface of every effect.
 
 use crate::param::ParamSpec;
+use crate::tune::TuneStatus;
 
 /// A realtime stereo processor. Rules for implementors:
 /// - every allocation happens in the constructor (`new(sample_rate)`), never in `process`;
@@ -26,6 +27,10 @@ pub trait Processor: Send {
     /// Gain reduction in dB for meters (dynamics only; 0 otherwise).
     fn gain_reduction_db(&self) -> f32 {
         0.0
+    }
+    /// Pitch telemetry (autotune / tuner only).
+    fn tune_status(&self) -> Option<TuneStatus> {
+        None
     }
 }
 

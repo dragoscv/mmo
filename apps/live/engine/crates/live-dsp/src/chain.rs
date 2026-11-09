@@ -166,14 +166,51 @@ impl Insert {
     }
 }
 
-/// Ordered list of inserts. Structural edits (add/remove/move) allocate and therefore happen
-/// on the control thread, which then swaps the whole chain into the audio thread.
-#[derive(Default)]
+/// Maximum inserts per chain. The vector is preallocated to this capacity so add/remove/move
+/// on the audio thread never reallocate; inserts are boxed so moving them in/out is free.
+pub const MAX_INSERTS: usize = 32;
+
+/// Ordered list of inserts.
 pub struct Chain {
-    pub inserts: Vec<Insert>,
+    pub inserts: Vec<Box<Insert>>,
+}
+
+impl Default for Chain {
+    fn default() -> Self {
+        Self {
+            inserts: Vec::with_capacity(MAX_INSERTS),
+        }
+    }
 }
 
 impl Chain {
+    /// Append without reallocating; gives the insert back when the chain is full.
+    pub fn try_insert(&mut self, at: usize, ins: Box<Insert>) -> Result<(), Box<Insert>> {
+        if self.inserts.len() >= MAX_INSERTS || self.inserts.len() >= self.inserts.capacity() {
+            return Err(ins);
+        }
+        let at = at.min(self.inserts.len());
+        self.inserts.insert(at, ins);
+        Ok(())
+    }
+
+    pub fn remove(&mut self, id: u32) -> Option<Box<Insert>> {
+        let i = self.inserts.iter().position(|x| x.id == id)?;
+        Some(self.inserts.remove(i))
+    }
+
+    pub fn move_to(&mut self, id: u32, to: usize) -> bool {
+        match self.inserts.iter().position(|x| x.id == id) {
+            Some(i) => {
+                let ins = self.inserts.remove(i);
+                let to = to.min(self.inserts.len());
+                self.inserts.insert(to, ins);
+                true
+            }
+            None => false,
+        }
+    }
+
     pub fn process(&mut self, l: &mut [f32], r: &mut [f32]) {
         for ins in &mut self.inserts {
             ins.process(l, r);
@@ -181,7 +218,10 @@ impl Chain {
     }
 
     pub fn find_mut(&mut self, id: u32) -> Option<&mut Insert> {
-        self.inserts.iter_mut().find(|i| i.id == id)
+        self.inserts
+            .iter_mut()
+            .find(|i| i.id == id)
+            .map(|b| &mut **b)
     }
 
     pub fn latency(&self) -> usize {
@@ -255,15 +295,19 @@ mod tests {
     fn processing_does_not_allocate() {
         let mut chain = Chain::default();
         for (n, k) in FxKind::ALL.into_iter().enumerate() {
-            chain.inserts.push(Insert::new(n as u32, k, 48000.0, 128));
+            chain
+                .try_insert(n, Box::new(Insert::new(n as u32, k, 48000.0, 128)))
+                .ok()
+                .unwrap();
         }
+        let spare = Box::new(Insert::new(99, FxKind::Eq, 48000.0, 128));
         let mut l = sine(220.0, 48000.0, 128, 0.5);
         let mut r = l.clone();
         // Warm up (first LPC compute etc.).
         for _ in 0..50 {
             chain.process(&mut l, &mut r);
         }
-        assert_no_alloc::assert_no_alloc(|| {
+        let removed = assert_no_alloc::assert_no_alloc(|| {
             for _ in 0..200 {
                 chain.process(&mut l, &mut r);
             }
@@ -271,6 +315,11 @@ mod tests {
                 .find_mut(3)
                 .unwrap()
                 .set_param_by_id("threshold", -20.0);
+            // Structural edits within capacity are allocation-free too.
+            chain.try_insert(0, spare).ok().unwrap();
+            chain.move_to(99, 5);
+            chain.remove(99)
         });
+        assert!(removed.is_some());
     }
 }
