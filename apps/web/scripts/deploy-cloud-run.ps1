@@ -86,6 +86,8 @@ $OptionalSecretMap = [ordered]@{
   FCM_SERVICE_ACCOUNT_JSON = 'mixai-web-fcm-sa'
   APNS_KEY_ID              = 'mixai-web-apns-key-id'
   APNS_PRIVATE_KEY         = 'mixai-web-apns-p8'
+  SHAZAM_KEY_ID            = 'mixai-web-shazam-key-id'
+  SHAZAM_PRIVATE_KEY       = 'mixai-web-shazam-p8'
 }
 foreach ($k in $OptionalSecretMap.Keys) { $SecretMap[$k] = $OptionalSecretMap[$k] }
 $PlainEnv = @(

@@ -23,6 +23,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **Web 3.3.4 — Decks Pro infra, not enabled** (WP19-23, ADR-0014 decision 10): `lib/entitlements.ts` defines the
   `decks_pro` entitlement (Stripe plans `pro_monthly` / `pro_yearly`) behind the `MIXAI_FLAG_DECKS_PRO` flag, **off by
   default**; no UI, no route, no DB migration (definitions in code, state from the existing `subscriptions` table).
+- **Web 3.3.5 — ShazamKit token** (WP18-17, D69): `GET /api/shazam/token` returns a 12-hour ES256 developer token
+  for ShazamKit on Android (MixAI Key & BPM). Anonymous by design: requires `x-mixai-app: keybpm-android|keybpm-ios`,
+  30 requests per IP per hour, `no-store`, 503 when `SHAZAM_KEY_ID` / `SHAZAM_PRIVATE_KEY` are not mounted (Media
+  Services key `2N59DNU7BN`, Media ID `media.ro.mixai.keybpm`). One signature per instance per ~11 h.
 - **Docs:** `docs/decks/` is the new home of MixAI Decks docs — index, architecture (crates, threading, data flow,
   native UIs, licence gate, CI, performance budgets, Pro infra), controllers guide (RO), streaming strategy with the
   partner application checklist + draft emails, library interop matrix (WP19-25).

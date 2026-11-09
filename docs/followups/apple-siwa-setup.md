@@ -13,6 +13,7 @@ State on 2026-11-05 (team **S6D533QSV2**, project `mmo-mw-prod`):
 | FCM service account `mixai-web-fcm-sa` | **not created** — Android push stays off until it exists | below |
 | `assetlinks.json` release fingerprint | **placeholder** — fill after the first Play upload | below |
 | Private Email Relay sources | not registered (only needed if we email `@privaterelay.appleid.com` users) | Services → Sign in with Apple for Email Communication |
+| Media ID `media.ro.mixai.keybpm` ("MixAI Key and BPM", ShazamKit) + key `2N59DNU7BN` "MixAI Media Services" (Media Services only, WP18-17) | done 2026-11-09; .p8 in `mixai-web-shazam-p8`, key id in `mixai-web-shazam-key-id`, local copy only in the owner's `~/.codai/keys` | Identifiers → Media IDs, Keys |
 
 Apple allows two APNs keys per team: codai's `TSN243T8W4` and MixAI's `F2YDTZV29A` now use both slots.
 Rotating either one means revoking it first.
@@ -21,7 +22,8 @@ Rotating either one means revoking it first.
 
 `apps/web/scripts/deploy-cloud-run.ps1` mounts the optional secrets only when a version exists
 (`$OptionalSecretMap`): `AUTH_APPLE_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `APNS_KEY_ID`, `APNS_PRIVATE_KEY`,
-`FCM_SERVICE_ACCOUNT_JSON`. With `AUTH_APPLE_ID` + the key the app mints the 6-month client-secret JWT at boot,
+`FCM_SERVICE_ACCOUNT_JSON`, `SHAZAM_KEY_ID`, `SHAZAM_PRIVATE_KEY` (the last two power `GET /api/shazam/token`, the
+12-hour ShazamKit developer token for MixAI Key & BPM on Android; 503 when absent). With `AUTH_APPLE_ID` + the key the app mints the 6-month client-secret JWT at boot,
 so there is nothing to rotate every 6 months. `AUTH_APPLE_SECRET` (pre-built JWT) is supported too:
 
 ```powershell
