@@ -51,7 +51,22 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
+        if (savedInstanceState == null) handleAudioIntent(intent)
         setContent { MixaiTheme("system") { App(model) } }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleAudioIntent(intent)
+    }
+
+    private fun handleAudioIntent(intent: Intent?) {
+        val uri: Uri? = when (intent?.action) {
+            Intent.ACTION_VIEW -> intent.data
+            Intent.ACTION_SEND -> androidx.core.content.IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+            else -> null
+        }
+        if (uri != null) model.analyzeUri(uri)
     }
 
     override fun onStop() {
@@ -69,6 +84,9 @@ class MainActivity : ComponentActivity() {
         val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             denied = !granted
             if (granted) model.start()
+        }
+        val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) model.analyzeUri(uri)
         }
         val start = {
             when {
@@ -117,7 +135,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 when (tab) {
-                    0 -> LiveScreen(ui, start, model::stop, model::again, model::cycleTempo, model::setNotation)
+                    0 -> LiveScreen(ui, start, model::stop, model::again, model::cycleTempo, model::setNotation, { picker.launch(arrayOf("audio/*")) })
                     else -> TunerScreen(ui, start, model::stop, model::setA4)
                 }
             }

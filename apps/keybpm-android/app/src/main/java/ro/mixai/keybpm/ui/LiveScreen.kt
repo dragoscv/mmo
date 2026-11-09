@@ -50,6 +50,7 @@ fun LiveScreen(
     onAgain: () -> Unit,
     onCycleTempo: () -> Unit,
     onNotation: (KeyNotation) -> Unit,
+    onPickFile: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = ui.snapshot
@@ -79,6 +80,10 @@ fun LiveScreen(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        ui.fileName?.let {
+            Text(stringResource(R.string.file_header, it), style = MaterialTheme.typography.titleSmall, color = Mixai.colors.muted)
+            Spacer(Modifier.height(8.dp))
+        }
         CamelotWheel(
             camelotNumber = key?.key?.camelotNumber?.toInt(),
             minor = key?.key?.minor == true,
@@ -133,6 +138,11 @@ fun LiveScreen(
             }
             Spacer(Modifier.height(8.dp))
             ChromaStrip(s.chroma)
+        } else if (ui.analysing) {
+            Text(stringResource(R.string.analysing), color = Mixai.colors.muted)
+            LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
+        } else if (ui.fileError) {
+            Text(stringResource(R.string.file_error), color = MaterialTheme.colorScheme.error)
         } else {
             Text(
                 stringResource(if (ui.listening) R.string.listening else R.string.idle_hint),
@@ -159,6 +169,7 @@ fun LiveScreen(
             } else {
                 Button(onClick = onStart) { Text(stringResource(R.string.listen_start)) }
             }
+            FilledTonalButton(onClick = onPickFile, enabled = !ui.analysing) { Text(stringResource(R.string.open_file)) }
         }
     }
 }

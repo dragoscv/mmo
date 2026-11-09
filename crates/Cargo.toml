@@ -13,3 +13,14 @@ lto = "fat"
 codegen-units = 1
 opt-level = 3
 strip = true
+
+# Debug app builds (Android debug APK, iOS dev) still need a real-time engine: unoptimised DSP took 167 s for a
+# 2-minute file on the A51 and cannot keep up with the mic. Optimise every crate, keep debug info for our own.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev.package.mixai-listen]
+opt-level = 3

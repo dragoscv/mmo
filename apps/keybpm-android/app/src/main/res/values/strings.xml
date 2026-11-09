@@ -39,4 +39,8 @@
     <string name="level_low">Too quiet — move closer to the speaker</string>
     <string name="cd_wheel">Camelot wheel, %1$s highlighted</string>
     <string name="cd_beat">Beat indicator</string>
+    <string name="open_file">Open file</string>
+    <string name="file_header">File: %1$s</string>
+    <string name="analysing">Analysing…</string>
+    <string name="file_error">This file could not be read. Try an MP3, M4A, FLAC, WAV or OGG file.</string>
 </resources>

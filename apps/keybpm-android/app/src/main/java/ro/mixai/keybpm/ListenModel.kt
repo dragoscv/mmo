@@ -29,6 +29,10 @@ data class ListenUi(
     val a4: Int = 440,
     val keyChange: String? = null,
     val micFailed: Boolean = false,
+    /** File mode: display name of the analysed file, null in live mode. */
+    val fileName: String? = null,
+    val analysing: Boolean = false,
+    val fileError: Boolean = false,
 )
 
 /**
@@ -56,7 +60,7 @@ class ListenModel(app: Application) : AndroidViewModel(app) {
             e.close()
             KeyBpmEngine(EngineConfig(mic.sampleRate.toUInt(), 88.0, _ui.value.a4.toDouble()))
         }
-        _ui.value = _ui.value.copy(listening = true, snapshot = null, micFailed = false, keyChange = null, tempoFactor = 1.0)
+        _ui.value = _ui.value.copy(listening = true, snapshot = null, micFailed = false, keyChange = null, tempoFactor = 1.0, fileName = null, fileError = false)
         poll = viewModelScope.launch(Dispatchers.Default) {
             while (isActive) {
                 val s = engine?.snapshot() ?: break
@@ -98,6 +102,33 @@ class ListenModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissKeyChange() {
         _ui.value = _ui.value.copy(keyChange = null)
+    }
+
+    /** File mode: copy the picked document to cache (symphonia needs a path + extension) and analyse it. */
+    fun analyzeUri(uri: android.net.Uri) {
+        stop()
+        val app = getApplication<Application>()
+        val name = app.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: "audio"
+        _ui.value = _ui.value.copy(analysing = true, fileName = name, snapshot = null, fileError = false, keyChange = null)
+        viewModelScope.launch(Dispatchers.IO) {
+            val ext = name.substringAfterLast('.', "mp3").lowercase().take(5)
+            val tmp = java.io.File(app.cacheDir, "analyse.$ext")
+            val result = runCatching {
+                app.contentResolver.openInputStream(uri)!!.use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                uniffi.mixai_listen_ffi.analyzeFile(tmp.absolutePath, 88.0)
+            }
+            tmp.delete()
+            _ui.value = _ui.value.copy(
+                analysing = false,
+                snapshot = result.getOrNull(),
+                fileError = result.isFailure,
+            )
+        }
+    }
+
+    fun clearFile() {
+        _ui.value = _ui.value.copy(fileName = null, snapshot = null, fileError = false)
     }
 
     override fun onCleared() {

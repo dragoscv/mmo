@@ -39,4 +39,8 @@
     <string name="level_low">Prea încet — apropie-te de boxă</string>
     <string name="cd_wheel">Roata Camelot, %1$s evidențiat</string>
     <string name="cd_beat">Indicator de bătaie</string>
+    <string name="open_file">Deschide fișier</string>
+    <string name="file_header">Fișier: %1$s</string>
+    <string name="analysing">Analizez…</string>
+    <string name="file_error">Fișierul nu a putut fi citit. Încearcă un fișier MP3, M4A, FLAC, WAV sau OGG.</string>
 </resources>
