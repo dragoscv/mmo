@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## web 3.3.7 · server 3.14.1 — Node 24 everywhere (WP20-01)
+
+- `apps/web` `engines.node` 24.x and Docker `node:24-bookworm-slim`; web-ci, server-ci, docs-ci, deps-weekly and companion-release run on Node 24.
+
 ## web 3.3.6 — privacy policy covers MixAI Decks (WP19-24)
 
 - `/privacy` gains a **MixAI Decks** section (RO/EN): library, analysis, stems, recordings and tracklists stay on the device; audio input only for DVS / listening, processed locally; connected mode is a LAN-only server while switched on; only unrecognised commands the user chooses to send reach the MixAI assistant.

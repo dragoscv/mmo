@@ -7,7 +7,7 @@
 # glibc base on purpose: the lockfile carries linux-x64-gnu natives (next swc, lightningcss,
 # sharp); engines = node 22.x.
 
-ARG NODE_IMAGE=node:22-bookworm-slim
+ARG NODE_IMAGE=node:24-bookworm-slim
 
 # ---------- deps: one frozen install per lockfile (per-app lockfiles, no shared workspace) ----------
 FROM ${NODE_IMAGE} AS deps

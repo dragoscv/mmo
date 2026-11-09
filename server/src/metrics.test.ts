@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { buildCompanionMetrics } from "./metrics";
 
-describe("buildCompanionMetrics", () => {
+// listConnectedDrives() shells out (PowerShell Get-Volume on Windows, ~5 s measured; execSync caps it at 10 s),
+// so the default 5 s test timeout raced it.
+describe("buildCompanionMetrics", { timeout: 20_000 }, () => {
     it("returns the documented shape with safe defaults", async () => {
         const m = await buildCompanionMetrics("9.9.9");
 

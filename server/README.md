@@ -75,7 +75,7 @@ pnpm exec asar list release/win-unpacked/resources/app.asar | Select-String 'ui/
 
 ### Headless (Docker, Raspberry Pi)
 
-Același cod rulează și ca proces Node 22 simplu, fără Electron / `audify`
+Același cod rulează și ca proces Node 24 simplu, fără Electron / `audify`
 (ADR-0002, `src/platform/` este singurul loc care atinge Electron):
 
 ```bash
@@ -168,7 +168,7 @@ Assistant…) poate reda biblioteca direct. Cod în `src/subsonic/`.
    setRating, scrobble, getPlaylists/getPlaylist/createPlaylist/updatePlaylist/
    deletePlaylist, stream, download, getCoverArt, getLyricsBySongId, getUser,
    getScanStatus, startScan.
-- Teste: `node node_modules/vitest/vitest.mjs run src/subsonic` cu Node 22 pe
+- Teste: `node node_modules/vitest/vitest.mjs run src/subsonic` cu Node 24 pe
    PATH (vitest 5; `better-sqlite3` 13 nu mai are nevoie de rebuild per runtime).
 
 Ghid utilizator: `docs/aplicatie/opensubsonic.md`.
@@ -241,7 +241,7 @@ Content-Type: application/json
 2. Commit + push pe `main`
 3. Workflow-ul `.github/workflows/companion-release.yml` pornește automat (job `detect`: build doar
    dacă nu există deja release `v<version>`)
-   - Node 22 + pnpm 10, cache `~/.cache/electron` + `electron-builder`
+   - Node 24 + pnpm 10, cache `~/.cache/electron` + `electron-builder`
    - `pnpm build` (Vite renderer → `ui/dist` + `tsc`), apoi `electron-builder` per OS
    - Upload în GitHub Releases la `dragoscv/mmo`
 4. Utilizatorii primesc notificare auto-update la următoarea pornire (sau în 24h)

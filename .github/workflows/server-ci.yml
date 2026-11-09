@@ -40,11 +40,13 @@ jobs:
             - uses: pnpm/action-setup@v6
             - uses: actions/setup-node@v6
               with:
-                  node-version: 22
+                  node-version: 24
                   cache: pnpm
                   cache-dependency-path: server/pnpm-lock.yaml
             - name: Install (server)
               run: pnpm install --frozen-lockfile --ignore-workspace
+            - name: Install (packages/ui, imported by the renderer through tsconfig paths)
+              run: pnpm -C ../packages/ui install --frozen-lockfile --ignore-workspace
             - name: Typecheck headless core (tsc)
               run: pnpm build:headless
             - name: Typecheck renderer
@@ -85,7 +87,7 @@ jobs:
             - uses: pnpm/action-setup@v6
             - uses: actions/setup-node@v6
               with:
-                  node-version: 22
+                  node-version: 24
                   cache: pnpm
                   cache-dependency-path: packages/sdk/pnpm-lock.yaml
             - run: pnpm install --frozen-lockfile --ignore-workspace

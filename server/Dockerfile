@@ -16,7 +16,7 @@
 #     typescript, docs and tests pruned.
 #   * runtime = node:22-bookworm-slim + tini + 2 static binaries.
 
-ARG NODE_IMAGE=node:22-bookworm-slim
+ARG NODE_IMAGE=node:24-bookworm-slim
 
 # ---------- ffmpeg (static, per arch) ----------
 FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS ffmpeg

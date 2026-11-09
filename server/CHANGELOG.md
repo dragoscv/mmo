@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.14.1 — Node 24 (WP20-01)
+
+- Runtime moves to Node 24: Docker `NODE_IMAGE=node:24-bookworm-slim`, server-ci on 24. better-sqlite3 13 is N-API, no rebuild; vitest 319/319 and the headless `/health` smoke pass on Node 24.21.0.
+- `metrics.test.ts` timeout 20 s: the Windows drive probe (`Get-Volume`, ~5 s) raced vitest's 5 s default.
+- server-ci installs `packages/ui` before the renderer typecheck (red since 2026-11-05: `Cannot find module '@base-ui/react/...'`).
+
 ## 3.14.0 — Compatible tracks for MixAI Key & BPM (WP18-24)
 
 - `GET /media/music/compatible?key=&bpm=&limit=`: library tracks that mix from a detected key and/or tempo, best
