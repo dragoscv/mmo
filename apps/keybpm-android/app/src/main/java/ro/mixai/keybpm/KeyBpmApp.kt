@@ -14,6 +14,9 @@ import ro.mixai.tv.data.Settings
 class KeyBpmApp : Application() {
 	lateinit var settings: Settings
 		private set
+	lateinit var session: ListenSession
+		private set
+	val midi: ro.mixai.keybpm.midi.MidiClock by lazy { ro.mixai.keybpm.midi.MidiClock(this) }
 
 	val config: MobileConfig by lazy {
 		MobileConfig(origin = "", webOrigin = "", googleWebClientId = "", appVersion = BuildConfig.VERSION_NAME, deviceLabel = "MixAI Key & BPM")
@@ -23,5 +26,7 @@ class KeyBpmApp : Application() {
 		super.onCreate()
 		ClientIdentity.current = ClientIdentity("android-keybpm", BuildConfig.VERSION_NAME, Build.MODEL ?: "Android", "MixAI-KeyBpm-Android")
 		settings = Settings(this)
+		session = ListenSession(this)
+		ListenService.createChannel(this)
 	}
 }

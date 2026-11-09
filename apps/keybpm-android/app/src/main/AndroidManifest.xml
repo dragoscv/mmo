@@ -3,6 +3,10 @@
 
     <!-- Live key/BPM from the microphone. Audio is analysed on the device and never recorded or uploaded. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Background listening (WP18-18): microphone foreground service + its ongoing notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Optional MMO Server connection: LAN discovery (mDNS) + HTTP to the user's own server. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -10,6 +14,8 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-feature android:name="android.hardware.microphone" android:required="true" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <!-- MIDI clock out (WP18-08) is optional. -->
+    <uses-feature android:name="android.software.midi" android:required="false" />
 
     <!-- "Play in MixAI Music" from the compatible tracks list. -->
     <queries>
@@ -54,6 +60,11 @@
         </activity>
 
         <!-- Set log CSV export through the share sheet (cache/exports only). -->
+        <service
+            android:name=".ListenService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

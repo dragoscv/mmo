@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -45,6 +46,8 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import ro.mixai.keybpm.ui.LiveScreen
 import ro.mixai.keybpm.ui.HistoryScreen
 import ro.mixai.keybpm.ui.LibraryScreen
+import ro.mixai.keybpm.ui.StageScreen
+import ro.mixai.keybpm.ui.TempoScreen
 import ro.mixai.keybpm.ui.TunerScreen
 import ro.mixai.keybpm.data.SetLog
 import ro.mixai.mobile.theme.MixaiTheme
@@ -78,23 +81,24 @@ class MainActivity : ComponentActivity() {
         if (uri != null) model.analyzeUri(uri)
     }
 
-    override fun onStop() {
-        super.onStop()
-        // No background listening yet (WP18-18 adds the microphone foreground service): stop with the UI.
-        if (!isChangingConfigurations) model.stop()
-    }
-
     @Composable
     private fun App(model: ListenModel) {
         val ui by model.ui.collectAsState()
         val entries by model.log.entries.collectAsState()
         var tab by rememberSaveable { mutableIntStateOf(0) }
+        var stage by rememberSaveable { mutableStateOf(false) }
         var showRationale by remember { mutableStateOf(false) }
         var denied by remember { mutableStateOf(false) }
-        val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            val granted = result[Manifest.permission.RECORD_AUDIO] == true
             denied = !granted
             if (granted) model.start()
         }
+        val perms = buildList {
+            add(Manifest.permission.RECORD_AUDIO)
+            // Android 13+: the ongoing listening notification needs POST_NOTIFICATIONS (listening works without it).
+            if (android.os.Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
+        }.toTypedArray()
         val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) model.analyzeUri(uri)
         }
@@ -102,7 +106,7 @@ class MainActivity : ComponentActivity() {
             when {
                 ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED -> model.start()
                 shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO) -> showRationale = true
-                else -> launcher.launch(Manifest.permission.RECORD_AUDIO)
+                else -> launcher.launch(perms)
             }
         }
         // Keep the screen on while listening (stage use).
@@ -111,11 +115,16 @@ class MainActivity : ComponentActivity() {
             else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             onDispose { }
         }
+        if (stage) {
+            StageScreen(ui, model::cycleTempo, model::dismissKeyChange, onExit = { stage = false })
+            return
+        }
         Scaffold(
             bottomBar = {
                 NavigationBar {
                     NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Filled.GraphicEq, null) }, label = { Text(stringResource(R.string.tab_live)) })
                     NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Filled.Tune, null) }, label = { Text(stringResource(R.string.tab_tuner)) })
+                    NavigationBarItem(tab == 4, { tab = 4 }, { Icon(Icons.Filled.Speed, null) }, label = { Text(stringResource(R.string.tab_tempo)) })
                     NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Filled.History, null) }, label = { Text(stringResource(R.string.tab_history)) })
                     NavigationBarItem(tab == 3, { tab = 3 }, { Icon(Icons.Filled.LibraryMusic, null) }, label = { Text(stringResource(R.string.tab_library)) })
                 }
@@ -140,16 +149,17 @@ class MainActivity : ComponentActivity() {
                         title = { Text(stringResource(R.string.mic_rationale_title)) },
                         text = { Text(stringResource(R.string.mic_rationale)) },
                         confirmButton = {
-                            TextButton(onClick = { showRationale = false; launcher.launch(Manifest.permission.RECORD_AUDIO) }) {
+                            TextButton(onClick = { showRationale = false; launcher.launch(perms) }) {
                                 Text(stringResource(R.string.mic_allow))
                             }
                         },
                     )
                 }
                 when (tab) {
-                    0 -> LiveScreen(ui, start, model::stop, model::again, model::cycleTempo, model::setNotation, { picker.launch(arrayOf("audio/*")) }, { model.save() })
+                    0 -> LiveScreen(ui, start, model::stop, model::again, model::cycleTempo, model::setNotation, { picker.launch(arrayOf("audio/*")) }, { model.save() }, onStage = { stage = true })
                     1 -> TunerScreen(ui, start, model::stop, model::setA4)
                     2 -> HistoryScreen(entries, ui.notation, { shareCsv(entries) }, model::deleteEntry, model::clearLog)
+                    4 -> TempoScreen((application as KeyBpmApp).midi, ui.bpm)
                     else -> LibraryScreen(
                         settings = (application as KeyBpmApp).settings,
                         camelot = ui.snapshot?.key?.key?.camelot ?: entries.firstOrNull()?.camelot,
