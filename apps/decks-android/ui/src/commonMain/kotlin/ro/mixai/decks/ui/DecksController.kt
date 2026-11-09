@@ -7,6 +7,12 @@ import androidx.compose.runtime.setValue
 import ro.mixai.decks.ui.engine.Band
 import ro.mixai.decks.ui.engine.DecksBackend
 import ro.mixai.decks.ui.engine.Monitoring
+import ro.mixai.decks.ui.engine.RemoteMixerUi
+import ro.mixai.decks.ui.engine.RemotePairingUi
+import ro.mixai.decks.ui.engine.RemotePort
+import ro.mixai.decks.ui.engine.RemoteRoleUi
+import ro.mixai.decks.ui.engine.RequestStateUi
+import ro.mixai.decks.ui.engine.SongRequestUi
 import ro.mixai.decks.ui.logic.DeckMath
 import ro.mixai.decks.ui.model.CrateItem
 import ro.mixai.decks.ui.model.EngineState
@@ -79,6 +85,22 @@ class DecksController(val backend: DecksBackend) {
     var lastMidi by mutableStateOf<String?>(null)
         private set
 
+    // Connected mode (phone remote / second screen / Party DJ)
+    var remote: RemotePort? = null
+        private set
+    var remoteOn by mutableStateOf(false)
+        private set
+    var remoteError by mutableStateOf(false)
+        private set
+    var pairings by mutableStateOf<Map<RemoteRoleUi, RemotePairingUi>>(emptyMap())
+        private set
+    var requests by mutableStateOf<List<SongRequestUi>>(emptyList())
+        private set
+    var partyOpen by mutableStateOf(true)
+        private set
+    var remoteClients by mutableStateOf(0)
+        private set
+
     private val loadTickets = LongArray(EngineState.DECKS) { -1L }
     private var scanId = -1L
     private var frame = 0L
@@ -98,6 +120,86 @@ class DecksController(val backend: DecksBackend) {
         engine = backend.snapshot()
         frame++
         if (frame % 6L == 0L) pollJobs()
+        if (remote != null && frame % 4L == 0L) pumpRemote()
+    }
+
+    // ---- Connected mode ------------------------------------------------------------------
+
+    /** Start or stop the LAN server. Returns false when it could not start (demo engine, port). */
+    fun setRemoteEnabled(on: Boolean): Boolean {
+        if (on == remoteOn) return true
+        if (!on) {
+            remote?.close()
+            remote = null
+            remoteOn = false
+            pairings = emptyMap()
+            requests = emptyList()
+            remoteClients = 0
+            return true
+        }
+        val r = backend.startRemote()
+        remoteError = r == null
+        if (r == null) return false
+        remote = r
+        remoteOn = true
+        r.setPartyOpen(partyOpen)
+        pairings = RemoteRoleUi.entries.mapNotNull { role -> r.pairing(role)?.let { role to it } }.toMap()
+        for (d in controls.indices) labelDeck(d)
+        return true
+    }
+
+    fun rotatePairing(role: RemoteRoleUi) {
+        val p = remote?.rotate(role) ?: return
+        pairings = pairings + (role to p)
+    }
+
+    fun changePartyOpen(open: Boolean) {
+        partyOpen = open
+        remote?.setPartyOpen(open)
+    }
+
+    fun moderate(id: Long, state: RequestStateUi) {
+        val r = remote ?: return
+        r.setRequestState(id, state)
+        requests = r.requests()
+    }
+
+    fun clearDoneRequests() {
+        val r = remote ?: return
+        r.clearDone()
+        requests = r.requests()
+    }
+
+    private fun labelDeck(d: Int) {
+        val m = controls[d].meta
+        remote?.setTrackLabels(d, m?.title ?: deck(d)?.title, artistOf(d))
+    }
+
+    private val deckArtists = arrayOfNulls<String>(EngineState.DECKS)
+
+    private fun artistOf(d: Int): String? = deckArtists[d]
+
+    private fun pumpRemote() {
+        val r = remote ?: return
+        val rep = r.pump()
+        for (m in rep.mixer) applyRemoteMixer(m)
+        if (frame % 24L == 0L) {
+            requests = r.requests()
+            remoteClients = r.clientCount()
+        }
+    }
+
+    /** Moves this shell's knobs when a phone moved them (the engine already applied it). */
+    fun applyRemoteMixer(m: RemoteMixerUi) {
+        when (m) {
+            is RemoteMixerUi.Volume -> controls.getOrNull(m.deck)?.volume = m.value
+            is RemoteMixerUi.Eq -> controls.getOrNull(m.deck)?.let { c ->
+                when (m.band) { Band.LOW -> c.eqLow = m.db; Band.MID -> c.eqMid = m.db; Band.HIGH -> c.eqHigh = m.db }
+            }
+            is RemoteMixerUi.Filter -> controls.getOrNull(m.deck)?.filter = m.value
+            is RemoteMixerUi.Crossfader -> crossfader = m.value
+            is RemoteMixerUi.MasterVolume -> masterVolume = m.value
+        }
     }
 
     private fun pollJobs() {
@@ -115,6 +217,7 @@ class DecksController(val backend: DecksBackend) {
                     c.peaks = backend.peaks(d)
                     c.peaksVersion++
                     c.loadPhase = null
+                    labelDeck(d)
                 }
                 LoadPhase.FAILED, LoadPhase.CANCELLED -> loadTickets[d] = -1
                 else -> Unit
@@ -165,6 +268,7 @@ class DecksController(val backend: DecksBackend) {
         c.loadPhase = LoadPhase.QUEUED
         c.tempoFader = 0f
         c.keyShift = 0.0
+        deckArtists[deck] = row.artist
         loadTickets[deck] = backend.load(deck, row.path)
         if (loadTickets[deck] < 0) {
             c.loadPhase = LoadPhase.FAILED

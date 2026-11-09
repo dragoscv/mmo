@@ -11,6 +11,7 @@
 //! * [`DecksMapping`] + [`MidiClock`] — controller mapping engine (`decks-mapping`).
 //! * [`DvsInput`] — timecode decoder (`decks-dvs`).
 //! * [`DecksRenderer`] — wgpu deck views (`decks-render`), headless or on a native surface.
+//! * [`DecksRemote`] — phone remote, second screen and Party DJ over the LAN (`decks-remote`).
 //!
 //! Conventions (same as `crates/mixai-listen-ffi`): proc-macro UniFFI, **polling instead of
 //! callbacks** (every foreign call happens on a thread the app owns), objects are `Send + Sync`
@@ -26,12 +27,14 @@ mod dvs;
 mod engine;
 mod library;
 mod mapping;
+mod remote;
 mod render;
 
 pub use dvs::*;
 pub use engine::*;
 pub use library::*;
 pub use mapping::*;
+pub use remote::*;
 pub use render::*;
 
 uniffi::setup_scaffolding!();

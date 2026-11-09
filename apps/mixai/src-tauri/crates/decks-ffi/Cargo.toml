@@ -30,6 +30,7 @@ decks-library = { path = "../decks-library" }
 decks-mapping = { path = "../decks-mapping" }
 decks-dvs = { path = "../decks-dvs" }
 decks-render = { path = "../decks-render" }
+decks-remote = { path = "../decks-remote" }
 uniffi = "0.32.2"
 thiserror = "2.0.21"
 serde_json = "1.0.154"

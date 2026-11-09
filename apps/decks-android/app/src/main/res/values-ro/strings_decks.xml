@@ -81,4 +81,27 @@
     <string name="decks_load_queued" formatted="false">În așteptare…</string>
     <string name="decks_load_decoding" formatted="false">Se decodează…</string>
     <string name="decks_load_analysing" formatted="false">Se analizează ritmul și tonalitatea…</string>
+    <string name="decks_connect" formatted="false">Conectare</string>
+    <string name="decks_connect_toggle" formatted="false">Telecomandă din telefon și cereri la petrecere</string>
+    <string name="decks_connect_hint" formatted="false">Pornește ca să controlezi deck-urile din telefon, să le afișezi pe un al doilea ecran sau să primești cereri de piese. Dispozitivele trebuie să fie în aceeași rețea Wi-Fi.</string>
+    <string name="decks_connect_unavailable" formatted="false">Modul conectat nu este disponibil (port de rețea sau motor demo).</string>
+    <string name="decks_connect_clients" formatted="false">%1 conectate</string>
+    <string name="decks_connect_remote" formatted="false">Telecomandă</string>
+    <string name="decks_connect_screen" formatted="false">Al doilea ecran</string>
+    <string name="decks_connect_party" formatted="false">Cereri la petrecere</string>
+    <string name="decks_connect_new_code" formatted="false">Cod nou</string>
+    <string name="decks_requests" formatted="false">Cereri</string>
+    <string name="decks_requests_open" formatted="false">Deschise</string>
+    <string name="decks_requests_closed" formatted="false">Închise</string>
+    <string name="decks_requests_toggle" formatted="false">Acceptă cereri de piese</string>
+    <string name="decks_requests_clear" formatted="false">Șterge terminate</string>
+    <string name="decks_requests_none" formatted="false">Încă nicio cerere</string>
+    <string name="decks_request_votes" formatted="false">%1 voturi</string>
+    <string name="decks_request_accept" formatted="false">Acceptă</string>
+    <string name="decks_request_played" formatted="false">Pusă</string>
+    <string name="decks_request_reject" formatted="false">Respinge</string>
+    <string name="decks_request_pending" formatted="false">în așteptare</string>
+    <string name="decks_request_accepted" formatted="false">urmează</string>
+    <string name="decks_request_rejected" formatted="false">respinsă</string>
+    <string name="decks_request_played_state" formatted="false">pusă</string>
 </resources>

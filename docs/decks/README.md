@@ -13,6 +13,7 @@ the Tauri 1.x plan is kept for history in [`docs/mixai/`](../mixai/00-architectu
 | [dvs.md](dvs.md) | Digital vinyl decoder: support matrix, API, MixAI timecode, measured results |
 | [skins.md](skins.md) | Skins: token-derived palettes, layouts, contrast gate, persistence |
 | [stems.md](stems.md) | On-device stem separation: HT-Demucs ONNX, accelerators, cache, server fallback |
+| [remote.md](remote.md) | Connected mode: phone remote, second screen, Party DJ requests (LAN, QR pairing, security model) |
 | [dvs-clean-room.md](dvs-clean-room.md) | Clean-room provenance statement for the DVS decoder |
 | [library-interop.md](library-interop.md) | rekordbox / Traktor / Serato / Engine / PDB / JSON read-write matrix, migration, key and colour mapping |
 | [streaming.md](streaming.md) | Streaming strategy (D64), partner applications checklist, draft emails |

@@ -1,0 +1,24 @@
+[package]
+name = "decks-remote"
+version = "0.1.0"
+description = "MixAI Decks connected mode (WP19-21): phone remote / second screen and Party DJ over the LAN (HTTP + WebSocket, token-gated roles, QR pairing, song request queue with votes)"
+authors = ["mwrty <vladulescu.catalin@gmail.com>"]
+# Permissive on purpose (ADR-0014): own LAN protocol, no GPL sync stacks (Ableton Link, Mixxx).
+license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.87"
+publish = false
+
+[lib]
+name = "decks_remote"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+# WebSocket (MIT/Apache); handshake only, no TLS: the remote is LAN-only and token-gated.
+tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
+httparse = "1.10.1"
+# QR matrix for pairing (MIT/Apache); no `image` feature, the native UI draws the modules.
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
+getrandom = "0.3.4"

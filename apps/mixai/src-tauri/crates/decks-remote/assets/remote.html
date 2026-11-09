@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en" data-mode="dark" data-surface="solid">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>MixAI Decks Remote</title>
+<link rel="stylesheet" href="/tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-sans); background: var(--background); color: var(--foreground);
+    padding: calc(var(--safe-top) + 0.75rem) calc(var(--safe-right) + 0.75rem) calc(var(--safe-bottom) + 0.75rem) calc(var(--safe-left) + 0.75rem); }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; }
+  h1 { font-family: var(--font-heading); font-size: 1.125rem; margin: 0; }
+  .status { font-size: 0.875rem; color: var(--muted-foreground); }
+  .status[data-ok="false"] { color: var(--destructive); }
+  .decks { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+  .deck { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem;
+    border-top: 4px solid var(--deck-color); }
+  .deck h2 { font-size: 1rem; margin: 0 0 0.25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { font-family: var(--font-mono); font-size: 0.875rem; color: var(--muted-foreground); display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .phase { height: 0.375rem; background: var(--muted); border-radius: 999px; margin: 0.5rem 0; overflow: hidden; }
+  .phase > i { display: block; height: 100%; width: 0; background: var(--deck-color); }
+  .row { display: flex; gap: 0.375rem; flex-wrap: wrap; margin-top: 0.5rem; }
+  button { min-height: var(--control-h-lg); min-width: 3rem; padding: 0 0.75rem; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--secondary, var(--muted)); color: var(--foreground);
+    font: inherit; font-weight: 600; touch-action: manipulation; }
+  button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--ring, var(--primary)); outline-offset: 2px; }
+  label { display: grid; grid-template-columns: 3.5rem 1fr; align-items: center; gap: 0.5rem; font-size: 0.875rem; margin-top: 0.375rem; }
+  input[type="range"] { width: 100%; min-height: 2.75rem; accent-color: var(--deck-color, var(--primary)); }
+  .mixer { margin-top: 0.75rem; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; }
+  .requests { margin-top: 0.75rem; }
+  .requests li { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+  .requests ul { list-style: none; margin: 0; padding: 0; }
+  .viewer .ctl { display: none; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<header>
+  <h1 data-i18n="title">MixAI Decks Remote</h1>
+  <span class="status" id="status" role="status" aria-live="polite"></span>
+</header>
+<main>
+  <section class="decks" id="decks" aria-label="Decks"></section>
+  <section class="mixer ctl" aria-labelledby="mix-h">
+    <h2 id="mix-h" class="sr" data-i18n="mixer">Mixer</h2>
+    <label><span data-i18n="xfader">X-fade</span><input id="xf" type="range" min="-1" max="1" step="0.01" value="0"></label>
+    <label><span data-i18n="master">Master</span><input id="mv" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+  </section>
+  <section class="requests ctl" aria-labelledby="req-h">
+    <h2 id="req-h" data-i18n="requests">Requests</h2>
+    <ul id="reqs"></ul>
+  </section>
+</main>
+<script>
+(() => {
+  "use strict";
+  const ro = (navigator.language || "en").toLowerCase().startsWith("ro");
+  const T = ro ? {
+    title: "MixAI Decks — telecomandă", mixer: "Mixer", xfader: "X-fade", master: "Master", requests: "Cereri",
+    connecting: "Se conectează…", connected: "Conectat", viewer: "Doar vizualizare", lost: "Conexiune pierdută, reîncerc…",
+    denied: "Cod invalid. Scanează din nou codul QR.", play: "Play", pause: "Pauză", cue: "Cue", sync: "Sync",
+    loop: "Loop 4", vol: "Volum", low: "Joase", mid: "Medii", high: "Înalte", empty: "Gol", deck: "Deck",
+    accept: "Acceptă", reject: "Respinge", played: "Pus", votes: "voturi", none: "Nicio cerere"
+  } : {
+    title: "MixAI Decks Remote", mixer: "Mixer", xfader: "X-fade", master: "Master", requests: "Requests",
+    connecting: "Connecting…", connected: "Connected", viewer: "View only", lost: "Connection lost, retrying…",
+    denied: "Invalid code. Scan the QR code again.", play: "Play", pause: "Pause", cue: "Cue", sync: "Sync",
+    loop: "Loop 4", vol: "Volume", low: "Low", mid: "Mid", high: "High", empty: "Empty", deck: "Deck",
+    accept: "Accept", reject: "Reject", played: "Played", votes: "votes", none: "No requests"
+  };
+  document.documentElement.lang = ro ? "ro" : "en";
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T[el.dataset.i18n]; });
+  document.title = T.title;
+  const token = new URLSearchParams(location.search).get("t") || "";
+  let cid = localStorage.getItem("mixai:remote:cid");
+  if (!cid) { cid = "web-" + Math.random().toString(36).slice(2, 12); localStorage.setItem("mixai:remote:cid", cid); }
+  const $ = id => document.getElementById(id);
+  const status = (txt, ok) => { $("status").textContent = txt; $("status").dataset.ok = String(ok); };
+  const letters = ["A", "B", "C", "D"];
+  const colors = ["var(--deck-a)", "var(--deck-b)", "var(--deck-c)", "var(--deck-d)"];
+  let ws, role = "viewer", built = 0;
+  const send = cmd => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "command", command: cmd })); };
+  const fmt = s => { s = Math.max(0, s | 0); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+  function el(tag, attrs, text) { const e = document.createElement(tag); Object.assign(e, attrs || {}); if (text != null) e.textContent = text; return e; }
+  function slider(label, min, max, step, onInput) {
+    const l = el("label", { className: "ctl" }); l.append(el("span", {}, label));
+    const i = el("input", { type: "range", min, max, step }); i.addEventListener("input", () => onInput(parseFloat(i.value)));
+    l.append(i); return [l, i];
+  }
+  function build(n) {
+    const root = $("decks"); root.textContent = ""; built = n;
+    for (let d = 0; d < n; d++) {
+      const s = el("article", { className: "deck", id: "deck" + d }); s.style.setProperty("--deck-color", colors[d]);
+      s.setAttribute("aria-label", T.deck + " " + letters[d]);
+      s.append(el("h2", { className: "t" }, T.empty));
+      const meta = el("div", { className: "meta" }); meta.append(el("span", { className: "bpm" }), el("span", { className: "key" }), el("span", { className: "left" })); s.append(meta);
+      const ph = el("div", { className: "phase" }); ph.setAttribute("aria-hidden", "true"); ph.append(el("i")); s.append(ph);
+      const row = el("div", { className: "row ctl" });
+      const play = el("button", { className: "play" }, T.play); play.addEventListener("click", () => send({ cmd: play.getAttribute("aria-pressed") === "true" ? "pause" : "play", deck: d }));
+      const cue = el("button", {}, T.cue);
+      cue.addEventListener("pointerdown", () => send({ cmd: "cue", deck: d, pressed: true }));
+      ["pointerup", "pointercancel", "pointerleave"].forEach(ev => cue.addEventListener(ev, () => send({ cmd: "cue", deck: d, pressed: false })));
+      const sync = el("button", { className: "sync" }, T.sync); sync.addEventListener("click", () => send({ cmd: "sync", deck: d, lock: sync.getAttribute("aria-pressed") !== "true" }));
+      const loop = el("button", { className: "loop" }, T.loop); loop.addEventListener("click", () => send(loop.getAttribute("aria-pressed") === "true" ? { cmd: "loop_exit", deck: d } : { cmd: "loop_auto", deck: d, beats: 4 }));
+      row.append(play, cue, sync, loop);
+      for (let h = 0; h < 4; h++) { const b = el("button", {}, String(h + 1)); b.setAttribute("aria-label", "Hot cue " + (h + 1)); b.addEventListener("click", () => send({ cmd: "hot_cue", deck: d, slot: h })); row.append(b); }
+      s.append(row);
+      const [lv, iv] = slider(T.vol, 0, 1, 0.01, v => send({ cmd: "volume", deck: d, value: v })); iv.className = "vol"; s.append(lv);
+      [["low", T.low], ["mid", T.mid], ["high", T.high]].forEach(([band, name]) => {
+        const [l, i] = slider(name, -26, 6, 0.5, v => send({ cmd: "eq", deck: d, band, db: v })); i.className = "eq-" + band; s.append(l);
+      });
+      root.append(s);
+    }
+  }
+  function setIfIdle(input, v) { if (document.activeElement !== input) input.value = v; }
+  function render(st) {
+    if (built !== st.decks.length) build(st.decks.length);
+    st.decks.forEach(d => {
+      const s = $("deck" + d.deck); if (!s) return;
+      s.querySelector(".t").textContent = d.title ? (d.artist ? d.artist + " — " + d.title : d.title) : T.empty;
+      s.querySelector(".bpm").textContent = d.bpm ? d.bpm.toFixed(1) + " BPM" : "";
+      s.querySelector(".key").textContent = d.key || "";
+      s.querySelector(".left").textContent = d.loaded ? "-" + fmt(d.duration_sec - d.position_sec) : "";
+      s.querySelector(".phase > i").style.width = ((d.bar_phase || 0) * 100).toFixed(1) + "%";
+      const p = s.querySelector(".play"); p.setAttribute("aria-pressed", String(d.playing)); p.textContent = d.playing ? T.pause : T.play;
+      s.querySelector(".sync").setAttribute("aria-pressed", String(d.sync_lock));
+      s.querySelector(".loop").setAttribute("aria-pressed", String(d.loop_active));
+      setIfIdle(s.querySelector(".vol"), d.volume);
+      setIfIdle(s.querySelector(".eq-low"), d.eq_low); setIfIdle(s.querySelector(".eq-mid"), d.eq_mid); setIfIdle(s.querySelector(".eq-high"), d.eq_high);
+    });
+    setIfIdle($("xf"), st.crossfader); setIfIdle($("mv"), st.master_volume);
+  }
+  function renderRequests(items) {
+    const ul = $("reqs"); ul.textContent = "";
+    if (!items.length) { ul.append(el("li", {}, T.none)); return; }
+    items.forEach(r => {
+      const li = el("li"); li.append(el("span", {}, (r.artist ? r.artist + " — " : "") + r.title + " · " + r.votes + " " + T.votes + " · " + r.status));
+      if (r.status === "pending" || r.status === "accepted") {
+        const row = el("span", { className: "row" });
+        [["accept", T.accept], ["played", T.played], ["reject", T.reject]].forEach(([a, n]) => {
+          const b = el("button", {}, n); b.addEventListener("click", () => ws.send(JSON.stringify({ type: "moderate", id: r.id, action: a }))); row.append(b);
+        });
+        li.append(row);
+      }
+      ul.append(li);
+    });
+  }
+  $("xf").addEventListener("input", e => send({ cmd: "crossfader", value: parseFloat(e.target.value) }));
+  $("mv").addEventListener("input", e => send({ cmd: "master_volume", value: parseFloat(e.target.value) }));
+  let delay = 500;
+  function connect() {
+    status(T.connecting, true);
+    ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws?t=" + encodeURIComponent(token) + "&c=" + encodeURIComponent(cid));
+    let hello = false;
+    ws.onmessage = ev => {
+      const m = JSON.parse(ev.data);
+      if (m.type === "hello") { hello = true; delay = 500; role = m.role; document.body.classList.toggle("viewer", role !== "controller"); status(role === "controller" ? T.connected : T.viewer, true); }
+      else if (m.type === "state") render(m.state);
+      else if (m.type === "requests") renderRequests(m.items);
+      else if (m.type === "error") status(m.reason, false);
+    };
+    ws.onclose = () => {
+      if (!hello) { status(T.denied, false); setTimeout(connect, 5000); return; }
+      status(T.lost, false); setTimeout(connect, delay); delay = Math.min(delay * 2, 8000);
+    };
+  }
+  connect();
+})();
+</script>
+</body>
+</html>

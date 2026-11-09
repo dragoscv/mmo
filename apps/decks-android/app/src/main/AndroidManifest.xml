@@ -9,6 +9,10 @@
     <!-- Library scan reads the user's music folder. -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+        <!-- Connected mode (WP19-21): LAN server for the phone remote / second screen / Party DJ.
+            Started only when the DJ turns it on. ACCESS_LOCAL_NETWORK is enforced from targetSdk 37. -->
+        <uses-permission android:name="android.permission.INTERNET" />
+        <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
     <application
         android:label="@string/decks_app_name"

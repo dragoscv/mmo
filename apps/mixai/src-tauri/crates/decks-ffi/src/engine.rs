@@ -722,6 +722,20 @@ impl DecksEngine {
         Ok(f(s.engine()?))
     }
 
+    /// `[eq_low, eq_mid, eq_high, filter]` per deck from the UI mirror (zeros while stopped).
+    pub(crate) fn mixer_eq(&self) -> Vec<[f32; 4]> {
+        let s = lock(&self.shared);
+        match &s.engine {
+            Some(e) => e
+                .mirror()
+                .decks
+                .iter()
+                .map(|d| [d.eq_low, d.eq_mid, d.eq_high, d.filter])
+                .collect(),
+            None => vec![[0.0; 4]; DECKS],
+        }
+    }
+
     fn deck_cmd(&self, deck: u8, f: impl FnOnce(DeckId) -> Command) -> Result<(), DecksError> {
         let id = deck_id(deck)?;
         self.with(|e| e.send(f(id)))

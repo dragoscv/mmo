@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en" data-mode="dark" data-surface="solid">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>MixAI Party</title>
+<link rel="stylesheet" href="/tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0 auto; max-width: var(--content-sm); font-family: var(--font-sans); background: var(--background); color: var(--foreground);
+    padding: calc(var(--safe-top) + 1rem) calc(var(--safe-right) + 1rem) calc(var(--safe-bottom) + 1rem) calc(var(--safe-left) + 1rem); }
+  h1 { font-family: var(--font-heading); font-size: 1.5rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1rem; margin: 1.25rem 0 0.5rem; }
+  .now { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; font-weight: 600; }
+  .muted { color: var(--muted-foreground); font-size: 0.875rem; }
+  form { display: grid; gap: 0.5rem; }
+  label { display: grid; gap: 0.25rem; font-size: 0.875rem; }
+  input { min-height: var(--control-h-lg); border-radius: var(--radius); border: 1px solid var(--border); background: var(--card); color: var(--foreground); padding: 0 0.75rem; font: inherit; }
+  button { min-height: var(--control-h-lg); border-radius: var(--radius); border: 1px solid var(--primary); background: var(--primary); color: var(--primary-foreground); font: inherit; font-weight: 600; padding: 0 1rem; }
+  button.vote { background: transparent; color: var(--foreground); border-color: var(--border); min-width: 4.5rem; }
+  button.vote[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  button:disabled { opacity: 0.6; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--ring, var(--primary)); outline-offset: 2px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.625rem 0; border-bottom: 1px solid var(--border); }
+  .msg { min-height: 1.25rem; font-size: 0.875rem; }
+  .msg[data-ok="false"] { color: var(--destructive); }
+</style>
+</head>
+<body>
+<header>
+  <h1 data-i18n="title">MixAI Party</h1>
+  <p class="muted" data-i18n="intro">Ask the DJ for a song and vote for the ones you want next.</p>
+</header>
+<main>
+  <h2 data-i18n="now">Now playing</h2>
+  <div class="now" id="now" aria-live="polite">—</div>
+  <h2 data-i18n="ask">Request a song</h2>
+  <form id="f" autocomplete="off">
+    <label><span data-i18n="song">Song</span><input id="title" name="title" maxlength="120" required></label>
+    <label><span data-i18n="artist">Artist (optional)</span><input id="artist" name="artist" maxlength="120"></label>
+    <button type="submit" id="send" data-i18n="send">Send request</button>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+  </form>
+  <h2 data-i18n="queue">Requests</h2>
+  <ul id="list"></ul>
+</main>
+<script>
+(() => {
+  "use strict";
+  const ro = (navigator.language || "en").toLowerCase().startsWith("ro");
+  const T = ro ? {
+    title: "MixAI Party", intro: "Cere o piesă DJ-ului și votează ce vrei să urmeze.", now: "Acum se aude", ask: "Cere o piesă",
+    song: "Piesă", artist: "Artist (opțional)", send: "Trimite cererea", queue: "Cereri", vote: "Votează", voted: "Votat",
+    sent: "Cerere trimisă.", merged: "Cineva a cerut-o deja: ți-am adăugat votul.", closed: "Cererile sunt închise acum.",
+    none: "Încă nicio cerere.", lost: "Conexiune pierdută, reîncerc…", denied: "Cod invalid. Scanează din nou codul QR.",
+    accepted: "urmează", played: "s-a pus", pending: ""
+  } : {
+    title: "MixAI Party", intro: "Ask the DJ for a song and vote for the ones you want next.", now: "Now playing", ask: "Request a song",
+    song: "Song", artist: "Artist (optional)", send: "Send request", queue: "Requests", vote: "Vote", voted: "Voted",
+    sent: "Request sent.", merged: "Someone already asked for it: your vote was added.", closed: "Requests are closed right now.",
+    none: "No requests yet.", lost: "Connection lost, retrying…", denied: "Invalid code. Scan the QR code again.",
+    accepted: "up next", played: "played", pending: ""
+  };
+  document.documentElement.lang = ro ? "ro" : "en";
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = T[el.dataset.i18n]; });
+  document.title = T.title;
+  const token = new URLSearchParams(location.search).get("t") || "";
+  let cid = localStorage.getItem("mixai:party:cid");
+  if (!cid) { cid = "guest-" + Math.random().toString(36).slice(2, 12); localStorage.setItem("mixai:party:cid", cid); }
+  const $ = id => document.getElementById(id);
+  const msg = (t, ok) => { $("msg").textContent = t; $("msg").dataset.ok = String(ok); };
+  let ws, delay = 500;
+  function renderList(items, open) {
+    $("send").disabled = !open; if (!open) msg(T.closed, false);
+    const ul = $("list"); ul.textContent = "";
+    if (!items.length) { const li = document.createElement("li"); li.textContent = T.none; ul.append(li); return; }
+    items.forEach(r => {
+      const li = document.createElement("li");
+      const label = document.createElement("span");
+      label.textContent = (r.artist ? r.artist + " — " : "") + r.title + (T[r.status] ? " · " + T[r.status] : "");
+      const b = document.createElement("button"); b.className = "vote";
+      b.textContent = (r.mine ? T.voted : T.vote) + " " + r.votes;
+      b.setAttribute("aria-pressed", String(r.mine)); b.disabled = r.mine || r.status !== "pending";
+      b.addEventListener("click", () => ws.send(JSON.stringify({ type: "vote", id: r.id })));
+      li.append(label, b); ul.append(li);
+    });
+  }
+  $("f").addEventListener("submit", e => {
+    e.preventDefault();
+    if (!ws || ws.readyState !== 1) return;
+    ws.send(JSON.stringify({ type: "request", title: $("title").value, artist: $("artist").value }));
+  });
+  function connect() {
+    ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws?t=" + encodeURIComponent(token) + "&c=" + encodeURIComponent(cid));
+    let hello = false;
+    ws.onmessage = ev => {
+      const m = JSON.parse(ev.data);
+      if (m.type === "hello") { hello = true; delay = 500; msg("", true); }
+      else if (m.type === "now_playing") $("now").textContent = m.titles.length ? m.titles.join(" · ") : "—";
+      else if (m.type === "requests") renderList(m.items, m.party_open);
+      else if (m.type === "requested") { msg(m.merged ? T.merged : T.sent, true); $("title").value = ""; $("artist").value = ""; }
+      else if (m.type === "error") msg(m.reason, false);
+    };
+    ws.onclose = () => {
+      if (!hello) { msg(T.denied, false); setTimeout(connect, 5000); return; }
+      msg(T.lost, false); setTimeout(connect, delay); delay = Math.min(delay * 2, 8000);
+    };
+  }
+  connect();
+})();
+</script>
+</body>
+</html>

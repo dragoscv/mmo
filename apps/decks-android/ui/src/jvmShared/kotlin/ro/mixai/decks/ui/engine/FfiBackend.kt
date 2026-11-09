@@ -267,6 +267,8 @@ class FfiBackend(libraryDbPath: String?) : DecksBackend {
         mapping.feedbackFromSnapshot(s).map { it.bytes }
     }.getOrDefault(emptyList())
 
+    override fun startRemote(): RemotePort? = FfiRemote.start(engine)
+
     override fun close() {
         runCatching { engine.stop() }
         runCatching { engine.close() }

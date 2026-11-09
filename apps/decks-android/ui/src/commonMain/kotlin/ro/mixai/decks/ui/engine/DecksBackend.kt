@@ -87,4 +87,7 @@ interface DecksBackend : AutoCloseable {
     fun detectMapping(portName: String, usbVendor: Int?, usbProduct: Int?)
     fun onMidi(port: String, bytes: ByteArray, timestampUs: Long): List<MidiAction>
     fun feedback(): List<ByteArray>
+
+    /** Connected mode (WP19-21): start the LAN remote server; null when unavailable (demo engine). */
+    fun startRemote(): RemotePort? = null
 }

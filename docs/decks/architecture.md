@@ -20,6 +20,9 @@ root (path dependency).
 | `decks-mapping` | `crates/decks-mapping` | Controller runtime: mapping format v1 + JSON Schema, rhai sandbox scripts, MIDI learn, MIDI clock master/follower, groove lane, BLE MIDI codec, built-in profiles — see [mapping-format.md](mapping-format.md), [controllers.md](controllers.md) | MIT OR Apache-2.0 |
 | `decks-dvs` | `crates/decks-dvs` | Clean-room DVS decoder: MixAI timecode (absolute + relative), Serato CV02.5 / Traktor MK2 relative (experimental) — see [dvs.md](dvs.md), [dvs-clean-room.md](dvs-clean-room.md) | MIT OR Apache-2.0 |
 | `decks-render` | `crates/decks-render` | wgpu 30 GPU views: scrolling 3-band waveform + beatgrid, overview, stacked decks, platter, DVS scope; native surface or headless | MIT OR Apache-2.0 |
+| `decks-stems` | `crates/decks-stems` | On-device stem separation (HT-Demucs ONNX via ort, load-dynamic), stem cache shared with the MMO Server — see [stems.md](stems.md) | MIT OR Apache-2.0 |
+| `decks-remote` | `crates/decks-remote` | Connected mode: LAN HTTP + WebSocket server, phone remote / second screen / Party DJ requests, QR pairing — see [remote.md](remote.md) | MIT OR Apache-2.0 |
+| `decks-ffi` | `crates/decks-ffi` | UniFFI surface for Swift and Kotlin over all of the above — see [ffi.md](ffi.md) | MIT OR Apache-2.0 |
 
 Planned (WP19-04): a `decks-core` facade with a stable command/event API and the UniFFI 0.31 surface for Swift and
 Kotlin. The binding layer is specified in [ffi.md](ffi.md).
@@ -41,6 +44,7 @@ flowchart LR
     FFI --> LIB[decks-library]
     FFI --> MAP[decks-mapping]
     FFI --> REN[decks-render]
+    FFI --> REM[decks-remote]
     CORE --> DVS[decks-dvs]
     LIB --> ANA[decks-analysis]
     ANA --> LST[mixai-listen]

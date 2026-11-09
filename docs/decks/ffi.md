@@ -195,6 +195,17 @@ Kotlin, deinit in Swift). Android: create in `surfaceCreated`, destroy in `surfa
 `ANativeWindow_release`. Apple: pass `Unmanaged.passUnretained(view).toOpaque()` and keep the view
 alive. Null / zero handles are rejected with `InvalidArgument`; anything else is trusted.
 
+### `DecksRemote`
+
+Connected mode (phone remote, second screen, Party DJ — [remote.md](remote.md)).
+`start(port, party_open)` (port 0 = any) → `port()`, `pairing(RemoteRole) -> RemotePairing{role, url,
+qr_width, qr_modules}`, `rotate(role)`, `set_track_labels(deck, title?, artist?)`,
+`pump(engine: DecksEngine) -> RemotePumpReport{applied, errors, mixer_changes: [RemoteMixerChange]}`
+(call from the UI tick; applies phone commands and publishes the engine state), `requests() ->
+[SongRequest]`, `set_request_state(id, SongRequestState)`, `set_party_open`, `clear_done_requests`,
+`clients() -> [RemoteClient]`, `stop()`, `is_running()`. A stopped server returns `NotRunning`; a port
+that cannot open fails `start` with `Unsupported`.
+
 ## Limits (2026-11-09)
 
 * Device / config: `mixai_core::Engine::start_with(device, sample_rate, buffer_frames)` applies
