@@ -44,6 +44,9 @@ packages:
   # scripts/build-keybpm-xcframework.sh (gitignored artefacts; Package.swift committed).
   KeyBpmFFI:
     path: KeyBpmFFI
+  # MixAI Live controller core (WP21-09, ADR-0015): protocol v1 models, reducer, WebSocket LiveClient, watch link.
+  LiveCore:
+    path: LiveCore
 targets:
   MixAI:
     type: application
@@ -654,6 +657,132 @@ targets:
         SKIP_INSTALL: YES
         APPLICATION_EXTENSION_API_ONLY: YES
         SWIFT_EMIT_LOC_STRINGS: NO
+  # MixAI Live controller (WP21-09, ADR-0015): iPhone + iPad remote for the MixAI Live engine on the user's computer,
+  # a pure client of control protocol v1 (WebSocket, docs/live/remote-protocol.md) — no audio, no Rust on the phone.
+  # Own App Store record ro.mixai.live with an embedded watch app. App IDs ro.mixai.live / .watchkitapp /
+  # .watchkitapp.widgets and App Group group.ro.mixai.live do NOT exist in the Apple portal yet (2026-11-09):
+  # unsigned compiles work; signed / TestFlight builds need them first.
+  MixAILive:
+    type: application
+    platform: iOS
+    deploymentTarget: '26.0'
+    sources:
+      - path: LiveApp
+      - path: MixAI/Resources/Fonts
+        buildPhase: resources
+    dependencies:
+      - package: MixaiCore
+      - package: LiveCore
+      - target: MixAILiveWatch
+        embed: true
+        codeSign: true
+      - sdk: Network.framework
+      - sdk: VisionKit.framework
+      - sdk: WatchConnectivity.framework
+    info:
+      path: LiveApp/Info.plist
+      properties:
+        NSBonjourServices: [_mixai-live._tcp]
+        # The engine speaks plain HTTP / WebSocket on the LAN; nothing else is exempted from ATS.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UIAppFonts: [SpaceGrotesk-Variable.ttf, Inter-Variable.ttf]
+        CFBundleURLTypes:
+          - CFBundleURLName: ro.mixai.live
+            CFBundleURLSchemes: [mixai-live]
+        UIUserInterfaceStyle: Dark
+        CFBundleLocalizations: [en, ro]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.live
+        PRODUCT_NAME: MixAILive
+        MARKETING_VERSION: '0.1.0'
+        TARGETED_DEVICE_FAMILY: '1,2'
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MixAI Live
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: MixAI Live finds and controls the MixAI Live engine on your computer over this network.
+        INFOPLIST_KEY_NSCameraUsageDescription: MixAI Live uses the camera only to scan the pairing QR code shown by MixAI Live on your computer.
+        SWIFT_EMIT_LOC_STRINGS: YES
+  # Watch controller: scene prev / next, mute / panic, current part, input level ring. Commands go through the iPhone
+  # (WatchConnectivity); direct LAN to the engine (config from the phone's applicationContext) is the fallback.
+  MixAILiveWatch:
+    type: application
+    platform: watchOS
+    deploymentTarget: '11.0'
+    sources:
+      - path: LiveWatch
+        excludes: [Complication/**]
+      - path: MixaiCore/Sources/MixaiCore/Theme/Tokens.swift
+      - path: LiveApp/Localizable.xcstrings
+    dependencies:
+      - package: LiveCore
+      - target: MixAILiveWatchWidgets
+        embed: true
+        codeSign: true
+      - sdk: WatchConnectivity.framework
+      - sdk: WidgetKit.framework
+    info:
+      path: LiveWatch/Info.plist
+      properties:
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: ro.mixai.live
+        WKRunsIndependentlyOfCompanionApp: false
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        CFBundleLocalizations: [en, ro]
+    entitlements:
+      path: LiveWatch/MixAILiveWatch.entitlements
+      properties:
+        com.apple.security.application-groups: [group.ro.mixai.live]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.live.watchkitapp
+        PRODUCT_NAME: MixAILiveWatch
+        MARKETING_VERSION: '0.1.0'
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MixAI Live
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        TARGETED_DEVICE_FAMILY: '4'
+        SKIP_INSTALL: YES
+        SWIFT_EMIT_LOC_STRINGS: NO
+  MixAILiveWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    deploymentTarget: '11.0'
+    sources:
+      - path: LiveWatch/Complication
+      - path: LiveWatch/Shared
+      - path: LiveApp/Localizable.xcstrings
+    dependencies:
+      - package: LiveCore
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    info:
+      path: LiveWatch/Complication/Info.plist
+      properties:
+        CFBundleDisplayName: MixAI Live
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: LiveWatch/Complication/MixAILiveWatchWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.ro.mixai.live]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.live.watchkitapp.widgets
+        PRODUCT_NAME: MixAILiveWatchWidgets
+        MARKETING_VERSION: '0.1.0'
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MixAI Live
+        TARGETED_DEVICE_FAMILY: '4'
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SWIFT_EMIT_LOC_STRINGS: NO
 schemes:
   MixAI:
     build:
@@ -714,6 +843,25 @@ schemes:
       targets:
         MixAIKeyBpmWatch: all
         MixAIKeyBpmWatchWidgets: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  MixAILive:
+    build:
+      targets:
+        MixAILive: all
+        MixAILiveWatch: all
+        MixAILiveWatchWidgets: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  MixAILiveWatch:
+    build:
+      targets:
+        MixAILiveWatch: all
+        MixAILiveWatchWidgets: all
     run:
       config: Debug
     archive:
