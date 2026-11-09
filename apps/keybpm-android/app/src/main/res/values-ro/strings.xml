@@ -87,7 +87,7 @@
     <string name="songid_identify">Identifică</string>
     <string name="songid_tracklist">Mod tracklist</string>
     <string name="songid_tracklist_hint">Identifică fiecare piesă nouă cât asculți, pentru tracklistul complet al setului.</string>
-    <string name="songid_need_listen">Pornește ascultarea, apoi apasă Identifică.</string>
+    <string name="songid_need_listen">Apasă Identifică: aplicația ascultă câteva secunde și găsește piesa.</string>
     <string name="songid_collecting">Ascult câteva secunde…</string>
     <string name="songid_matching">Caut piesa…</string>
     <string name="songid_no_match">Nicio potrivire. Încearcă mai aproape de boxă.</string>

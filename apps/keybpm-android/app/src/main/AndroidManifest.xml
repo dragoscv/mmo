@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Merged from :core (MixAI Music player) and implied by the ShazamKit AAR (no targetSdk): Key & BPM plays no
+        media and needs no phone/storage access, so these must not reach the Play listing or the FGS declaration. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove" />
 
         <!-- Live key/BPM from the microphone. Audio is analysed on the device and never recorded or uploaded; Song ID
             (user-triggered or tracklist mode) sends only a ShazamKit fingerprint to Shazam. -->
@@ -109,5 +117,6 @@
             </intent-filter>
             <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="true" />
         </service>
+        <service android:name="ro.mixai.tv.player.MusicService" tools:node="remove" />
     </application>
 </manifest>

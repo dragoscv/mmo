@@ -27,7 +27,7 @@ android {
         minSdk = 31
         targetSdk = libs.versions.targetSdk.get().toInt()
         // Wear builds use their own versionCode range (phone 1.., wear 100001..) so both live in one Play listing.
-        versionCode = 100002
+        versionCode = 100003
         versionName = "0.4.0"
         // Play requires 64-bit for Wear (2026-09-15); armeabi-v7a stays for 32-bit watches (Galaxy Watch8).
         // -Pkeybpm.wearAbis=armeabi-v7a keeps device-test APKs small (Wi-Fi adb to the watch is slow).

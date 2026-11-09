@@ -109,11 +109,11 @@ class ListenSession(private val app: Application) {
             while (isActive) {
                 val s = engine?.snapshot() ?: break
                 val change = if (s.keyChanged) s.key?.key?.camelot else null
-                // A key change mid-set is a new song for the log.
+                // A key change mid-set is a new song for the log. A running Song ID keeps going: it captured its
+                // own entry time, and on a noisy room a low-confidence key flip must not throw the match away.
                 if (change != null) {
                     currentEntryAt = null
                     unsavedMatch = null
-                    identifyJob?.cancel()
                     if (_ui.value.announceKey) s.key?.key?.let { announcer.keyChanged(it.name) }
                 }
                 // Drift alarm: reference = first locked tempo (or "Use current BPM").
@@ -133,7 +133,7 @@ class ListenSession(private val app: Application) {
                     lastEmit = now
                     _ui.value = _ui.value.copy(
                         snapshot = s, keyChange = change ?: _ui.value.keyChange, saved = _ui.value.saved && change == null,
-                        songId = if (change != null) SongIdUi.Idle else _ui.value.songId,
+                        songId = if (change != null && identifyJob?.isActive != true) SongIdUi.Idle else _ui.value.songId,
                     )
                 }
                 if (lockNow) save("mic")

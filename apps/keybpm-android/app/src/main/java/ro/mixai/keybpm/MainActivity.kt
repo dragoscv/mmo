@@ -215,7 +215,7 @@ class MainActivity : ComponentActivity() {
                 when (tab) {
                     0 -> LiveScreen(
                         ui, start, model::stop, model::again, model::cycleTempo, model::setNotation, { picker.launch(arrayOf("audio/*")) }, { model.save() },
-                        onStage = { stage = true }, onIdentify = model::identify, onTracklist = model::setTracklistMode, onAddToQueue = model::addToQueue,
+                        onStage = { stage = true }, onIdentify = { identifyRequest.intValue++ }, onTracklist = model::setTracklistMode, onAddToQueue = model::addToQueue,
                     )
                     1 -> TunerScreen(ui, start, model::stop, model::setA4)
                     2 -> HistoryScreen(entries, ui.notation, { format -> shareExport(entries, format) }, model::deleteEntry, model::clearLog)

@@ -145,7 +145,11 @@ final class ListenSession {
         guard change != nil || freshLock || now - lastEmit >= 0.1 else { return }
         lastEmit = now
         reading = r
-        if let change { keyChange = change; saved = false; songId = .idle }
+        if let change {
+            keyChange = change; saved = false
+            // A running Song ID keeps its status: it captured its own entry time (a key flip must not hide the match).
+            if identifyTask == nil { songId = .idle }
+        }
         if whatKeyPending, r.keyLocked, r.tempoLocked, let k = r.keyIndex, let b = bpm {
             whatKeyPending = false
             announcer.whatKey(k, bpm: b)

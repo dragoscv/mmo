@@ -87,7 +87,7 @@
     <string name="songid_identify">Identify</string>
     <string name="songid_tracklist">Tracklist mode</string>
     <string name="songid_tracklist_hint">Identify every new song while listening, for a full set tracklist.</string>
-    <string name="songid_need_listen">Start listening, then tap Identify.</string>
+    <string name="songid_need_listen">Tap Identify: the app listens for a few seconds and finds the song.</string>
     <string name="songid_collecting">Listening for a few seconds…</string>
     <string name="songid_matching">Looking it up…</string>
     <string name="songid_no_match">No match. Try again closer to the speaker.</string>

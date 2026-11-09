@@ -142,8 +142,10 @@ struct SongIdCard: View {
             HStack {
                 Text("kb.songid.title").font(Theme.body(16, weight: .semibold))
                 Spacer()
-                Button("kb.songid.identify") { s.identify() }.buttonStyle(.glassProminent).controlSize(.small)
-                    .disabled(!s.listening || s.songId == .collecting || s.songId == .matching)
+                Button("kb.songid.identify") {
+                    Task { if !s.listening { await s.start() }; s.identify() }
+                }.buttonStyle(.glassProminent).controlSize(.small)
+                    .disabled(s.songId == .collecting || s.songId == .matching)
             }
             Toggle(isOn: Binding(get: { s.prefs.tracklistMode }, set: { s.setTracklistMode($0) })) {
                 VStack(alignment: .leading) {

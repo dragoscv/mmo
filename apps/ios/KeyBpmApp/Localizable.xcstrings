@@ -1826,13 +1826,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Start listening, then tap Identify."
+            "value": "Tap Identify: the app listens for a few seconds and finds the song."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pornește ascultarea, apoi apasă Identifică."
+            "value": "Apasă Identifică: aplicația ascultă câteva secunde și găsește piesa."
           }
         }
       }

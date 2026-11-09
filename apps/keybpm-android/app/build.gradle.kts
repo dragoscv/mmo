@@ -34,7 +34,7 @@ android {
         applicationId = "ro.mixai.keybpm"
         minSdk = 31
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 4
+        versionCode = 5
         versionName = "0.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SHAZAM_TOKEN_URL", "\"$shazamTokenUrl\"")

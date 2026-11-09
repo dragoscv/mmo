@@ -35,6 +35,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - **Wear 0.4.0**: phone → watch mirror fixed on release builds (R8 dropped `android_wear_capabilities`; kept via
   `res/raw/keep.xml` on phone and watch); haptic beat no longer skips beats (BeatClock resyncs only on a confirmed phase
   shift, late beats inside 40 % of a period still play).
+- **Store builds** (phone vc5, Wear vc100003): the shared `:core` music player service, its mediaPlayback foreground
+  service permission and the phone/storage permissions implied by the ShazamKit AAR are removed from both manifests
+  (microphone is the only foreground service type). Identify now starts listening by itself on Android and iOS, and a
+  key change no longer cancels a Song ID that is already running.
 
 ## web 3.4.1 · ui 1.0.2 · design-tokens 1.4.3 · extension 3.0.5 — WCAG AA contrast (axe gate)
 

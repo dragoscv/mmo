@@ -50,7 +50,7 @@ fun SongIdCard(ui: ListenUi, onIdentify: () -> Unit, onTracklist: (Boolean) -> U
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.songid_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 val busy = ui.songId is SongIdUi.Collecting || ui.songId is SongIdUi.Matching
-                FilledTonalButton(onClick = onIdentify, enabled = ui.listening && !busy) { Text(stringResource(R.string.songid_identify)) }
+                FilledTonalButton(onClick = onIdentify, enabled = !busy) { Text(stringResource(R.string.songid_identify)) }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
