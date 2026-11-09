@@ -1,0 +1,49 @@
+[package]
+name = "decks-stems"
+version = "0.1.0"
+description = "MixAI Decks on-device stem separation (WP19-09): HT-Demucs ONNX via ONNX Runtime (DirectML / CoreML / NNAPI / CPU), chunked overlap-add, 44.1 kHz resampling, content-addressed WAV stem cache compatible with the MMO Server stems"
+authors = ["mwrty <vladulescu.catalin@gmail.com>"]
+# Permissive on purpose (ADR-0014). Model weights (htdemucs, MIT) are downloaded at runtime, never vendored.
+license = "MIT OR Apache-2.0"
+edition = "2024"
+# ort 2.0.0-rc.15 declares rust-version 1.92.
+rust-version = "1.92"
+publish = false
+
+[lib]
+name = "decks_stems"
+crate-type = ["rlib"]
+
+[dependencies]
+thiserror = "2.0.18"
+# FFT resampler (MIT/Apache), already in the workspace graph via mixai-core.
+rubato = "5.0.1"
+# WAV cache read/write (Apache-2.0), already in the workspace graph.
+hound = "3.5.1"
+# Cache keys (MIT/Apache), already in the workspace graph.
+sha2 = "0.10.9"
+# ONNX Runtime (MIT/Apache). `load-dynamic`: the app bundles the onnxruntime library for its platform
+# (onnxruntime-directml.dll on Windows, the CoreML build on Apple, the NNAPI AAR .so on Android), so the
+# build never downloads binaries and CI stays offline.
+ort = { version = "2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic", "api-22"], optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+ort = { version = "2.0.0-rc.15", default-features = false, features = ["directml"], optional = true }
+
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+ort = { version = "2.0.0-rc.15", default-features = false, features = ["coreml"], optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+ort = { version = "2.0.0-rc.15", default-features = false, features = ["nnapi", "xnnpack"], optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+default = []
+# `OnnxSeparator` (HT-Demucs through ONNX Runtime).
+onnx = ["dep:ort"]
+
+[[example]]
+name = "separate"
+required-features = ["onnx"]

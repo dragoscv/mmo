@@ -11,6 +11,7 @@ the Tauri 1.x plan is kept for history in [`docs/mixai/`](../mixai/00-architectu
 | [controllers.md](controllers.md) | User guide (RO): DDJ-FLX4, Circuit Tracks, MIDI keyboard, BLE MIDI, MIDI learn |
 | [mapping-format.md](mapping-format.md) | Controller mapping format v1, action vocabulary, scripts, MIDI clock, groove lane, BLE MIDI |
 | [dvs.md](dvs.md) | Digital vinyl decoder: support matrix, API, MixAI timecode, measured results |
+| [stems.md](stems.md) | On-device stem separation: HT-Demucs ONNX, accelerators, cache, server fallback |
 | [dvs-clean-room.md](dvs-clean-room.md) | Clean-room provenance statement for the DVS decoder |
 | [library-interop.md](library-interop.md) | rekordbox / Traktor / Serato / Engine / PDB / JSON read-write matrix, migration, key and colour mapping |
 | [streaming.md](streaming.md) | Streaming strategy (D64), partner applications checklist, draft emails |
