@@ -44,7 +44,7 @@ export interface ShortcutGroup {
 const deckA: Shortcut[] = [
     { code: "KeyQ", keyLabel: "Q", label: "Play / Pause", deck: "a", action: "play" },
     { code: "KeyA", keyLabel: "A", label: "Cue", deck: "a", action: "cue" },
-    { code: "KeyS", keyLabel: "S", label: "Sync", deck: "a", action: "sync" },
+    { code: "KeyS", keyLabel: "S", label: "Sync (Shift: sync lock)", deck: "a", action: "sync" },
     { code: "KeyZ", keyLabel: "Z", label: "Nudge back", deck: "a", action: "nudge", arg: -1 },
     { code: "KeyX", keyLabel: "X", label: "Nudge forward", deck: "a", action: "nudge", arg: 1 },
     { code: "KeyW", keyLabel: "W", label: "Loop on/off", deck: "a", action: "loopToggle" },
@@ -57,7 +57,7 @@ const deckA: Shortcut[] = [
 const deckB: Shortcut[] = [
     { code: "KeyP", keyLabel: "P", label: "Play / Pause", deck: "b", action: "play" },
     { code: "Semicolon", keyLabel: ";", label: "Cue", deck: "b", action: "cue" },
-    { code: "KeyL", keyLabel: "L", label: "Sync", deck: "b", action: "sync" },
+    { code: "KeyL", keyLabel: "L", label: "Sync (Shift: sync lock)", deck: "b", action: "sync" },
     { code: "Comma", keyLabel: ",", label: "Nudge back", deck: "b", action: "nudge", arg: -1 },
     { code: "Period", keyLabel: ".", label: "Nudge forward", deck: "b", action: "nudge", arg: 1 },
     { code: "KeyO", keyLabel: "O", label: "Loop on/off", deck: "b", action: "loopToggle" },

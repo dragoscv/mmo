@@ -10,6 +10,7 @@ import { TopBar } from "./components/TopBar";
 import { Deck } from "./components/Deck";
 import { MixerStrip } from "./components/MixerStrip";
 import { Crossfader } from "./components/Crossfader";
+import { MasterClock } from "./components/MasterClock";
 import { useAutoMixStore } from "./state/auto-mix-store";
 import { useShortcuts } from "./lib/use-shortcuts";
 import { useHidStore } from "./state/hid-store";
@@ -133,7 +134,8 @@ export function App() {
 
                 {/* Mixer + crossfader live together in the center column — the
                     crossfader belongs directly under the channel faders. */}
-                <div className="grid min-h-0 gap-3" style={{ gridTemplateRows: "1fr auto" }}>
+                <div className="grid min-h-0 gap-3" style={{ gridTemplateRows: "auto minmax(0, 1fr) auto" }}>
+                    <MasterClock deckCount={deckCount} />
                     <MixerStrip decks={deckCount === 4 ? ["c", "a", "b", "d"] : ["a", "b"]} />
                     <Crossfader />
                 </div>

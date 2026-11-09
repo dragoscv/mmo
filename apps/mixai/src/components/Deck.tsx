@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { Lock, LockOpen, Pause, Play, RefreshCw } from "lucide-react";
+import { Lock, LockOpen, Pause, Play } from "lucide-react";
 import { Skeleton } from "@mmo/ui";
 import { engine } from "@/bridge/engine";
 import type { DeckId } from "@/bridge/types";
@@ -7,6 +7,8 @@ import { useMixerStore } from "@/state/mixer-store";
 import { useT } from "@/i18n";
 import { Waveform } from "./Waveform";
 import { PerformancePads } from "./PerformancePads";
+import { DeckPerformance } from "./DeckPerformance";
+import { ColorFx } from "./ColorFx";
 
 // Below-the-fold deck sections: not needed for first paint of the transport.
 const StemControls = lazy(() => import("./StemControls").then((m) => ({ default: m.StemControls })));
@@ -83,8 +85,10 @@ export function Deck({ deckId }: { deckId: DeckId }) {
 
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <button
+                    type="button"
                     onClick={togglePlay}
                     disabled={!deck.loaded}
+                    aria-label={t(deck.playing ? "deck.pauseAria" : "deck.playAria", { id: deckId.toUpperCase() })}
                     style={{
                         flex: 1,
                         padding: "10px 0",
@@ -103,8 +107,11 @@ export function Deck({ deckId }: { deckId: DeckId }) {
                     {deck.playing ? t("deck.pause") : t("deck.play")}
                 </button>
                 <button
+                    type="button"
                     onClick={toggleKeyLock}
-                    title="Key lock (preserve pitch when changing tempo)"
+                    aria-pressed={deck.keyLock}
+                    aria-label={t("deck.keyLockAria", { id: deckId.toUpperCase() })}
+                    title={t("deck.keyLockHint")}
                     style={{
                         padding: "10px 12px",
                         borderRadius: 10,
@@ -120,27 +127,9 @@ export function Deck({ deckId }: { deckId: DeckId }) {
                     {deck.keyLock ? <Lock size={13} aria-hidden /> : <LockOpen size={13} aria-hidden />}
                     {t("deck.key")}
                 </button>
-                <button
-                    onClick={() => void engine.sync(deckId)}
-                    disabled={!deck.loaded}
-                    title="Beat sync to the other deck"
-                    style={{
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        background: "var(--bg-elev-2)",
-                        color: "var(--fg)",
-                        fontWeight: 700,
-                        fontSize: 12,
-                        opacity: deck.loaded ? 1 : 0.4,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                    }}
-                >
-                    <RefreshCw size={13} aria-hidden />
-                    {t("deck.sync")}
-                </button>
             </div>
+
+            <DeckPerformance deckId={deckId} deck={deck} accent={accent} />
 
             <div style={{ display: "grid", gap: 4 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--fg-dim)" }}>
@@ -153,9 +142,12 @@ export function Deck({ deckId }: { deckId: DeckId }) {
                     max={1.5}
                     step={0.001}
                     value={deck.tempo}
+                    aria-label={t("deck.tempoAria", { id: deckId.toUpperCase() })}
                     onChange={(e) => setTempo(Number(e.target.value))}
                 />
             </div>
+
+            <ColorFx deckId={deckId} accent={accent} />
 
             <Suspense fallback={<Skeleton className="h-16 w-full" />}>
                 <StemControls deckId={deckId} deck={deck} accent={accent} />

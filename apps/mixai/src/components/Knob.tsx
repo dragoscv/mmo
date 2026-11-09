@@ -11,11 +11,16 @@ interface KnobProps {
     color?: string;
     onChange: (v: number) => void;
     format?: (v: number) => string;
+    /** Accessible name (defaults to `label`). */
+    ariaLabel?: string;
+    disabled?: boolean;
 }
 
 /**
  * Vertical-drag rotary knob. Drag up/down to change; double-click resets to
  * `center`. Renders an SVG arc indicator. Pointer-capture keeps it smooth.
+ * Keyboard: focusable `role="slider"`; arrows step 1 %, Shift+arrows 0.25 %,
+ * PageUp/PageDown 10 %, Home/End to the ends, Enter/Backspace resets to `center`.
  */
 export function Knob({
     value,
@@ -27,17 +32,20 @@ export function Knob({
     color = "var(--accent)",
     onChange,
     format,
+    ariaLabel,
+    disabled = false,
 }: KnobProps) {
     const startY = useRef(0);
     const startVal = useRef(0);
 
     const onPointerDown = useCallback(
         (e: React.PointerEvent) => {
+            if (disabled) return;
             (e.target as Element).setPointerCapture(e.pointerId);
             startY.current = e.clientY;
             startVal.current = value;
         },
-        [value],
+        [value, disabled],
     );
 
     const onPointerMove = useCallback(
@@ -54,8 +62,51 @@ export function Knob({
     );
 
     const onDoubleClick = useCallback(() => {
-        if (center !== undefined) onChange(center);
-    }, [center, onChange]);
+        if (center !== undefined && !disabled) onChange(center);
+    }, [center, onChange, disabled]);
+
+    const onKeyDown = useCallback(
+        (e: React.KeyboardEvent) => {
+            if (disabled) return;
+            const range = max - min;
+            const step = e.shiftKey ? range / 400 : range / 100;
+            let next: number | null = null;
+            switch (e.key) {
+                case "ArrowUp":
+                case "ArrowRight":
+                    next = value + step;
+                    break;
+                case "ArrowDown":
+                case "ArrowLeft":
+                    next = value - step;
+                    break;
+                case "PageUp":
+                    next = value + range / 10;
+                    break;
+                case "PageDown":
+                    next = value - range / 10;
+                    break;
+                case "Home":
+                    next = min;
+                    break;
+                case "End":
+                    next = max;
+                    break;
+                case "Enter":
+                case "Backspace":
+                    if (center !== undefined) next = center;
+                    break;
+                default:
+                    return;
+            }
+            if (next === null) return;
+            // Keep deck shortcuts (bound to bare keys) from firing while the knob has focus.
+            e.preventDefault();
+            e.stopPropagation();
+            onChange(clamp(next, min, max));
+        },
+        [value, min, max, center, onChange, disabled],
+    );
 
     const pct = (value - min) / (max - min);
     // Arc spans 270deg from -135 to +135.
@@ -68,10 +119,22 @@ export function Knob({
     const py = cy + r * Math.sin(rad - Math.PI / 2);
 
     return (
-        <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
+        <div
+            role="slider"
+            tabIndex={disabled ? -1 : 0}
+            aria-label={ariaLabel ?? label}
+            aria-valuemin={min}
+            aria-valuemax={max}
+            aria-valuenow={Number(value.toFixed(3))}
+            aria-valuetext={format ? format(value) : undefined}
+            aria-disabled={disabled || undefined}
+            onKeyDown={onKeyDown}
+            style={{ display: "grid", justifyItems: "center", gap: 4, borderRadius: 8, opacity: disabled ? 0.4 : 1 }}
+        >
             <svg
                 width={size}
                 height={size}
+                aria-hidden
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onDoubleClick={onDoubleClick}

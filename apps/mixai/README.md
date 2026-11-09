@@ -1,4 +1,7 @@
-# @mmo/mixai — MixAI DJ native DJ software
+# @mmo/mixai — MixAI Decks native DJ software
+
+> Renamed from "MixAI DJ" (D60, [ADR-0014](../../docs/adr/0014-mixai-decks-native-dj.md)). The app id stays
+> `ro.mixai.dj`, the folder and crates keep their names; the site is `decks.mixai.ro` (`dj.mixai.ro` redirects).
 
 The flagship native DJ app of the mixai.ro suite. Built to combine the best of
 rekordbox, Serato, Traktor, VirtualDJ and djay — beautiful, themeable, animated,
@@ -18,7 +21,7 @@ low-latency, every controller — with mixai.ro / AI integration nobody else has
 
 ## Appearance (surface presets)
 
-MixAI DJ shares one theme model with mixai.ro, the Companion and the TV apps:
+MixAI Decks shares one theme model with mixai.ro, the Companion and the TV apps:
 `mode` (light/dark/system) · `accent` · `surface` · `density` · `radius` ·
 `motion` · `locale`, persisted under `mixai:prefs:v1` and applied before first
 paint by `public/prehydrate.js`. The three original DJ skins live on as
@@ -42,7 +45,7 @@ App strings are RO/EN via a tiny `t()` (`src/i18n/`) layered over the shared
 ## Why native (not the web mixer)
 
 The existing web mixer (`apps/web`) is Web Audio + WebMIDI with a ~10–30 ms
-latency ceiling and a key-lock stub. MixAI DJ runs the realtime path in Rust for
+latency ceiling and a key-lock stub. MixAI Decks runs the realtime path in Rust for
 sub-5 ms latency and true time-stretch / key-lock. We **port the concepts**
 (signal-chain topology, the two-layer MIDI architecture, Camelot harmonic-mixing
 logic, Pioneer SysEx device knowledge) but reimplement the DSP natively.

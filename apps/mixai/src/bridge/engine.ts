@@ -22,6 +22,15 @@ import type {
     TrackStems,
 } from "./types";
 import type { HidDeviceInfo, MidiPreset } from "./types";
+import type {
+    BeatFxRequest,
+    BeatGrid,
+    ClockSource,
+    ClockState,
+    ColorFxKind,
+    KeyMatchRequest,
+    RoutingConfig,
+} from "./types";
 
 type InvokeFn = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -416,5 +425,86 @@ export const engine = {
      *  companion, keyed by the signed-in user. */
     companionPutProfile(profile: string): Promise<null> {
         return call<null>("companion_put_profile", { profile });
+    },
+
+    // ---- WP19-05 sync / quantize / beat jump / slip / key ------------------
+
+    /** One-shot phase + tempo sync to the master clock; `lock` keeps it locked. */
+    phaseSync(deck: DeckId, lock = false): Promise<null> {
+        return call<null>("deck_phase_sync", { deck, lock });
+    },
+
+    /** Continuous sync lock on/off without a one-shot alignment. */
+    setSyncLock(deck: DeckId, enabled: boolean): Promise<null> {
+        return call<null>("deck_set_sync_lock", { deck, enabled });
+    },
+
+    /** Replace a deck's beatgrid (constant or anchored variable tempo). */
+    setBeatgrid(deck: DeckId, grid: BeatGrid): Promise<null> {
+        return call<null>("deck_set_beatgrid", { deck, grid });
+    },
+
+    setQuantize(deck: DeckId, enabled: boolean): Promise<null> {
+        return call<null>("deck_set_quantize", { deck, enabled });
+    },
+
+    /** Jump by `beats` (negative = back), within ±64. */
+    beatJump(deck: DeckId, beats: number): Promise<null> {
+        return call<null>("deck_beat_jump", { deck, beats });
+    },
+
+    setSlip(deck: DeckId, enabled: boolean): Promise<null> {
+        return call<null>("deck_set_slip", { deck, enabled });
+    },
+
+    setReverse(deck: DeckId, enabled: boolean): Promise<null> {
+        return call<null>("deck_set_reverse", { deck, enabled });
+    },
+
+    /** Key shift in semitones (−12..12), independent of tempo. */
+    setKeyShift(deck: DeckId, semitones: number): Promise<null> {
+        return call<null>("deck_set_key_shift", { deck, semitones });
+    },
+
+    /** Key-shift `deck` to the master's key; returns the applied shift (semitones). */
+    keyMatch(req: KeyMatchRequest): Promise<number | null> {
+        return call<number>("deck_key_match", { req });
+    },
+
+    /** Remember a deck's key: 0..23 or a Camelot / Open Key name (null clears). */
+    setDeckKey(deck: DeckId, key: { key?: number; keyName?: string } | null): Promise<null> {
+        return call<null>("deck_set_key", { deck, key: key?.key ?? null, keyName: key?.keyName ?? null });
+    },
+
+    /** Master clock source and/or internal bpm (20..300). Omitted fields stay. */
+    setMasterClock(opts: { source?: ClockSource; bpm?: number }): Promise<null> {
+        return call<null>("master_set_clock", { source: opts.source ?? null, bpm: opts.bpm ?? null });
+    },
+
+    /** Master tempo + beat phase + per-deck beat positions (null when engine down). */
+    clockState(): Promise<ClockState | null> {
+        return call<ClockState | null>("engine_clock_state");
+    },
+
+    // ---- WP19-06 routing ----------------------------------------------------
+
+    setRouting(routing: RoutingConfig): Promise<null> {
+        return call<null>("routing_set", { routing });
+    },
+
+    getRouting(): Promise<RoutingConfig | null> {
+        return call<RoutingConfig | null>("routing_get");
+    },
+
+    // ---- WP19-10 colour FX / beat FX ----------------------------------------
+
+    /** Colour FX on a deck; `param` −1..1 (one knob). */
+    setColorFx(deck: DeckId, kind: ColorFxKind, param: number): Promise<null> {
+        return call<null>("fx_color_set", { deck, kind, param });
+    },
+
+    /** Beat FX synced to the master clock. */
+    setBeatFx(req: BeatFxRequest): Promise<null> {
+        return call<null>("fx_beat_set", { req });
     },
 };

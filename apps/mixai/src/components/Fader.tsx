@@ -7,9 +7,12 @@ interface FaderProps {
     height?: number;
     color?: string;
     onChange: (v: number) => void;
+    /** Accessible name. */
+    ariaLabel?: string;
 }
 
-/** Vertical channel fader. Drag the cap; double-click resets to max. */
+/** Vertical channel fader. Drag the cap; double-click resets to max.
+ *  Keyboard: arrows 1 % (Shift 0.25 %), PageUp/PageDown 10 %, Home/End. */
 export function Fader({
     value,
     min = 0,
@@ -17,6 +20,7 @@ export function Fader({
     height = 160,
     color = "var(--accent)",
     onChange,
+    ariaLabel,
 }: FaderProps) {
     const trackRef = useRef<HTMLDivElement>(null);
 
@@ -49,9 +53,34 @@ export function Fader({
 
     const pct = (value - min) / (max - min);
 
+    const onKeyDown = (e: React.KeyboardEvent) => {
+        const range = max - min;
+        const step = e.shiftKey ? range / 400 : range / 100;
+        const next =
+            e.key === "ArrowUp" || e.key === "ArrowRight" ? value + step
+            : e.key === "ArrowDown" || e.key === "ArrowLeft" ? value - step
+            : e.key === "PageUp" ? value + range / 10
+            : e.key === "PageDown" ? value - range / 10
+            : e.key === "Home" ? min
+            : e.key === "End" ? max
+            : null;
+        if (next === null) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onChange(clamp(next, min, max));
+    };
+
     return (
         <div
             ref={trackRef}
+            role="slider"
+            tabIndex={0}
+            aria-label={ariaLabel}
+            aria-orientation="vertical"
+            aria-valuemin={min}
+            aria-valuemax={max}
+            aria-valuenow={Number(value.toFixed(3))}
+            onKeyDown={onKeyDown}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onDoubleClick={() => onChange(max)}

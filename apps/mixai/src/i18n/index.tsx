@@ -1,5 +1,5 @@
 /**
- * Tiny `t()` for MixAI DJ. Resolves app strings (./messages) first, then the
+ * Tiny `t()` for MixAI Decks. Resolves app strings (./messages) first, then the
  * shared @mmo/ui catalogue, then falls back to English, then to the key.
  * Locale comes from the shared theme prefs (`prefs.locale`, RO default).
  */

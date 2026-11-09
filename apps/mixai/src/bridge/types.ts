@@ -225,3 +225,105 @@ export interface HidInputEvent {
     bytes: number[];
     hex: string;
 }
+
+// ─── WP19-05 sync / clock / beatgrid ─────────────────────────────────────────
+
+/** Master clock source (`auto`, `internal` or a deck id). */
+export type ClockSource = "auto" | "internal" | DeckId;
+
+/** Per-deck clock view (matches Rust `DeckClock`). */
+export interface DeckClock {
+    id: DeckId;
+    /** Audible tempo (grid × tempo fader × sync nudge). */
+    bpm: number;
+    /** Fractional beat number at the playhead. */
+    beat: number;
+    /** Position inside the bar (0..beatsPerBar) when the downbeat is known. */
+    barPhase: number | null;
+    keyShift: number;
+    slip: boolean;
+    quantize: boolean;
+    syncLock: boolean;
+}
+
+/** Master clock snapshot (matches Rust `ClockState`). */
+export interface ClockState {
+    /** Configured source (`auto`, `internal`, `a`..`d`). */
+    configured: ClockSource;
+    /** Source driving the clock right now (`internal` or a deck id). */
+    source: "internal" | DeckId;
+    bpm: number;
+    /** Fractional master beat count. */
+    beat: number;
+    /** `beat` modulo 1 (0..1). */
+    beatPhase: number;
+    /** Position in the bar (0..beatsPerBar). */
+    barPhase: number | null;
+    beatsPerBar: number;
+    frame: number;
+    sampleRate: number;
+    decks: DeckClock[];
+}
+
+/** Variable-tempo anchor: source time `time` (s) is beat number `beat`. */
+export interface GridAnchor {
+    time: number;
+    beat: number;
+}
+
+/** Per-deck beatgrid (matches Rust `mixai_core::beatgrid::BeatGrid`). */
+export interface BeatGrid {
+    bpm: number;
+    firstBeat?: number;
+    /** Beat number (from beat 0) that is a downbeat; null = unknown. */
+    downbeat?: number | null;
+    beatsPerBar?: number;
+    anchors?: GridAnchor[];
+}
+
+/** Key-match request (matches Rust `KeyMatchReq`). Keys are 0..23 or Camelot / Open Key names. */
+export interface KeyMatchRequest {
+    deck: DeckId;
+    key?: number;
+    masterKey?: number;
+    keyName?: string;
+    masterKeyName?: string;
+}
+
+// ─── WP19-06 routing ─────────────────────────────────────────────────────────
+
+/** Output mapping mode (matches Rust `OutputMode`). */
+export type OutputMode = "auto" | "stereo" | "fourChannel";
+
+/** Output routing matrix (matches Rust `RoutingConfig`). */
+export interface RoutingConfig {
+    mode: OutputMode;
+    /** Headphone blend: 0 = cue only, 1 = master only. */
+    cueMix: number;
+    /** Headphone level, 0..1.5. */
+    headphoneLevel: number;
+    /** Split-mono on 2-channel outputs (L = cue, R = master). */
+    splitMono: boolean;
+    /** Booth level, 0..1.5 (0 = booth off). */
+    boothLevel: number;
+    masterLatencyMs: number;
+    headphoneLatencyMs: number;
+    boothLatencyMs: number;
+}
+
+// ─── WP19-10 FX ──────────────────────────────────────────────────────────────
+
+export type ColorFxKind = "none" | "filter" | "phaser" | "flanger" | "noise" | "dub_echo";
+export type BeatFxKind = "none" | "echo" | "reverb" | "roll" | "gate";
+
+/** Beat FX request (matches Rust `BeatFxReq`). */
+export interface BeatFxRequest {
+    deck: DeckId;
+    kind: BeatFxKind;
+    /** Wet/dry 0..1. */
+    wet: number;
+    /** Beat fraction 1/32..8. */
+    beats: number;
+    /** Echo feedback / reverb decay / gate depth 0..1 (default 0.5). */
+    feedback?: number;
+}

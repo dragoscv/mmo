@@ -10,6 +10,7 @@ import { useMixerStore } from "@/state/mixer-store";
 import { useUiStore } from "@/state/ui-store";
 import { type Shortcut } from "@/lib/shortcuts";
 import { useKeybindStore } from "@/state/keybind-store";
+import { usePerfStore } from "@/state/perf-store";
 
 /** True when focus is in a field where typing should win over shortcuts. */
 function isEditableTarget(el: EventTarget | null): boolean {
@@ -27,7 +28,7 @@ async function nudge(deck: Shortcut["deck"], dir: number): Promise<void> {
     await engine.seek(deck, next);
 }
 
-async function dispatch(s: Shortcut): Promise<void> {
+async function dispatch(s: Shortcut, shift = false): Promise<void> {
     const ui = useUiStore.getState();
     switch (s.action) {
         case "toggleHelp":
@@ -53,7 +54,13 @@ async function dispatch(s: Shortcut): Promise<void> {
             await engine.setCue(s.deck, !deck.cue);
             return;
         case "sync":
-            await engine.sync(s.deck);
+            // Tap = phase sync to the master clock; Shift = toggle sync lock.
+            if (shift) {
+                const perf = usePerfStore.getState();
+                perf.setSyncLock(s.deck, !perf.decks[s.deck].syncLock);
+            } else {
+                usePerfStore.getState().phaseSync(s.deck);
+            }
             return;
         case "loopToggle":
             await engine.loopToggle(s.deck);
@@ -78,7 +85,7 @@ export function useShortcuts(): void {
             const s = useKeybindStore.getState().bindings.get(e.code);
             if (!s) return;
             e.preventDefault();
-            void dispatch(s);
+            void dispatch(s, e.shiftKey);
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);

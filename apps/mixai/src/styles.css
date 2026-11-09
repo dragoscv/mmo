@@ -1,5 +1,5 @@
 /*
- * MixAI DJ global styles — on the shared design system (docs/design-system.md §9).
+ * MixAI Decks global styles — on the shared design system (docs/design-system.md §9).
  * Theme dimensions (mode/accent/surface/density/radius/motion) are written to
  * <html> by @mmo/ui's ThemeProvider (and prehydrate.js before first paint).
  */
@@ -162,6 +162,43 @@ input[type="range"] {
 .mono {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+}
+
+/* Master clock beat/bar indicator (WP19-05). Cells are discrete state (fine
+   under reduced motion); the sub-beat sweep is decorative and hidden there. */
+.mixai-beat-cell {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+}
+.mixai-beat-cell[data-on="true"] {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+.mixai-beat-cell[data-on="true"][data-downbeat="true"] {
+    background: var(--warning);
+    border-color: var(--warning);
+}
+.mixai-phase {
+    height: 2px;
+    border-radius: 1px;
+    background: var(--bg-elev-2);
+    overflow: hidden;
+}
+.mixai-phase > span {
+    display: block;
+    height: 100%;
+    background: var(--primary);
+    transform-origin: left center;
+}
+:root[data-motion="reduced"] .mixai-phase {
+    visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+    .mixai-phase {
+        visibility: hidden;
+    }
 }
 
 /* Deck-count aware layout: 4 decks only from 100rem (1600 px). */
