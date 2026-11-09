@@ -1,0 +1,16 @@
+[package]
+name = "live-dsp"
+description = "MixAI Live: allocation-free realtime vocal DSP (dynamics, EQ, de-esser, modulation, delay, reverb, pitch correction, harmonizer)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+# Zero runtime dependencies on purpose: this crate runs on the audio thread and
+# must stay portable to every target (desktop, Android, iOS) and permissively licensed.
+[dependencies]
+
+[dev-dependencies]
+assert_no_alloc = "1.1.2"
