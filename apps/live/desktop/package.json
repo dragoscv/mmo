@@ -1,0 +1,48 @@
+{
+    "name": "@mmo/live-desktop",
+    "version": "0.1.0",
+    "private": true,
+    "description": "MixAI Live desktop — Tauri 2 shell + React UI for the mixai-live-engine sidecar (protocol v1).",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc --noEmit && vite build",
+        "preview": "vite preview",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "i18n:check": "node scripts/i18n-parity.mjs",
+        "engine:copy": "node scripts/copy-engine.mjs",
+        "tauri": "tauri",
+        "tauri:dev": "node scripts/copy-engine.mjs && tauri dev",
+        "tauri:build": "node scripts/copy-engine.mjs && tauri build"
+    },
+    "dependencies": {
+        "@base-ui/react": "^1.8.0",
+        "@tanstack/react-table": "^9.2.4",
+        "@tauri-apps/api": "^2.12.4",
+        "@tauri-apps/plugin-websocket": "^2.5.0",
+        "class-variance-authority": "^0.7.1",
+        "clsx": "^2.1.1",
+        "cmdk": "^1.1.1",
+        "i18next": "^27.0.1",
+        "lucide-react": "^1.47.0",
+        "motion": "^13.4.0",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "react-i18next": "^18.0.0",
+        "tailwind-merge": "^3.7.0",
+        "zustand": "^5.0.11"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.3.3",
+        "@tauri-apps/cli": "^2.12.4",
+        "@types/node": "^24.19.2",
+        "@types/react": "^19.2.17",
+        "@types/react-dom": "^19.2.3",
+        "@vitejs/plugin-react": "^6.2.1",
+        "tailwindcss": "^4.3.3",
+        "typescript": "^7.0.2",
+        "vite": "^8.3.0",
+        "vitest": "^5.1.0"
+    }
+}

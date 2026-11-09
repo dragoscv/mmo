@@ -1,0 +1,7 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "main-capability",
+    "description": "MixAI Live main window: app commands, events, and the WebSocket client for the local engine. No shell, fs or http permission: the engine sidecar is spawned from Rust only.",
+    "windows": ["main"],
+    "permissions": ["core:default", "core:event:default", "websocket:allow-connect", "websocket:allow-send"]
+}

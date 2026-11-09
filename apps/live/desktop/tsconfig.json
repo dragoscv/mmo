@@ -1,0 +1,38 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "useDefineForClassFields": true,
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "module": "ESNext",
+        "skipLibCheck": true,
+        "moduleResolution": "bundler",
+        "allowImportingTsExtensions": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "moduleDetection": "force",
+        "noEmit": true,
+        "jsx": "react-jsx",
+        "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedIndexedAccess": true,
+        "verbatimModuleSyntax": true,
+        "incremental": true,
+        "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo",
+        "types": ["node"],
+        "paths": {
+            "@/*": ["./src/*"],
+            "@mmo/ui": ["../../../packages/ui/src/index.ts"],
+            "@mmo/ui/*": ["../../../packages/ui/src/*"],
+            "@mmo/design-tokens": ["../../../packages/design-tokens/src/index.ts"]
+        }
+    },
+    "include": ["src", "vite.config.ts", "vitest.config.ts", "../../../packages/ui/src", "../../../packages/design-tokens/src"],
+    "exclude": [
+        "../../../packages/**/*.test.ts",
+        "../../../packages/**/*.test.tsx",
+        "../../../packages/**/build.ts",
+        "../../../packages/**/generate.ts"
+    ]
+}

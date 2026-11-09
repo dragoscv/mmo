@@ -1,0 +1,6 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+# Copied by scripts/copy-engine.mjs from apps/live/engine/target/release.
+src-tauri/binaries/

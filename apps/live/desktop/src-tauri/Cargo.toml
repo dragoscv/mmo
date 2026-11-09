@@ -1,0 +1,41 @@
+[package]
+name = "mixai-live-desktop"
+version = "0.1.0"
+description = "MixAI Live desktop shell: Tauri 2 window around the mixai-live-engine sidecar"
+authors = ["mwrty <vladulescu.catalin@gmail.com>"]
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/dragoscv/mmo"
+edition = "2024"
+rust-version = "1.90"
+publish = false
+
+# Standalone (own Cargo.lock); the engine is a separate workspace and a separate process (ADR-0015).
+[workspace]
+resolver = "3"
+
+[lib]
+name = "mixai_live_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.5", features = [] }
+# Spawns the bundled engine (sidecar). Rust-only: the webview gets no shell permission.
+tauri-plugin-shell = "2.6.0"
+# WebSocket client in Rust: sends no Origin header, which the engine's same-origin check requires.
+tauri-plugin-websocket = "2.5.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
+tokio = { version = "1", features = ["time"] }
+log = "0.4.35"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+incremental = false
+opt-level = 3
+strip = true
