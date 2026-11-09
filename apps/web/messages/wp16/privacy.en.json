@@ -3,7 +3,7 @@
     "metaDescription": "What the MixAI apps and website collect, why, where it is stored and how to delete it.",
     "title": "Privacy policy",
     "updated": "Last updated: 9 November 2026",
-    "intro": "MixAI is a player for your own media library, served by your own MMO Server. This policy covers the MixAI website, the MixAI apps for Android, iOS and TV, and MixAI Decks. MixAI shows no ads and does not track you across apps or websites.",
+    "intro": "MixAI is a player for your own media library, served by your own MMO Server. This policy covers the MixAI website, the MixAI apps for Android, iOS and TV, MixAI Decks, and MixAI Key & BPM (phone, Wear OS and Apple Watch). MixAI shows no ads and does not track you across apps or websites.",
     "controller": "Controller: Dragos Catalin Vladulescu, Romania. Contact:",
     "langSwitch": "Citește în română",
     "sections": {
@@ -14,6 +14,10 @@
         "decks": {
             "title": "MixAI Decks (DJ app)",
             "body": "MixAI Decks works on your device. Your music library, analysis (tempo, key, waveforms), stems, cue points, set recordings and tracklists are stored only on your device. Microphone or audio input is used only when you turn on timecode vinyl (DVS) or listening features, and the audio is processed on the device and never uploaded. Connected mode (phone remote, second screen, party requests) runs a small server on your local network only while you keep it on; guests' song requests and votes stay on your device and are deleted when you close the session. Typed or spoken DJ commands are understood on the device; if you choose to send one that the app cannot understand to the MixAI assistant, only that text is sent."
+        },
+        "keybpm": {
+            "title": "MixAI Key & BPM (key, tempo and song finder)",
+            "body": "MixAI Key & BPM needs no account. It uses the microphone only while you listen; key and tempo are calculated on your device and the audio is never recorded, stored or uploaded. Song identification runs only when you tap Identify or turn on auto-identify: the app then creates an audio fingerprint (a short mathematical summary that cannot be turned back into sound) and sends only that fingerprint to Apple's Shazam service, which returns the song title. Apple processes it under its own privacy policy. Fingerprints made while offline wait on your device until you are back online. Your set log, history and settings are stored only on your device; the phone and watch share readings directly over Bluetooth or Wi-Fi. If you export to Apple Music, the playlist is created in your own Apple Music account only when you ask. On Android the app fetches a short-lived Shazam access token from mixai.ro; that request contains no personal data, and your IP address is used only for rate limiting and kept in server logs for at most 30 days."
         },
         "account": {
             "title": "MixAI account (optional)",

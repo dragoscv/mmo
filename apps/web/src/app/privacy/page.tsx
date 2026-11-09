@@ -12,7 +12,7 @@ import { isAppLocale, type AppLocale } from "@/i18n/locales";
 export const dynamic = "force-dynamic";
 
 const CONTACT_EMAIL = "support@mixai.ro";
-const SECTIONS = ["server", "decks", "account", "sync", "push", "diagnostics", "noAds", "security", "rights", "children"] as const;
+const SECTIONS = ["server", "decks", "keybpm", "account", "sync", "push", "diagnostics", "noAds", "security", "rights", "children"] as const;
 
 type Props = { searchParams: Promise<{ lang?: string }> };
 
