@@ -27,6 +27,11 @@ class KeyAnnouncer(private val context: Context) {
         vibrator?.vibrate(VibrationEffect.createOneShot(400, 255), attrs)
     }
 
+    /** "Key now A minor, 124 BPM" for a "What key is this?" request. */
+    fun whatKey(keyName: String, bpm: Double) {
+        speak(context.getString(R.string.a11y_key_now, context.getString(R.string.a11y_what_key, keyName, "%.0f".format(bpm))))
+    }
+
     private fun speak(text: String) {
         val t = tts
         if (t == null) {

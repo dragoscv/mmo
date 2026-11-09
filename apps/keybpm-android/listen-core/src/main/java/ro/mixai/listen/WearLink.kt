@@ -76,7 +76,10 @@ object WearLink {
 
 /**
  * Beat clock for haptics and pulses: turns "next beat in X ms at BPM" snapshots into a stable beat grid. Small
- * corrections are smoothed (the engine's phase jitters by a few ms), a jump of more than a quarter period resyncs.
+ * corrections are smoothed (the engine's phase jitters by a few ms). A jump of more than a quarter period resyncs only
+ * once a second observation at least [CONFIRM_MS] later agrees with it: the engine's phase swings out and back by up
+ * to ~40 % of a beat, and resyncing on every swing moved the grid while the haptic thread slept, so it woke late and
+ * skipped the beat (Watch8 log: jumps in pairs, one skipped beat per pair).
  */
 class BeatClock {
     var periodMs: Double = 0.0
@@ -84,11 +87,21 @@ class BeatClock {
     private var nextBeatAt = 0.0
     var beatIndex = 0L
         private set
+    /** Diagnostics: beats skipped as too late, and phase jumps larger than a quarter beat. */
+    var skips = 0L
+        private set
+    var jumps = 0L
+        private set
+    var lastJumpMs = 0.0
+        private set
+    private var pendingErr: Double? = null
+    private var pendingSince = 0.0
 
     val running: Boolean get() = periodMs > 0
 
     fun stop() {
         periodMs = 0.0
+        pendingErr = null
     }
 
     fun update(bpm: Double, nextBeatInMs: Double, nowMs: Double) {
@@ -99,24 +112,35 @@ class BeatClock {
             periodMs = p
             nextBeatAt = observed
             beatIndex = 0
+            pendingErr = null
             return
         }
         periodMs = p
         // Bring the predicted grid next to the observation, then nudge (a beat that is due but not yet played stays).
-        while (nextBeatAt < nowMs - LATE_MS) { nextBeatAt += periodMs; beatIndex++ }
+        while (nextBeatAt < nowMs - lateMs()) { nextBeatAt += periodMs; beatIndex++; skips++ }
         var err = observed - nextBeatAt
         if (err > periodMs / 2) err -= periodMs
         if (err < -periodMs / 2) err += periodMs
-        nextBeatAt += if (kotlin.math.abs(err) > periodMs / 4) err else err * 0.25
+        if (kotlin.math.abs(err) <= periodMs / 4) {
+            pendingErr = null
+            nextBeatAt += err * 0.25
+            return
+        }
+        val pending = pendingErr
+        if (pending != null && kotlin.math.abs(err - pending) <= periodMs / 8 && nowMs - pendingSince >= CONFIRM_MS) {
+            jumps++; lastJumpMs = err; nextBeatAt += err; pendingErr = null
+        } else if (pending == null || kotlin.math.abs(err - pending) > periodMs / 8) {
+            pendingErr = err; pendingSince = nowMs
+        }
     }
 
     /**
-     * Milliseconds until the next beat (0 when due) and skips beats missed by more than [LATE_MS] (a timer that wakes
-     * a few ms late still plays its beat — skipping those made the watch haptics irregular). Null when stopped.
+     * Milliseconds until the next beat (0 when due). A beat missed by less than 40 % of a period (min [LATE_MS]) still
+     * plays now; only beats missed by more (app suspended) are skipped. Null when stopped.
      */
     fun untilNext(nowMs: Double): Double? {
         if (!running) return null
-        while (nextBeatAt < nowMs - LATE_MS) { nextBeatAt += periodMs; beatIndex++ }
+        while (nextBeatAt < nowMs - lateMs()) { nextBeatAt += periodMs; beatIndex++; skips++ }
         return (nextBeatAt - nowMs).coerceAtLeast(0.0)
     }
 
@@ -128,7 +152,10 @@ class BeatClock {
         return i
     }
 
+    private fun lateMs() = maxOf(LATE_MS, periodMs * 0.4)
+
     private companion object {
         const val LATE_MS = 60.0
+        const val CONFIRM_MS = 250.0
     }
 }

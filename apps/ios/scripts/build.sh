@@ -13,6 +13,11 @@
 #   scripts/build.sh decksbuild     Rust decks-ffi (iOS device slice) + compile MixAI Decks for iphoneos, unsigned (WP19-15)
 #   scripts/build.sh decksmacbuild  Rust decks-ffi (universal macOS) + compile MixAI Decks for macOS, unsigned (WP19-15)
 #     (both need the Rust sources: DECKS_RUST_ROOT = a tree holding apps/mixai/src-tauri + crates/; ios-build.ps1 ships it)
+#   scripts/build.sh keybpmbuild     Rust mixai-listen-ffi (iOS + watchOS device) + compile MixAI Key & BPM, unsigned (WP18-05)
+#   scripts/build.sh keybpmwatchsim  Rust Simulator slices + Key & BPM watch app in the watchOS Simulator + screenshots
+#   scripts/build.sh keybpmdevipa    development-signed ro.mixai.keybpm .ipa (with the watch app) for registered devices
+#   scripts/build.sh keybpmupload    archive MixAI Key & BPM (iOS + embedded watchOS), sign and upload to TestFlight
+#     (all need crates/: KEYBPM_RUST_ROOT = a tree holding crates/mixai-listen*; ios-build.ps1 ships it)
 #
 # Env for devipa/upload (the Windows driver scripts/ios-build.ps1 sets these from Secret Manager and deletes the key
 # file afterwards; nothing is stored in the repo):
@@ -150,6 +155,38 @@ case "$MODE" in
       CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build -quiet
     log "OK: $OUT/dd/Build/Products/Release/MixAIDecks.app"
     ;;
+  keybpmbuild)
+    [ -d KeyBpmFFI/KeyBpmFFI.xcframework ] || ./scripts/build-keybpm-xcframework.sh device
+    generate
+    log "compile MixAI Key & BPM (iphoneos + embedded watchOS app, unsigned)"
+    xcodebuild -project MixAI.xcodeproj -scheme MixAIKeyBpm -configuration Release \
+      -destination 'generic/platform=iOS' -derivedDataPath "$OUT/dd" "${SPM_FLAGS[@]}" \
+      CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build -quiet
+    log "OK: $OUT/dd/Build/Products/Release-iphoneos/MixAIKeyBpm.app"
+    ;;
+  keybpmwatchsim)
+    [ -d KeyBpmFFI/KeyBpmFFI.xcframework/watchos-arm64_x86_64-simulator ] || ./scripts/build-keybpm-xcframework.sh sim
+    generate
+    ./scripts/keybpm-watch-shots.sh
+    ;;
+  keybpmdevipa)
+    [ -d KeyBpmFFI/KeyBpmFFI.xcframework ] || ./scripts/build-keybpm-xcframework.sh device
+    archive MixAIKeyBpm
+    export_plist "${EXPORT_METHOD:-debugging}" export
+    log "export MixAI Key & BPM (${EXPORT_METHOD:-debugging})"
+    xcodebuild -exportArchive -archivePath "$OUT/MixAI.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}"
+    cp "$OUT/export/"*.ipa "$OUT/mixai-dev.ipa"
+    log "OK: $OUT/mixai-dev.ipa ($(du -h "$OUT/mixai-dev.ipa" | cut -f1))"
+    ;;
+  keybpmupload)
+    # Store builds use the full release profile (fat LTO) for the Rust engine.
+    KEYBPM_RELEASE=1 ./scripts/build-keybpm-xcframework.sh device
+    archive MixAIKeyBpm
+    export_plist app-store-connect upload
+    log "export + upload MixAI Key & BPM to App Store Connect"
+    xcodebuild -exportArchive -archivePath "$OUT/MixAI.xcarchive" -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}"
+    log "UPLOADED MixAI Key & BPM build $BUILD_NUMBER (TestFlight processing takes ~5-15 min)"
+    ;;
   musicdevipa)
     archive MixAIMusic
     export_plist "${EXPORT_METHOD:-debugging}" export
@@ -217,7 +254,7 @@ case "$MODE" in
     log "UPLOADED tvOS build $BUILD_NUMBER (TestFlight processing takes ~5-15 min)"
     ;;
   *)
-    echo "usage: $0 test|build|tvbuild|devipa|upload|tvupload|musicbuild|musicdevipa|musicupload|decksbuild|decksmacbuild" >&2
+    echo "usage: $0 test|build|tvbuild|devipa|upload|tvupload|musicbuild|musicdevipa|musicupload|decksbuild|decksmacbuild|keybpmbuild|keybpmwatchsim|keybpmdevipa|keybpmupload" >&2
     exit 2
     ;;
 esac

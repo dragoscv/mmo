@@ -56,6 +56,8 @@ data class ListenUi(
     /** Current drift alert in percent (sustained), null when in range. */
     val drift: Double? = null,
     val announceKey: Boolean = false,
+    val stageNight: Boolean = false,
+    val stageDnd: Boolean = false,
 ) {
     /** BPM after the user's half/double override, null before a tempo reading. */
     val bpm: Double? get() = snapshot?.tempo?.let { it.bpm * tempoFactor }
@@ -85,4 +87,7 @@ class ListenModel(app: Application) : AndroidViewModel(app) {
     fun setDriftAlarm(on: Boolean) = session.setDriftAlarm(on)
     fun setDriftReference() = session.setDriftReference()
     fun setAnnounceKey(on: Boolean) = session.setAnnounceKey(on)
+    fun setStageNight(on: Boolean) = session.setStageNight(on)
+    fun setStageDnd(on: Boolean) = session.setStageDnd(on)
+    fun requestWhatKey() = session.requestWhatKey()
 }

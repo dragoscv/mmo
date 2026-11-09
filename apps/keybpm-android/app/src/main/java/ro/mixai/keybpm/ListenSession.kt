@@ -57,6 +57,8 @@ class ListenSession(private val app: Application) {
     private val watch = WatchBridge(app)
     private val drift = ro.mixai.listen.DriftMonitor()
     private val announcer = KeyAnnouncer(app)
+    /** "What key is this?" (shortcut / Assistant): speak key + BPM once, the first time both are locked. */
+    @Volatile private var whatKeyPending = false
 
     init {
         scope.launch { log.load() }
@@ -64,6 +66,8 @@ class ListenSession(private val app: Application) {
         scope.launch { prefs.tracklistMode.collect { on -> _ui.value = _ui.value.copy(tracklistMode = on) } }
         scope.launch { prefs.driftAlarm.collect { on -> _ui.value = _ui.value.copy(driftAlarm = on, drift = null) } }
         scope.launch { prefs.announceKey.collect { on -> _ui.value = _ui.value.copy(announceKey = on) } }
+        scope.launch { prefs.stageNight.collect { on -> _ui.value = _ui.value.copy(stageNight = on) } }
+        scope.launch { prefs.stageDnd.collect { on -> _ui.value = _ui.value.copy(stageDnd = on) } }
         // Mirror to a paired Wear OS watch (WP18-04); the bridge throttles to changes + a 2 s heartbeat.
         scope.launch { _ui.collect { watch.publish(it) } }
     }
@@ -133,6 +137,12 @@ class ListenSession(private val app: Application) {
                     )
                 }
                 if (lockNow) save("mic")
+                if (whatKeyPending && s.key?.locked == true && s.tempo?.locked == true) {
+                    whatKeyPending = false
+                    val k = s.key
+                    val tl = s.tempo
+                    if (k != null && tl != null) announcer.whatKey(k.key.name, tl.bpm * _ui.value.tempoFactor)
+                }
                 delay(50)
             }
         }
@@ -217,6 +227,19 @@ class ListenSession(private val app: Application) {
 
     fun setAnnounceKey(on: Boolean) {
         scope.launch { prefs.setAnnounceKey(on) }
+    }
+
+    fun setStageNight(on: Boolean) {
+        scope.launch { prefs.setStageNight(on) }
+    }
+
+    fun setStageDnd(on: Boolean) {
+        scope.launch { prefs.setStageDnd(on) }
+    }
+
+    /** Announced regardless of [ListenUi.announceKey]; one announcement per request. */
+    fun requestWhatKey() {
+        whatKeyPending = true
     }
 
     private fun now() = android.os.SystemClock.uptimeMillis()

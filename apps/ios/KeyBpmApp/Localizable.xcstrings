@@ -1,0 +1,3066 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "a11y.key_now %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key now %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tonalitatea acum %@"
+          }
+        }
+      }
+    },
+    "a11y.what_key %@ %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$lld BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$lld BPM"
+          }
+        }
+      }
+    },
+    "kb.a11y.announce": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Announce key changes"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anunță schimbările de tonalitate"
+          }
+        }
+      }
+    },
+    "kb.a11y.announce_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speak and vibrate when the key changes (VoiceOver or eyes-off use)."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vorbește și vibrează când se schimbă tonalitatea (VoiceOver sau fără să te uiți)."
+          }
+        }
+      }
+    },
+    "kb.a11y.what_key %@ %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$lld BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$lld BPM"
+          }
+        }
+      }
+    },
+    "kb.advice.lands %@ %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · lands on %2$@ without key lock"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · ajunge în %2$@ fără key lock"
+          }
+        }
+      }
+    },
+    "kb.advice.rate %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ to match"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ca să se potrivească"
+          }
+        }
+      }
+    },
+    "kb.advice.transpose %@ %@ %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · key lock %2$@ → %3$@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · key lock %2$@ → %3$@"
+          }
+        }
+      }
+    },
+    "kb.alternative %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "or %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sau %@"
+          }
+        }
+      }
+    },
+    "kb.analysing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analysing…"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analizez…"
+          }
+        }
+      }
+    },
+    "kb.apple_key %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's analysis suggests %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analiza Apple sugerează %@"
+          }
+        }
+      }
+    },
+    "kb.background": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep listening in the background"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuă să asculți în fundal"
+          }
+        }
+      }
+    },
+    "kb.background_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keeps detecting with the screen locked, shown in the Live Activity and by the microphone indicator. Off by default."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuă detectarea cu ecranul blocat, afișată în Live Activity și de indicatorul de microfon. Oprit implicit."
+          }
+        }
+      }
+    },
+    "kb.bpm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BPM"
+          }
+        }
+      }
+    },
+    "kb.cancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anulează"
+          }
+        }
+      }
+    },
+    "kb.capo.open %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No capo, play %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fără capodastru, cântă în %@"
+          }
+        }
+      }
+    },
+    "kb.capo.result %lld %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capo %1$lld, play %2$@ shapes"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capodastru %1$lld, cântă forme de %2$@"
+          }
+        }
+      }
+    },
+    "kb.capo.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guitar capo"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capodastru la chitară"
+          }
+        }
+      }
+    },
+    "kb.cd.beat": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beat indicator"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indicator de bătaie"
+          }
+        }
+      }
+    },
+    "kb.cd.wheel %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camelot wheel, %@ highlighted"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Roata Camelot, %@ evidențiat"
+          }
+        }
+      }
+    },
+    "kb.chord": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chord"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acord"
+          }
+        }
+      }
+    },
+    "kb.confidence %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%% sure"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sigur %lld%%"
+          }
+        }
+      }
+    },
+    "kb.control.listen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key & BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key & BPM"
+          }
+        }
+      }
+    },
+    "kb.control.listen_desc": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start listening for key and BPM."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pornește ascultarea pentru tonalitate și BPM."
+          }
+        }
+      }
+    },
+    "kb.double_tempo": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2×"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2×"
+          }
+        }
+      }
+    },
+    "kb.drift.alert %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempo drift %@ %%"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Derivă de tempo %@ %%"
+          }
+        }
+      }
+    },
+    "kb.drift.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warn when the tempo drifts more than 0.5 % from the reference (bands, drummers)."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avertizează când tempoul se abate cu peste 0,5 % de la referință (trupe, toboșari)."
+          }
+        }
+      }
+    },
+    "kb.drift.reference %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference %@ BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referință %@ BPM"
+          }
+        }
+      }
+    },
+    "kb.drift.set_ref": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use current BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folosește BPM-ul curent"
+          }
+        }
+      }
+    },
+    "kb.drift.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drift alarm"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alarmă de derivă"
+          }
+        }
+      }
+    },
+    "kb.energy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Energy"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Energie"
+          }
+        }
+      }
+    },
+    "kb.export.apple_music": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music playlist"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist Apple Music"
+          }
+        }
+      }
+    },
+    "kb.export.apple_music_denied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow Apple Music access in Settings to save the playlist."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permite accesul la Apple Music din Setări ca să salvezi playlistul."
+          }
+        }
+      }
+    },
+    "kb.export.apple_music_done %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist saved with %lld songs."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist salvat cu %lld piese."
+          }
+        }
+      }
+    },
+    "kb.export.apple_music_failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The playlist could not be saved."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlistul nu a putut fi salvat."
+          }
+        }
+      }
+    },
+    "kb.export.apple_music_none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No identified songs found on Apple Music yet."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicio piesă identificată nu a fost găsită încă în Apple Music."
+          }
+        }
+      }
+    },
+    "kb.export.csv": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CSV"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CSV"
+          }
+        }
+      }
+    },
+    "kb.export.m3u8": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist (M3U8)"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist (M3U8)"
+          }
+        }
+      }
+    },
+    "kb.export.rekordbox": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "rekordbox XML"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "rekordbox XML"
+          }
+        }
+      }
+    },
+    "kb.export.text": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracklist (text)"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracklist (text)"
+          }
+        }
+      }
+    },
+    "kb.export.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MixAI set log"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jurnal set MixAI"
+          }
+        }
+      }
+    },
+    "kb.file.header %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File: %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fișier: %@"
+          }
+        }
+      }
+    },
+    "kb.file_error": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This file could not be read. Try an MP3, M4A, FLAC, WAV or OGG file."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fișierul nu a putut fi citit. Încearcă un fișier MP3, M4A, FLAC, WAV sau OGG."
+          }
+        }
+      }
+    },
+    "kb.focus.autostart": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start listening"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pornește ascultarea"
+          }
+        }
+      }
+    },
+    "kb.focus.desc": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "During a gig: stage mode in night red and listening starts by itself."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "În timpul unui set: modul scenă în roșu de noapte și ascultarea pornește singură."
+          }
+        }
+      }
+    },
+    "kb.focus.night": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Night red stage mode"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mod scenă roșu de noapte"
+          }
+        }
+      }
+    },
+    "kb.focus.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gig"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set live"
+          }
+        }
+      }
+    },
+    "kb.half_tempo": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "½×"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "½×"
+          }
+        }
+      }
+    },
+    "kb.history.clear": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Șterge"
+          }
+        }
+      }
+    },
+    "kb.history.clear_confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete every saved reading? This cannot be undone."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ștergi toate citirile salvate? Acțiunea nu poate fi anulată."
+          }
+        }
+      }
+    },
+    "kb.history.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing saved yet. Readings are saved automatically once key and BPM lock."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nimic salvat încă. Citirile se salvează automat când tonalitatea și BPM-ul se fixează."
+          }
+        }
+      }
+    },
+    "kb.history.export": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportă"
+          }
+        }
+      }
+    },
+    "kb.idle_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold your iPhone near the music. Audio is analysed on your device and never recorded."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ține iPhone-ul lângă muzică. Sunetul e analizat pe dispozitiv și nu e înregistrat."
+          }
+        }
+      }
+    },
+    "kb.intent.identify": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identify song"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identifică piesa"
+          }
+        }
+      }
+    },
+    "kb.intent.listen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start listening"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pornește ascultarea"
+          }
+        }
+      }
+    },
+    "kb.intent.listen_desc": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detect the key and BPM of the music around you."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detectează tonalitatea și BPM-ul muzicii din jur."
+          }
+        }
+      }
+    },
+    "kb.intent.listening": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listening"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ascultare"
+          }
+        }
+      }
+    },
+    "kb.intent.no_reading": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No steady key yet. Move closer to the speaker."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Încă nu e o tonalitate stabilă. Apropie-te de boxă."
+          }
+        }
+      }
+    },
+    "kb.intent.stage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stage mode"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mod scenă"
+          }
+        }
+      }
+    },
+    "kb.intent.stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop listening"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oprește ascultarea"
+          }
+        }
+      }
+    },
+    "kb.intent.what_key": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What key is this?"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce tonalitate e asta?"
+          }
+        }
+      }
+    },
+    "kb.key": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tonalitate"
+          }
+        }
+      }
+    },
+    "kb.key_changed %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key change: %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schimbare de tonalitate: %@"
+          }
+        }
+      }
+    },
+    "kb.key_chords %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chords in key: %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acorduri în tonalitate: %@"
+          }
+        }
+      }
+    },
+    "kb.key_notes %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scale: %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gamă: %@"
+          }
+        }
+      }
+    },
+    "kb.la.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Următoarele"
+          }
+        }
+      }
+    },
+    "kb.level_low": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too quiet — move closer to the speaker"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prea încet — apropie-te de boxă"
+          }
+        }
+      }
+    },
+    "kb.library.connect": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect server"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conectează serverul"
+          }
+        }
+      }
+    },
+    "kb.library.disconnect": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disconnect"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deconectează"
+          }
+        }
+      }
+    },
+    "kb.library.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No analysed tracks in your library mix with this key and tempo yet."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicio piesă analizată din biblioteca ta nu se mixează încă cu această tonalitate și acest tempo."
+          }
+        }
+      }
+    },
+    "kb.library.error %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not reach your server (%@)."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serverul nu a putut fi contactat (%@)."
+          }
+        }
+      }
+    },
+    "kb.library.for %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mixes with %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se mixează cu %@"
+          }
+        }
+      }
+    },
+    "kb.library.intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect your MMO Server to see which of your own tracks mix well with what is playing. Optional — everything else works offline."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conectează serverul MMO ca să vezi care piese din colecția ta se mixează bine cu ce se aude acum. Opțional — restul funcționează offline."
+          }
+        }
+      }
+    },
+    "kb.library.need_reading": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listen to a song or open a file first."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ascultă o piesă sau deschide un fișier mai întâi."
+          }
+        }
+      }
+    },
+    "kb.listen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listen"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ascultă"
+          }
+        }
+      }
+    },
+    "kb.listen_again": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listen again"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ascultă din nou"
+          }
+        }
+      }
+    },
+    "kb.listening": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listening…"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ascult…"
+          }
+        }
+      }
+    },
+    "kb.locked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "locked"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fixat"
+          }
+        }
+      }
+    },
+    "kb.loudness": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loudness"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volum"
+          }
+        }
+      }
+    },
+    "kb.lufs %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ LUFS"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ LUFS"
+          }
+        }
+      }
+    },
+    "kb.mic.denied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone access is off. Turn it on in Settings to detect key and BPM."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accesul la microfon e oprit. Pornește-l din Setări ca să detectezi tonalitatea și BPM-ul."
+          }
+        }
+      }
+    },
+    "kb.mix_next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mix next"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mixează în continuare"
+          }
+        }
+      }
+    },
+    "kb.notation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notation"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notație"
+          }
+        }
+      }
+    },
+    "kb.notation.camelot": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camelot"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camelot"
+          }
+        }
+      }
+    },
+    "kb.notation.musical": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Musical"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muzicală"
+          }
+        }
+      }
+    },
+    "kb.notation.open_key": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Key"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Key"
+          }
+        }
+      }
+    },
+    "kb.ok": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "kb.open_file": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open file"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deschide fișier"
+          }
+        }
+      }
+    },
+    "kb.open_settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deschide Setările"
+          }
+        }
+      }
+    },
+    "kb.provisional": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "provisional"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "provizoriu"
+          }
+        }
+      }
+    },
+    "kb.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvează"
+          }
+        }
+      }
+    },
+    "kb.saved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvat"
+          }
+        }
+      }
+    },
+    "kb.sing.centre %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your comfortable centre: %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Centrul tău comod: %@"
+          }
+        }
+      }
+    },
+    "kb.sing.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hum or sing a comfortable phrase for a few seconds, then stop."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fredonează sau cântă o frază comodă câteva secunde, apoi oprește."
+          }
+        }
+      }
+    },
+    "kb.sing.need_key": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detect a song key first (Live tab)."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detectează mai întâi tonalitatea piesei (fila Live)."
+          }
+        }
+      }
+    },
+    "kb.sing.result %@ %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transpose %1$@ → sing in %2$@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transpune %1$@ → cântă în %2$@"
+          }
+        }
+      }
+    },
+    "kb.sing.start": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hum test"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test de voce"
+          }
+        }
+      }
+    },
+    "kb.sing.stop %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done (%lld)"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gata (%lld)"
+          }
+        }
+      }
+    },
+    "kb.sing.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Singer transpose"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transpunere pentru voce"
+          }
+        }
+      }
+    },
+    "kb.songid.add_queue": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to MixAI queue"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adaugă în coada MixAI"
+          }
+        }
+      }
+    },
+    "kb.songid.apple_music": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music"
+          }
+        }
+      }
+    },
+    "kb.songid.collecting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listening for a few seconds…"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ascult câteva secunde…"
+          }
+        }
+      }
+    },
+    "kb.songid.compare %@ %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live %1$@ · library %2$@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live %1$@ · bibliotecă %2$@"
+          }
+        }
+      }
+    },
+    "kb.songid.error %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Song ID failed (%@)."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identificarea a eșuat (%@)."
+          }
+        }
+      }
+    },
+    "kb.songid.identify": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identify"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identifică"
+          }
+        }
+      }
+    },
+    "kb.songid.in_library": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In your MixAI library"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "În biblioteca ta MixAI"
+          }
+        }
+      }
+    },
+    "kb.songid.matching": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looking it up…"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Caut piesa…"
+          }
+        }
+      }
+    },
+    "kb.songid.need_listen": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start listening, then tap Identify."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pornește ascultarea, apoi apasă Identifică."
+          }
+        }
+      }
+    },
+    "kb.songid.no_match": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No match. Try again closer to the speaker."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicio potrivire. Încearcă mai aproape de boxă."
+          }
+        }
+      }
+    },
+    "kb.songid.offline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No connection — the song will be identified when you are back online."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fără conexiune — piesa va fi identificată când revii online."
+          }
+        }
+      }
+    },
+    "kb.songid.pending %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld songs waiting to be identified"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld piese așteaptă identificarea"
+          }
+        }
+      }
+    },
+    "kb.songid.privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Song ID sends a short audio fingerprint (not audio) to Apple's Shazam. Key and BPM never leave your iPhone."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identificarea trimite către Shazam (Apple) o amprentă audio scurtă (nu sunetul). Tonalitatea și BPM-ul nu părăsesc iPhone-ul."
+          }
+        }
+      }
+    },
+    "kb.songid.queued": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added to queue"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adăugată în coadă"
+          }
+        }
+      }
+    },
+    "kb.songid.spotify": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spotify"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spotify"
+          }
+        }
+      }
+    },
+    "kb.songid.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Song ID"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identificare piesă"
+          }
+        }
+      }
+    },
+    "kb.songid.tracklist": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracklist mode"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mod tracklist"
+          }
+        }
+      }
+    },
+    "kb.songid.tracklist_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identify every new song while listening, for a full set tracklist."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identifică fiecare piesă nouă cât asculți, pentru tracklistul complet al setului."
+          }
+        }
+      }
+    },
+    "kb.songid.youtube_music": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YouTube Music"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YouTube Music"
+          }
+        }
+      }
+    },
+    "kb.stage.exit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exit"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ieșire"
+          }
+        }
+      }
+    },
+    "kb.stage.idle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not listening"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nu se ascultă"
+          }
+        }
+      }
+    },
+    "kb.stage.night": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Night red"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Roșu de noapte"
+          }
+        }
+      }
+    },
+    "kb.stage.timer %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set time %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durata setului %@"
+          }
+        }
+      }
+    },
+    "kb.stage_mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stage mode"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mod scenă"
+          }
+        }
+      }
+    },
+    "kb.stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        }
+      }
+    },
+    "kb.tab.library": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Library"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bibliotecă"
+          }
+        }
+      }
+    },
+    "kb.tab.live": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live"
+          }
+        }
+      }
+    },
+    "kb.tab.practice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Practice"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exersare"
+          }
+        }
+      }
+    },
+    "kb.tab.setlog": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set log"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jurnal set"
+          }
+        }
+      }
+    },
+    "kb.tab.tempo": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempo"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempo"
+          }
+        }
+      }
+    },
+    "kb.tab.tuner": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tuner"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acordor"
+          }
+        }
+      }
+    },
+    "kb.tempo.bluetooth": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bluetooth MIDI"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MIDI prin Bluetooth"
+          }
+        }
+      }
+    },
+    "kb.tempo.click": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metronome click"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clic metronom"
+          }
+        }
+      }
+    },
+    "kb.tempo.follow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow detected BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Urmează BPM detectat"
+          }
+        }
+      }
+    },
+    "kb.tempo.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sends MIDI Start, 24 clock ticks per beat and Stop to every connected device and to the virtual source \"MixAI Clock\"."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trimite MIDI Start, 24 de impulsuri de ceas pe bătaie și Stop către fiecare dispozitiv conectat și către sursa virtuală „MixAI Clock”."
+          }
+        }
+      }
+    },
+    "kb.tempo.midi_out": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MIDI clock out"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ceas MIDI"
+          }
+        }
+      }
+    },
+    "kb.tempo.no_devices": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No MIDI device connected. Plug one in over USB, use network MIDI or pair one over Bluetooth."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niciun dispozitiv MIDI conectat. Conectează unul prin USB, folosește MIDI prin rețea sau asociază-l prin Bluetooth."
+          }
+        }
+      }
+    },
+    "kb.tempo.refresh": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reîmprospătează"
+          }
+        }
+      }
+    },
+    "kb.tempo.start": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start clock"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pornește ceasul"
+          }
+        }
+      }
+    },
+    "kb.tempo.stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop clock"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oprește ceasul"
+          }
+        }
+      }
+    },
+    "kb.tempo.tap": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap"
+          }
+        }
+      }
+    },
+    "kb.tempo.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempo tools"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instrumente de tempo"
+          }
+        }
+      }
+    },
+    "kb.tempo.virtual": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other apps on this iPhone can follow the \"MixAI Clock\" source."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alte aplicații de pe iPhone pot urma sursa „MixAI Clock”."
+          }
+        }
+      }
+    },
+    "kb.tempo_cycle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "½× / 2×"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "½× / 2×"
+          }
+        }
+      }
+    },
+    "kb.tempo_cycle_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch between the detected, double and half tempo."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comută între tempoul detectat, dublu și pe jumătate."
+          }
+        }
+      }
+    },
+    "kb.timeline.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved readings appear here as a key / BPM timeline."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Citirile salvate apar aici ca o cronologie de tonalitate / BPM."
+          }
+        }
+      }
+    },
+    "kb.timeline.share": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share image"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distribuie imaginea"
+          }
+        }
+      }
+    },
+    "kb.timeline.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set timeline"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cronologia setului"
+          }
+        }
+      }
+    },
+    "kb.tuner.higher": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raise reference"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mărește referința"
+          }
+        }
+      }
+    },
+    "kb.tuner.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play a single note"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cântă o singură notă"
+          }
+        }
+      }
+    },
+    "kb.tuner.lower": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lower reference"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scade referința"
+          }
+        }
+      }
+    },
+    "kb.tuner.reference %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference A4 = %lld Hz"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referință La4 = %lld Hz"
+          }
+        }
+      }
+    },
+    "kb.tuning": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tuning"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acordaj"
+          }
+        }
+      }
+    },
+    "kb.tuning_value %@ %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A4 = %1$@ Hz (%2$@ ¢)"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La4 = %1$@ Hz (%2$@ ¢)"
+          }
+        }
+      }
+    },
+    "kb.watch.app_short": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key & BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key & BPM"
+          }
+        }
+      }
+    },
+    "kb.watch.bpm_tapped": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BPM · tapped"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BPM · bătut"
+          }
+        }
+      }
+    },
+    "kb.watch.cd_complication %@ %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key %1$@, %2$@ BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tonalitate %1$@, %2$@ BPM"
+          }
+        }
+      }
+    },
+    "kb.watch.cd_live %@ %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key %1$@, %2$@ BPM. Tap in time to set the tempo."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tonalitate %1$@, %2$@ BPM. Atinge în ritm ca să setezi tempoul."
+          }
+        }
+      }
+    },
+    "kb.watch.from_phone": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BPM · from iPhone"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BPM · de pe iPhone"
+          }
+        }
+      }
+    },
+    "kb.watch.haptic": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haptic beat"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bătaie prin vibrație"
+          }
+        }
+      }
+    },
+    "kb.watch.haptic_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feel the beat on your wrist, stronger on the downbeat"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simți bătaia pe încheietură, mai puternic pe timpul 1"
+          }
+        }
+      }
+    },
+    "kb.watch.key_changed %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key changed to %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tonalitatea s-a schimbat în %@"
+          }
+        }
+      }
+    },
+    "kb.watch.level_low": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too quiet, move closer"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prea încet, apropie-te"
+          }
+        }
+      }
+    },
+    "kb.watch.listen_watch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listen on watch"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ascultă pe ceas"
+          }
+        }
+      }
+    },
+    "kb.watch.mic_failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone unavailable"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microfon indisponibil"
+          }
+        }
+      }
+    },
+    "kb.watch.phone_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start listening in the iPhone app to mirror it here."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pornește ascultarea în aplicația de pe iPhone ca să apară aici."
+          }
+        }
+      }
+    },
+    "kb.watch.phone_listening": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The iPhone is listening: its reading shows here when the watch is not listening."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone-ul ascultă: citirea lui apare aici când ceasul nu ascultă."
+          }
+        }
+      }
+    },
+    "kb.watch.tap_clear": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear tapped BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Șterge BPM-ul bătut"
+          }
+        }
+      }
+    },
+    "kb.watch.tap_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap in time to set the BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atinge în ritm ca să setezi BPM-ul"
+          }
+        }
+      }
+    },
+    "kb.watch.tap_tempo": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap tempo"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempo prin atingere"
+          }
+        }
+      }
+    },
+    "kb.watch.tile_empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap Listen"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atinge Ascultă"
+          }
+        }
+      }
+    },
+    "kb.widget.identify": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identify song"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identifică piesa"
+          }
+        }
+      }
+    },
+    "kb.widget.identify_desc": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start listening and identify the song with one tap."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pornește ascultarea și identifică piesa dintr-o atingere."
+          }
+        }
+      }
+    },
+    "kb.widget.last": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key & BPM"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key & BPM"
+          }
+        }
+      }
+    },
+    "kb.widget.last_desc": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last detected key and BPM, tap to listen."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultima tonalitate și BPM detectate, atinge ca să asculți."
+          }
+        }
+      }
+    },
+    "mix.boost": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+2 energy boost"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+2 boost de energie"
+          }
+        }
+      }
+    },
+    "mix.diagonal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mood change"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schimbare de stare"
+          }
+        }
+      }
+    },
+    "mix.down": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "−1 calmer"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "−1 mai calm"
+          }
+        }
+      }
+    },
+    "mix.relative": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relative"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relativă"
+          }
+        }
+      }
+    },
+    "mix.same": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Same key"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aceeași tonalitate"
+          }
+        }
+      }
+    },
+    "mix.up": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+1 energy up"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+1 mai multă energie"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

@@ -23,7 +23,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
@@ -81,10 +83,16 @@ fun LiveScreen(
         key?.key?.index?.let { idx -> compatibleKeys(idx).map { it.key.camelot }.toSet() } ?: emptySet()
     }
     val keyText = key?.let { keyLabel(it.key.index, ui.notation) } ?: "—"
+    val charging = rememberCharging()
+    val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        if (ro.mixai.keybpm.MixNext.showBoothChip(charging, landscape, ui.listening)) {
+            AssistChip(onClick = onStage, label = { Text(stringResource(R.string.booth_chip)) })
+            Spacer(Modifier.height(8.dp))
+        }
         ui.fileName?.let {
             Text(stringResource(R.string.file_header, it), style = MaterialTheme.typography.titleSmall, color = Mixai.colors.muted)
             Spacer(Modifier.height(8.dp))
@@ -192,6 +200,34 @@ fun LiveScreen(
             SongIdCard(ui, onIdentify, onTracklist, onAddToQueue)
         }
     }
+}
+
+/**
+ * Charging state for auto booth mode: a sticky ACTION_BATTERY_CHANGED read (no permission), refreshed on
+ * power connect / disconnect while the screen is shown.
+ */
+@Composable
+private fun rememberCharging(): Boolean {
+    val context = LocalView.current.context
+    var charging by remember { androidx.compose.runtime.mutableStateOf(readCharging(context)) }
+    androidx.compose.runtime.DisposableEffect(context) {
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context, i: android.content.Intent) { charging = readCharging(c) }
+        }
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_POWER_CONNECTED)
+            addAction(android.content.Intent.ACTION_POWER_DISCONNECTED)
+        }
+        androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    return charging
+}
+
+private fun readCharging(context: android.content.Context): Boolean {
+    val sticky = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED)) ?: return false
+    val status = sticky.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
+    return status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
 }
 
 @Composable

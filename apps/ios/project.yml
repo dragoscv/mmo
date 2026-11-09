@@ -40,6 +40,10 @@ packages:
   # scripts/build-decks-xcframework.sh (gitignored artefacts; Package.swift committed).
   DecksFFI:
     path: DecksFFI
+  # MixAI Key & BPM Rust engine (WP18-05): KeyBpmFFI.xcframework (iOS + watchOS slices) + generated bindings, built by
+  # scripts/build-keybpm-xcframework.sh (gitignored artefacts; Package.swift committed).
+  KeyBpmFFI:
+    path: KeyBpmFFI
 targets:
   MixAI:
     type: application
@@ -452,6 +456,200 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         COMBINE_HIDPI_IMAGES: YES
         SWIFT_EMIT_LOC_STRINGS: YES
+  # MixAI Key & BPM (WP18-05, D69/D70): live key + BPM from the mic on the Rust engine (crates/mixai-listen-ffi),
+  # Song ID (ShazamKit), set log + exports, tuner, tempo + MIDI clock, practice, optional MMO library. Own App Store
+  # record ro.mixai.keybpm with an embedded INDEPENDENT watch app (own mic + engine). App IDs ro.mixai.keybpm /
+  # .widgets / .watchkitapp / .watchkitapp.widgets with ShazamKit + App Group group.ro.mixai.keybpm.
+  MixAIKeyBpm:
+    type: application
+    platform: iOS
+    deploymentTarget: '26.0'
+    sources:
+      - path: KeyBpmApp
+      - path: MixAI/Resources/Fonts
+        buildPhase: resources
+    dependencies:
+      - package: MixaiCore
+      - package: MixaiUI
+      - package: KeyBpmFFI
+      - target: MixAIKeyBpmWidgets
+        embed: true
+        codeSign: true
+      - target: MixAIKeyBpmWatch
+        embed: true
+        codeSign: true
+      - sdk: AVFoundation.framework
+      - sdk: ShazamKit.framework
+      - sdk: CoreMIDI.framework
+      - sdk: CoreAudioKit.framework
+      - sdk: ActivityKit.framework
+      - sdk: WidgetKit.framework
+      - sdk: AppIntents.framework
+      - sdk: WatchConnectivity.framework
+      - sdk: MusicKit.framework
+      - sdk: Charts.framework
+    info:
+      path: KeyBpmApp/Info.plist
+      properties:
+        # audio = keep listening with the screen locked, only when the user turned "Keep listening in the background"
+        # on (default off) and always with the Live Activity + system mic indicator (review note in the store record).
+        UIBackgroundModes: [audio]
+        NSSupportsLiveActivities: true
+        NSBonjourServices: [_mmo-companion._tcp, _apple-midi._udp]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UIAppFonts: [SpaceGrotesk-Variable.ttf, Inter-Variable.ttf]
+        CFBundleURLTypes:
+          - CFBundleURLName: ro.mixai.keybpm
+            CFBundleURLSchemes: [mixai-keybpm]
+        LSApplicationQueriesSchemes: [mixai-music]
+        UIUserInterfaceStyle: Dark
+        CFBundleLocalizations: [en, ro]
+        UIFileSharingEnabled: false
+    entitlements:
+      path: KeyBpmApp/MixAIKeyBpm.entitlements
+      properties:
+        com.apple.security.application-groups: [group.ro.mixai.keybpm]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.keybpm
+        PRODUCT_NAME: MixAIKeyBpm
+        MARKETING_VERSION: '0.4.0'
+        TARGETED_DEVICE_FAMILY: '1'
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Key & BPM
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.music
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: MixAI listens to the music around you to show its key, BPM and tuning. Audio is analysed on your iPhone and never recorded; Song ID sends only an audio fingerprint to Apple's Shazam.
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: MixAI finds your MMO Server and network MIDI devices on this network.
+        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: MixAI sends MIDI clock to Bluetooth MIDI devices you choose.
+        INFOPLIST_KEY_NSAppleMusicUsageDescription: MixAI saves the songs identified in your set as an Apple Music playlist when you ask it to.
+        SWIFT_EMIT_LOC_STRINGS: YES
+  MixAIKeyBpmWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: '26.0'
+    sources:
+      - path: KeyBpmWidgets
+      - path: KeyBpmApp/Shared
+        excludes: [SetLog.swift]
+      - path: KeyBpmApp/Localizable.xcstrings
+    dependencies:
+      - package: MixaiCore
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+      - sdk: ActivityKit.framework
+      - sdk: AppIntents.framework
+    info:
+      path: KeyBpmWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Key & BPM
+        CFBundleLocalizations: [en, ro]
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: KeyBpmWidgets/MixAIKeyBpmWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.ro.mixai.keybpm]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.keybpm.widgets
+        PRODUCT_NAME: MixAIKeyBpmWidgets
+        MARKETING_VERSION: '0.4.0'
+        TARGETED_DEVICE_FAMILY: '1'
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Key & BPM
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ''
+        ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME: ''
+        SWIFT_EMIT_LOC_STRINGS: NO
+  # Independent watch app (owner 2026-11-09): own mic + Rust engine (aarch64 watchOS = Series 9+ / Ultra 2+), iPhone
+  # mirror over WatchConnectivity, haptic beat, Double Tap tap tempo, complications. Background audio mode keeps the
+  # mic while the wrist is down (started in the foreground; no runtime / workout session).
+  MixAIKeyBpmWatch:
+    type: application
+    platform: watchOS
+    deploymentTarget: '11.0'
+    sources:
+      - path: KeyBpmWatch
+      - path: KeyBpmApp/Shared
+        excludes: [KeyBpmActivity.swift, SetLog.swift]
+      - path: KeyBpmApp/Engine/MicCapture.swift
+      - path: MixaiCore/Sources/MixaiCore/Theme/Tokens.swift
+      - path: KeyBpmApp/Localizable.xcstrings
+    dependencies:
+      - package: KeyBpmFFI
+      - target: MixAIKeyBpmWatchWidgets
+        embed: true
+        codeSign: true
+      - sdk: WatchConnectivity.framework
+      - sdk: WidgetKit.framework
+    info:
+      path: KeyBpmWatch/Info.plist
+      properties:
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: ro.mixai.keybpm
+        WKRunsIndependentlyOfCompanionApp: true
+        WKBackgroundModes: [audio]
+        CFBundleLocalizations: [en, ro]
+    entitlements:
+      path: KeyBpmWatch/MixAIKeyBpmWatch.entitlements
+      properties:
+        com.apple.security.application-groups: [group.ro.mixai.keybpm]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.keybpm.watchkitapp
+        # D69: aarch64 watches only (Series 9+ / Ultra 2+); the Rust engine has no arm64_32 slice yet.
+        ARCHS[sdk=watchos*]: arm64
+        PRODUCT_NAME: MixAIKeyBpmWatch
+        MARKETING_VERSION: '0.4.0'
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Key & BPM
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: MixAI listens to the music around you to show its key and BPM on your watch. Audio is analysed on the watch and never recorded.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: '4'
+        SKIP_INSTALL: YES
+        SWIFT_EMIT_LOC_STRINGS: NO
+  MixAIKeyBpmWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    deploymentTarget: '11.0'
+    sources:
+      - path: KeyBpmWatchWidgets
+      - path: KeyBpmApp/Shared/Harmony.swift
+      - path: KeyBpmApp/Shared/KeyBpmShared.swift
+      - path: MixaiCore/Sources/MixaiCore/Theme/Tokens.swift
+      - path: KeyBpmApp/Localizable.xcstrings
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    info:
+      path: KeyBpmWatchWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Key & BPM
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: KeyBpmWatchWidgets/MixAIKeyBpmWatchWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.ro.mixai.keybpm]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.keybpm.watchkitapp.widgets
+        ARCHS[sdk=watchos*]: arm64
+        PRODUCT_NAME: MixAIKeyBpmWatchWidgets
+        MARKETING_VERSION: '0.4.0'
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Key & BPM
+        TARGETED_DEVICE_FAMILY: '4'
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SWIFT_EMIT_LOC_STRINGS: NO
 schemes:
   MixAI:
     build:
@@ -492,6 +690,26 @@ schemes:
     build:
       targets:
         MixAIDecksMac: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  MixAIKeyBpm:
+    build:
+      targets:
+        MixAIKeyBpm: all
+        MixAIKeyBpmWidgets: all
+        MixAIKeyBpmWatch: all
+        MixAIKeyBpmWatchWidgets: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  MixAIKeyBpmWatch:
+    build:
+      targets:
+        MixAIKeyBpmWatch: all
+        MixAIKeyBpmWatchWidgets: all
     run:
       config: Debug
     archive:

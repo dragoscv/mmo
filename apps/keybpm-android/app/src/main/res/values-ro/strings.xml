@@ -151,4 +151,12 @@
     <string name="a11y_announce">Anunță schimbările de tonalitate</string>
     <string name="a11y_announce_hint">Vorbește și vibrează când se schimbă tonalitatea (TalkBack sau fără să te uiți).</string>
     <string name="a11y_key_now">Tonalitatea acum %1$s</string>
+    <string name="a11y_what_key">%1$s, %2$s BPM</string>
+    <string name="shortcut_listen">Ascultă</string>
+    <string name="shortcut_identify">Identifică piesa</string>
+    <string name="shortcut_what_key">Ce tonalitate e asta?</string>
+    <string name="notif_next">Următoarele: %1$s</string>
+    <string name="stage_night">Noapte</string>
+    <string name="stage_dnd">Nu deranja</string>
+    <string name="booth_chip">Display de cabină</string>
 </resources>

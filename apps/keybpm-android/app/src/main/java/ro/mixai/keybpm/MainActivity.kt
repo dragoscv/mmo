@@ -62,6 +62,8 @@ class MainActivity : ComponentActivity() {
     private val identifyRequest = androidx.compose.runtime.mutableIntStateOf(0)
     /** Set by the Quick Settings tile. */
     private val listenRequest = androidx.compose.runtime.mutableIntStateOf(0)
+    /** Set by the "What key is this?" shortcut / Assistant App Action. */
+    private val whatKeyRequest = androidx.compose.runtime.mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -87,6 +89,19 @@ class MainActivity : ComponentActivity() {
         }
         if (intent?.action == ListenTileService.ACTION_LISTEN) {
             listenRequest.intValue++
+            return
+        }
+        if (intent?.action == ACTION_WHAT_KEY) {
+            whatKeyRequest.intValue++
+            return
+        }
+        // Assistant OPEN_APP_FEATURE fulfilled through the capability intent (VIEW + "feature" extra, no data).
+        if (intent?.action == Intent.ACTION_VIEW && intent.data == null) {
+            when (intent.getStringExtra("feature")?.lowercase()) {
+                "listen" -> listenRequest.intValue++
+                "identify song", "identify" -> identifyRequest.intValue++
+                "what key" -> whatKeyRequest.intValue++
+            }
             return
         }
         val uri: Uri? = when (intent?.action) {
@@ -139,6 +154,14 @@ class MainActivity : ComponentActivity() {
             tab = 0
             if (!ui.listening) start()
         }
+        val whatKeyReq by whatKeyRequest
+        androidx.compose.runtime.LaunchedEffect(whatKeyReq) {
+            if (whatKeyReq == 0) return@LaunchedEffect
+            tab = 0
+            stage = false
+            model.requestWhatKey()
+            if (!ui.listening) start()
+        }
         // Keep the screen on while listening (stage use).
         DisposableEffect(ui.listening) {
             if (ui.listening) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -146,7 +169,10 @@ class MainActivity : ComponentActivity() {
             onDispose { }
         }
         if (stage) {
-            StageScreen(ui, model::cycleTempo, model::dismissKeyChange, onExit = { stage = false })
+            StageScreen(
+                ui, model::cycleTempo, model::dismissKeyChange, onExit = { stage = false },
+                onNight = model::setStageNight, onDnd = model::setStageDnd,
+            )
             return
         }
         Scaffold(
@@ -262,5 +288,10 @@ class MainActivity : ComponentActivity() {
         val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.files", f)
         val send = Intent(Intent.ACTION_SEND).setType("image/png").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         startActivity(Intent.createChooser(send, getString(R.string.timeline_share)))
+    }
+
+    companion object {
+        /** "What key is this?" static shortcut + Assistant OPEN_APP_FEATURE "what key". */
+        const val ACTION_WHAT_KEY = "ro.mixai.keybpm.WHAT_KEY"
     }
 }

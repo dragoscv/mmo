@@ -22,10 +22,13 @@
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode musicupload -Ref origin/main  # MixAI Music to TestFlight
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode decksbuild                  # MixAI Decks iOS/iPadOS, unsigned (WP19-15)
   pwsh -NoProfile -File scripts/ios-build.ps1 -Mode decksmacbuild               # MixAI Decks macOS, unsigned (WP19-15)
+  pwsh -NoProfile -File scripts/ios-build.ps1 -Mode keybpmbuild                 # MixAI Key & BPM iOS + watchOS, unsigned (WP18-05)
+  pwsh -NoProfile -File scripts/ios-build.ps1 -Mode keybpmwatchsim              # Key & BPM watch app in the watchOS Simulator + store shots
+  pwsh -NoProfile -File scripts/ios-build.ps1 -Mode keybpmupload -Ref origin/main # Key & BPM (iOS + watch) to TestFlight
 #>
 [CmdletBinding()]
 param(
-  [ValidateSet('test', 'build', 'tvbuild', 'devipa', 'upload', 'tvupload', 'musicbuild', 'musicdevipa', 'musicupload', 'decksbuild', 'decksmacbuild')] [string]$Mode = 'build',
+  [ValidateSet('test', 'build', 'tvbuild', 'devipa', 'upload', 'tvupload', 'musicbuild', 'musicdevipa', 'musicupload', 'decksbuild', 'decksmacbuild', 'keybpmbuild', 'keybpmwatchsim', 'keybpmdevipa', 'keybpmupload')] [string]$Mode = 'build',
   [string]$Ref = 'HEAD',
   [string]$GuestHost = '100.106.244.19',
   [int]$GuestPort = 10022,
@@ -47,7 +50,7 @@ function Invoke-Guest([string]$cmd) {
   if ($LASTEXITCODE -ne 0) { throw "guest command failed ($LASTEXITCODE): $($cmd.Split(';')[0])" }
 }
 
-$signed = $Mode -in @('upload', 'devipa', 'tvupload', 'musicdevipa', 'musicupload')
+$signed = $Mode -in @('upload', 'devipa', 'tvupload', 'musicdevipa', 'musicupload', 'keybpmdevipa', 'keybpmupload')
 if ($signed) {
   $names = @(gcloud secrets list --project $Project --filter='name~apple-' --format='value(name)' 2>$null) | ForEach-Object { ($_ -split '/')[-1] }
   $missing = @('apple-asc-key-p8', 'apple-asc-key-id', 'apple-asc-issuer', 'apple-team-id') | Where-Object { $names -notcontains $_ }
@@ -99,12 +102,27 @@ if ($Mode -like 'decks*') {
   Invoke-Guest "cd ~/$remote && mkdir -p rust && tar -xf rust.tar -C rust && rm rust.tar"
   $rustEnv = 'DECKS_RUST_ROOT=$HOME/' + $remote + '/rust '
 }
+# MixAI Key & BPM modes need the committed Rust engine (crates/mixai-listen, -ffi).
+if ($Mode -like 'keybpm*') {
+  $rtar = Join-Path $tmp 'rust.tar'
+  git -C $repo -c core.autocrlf=false archive --format=tar -o $rtar $sha -- crates
+  & scp -q -o BatchMode=yes -i $Key -P $GuestPort $rtar "${target}:$remote/rust.tar"
+  if ($LASTEXITCODE -ne 0) { throw 'scp rust.tar failed' }
+  Invoke-Guest "cd ~/$remote && mkdir -p rust && tar -xf rust.tar -C rust && rm rust.tar"
+  $rustEnv = 'KEYBPM_RUST_ROOT=$HOME/' + $remote + '/rust '
+}
 
 $log = Join-Path $tmp "$Mode.log"
 $build = (git -C $repo rev-list --count $sha).Trim()
 if (-not $signed) {
   & ssh @ssh $target "cd ~/$remote && ${rustEnv}BUILD_NUMBER=$build ./scripts/build.sh $Mode" *>&1 | Tee-Object -FilePath $log
   $rc = $LASTEXITCODE
+  if ($rc -eq 0 -and $Mode -eq 'keybpmwatchsim') {
+    $shots = Join-Path $tmp 'watch-shots'
+    New-Item -ItemType Directory -Force -Path $shots | Out-Null
+    & scp -q -o BatchMode=yes -i $Key -P $GuestPort "${target}:$remote/build/watch-shots/*.png" $shots
+    Write-Host "watch shots: $shots"
+  }
 } else {
   $p8 = Join-Path $tmp 'k.p8'
   try {
@@ -120,10 +138,10 @@ if (-not $signed) {
     Remove-Item $p8 -Force -ErrorAction SilentlyContinue
   }
   # ids are not secret (key id / issuer / team); the .p8 is, and it is removed whatever build.sh returns.
-  $cmd = "cd ~/$remote && chmod 600 .k.p8 && DEVELOPMENT_TEAM=$team ASC_KEY_ID=$kid ASC_ISSUER_ID=$iss ASC_KEY_PATH=`$PWD/.k.p8 BUILD_NUMBER=$build ./scripts/build.sh $Mode; rc=`$?; rm -f .k.p8; exit `$rc"
+  $cmd = "cd ~/$remote && chmod 600 .k.p8 && ${rustEnv}DEVELOPMENT_TEAM=$team ASC_KEY_ID=$kid ASC_ISSUER_ID=$iss ASC_KEY_PATH=`$PWD/.k.p8 BUILD_NUMBER=$build ./scripts/build.sh $Mode; rc=`$?; rm -f .k.p8; exit `$rc"
   & ssh @ssh $target $cmd *>&1 | Tee-Object -FilePath $log
   $rc = $LASTEXITCODE
-  if ($rc -eq 0 -and $Mode -in @('devipa', 'musicdevipa')) {
+  if ($rc -eq 0 -and $Mode -in @('devipa', 'musicdevipa', 'keybpmdevipa')) {
     $ipa = Join-Path $tmp 'mixai-dev.ipa'
     & scp -q -o BatchMode=yes -i $Key -P $GuestPort "${target}:$remote/build/mixai-dev.ipa" $ipa
     $rc = $LASTEXITCODE

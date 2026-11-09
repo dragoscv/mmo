@@ -14,6 +14,8 @@ class KeyBpmPrefs(private val context: Context) {
     private val keyTracklist = booleanPreferencesKey("tracklist_mode")
     private val keyDrift = booleanPreferencesKey("drift_alarm")
     private val keyAnnounce = booleanPreferencesKey("announce_key")
+    private val keyStageNight = booleanPreferencesKey("stage_night")
+    private val keyStageDnd = booleanPreferencesKey("stage_dnd")
 
     /** Tracklist mode (WP18-06): identify each new song automatically while listening. Off by default. */
     val tracklistMode: Flow<Boolean> = context.keyBpmStore.data.map { it[keyTracklist] ?: false }
@@ -21,6 +23,10 @@ class KeyBpmPrefs(private val context: Context) {
     val driftAlarm: Flow<Boolean> = context.keyBpmStore.data.map { it[keyDrift] ?: false }
     /** Speak + vibrate key changes (accessibility). Off by default. */
     val announceKey: Flow<Boolean> = context.keyBpmStore.data.map { it[keyAnnounce] ?: false }
+    /** Stage mode night (red) palette. Off by default. */
+    val stageNight: Flow<Boolean> = context.keyBpmStore.data.map { it[keyStageNight] ?: false }
+    /** Stage mode sets Do not disturb (priority only) while it is open. Off by default. */
+    val stageDnd: Flow<Boolean> = context.keyBpmStore.data.map { it[keyStageDnd] ?: false }
 
     suspend fun setTracklistMode(on: Boolean) {
         context.keyBpmStore.edit { it[keyTracklist] = on }
@@ -32,5 +38,13 @@ class KeyBpmPrefs(private val context: Context) {
 
     suspend fun setAnnounceKey(on: Boolean) {
         context.keyBpmStore.edit { it[keyAnnounce] = on }
+    }
+
+    suspend fun setStageNight(on: Boolean) {
+        context.keyBpmStore.edit { it[keyStageNight] = on }
+    }
+
+    suspend fun setStageDnd(on: Boolean) {
+        context.keyBpmStore.edit { it[keyStageDnd] = on }
     }
 }

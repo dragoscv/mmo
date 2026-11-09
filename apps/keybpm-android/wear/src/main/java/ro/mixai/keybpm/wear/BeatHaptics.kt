@@ -33,6 +33,11 @@ class BeatHaptics(context: Context, private val session: WearListen) {
             if (wait <= 4) {
                 val i = session.clock.consume()
                 vibrator?.vibrate(if (i % 4 == 0L) accent else tick, attrs)
+                // Diagnostics: `adb shell setprop log.tag.KeyBpmBeat DEBUG` logs every beat (app side vs vibrator history).
+                if (android.util.Log.isLoggable(BEAT_TAG, android.util.Log.DEBUG)) {
+                    val c = session.clock
+                    android.util.Log.d(BEAT_TAG, "beat i=$i t=${now.toLong()} p=${c.periodMs.toInt()} skips=${c.skips} jumps=${c.jumps}")
+                }
                 schedule()
             } else {
                 handler.postAtTime(this, (now + wait).toLong())
@@ -59,5 +64,9 @@ class BeatHaptics(context: Context, private val session: WearListen) {
     fun keyChange() {
         val v = vibrator ?: return
         v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 60, 90, 60), intArrayOf(0, 255, 0, 255), -1), attrs)
+    }
+
+    private companion object {
+        const val BEAT_TAG = "KeyBpmBeat"
     }
 }

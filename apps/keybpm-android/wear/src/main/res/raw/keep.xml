@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resource shrinker: the Data Layer reads android_wear_capabilities by name (no code reference), so R8 builds
+     dropped it and the phone never found the watch (WP18-04, Watch8 2026-11-09). tools:keep only works here. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities" />

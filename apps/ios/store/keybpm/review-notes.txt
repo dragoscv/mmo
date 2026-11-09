@@ -1,0 +1,9 @@
+MixAI Key & BPM detects the musical key and tempo of the music playing near the device. No account or sign-in is needed: open the app, tap Listen and play any song from another device or speaker.
+
+Microphone: audio is analysed on the device by our own engine and is never recorded, stored or uploaded. Song ID (ShazamKit) sends only an audio signature to Apple's Shazam service.
+
+Background audio (UIBackgroundModes audio): used only when the user turns on "Keep listening in the background" (Practice tab, off by default) and has started a Listening session. A DJ can then lock the phone at the booth and keep live key/BPM detection running. The session is always shown by a Live Activity and the system microphone indicator, and can be stopped from the Live Activity, Control Center or the app. Starting from Control Center / Siri uses AudioRecordingIntent with the Live Activity, as required.
+
+Apple Watch: independent watch app with its own microphone and on-device engine (background audio mode only while the user listens on the watch), or a mirror of the iPhone over WatchConnectivity.
+
+Optional features that need the user's own hardware: MIDI clock out (USB / network / Bluetooth MIDI device) and "Library" (the user's own self-hosted MixAI server, found on the local network). Neither is needed to review the core features.

@@ -151,4 +151,12 @@
     <string name="a11y_announce">Announce key changes</string>
     <string name="a11y_announce_hint">Speak and vibrate when the key changes (TalkBack or eyes-off use).</string>
     <string name="a11y_key_now">Key now %1$s</string>
+    <string name="a11y_what_key">%1$s, %2$s BPM</string>
+    <string name="shortcut_listen">Listen</string>
+    <string name="shortcut_identify">Identify song</string>
+    <string name="shortcut_what_key">What key is this?</string>
+    <string name="notif_next">Next: %1$s</string>
+    <string name="stage_night">Night</string>
+    <string name="stage_dnd">Do not disturb</string>
+    <string name="booth_chip">Booth display</string>
 </resources>

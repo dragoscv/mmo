@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
+import uniffi.mixai_listen_ffi.compatibleKeys
 import uniffi.mixai_listen_ffi.keyLabel
 
 /**
@@ -49,7 +51,7 @@ class ListenService : Service() {
             scope.launch {
                 session.ui
                     .sample(1_000)
-                    .map { u -> if (u.listening) text(u) else null }
+                    .map { u -> if (u.listening) content(u) else null }
                     .distinctUntilChanged()
                     .collect { t ->
                         if (t == null) stopSelf()
@@ -65,21 +67,30 @@ class ListenService : Service() {
         super.onDestroy()
     }
 
-    private fun text(u: ListenUi): String {
-        val k = u.snapshot?.key ?: return getString(R.string.notif_waiting)
+    /** Ongoing notification text: reading, the "Next:" mix line and the short Camelot chip for the Live Update. */
+    private data class Content(val text: String, val next: String?, val camelot: String?)
+
+    private fun content(u: ListenUi): Content {
+        val k = u.snapshot?.key ?: return Content(getString(R.string.notif_waiting), null, null)
         val label = keyLabel(k.key.index, u.notation)
-        return u.bpm?.let { getString(R.string.notif_reading, label, "%.1f".format(it)) } ?: label
+        val text = u.bpm?.let { getString(R.string.notif_reading, label, "%.1f".format(it)) } ?: label
+        val next = runCatching {
+            val keys = MixNext.nextKeysForNotification(compatibleKeys(k.key.index).map { it.relation to it.key.index.toInt() })
+            MixNext.joinLabels(keys.map { keyLabel(it.toUByte(), u.notation) })
+        }.getOrNull()
+        return Content(text, next?.let { getString(R.string.notif_next, it) }, k.key.camelot)
     }
 
-    private fun build(content: String?): Notification {
+    private fun build(content: Content?): Notification {
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val text = content?.text ?: getString(R.string.notif_waiting)
+        val b = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_listen)
             .setContentTitle(getString(R.string.notif_listening))
-            .setContentText(content ?: getString(R.string.notif_waiting))
+            .setContentText(text)
             .setContentIntent(open)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -88,7 +99,13 @@ class ListenService : Service() {
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .addAction(0, getString(R.string.notif_save), action(ACTION_SAVE, 1))
             .addAction(0, getString(R.string.notif_stop), action(ACTION_STOP, 2))
-            .build()
+        content?.next?.let { b.setStyle(NotificationCompat.BigTextStyle().bigText("$text\n$it")) }
+        // Android 16 Live Update: promoted ongoing chip with the Camelot key in the status bar.
+        if (Build.VERSION.SDK_INT >= 36) {
+            b.setRequestPromotedOngoing(true)
+            content?.camelot?.let { b.setShortCriticalText(it) }
+        }
+        return b.build()
     }
 
     private fun action(name: String, code: Int): PendingIntent =
