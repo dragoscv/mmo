@@ -1,0 +1,26 @@
+[package]
+name = "live-remote"
+description = "MixAI Live LAN control: HTTP + WebSocket (protocol v1, token roles, QR pairing), OSC/UDP, web remote page."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+live-engine = { path = "../live-engine" }
+live-dsp = { path = "../live-dsp" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+# WebSocket (MIT/Apache), handshake only: LAN-only, token-gated (same choice as decks-remote).
+tungstenite = { version = "0.30.0", default-features = false, features = ["handshake"] }
+httparse = "1.10.1"
+getrandom = "0.4.3"
+rosc = "0.11.4"
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
+mdns-sd = "0.21.7"
+log = "0.4.35"
+
+[dev-dependencies]
+tungstenite = { version = "0.30.0", default-features = false, features = ["handshake"] }

@@ -16,7 +16,6 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 thiserror = "2.0.21"
 log = "0.4.35"
-clap = { version = "4.6.7", features = ["derive"] }
 
 [features]
 default = []
@@ -28,7 +27,3 @@ jack = ["cpal/jack"]
 
 [dev-dependencies]
 assert_no_alloc = "1.1.2"
-
-[[bin]]
-name = "mixai-live-engine"
-path = "src/bin/mixai-live-engine.rs"

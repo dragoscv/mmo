@@ -1,0 +1,25 @@
+[package]
+name = "live-cli"
+description = "MixAI Live headless engine binary: devices, presets, run, serve (LAN remote), latency, render."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "mixai-live-engine"
+path = "src/main.rs"
+
+[dependencies]
+live-dsp = { path = "../live-dsp" }
+live-engine = { path = "../live-engine" }
+live-remote = { path = "../live-remote" }
+clap = { version = "4.6.7", features = ["derive"] }
+serde_json = "1.0.154"
+
+[features]
+asio = ["live-engine/asio"]
+pipewire = ["live-engine/pipewire"]
+jack = ["live-engine/jack"]

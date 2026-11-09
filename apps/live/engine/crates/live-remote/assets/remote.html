@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en" data-mode="dark" data-surface="solid">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>MixAI Live Remote</title>
+<link rel="stylesheet" href="/tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-sans); background: var(--background); color: var(--foreground);
+    padding: calc(var(--safe-top) + 0.75rem) calc(var(--safe-right) + 0.75rem) calc(var(--safe-bottom) + 0.75rem) calc(var(--safe-left) + 0.75rem); }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+  h1 { font-family: var(--font-heading); font-size: 1.125rem; margin: 0; }
+  h2 { font-family: var(--font-heading); font-size: 1rem; margin: 0 0 0.5rem; }
+  .hl { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .badge { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; padding: 0.125rem 0.5rem; border-radius: 999px;
+    background: var(--muted); color: var(--muted-foreground); border: 1px solid var(--border); }
+  .info { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--muted-foreground); width: 100%; }
+  .status { font-size: 0.875rem; padding: 0.25rem 0.625rem; border-radius: 999px; border: 1px solid var(--border); color: var(--muted-foreground); }
+  .status[data-s="ok"] { color: var(--primary); border-color: var(--primary); }
+  .status[data-s="bad"] { color: var(--destructive); border-color: var(--destructive); }
+  main { display: grid; gap: 0.75rem; grid-template-columns: 1fr; }
+  @media (min-width: 48rem) { main { grid-template-columns: 1fr 1fr; } .wide { grid-column: 1 / -1; } }
+  .card { background: var(--card); color: var(--card-foreground, var(--foreground)); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; min-width: 0; }
+  .meter { display: grid; grid-template-columns: 3.5rem 1fr 3.5rem; align-items: center; gap: 0.5rem; margin: 0.375rem 0; font-size: 0.875rem; }
+  .bar { position: relative; height: 1.5rem; background: var(--muted); border-radius: var(--radius); overflow: hidden; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--primary); }
+  .bar.sm { height: 0.5rem; }
+  .db { font-family: var(--font-mono); font-size: 0.8125rem; text-align: right; color: var(--muted-foreground); }
+  .clip { font-size: 0.75rem; font-weight: 700; padding: 0.125rem 0.5rem; border-radius: 999px; background: var(--muted); color: var(--muted-foreground); }
+  .clip[data-on="true"] { background: var(--destructive); color: var(--destructive-foreground, var(--foreground)); }
+  .gr { display: grid; gap: 0.25rem; margin-top: 0.5rem; }
+  .gr .meter { grid-template-columns: 6rem 1fr 3.5rem; margin: 0; font-size: 0.75rem; }
+  .gr .bar > i { background: var(--accent-foreground, var(--primary)); left: auto; right: 0; }
+  .note { font-family: var(--font-heading); font-size: 3rem; font-weight: 700; text-align: center; line-height: 1.1; }
+  .scale { position: relative; height: 2rem; background: var(--muted); border-radius: var(--radius); margin: 0.5rem 0; }
+  .scale::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--muted-foreground); }
+  .needle { position: absolute; top: 0; bottom: 0; width: 4px; margin-left: -2px; left: 50%; background: var(--primary); border-radius: 2px; }
+  .tmeta { font-family: var(--font-mono); font-size: 0.875rem; text-align: center; color: var(--muted-foreground); }
+  .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.5rem 0; }
+  .row > button { flex: 1 1 6rem; }
+  button, select { min-height: var(--control-h-lg); min-width: 3rem; padding: 0 0.75rem; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--secondary, var(--muted)); color: var(--secondary-foreground, var(--foreground));
+    font: inherit; font-weight: 600; touch-action: manipulation; }
+  button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  button.panic { background: var(--destructive); color: var(--destructive-foreground, var(--foreground)); border-color: var(--destructive); font-size: 1.125rem; }
+  button.panic[data-armed="true"] { outline: 3px dashed var(--foreground); outline-offset: 2px; }
+  button:focus-visible, input:focus-visible, select:focus-visible, li:focus-visible { outline: 3px solid var(--ring, var(--primary)); outline-offset: 2px; }
+  label.sl { display: grid; grid-template-columns: 7rem 1fr 4rem; align-items: center; gap: 0.5rem; font-size: 0.875rem; margin-top: 0.375rem; }
+  label.sl output { font-family: var(--font-mono); font-size: 0.8125rem; text-align: right; color: var(--muted-foreground); }
+  input[type="range"] { width: 100%; min-height: 2.75rem; accent-color: var(--primary); }
+  .chips { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+  ol.songs { list-style: none; margin: 0; padding: 0; }
+  ol.songs > li { padding: 0.375rem 0; border-bottom: 1px solid var(--border); }
+  .stitle { font-weight: 700; }
+  .stitle small { color: var(--muted-foreground); font-weight: 400; }
+  .lyrics { white-space: pre-wrap; font-size: 1.5rem; line-height: 1.5; max-height: 50vh; overflow-y: auto; background: var(--muted);
+    border-radius: var(--radius); padding: 0.75rem; margin-top: 0.75rem; }
+  .fx { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.75rem; margin-top: 0.5rem; }
+  .fx[data-on="false"] { opacity: 0.6; }
+  .fxh { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .fxh h3 { font-size: 0.9375rem; margin: 0; }
+  .toast { position: fixed; left: 50%; bottom: calc(var(--safe-bottom) + 1rem); transform: translateX(-50%); max-width: 90vw;
+    background: var(--destructive); color: var(--destructive-foreground, var(--foreground)); padding: 0.625rem 1rem; border-radius: var(--radius);
+    font-weight: 600; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+  .toast[data-on="true"] { opacity: 1; }
+  [hidden] { display: none !important; }
+  .viewer .ctl, body:not(.controller) .ctrl-only { display: none !important; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body class="viewer">
+<header>
+  <div class="hl"><h1 id="name" data-i18n="title">MixAI Live Remote</h1><span class="badge" id="role"></span></div>
+  <span class="status" id="status" role="status" aria-live="polite"></span>
+  <div class="info" id="info"></div>
+</header>
+<main>
+  <section class="card" aria-labelledby="m-h">
+    <h2 id="m-h" data-i18n="meters">Meters</h2>
+    <div class="meter"><span data-i18n="input">Input</span><div class="bar" aria-hidden="true"><i id="b-in"></i></div><span class="db" id="d-in">-∞</span></div>
+    <div class="meter"><span data-i18n="outL">Out L</span><div class="bar" aria-hidden="true"><i id="b-ol"></i></div><span class="db" id="d-ol">-∞</span></div>
+    <div class="meter"><span data-i18n="outR">Out R</span><div class="bar" aria-hidden="true"><i id="b-or"></i></div><span class="db" id="d-or">-∞</span></div>
+    <div class="hl"><span class="clip" id="clip" data-i18n="clip">CLIP</span></div>
+    <div class="gr" id="gr" aria-label="Gain reduction"></div>
+  </section>
+  <section class="card" id="tuner" aria-labelledby="t-h" hidden>
+    <h2 id="t-h" data-i18n="tuner">Tuner</h2>
+    <div class="note" id="note">–</div>
+    <div class="scale" aria-hidden="true"><span class="needle" id="needle"></span></div>
+    <div class="tmeta" id="tmeta"></div>
+  </section>
+  <section class="card ctl" aria-labelledby="p-h">
+    <h2 id="p-h" data-i18n="perform">Performance</h2>
+    <div class="row">
+      <button class="panic" id="panic" data-i18n="panic">PANIC</button>
+      <button id="mute" aria-pressed="false" data-i18n="mute">Mute</button>
+      <button id="bypass" aria-pressed="false" data-i18n="bypass">Bypass</button>
+    </div>
+    <div class="row">
+      <button id="prev" data-i18n="prev">Prev</button>
+      <button id="tap"><span data-i18n="tap">Tap</span> <span id="bpm"></span></button>
+      <button id="next" data-i18n="next">Next</button>
+    </div>
+    <div id="mix"></div>
+  </section>
+  <section class="card" aria-labelledby="pr-h">
+    <h2 id="pr-h" data-i18n="presets">Presets</h2>
+    <div class="chips" id="presets"></div>
+  </section>
+  <section class="card wide" id="setlist" aria-labelledby="s-h" hidden>
+    <h2 id="s-h"><span data-i18n="setlist">Setlist</span> <small id="sl-name"></small></h2>
+    <ol class="songs" id="songs"></ol>
+    <div class="lyrics" id="lyrics" tabindex="0" hidden></div>
+  </section>
+  <section class="card wide ctl ctrl-only" aria-labelledby="c-h">
+    <h2 id="c-h" data-i18n="chain">Chain</h2>
+    <div id="chain"></div>
+  </section>
+</main>
+<div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+<script>
+(() => {
+  "use strict";
+  const ro = (navigator.language || "en").toLowerCase().startsWith("ro");
+  const T = ro ? {
+    title: "MixAI Live — telecomandă", meters: "Niveluri", input: "Intrare", outL: "Ieșire S", outR: "Ieșire D", clip: "CLIP",
+    tuner: "Acordor", perform: "Spectacol", panic: "PANICĂ", panicConfirm: "Atinge din nou", mute: "Mut", bypass: "Ocolire",
+    prev: "Înapoi", next: "Înainte", tap: "Tempo", presets: "Presetări", setlist: "Listă de cântece", chain: "Lanț de efecte",
+    inputDb: "Intrare dB", monitorDb: "Monitor dB", monitorDry: "Monitor sec", mainDb: "Principal dB", on: "Pornit", off: "Oprit",
+    connecting: "Se conectează…", connectedAs: "Conectat ca", disconnected: "Deconectat, reîncerc…", unauthorized: "Cod invalid. Scanează din nou codul QR.",
+    controller: "control", performer: "interpret", viewer: "vizualizare", dsp: "DSP", buffer: "tampon", correction: "corecție", cents: "cenți",
+    update: "Actualizează aplicația: protocol nou", noToken: "Lipsește codul de acces din adresă.",
+    gate: "Poartă de zgomot", eq: "Egalizator", deesser: "De-esser", compressor: "Compresor", autotune: "Autotune", harmonizer: "Armonizator",
+    saturator: "Saturator", doubler: "Dublare", chorus: "Chorus", delay: "Ecou", reverb: "Reverberație", limiter: "Limitator"
+  } : {
+    title: "MixAI Live Remote", meters: "Meters", input: "Input", outL: "Out L", outR: "Out R", clip: "CLIP",
+    tuner: "Tuner", perform: "Performance", panic: "PANIC", panicConfirm: "Tap again", mute: "Mute", bypass: "Bypass",
+    prev: "Prev", next: "Next", tap: "Tap", presets: "Presets", setlist: "Setlist", chain: "Effect chain",
+    inputDb: "Input dB", monitorDb: "Monitor dB", monitorDry: "Monitor dry", mainDb: "Main dB", on: "On", off: "Off",
+    connecting: "Connecting…", connectedAs: "Connected as", disconnected: "Disconnected, retrying…", unauthorized: "Invalid code. Scan the QR code again.",
+    controller: "controller", performer: "performer", viewer: "viewer", dsp: "DSP", buffer: "buffer", correction: "correction", cents: "cents",
+    update: "Update the app: newer protocol", noToken: "The access code is missing from the address.",
+    gate: "Noise gate", eq: "Equalizer", deesser: "De-esser", compressor: "Compressor", autotune: "Autotune", harmonizer: "Harmonizer",
+    saturator: "Saturator", doubler: "Doubler", chorus: "Chorus", delay: "Delay", reverb: "Reverb", limiter: "Limiter"
+  };
+  document.documentElement.lang = ro ? "ro" : "en";
+  document.querySelectorAll("[data-i18n]").forEach(e => { e.textContent = T[e.dataset.i18n]; });
+  document.title = T.title;
+  const $ = id => document.getElementById(id);
+  const el = (tag, props, text) => { const e = document.createElement(tag); Object.assign(e, props || {}); if (text != null) e.textContent = text; return e; };
+  const token = new URLSearchParams(location.search).get("t") || "";
+  let cid = null;
+  try { cid = localStorage.getItem("mixai-live:client"); if (!cid) { cid = "web-" + Math.random().toString(36).slice(2, 12); localStorage.setItem("mixai-live:client", cid); } }
+  catch (_) { cid = "web-" + Math.random().toString(36).slice(2, 12); }
+  const status = (txt, s) => { $("status").textContent = txt; $("status").dataset.s = s; };
+  let toastTimer = 0;
+  const toast = msg => { const t = $("toast"); t.textContent = msg; t.dataset.on = "true"; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.dataset.on = "false"; }, 3500); };
+
+  let ws = null, role = "viewer", hello = null, state = null, fxCat = null, msgId = 1;
+  const send = obj => { if (ws && ws.readyState === 1) { obj.id = msgId++; ws.send(JSON.stringify(obj)); } };
+  // Throttle per key: at most one message per 30 ms, final value always sent.
+  const thr = {};
+  function throttled(key, make) {
+    const t = thr[key] || (thr[key] = { last: 0, timer: 0, make: null });
+    t.make = make; const now = performance.now(); clearTimeout(t.timer);
+    if (now - t.last >= 30) { t.last = now; send(t.make()); }
+    else t.timer = setTimeout(() => { t.last = performance.now(); send(t.make()); }, 30 - (now - t.last));
+  }
+  const isFocused = e => document.activeElement === e;
+  const fmtNum = (v, unit) => { const a = Math.abs(v); const s = a >= 100 ? v.toFixed(0) : a >= 10 ? v.toFixed(1) : v.toFixed(2); return unit ? s + " " + unit : s; };
+
+  function slider(label, min, max, step, onInput, unit) {
+    const l = el("label", { className: "sl" }); const span = el("span", {}, label);
+    const i = el("input", { type: "range", min, max, step }); const o = el("output", {});
+    i.addEventListener("input", () => { const v = parseFloat(i.value); o.textContent = fmtNum(v, unit); onInput(v); });
+    l.append(span, i, o);
+    return { root: l, input: i, set(v) { if (!isFocused(i)) { i.value = v; o.textContent = fmtNum(v, unit); } } };
+  }
+
+  // Mix sliders
+  const mix = {};
+  [["input_db", T.inputDb, -24, 12, 0.5, "dB"], ["monitor_db", T.monitorDb, -60, 12, 0.5, "dB"], ["monitor_dry", T.monitorDry, 0, 1, 0.01, ""], ["main_db", T.mainDb, -60, 12, 0.5, "dB"]]
+    .forEach(([k, lab, mn, mx, st, u]) => { mix[k] = slider(lab, mn, mx, st, v => throttled("mix:" + k, () => ({ type: "set_mix", [k]: v })), u); $("mix").append(mix[k].root); });
+
+  let armed = 0;
+  $("panic").addEventListener("click", () => {
+    const b = $("panic");
+    if (armed && performance.now() - armed < 2000) { armed = 0; b.dataset.armed = "false"; b.textContent = T.panic; send({ type: "panic" }); return; }
+    armed = performance.now(); b.dataset.armed = "true"; b.textContent = T.panicConfirm;
+    setTimeout(() => { if (armed && performance.now() - armed >= 2000) { armed = 0; b.dataset.armed = "false"; b.textContent = T.panic; } }, 2050);
+  });
+  $("mute").addEventListener("click", () => send({ type: "set_mix", mute: $("mute").getAttribute("aria-pressed") !== "true" }));
+  $("bypass").addEventListener("click", () => send({ type: "set_mix", bypass: $("bypass").getAttribute("aria-pressed") !== "true" }));
+  $("prev").addEventListener("click", () => send({ type: "prev" }));
+  $("next").addEventListener("click", () => send({ type: "next" }));
+  $("tap").addEventListener("click", () => send({ type: "tap_tempo" }));
+
+  const KEY_PARAMS = { gate: ["threshold"], eq: ["low_gain", "mid1_gain", "mid2_gain", "high_gain"], deesser: ["threshold"], compressor: ["threshold", "ratio"],
+    autotune: ["key", "scale", "amount", "retune"], harmonizer: ["v1_level", "v2_level"], saturator: ["drive", "mix"], doubler: ["mix"], chorus: ["mix"],
+    delay: ["mix", "feedback"], reverb: ["mix", "decay"], limiter: ["ceiling"], tuner: [] };
+  const fxLabel = id => T[id] || id;
+  const paramLabel = p => p.replace(/_/g, " ");
+
+  let chainSig = "";
+  const chainCtl = {};
+  function renderChain(chain) {
+    const sig = chain.map(c => c.id + ":" + c.fx).join(",") + "|" + (fxCat ? 1 : 0);
+    if (sig !== chainSig) {
+      chainSig = sig; const root = $("chain"); root.textContent = "";
+      for (const k in chainCtl) delete chainCtl[k];
+      chain.forEach(ins => {
+        const card = el("article", { className: "fx" }); const h = el("div", { className: "fxh" });
+        const h3 = el("h3", {}, fxLabel(ins.fx)); const tog = el("button", {});
+        tog.addEventListener("click", () => send({ type: "set_enabled", insert: ins.id, on: tog.getAttribute("aria-pressed") !== "true" }));
+        h.append(h3, tog); card.append(h);
+        const ctl = { card, tog, h3, params: {} };
+        const def = fxCat && fxCat.find(f => f.id === ins.fx);
+        (KEY_PARAMS[ins.fx] || []).forEach(pid => {
+          const pd = def && def.params.find(p => p.id === pid); if (!pd) return;
+          const lab = paramLabel(pid) + " — " + fxLabel(ins.fx);
+          if (pd.choices && pd.choices.length) {
+            const l = el("label", { className: "sl" }); const s = el("select", {});
+            s.setAttribute("aria-label", lab);
+            pd.choices.forEach((c, i) => s.append(el("option", { value: String(i) }, String(c))));
+            s.addEventListener("change", () => send({ type: "set_param", insert: ins.id, param: pid, value: parseFloat(s.value) }));
+            l.append(el("span", {}, paramLabel(pid)), s, el("output", {}));
+            card.append(l);
+            ctl.params[pid] = { set(v) { if (!isFocused(s)) s.value = String(Math.round(v)); } };
+          } else {
+            const range = pd.max - pd.min; const step = range > 20 ? 0.5 : range > 2 ? 0.05 : 0.01;
+            const sl = slider(paramLabel(pid), pd.min, pd.max, step, v => throttled("p:" + ins.id + ":" + pid, () => ({ type: "set_param", insert: ins.id, param: pid, value: v })), pd.unit || "");
+            sl.input.setAttribute("aria-label", lab);
+            card.append(sl.root); ctl.params[pid] = sl;
+          }
+        });
+        chainCtl[ins.id] = ctl; root.append(card);
+      });
+    }
+    chain.forEach(ins => {
+      const c = chainCtl[ins.id]; if (!c) return;
+      c.card.dataset.on = String(ins.enabled); c.tog.setAttribute("aria-pressed", String(ins.enabled));
+      c.tog.textContent = ins.enabled ? T.on : T.off; c.tog.setAttribute("aria-label", fxLabel(ins.fx) + ": " + (ins.enabled ? T.on : T.off));
+      (ins.params || []).forEach(([pid, v]) => { const p = c.params[pid]; if (p) p.set(v); });
+    });
+  }
+
+  function renderSetlist(st) {
+    const sec = $("setlist"); const sl = st.setlist;
+    if (!sl || !sl.songs) { sec.hidden = true; return; }
+    sec.hidden = false; $("sl-name").textContent = sl.name || "";
+    const pos = st.position; const ol = $("songs"); ol.textContent = "";
+    sl.songs.forEach((song, i) => {
+      const li = el("li"); const t = el("div", { className: "stitle" }, (i + 1) + ". " + song.title + " ");
+      const extra = [song.artist, song.key, song.bpm ? Math.round(song.bpm) + " BPM" : ""].filter(Boolean).join(" · ");
+      if (extra) t.append(el("small", {}, extra));
+      li.append(t);
+      const row = el("div", { className: "chips" });
+      (song.parts || []).forEach((p, j) => {
+        const cur = !!pos && pos.song === i && pos.part === j;
+        const b = el("button", {}, p.name); b.setAttribute("aria-pressed", String(cur));
+        if (cur) b.setAttribute("aria-current", "step");
+        b.addEventListener("click", () => send({ type: "goto", song: i, part: j }));
+        if (role === "viewer") b.disabled = true;
+        row.append(b);
+      });
+      li.append(row); ol.append(li);
+    });
+    const ly = $("lyrics"); const cs = pos ? sl.songs[pos.song] : null;
+    if (cs && cs.lyrics) { if (ly.textContent !== cs.lyrics) { ly.textContent = cs.lyrics; ly.scrollTop = 0; } ly.hidden = false; ly.setAttribute("aria-label", cs.title); }
+    else { ly.hidden = true; ly.textContent = ""; }
+  }
+
+  function renderPresets(st) {
+    const root = $("presets"); root.textContent = "";
+    (st.presets || []).forEach(name => {
+      const b = el("button", {}, name); b.setAttribute("aria-pressed", String(name === st.preset));
+      b.addEventListener("click", () => send({ type: "load_preset", name }));
+      if (role === "viewer") b.disabled = true;
+      root.append(b);
+    });
+  }
+
+  function renderState(st) {
+    state = st;
+    const m = st.mix || {};
+    for (const k in mix) if (typeof m[k] === "number") mix[k].set(m[k]);
+    $("mute").setAttribute("aria-pressed", String(!!m.mute));
+    $("bypass").setAttribute("aria-pressed", String(!!m.bypass));
+    $("bpm").textContent = st.bpm ? Math.round(st.bpm) + " BPM" : "";
+    renderPresets(st); renderSetlist(st);
+    if (role === "controller") renderChain(st.chain || []);
+    buildGr(st.chain || []);
+  }
+
+  // Meters
+  const toDb = lin => lin > 0 ? 20 * Math.log10(lin) : -Infinity;
+  const pct = db => db === -Infinity ? 0 : Math.max(0, Math.min(100, (db + 60) / 60 * 100));
+  const dbTxt = db => db === -Infinity || db < -60 ? "-∞" : db.toFixed(1);
+  let grSig = "", grBars = [];
+  function buildGr(chain) {
+    const sig = chain.map(c => c.fx).join(",");
+    if (sig === grSig) return; grSig = sig;
+    const root = $("gr"); root.textContent = ""; grBars = [];
+    chain.forEach(c => {
+      const row = el("div", { className: "meter" }); const bar = el("div", { className: "bar sm" }); const i = el("i"); bar.append(i);
+      bar.setAttribute("aria-hidden", "true"); const d = el("span", { className: "db" }, "0.0");
+      row.append(el("span", {}, fxLabel(c.fx)), bar, d); root.append(row); grBars.push([i, d]);
+    });
+  }
+  let meters = null, dirty = false;
+  const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const midiName = n => { n = Math.round(n); return NOTES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); };
+  function frame() {
+    requestAnimationFrame(frame);
+    if (!dirty || !meters) return; dirty = false; const m = meters;
+    const set = (bar, txt, lin) => { const db = toDb(lin || 0); $(bar).style.width = pct(db) + "%"; $(txt).textContent = dbTxt(db); };
+    set("b-in", "d-in", m.in_peak);
+    const op = m.out_peak || [0, 0]; set("b-ol", "d-ol", op[0]); set("b-or", "d-or", op[1]);
+    $("clip").dataset.on = String(!!m.clipped);
+    (m.gr || []).forEach((g, i) => { const b = grBars[i]; if (!b) return; const a = Math.min(24, Math.abs(g || 0)); b[0].style.width = (a / 24 * 100) + "%"; b[1].textContent = a.toFixed(1); });
+    if (typeof m.dsp_load === "number") updateInfo(m.dsp_load);
+    const t = m.tune;
+    if (t) {
+      $("tuner").hidden = false;
+      const name = typeof t.target === "string" && t.target ? t.target : typeof t.target === "number" ? midiName(t.target) : midiName(t.midi);
+      $("note").textContent = name;
+      const c = Math.max(-50, Math.min(50, t.cents || 0)); $("needle").style.left = (50 + c) + "%";
+      $("tmeta").textContent = (c >= 0 ? "+" : "") + c.toFixed(0) + " " + T.cents + " · " + T.correction + " " + (t.correction_cents || 0).toFixed(0) + " · " + (t.freq ? t.freq.toFixed(1) + " Hz" : "");
+    } else $("tuner").hidden = true;
+  }
+  requestAnimationFrame(frame);
+
+  let dspLoad = null;
+  function updateInfo(load) {
+    if (load != null) dspLoad = load; if (!hello) return;
+    const parts = [];
+    if (hello.sample_rate && hello.buffer_frames) parts.push(hello.sample_rate + " Hz · " + T.buffer + " " + hello.buffer_frames + " (" + (hello.buffer_frames / hello.sample_rate * 1000).toFixed(1) + " ms)");
+    if (dspLoad != null) parts.push(T.dsp + " " + (dspLoad * (dspLoad <= 1 ? 100 : 1)).toFixed(0) + "%");
+    $("info").textContent = parts.join(" · ");
+  }
+
+  function setRole(r) {
+    role = r; document.body.classList.toggle("viewer", r === "viewer"); document.body.classList.toggle("controller", r === "controller");
+    $("role").textContent = T[r] || r;
+  }
+
+  function loadFx() {
+    if (fxCat) return;
+    fetch("/api/fx?t=" + encodeURIComponent(token), { headers: { "Authorization": "Bearer " + token } }).then(r => r.ok ? r.json() : null).then(j => {
+      if (Array.isArray(j)) { fxCat = j; if (state && role === "controller") renderChain(state.chain || []); }
+    }).catch(() => {});
+  }
+
+  let delay = 500;
+  function connect() {
+    if (!token) { status(T.noToken, "bad"); return; }
+    status(T.connecting, "");
+    let opened = 0, gotHello = false;
+    try { ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws?t=" + encodeURIComponent(token) + "&c=" + encodeURIComponent(cid)); }
+    catch (_) { setTimeout(connect, delay); delay = Math.min(delay * 2, 5000); return; }
+    ws.onopen = () => { opened = performance.now(); };
+    ws.onmessage = ev => {
+      let m; try { m = JSON.parse(ev.data); } catch (_) { return; }
+      if (m.type === "hello") {
+        gotHello = true; delay = 500; hello = m; setRole(m.role || "viewer");
+        if (m.engine_name) { $("name").textContent = m.engine_name; document.title = m.engine_name + " — " + T.title; }
+        status(T.connectedAs + " " + (T[m.role] || m.role), "ok"); updateInfo(null);
+        if (m.protocol > 1) toast(T.update);
+        ws.send(JSON.stringify({ type: "subscribe", meters: true, meters_hz: 20 }));
+        if (role === "controller") loadFx();
+      } else if (m.type === "state" && m.state) renderState(m.state);
+      else if (m.type === "meters") { meters = m; dirty = true; }
+      else if (m.type === "error") { if (m.code === "unauthorized") status(T.unauthorized, "bad"); toast(m.message || m.code || "error"); }
+    };
+    ws.onclose = ev => {
+      const quick = !gotHello && opened > 0 && performance.now() - opened < 1500;
+      if (!opened) {
+        fetch("/ws?t=" + encodeURIComponent(token) + "&c=" + encodeURIComponent(cid), { cache: "no-store" })
+          .then(r => { if (r.status === 401 || r.status === 403) { status(T.unauthorized, "bad"); setTimeout(connect, 5000); } else retry(); })
+          .catch(retry);
+        return;
+      }
+      if (ev.code === 4401 || ev.code === 1008 || quick) {
+        status(T.unauthorized, "bad"); setTimeout(connect, 5000); return;
+      }
+      retry();
+    };
+    ws.onerror = () => {};
+  }
+  function retry() { status(T.disconnected, "bad"); setTimeout(connect, delay); delay = Math.min(delay * 2, 5000); }
+  connect();
+})();
+</script>
+</body>
+</html>

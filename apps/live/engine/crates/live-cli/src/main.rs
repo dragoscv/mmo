@@ -4,9 +4,12 @@
 //!   mixai-live-engine run --input <id|name> --output <id|name> --preset "Natural Vocal" [--buffer 128]
 //!   mixai-live-engine latency --input <..> --output <..>     (needs a loopback)
 //!   mixai-live-engine render --in voice.wav --out processed.wav --preset "Pop Polish"
+//!   mixai-live-engine serve --input <..> --output <..> [--lan] [--port 17920]   (desktop UI + phones)
 
 use clap::{Parser, Subcommand};
-use live_engine::{Buses, Core, IoConfig, ProbeState, Session, io};
+use live_engine::{Buses, Core, IoConfig, ProbeState, Role, Session, io};
+use live_remote::{RemoteConfig, RemoteServer};
+use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
 
 #[derive(Parser)]
@@ -77,6 +80,23 @@ enum Cmd {
     },
     /// List factory presets as JSON.
     Presets,
+    /// Run the engine with the control server (desktop UI on loopback; phones with --lan).
+    Serve {
+        #[command(flatten)]
+        dev: DevArgs,
+        #[arg(long, default_value = "Natural Vocal")]
+        preset: String,
+        /// Listen on every interface and announce over mDNS (phones/watches).
+        #[arg(long)]
+        lan: bool,
+        #[arg(long, default_value_t = live_remote::DEFAULT_PORT)]
+        port: u16,
+        #[arg(long, default_value = "MixAI Live")]
+        name: String,
+        /// Exit after N seconds (tests).
+        #[arg(long)]
+        seconds: Option<u64>,
+    },
 }
 
 fn pair(s: &str) -> Result<[u16; 2], String> {
@@ -220,8 +240,135 @@ fn run(cli: Cli) -> Result<(), String> {
             preset,
             block,
         } => render(&input, &output, &preset, block)?,
+        Cmd::Serve {
+            dev,
+            preset,
+            lan,
+            port,
+            name,
+            seconds,
+        } => serve(&dev, &preset, lan, port, &name, seconds)?,
     }
     Ok(())
+}
+
+fn serve(
+    dev: &DevArgs,
+    preset: &str,
+    lan: bool,
+    port: u16,
+    name: &str,
+    seconds: Option<u64>,
+) -> Result<(), String> {
+    let cfg = io_config(dev)?;
+    let mut running = io::start(&cfg).map_err(|e| e.to_string())?;
+    let mut session = Session::new(
+        cfg.sample_rate as f32,
+        running.info.buffer_frames as usize * 8,
+    );
+    let first = session.load_preset(preset).map_err(|e| e.to_string())?;
+    running.send(first).map_err(|_| "command ring full")?;
+    let bind = if lan {
+        IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+    } else {
+        IpAddr::V4(Ipv4Addr::LOCALHOST)
+    };
+    let server = RemoteServer::start(RemoteConfig {
+        bind,
+        port,
+        osc: true,
+        engine_name: name.into(),
+    })
+    .map_err(|e| format!("control server on port {port}: {e}"))?;
+    server.set_hello(serde_json::json!({
+        "sample_rate": running.info.sample_rate,
+        "buffer_frames": running.info.buffer_frames,
+        "devices": running.info,
+    }));
+    let host = if lan {
+        live_remote::lan_ip()
+    } else {
+        IpAddr::V4(Ipv4Addr::LOCALHOST)
+    };
+    let _mdns = if lan {
+        match live_remote::discovery::Announcer::start(name, host, server.port(), server.osc_port())
+        {
+            Ok(a) => Some(a),
+            Err(e) => {
+                eprintln!("mDNS announcement failed ({e}); pairing by QR still works");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    // One JSON line for the desktop shell / scripts: where to connect and with which tokens.
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "ready",
+            "port": server.port(),
+            "osc_port": server.osc_port(),
+            "controller_url": server.pairing_url(Role::Controller, host),
+            "performer_url": server.pairing_url(Role::Performer, host),
+            "viewer_url": server.pairing_url(Role::Viewer, host),
+            "info": running.info,
+        })
+    );
+    let start = Instant::now();
+    let mut last_rev = u64::MAX;
+    let mut pending: Vec<live_engine::Command> = Vec::new();
+    loop {
+        std::thread::sleep(Duration::from_millis(5));
+        // Commands that did not fit last tick go first (ring full = engine stalled briefly).
+        let mut retry = Vec::new();
+        for c in pending.drain(..) {
+            if let Err(c) = running.send(c) {
+                retry.push(c);
+            }
+        }
+        pending = retry;
+        let mut replies = Vec::new();
+        for inc in server.drain() {
+            match session.apply_control(inc.control, Instant::now()) {
+                Ok(cmds) => {
+                    for c in cmds {
+                        if let Err(c) = running.send(c) {
+                            pending.push(c);
+                        }
+                    }
+                    replies.push((inc.conn, inc.id, Ok(())));
+                }
+                Err(e) => replies.push((
+                    inc.conn,
+                    inc.id,
+                    Err((live_remote::server_error_code(&e), e.to_string())),
+                )),
+            }
+        }
+        // State first, then acks: a client seeing `ack` already has the new state.
+        if session.revision != last_rev {
+            last_rev = session.revision;
+            server.publish_state(&session.state());
+        }
+        for (conn, id, r) in replies {
+            server.reply(conn, id, r);
+        }
+        if let Some(m) = running.poll() {
+            server.publish_meters(live_remote::meters_json(&m));
+        }
+        if !running.alive() {
+            return Err(format!(
+                "audio stream stopped: {}",
+                running
+                    .last_error()
+                    .unwrap_or_else(|| "unknown driver error".into())
+            ));
+        }
+        if seconds.is_some_and(|s| start.elapsed() >= Duration::from_secs(s)) {
+            return Ok(());
+        }
+    }
 }
 
 /// Minimal WAV I/O (16-bit PCM / 32-bit float, mono or stereo) to keep the binary dependency-light.

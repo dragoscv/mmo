@@ -2,6 +2,7 @@
 //! and remote controllers can read state without touching the audio thread, and turns user
 //! intents into [`Command`]s.
 
+use crate::control::TapTempo;
 use crate::core::Command;
 use crate::preset::{Preset, PresetError, Setlist, factory, parse_key};
 use live_dsp::param::param_index;
@@ -55,6 +56,7 @@ pub struct SessionState {
     pub setlist: Option<Setlist>,
     pub position: Option<Position>,
     pub presets: Vec<String>,
+    pub bpm: Option<f32>,
     pub revision: u64,
 }
 
@@ -69,6 +71,8 @@ pub struct Session {
     pub setlist: Option<Setlist>,
     pub position: Option<Position>,
     pub revision: u64,
+    pub bpm: Option<f32>,
+    pub(crate) tap: TapTempo,
 }
 
 #[derive(Debug, thiserror::Error, PartialEq)]
@@ -102,6 +106,8 @@ impl Session {
             setlist: None,
             position: None,
             revision: 0,
+            bpm: None,
+            tap: TapTempo::default(),
         }
     }
 
@@ -113,6 +119,7 @@ impl Session {
             setlist: self.setlist.clone(),
             position: self.position.clone(),
             presets: self.presets.iter().map(|p| p.name.clone()).collect(),
+            bpm: self.bpm,
             revision: self.revision,
         }
     }
@@ -330,6 +337,7 @@ impl Session {
             }
         }
         if let Some(bpm) = s.bpm {
+            self.bpm = Some(bpm);
             for (id, fx) in &ids {
                 if fx == "delay" {
                     cmds.push(self.set_param(*id, "bpm", bpm)?);
