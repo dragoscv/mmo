@@ -134,6 +134,9 @@ jobs:
             # satisfies the env shape; nothing connects to it.
             DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/ci
             AUTH_SECRET: ci-only-not-a-secret-0123456789abcdef
+            # lib/env.ts refuses to boot a production server without Google OAuth creds.
+            AUTH_GOOGLE_ID: ci-only.apps.googleusercontent.com
+            AUTH_GOOGLE_SECRET: ci-only-not-a-secret
             NEXTAUTH_URL: http://localhost:13789
             PORT: 13789
             PLAYWRIGHT_BASE_URL: http://localhost:13789
