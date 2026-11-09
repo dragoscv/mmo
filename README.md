@@ -288,7 +288,7 @@ mmo/
 
 ## 🤝 Contribuții
 
-Contribuțiile sunt binevenite! Vezi [CONTRIBUTING.md](CONTRIBUTING.md) (TBD) pentru ghid.
+Contribuțiile sunt binevenite! Vezi `CONTRIBUTING.md` (TBD) pentru ghid.
 
 Înainte să deschizi un PR:
 1. Citește [docs/arhitectura/](docs/arhitectura/) pentru context

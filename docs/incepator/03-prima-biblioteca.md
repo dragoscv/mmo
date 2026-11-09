@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: ghid pentru **rekordbox**. Pentru biblioteca în MMO → [`docs/aplicatie/biblioteca.md`](../aplicatie/biblioteca.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../README.md#-începător)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

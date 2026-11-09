@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: preparare cu **rekordbox + CDJ**. Aplicabil și cu MMO + USB export → [`docs/aplicatie/playlists.md`](../aplicatie/playlists.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../README.md#-profesional)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

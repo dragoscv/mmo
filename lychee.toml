@@ -11,6 +11,9 @@ exclude_path = [
   "target",
   "external",
   ".copilot-tmp",
+  # Archived snapshots of the pre-MixAI READMEs: their links describe the old layout on purpose.
+  "docs/legacy-navigare.md",
+  "docs/legacy-readme-rekordbox.md",
   "apps/web/public",
   "apps/tv-android/build",
   "apps/native/android",
@@ -31,6 +34,8 @@ exclude = [
   "^chrome://",
   "^chrome-extension://",
   "^tizen",
+  # TRADEMARKS.md is owner-maintained and kept out of git.
+  "TRADEMARKS\\.md$",
 ]
 
 # Anchors inside markdown are checked; missing fragments are errors.

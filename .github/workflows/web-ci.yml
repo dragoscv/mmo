@@ -154,6 +154,21 @@ jobs:
               run: for d in ../../packages/*/; do (cd "$d" && pnpm install --frozen-lockfile --ignore-workspace --reporter=append-only); done
             - name: Build (production)
               run: pnpm build
+            # LHCI hides the server output; probe the pages first so a 500 shows its stack trace.
+            - name: Smoke public pages (prints the server log on failure)
+              run: |
+                  nohup pnpm start > smoke-start.log 2>&1 &
+                  pid=$!
+                  for _ in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:13789/status && break; sleep 2; done
+                  rc=0
+                  for u in / /offline /status /get; do
+                    code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:13789$u")
+                    echo "$u -> $code"
+                    if [ "$code" -ge 500 ]; then rc=1; fi
+                  done
+                  kill "$pid" || true; fuser -k 13789/tcp || true; sleep 2
+                  if [ "$rc" -ne 0 ]; then echo "::error::public page returned 5xx"; tail -n 200 smoke-start.log; fi
+                  exit "$rc"
             - name: Lighthouse CI (starts `pnpm start` itself)
               run: pnpm exec lhci autorun --config=./lighthouserc.cjs
             - uses: actions/upload-artifact@v4

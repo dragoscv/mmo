@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: export USB din **rekordbox**. MMO suportă export rekordbox XML pe USB → [`docs/aplicatie/playlists.md`](../aplicatie/playlists.md) + [`docs/aplicatie/drive-manager.md`](../aplicatie/drive-manager.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../README.md#-începător)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: ghid pentru **rekordbox**. MMO are analiză automată (BPM/key/energy) → [`docs/aplicatie/scanner.md`](../aplicatie/scanner.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../README.md#-începător)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

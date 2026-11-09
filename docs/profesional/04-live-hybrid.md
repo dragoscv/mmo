@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: hybrid live cu **rekordbox**. MMO are mod live integrat → [`docs/aplicatie/live.md`](../aplicatie/live.md) + [`docs/aplicatie/daw-editor.md`](../aplicatie/daw-editor.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../README.md#-profesional)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|
@@ -173,7 +173,7 @@ MIDI Keyboard ──→ Laptop USB ──→ Software Synth
 - [ ] Am patterns pe CT care merg cu genurile mele
 - [ ] (Opțional) MIDI keyboard conectat la CT sau laptop
 
-> **📋 Referință CT:** [circuit-tracks-mwrty](../../../circuit-tracks-mwrty/) — Ghidul complet CT
+> **📋 Referință CT:** `circuit-tracks-mwrty` (repo separat) — Ghidul complet CT
 
 ---
 

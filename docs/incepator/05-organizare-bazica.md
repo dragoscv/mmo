@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: ghid pentru **rekordbox**. Organizare în MMO → [`docs/aplicatie/playlists.md`](../aplicatie/playlists.md) + [`organizare/`](../organizare/).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../README.md#-începător)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

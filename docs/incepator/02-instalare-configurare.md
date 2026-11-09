@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: ghid pentru **rekordbox** (software Pioneer DJ extern). Pentru MMO → [`docs/aplicatie/`](../aplicatie/README.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../README.md#-începător)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟢 Începător](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

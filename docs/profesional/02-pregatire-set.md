@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: pregătire set pro **rekordbox**. Echivalent în MMO → [`docs/aplicatie/playlists.md`](../aplicatie/playlists.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../README.md#-profesional)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

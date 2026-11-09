@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: workflow cu **rekordbox + CDJ**. Suplimentar/alternativ în MMO → [`docs/aplicatie/`](../aplicatie/README.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../README.md#-profesional)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

@@ -212,7 +212,7 @@ mmo/
 
 ## 🤝 Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) (TBD) for guidelines.
+Contributions are welcome! See `CONTRIBUTING.md` (TBD) for guidelines.
 
 Before opening a PR:
 1. Read [docs/arhitectura/](docs/arhitectura/) for context

@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: hardware Pioneer + **rekordbox**. MMO are remote/multi-device nativ → [`docs/aplicatie/devices.md`](../aplicatie/devices.md) + [`docs/aplicatie/remote.md`](../aplicatie/remote.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../README.md#-profesional)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

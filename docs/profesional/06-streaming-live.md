@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: streaming cu **rekordbox + OBS**. MMO are vizualizări auto-reactive perfect pentru OBS Browser Source → [`docs/aplicatie/visualizations.md`](../aplicatie/visualizations.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../README.md#-profesional)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

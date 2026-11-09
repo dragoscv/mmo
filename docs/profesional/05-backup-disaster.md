@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: strategie pentru **rekordbox library**. Aplicabil și pentru MMO music root + DB SQLite.
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../README.md#-profesional)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🔴 Profesional](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|
