@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## web 3.4.7 — web-ci green again
+
+- `audio-fx-live-dsp.test.ts` evaluates the live gate worklet with `node:vm` instead of `new Function` (oxlint `no-implied-eval` error since 3.4.5).
+
 ## web 3.4.6 — Decks marketplace previews load in the app (WP19-35)
 
 - `/api/decks/packs/*` sends `Cross-Origin-Resource-Policy: cross-origin` (public, CORS `*`): the global `same-site` blocked pack preview images in the Decks webview (found by the Decks 1.3.1 CSP smoke).

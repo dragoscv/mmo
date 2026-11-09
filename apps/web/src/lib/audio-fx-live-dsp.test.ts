@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import {
     deEsserSettings,
@@ -96,11 +97,13 @@ function loadGate(sr: number): { make: () => Proc; defaults: Record<string, numb
     const src = readFileSync(new URL("../../public/worklets/live-gate-processor.js", import.meta.url), "utf8");
     let ctor: (new () => Proc) | null = null;
     class Base {}
-    new Function("AudioWorkletProcessor", "registerProcessor", "sampleRate", src)(
-        Base,
-        (name: string, c: new () => Proc) => { if (name === "live-gate") ctor = c; },
-        sr,
-    );
+    runInNewContext(src, {
+        AudioWorkletProcessor: Base,
+        registerProcessor: (name: string, c: new () => Proc) => { if (name === "live-gate") ctor = c; },
+        sampleRate: sr,
+        Float32Array,
+        Math,
+    });
     if (!ctor) throw new Error("live-gate not registered");
     const C = ctor as unknown as { new (): Proc; parameterDescriptors: { name: string; defaultValue: number }[] };
     const defaults = Object.fromEntries(C.parameterDescriptors.map((d) => [d.name, d.defaultValue]));
