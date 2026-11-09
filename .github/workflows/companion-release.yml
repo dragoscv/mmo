@@ -189,7 +189,7 @@ jobs:
         # electron (~110 MB) and the NSIS/AppImage/winCodeSign helpers are
         # re-downloaded on every run otherwise. Keyed on the lockfile so an
         # Electron bump invalidates it.
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/electron

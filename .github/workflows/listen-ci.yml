@@ -61,7 +61,7 @@ jobs:
               with:
                   node-version: 24
             - name: Dataset cache (private to this repo, never uploaded as an artifact)
-              uses: actions/cache@v4
+              uses: actions/cache@v6
               with:
                   path: ~/giantsteps
                   key: giantsteps-v1
