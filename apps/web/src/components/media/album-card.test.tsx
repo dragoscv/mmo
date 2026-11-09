@@ -42,6 +42,7 @@ describe("AlbumCard", () => {
         fireEvent.click(screen.getByRole("button"));
         await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Nothing to play"));
         expect(play).not.toHaveBeenCalled();
-        expect(screen.getByRole("button")).toHaveAttribute("aria-invalid", "true");
+        // aria-invalid is not valid on a button (WAI-ARIA); the failure is announced by the toast.
+        expect(screen.getByRole("button")).toHaveAttribute("data-failed", "true");
     });
 });

@@ -15,9 +15,11 @@ import { webcrypto } from "node:crypto";
 const subtle = webcrypto.subtle;
 const SCHEME = "v1";
 
-let _key: CryptoKey | null = null;
+// node's webcrypto types (KeyUsage includes "decapsulateBits") are not assignable to the DOM lib's.
+type NodeCryptoKey = webcrypto.CryptoKey;
+let _key: NodeCryptoKey | null = null;
 
-async function getKey(): Promise<CryptoKey> {
+async function getKey(): Promise<NodeCryptoKey> {
     if (_key) return _key;
     const raw = process.env.AUTH_TOKEN_ENC_KEY;
     let bytes: Uint8Array;

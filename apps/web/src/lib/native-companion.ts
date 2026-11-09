@@ -354,7 +354,7 @@ export class NativeCompanionClient {
             ...init,
             headers: {
                 "Content-Type": "application/json",
-                ...(init?.headers ?? {}),
+                ...Object.fromEntries(new Headers(init?.headers)),
             },
             cache: "no-store",
         });

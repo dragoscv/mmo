@@ -43,7 +43,7 @@ export async function directFetch<T>(
                 "X-Device-Token": target.bearer,
                 Accept: "application/json",
                 ...(init.body ? { "Content-Type": "application/json" } : {}),
-                ...(init.headers ?? {}),
+                ...Object.fromEntries(new Headers(init.headers)),
             },
             signal: ac.signal,
             // Direct tunnel fetches must never carry session cookies;

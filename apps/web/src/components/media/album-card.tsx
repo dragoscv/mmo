@@ -52,7 +52,7 @@ export function AlbumCard({ album, labels, resolveTracks = getTracksByCloudIds, 
                 onClick={play}
                 disabled={pending}
                 aria-busy={pending}
-                aria-invalid={failed || undefined}
+                data-failed={failed || undefined}
                 aria-label={`${labels.play}: ${album.title}${album.artist ? ` — ${album.artist}` : ""}`}
                 className="group/card block w-full rounded-xl text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
             >

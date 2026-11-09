@@ -22,6 +22,7 @@ export function EditorPluginsPanel() {
     return (
         <PluginRack
             mode="compact"
+            // oxlint-disable-next-line jsx-a11y/aria-role -- PluginRack's own `role` prop (chain slot), not ARIA
             role="selection"
             title="Plugin chain"
             chain={chain}

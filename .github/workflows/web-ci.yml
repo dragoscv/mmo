@@ -104,6 +104,9 @@ jobs:
             # install them like apps/web/Dockerfile does.
             - name: Install packages/* (tsconfig-path consumers)
               run: for d in ../../packages/*/; do (cd "$d" && pnpm install --frozen-lockfile --reporter=append-only); done
+            # oxlint --type-aware (tsgolint, TS 7): fast correctness gate, errors only.
+            - name: oxlint (type-aware)
+              run: pnpm lint:ox
             - name: Lint (baseline-aware)
               run: pnpm lint:check
             - run: pnpm typecheck

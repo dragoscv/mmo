@@ -159,6 +159,7 @@ export function DAWEffectsRack() {
                 <div className="border-t border-white/10 p-1.5">
                     <PluginRack
                         mode="compact"
+                        // oxlint-disable-next-line jsx-a11y/aria-role -- PluginRack's own `role` prop (chain slot), not ARIA
                         role="track"
                         title="Plugins"
                         chain={pluginChains[track.id] ?? []}

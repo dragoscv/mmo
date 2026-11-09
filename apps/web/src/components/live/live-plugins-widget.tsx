@@ -28,6 +28,7 @@ export function LivePluginsWidget() {
         <div className="h-full flex flex-col gap-2 p-2">
             <PluginRack
                 mode="full"
+                // oxlint-disable-next-line jsx-a11y/aria-role -- PluginRack's own `role` prop (chain slot), not ARIA
                 role="master"
                 title="Master FX rack"
                 chain={chain}

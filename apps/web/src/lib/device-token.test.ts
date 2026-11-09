@@ -25,7 +25,8 @@ describe("device-token crypto", () => {
         expect(issued.encrypted).toMatch(/^v1:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$/);
         expect(hashDeviceToken(issued.plaintext)).toBe(issued.hash);
         expect(decryptDeviceToken(issued.encrypted)).toBe(issued.plaintext);
-    });
+        // First test pays the cold import of ./device-token (db + crypto graph): 3 s idle, 6-8 s on a loaded box.
+    }, 20_000);
 
     it("encryptDeviceToken uses a fresh nonce per call", async () => {
         const { encryptDeviceToken } = await import("./device-token");

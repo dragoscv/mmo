@@ -120,7 +120,8 @@ export function DAWPianoRoll() {
         setTimeout(() => daw.stopSynthNote(noteId), 300);
     };
 
-    const handleGridContextMenu = useCallback((e: React.MouseEvent) => {
+    // Plain function: it sits after the early return, so it must not be a hook (rules-of-hooks).
+    const handleGridContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
         if (!gridRef.current || !clip) return;
         const rect = gridRef.current.getBoundingClientRect();
@@ -166,7 +167,7 @@ export function DAWPianoRoll() {
             ];
             ctxMenu.show(e.clientX, e.clientY, items);
         }
-    }, [daw, clip, notes, ctxMenu]);
+    };
 
     return (
         <div className="h-full flex flex-col bg-[var(--daw-bg)]">

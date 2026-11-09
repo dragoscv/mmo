@@ -63,7 +63,7 @@ async function cf<T>(cfg: CloudflareConfig, path: string, init: RequestInit): Pr
         headers: {
             Authorization: `Bearer ${cfg.apiToken}`,
             "Content-Type": "application/json",
-            ...(init.headers ?? {}),
+            ...Object.fromEntries(new Headers(init.headers)),
         },
     });
     const body = await res.json().catch(() => null) as CFEnvelope<T> | null;

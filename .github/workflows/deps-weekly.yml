@@ -42,11 +42,9 @@ jobs:
                     echo
                     echo "| Package | Surface | Stuck at | Why |"
                     echo "|---|---|---|---|"
-                    echo "| typescript | apps/web | 5.9.x | typescript-eslint 8.70 has no TS 7 API (typescript-eslint#10940); packages/* already on 7.x |"
-                    echo "| eslint | apps/web | 9.x | eslint-plugin-react 7.37 peer \`^9.7\` — no ESLint 10 |"
+                    echo "| typescript (API) | apps/web | 6.0 (tsc = 7 via @typescript/native) | typescript-eslint peer typescript <6.1; collapse to one typescript ^7 when it ships TS 7 support |"
                     echo "| @tauri-apps/* + tauri crates | apps/mixai, apps/native | 2.x | tauri 3 is alpha only |"
                     echo "| cpal / symphonia | apps/mixai Rust | 0.15.3 / 0.5.5 | 0.16+/0.6 need source changes (SampleRate→u32, AudioBufferRef rework) |"
-                    echo "| pnpm (Dockerfile) | server | 10.0.0 | newer 10.x makes ERR_PNPM_IGNORED_BUILDS fatal |"
                     echo
                   } > "$out"
 

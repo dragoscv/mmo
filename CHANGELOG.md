@@ -10,6 +10,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Key & BPM 0.4.0 — iPhone + Apple Watch, Android parity, Wear fixes (WP18-04/05/09)
+
+- **iOS + watchOS** (`apps/ios/KeyBpmApp`, `KeyBpmWidgets`, `KeyBpmWatch`, `KeyBpmWatchWidgets`, bundle `ro.mixai.keybpm`):
+  Rust engine (`crates/mixai-listen-ffi`) over UniFFI as `KeyBpmFFI.xcframework` (iOS device/sim + aarch64 watchOS
+  device/sim), Live / Tuner / Tempo / Set log / Practice / Library tabs, ShazamKit Song ID from the mic ring with an
+  offline signature queue and Shazam library add, set exports (text, CSV, M3U8, rekordbox XML, Apple Music playlist),
+  CoreMIDI clock out (USB, network, Bluetooth LE, virtual "MixAI Clock"), Live Activity + Dynamic Island with the next
+  harmonic keys, AudioRecordingIntent controls (Control Center, Action button, Siri "What key is this", "Identify song"),
+  "Gig" Focus filter, StandBy booth display, iOS 27 Music Understanding cross-check, independent watch app (own mic +
+  engine, iPhone mirror over WatchConnectivity, haptic beat, Double Tap tap tempo, complications). EN + RO catalog.
+  Build: `scripts/ios-build.ps1 -Mode keybpmbuild|keybpmwatchsim|keybpmdevipa|keybpmupload` (ships `crates/`).
+- **Android 0.4.0**: static shortcuts + Assistant App Actions ("What key", "Identify song", "Listen"), notification
+  "Next: 9A · 7A · 8B" + Android 16 promoted Live Update, stage night red + Do Not Disturb, booth display chip.
+- **Wear 0.4.0**: phone → watch mirror fixed on release builds (R8 dropped `android_wear_capabilities`; kept via
+  `res/raw/keep.xml` on phone and watch); haptic beat no longer skips beats (BeatClock resyncs only on a confirmed phase
+  shift, late beats inside 40 % of a period still play).
+
+## web 3.4.0 — ESLint 10, oxlint gate, TypeScript 7 (WP20-08, WP20-02)
+
+- ESLint 10.14 with a hand-built flat config (`eslint-config-next` dropped: it pulls eslint-plugin-react / jsx-a11y / import, none support ESLint 10): `@eslint/js` + typescript-eslint 8.72 recommended + `@eslint-react` recommended-typescript + react-hooks 7 recommended-latest + `@next/eslint-plugin-next` core-web-vitals. Rules the old preset never enforced start as warnings; baseline re-snapshotted 44 files / 80 errors → 41 / 74.
+- `pnpm lint:ox` = oxlint 1.92 `--type-aware` (tsgolint, TS 7), correctness errors only, ~26 s; first step of the web-ci lint job.
+- TypeScript dual install: `tsc` = 7.0.2 (`@typescript/native: npm:typescript@^7`), `typescript` = 6.0 API for typescript-eslint/Next; web typecheck ~6 s. `@types/node` 24.
+- Fixed while enabling the new rules: hooks after an early return in `visualizations-client` (preview mode crashed React with a changed hook count) and `daw-piano-roll`; `Headers` instances spread as `{}` in 4 fetch helpers (headers silently dropped); `aria-invalid` on a button; comboboxes without `aria-controls`; `loadSample` typed as sync; node webcrypto `CryptoKey` type in token-crypto.
+- Dropped the stale `@typescript-eslint/*` overrides from `apps/web/pnpm-workspace.yaml`.
+- `@types/node` 24 everywhere it was still 22: apps/mixai, packages/design-tokens (1.4.2), packages/ai-mcp (tsc clean in each).
+
 ## pnpm 12 — web 3.3.9 · server 3.14.4 · extension 3.0.4 · ui 1.0.1 · design-tokens 1.4.1 · sdk 0.11.1 · ai 0.0.3 (WP20-01)
 
 - Root `packageManager: pnpm@12.18.0`. Every project (17) has its own `pnpm-workspace.yaml` (pnpm 11+ reads settings only there): `minimumReleaseAge: 1440`, explicit `allowBuilds` (replaces `onlyBuiltDependencies`), web/server `overrides`, server `nodeLinker: hoisted`. Root `.npmrc` + `server/.npmrc` removed; root yaml keeps `sharedWorkspaceLockfile: false`.

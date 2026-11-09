@@ -145,7 +145,7 @@ interface MixerActions extends DeckActions {
     setWaveformMode: (mode: WaveformMode) => void;
     triggerSampler: (slotIndex: number) => void;
     stopSampler: (slotIndex: number) => void;
-    loadSample: (slotIndex: number, url: string, name?: string) => void;
+    loadSample: (slotIndex: number, url: string, name?: string) => Promise<void>;
     loadSampleFromFile: (slotIndex: number, file: File) => Promise<boolean>;
     clearSampler: (slotIndex: number) => void;
     toggleSamplerLoop: (slotIndex: number) => void;

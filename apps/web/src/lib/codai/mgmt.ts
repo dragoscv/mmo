@@ -70,7 +70,7 @@ async function mgmtFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
             accept: "application/json",
             "content-type": "application/json",
             authorization: `Bearer ${appToken()}`,
-            ...(init.headers ?? {}),
+            ...Object.fromEntries(new Headers(init.headers)),
         },
     });
     let body: Envelope<T> | undefined;

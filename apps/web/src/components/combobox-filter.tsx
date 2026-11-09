@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useId, useState, useMemo } from "react";
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -129,6 +129,7 @@ function SingleCombobox({
     triggerClassName?: string;
 }) {
     const selected = options.find((o) => o.value === value);
+    const listId = useId();
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -137,6 +138,7 @@ function SingleCombobox({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
+                    aria-controls={listId}
                     className={cn(
                         "h-8 justify-between gap-1 text-xs font-normal",
                         !value && "text-muted-foreground",
@@ -159,7 +161,7 @@ function SingleCombobox({
                     )}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className={cn("p-0", className)} align="start">
+            <PopoverContent id={listId} className={cn("p-0", className)} align="start">
                 <Command shouldFilter={false}>
                     <CommandInput
                         placeholder={`Search ${placeholder.toLowerCase()}...`}
@@ -228,6 +230,7 @@ function MultiCombobox({
             onChange([...value, val]);
         }
     }
+    const listId = useId();
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -236,6 +239,7 @@ function MultiCombobox({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
+                    aria-controls={listId}
                     className={cn(
                         "h-8 justify-between gap-1 text-xs font-normal",
                         value.length === 0 && "text-muted-foreground",
@@ -262,7 +266,7 @@ function MultiCombobox({
                     )}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className={cn("p-0", className)} align="start">
+            <PopoverContent id={listId} className={cn("p-0", className)} align="start">
                 <Command shouldFilter={false}>
                     <CommandInput
                         placeholder={`Search ${placeholder.toLowerCase()}...`}

@@ -168,6 +168,27 @@ export function VisualizationsClient() {
         }
     }, []);
 
+    // Stable preset id for cloud persistence (favorites + playlists).
+    const [presetId, setPresetId] = useState<string | null>(null);
+    useEffect(() => {
+        try {
+            const KEY = "mmo:viz:preset-id";
+            let id = localStorage.getItem(KEY);
+            if (!id) {
+                id = (crypto.randomUUID?.() ?? `viz-${Date.now()}`);
+                localStorage.setItem(KEY, id);
+            }
+            setPresetId(id);
+        } catch { /* ignore */ }
+    }, []);
+    useProjectAutosave({
+        kind: "visualization",
+        externalId: presetId,
+        name: "Visualization Preset",
+        document: settings as unknown as Record<string, unknown>,
+        enabled: Boolean(presetId),
+    });
+
     // Preview Mode
     if (viewMode === "preview" && selectedViz) {
         return (
@@ -207,26 +228,6 @@ export function VisualizationsClient() {
         );
     }
 
-    // Stable preset id for cloud persistence (favorites + playlists).
-    const [presetId, setPresetId] = useState<string | null>(null);
-    useEffect(() => {
-        try {
-            const KEY = "mmo:viz:preset-id";
-            let id = localStorage.getItem(KEY);
-            if (!id) {
-                id = (crypto.randomUUID?.() ?? `viz-${Date.now()}`);
-                localStorage.setItem(KEY, id);
-            }
-            setPresetId(id);
-        } catch { /* ignore */ }
-    }, []);
-    useProjectAutosave({
-        kind: "visualization",
-        externalId: presetId,
-        name: "Visualization Preset",
-        document: settings as unknown as Record<string, unknown>,
-        enabled: Boolean(presetId),
-    });
 
     // Browse Mode
     return (
