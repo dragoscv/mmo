@@ -192,6 +192,10 @@ jobs:
                   done
                   echo "::error::next start never became ready"; cat next-start.log; exit 1
             - name: axe-core accessibility gate (w390 + w1440, light + dark)
+              # 127.0.0.1 (not localhost) so playwright.config.ts skips its own webServer and uses
+              # the production server started above instead of failing on the busy port.
+              env:
+                  PLAYWRIGHT_BASE_URL: http://127.0.0.1:13789
               run: pnpm exec playwright test e2e/a11y.spec.ts --project=w390 --project=w1440
             - uses: actions/upload-artifact@v4
               if: failure()
