@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## server 3.14.2 · native 1.1.2 · yjs-relay 0.1.2 — TypeScript 7 (WP20-02)
+
+- server: `tsc` = TypeScript 7.0.2 via `@typescript/native`, TS 6 API kept for openapi-typescript; `moduleResolution: bundler` (commonjs emit unchanged).
+- apps/native and infra/yjs-relay: plain `typescript ^7.0.2` (no TS API users); yjs-relay drops two stray dependencies (`-`, `D`).
+- apps/web stays on TS 5.9 until the ESLint 10 / typescript-eslint slice (typescript-eslint peer `typescript <6.1`).
+
 ## web 3.3.7 · server 3.14.1 — Node 24 everywhere (WP20-01)
 
 - `apps/web` `engines.node` 24.x and Docker `node:24-bookworm-slim`; web-ci, server-ci, docs-ci, deps-weekly and companion-release run on Node 24.

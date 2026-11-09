@@ -1,6 +1,6 @@
 {
     "name": "@mmo/native",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "private": true,
     "description": "MixAI native shell — Tauri 2 (desktop) + Capacitor (mobile). Wraps https://mixai.ro and lets the existing PWA service worker handle offline.",
     "type": "module",
@@ -26,7 +26,7 @@
         "@capacitor/core": "^8.5.2",
         "@capacitor/ios": "^8.5.2",
         "@tauri-apps/cli": "^2.12.4",
-        "typescript": "^5.9.3"
+        "typescript": "^7.0.2"
     },
     "dependencies": {
         "-": "0.0.1-security.1",

@@ -2,6 +2,12 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.14.2 — TypeScript 7 (WP20-02)
+
+- `tsc` is TypeScript 7.0.2 (`@typescript/native: npm:typescript@^7`); `typescript` stays the 6.0 API package (`npm:@typescript/typescript6`) for openapi-typescript.
+- `tsconfig.json` `moduleResolution: bundler` (TS 7 removed `node10`), still `module: commonjs` so `dist/` is unchanged; renderer tsconfig drops `baseUrl`.
+- Verified: tsc + ui typecheck 0 errors, vitest 319/319, openapi check + regen (only the version header moves).
+
 ## 3.14.1 — Node 24 (WP20-01)
 
 - Runtime moves to Node 24: Docker `NODE_IMAGE=node:24-bookworm-slim`, server-ci on 24. better-sqlite3 13 is N-API, no rebuild; vitest 319/319 and the headless `/health` smoke pass on Node 24.21.0.

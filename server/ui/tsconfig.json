@@ -16,7 +16,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": ["vite/client"],
-    "baseUrl": ".",
     "paths": {
       "@mmo/ui": ["../../packages/ui/src/index.ts"],
       "@mmo/ui/*": ["../../packages/ui/src/*"],
