@@ -81,6 +81,16 @@ enum class Str(val key: String) {
     Off("off"),
     Mixer("mixer"),
     Shortcuts("shortcuts"),
+    Skin("skin"),
+    SkinNext("skin_next"),
+    SkinNocturne("skin_nocturne"),
+    SkinClub("skin_club"),
+    SkinBooth("skin_booth"),
+    SkinStudio("skin_studio"),
+    SkinEmerald("skin_emerald"),
+    LoadQueued("load_queued"),
+    LoadDecoding("load_decoding"),
+    LoadAnalysing("load_analysing"),
 }
 
 typealias StringTable = Map<String, String>

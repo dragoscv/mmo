@@ -14,12 +14,13 @@ plugins {
 }
 
 val repoRoot = rootProject.projectDir.resolve("../..").canonicalFile
-val tokensSrc = repoRoot.resolve("apps/mobile-android-common/src/main/java/ro/mixai/mobile/theme/Tokens.kt")
+val tokensDir = repoRoot.resolve("apps/mobile-android-common/src/main/java/ro/mixai/mobile/theme")
 val tokensOut = layout.buildDirectory.dir("generated/tokens/kotlin")
 
-// Mirror of the generated design tokens (single source: packages/design-tokens). Never edited here.
+// Mirror of the generated design tokens (single source: packages/design-tokens): Tokens.kt (sRGB) and
+// TokenRoles.kt (OKLCH roles + dimensions for runtime skins, WP19-18). Never edited here.
 val syncTokens = tasks.register<Sync>("syncTokens") {
-    from(tokensSrc)
+    from(tokensDir) { include("Tokens.kt", "TokenRoles.kt") }
     into(tokensOut.map { it.dir("ro/mixai/mobile/theme") })
 }
 // Source dir carrying the task dependency (Kotlin compile tasks then depend on syncTokens implicitly).

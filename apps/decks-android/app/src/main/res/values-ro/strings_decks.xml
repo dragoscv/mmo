@@ -70,5 +70,15 @@
     <string name="decks_on" formatted="false">pornit</string>
     <string name="decks_off" formatted="false">oprit</string>
     <string name="decks_mixer" formatted="false">Mixer</string>
-    <string name="decks_shortcuts" formatted="false">Taste: Space/Enter redă A/B · Q/W cue · 1–4 / 7–0 hot cue · S/K sync · ↑↓ navighează · ←/→ încarcă</string>
+    <string name="decks_shortcuts" formatted="false">Taste: Space/Enter redă A/B · Q/W cue · 1–4 / 7–0 hot cue · S/K sync · ↑↓ navighează · ←/→ încarcă · Ctrl+K temă</string>
+    <string name="decks_skin" formatted="false">Temă: %1</string>
+    <string name="decks_skin_next" formatted="false">Tema următoare</string>
+    <string name="decks_skin_nocturne" formatted="false">Nocturn</string>
+    <string name="decks_skin_club" formatted="false">Club</string>
+    <string name="decks_skin_booth" formatted="false">Cabină (contrast mare)</string>
+    <string name="decks_skin_studio" formatted="false">Studio (luminos)</string>
+    <string name="decks_skin_emerald" formatted="false">Smarald</string>
+    <string name="decks_load_queued" formatted="false">În așteptare…</string>
+    <string name="decks_load_decoding" formatted="false">Se decodează…</string>
+    <string name="decks_load_analysing" formatted="false">Se analizează ritmul și tonalitatea…</string>
 </resources>

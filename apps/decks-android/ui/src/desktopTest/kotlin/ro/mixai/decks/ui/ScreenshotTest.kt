@@ -12,13 +12,14 @@ import ro.mixai.decks.ui.i18n.DesktopStrings
 import ro.mixai.decks.ui.i18n.LocalStrings
 import ro.mixai.decks.ui.screens.DecksScreen
 import ro.mixai.decks.ui.theme.DecksTheme
+import ro.mixai.decks.ui.theme.DecksSkin
 
 /**
  * Headless render of the full Decks screen (demo engine, two decks loaded, playing) to PNG.
  * Output dir: system property `decks.shotDir` (defaults to build/screenshots).
  */
 class ScreenshotTest {
-    private fun shot(lang: String, width: Int, height: Int, name: String) {
+    private fun shot(lang: String, width: Int, height: Int, name: String, skin: DecksSkin = DecksSkin.default) {
         var now = 0.0
         val ctl = DecksController(DemoBackend { now })
         ctl.startEngine()
@@ -31,7 +32,7 @@ class ScreenshotTest {
         ctl.dispatch(ro.mixai.decks.ui.model.MidiAction("deck", "auto_loop", deck = 1, pressed = true, beats = 4.0))
         val scene = ImageComposeScene(width, height, Density(1f)) {
             CompositionLocalProvider(LocalStrings provides DesktopStrings.forLanguage(lang)) {
-                DecksTheme(reducedMotion = false) { DecksScreen(ctl, autoFocus = false) }
+                DecksTheme(reducedMotion = false, skin = skin) { DecksScreen(ctl, autoFocus = false) }
             }
         }
         var t = 0L
@@ -51,4 +52,8 @@ class ScreenshotTest {
     @Test fun wideEnglish() = shot("en", 1600, 1000, "decks-desktop-en.png")
 
     @Test fun narrowRomanian() = shot("ro", 480, 1000, "decks-phone-ro.png")
+
+    @Test fun everySkin() {
+        for (s in DecksSkin.presets) shot("en", 1600, 1000, "decks-skin-${s.id}.png", s)
+    }
 }

@@ -70,5 +70,15 @@
     <string name="decks_on" formatted="false">on</string>
     <string name="decks_off" formatted="false">off</string>
     <string name="decks_mixer" formatted="false">Mixer</string>
-    <string name="decks_shortcuts" formatted="false">Keys: Space/Enter play A/B · Q/W cue · 1–4 / 7–0 hot cues · S/K sync · ↑↓ browse · ←/→ load</string>
+    <string name="decks_shortcuts" formatted="false">Keys: Space/Enter play A/B · Q/W cue · 1–4 / 7–0 hot cues · S/K sync · ↑↓ browse · ←/→ load · Ctrl+K skin</string>
+    <string name="decks_skin" formatted="false">Skin: %1</string>
+    <string name="decks_skin_next" formatted="false">Next skin</string>
+    <string name="decks_skin_nocturne" formatted="false">Nocturne</string>
+    <string name="decks_skin_club" formatted="false">Club</string>
+    <string name="decks_skin_booth" formatted="false">Booth (high contrast)</string>
+    <string name="decks_skin_studio" formatted="false">Studio (light)</string>
+    <string name="decks_skin_emerald" formatted="false">Emerald</string>
+    <string name="decks_load_queued" formatted="false">Queued…</string>
+    <string name="decks_load_decoding" formatted="false">Decoding…</string>
+    <string name="decks_load_analysing" formatted="false">Analysing beats and key…</string>
 </resources>

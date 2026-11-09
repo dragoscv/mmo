@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { kotlinTokens, oklchToHex, plainCss, prehydrateScript, swiftTokens, tailwindCss, tokensJson } from "./generate";
+import { kotlinRoles, kotlinTokens, oklchToHex, plainCss, prehydrateScript, swiftTokens, tailwindCss, tokensJson } from "./generate";
 import { ACCENTS, CAMELOT, DATA_ATTRS, PREFS_STORAGE_KEY, camelotColors, normalizePrefs, parseAccent } from "./tokens";
 
 describe("camelot key colours", () => {
@@ -53,6 +53,15 @@ describe("kotlin", () => {
 });
 
 describe("swift", () => {
+  it("kotlinRoles emits every role, accent hues and dimensions as numbers", () => {
+    const kt = kotlinRoles();
+    expect(kt).toContain("object TokenRoles");
+    expect(kt).toMatch(/"primary" to Oklch\(0\.7f, 0\.19f, -1f, 1\.0f\)/);
+    expect(kt).toContain(`"violet" to ${ACCENTS.violet.hue}.0f`);
+    expect(kt).toContain(`"compact" to 34`);
+    expect(kt).toContain(`"reduced" to 0`);
+    expect(kt).not.toMatch(/Color\(0x/);
+  });
   it("emits dark + light roles and brand colours as sRGB", () => {
     const sw = swiftTokens();
     expect(sw).toContain("public enum Tokens");

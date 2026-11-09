@@ -18,6 +18,7 @@ import ro.mixai.decks.ui.i18n.DesktopStrings
  * MixAI Decks desktop entry point. System properties:
  *  - `decks.lang` (en | ro, default = OS locale), `decks.reducedMotion` (true/false, default = OS)
  *  - `decks.waveform` (native | headless | compose), `decks.ffi.path` (host decks_ffi library)
+ *  - `decks.skin` (nocturne | club | booth | studio | emerald; default = last used)
  */
 fun main() {
     val backend = DesktopDecks.createBackend()
@@ -26,6 +27,7 @@ fun main() {
     val lang = DesktopDecks.language()
     val reduced = DesktopDecks.reducedMotion()
     val waveMode = waveModeFromEnv()
+    val skins = DesktopDecks.skinState()
     val title = DesktopStrings.forLanguage(lang)["app_name"] ?: "MixAI Decks"
 
     application {
@@ -38,7 +40,7 @@ fun main() {
             title = title,
             state = rememberWindowState(size = DpSize(1440.dp, 900.dp)),
         ) {
-            DecksDesktopRoot(ctl, lang, reduced, waveMode) {
+            DecksDesktopRoot(ctl, lang, reduced, waveMode, skins) {
                 val chooser = JFileChooser(File(System.getProperty("user.home"), "Music")).apply {
                     fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
                     dialogTitle = DesktopStrings.forLanguage(lang)["scan_folder"]

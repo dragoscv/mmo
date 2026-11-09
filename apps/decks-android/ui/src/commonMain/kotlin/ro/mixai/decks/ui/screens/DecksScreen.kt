@@ -42,18 +42,24 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import ro.mixai.decks.ui.DecksController
 import ro.mixai.decks.ui.components.ComposeWaveforms
+import ro.mixai.decks.ui.components.PadButton
 import ro.mixai.decks.ui.components.Panel
 import ro.mixai.decks.ui.components.WaveformSlot
 import ro.mixai.decks.ui.i18n.Str
 import ro.mixai.decks.ui.i18n.str
 import ro.mixai.decks.ui.logic.Format
 import ro.mixai.decks.ui.theme.DecksColors
+import ro.mixai.decks.ui.theme.DeckLayout
+import ro.mixai.decks.ui.theme.DecksSkin
+import ro.mixai.decks.ui.theme.LocalDecksSkin
 import ro.mixai.decks.ui.theme.LocalDecksType
 import ro.mixai.decks.ui.theme.LocalReducedMotion
+import ro.mixai.decks.ui.theme.SkinState
 
 /**
  * Root of the Decks UI (shared by Android and Desktop).
- * Wide (≥ 1000 dp): deck A | mixer | deck B over the waveforms, library below.
+ * Wide (≥ 1000 dp): layout from the skin ([DeckLayout]): classic (deck A | mixer | deck B, library
+ * below), performance (tall waveforms, no jogs) or library-first.
  * Narrow (phones): stacked and scrollable, jog wheels hidden.
  */
 @Composable
@@ -62,8 +68,10 @@ fun DecksScreen(
     waveforms: WaveformSlot = { f, p, m -> ComposeWaveforms(f, p, m) },
     onScanFolder: (() -> Unit)? = null,
     autoFocus: Boolean = true,
+    skins: SkinState? = null,
 ) {
     val reduced = LocalReducedMotion.current
+    val layout = LocalDecksSkin.current.layout
     LaunchedEffect(ctl) {
         ctl.startEngine()
         while (true) withFrameNanos { ctl.tick() }
@@ -77,7 +85,11 @@ fun DecksScreen(
     BoxWithConstraints(
         Modifier.fillMaxSize()
             .background(DecksColors.background)
-            .onKeyEvent { handleShortcut(ctl, it) { z -> zoom = (zoom * z).coerceIn(2f, 32f) } }
+            .onKeyEvent {
+                if (skins != null && it.type == KeyEventType.KeyDown && it.isCtrlPressed && it.key == Key.K) {
+                    skins.cycle(); true
+                } else handleShortcut(ctl, it) { z -> zoom = (zoom * z).coerceIn(2f, 32f) }
+            }
             .focusRequester(focus)
             .focusable(),
     ) {
@@ -87,16 +99,30 @@ fun DecksScreen(
         val peaks = ctl.controls.map { it.peaks }
         val frame = ctl.waveFrame(zoom, reduced)
         Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusBar(ctl)
+            StatusBar(ctl, skins)
             val waveLabel = str(Str.Waveform)
-            Box(Modifier.fillMaxWidth().height(if (wide) 150.dp else 110.dp)) {
+            val waveH = when {
+                !wide -> 110.dp
+                layout == DeckLayout.Performance -> 260.dp
+                layout == DeckLayout.Library -> 110.dp
+                else -> 150.dp
+            }
+            Box(Modifier.fillMaxWidth().height(waveH)) {
                 waveforms(frame, peaks, Modifier.fillMaxSize().semantics { contentDescription = waveLabel })
             }
-            if (wide && tall) {
+            val jogs = layout == DeckLayout.Classic
+            if (wide && layout == DeckLayout.Library) {
+                LibraryPanel(ctl, onScanFolder, Modifier.fillMaxWidth().weight(1f))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DeckPanel(ctl, 0, Modifier.weight(1f))
+                    DeckPanel(ctl, 0, Modifier.weight(1f), compact = true)
                     MixerPanel(ctl, Modifier.width(280.dp))
-                    DeckPanel(ctl, 1, Modifier.weight(1f))
+                    DeckPanel(ctl, 1, Modifier.weight(1f), compact = true)
+                }
+            } else if (wide && tall) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DeckPanel(ctl, 0, Modifier.weight(1f), compact = !jogs)
+                    MixerPanel(ctl, Modifier.width(280.dp))
+                    DeckPanel(ctl, 1, Modifier.weight(1f), compact = !jogs)
                 }
                 LibraryPanel(ctl, onScanFolder, Modifier.fillMaxWidth().weight(1f))
             } else if (wide) {
@@ -105,9 +131,9 @@ fun DecksScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DeckPanel(ctl, 0, Modifier.weight(1f))
+                        DeckPanel(ctl, 0, Modifier.weight(1f), compact = !jogs)
                         MixerPanel(ctl, Modifier.width(280.dp))
-                        DeckPanel(ctl, 1, Modifier.weight(1f))
+                        DeckPanel(ctl, 1, Modifier.weight(1f), compact = !jogs)
                     }
                     LibraryPanel(ctl, onScanFolder, Modifier.fillMaxWidth().height(360.dp))
                 }
@@ -127,7 +153,7 @@ fun DecksScreen(
 }
 
 @Composable
-private fun StatusBar(ctl: DecksController) {
+private fun StatusBar(ctl: DecksController, skins: SkinState?) {
     val type = LocalDecksType.current
     val clock = ctl.engine.clock
     Panel(Modifier.fillMaxWidth()) {
@@ -142,7 +168,12 @@ private fun StatusBar(ctl: DecksController) {
             )
             BasicText(
                 if (ctl.backend.isNative) ctl.backend.description else str(Str.DemoEngine),
-                style = type.small.copy(color = if (ctl.backend.isNative) DecksColors.muted else DecksColors.warning),
+                // Amber text is below 4.5:1 on light backgrounds: light skins use the foreground role.
+                style = type.small.copy(color = when {
+                    ctl.backend.isNative -> DecksColors.muted
+                    DecksColors.skin.dark -> DecksColors.warning
+                    else -> DecksColors.foreground
+                }),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             ctl.startError?.let {
@@ -154,8 +185,22 @@ private fun StatusBar(ctl: DecksController) {
                 "${str(Str.Midi)}: ${ctl.midiStatus ?: str(Str.MidiNone)}" + (ctl.lastMidi?.let { " · $it" } ?: ""),
                 style = type.small.copy(color = DecksColors.muted), maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
+            if (skins != null) {
+                val name = skinName(skins.skin)
+                PadButton(str(Str.Skin, name), "${str(Str.SkinNext)} · ${str(Str.Skin, name)}") { skins.cycle() }
+            }
         }
     }
+}
+
+@Composable
+fun skinName(s: DecksSkin): String = when (s.id) {
+    "club" -> str(Str.SkinClub)
+    "booth" -> str(Str.SkinBooth)
+    "studio" -> str(Str.SkinStudio)
+    "emerald" -> str(Str.SkinEmerald)
+    "nocturne" -> str(Str.SkinNocturne)
+    else -> s.id
 }
 
 /**

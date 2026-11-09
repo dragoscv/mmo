@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 // Executed directly by `node --experimental-strip-types`, which needs explicit
 // extensions (unlike the bundler-resolved imports elsewhere in this package).
-import { kotlinTokens, plainCss, prehydrateScript, swiftTokens, tailwindCss, tokensJson } from "./generate.ts";
+import { kotlinRoles, kotlinTokens, plainCss, prehydrateScript, swiftTokens, tailwindCss, tokensJson } from "./generate.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = join(here, "..", "dist");
@@ -46,6 +46,10 @@ const phoneKt = join(repo, "apps", "mobile-android-common", "src", "main", "java
 mkdirSync(dirname(phoneKt), { recursive: true });
 writeFileSync(phoneKt, lf(kotlinTokens("ro.mixai.mobile.theme", true)) + "\n", { encoding: "utf8" });
 console.log(`mirrored Tokens.kt → ${phoneKt.replace(repo, "")}`);
+// MixAI Decks skins (WP19-18): raw OKLCH roles + dimensions for runtime re-tinting.
+const rolesKt = join(dirname(phoneKt), "TokenRoles.kt");
+writeFileSync(rolesKt, lf(kotlinRoles("ro.mixai.mobile.theme")) + "\n", { encoding: "utf8" });
+console.log(`mirrored TokenRoles.kt → ${rolesKt.replace(repo, "")}`);
 
 // iOS / tvOS apps (WP16-47, WP17-42): SwiftUI tokens in the shared MixaiCore package (public, used by MixAI,
 // MixAI TV and MixAI Music).

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -55,14 +54,15 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import ro.mixai.decks.ui.theme.DecksColors
+import ro.mixai.decks.ui.theme.LocalDecksSkin
 import ro.mixai.decks.ui.theme.LocalDecksType
-
-private val Shape = RoundedCornerShape(8.dp)
+import ro.mixai.decks.ui.theme.controlShape
+import ro.mixai.decks.ui.theme.panelShape
 
 /** Focus ring shared by every interactive control (keyboard users must see where they are). */
 @Composable
-private fun Modifier.focusRing(focused: Boolean): Modifier =
-    if (focused) border(2.dp, DecksColors.ring, Shape) else this
+private fun Modifier.focusRing(focused: Boolean, shape: androidx.compose.ui.graphics.Shape): Modifier =
+    if (focused) border(2.dp, DecksColors.ring, shape) else this
 
 /**
  * Push button with optional latched state. [onPress]/[onRelease] give momentary behaviour (CUE);
@@ -92,13 +92,16 @@ fun PadButton(
         else -> DecksColors.surfaceRaised
     }
     val fg = if (active || down) DecksColors.onPrimary else if (enabled) DecksColors.foreground else DecksColors.muted
+    val skin = LocalDecksSkin.current
+    val shape = controlShape(skin)
+    val minH = maxOf(44, skin.controlHeightDp).dp
     Box(
         modifier
-            .sizeIn(minWidth = 44.dp, minHeight = 44.dp)
-            .clip(Shape)
-            .background(bg, Shape)
-            .border(1.dp, if (active) accent else DecksColors.border, Shape)
-            .focusRing(focused)
+            .sizeIn(minWidth = 44.dp, minHeight = minH)
+            .clip(shape)
+            .background(bg, shape)
+            .border(1.dp, if (active) accent else DecksColors.border, shape)
+            .focusRing(focused, shape)
             .onFocusChanged { focused = it.isFocused }
             .onKeyEvent { e ->
                 if (!enabled || (e.key != Key.Enter && e.key != Key.Spacebar && e.key != Key.NumPadEnter)) return@onKeyEvent false
@@ -297,11 +300,12 @@ fun Readout(label: String, value: String, modifier: Modifier = Modifier, color: 
 
 @Composable
 fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val shape = panelShape(LocalDecksSkin.current)
     Box(
         modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(shape)
             .background(DecksColors.surface)
-            .border(1.dp, DecksColors.border, RoundedCornerShape(12.dp))
+            .border(1.dp, DecksColors.border, shape)
             .padding(10.dp),
     ) { content() }
 }

@@ -12,6 +12,7 @@ const GENERATED = [
     "packages/design-tokens/dist",
     "apps/tv-android/app/src/main/java/ro/mixai/tv/ui/theme/Tokens.kt",
     "apps/mobile-android-common/src/main/java/ro/mixai/mobile/theme/Tokens.kt",
+    "apps/mobile-android-common/src/main/java/ro/mixai/mobile/theme/TokenRoles.kt",
     "apps/ios/MixaiCore/Sources/MixaiCore/Theme/Tokens.swift",
     "apps/tv-tizen/src/tokens.css",
     "apps/extension/tokens.css",

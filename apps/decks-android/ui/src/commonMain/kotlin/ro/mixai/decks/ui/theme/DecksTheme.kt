@@ -1,40 +1,60 @@
 package ro.mixai.decks.ui.theme
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ro.mixai.mobile.theme.Tokens
 
 /**
- * Dark-first Decks palette. Every colour comes from the generated design tokens
- * (packages/design-tokens → Tokens.kt, mirrored at build time by `:decks-ui:syncTokens`);
- * no literal colours here.
+ * Decks palette. Every colour comes from the generated design tokens (packages/design-tokens →
+ * Tokens.kt / TokenRoles.kt in :mobile-common, mirrored by `:decks-ui:syncTokens`), re-tinted by
+ * the active [DecksSkin] (WP19-18). Backed by snapshot state, so composables and Canvas draws
+ * update when the skin changes; non-Compose callers (the native renderer) read the same values.
  */
 object DecksColors {
-    val background = Tokens.background
-    val surface = Tokens.card
-    val surfaceRaised = Tokens.secondary
-    val sidebar = Tokens.sidebar
-    val foreground = Tokens.foreground
-    val muted = Tokens.mutedForeground
-    val border = Tokens.border
-    val input = Tokens.input
-    val primary = Tokens.primary
-    val onPrimary = Tokens.primaryForeground
-    val accent = Tokens.accent
-    val ring = Tokens.ring
-    val danger = Tokens.destructive
-    val warning = Tokens.warning
-    val success = Tokens.success
+    private var palette by mutableStateOf(DecksPalette(DecksSkin.default))
+
+    /** Active skin (set by [DecksTheme]). */
+    var skin by mutableStateOf(DecksSkin.default)
+        private set
+
+    fun apply(s: DecksSkin) {
+        if (s == skin) return
+        skin = s
+        palette = DecksPalette(s)
+    }
+
+    val background get() = palette.background
+    val surface get() = palette.surface
+    val surfaceRaised get() = palette.surfaceRaised
+    val sidebar get() = palette.sidebar
+    val foreground get() = palette.foreground
+    val muted get() = palette.muted
+    val border get() = palette.border
+    val input get() = palette.input
+    val primary get() = palette.primary
+    val onPrimary get() = palette.onPrimary
+    val accent get() = palette.accent
+    val ring get() = palette.ring
+    val danger get() = palette.danger
+    val warning get() = palette.warning
+    val success get() = palette.success
+    /** Deck identity colours are brand-fixed (never re-hued) so A/B stay recognisable in every skin. */
     val decks = listOf(Tokens.brandDeckA, Tokens.brandDeckB, Tokens.brandDeckC, Tokens.brandDeckD)
-    val waveLow = Tokens.chart4
-    val waveMid = Tokens.chart1
-    val waveHigh = Tokens.chart3
+    val waveLow get() = palette.waveLow
+    val waveMid get() = palette.waveMid
+    val waveHigh get() = palette.waveHigh
 
     fun deck(i: Int): Color = decks[i.coerceIn(0, decks.lastIndex)]
 
@@ -63,20 +83,53 @@ data class DecksType(
     val display: TextStyle,
 )
 
-val LocalDecksType = staticCompositionLocalOf {
-    DecksType(
-        label = TextStyle(color = DecksColors.muted, fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.6.sp),
-        small = TextStyle(color = DecksColors.foreground, fontSize = 12.sp),
-        body = TextStyle(color = DecksColors.foreground, fontSize = 14.sp),
-        title = TextStyle(color = DecksColors.foreground, fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
-        display = TextStyle(color = DecksColors.foreground, fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace),
+fun decksType(scale: Float = 1f) = DecksType(
+    label = TextStyle(color = DecksColors.muted, fontSize = (11 * scale).sp, fontWeight = FontWeight.Medium, letterSpacing = 0.6.sp),
+    small = TextStyle(color = DecksColors.foreground, fontSize = (12 * scale).sp),
+    body = TextStyle(color = DecksColors.foreground, fontSize = (14 * scale).sp),
+    title = TextStyle(color = DecksColors.foreground, fontSize = (16 * scale).sp, fontWeight = FontWeight.SemiBold),
+    display = TextStyle(color = DecksColors.foreground, fontSize = (22 * scale).sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace),
+)
+
+val LocalDecksType = staticCompositionLocalOf { decksType() }
+
+/** Reduced motion flag (OS setting or skin): no continuous jog rotation, no beat pulses, no scrolling grid. */
+val LocalReducedMotion = staticCompositionLocalOf { false }
+
+/** Active skin geometry (corner radius, control height, layout). */
+val LocalDecksSkin = staticCompositionLocalOf { DecksSkin.default }
+
+/** Control / panel shapes from the skin radius (controls use the smaller radius). */
+fun controlShape(skin: DecksSkin) = RoundedCornerShape((skin.radiusDp * 0.8f).dp)
+fun panelShape(skin: DecksSkin) = RoundedCornerShape((skin.radiusDp * 1.2f).dp)
+
+@Composable
+fun DecksTheme(reducedMotion: Boolean, skin: DecksSkin = DecksSkin.default, content: @Composable () -> Unit) {
+    DecksColors.apply(skin)
+    // Recomputed per skin: TextStyles capture the colours at creation time.
+    val type = remember(skin) { decksType(skin.textScale) }
+    CompositionLocalProvider(
+        LocalReducedMotion provides (reducedMotion || skin.reducedMotion),
+        LocalDecksSkin provides skin,
+        LocalDecksType provides type,
+        content = content,
     )
 }
 
-/** Reduced motion flag (OS setting): no continuous jog rotation, no beat pulses, no scrolling grid. */
-val LocalReducedMotion = staticCompositionLocalOf { false }
+/** Holds the skin chosen in the UI; platforms persist [DecksSkin.encode] and restore with [DecksSkin.decode]. */
+class SkinState(initial: DecksSkin, private val onChange: (DecksSkin) -> Unit = {}) {
+    var skin by mutableStateOf(initial)
+        private set
 
-@Composable
-fun DecksTheme(reducedMotion: Boolean, content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalReducedMotion provides reducedMotion, content = content)
+    fun select(s: DecksSkin) {
+        if (s == skin) return
+        skin = s
+        onChange(s)
+    }
+
+    /** Next preset (keyboard shortcut / settings cycling). */
+    fun cycle() {
+        val i = DecksSkin.presets.indexOfFirst { it.id == skin.id }
+        select(DecksSkin.presets[(i + 1).mod(DecksSkin.presets.size)])
+    }
 }

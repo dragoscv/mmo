@@ -54,6 +54,9 @@ fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, c
                 BasicText(deckName, style = type.title.copy(color = color), modifier = Modifier.semantics { heading() })
                 val title = when {
                     c.loadPhase == LoadPhase.FAILED -> str(Str.LoadFailed, c.loadError ?: "?")
+                    c.loadPhase == LoadPhase.QUEUED -> str(Str.LoadQueued)
+                    c.loadPhase == LoadPhase.DECODING -> str(Str.LoadDecoding)
+                    c.loadPhase == LoadPhase.ANALYSING -> str(Str.LoadAnalysing)
                     c.loadPhase != null || d.loading -> str(Str.Loading)
                     d.title != null -> d.title
                     else -> str(Str.NoTrack)

@@ -75,7 +75,17 @@ object DesktopStrings {
         "on" to "on",
         "off" to "off",
         "mixer" to "Mixer",
-        "shortcuts" to "Keys: Space/Enter play A/B · Q/W cue · 1–4 / 7–0 hot cues · S/K sync · ↑↓ browse · ←/→ load",
+        "shortcuts" to "Keys: Space/Enter play A/B · Q/W cue · 1–4 / 7–0 hot cues · S/K sync · ↑↓ browse · ←/→ load · Ctrl+K skin",
+        "skin" to "Skin: %1",
+        "skin_next" to "Next skin",
+        "skin_nocturne" to "Nocturne",
+        "skin_club" to "Club",
+        "skin_booth" to "Booth (high contrast)",
+        "skin_studio" to "Studio (light)",
+        "skin_emerald" to "Emerald",
+        "load_queued" to "Queued…",
+        "load_decoding" to "Decoding…",
+        "load_analysing" to "Analysing beats and key…",
     )
 
     val ro: StringTable = mapOf(
@@ -148,7 +158,17 @@ object DesktopStrings {
         "on" to "pornit",
         "off" to "oprit",
         "mixer" to "Mixer",
-        "shortcuts" to "Taste: Space/Enter redă A/B · Q/W cue · 1–4 / 7–0 hot cue · S/K sync · ↑↓ navighează · ←/→ încarcă",
+        "shortcuts" to "Taste: Space/Enter redă A/B · Q/W cue · 1–4 / 7–0 hot cue · S/K sync · ↑↓ navighează · ←/→ încarcă · Ctrl+K temă",
+        "skin" to "Temă: %1",
+        "skin_next" to "Tema următoare",
+        "skin_nocturne" to "Nocturn",
+        "skin_club" to "Club",
+        "skin_booth" to "Cabină (contrast mare)",
+        "skin_studio" to "Studio (luminos)",
+        "skin_emerald" to "Smarald",
+        "load_queued" to "În așteptare…",
+        "load_decoding" to "Se decodează…",
+        "load_analysing" to "Se analizează ritmul și tonalitatea…",
     )
 
     fun forLanguage(lang: String): StringTable = if (lang.lowercase().startsWith("ro")) ro else en

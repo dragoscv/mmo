@@ -2,6 +2,7 @@ package ro.mixai.decks.ui.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import java.io.File
 import java.util.Locale
 import ro.mixai.decks.ui.DecksController
@@ -13,6 +14,8 @@ import ro.mixai.decks.ui.i18n.DesktopStrings
 import ro.mixai.decks.ui.i18n.LocalStrings
 import ro.mixai.decks.ui.screens.DecksScreen
 import ro.mixai.decks.ui.theme.DecksTheme
+import ro.mixai.decks.ui.theme.DecksSkin
+import ro.mixai.decks.ui.theme.SkinState
 
 object DesktopDecks {
     /**
@@ -41,6 +44,13 @@ object DesktopDecks {
 
     fun language(): String = System.getProperty("decks.lang") ?: Locale.getDefault().language
 
+    /** Skin persisted in java.util.prefs (`ro/mixai/decks` → `skin`); `-Ddecks.skin=<id>` overrides. */
+    fun skinState(): SkinState {
+        val prefs = java.util.prefs.Preferences.userRoot().node("ro/mixai/decks")
+        val initial = System.getProperty("decks.skin")?.let { DecksSkin.decode("id=$it") } ?: DecksSkin.decode(prefs.get("skin", null))
+        return SkinState(initial) { prefs.put("skin", it.encode()) }
+    }
+
     /** Windows "show animations" off / GNOME enable-animations false → reduced motion. */
     fun reducedMotion(): Boolean {
         System.getProperty("decks.reducedMotion")?.let { return it.toBoolean() }
@@ -64,10 +74,15 @@ object DesktopDecks {
 }
 
 @Composable
-fun DecksDesktopRoot(ctl: DecksController, lang: String, reducedMotion: Boolean, waveMode: WaveMode, onScanFolder: () -> Unit) {
+fun DecksDesktopRoot(
+    ctl: DecksController, lang: String, reducedMotion: Boolean, waveMode: WaveMode,
+    skins: SkinState? = null,
+    onScanFolder: () -> Unit,
+) {
     val backend = ctl.backend
+    val state = skins ?: remember { SkinState(DecksSkin.default) }
     CompositionLocalProvider(LocalStrings provides DesktopStrings.forLanguage(lang)) {
-        DecksTheme(reducedMotion) {
+        DecksTheme(reducedMotion, state.skin) {
             DecksScreen(
                 ctl,
                 waveforms = { frame, peaks, modifier ->
@@ -75,6 +90,7 @@ fun DecksDesktopRoot(ctl: DecksController, lang: String, reducedMotion: Boolean,
                     else ComposeWaveforms(frame, peaks, modifier)
                 },
                 onScanFolder = onScanFolder,
+                skins = state,
             )
         }
     }

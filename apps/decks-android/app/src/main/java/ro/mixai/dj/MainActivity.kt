@@ -45,9 +45,10 @@ class MainActivity : ComponentActivity() {
         midi = AndroidMidi(this, ctl).also { it.start() }
         val strings = strings()
         val reduced = AndroidDecks.reducedMotion(this)
+        val skins = AndroidDecks.skinState(this)
         setContent {
             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                DecksAndroidRoot(ctl, strings, reduced, ::scanFolder)
+                DecksAndroidRoot(ctl, strings, reduced, ::scanFolder, skins)
             }
         }
     }
