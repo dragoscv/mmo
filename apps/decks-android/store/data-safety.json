@@ -1,0 +1,25 @@
+{
+  "$comment": "Answers for the Google Play Data safety form and the App Store privacy labels for MixAI Decks (ro.mixai.dj). Must match /privacy (section 'decks') and the manifest permissions; checked by scripts/decks-store-check.mjs.",
+  "collectsData": false,
+  "sharesData": false,
+  "encryptedInTransit": true,
+  "deletionRequest": "Data is stored only on the device; uninstalling or clearing app data deletes it. Optional MixAI account deletion: https://mixai.ro/account/delete",
+  "permissions": {
+    "android.permission.READ_MEDIA_AUDIO": "Read the music files the user chooses to add to the library (processed on the device).",
+    "android.permission.READ_EXTERNAL_STORAGE": "Same as READ_MEDIA_AUDIO on Android 12 and older.",
+    "android.permission.INTERNET": "Connected mode: a server on the local network for the phone remote, second screen and party requests, started only by the user.",
+    "android.permission.ACCESS_LOCAL_NETWORK": "Connected mode on the local network (Android 17+)."
+  },
+  "dataTypes": {
+    "audio": { "collected": false, "note": "Audio input for DVS / listening is processed on the device only." },
+    "music files": { "collected": false, "note": "Library, analysis, stems and recordings stay on the device." },
+    "app interactions": { "collected": false },
+    "crash logs": { "collected": false },
+    "device id": { "collected": false }
+  },
+  "apple": {
+    "tracking": false,
+    "dataLinkedToYou": [],
+    "dataNotLinkedToYou": []
+  }
+}

@@ -2,14 +2,18 @@
     "metaTitle": "MixAI privacy policy",
     "metaDescription": "What the MixAI apps and website collect, why, where it is stored and how to delete it.",
     "title": "Privacy policy",
-    "updated": "Last updated: 5 November 2026",
-    "intro": "MixAI is a player for your own media library, served by your own MMO Server. This policy covers the MixAI website and the MixAI apps for Android, iOS and TV. MixAI shows no ads and does not track you across apps or websites.",
+    "updated": "Last updated: 9 November 2026",
+    "intro": "MixAI is a player for your own media library, served by your own MMO Server. This policy covers the MixAI website, the MixAI apps for Android, iOS and TV, and MixAI Decks. MixAI shows no ads and does not track you across apps or websites.",
     "controller": "Controller: Dragos Catalin Vladulescu, Romania. Contact:",
     "langSwitch": "Citește în română",
     "sections": {
         "server": {
             "title": "Your own server",
             "body": "Your films, series, music and live sources stay on the MMO Server you run. The app talks to that server directly. Watch progress, Watch Together rooms and chat messages, downloads and listening history are stored on your server, not by us. Watch Together chat is relayed only through your server and is not sent to MixAI."
+        },
+        "decks": {
+            "title": "MixAI Decks (DJ app)",
+            "body": "MixAI Decks works on your device. Your music library, analysis (tempo, key, waveforms), stems, cue points, set recordings and tracklists are stored only on your device. Microphone or audio input is used only when you turn on timecode vinyl (DVS) or listening features, and the audio is processed on the device and never uploaded. Connected mode (phone remote, second screen, party requests) runs a small server on your local network only while you keep it on; guests' song requests and votes stay on your device and are deleted when you close the session. Typed or spoken DJ commands are understood on the device; if you choose to send one that the app cannot understand to the MixAI assistant, only that text is sent."
         },
         "account": {
             "title": "MixAI account (optional)",

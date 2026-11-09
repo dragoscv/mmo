@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## web 3.3.6 — privacy policy covers MixAI Decks (WP19-24)
+
+- `/privacy` gains a **MixAI Decks** section (RO/EN): library, analysis, stems, recordings and tracklists stay on the device; audio input only for DVS / listening, processed locally; connected mode is a LAN-only server while switched on; only unrecognised commands the user chooses to send reach the MixAI assistant.
+
 ## Unreleased — MixAI DJ renamed to MixAI Decks (D60, ADR-0014) · web 3.3.3 · MixAI Decks 1.1.0
 
 - **MixAI DJ renamed to MixAI Decks** (D60, [ADR-0014](docs/adr/0014-mixai-decks-native-dj.md)): product name, window

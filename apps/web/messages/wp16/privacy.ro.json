@@ -2,7 +2,7 @@
     "metaTitle": "Politica de confidențialitate MixAI",
     "metaDescription": "Ce colectează aplicațiile și site-ul MixAI, de ce, unde sunt stocate datele și cum le ștergi.",
     "title": "Politica de confidențialitate",
-    "updated": "Ultima actualizare: 5 noiembrie 2026",
+    "updated": "Ultima actualizare: 9 noiembrie 2026",
     "intro": "MixAI este un player pentru propria ta bibliotecă media, servită de propriul tău MMO Server. Politica acoperă site-ul MixAI și aplicațiile MixAI pentru Android, iOS și TV. MixAI nu afișează reclame și nu te urmărește în alte aplicații sau site-uri.",
     "controller": "Operator: Dragoș Cătălin Vlădulescu, România. Contact:",
     "langSwitch": "Read in English",
@@ -42,6 +42,10 @@
         "children": {
             "title": "Copii",
             "body": "MixAI nu se adresează copiilor sub 13 ani. Profilurile pentru copii sunt o funcție parentală gestionată de titularul adult al contului, pe propriul server."
+        },
+        "decks": {
+            "title": "MixAI Decks (aplicația de DJ)",
+            "body": "MixAI Decks funcționează pe dispozitivul tău. Biblioteca de muzică, analiza (tempo, tonalitate, forme de undă), stem-urile, punctele cue, înregistrările de seturi și listele de piese sunt păstrate doar pe dispozitiv. Microfonul sau intrarea audio sunt folosite doar când pornești vinilul cu timecode (DVS) sau funcțiile de ascultare, iar sunetul este procesat pe dispozitiv și nu este trimis nicăieri. Modul conectat (telecomandă din telefon, al doilea ecran, cereri la petrecere) pornește un mic server doar în rețeaua ta locală, cât timp îl ții pornit; cererile și voturile invitaților rămân pe dispozitivul tău și se șterg când închizi sesiunea. Comenzile de DJ scrise sau rostite sunt înțelese pe dispozitiv; dacă alegi să trimiți asistentului MixAI o comandă pe care aplicația nu o înțelege, se trimite doar acel text."
         }
     }
 }

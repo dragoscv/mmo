@@ -1,0 +1,33 @@
+{
+  "$comment": "MixAI Decks store copy for Google Play (ro.mixai.dj), Microsoft Store (9P5P2WN26RMS) and the App Store / Mac App Store (ro.mixai.dj). Validated by scripts/decks-store-check.mjs (limits, RO/EN parity, banned claims). Every claim must match a shipped feature (docs/decks).",
+  "privacyUrl": {
+    "en": "https://mixai.ro/privacy?lang=en",
+    "ro": "https://mixai.ro/privacy?lang=ro"
+  },
+  "supportUrl": "https://decks.mixai.ro",
+  "supportEmail": "support@mixai.ro",
+  "developer": "Dragos Catalin Vladulescu",
+  "category": { "play": "MUSIC_AND_AUDIO", "msstore": "Music", "apple": "Music" },
+  "locales": {
+    "en": {
+      "title": "MixAI Decks",
+      "shortDescription": "Four-deck DJ app: beat sync, stems, harmonic AI mixing, controllers and DVS.",
+      "subtitle": "DJ with four decks and AI",
+      "promotionalText": "Mix your own music on four decks with beat sync, key lock, stems separated on your device and an AI that plans phrase-aligned transitions.",
+      "keywords": ["dj", "mixer", "decks", "beat sync", "stems", "harmonic mixing", "midi controller", "dvs", "rekordbox", "tracklist"],
+      "description": "MixAI Decks is a DJ app for your own music, made to feel like club gear and to work offline.\n\nMIX\n• Four decks with beat and phase sync, quantize, slip mode, key lock and key shift.\n• Hot cues, loops, beat jump, colour and beat FX, a three-band EQ, a filter and headphone cue.\n• Signalsmith time stretching keeps vocals clean when you change tempo.\n\nSTEMS ON YOUR DEVICE\n• Split any track into vocals, drums, bass and melody with HT-Demucs, run on your own device.\n• Swap the bass, keep the vocal, drop the drums.\n\nAI THAT HELPS, NOT TAKES OVER\n• Next-track suggestions from key, tempo and energy, with the reasons shown.\n• Auto mix plans a phrase-aligned transition (bass swap, filter sweep, echo out or stem swap) that you can edit.\n• Set safety warns you 32 bars ahead when a track is ending, the next one clashes or a level jumps.\n• Type or say commands in English or Romanian: \"mix next in 16 bars with a bass swap\".\n\nCONTROLLERS AND VINYL\n• MIDI learn on any control, ready profiles for the Pioneer DDJ-FLX4 and Novation Circuit Tracks, BLE MIDI.\n• Digital vinyl (DVS) with our own clean-room timecode decoder.\n\nYOUR LIBRARY\n• Fast local library with crates and smart crates.\n• Import and export rekordbox, Traktor, Serato and Engine DJ collections.\n\nPARTY AND PERFORMANCE\n• Phone remote and a second screen over your Wi-Fi: scan a QR code, no app to install.\n• Guests request songs and vote from their phones; you accept or reject.\n• Record your set with an automatic tracklist: CUE sheet with ISRC, Mixcloud sections and an ORDA / UCMR-ADA report.\n\nNo ads. Your music and recordings stay on your device. MixAI Decks plays files you own; it does not include a music catalogue.",
+      "releaseNotes": "MixAI Decks 2.0: native app with four decks, on-device stems, the AI transition designer, phone remote and party requests, and set recording with an automatic tracklist.",
+      "features": ["Four decks with beat sync and key lock", "Stems separated on your device", "AI transition designer and set safety", "MIDI controllers, BLE MIDI and DVS", "Phone remote and party song requests", "Set recording with automatic tracklist"]
+    },
+    "ro": {
+      "title": "MixAI Decks",
+      "shortDescription": "DJ cu patru deck-uri: sync pe beat, stem-uri, mixaj armonic AI, MIDI și DVS.",
+      "subtitle": "DJ cu patru deck-uri și AI",
+      "promotionalText": "Mixează muzica ta pe patru deck-uri cu sync pe beat, key lock, stem-uri separate pe dispozitiv și un AI care planifică tranziții aliniate pe fraze.",
+      "keywords": ["dj", "mixer", "deck", "sync pe beat", "stemuri", "mixaj armonic", "controller midi", "dvs", "rekordbox", "lista piese"],
+      "description": "MixAI Decks este o aplicație de DJ pentru muzica ta, făcută să se simtă ca echipamentul din club și să meargă fără internet.\n\nMIXAJ\n• Patru deck-uri cu sync pe beat și pe fază, quantize, mod slip, key lock și schimbare de tonalitate.\n• Hot cue-uri, bucle, salt pe beat, efecte de culoare și pe beat, egalizator pe trei benzi, filtru și cue în căști.\n• Întinderea în timp Signalsmith păstrează vocile curate când schimbi tempoul.\n\nSTEM-URI PE DISPOZITIV\n• Separă orice piesă în voce, tobe, bas și melodie cu HT-Demucs, rulat pe dispozitivul tău.\n• Schimbă basul, păstrează vocea, scoate tobele.\n\nUN AI CARE AJUTĂ, NU PREIA CONTROLUL\n• Sugestii pentru piesa următoare după tonalitate, tempo și energie, cu motivele afișate.\n• Mixul automat planifică o tranziție aliniată pe frază (schimb de bas, filtru, ecou sau schimb de stem-uri) pe care o poți modifica.\n• Siguranța setului te avertizează cu 32 de măsuri înainte când se termină o piesă, următoarea nu se potrivește sau nivelul sare.\n• Scrie sau spune comenzi în română sau engleză: „mixează următoarea în 16 măsuri cu schimb de bas”.\n\nCONTROLLERE ȘI VINIL\n• MIDI learn pe orice control, profiluri gata făcute pentru Pioneer DDJ-FLX4 și Novation Circuit Tracks, BLE MIDI.\n• Vinil digital (DVS) cu decodorul nostru de timecode scris de la zero.\n\nBIBLIOTECA TA\n• Bibliotecă locală rapidă, cu crate-uri și crate-uri inteligente.\n• Import și export pentru colecțiile rekordbox, Traktor, Serato și Engine DJ.\n\nPETRECERE ȘI SCENĂ\n• Telecomandă din telefon și al doilea ecran prin Wi-Fi: scanezi un cod QR, fără aplicație de instalat.\n• Invitații cer piese și votează de pe telefon; tu accepți sau respingi.\n• Înregistrează setul cu listă de piese automată: fișier CUE cu ISRC, secțiuni Mixcloud și raport ORDA / UCMR-ADA.\n\nFără reclame. Muzica și înregistrările tale rămân pe dispozitiv. MixAI Decks redă fișierele pe care le deții; nu include un catalog de muzică.",
+      "releaseNotes": "MixAI Decks 2.0: aplicație nativă cu patru deck-uri, stem-uri pe dispozitiv, designerul AI de tranziții, telecomandă din telefon și cereri la petrecere, înregistrarea setului cu listă de piese automată.",
+      "features": ["Patru deck-uri cu sync pe beat și key lock", "Stem-uri separate pe dispozitiv", "Designer AI de tranziții și siguranța setului", "Controllere MIDI, BLE MIDI și DVS", "Telecomandă din telefon și cereri de piese", "Înregistrarea setului cu listă automată"]
+    }
+  }
+}
