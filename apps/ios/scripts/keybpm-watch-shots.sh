@@ -37,7 +37,7 @@ APP="$(find "$OUT/dd-sim/Build/Products/Debug-watchsimulator" -maxdepth 1 -name 
 [ -n "$APP" ] || { echo "watch app not built" >&2; exit 1; }
 xcrun simctl install "$UDID" "$APP"
 xcrun simctl privacy "$UDID" grant microphone ro.mixai.keybpm.watchkitapp 2>/dev/null || true
-xcrun simctl status_bar "$UDID" override --time 9:41 2>/dev/null || true
+xcrun simctl status_bar "$UDID" override --time "2026-11-09T09:41:00Z" 2>/dev/null || xcrun simctl status_bar "$UDID" override --time 9:41 2>/dev/null || true
 
 shot() { # name launch-args...
   local name="$1"; shift

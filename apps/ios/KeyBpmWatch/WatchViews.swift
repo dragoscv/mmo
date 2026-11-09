@@ -88,17 +88,21 @@ struct WatchControls: View {
     var body: some View {
         @Bindable var m = m
         List {
-            Text("kb.watch.app_short").font(.headline)
-            if m.source == .watch {
-                Button("kb.stop", role: .destructive) { m.stopWatch() }
-            } else {
-                Button("kb.watch.listen_watch") { Task { await m.startWatch() } }
+            Section {
+                if m.source == .watch {
+                    Button("kb.stop", role: .destructive) { m.stopWatch() }
+                } else {
+                    Button("kb.watch.listen_watch") { Task { await m.startWatch() } }
+                }
+                Toggle(isOn: $m.haptics) {
+                    VStack(alignment: .leading) { Text("kb.watch.haptic"); Text("kb.watch.haptic_hint").font(.caption2).foregroundStyle(.secondary) }
+                }
+                if m.tapBpm != nil { Button("kb.watch.tap_clear") { m.clearTap() } }
+            } header: {
+                Text("kb.watch.app_short")
+            } footer: {
+                Text(m.phoneListening ? LocalizedStringKey("kb.watch.phone_listening") : LocalizedStringKey("kb.watch.phone_hint"))
             }
-            Toggle(isOn: $m.haptics) {
-                VStack(alignment: .leading) { Text("kb.watch.haptic"); Text("kb.watch.haptic_hint").font(.caption2).foregroundStyle(.secondary) }
-            }
-            if m.tapBpm != nil { Button("kb.watch.tap_clear") { m.clearTap() } }
-            Text(m.phoneListening ? LocalizedStringKey("kb.watch.phone_listening") : LocalizedStringKey("kb.watch.phone_hint")).font(.caption2).foregroundStyle(.secondary)
         }
     }
 }
