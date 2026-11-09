@@ -2,6 +2,10 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.14.3 — Linux CI fix
+
+- `showHintFor` resolves Windows library paths (`D:\TV\…`) with `path.win32` on every OS; server-ci on Linux used posix `path.relative` and returned `null` (pre-existing failure since 3.9.0).
+
 ## 3.14.2 — TypeScript 7 (WP20-02)
 
 - `tsc` is TypeScript 7.0.2 (`@typescript/native: npm:typescript@^7`); `typescript` stays the 6.0 API package (`npm:@typescript/typescript6`) for openapi-typescript.

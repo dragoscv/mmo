@@ -49,7 +49,8 @@ export function mediaLibraryHooks(): MediaLibraryHooks {
 export function showHintFor(filePath: string, roots: string[]): string | null {
     const root = roots.find((r) => filePath.toLowerCase().startsWith(r.toLowerCase()));
     if (!root) return null;
-    const rel = path.relative(root, filePath);
+    const flavour = /^[a-zA-Z]:[\\/]|^\\\\/.test(filePath) ? path.win32 : path;
+    const rel = flavour.relative(root, filePath);
     if (!rel || rel.startsWith("..")) return null;
     const parts = rel.split(/[\\/]/);
     parts.pop();
