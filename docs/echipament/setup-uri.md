@@ -1,6 +1,6 @@
 # 🏗️ Setup-uri Recomandate — Per Nivel
 
-[🏠 Home](../../README.md) · [🔌 Echipament](../../README.md#-echipament)
+[🏠 Home](../../README.md) · [🔌 Echipament](./README.md)
 
 ---
 
@@ -130,4 +130,4 @@ graph LR
 
 ---
 
-[🏠 Home](../../README.md) · [🔌 Echipament](../../README.md#-echipament)
+[🏠 Home](../../README.md) · [🔌 Echipament](./README.md)

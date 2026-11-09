@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: teoria se aplică în orice DAW/DJ tool. În MMO filtrezi tracks după key în [`docs/aplicatie/biblioteca.md`](../aplicatie/biblioteca.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../README.md#-avansat)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

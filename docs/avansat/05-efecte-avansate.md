@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: FX în **rekordbox**. MMO are FX engine propriu → [`docs/aplicatie/mixer.md`](../aplicatie/mixer.md) și [`docs/aplicatie/daw-editor.md`](../aplicatie/daw-editor.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../README.md#-avansat)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: ghid avansat **rekordbox**. Pentru MMO → [`docs/aplicatie/`](../aplicatie/README.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../README.md#-avansat)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

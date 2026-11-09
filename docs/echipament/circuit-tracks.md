@@ -1,6 +1,6 @@
 # 🎹 Circuit Tracks — Integrare cu Rekordbox
 
-[🏠 Home](../../README.md) · [🔌 Echipament](../../README.md#-echipament)
+[🏠 Home](../../README.md) · [🔌 Echipament](./README.md)
 
 ---
 
@@ -122,4 +122,4 @@ sequenceDiagram
 
 ---
 
-[🏠 Home](../../README.md) · [🔌 Echipament](../../README.md#-echipament)
+[🏠 Home](../../README.md) · [🔌 Echipament](./README.md)

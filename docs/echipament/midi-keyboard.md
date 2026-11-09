@@ -1,6 +1,6 @@
 # 🎹 MIDI Keyboard — Performanță Live
 
-[🏠 Home](../../README.md) · [🔌 Echipament](../../README.md#-echipament)
+[🏠 Home](../../README.md) · [🔌 Echipament](./README.md)
 
 ---
 
@@ -82,4 +82,4 @@ graph TD
 
 ---
 
-[🏠 Home](../../README.md) · [🔌 Echipament](../../README.md#-echipament)
+[🏠 Home](../../README.md) · [🔌 Echipament](./README.md)

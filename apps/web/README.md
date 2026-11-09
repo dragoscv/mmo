@@ -1,10 +1,10 @@
 # 🌐 Web App — Setup pentru dezvoltatori
 
 > Setup, comenzi și convenții pentru lucrul la **MMO Web App** (`apps/web/`).
-> Pentru ghiduri user → [`docs/aplicatie/`](../docs/aplicatie/).
-> Pentru arhitectură → [`docs/arhitectura/`](../docs/arhitectura/).
+> Pentru ghiduri user → [`docs/aplicatie/`](../../docs/aplicatie/).
+> Pentru arhitectură → [`docs/arhitectura/`](../../docs/arhitectura/).
 
-[🏠 Home](../README.md) · [🇬🇧 EN README](../README.en.md)
+[🏠 Home](../../README.md) · [🇬🇧 EN README](../../README.en.md)
 
 ---
 
@@ -174,7 +174,7 @@ Producția web rulează pe **Cloud Run `mixai-web`** (proiect `mmo-mw-prod`, `eu
 - **Audio**: music-metadata, node-id3, Web Audio API + AudioWorklet
 - **Realtime**: Server-Sent Events + WebRTC (TURN opțional)
 
-→ Detaliat: [`docs/arhitectura/03-stack-tehnologic.md`](../docs/arhitectura/03-stack-tehnologic.md)
+→ Detaliat: [`docs/arhitectura/03-stack-tehnologic.md`](../../docs/arhitectura/03-stack-tehnologic.md)
 
 ---
 
@@ -202,7 +202,7 @@ pnpm dev -- -p 3001
 Închide Drizzle Studio sau orice altă conexiune înainte de `pnpm db:migrate`.
 
 ### Companion 503 în consolă
-Vezi [`docs/companion/`](../docs/companion/) — fie instalezi companion-ul, fie ignori (e doar warn, nu eroare).
+Vezi [`docs/companion/`](../../docs/companion/) — fie instalezi companion-ul, fie ignori (e doar warn, nu eroare).
 
 ### `[next-auth][error][JWT_SESSION_ERROR]`
 Verifică `NEXTAUTH_SECRET` setat în `.env.local`.
@@ -211,8 +211,8 @@ Verifică `NEXTAUTH_SECRET` setat în `.env.local`.
 
 ## 🔗 Linkuri
 
-- 🏠 [README principal](../README.md)
-- 🏗️ [Arhitectură](../docs/arhitectura/)
-- 📚 [Ghiduri user](../docs/aplicatie/)
-- 🖥️ [Companion dev](../server/README.md)
+- 🏠 [README principal](../../README.md)
+- 🏗️ [Arhitectură](../../docs/arhitectura/)
+- 📚 [Ghiduri user](../../docs/aplicatie/)
+- 🖥️ [Companion dev](../../server/README.md)
 - 🧩 [Extension dev](../extension/README.md)

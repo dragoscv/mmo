@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: ghid **rekordbox**. Playlist-uri smart în MMO → [`docs/aplicatie/playlists.md`](../aplicatie/playlists.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../README.md#-avansat)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

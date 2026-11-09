@@ -86,6 +86,9 @@ jobs:
         env:
             NEXT_TELEMETRY_DISABLED: 1
             SKIP_ENV_VALIDATION: 1
+            # Build-time route config collection imports the db module; nothing connects to this.
+            DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/ci
+            AUTH_SECRET: ci-only-not-a-secret-0123456789abcdef
         steps:
             - uses: actions/checkout@v5
             - uses: pnpm/action-setup@v6

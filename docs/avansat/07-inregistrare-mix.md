@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: înregistrare în **rekordbox**. MMO înregistrează nativ → [`docs/aplicatie/recordings.md`](../aplicatie/recordings.md).
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../README.md#-avansat)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

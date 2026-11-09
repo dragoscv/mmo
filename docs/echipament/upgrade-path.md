@@ -1,6 +1,6 @@
 # 📈 Upgrade Path — Parcursul Echipamentului
 
-[🏠 Home](../../README.md) · [🔌 Echipament](../../README.md#-echipament)
+[🏠 Home](../../README.md) · [🔌 Echipament](./README.md)
 
 ---
 
@@ -97,4 +97,4 @@ Pentru a combina DDJ-FLX4 + Circuit Tracks + MIDI Keyboard:
 
 ---
 
-[🏠 Home](../../README.md) · [🔌 Echipament](../../README.md#-echipament)
+[🏠 Home](../../README.md) · [🔌 Echipament](./README.md)

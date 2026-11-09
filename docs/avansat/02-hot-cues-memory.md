@@ -2,7 +2,7 @@
 
 > ⚠️ **Context**: ghid **rekordbox**. În MMO setezi cues în [`docs/aplicatie/mixer.md`](../aplicatie/mixer.md), sunt incluse în export USB.
 
-[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../README.md#-avansat)
+[🏠 Home](../../README.md) · [🗺️ Navigare](../../NAVIGARE.md) · [🟡 Avansat](../../NAVIGARE.md)
 
 | ← Prev | Next → |
 |:---|---:|

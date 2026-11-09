@@ -102,6 +102,6 @@ cd app && pnpm db:migrate
 
 ## Vezi și
 
-- [Snapshot-uri și storage tiers](./snapshots-storage.md) (TODO)
+- Snapshot-uri și storage tiers (TODO)
 - [`infra/yjs-relay/README.md`](../../infra/yjs-relay/README.md) –
   colaborare în timp real
