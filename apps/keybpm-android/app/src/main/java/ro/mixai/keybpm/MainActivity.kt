@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -41,7 +42,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import ro.mixai.keybpm.ui.LiveScreen
+import ro.mixai.keybpm.ui.HistoryScreen
 import ro.mixai.keybpm.ui.TunerScreen
+import ro.mixai.keybpm.data.SetLog
 import ro.mixai.mobile.theme.MixaiTheme
 
 class MainActivity : ComponentActivity() {
@@ -78,6 +81,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun App(model: ListenModel) {
         val ui by model.ui.collectAsState()
+        val entries by model.log.entries.collectAsState()
         var tab by rememberSaveable { mutableIntStateOf(0) }
         var showRationale by remember { mutableStateOf(false) }
         var denied by remember { mutableStateOf(false) }
@@ -106,6 +110,7 @@ class MainActivity : ComponentActivity() {
                 NavigationBar {
                     NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Filled.GraphicEq, null) }, label = { Text(stringResource(R.string.tab_live)) })
                     NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Filled.Tune, null) }, label = { Text(stringResource(R.string.tab_tuner)) })
+                    NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Filled.History, null) }, label = { Text(stringResource(R.string.tab_history)) })
                 }
             },
         ) { pad ->
@@ -135,10 +140,21 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 when (tab) {
-                    0 -> LiveScreen(ui, start, model::stop, model::again, model::cycleTempo, model::setNotation, { picker.launch(arrayOf("audio/*")) })
-                    else -> TunerScreen(ui, start, model::stop, model::setA4)
+                    0 -> LiveScreen(ui, start, model::stop, model::again, model::cycleTempo, model::setNotation, { picker.launch(arrayOf("audio/*")) }, { model.save() })
+                    1 -> TunerScreen(ui, start, model::stop, model::setA4)
+                    else -> HistoryScreen(entries, ui.notation, { shareCsv(entries) }, model::deleteEntry, model::clearLog)
                 }
             }
         }
+    }
+
+    private fun shareCsv(entries: List<ro.mixai.keybpm.data.LogEntry>) {
+        val dir = java.io.File(cacheDir, "exports").apply { mkdirs() }
+        val f = java.io.File(dir, "mixai-setlog-${java.time.LocalDate.now()}.csv")
+        f.writeText(SetLog.toCsv(entries))
+        val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.files", f)
+        val send = Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM, uri)
+            .putExtra(Intent.EXTRA_SUBJECT, getString(R.string.export_title)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivity(Intent.createChooser(send, getString(R.string.history_export)))
     }
 }

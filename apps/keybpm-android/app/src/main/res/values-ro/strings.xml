@@ -43,4 +43,13 @@
     <string name="file_header">Fișier: %1$s</string>
     <string name="analysing">Analizez…</string>
     <string name="file_error">Fișierul nu a putut fi citit. Încearcă un fișier MP3, M4A, FLAC, WAV sau OGG.</string>
+    <string name="tab_history">Jurnal set</string>
+    <string name="history_export">Exportă CSV</string>
+    <string name="history_clear">Șterge</string>
+    <string name="history_clear_confirm">Ștergi toate citirile salvate? Acțiunea nu poate fi anulată.</string>
+    <string name="history_empty">Nimic salvat încă. Citirile se salvează automat când tonalitatea și BPM-ul se fixează.</string>
+    <string name="history_delete">Șterge citirea</string>
+    <string name="save">Salvează</string>
+    <string name="saved">Salvat</string>
+    <string name="export_title">Jurnal set MixAI</string>
 </resources>

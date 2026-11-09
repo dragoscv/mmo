@@ -51,6 +51,7 @@ fun LiveScreen(
     onCycleTempo: () -> Unit,
     onNotation: (KeyNotation) -> Unit,
     onPickFile: () -> Unit,
+    onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = ui.snapshot
@@ -170,6 +171,12 @@ fun LiveScreen(
                 Button(onClick = onStart) { Text(stringResource(R.string.listen_start)) }
             }
             FilledTonalButton(onClick = onPickFile, enabled = !ui.analysing) { Text(stringResource(R.string.open_file)) }
+        }
+        if (s?.key != null && s.tempo != null) {
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.material3.OutlinedButton(onClick = onSave, enabled = !ui.saved) {
+                Text(stringResource(if (ui.saved) R.string.saved else R.string.save))
+            }
         }
     }
 }

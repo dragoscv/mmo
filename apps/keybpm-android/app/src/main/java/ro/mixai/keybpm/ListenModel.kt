@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import ro.mixai.keybpm.audio.MicCapture
+import ro.mixai.keybpm.data.LogEntry
+import ro.mixai.keybpm.data.SetLog
 import uniffi.mixai_listen_ffi.EngineConfig
 import uniffi.mixai_listen_ffi.KeyBpmEngine
 import uniffi.mixai_listen_ffi.KeyNotation
@@ -33,6 +35,8 @@ data class ListenUi(
     val fileName: String? = null,
     val analysing: Boolean = false,
     val fileError: Boolean = false,
+    /** Reading already saved to the set log for this listen/file. */
+    val saved: Boolean = false,
 )
 
 /**
@@ -45,6 +49,11 @@ class ListenModel(app: Application) : AndroidViewModel(app) {
     private var poll: Job? = null
     private val _ui = MutableStateFlow(ListenUi())
     val ui: StateFlow<ListenUi> = _ui.asStateFlow()
+    val log = SetLog(app)
+
+    init {
+        viewModelScope.launch { log.load() }
+    }
 
     fun start() {
         if (_ui.value.listening) return
@@ -60,15 +69,36 @@ class ListenModel(app: Application) : AndroidViewModel(app) {
             e.close()
             KeyBpmEngine(EngineConfig(mic.sampleRate.toUInt(), 88.0, _ui.value.a4.toDouble()))
         }
-        _ui.value = _ui.value.copy(listening = true, snapshot = null, micFailed = false, keyChange = null, tempoFactor = 1.0, fileName = null, fileError = false)
+        _ui.value = _ui.value.copy(listening = true, snapshot = null, micFailed = false, keyChange = null, tempoFactor = 1.0, fileName = null, fileError = false, saved = false)
         poll = viewModelScope.launch(Dispatchers.Default) {
             while (isActive) {
                 val s = engine?.snapshot() ?: break
                 val change = if (s.keyChanged) s.key?.key?.camelot else null
-                _ui.value = _ui.value.copy(snapshot = s, keyChange = change ?: _ui.value.keyChange)
+                // A key change mid-set is a new song for the log.
+                _ui.value = _ui.value.copy(snapshot = s, keyChange = change ?: _ui.value.keyChange, saved = _ui.value.saved && change == null)
+                if (!_ui.value.saved && s.key?.locked == true && s.tempo?.locked == true) save("mic")
                 delay(50)
             }
         }
+    }
+
+    /** Saves the current reading (auto on lock while listening, manual from the Save button / file mode). */
+    fun save(source: String = if (_ui.value.fileName != null) "file" else "mic") {
+        val u = _ui.value
+        val k = u.snapshot?.key ?: return
+        val t = u.snapshot.tempo ?: return
+        _ui.value = u.copy(saved = true)
+        viewModelScope.launch {
+            log.add(LogEntry(System.currentTimeMillis(), k.key.camelot, k.key.name, t.bpm * u.tempoFactor, k.confidence, source, title = u.fileName))
+        }
+    }
+
+    fun deleteEntry(atMillis: Long) {
+        viewModelScope.launch { log.remove(atMillis) }
+    }
+
+    fun clearLog() {
+        viewModelScope.launch { log.clear() }
     }
 
     fun stop() {
@@ -110,7 +140,7 @@ class ListenModel(app: Application) : AndroidViewModel(app) {
         val app = getApplication<Application>()
         val name = app.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
             ?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: "audio"
-        _ui.value = _ui.value.copy(analysing = true, fileName = name, snapshot = null, fileError = false, keyChange = null)
+        _ui.value = _ui.value.copy(analysing = true, fileName = name, snapshot = null, fileError = false, keyChange = null, saved = false)
         viewModelScope.launch(Dispatchers.IO) {
             val ext = name.substringAfterLast('.', "mp3").lowercase().take(5)
             val tmp = java.io.File(app.cacheDir, "analyse.$ext")

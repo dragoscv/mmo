@@ -43,4 +43,13 @@
     <string name="file_header">File: %1$s</string>
     <string name="analysing">Analysing…</string>
     <string name="file_error">This file could not be read. Try an MP3, M4A, FLAC, WAV or OGG file.</string>
+    <string name="tab_history">Set log</string>
+    <string name="history_export">Export CSV</string>
+    <string name="history_clear">Clear</string>
+    <string name="history_clear_confirm">Delete every saved reading? This cannot be undone.</string>
+    <string name="history_empty">Nothing saved yet. Readings are saved automatically once key and BPM lock.</string>
+    <string name="history_delete">Delete reading</string>
+    <string name="save">Save</string>
+    <string name="saved">Saved</string>
+    <string name="export_title">MixAI set log</string>
 </resources>
