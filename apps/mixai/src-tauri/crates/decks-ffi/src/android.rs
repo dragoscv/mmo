@@ -40,7 +40,8 @@ pub unsafe extern "C" fn Java_ro_mixai_decks_ffi_DecksAndroid_nativeInit(
 #[repr(C)]
 pub struct JniNativeInterface {
     _reserved_0_20: [*const c_void; 21],
-    new_global_ref: unsafe extern "C" fn(*mut *const JniNativeInterface, *mut c_void) -> *mut c_void,
+    new_global_ref:
+        unsafe extern "C" fn(*mut *const JniNativeInterface, *mut c_void) -> *mut c_void,
     _reserved_22_218: [*const c_void; 197],
     get_java_vm: unsafe extern "C" fn(*mut *const JniNativeInterface, *mut *mut c_void) -> i32,
 }

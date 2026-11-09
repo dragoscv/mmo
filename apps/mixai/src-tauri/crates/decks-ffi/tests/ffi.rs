@@ -206,8 +206,16 @@ fn slip_shadow_reported_while_slip_and_loop_active() {
     assert!(d.playhead_sec <= d.loop_end_sec + 0.05, "{d:?}");
     assert!(shadow > 2.0);
     e.loop_exit(0).unwrap();
-    std::thread::sleep(Duration::from_millis(100));
-    assert!(e.snapshot().decks[0].slip_shadow_sec.is_none());
+    // The snapshot is published from the audio callback; slow CI devices (macOS runners) need > 100 ms.
+    let t1 = Instant::now();
+    while e.snapshot().decks[0].slip_shadow_sec.is_some() {
+        assert!(
+            t1.elapsed() < Duration::from_secs(5),
+            "{:?}",
+            e.snapshot().decks[0]
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
     // Device switch to the current/default device keeps the decks.
     assert!(e.set_output_device(None).unwrap());
     let s = e.snapshot();
