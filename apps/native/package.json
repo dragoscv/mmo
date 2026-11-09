@@ -21,10 +21,10 @@
         "ios:build": "xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -archivePath ios/build/App.xcarchive archive"
     },
     "devDependencies": {
-        "@capacitor/android": "^8.5.2",
-        "@capacitor/cli": "^8.5.2",
-        "@capacitor/core": "^8.5.2",
-        "@capacitor/ios": "^8.5.2",
+        "@capacitor/android": "^8.6.0",
+        "@capacitor/cli": "^8.6.0",
+        "@capacitor/core": "^8.6.0",
+        "@capacitor/ios": "^8.6.0",
         "@tauri-apps/cli": "^2.12.4",
         "typescript": "^7.0.2"
     },
