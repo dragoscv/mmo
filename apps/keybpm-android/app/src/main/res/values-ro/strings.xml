@@ -52,4 +52,13 @@
     <string name="save">Salvează</string>
     <string name="saved">Salvat</string>
     <string name="export_title">Jurnal set MixAI</string>
+    <string name="tab_library">Bibliotecă</string>
+    <string name="library_intro">Conectează serverul MMO ca să vezi care piese din colecția ta se mixează bine cu ce se aude acum. Opțional — restul funcționează offline.</string>
+    <string name="library_connect">Conectează serverul</string>
+    <string name="library_disconnect">Deconectează</string>
+    <string name="library_need_reading">Ascultă o piesă sau deschide un fișier mai întâi.</string>
+    <string name="library_for">Se mixează cu %1$s</string>
+    <string name="library_empty">Nicio piesă analizată din biblioteca ta nu se mixează încă cu această tonalitate și acest tempo.</string>
+    <string name="library_error">Serverul nu a putut fi contactat (%1$s).</string>
+    <string name="library_need_music_app">Instalează MixAI Music ca să redai piese din biblioteca ta.</string>
 </resources>

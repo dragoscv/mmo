@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -43,6 +44,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import ro.mixai.keybpm.ui.LiveScreen
 import ro.mixai.keybpm.ui.HistoryScreen
+import ro.mixai.keybpm.ui.LibraryScreen
 import ro.mixai.keybpm.ui.TunerScreen
 import ro.mixai.keybpm.data.SetLog
 import ro.mixai.mobile.theme.MixaiTheme
@@ -55,7 +57,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         if (savedInstanceState == null) handleAudioIntent(intent)
-        setContent { MixaiTheme("system") { App(model) } }
+        setContent {
+            MixaiTheme("system") {
+                androidx.compose.runtime.CompositionLocalProvider(ro.mixai.mobile.LocalMobileConfig provides (application as KeyBpmApp).config) { App(model) }
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -111,6 +117,7 @@ class MainActivity : ComponentActivity() {
                     NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Filled.GraphicEq, null) }, label = { Text(stringResource(R.string.tab_live)) })
                     NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Filled.Tune, null) }, label = { Text(stringResource(R.string.tab_tuner)) })
                     NavigationBarItem(tab == 2, { tab = 2 }, { Icon(Icons.Filled.History, null) }, label = { Text(stringResource(R.string.tab_history)) })
+                    NavigationBarItem(tab == 3, { tab = 3 }, { Icon(Icons.Filled.LibraryMusic, null) }, label = { Text(stringResource(R.string.tab_library)) })
                 }
             },
         ) { pad ->
@@ -142,7 +149,13 @@ class MainActivity : ComponentActivity() {
                 when (tab) {
                     0 -> LiveScreen(ui, start, model::stop, model::again, model::cycleTempo, model::setNotation, { picker.launch(arrayOf("audio/*")) }, { model.save() })
                     1 -> TunerScreen(ui, start, model::stop, model::setA4)
-                    else -> HistoryScreen(entries, ui.notation, { shareCsv(entries) }, model::deleteEntry, model::clearLog)
+                    2 -> HistoryScreen(entries, ui.notation, { shareCsv(entries) }, model::deleteEntry, model::clearLog)
+                    else -> LibraryScreen(
+                        settings = (application as KeyBpmApp).settings,
+                        camelot = ui.snapshot?.key?.key?.camelot ?: entries.firstOrNull()?.camelot,
+                        bpm = ui.snapshot?.tempo?.let { it.bpm * ui.tempoFactor } ?: entries.firstOrNull()?.bpm,
+                        notation = ui.notation,
+                    )
                 }
             }
         }

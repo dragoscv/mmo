@@ -3,8 +3,21 @@
 
     <!-- Live key/BPM from the microphone. Audio is analysed on the device and never recorded or uploaded. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Optional MMO Server connection: LAN discovery (mDNS) + HTTP to the user's own server. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-feature android:name="android.hardware.microphone" android:required="true" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <!-- "Play in MixAI Music" from the compatible tracks list. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="mixai-music" />
+        </intent>
+    </queries>
 
     <application
         android:name=".KeyBpmApp"
@@ -13,6 +26,7 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.KeyBpm.Starting"
         android:enableOnBackInvokedCallback="true"
+        android:usesCleartextTraffic="true"
         android:allowBackup="false"
         android:supportsRtl="true">
 

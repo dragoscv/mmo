@@ -52,4 +52,13 @@
     <string name="save">Save</string>
     <string name="saved">Saved</string>
     <string name="export_title">MixAI set log</string>
+    <string name="tab_library">Library</string>
+    <string name="library_intro">Connect your MMO Server to see which of your own tracks mix well with what is playing. Optional — everything else works offline.</string>
+    <string name="library_connect">Connect server</string>
+    <string name="library_disconnect">Disconnect</string>
+    <string name="library_need_reading">Listen to a song or open a file first.</string>
+    <string name="library_for">Mixes with %1$s</string>
+    <string name="library_empty">No analysed tracks in your library mix with this key and tempo yet.</string>
+    <string name="library_error">Could not reach your server (%1$s).</string>
+    <string name="library_need_music_app">Install MixAI Music to play tracks from your library.</string>
 </resources>
