@@ -53,6 +53,9 @@ fun LiveScreen(
     onPickFile: () -> Unit,
     onSave: () -> Unit,
     onStage: () -> Unit = {},
+    onIdentify: () -> Unit = {},
+    onTracklist: (Boolean) -> Unit = {},
+    onAddToQueue: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val s = ui.snapshot
@@ -182,6 +185,10 @@ fun LiveScreen(
             androidx.compose.material3.OutlinedButton(onClick = onSave, enabled = !ui.saved) {
                 Text(stringResource(if (ui.saved) R.string.saved else R.string.save))
             }
+        }
+        if (ui.fileName == null) {
+            Spacer(Modifier.height(16.dp))
+            SongIdCard(ui, onIdentify, onTracklist, onAddToQueue)
         }
     }
 }

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Live key/BPM from the microphone. Audio is analysed on the device and never recorded or uploaded. -->
+        <!-- Live key/BPM from the microphone. Audio is analysed on the device and never recorded or uploaded; Song ID
+            (user-triggered or tracklist mode) sends only a ShazamKit fingerprint to Shazam. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Background listening (WP18-18): microphone foreground service + its ongoing notification. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -64,6 +65,19 @@
             android:name=".ListenService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!-- One-tap "Identify song" home-screen widget (opens the app, which starts listening + Song ID). -->
+        <receiver
+            android:name=".IdentifyWidget"
+            android:exported="false"
+            android:label="@string/widget_identify">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_identify_info" />
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

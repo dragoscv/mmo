@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 
-/** One saved reading: what played, when, key + tempo (D69 set log). Title/artist come later from ShazamKit. */
+/** One saved reading: what played, when, key + tempo (D69 set log); title/artist/ISRC from Song ID (WP18-06). */
 @Serializable
 data class LogEntry(
     val atMillis: Long,
@@ -21,6 +21,16 @@ data class LogEntry(
     val source: String,
     val title: String? = null,
     val artist: String? = null,
+    val isrc: String? = null,
+    val artworkUrl: String? = null,
+    val appleMusicUrl: String? = null,
+    /** MixAI library track id (`tr_N`) when the identified song is in the user's own library. */
+    val libraryTrackId: String? = null,
+    /** Key/BPM the library analysed for that track (sanity check against the live reading). */
+    val libraryCamelot: String? = null,
+    val libraryBpm: Double? = null,
+    /** Absolute file path on the server (M3U8 / rekordbox export only). */
+    val libraryPath: String? = null,
 )
 
 /** App-private JSON file, newest first, capped at 2000 entries. Nothing leaves the device unless the user exports. */
@@ -46,6 +56,26 @@ class SetLog(context: Context) {
         file.writeText(json.encodeToString(next))
     }
 
+    /**
+     * Applies Song ID to an entry. When the same recording (ISRC, else title + artist) was identified on another
+     * entry within [DEDUPE_MS], the two are one song (e.g. a key change inside the track): the newer entry is
+     * dropped and the older one keeps its time. Returns the surviving entry's time.
+     */
+    suspend fun update(atMillis: Long, change: (LogEntry) -> LogEntry): Long? = withContext(Dispatchers.IO) {
+        val cur = _entries.value
+        val target = cur.firstOrNull { it.atMillis == atMillis } ?: return@withContext null
+        val updated = change(target)
+        val dup = cur.firstOrNull { it.atMillis != atMillis && sameSong(it, updated) && kotlin.math.abs(it.atMillis - atMillis) <= DEDUPE_MS }
+        val next = when {
+            dup == null -> cur.map { if (it.atMillis == atMillis) updated else it }
+            dup.atMillis < atMillis -> cur.filterNot { it.atMillis == atMillis }
+            else -> cur.filterNot { it.atMillis == dup.atMillis }.map { if (it.atMillis == atMillis) updated else it }
+        }
+        _entries.value = next
+        file.writeText(json.encodeToString(next))
+        if (dup != null && dup.atMillis < atMillis) dup.atMillis else atMillis
+    }
+
     suspend fun clear() = withContext(Dispatchers.IO) {
         _entries.value = emptyList()
         file.delete()
@@ -53,6 +83,14 @@ class SetLog(context: Context) {
 
     companion object {
         const val MAX = 2000
+        const val DEDUPE_MS = 10L * 60 * 1000
+
+        fun sameSong(a: LogEntry, b: LogEntry): Boolean = when {
+            a.isrc != null && b.isrc != null -> a.isrc.equals(b.isrc, ignoreCase = true)
+            a.title != null && b.title != null && a.source == "mic" && b.source == "mic" ->
+                a.title.equals(b.title, ignoreCase = true) && (a.artist ?: "").equals(b.artist ?: "", ignoreCase = true)
+            else -> false
+        }
 
         /** RFC 4180 CSV, oldest first (set order), ISO-8601 local time. */
         fun toCsv(entries: List<LogEntry>, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): String {

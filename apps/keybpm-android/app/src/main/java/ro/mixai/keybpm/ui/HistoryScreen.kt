@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -46,17 +48,22 @@ import uniffi.mixai_listen_ffi.parseKey
 import java.text.DateFormat
 import java.util.Date
 
-/** Set log: every saved reading, newest first; export as CSV through the share sheet. */
+enum class ExportFormat(val label: Int) {
+    TEXT(R.string.export_text), CSV(R.string.export_csv), M3U8(R.string.export_m3u8), REKORDBOX(R.string.export_rekordbox)
+}
+
+/** Set log: every saved reading, newest first; export (text tracklist, CSV, M3U8, rekordbox XML) via the share sheet. */
 @Composable
 fun HistoryScreen(
     entries: List<LogEntry>,
     notation: KeyNotation,
-    onShareCsv: () -> Unit,
+    onExport: (ExportFormat) -> Unit,
     onDelete: (Long) -> Unit,
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var confirmClear by remember { mutableStateOf(false) }
+    var exportMenu by remember { mutableStateOf(false) }
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
@@ -68,7 +75,14 @@ fun HistoryScreen(
     Column(modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.tab_history), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            FilledTonalButton(onClick = onShareCsv, enabled = entries.isNotEmpty()) { Text(stringResource(R.string.history_export)) }
+            Box {
+                FilledTonalButton(onClick = { exportMenu = true }, enabled = entries.isNotEmpty()) { Text(stringResource(R.string.history_export)) }
+                DropdownMenu(expanded = exportMenu, onDismissRequest = { exportMenu = false }) {
+                    ExportFormat.entries.forEach { f ->
+                        DropdownMenuItem(text = { Text(stringResource(f.label)) }, onClick = { exportMenu = false; onExport(f) })
+                    }
+                }
+            }
             OutlinedButton(onClick = { confirmClear = true }, enabled = entries.isNotEmpty()) { Text(stringResource(R.string.history_clear)) }
         }
         Spacer(Modifier.padding(4.dp))
@@ -89,12 +103,24 @@ fun HistoryScreen(
                     Surface(shape = CircleShape, color = dot, modifier = Modifier.size(14.dp)) {}
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
+                        val song = when {
+                            e.title != null && e.artist != null -> "${e.artist} – ${e.title}"
+                            else -> e.title
+                        }
+                        if (song != null && e.source == "mic") {
+                            Text(song, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        }
                         Text(
                             (k?.let { keyLabel(it.index, notation) } ?: e.camelot) + "  ·  " + "%.1f BPM".format(e.bpm),
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = if (song != null && e.source == "mic") FontWeight.Normal else FontWeight.SemiBold,
                         )
                         Text(
-                            listOfNotNull(e.title, e.keyName, day.format(Date(e.atMillis)) + " " + time.format(Date(e.atMillis))).joinToString(" · "),
+                            listOfNotNull(
+                                e.title.takeIf { e.source != "mic" },
+                                e.keyName,
+                                if (e.libraryTrackId != null) stringResource(R.string.songid_in_library) else null,
+                                day.format(Date(e.atMillis)) + " " + time.format(Date(e.atMillis)),
+                            ).joinToString(" · "),
                             style = MaterialTheme.typography.bodySmall,
                             color = Mixai.colors.muted,
                         )

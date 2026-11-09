@@ -117,6 +117,9 @@ coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp"
 
 # Hub WebSocket (remote control + Watch Together); same OkHttp Coil already pulls in.
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+# ShazamKit for Android (keybpm Song ID) calls the catalog through Retrofit + Gson.
+retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version = "3.0.0" }
+retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version = "3.0.0" }
 # Vector icons (core set only; extra glyphs live in ui/components/Icons.kt).
 compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core", version.ref = "materialIcons" }
 

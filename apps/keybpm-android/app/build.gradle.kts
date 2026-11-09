@@ -19,6 +19,13 @@ if (hasReleaseKeystore && !releaseKeystoreFile.exists()) {
     releaseKeystoreFile.writeBytes(Base64.getDecoder().decode(keystoreB64))
 }
 
+// Song ID (WP18-06): Apple's ShazamKit AAR is not redistributable, so it is never committed (public repo). It lives in
+// gs://mmo-mw-prod_cloudbuild/vendor/shazamkit/<ver>/ and is fetched into app/libs/ by
+// apps/keybpm-android/scripts/fetch-shazamkit.ps1. Without it the build uses src/noshazam (Song ID hidden).
+val shazamAar = file(providers.gradleProperty("keybpm.shazamAar").orNull ?: "libs/shazamkit-android-release.aar")
+val hasShazam = shazamAar.exists()
+val shazamTokenUrl = providers.gradleProperty("keybpm.shazamTokenUrl").orNull ?: "https://mixai.ro/api/shazam/token"
+
 android {
     namespace = "ro.mixai.keybpm"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -27,9 +34,11 @@ android {
         applicationId = "ro.mixai.keybpm"
         minSdk = 31
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SHAZAM_TOKEN_URL", "\"$shazamTokenUrl\"")
+        buildConfigField("boolean", "HAS_SHAZAM", hasShazam.toString())
     }
 
     signingConfigs {
@@ -71,6 +80,11 @@ android {
         // UniFFI loads the engine with JNA; keep native libs uncompressed + 16 KB aligned (AGP default).
         jniLibs.useLegacyPackaging = false
     }
+    sourceSets {
+        getByName("main") {
+            kotlin.directories.add(if (hasShazam) "src/shazam/kotlin" else "src/noshazam/kotlin")
+        }
+    }
 }
 
 dependencies {
@@ -89,6 +103,11 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
+    if (hasShazam) {
+        implementation(files(shazamAar))
+        implementation(libs.retrofit)
+        implementation(libs.retrofit.converter.gson)
+    }
 
     testImplementation(libs.junit)
 }

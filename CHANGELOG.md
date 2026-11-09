@@ -27,6 +27,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   for ShazamKit on Android (MixAI Key & BPM). Anonymous by design: requires `x-mixai-app: keybpm-android|keybpm-ios`,
   30 requests per IP per hour, `no-store`, 503 when `SHAZAM_KEY_ID` / `SHAZAM_PRIVATE_KEY` are not mounted (Media
   Services key `2N59DNU7BN`, Media ID `media.ro.mixai.keybpm`). One signature per instance per ~11 h.
+- **MixAI Key & BPM Android 0.2.0 — Song ID** (WP18-06, D70): Identify button + Tracklist mode (off by default,
+  one ShazamKit match per new song), result card with cover, "In your MixAI library" badge, live vs library key/BPM,
+  Apple Music / Spotify / YouTube Music links and Add to MixAI queue; set log stores title/artist/ISRC (same song
+  within 10 min merged); exports text tracklist, CSV, M3U8 and rekordbox XML; offline fingerprint queue; home-screen
+  Identify widget; EN + RO. ShazamKit AAR is fetched from a private bucket (`scripts/fetch-shazamkit.ps1`), never
+  committed; builds without it hide Song ID.
 - **Docs:** `docs/decks/` is the new home of MixAI Decks docs — index, architecture (crates, threading, data flow,
   native UIs, licence gate, CI, performance budgets, Pro infra), controllers guide (RO), streaming strategy with the
   partner application checklist + draft emails, library interop matrix (WP19-25).

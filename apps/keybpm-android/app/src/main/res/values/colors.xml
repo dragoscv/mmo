@@ -4,4 +4,5 @@
     <color name="bg">#07060F</color>
     <color name="accent">#9588FF</color>
     <color name="accent2">#38DCF2</color>
+    <color name="widget_fg">#F4F3FA</color>
 </resources>

@@ -54,6 +54,8 @@ import ro.mixai.mobile.theme.MixaiTheme
 
 class MainActivity : ComponentActivity() {
     private val model: ListenModel by viewModels()
+    /** Set by the Identify widget; consumed once the permission check in [App] can start listening. */
+    private val identifyRequest = androidx.compose.runtime.mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -73,6 +75,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleAudioIntent(intent: Intent?) {
+        if (intent?.action == IdentifyWidget.ACTION_IDENTIFY) {
+            identifyRequest.intValue++
+            return
+        }
         val uri: Uri? = when (intent?.action) {
             Intent.ACTION_VIEW -> intent.data
             Intent.ACTION_SEND -> androidx.core.content.IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
@@ -108,6 +114,14 @@ class MainActivity : ComponentActivity() {
                 shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO) -> showRationale = true
                 else -> launcher.launch(perms)
             }
+        }
+        val identifyReq by identifyRequest
+        androidx.compose.runtime.LaunchedEffect(identifyReq) {
+            if (identifyReq == 0) return@LaunchedEffect
+            tab = 0
+            stage = false
+            if (!ui.listening) start()
+            model.identify()
         }
         // Keep the screen on while listening (stage use).
         DisposableEffect(ui.listening) {
@@ -156,9 +170,12 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 when (tab) {
-                    0 -> LiveScreen(ui, start, model::stop, model::again, model::cycleTempo, model::setNotation, { picker.launch(arrayOf("audio/*")) }, { model.save() }, onStage = { stage = true })
+                    0 -> LiveScreen(
+                        ui, start, model::stop, model::again, model::cycleTempo, model::setNotation, { picker.launch(arrayOf("audio/*")) }, { model.save() },
+                        onStage = { stage = true }, onIdentify = model::identify, onTracklist = model::setTracklistMode, onAddToQueue = model::addToQueue,
+                    )
                     1 -> TunerScreen(ui, start, model::stop, model::setA4)
-                    2 -> HistoryScreen(entries, ui.notation, { shareCsv(entries) }, model::deleteEntry, model::clearLog)
+                    2 -> HistoryScreen(entries, ui.notation, { format -> shareExport(entries, format) }, model::deleteEntry, model::clearLog)
                     4 -> TempoScreen((application as KeyBpmApp).midi, ui.bpm)
                     else -> LibraryScreen(
                         settings = (application as KeyBpmApp).settings,
@@ -171,13 +188,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun shareCsv(entries: List<ro.mixai.keybpm.data.LogEntry>) {
+    /** Set log / tracklist export through the share sheet (CSV, text, M3U8, rekordbox XML). */
+    private fun shareExport(entries: List<ro.mixai.keybpm.data.LogEntry>, format: ro.mixai.keybpm.ui.ExportFormat) {
+        val day = java.time.LocalDate.now()
         val dir = java.io.File(cacheDir, "exports").apply { mkdirs() }
-        val f = java.io.File(dir, "mixai-setlog-${java.time.LocalDate.now()}.csv")
-        f.writeText(SetLog.toCsv(entries))
+        val title = getString(R.string.export_title) + " $day"
+        val (name, mime, body) = when (format) {
+            ro.mixai.keybpm.ui.ExportFormat.CSV -> Triple("mixai-setlog-$day.csv", "text/csv", SetLog.toCsv(entries))
+            ro.mixai.keybpm.ui.ExportFormat.TEXT -> Triple("mixai-tracklist-$day.txt", "text/plain", ro.mixai.keybpm.data.TracklistExport.text(entries))
+            ro.mixai.keybpm.ui.ExportFormat.M3U8 -> Triple("mixai-tracklist-$day.m3u8", "audio/x-mpegurl", ro.mixai.keybpm.data.TracklistExport.m3u8(entries))
+            ro.mixai.keybpm.ui.ExportFormat.REKORDBOX -> Triple("mixai-tracklist-$day.xml", "text/xml", ro.mixai.keybpm.data.TracklistExport.rekordboxXml(entries, title))
+        }
+        val f = java.io.File(dir, name)
+        f.writeText(body)
         val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.files", f)
-        val send = Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM, uri)
-            .putExtra(Intent.EXTRA_SUBJECT, getString(R.string.export_title)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val send = Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri)
+            .putExtra(Intent.EXTRA_SUBJECT, title).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // Plain text also goes in EXTRA_TEXT so it pastes straight into a description field.
+        if (format == ro.mixai.keybpm.ui.ExportFormat.TEXT) send.putExtra(Intent.EXTRA_TEXT, body)
         startActivity(Intent.createChooser(send, getString(R.string.history_export)))
     }
 }

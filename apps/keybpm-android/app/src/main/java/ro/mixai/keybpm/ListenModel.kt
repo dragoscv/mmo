@@ -4,8 +4,28 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.StateFlow
 import ro.mixai.keybpm.data.SetLog
+import ro.mixai.keybpm.songid.SongMatch
 import uniffi.mixai_listen_ffi.KeyNotation
 import uniffi.mixai_listen_ffi.ListenSnapshot
+
+/** Song ID (WP18-06) state for the live screen. */
+sealed interface SongIdUi {
+    data object Idle : SongIdUi
+    /** Collecting audio before the first attempt (needs ~8 s). */
+    data object Collecting : SongIdUi
+    data object Matching : SongIdUi
+    data class Found(
+        val song: SongMatch,
+        val libraryTrackId: String? = null,
+        val libraryCamelot: String? = null,
+        val libraryBpm: Double? = null,
+        val queued: Boolean = false,
+    ) : SongIdUi
+    data object NoMatch : SongIdUi
+    /** Offline: the fingerprint is kept and matched when the network is back. */
+    data object Offline : SongIdUi
+    data class Error(val reason: String) : SongIdUi
+}
 
 /** What the live screen renders. `snapshot` is null before the first reading. */
 data class ListenUi(
@@ -25,6 +45,12 @@ data class ListenUi(
     val saved: Boolean = false,
     /** Wall clock when live listening started (stage mode set timer), null when idle. */
     val startedAtMillis: Long? = null,
+    val songId: SongIdUi = SongIdUi.Idle,
+    /** False on builds without the ShazamKit AAR. */
+    val songIdAvailable: Boolean = false,
+    val tracklistMode: Boolean = false,
+    /** Fingerprints waiting for a network. */
+    val pendingIds: Int = 0,
 ) {
     /** BPM after the user's half/double override, null before a tempo reading. */
     val bpm: Double? get() = snapshot?.tempo?.let { it.bpm * tempoFactor }
@@ -48,4 +74,7 @@ class ListenModel(app: Application) : AndroidViewModel(app) {
     fun dismissKeyChange() = session.dismissKeyChange()
     fun analyzeUri(uri: android.net.Uri) = session.analyzeUri(uri)
     fun clearFile() = session.clearFile()
+    fun identify() = session.identify()
+    fun setTracklistMode(on: Boolean) = session.setTracklistMode(on)
+    fun addToQueue() = session.addFoundToQueue()
 }
