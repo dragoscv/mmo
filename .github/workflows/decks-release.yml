@@ -1,0 +1,279 @@
+name: Decks — build & release
+
+# MixAI Decks (apps/mixai, identifier ro.mixai.dj) desktop release. WP19-02.
+# Trigger: tag `decks-v<version>` (must equal apps/mixai/src-tauri/tauri.conf.json#version) or manual dispatch.
+#
+# Produces (all attached to ONE draft GitHub Release "MixAI Decks <version>"):
+#   - Windows: .msi (WiX) + -setup.exe (NSIS) via tauri-action, plus an unsigned Store MSIX
+#              (scripts/package-msix.ps1, identity DragosCatalin.MixAIDJ — the Store re-signs it)
+#   - macOS:   universal (aarch64 + x86_64) .dmg + .app.tar.gz, signed + notarised when the Apple secrets exist
+#   - Linux:   .AppImage + .deb (built on ubuntu-22.04 for an older glibc baseline)
+#
+# Signing steps SKIP gracefully when a secret is missing (unsigned artefacts), same convention as native-release.yml.
+# Secrets: APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD,
+#          APPLE_TEAM_ID, WINDOWS_CERTIFICATE, WINDOWS_CERTIFICATE_PASSWORD (inventory: docs/arhitectura/gates.md).
+
+on:
+    push:
+        tags:
+            - "decks-v*"
+    workflow_dispatch:
+        inputs:
+            publish:
+                description: "Create a draft GitHub Release (true) or only upload workflow artifacts (false)"
+                required: false
+                default: "false"
+                type: choice
+                options:
+                    - "false"
+                    - "true"
+
+permissions:
+    contents: read
+
+concurrency:
+    group: decks-release-${{ github.ref }}
+    cancel-in-progress: false
+
+env:
+    HUSKY: 0
+    CARGO_TERM_COLOR: always
+
+jobs:
+    # ~5 s guard: tag version == tauri.conf.json version == package.json version.
+    preflight:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        outputs:
+            version: ${{ steps.ver.outputs.version }}
+            tag: ${{ steps.ver.outputs.tag }}
+        steps:
+            - uses: actions/checkout@v5
+            - name: Resolve + assert version
+              id: ver
+              shell: bash
+              run: |
+                  confver="$(node -p "require('./apps/mixai/src-tauri/tauri.conf.json').version")"
+                  pkgver="$(node -p "require('./apps/mixai/package.json').version")"
+                  echo "tauri.conf.json: $confver / package.json: $pkgver"
+                  if [[ "$confver" != "$pkgver" ]]; then
+                    echo "::error::apps/mixai tauri.conf.json ($confver) and package.json ($pkgver) versions differ"
+                    exit 1
+                  fi
+                  if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+                    tagver="${GITHUB_REF_NAME#decks-v}"
+                    if [[ "$tagver" != "$confver" ]]; then
+                      echo "::error::Tag ${GITHUB_REF_NAME} does not match apps/mixai version $confver"
+                      exit 1
+                    fi
+                  fi
+                  echo "version=$confver" >> "$GITHUB_OUTPUT"
+                  echo "tag=decks-v$confver" >> "$GITHUB_OUTPUT"
+
+    create-release:
+        needs: [preflight]
+        if: github.event_name == 'push' || github.event.inputs.publish == 'true'
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+            contents: write
+        outputs:
+            release_id: ${{ steps.create.outputs.id }}
+        steps:
+            - uses: actions/checkout@v5
+            - name: Release notes (apps/mixai/CHANGELOG.md top section, if present)
+              shell: bash
+              run: |
+                  if [[ -f apps/mixai/CHANGELOG.md ]]; then
+                    awk '/^## /{c++} c==1{print} c==2{exit}' apps/mixai/CHANGELOG.md > release_notes.md
+                  fi
+                  if [[ ! -s release_notes.md ]]; then
+                    echo "MixAI Decks ${{ needs.preflight.outputs.version }}" > release_notes.md
+                  fi
+            - name: Create GitHub Release (draft)
+              id: create
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ needs.preflight.outputs.tag }}
+                  target_commitish: ${{ github.sha }}
+                  name: MixAI Decks ${{ needs.preflight.outputs.version }}
+                  body_path: release_notes.md
+                  draft: true
+                  prerelease: false
+
+    build:
+        needs: [preflight, create-release]
+        # Dispatch without publish skips create-release; still build and keep workflow artifacts.
+        if: ${{ always() && needs.preflight.result == 'success' && (needs.create-release.result == 'success' || needs.create-release.result == 'skipped') }}
+        permissions:
+            contents: write
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: windows-latest
+                      label: windows-x64
+                      rust_targets: x86_64-pc-windows-msvc
+                      args: --bundles msi,nsis
+                      bundle_dir: apps/mixai/src-tauri/target/release/bundle
+                    - os: macos-latest
+                      label: macos-universal
+                      rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+                      args: --target universal-apple-darwin --bundles app,dmg
+                      bundle_dir: apps/mixai/src-tauri/target/universal-apple-darwin/release/bundle
+                    - os: ubuntu-22.04
+                      label: linux-x64
+                      rust_targets: x86_64-unknown-linux-gnu
+                      args: --bundles appimage,deb
+                      bundle_dir: apps/mixai/src-tauri/target/release/bundle
+        runs-on: ${{ matrix.os }}
+        timeout-minutes: 90
+        defaults:
+            run:
+                working-directory: apps/mixai
+        steps:
+            - uses: actions/checkout@v5
+
+            # webkit2gtk-4.1 (Tauri 2), ALSA (cpal), udev (hidapi), appindicator, rsvg; gstreamer because
+            # tauri.conf.json sets appimage.bundleMediaFramework = true.
+            - name: Install Linux system deps
+              if: runner.os == 'Linux'
+              working-directory: .
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y --no-install-recommends \
+                    libwebkit2gtk-4.1-dev \
+                    libasound2-dev \
+                    libudev-dev \
+                    libayatana-appindicator3-dev \
+                    librsvg2-dev \
+                    libssl-dev \
+                    pkg-config \
+                    patchelf \
+                    file \
+                    libgstreamer1.0-dev \
+                    libgstreamer-plugins-base1.0-dev \
+                    gstreamer1.0-plugins-base \
+                    gstreamer1.0-plugins-good
+
+            - uses: pnpm/action-setup@v6
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: pnpm
+                  cache-dependency-path: apps/mixai/pnpm-lock.yaml
+
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: ${{ matrix.rust_targets }}
+
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: apps/mixai/src-tauri -> target
+                  key: ${{ matrix.label }}
+
+            - name: Install Node deps (apps/mixai + packages/ui, consumed from source)
+              run: |
+                  pnpm install --frozen-lockfile --ignore-workspace
+                  pnpm -C ../../packages/ui install --frozen-lockfile --ignore-workspace
+
+            # src-tauri/icons is gitignored; generated from the shared brand PNG (same as native-release.yml).
+            - name: Generate Tauri icons
+              run: pnpm tauri:icon
+
+            # Tauri imports APPLE_CERTIFICATE itself, but an EMPTY variable still triggers the import and fails,
+            # so only non-empty secrets are exported. Without them the build is unsigned / not notarised.
+            - name: Export Apple signing + notarisation env (macOS, when configured)
+              if: runner.os == 'macOS'
+              shell: bash
+              env:
+                  S_APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+                  S_APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+                  S_APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+                  S_APPLE_ID: ${{ secrets.APPLE_ID }}
+                  S_APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+                  S_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+              run: |
+                  put() {
+                    local name="$1" value="$2"
+                    [[ -z "$value" ]] && { echo "$name: not configured"; return; }
+                    { echo "$name<<__EOF_${name}__"; echo "$value"; echo "__EOF_${name}__"; } >> "$GITHUB_ENV"
+                    echo "$name: set"
+                  }
+                  if [[ -n "$S_APPLE_CERTIFICATE" && -n "$S_APPLE_CERTIFICATE_PASSWORD" ]]; then
+                    put APPLE_CERTIFICATE "$S_APPLE_CERTIFICATE"
+                    put APPLE_CERTIFICATE_PASSWORD "$S_APPLE_CERTIFICATE_PASSWORD"
+                    put APPLE_SIGNING_IDENTITY "$S_APPLE_SIGNING_IDENTITY"
+                  else
+                    echo "::warning::APPLE_CERTIFICATE not configured — macOS build will be unsigned"
+                  fi
+                  if [[ -n "$S_APPLE_ID" && -n "$S_APPLE_PASSWORD" && -n "$S_APPLE_TEAM_ID" ]]; then
+                    put APPLE_ID "$S_APPLE_ID"
+                    put APPLE_PASSWORD "$S_APPLE_PASSWORD"
+                    put APPLE_TEAM_ID "$S_APPLE_TEAM_ID"
+                  else
+                    echo "::warning::APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID not configured — DMG will not be notarised"
+                  fi
+
+            # Tauri signs Windows bundles with a certificate THUMBPRINT from the store, so the PFX is imported
+            # and a config overlay (merged via --config) carries the thumbprint.
+            - name: Import Windows signing certificate (Windows, when configured)
+              id: wincert
+              if: runner.os == 'Windows' && env.WINDOWS_CERTIFICATE != ''
+              shell: pwsh
+              env:
+                  WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+                  WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+              run: |
+                  $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
+                  [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+                  $pw = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+                  $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $pw
+                  Remove-Item $pfx -Force
+                  $overlay = Join-Path $env:RUNNER_TEMP 'tauri.sign.json'
+                  $json = @{ bundle = @{ windows = @{ certificateThumbprint = $cert.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' } } } | ConvertTo-Json -Depth 5
+                  Set-Content -Path $overlay -Value $json -Encoding utf8NoBOM
+                  "args=--config $overlay" >> $env:GITHUB_OUTPUT
+
+            - name: Build + upload Tauri bundles
+              uses: tauri-apps/tauri-action@v0
+              with:
+                  projectPath: apps/mixai
+                  releaseId: ${{ needs.create-release.outputs.release_id }}
+                  args: ${{ matrix.args }} ${{ steps.wincert.outputs.args }}
+
+            - name: Package Store MSIX (Windows)
+              if: runner.os == 'Windows'
+              working-directory: .
+              shell: pwsh
+              run: |
+                  $name = (Get-Content apps/mixai/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).productName
+                  pwsh -NoProfile -File scripts/package-msix.ps1 -App apps/mixai -Exe mixai.exe `
+                    -IdentityName DragosCatalin.MixAIDJ -DisplayName $name `
+                    -Description 'Professional DJ software with a native audio engine, AI stems and beat sync' `
+                    -FilePrefix MixAIDecks -AppId MixAIDJ
+                  Get-ChildItem apps/mixai/msix-out -Filter *.msix | ForEach-Object { "$($_.Name) $([math]::Round($_.Length / 1MB, 1)) MB" }
+
+            - name: Attach MSIX to the release
+              if: runner.os == 'Windows' && needs.create-release.outputs.release_id != ''
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ needs.preflight.outputs.tag }}
+                  files: apps/mixai/msix-out/*.msix
+                  fail_on_unmatched_files: true
+                  draft: true
+
+            - name: Upload workflow artifacts
+              uses: actions/upload-artifact@v5
+              with:
+                  name: mixai-decks-${{ needs.preflight.outputs.version }}-${{ matrix.label }}
+                  path: |
+                      ${{ matrix.bundle_dir }}/msi/*.msi
+                      ${{ matrix.bundle_dir }}/nsis/*.exe
+                      ${{ matrix.bundle_dir }}/dmg/*.dmg
+                      ${{ matrix.bundle_dir }}/macos/*.app.tar.gz
+                      ${{ matrix.bundle_dir }}/appimage/*.AppImage
+                      ${{ matrix.bundle_dir }}/deb/*.deb
+                      apps/mixai/msix-out/*.msix
+                  if-no-files-found: error
+                  retention-days: 14
