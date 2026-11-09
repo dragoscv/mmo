@@ -6,7 +6,7 @@
  * running under Tauri, this is a no-op and the UI polls nothing.
  */
 
-import type { HidInputEvent, MixerState } from "./types";
+import type { BleMidiStats, HidInputEvent, MixerState } from "./types";
 
 type UnlistenFn = () => void;
 
@@ -55,4 +55,21 @@ export async function subscribeHidInput(
         onInput(e.payload);
     });
     return unlisten;
+}
+
+/** Link-quality updates (1 Hz) and auto-reconnects of the Bluetooth MIDI controller. */
+export async function subscribeBleMidi(
+    onStats: (s: BleMidiStats) => void,
+    onConnected: (name: string) => void,
+): Promise<UnlistenFn> {
+    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
+        return () => {};
+    }
+    const { listen } = await import("@tauri-apps/api/event");
+    const a = await listen<BleMidiStats>("ble-midi://stats", (e) => onStats(e.payload));
+    const b = await listen<string>("ble-midi://connected", (e) => onConnected(e.payload));
+    return () => {
+        a();
+        b();
+    };
 }

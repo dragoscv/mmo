@@ -21,7 +21,7 @@ import type {
     StemJob,
     TrackStems,
 } from "./types";
-import type { HidDeviceInfo, MidiPreset } from "./types";
+import type { BleMidiDevice, HidDeviceInfo, MidiPreset } from "./types";
 import type {
     BeatFxRequest,
     BeatGrid,
@@ -213,6 +213,26 @@ export const engine = {
 
     midiDisconnect(): Promise<null> {
         return call<null>("midi_disconnect");
+    },
+
+    // ---- Bluetooth LE MIDI ----------------------------------------------
+
+    bleMidiScan(seconds = 4): Promise<BleMidiDevice[] | null> {
+        return call<BleMidiDevice[]>("ble_midi_scan", { seconds });
+    },
+
+    bleMidiConnect(name: string): Promise<string | null> {
+        return call<string>("ble_midi_connect", { name });
+    },
+
+    /** Disconnect; `forget` also turns auto-connect off. */
+    bleMidiDisconnect(forget = true): Promise<null> {
+        return call<null>("ble_midi_disconnect", { forget });
+    },
+
+    /** `[device name (connected or remembered), connected]`. */
+    bleMidiStatus(): Promise<[string | null, boolean] | null> {
+        return call<[string | null, boolean]>("ble_midi_status");
     },
 
     midiSetLearn(enabled: boolean): Promise<null> {

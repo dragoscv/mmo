@@ -1,6 +1,6 @@
 [package]
 name = "mixai"
-version = "1.1.0"
+version = "1.2.0"
 description = "MixAI Decks — native DJ software"
 authors = ["mwrty <vladulescu.catalin@gmail.com>"]
 license = "AGPL-3.0-or-later"
@@ -34,6 +34,11 @@ env_logger = "0.11.11"
 mixai-core = { path = "crates/mixai-core" }
 # Cross-platform MIDI I/O (MIT) for DJ controller support.
 midir = "0.11.1"
+# Direct Bluetooth LE MIDI (MIT/Apache-2.0/BSD-3): GATT central, no OS BLE-MIDI driver or pairing needed.
+btleplug = "0.13.5"
+futures = "0.3"
+tokio = { version = "1", features = ["time"] }
+uuid = "1"
 # Cross-platform HID I/O (MIT) for CDJs and HID-class DJ controllers.
 hidapi = "2.6.7"
 # HTTP client to talk to the MMO Companion library API (rustls = no OpenSSL).

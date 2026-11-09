@@ -378,6 +378,32 @@ pub fn set_preset(midi: &MidiState, preset: Preset) {
     *guard.preset.lock().unwrap() = preset;
 }
 
+/// A dispatcher sharing the live preset + learn flag, for non-midir transports (BLE MIDI).
+#[derive(Clone)]
+pub struct Dispatcher {
+    app: AppHandle,
+    preset: Arc<Mutex<Preset>>,
+    learn: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl Dispatcher {
+    pub fn new(app: AppHandle, midi: &MidiState) -> Self {
+        let guard = midi.inner.lock().unwrap();
+        if guard.preset.lock().unwrap().mappings.is_empty() {
+            *guard.preset.lock().unwrap() = ddj_flx4_preset();
+        }
+        Dispatcher {
+            app,
+            preset: guard.preset.clone(),
+            learn: guard.learn.clone(),
+        }
+    }
+
+    pub fn dispatch(&self, bytes: &[u8]) {
+        handle_message(&self.app, &self.preset, &self.learn, bytes);
+    }
+}
+
 /// Parse one MIDI message and either report it (learn) or dispatch its action.
 fn handle_message(
     app: &AppHandle,

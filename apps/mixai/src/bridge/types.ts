@@ -206,6 +206,25 @@ export interface MidiPreset {
     mappings: MidiMapping[];
 }
 
+/** A Bluetooth LE MIDI controller seen while scanning (matches Rust `BleMidiDevice`). */
+export interface BleMidiDevice {
+    id: string;
+    name: string;
+    rssi: number | null;
+    connected: boolean;
+}
+
+/** Per-second link quality of the connected BLE MIDI controller (`ble-midi://stats`). */
+export interface BleMidiStats {
+    name: string;
+    connected: boolean;
+    msgsPerSec: number;
+    packetsPerSec: number;
+    gapP95Ms: number;
+    rssi: number | null;
+    reconnects: number;
+}
+
 /** A discovered HID device (matches Rust `HidDeviceInfo`). */
 export interface HidDeviceInfo {
     /** OS device path used to open it unambiguously. */

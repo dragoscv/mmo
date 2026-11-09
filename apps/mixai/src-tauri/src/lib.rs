@@ -15,6 +15,10 @@ use tauri::{Emitter, Manager, State};
 mod midi;
 use midi::MidiState;
 
+mod ble_midi;
+mod ble_midi_packet;
+use ble_midi::BleMidiState;
+
 mod hid;
 use hid::HidState;
 
@@ -878,6 +882,33 @@ fn midi_set_preset(preset: midi::Preset, midi: State<'_, MidiState>) -> Result<(
     Ok(())
 }
 
+// ---- Bluetooth LE MIDI ---------------------------------------------------------
+
+#[tauri::command]
+async fn ble_midi_scan(
+    app: tauri::AppHandle,
+    seconds: Option<u64>,
+) -> Result<Vec<ble_midi::BleMidiDevice>, String> {
+    ble_midi::scan(&app, seconds.unwrap_or(4)).await
+}
+
+#[tauri::command]
+async fn ble_midi_connect(app: tauri::AppHandle, name: String) -> Result<String, String> {
+    ble_midi::connect(app, name).await
+}
+
+#[tauri::command]
+async fn ble_midi_disconnect(app: tauri::AppHandle, forget: Option<bool>) -> Result<(), String> {
+    ble_midi::disconnect(&app, forget.unwrap_or(true)).await;
+    Ok(())
+}
+
+/// `[device name (connected or remembered), connected]`.
+#[tauri::command]
+fn ble_midi_status(app: tauri::AppHandle) -> (Option<String>, bool) {
+    ble_midi::status(&app)
+}
+
 // ---- HID ---------------------------------------------------------------------
 
 #[tauri::command]
@@ -920,6 +951,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(EngineState(Mutex::new(None)))
         .manage(MidiState::new())
+        .manage(BleMidiState::new())
         .manage(HidState::new())
         .manage(CompanionState::default())
         .setup(|app| {
@@ -939,6 +971,8 @@ pub fn run() {
 
             // 30 Hz state pump → webview.
             let handle = app.handle().clone();
+            // Reconnect the remembered Bluetooth MIDI controller whenever it is switched on.
+            ble_midi::start_auto_connect(handle.clone());
             std::thread::spawn(move || {
                 loop {
                     std::thread::sleep(Duration::from_millis(33));
@@ -1007,6 +1041,10 @@ pub fn run() {
             midi_set_learn,
             midi_get_preset,
             midi_set_preset,
+            ble_midi_scan,
+            ble_midi_connect,
+            ble_midi_disconnect,
+            ble_midi_status,
             start_recording,
             stop_recording,
             is_recording,
