@@ -6,7 +6,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use mixai_core::{
-    list_output_devices, AudioDevice, Command, DeckId, Engine, MixerState,
+    AudioDevice, BeatFxKind, BeatGrid, ClockSource, ClockState, ColorFxKind, Command, DeckId,
+    Engine, MixerState, RoutingConfig, list_output_devices,
 };
 use serde::Deserialize;
 use tauri::{Emitter, Manager, State};
@@ -56,7 +57,15 @@ fn load_track(req: LoadReq, state: State<'_, EngineState>) -> Result<Vec<f32>, S
     let deck = parse_deck(&req.deck)?;
     // Decode off the audio thread, then send the buffer in.
     let buffer = mixai_core::decoder::decode_file(&req.source).map_err(|e| e.to_string())?;
-    load_decoded(deck, buffer, req.track_id, req.title, req.artist, req.bpm, &state)
+    load_decoded(
+        deck,
+        buffer,
+        req.track_id,
+        req.title,
+        req.artist,
+        req.bpm,
+        &state,
+    )
 }
 
 /// Shared loader: analyse a decoded buffer, mirror metadata, send it to the
@@ -106,6 +115,10 @@ fn load_decoded(
         artist,
         bpm,
     });
+    // Constant beatgrid from the analysis (phase anchor) so sync/quantize work at once.
+    if bpm > 0.0 {
+        engine.set_grid(deck, BeatGrid::constant(bpm, analysis.first_beat_secs));
+    }
     Ok(peaks)
 }
 
@@ -202,7 +215,11 @@ fn deck_set_tempo(deck: String, value: f64, state: State<'_, EngineState>) -> Re
 }
 
 #[tauri::command]
-fn deck_set_key_lock(deck: String, enabled: bool, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_set_key_lock(
+    deck: String,
+    enabled: bool,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
     let guard = state.0.lock().unwrap();
     let engine = guard.as_ref().ok_or("engine not running")?;
@@ -238,7 +255,12 @@ fn deck_set_cue(deck: String, enabled: bool, state: State<'_, EngineState>) -> R
 }
 
 #[tauri::command]
-fn deck_set_eq(deck: String, band: String, db: f32, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_set_eq(
+    deck: String,
+    band: String,
+    db: f32,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
     let guard = state.0.lock().unwrap();
     let engine = guard.as_ref().ok_or("engine not running")?;
@@ -286,10 +308,7 @@ fn set_cue_device(_device_id: String) -> Result<(), String> {
 
 // ---- hot cues + loops --------------------------------------------------------
 
-fn with_engine(
-    state: &State<'_, EngineState>,
-    f: impl FnOnce(&Engine),
-) -> Result<(), String> {
+fn with_engine(state: &State<'_, EngineState>, f: impl FnOnce(&Engine)) -> Result<(), String> {
     let guard = state.0.lock().unwrap();
     let engine = guard.as_ref().ok_or("engine not running")?;
     f(engine);
@@ -297,19 +316,31 @@ fn with_engine(
 }
 
 #[tauri::command]
-fn deck_set_hot_cue(deck: String, slot: usize, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_set_hot_cue(
+    deck: String,
+    slot: usize,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
     with_engine(&state, |e| e.send(Command::SetHotCue(deck, slot)))
 }
 
 #[tauri::command]
-fn deck_jump_hot_cue(deck: String, slot: usize, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_jump_hot_cue(
+    deck: String,
+    slot: usize,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
     with_engine(&state, |e| e.send(Command::JumpHotCue(deck, slot)))
 }
 
 #[tauri::command]
-fn deck_clear_hot_cue(deck: String, slot: usize, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_clear_hot_cue(
+    deck: String,
+    slot: usize,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
     with_engine(&state, |e| e.send(Command::ClearHotCue(deck, slot)))
 }
@@ -350,8 +381,9 @@ fn deck_loop_scale(deck: String, factor: f64, state: State<'_, EngineState>) -> 
     with_engine(&state, |e| e.send(Command::LoopScale(deck, factor)))
 }
 
-/// Beat-sync: set `deck`'s tempo so its effective BPM matches the other
-/// (first playing, else first loaded) deck. Reads BPMs from the mirror.
+/// Beat-sync (legacy): set `deck`'s tempo so its effective BPM matches the other
+/// (first playing, else first loaded) deck. When another deck is playing it also
+/// aligns the beat phase (one-shot phase sync, see `deck_phase_sync`).
 #[tauri::command]
 fn deck_sync(deck: String, state: State<'_, EngineState>) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
@@ -359,7 +391,7 @@ fn deck_sync(deck: String, state: State<'_, EngineState>) -> Result<(), String> 
     let engine = guard.as_ref().ok_or("engine not running")?;
 
     // Find a master reference deck: prefer a playing, loaded deck with a BPM.
-    let (this_bpm, target_eff_bpm) = {
+    let (this_bpm, target_eff_bpm, other_playing) = {
         let m = engine.mirror();
         let this = m.decks.iter().find(|d| d.id == deck);
         let this_bpm = this.map(|d| d.bpm).unwrap_or(0.0);
@@ -369,7 +401,7 @@ fn deck_sync(deck: String, state: State<'_, EngineState>) -> Result<(), String> 
             .filter(|d| d.id != deck && d.loaded && d.bpm > 0.0)
             .max_by_key(|d| d.playing as u8);
         let target = master.map(|d| d.bpm * d.tempo).unwrap_or(0.0);
-        (this_bpm, target)
+        (this_bpm, target, master.is_some_and(|d| d.playing))
     };
 
     if this_bpm <= 0.0 || target_eff_bpm <= 0.0 {
@@ -381,13 +413,253 @@ fn deck_sync(deck: String, state: State<'_, EngineState>) -> Result<(), String> 
         d.tempo = tempo;
     }
     engine.send(Command::Tempo(deck, tempo));
+    if other_playing {
+        engine.phase_sync(deck, false);
+    }
     Ok(())
+}
+
+// ---- WP19-05 sync / clock -------------------------------------------------------
+
+/// Phase sync `deck` to the master clock (tempo + beat/bar phase). `lock` keeps it
+/// locked (continuous tempo follow + inaudible phase nudging).
+#[tauri::command]
+fn deck_phase_sync(
+    deck: String,
+    lock: Option<bool>,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    with_engine(&state, |e| e.phase_sync(deck, lock.unwrap_or(false)))
+}
+
+/// Turn continuous sync lock on/off without a one-shot alignment.
+#[tauri::command]
+fn deck_set_sync_lock(
+    deck: String,
+    enabled: bool,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    with_engine(&state, |e| e.set_sync_lock(deck, enabled))
+}
+
+/// Replace a deck's beatgrid (seconds-based: bpm, firstBeat, downbeat, beatsPerBar,
+/// anchors `[{time, beat}]` for variable tempo).
+#[tauri::command]
+fn deck_set_beatgrid(
+    deck: String,
+    grid: BeatGrid,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    with_engine(&state, |e| e.set_grid(deck, grid))
+}
+
+#[tauri::command]
+fn deck_set_quantize(
+    deck: String,
+    enabled: bool,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    with_engine(&state, |e| e.set_quantize(deck, enabled))
+}
+
+/// Beat-jump by `beats` (±1/2/4/8/16/32; fractions allowed).
+#[tauri::command]
+fn deck_beat_jump(deck: String, beats: f64, state: State<'_, EngineState>) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    if !beats.is_finite() || beats.abs() > 64.0 {
+        return Err("beats must be within ±64".into());
+    }
+    with_engine(&state, |e| e.beat_jump(deck, beats))
+}
+
+#[tauri::command]
+fn deck_set_slip(deck: String, enabled: bool, state: State<'_, EngineState>) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    with_engine(&state, |e| e.set_slip(deck, enabled))
+}
+
+/// Reverse playback (censor when slip is on).
+#[tauri::command]
+fn deck_set_reverse(
+    deck: String,
+    enabled: bool,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    with_engine(&state, |e| e.set_reverse(deck, enabled))
+}
+
+/// Key shift in semitones (−12..12), independent of tempo.
+#[tauri::command]
+fn deck_set_key_shift(
+    deck: String,
+    semitones: f64,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    if !semitones.is_finite() {
+        return Err("semitones must be finite".into());
+    }
+    with_engine(&state, |e| e.set_key_shift(deck, semitones))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct KeyMatchReq {
+    deck: String,
+    /// Deck key 0..23 (pitch class + 12 × minor); omitted = last known.
+    key: Option<u8>,
+    /// Master key 0..23; omitted = last known key of the master deck.
+    master_key: Option<u8>,
+    /// Camelot (`8A`) or Open Key (`1m`) alternatives to `key` / `masterKey`.
+    key_name: Option<String>,
+    master_key_name: Option<String>,
+}
+
+fn parse_key(num: Option<u8>, name: Option<&str>) -> Result<Option<u8>, String> {
+    if let Some(k) = num {
+        return if k < mixai_core::keys::KEY_COUNT {
+            Ok(Some(k))
+        } else {
+            Err(format!("key {k} out of range 0..23"))
+        };
+    }
+    match name {
+        None => Ok(None),
+        Some(n) => mixai_core::keys::camelot_to_key(n)
+            .or_else(|| mixai_core::keys::open_key_to_key(n))
+            .map(Some)
+            .ok_or_else(|| format!("unknown key '{n}'")),
+    }
+}
+
+/// Key-shift `deck` so it plays in the master's key (or its relative); returns the
+/// applied shift in semitones.
+#[tauri::command]
+fn deck_key_match(req: KeyMatchReq, state: State<'_, EngineState>) -> Result<f64, String> {
+    let deck = parse_deck(&req.deck)?;
+    let key = parse_key(req.key, req.key_name.as_deref())?;
+    let master_key = parse_key(req.master_key, req.master_key_name.as_deref())?;
+    let guard = state.0.lock().unwrap();
+    let engine = guard.as_ref().ok_or("engine not running")?;
+    engine
+        .key_match(deck, key, master_key)
+        .map_err(|e| e.to_string())
+}
+
+/// Remember a deck's musical key (0..23 or Camelot / Open Key) for key matching.
+#[tauri::command]
+fn deck_set_key(
+    deck: String,
+    key: Option<u8>,
+    key_name: Option<String>,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    let key = parse_key(key, key_name.as_deref())?;
+    with_engine(&state, |e| e.set_deck_key(deck, key))
+}
+
+/// Master clock: `source` = `auto` | `internal` | `a`..`d`; `bpm` sets the internal tempo.
+#[tauri::command]
+fn master_set_clock(
+    source: Option<String>,
+    bpm: Option<f64>,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
+    let src = match source.as_deref() {
+        None => None,
+        Some(s) => {
+            Some(ClockSource::parse(s).ok_or_else(|| format!("invalid clock source '{s}'"))?)
+        }
+    };
+    if bpm.is_some_and(|b| !b.is_finite() || !(20.0..=300.0).contains(&b)) {
+        return Err("bpm must be within 20..300".into());
+    }
+    let guard = state.0.lock().unwrap();
+    let engine = guard.as_ref().ok_or("engine not running")?;
+    let src = src.unwrap_or_else(|| engine.perf().clock);
+    engine.set_clock(src, bpm);
+    Ok(())
+}
+
+/// Master tempo + beat phase (and per-deck beat positions) for UI / MIDI clock out.
+#[tauri::command]
+fn engine_clock_state(state: State<'_, EngineState>) -> Option<ClockState> {
+    state.0.lock().unwrap().as_ref().map(|e| e.clock_state())
+}
+
+// ---- WP19-06 routing ------------------------------------------------------------
+
+/// Set the output routing matrix (cue mix, headphone level, split mono, 4-ch mode,
+/// booth level, per-output latency compensation in ms).
+#[tauri::command]
+fn routing_set(routing: RoutingConfig, state: State<'_, EngineState>) -> Result<(), String> {
+    with_engine(&state, |e| e.set_routing(routing))
+}
+
+#[tauri::command]
+fn routing_get(state: State<'_, EngineState>) -> Option<RoutingConfig> {
+    state.0.lock().unwrap().as_ref().map(|e| e.routing())
+}
+
+// ---- WP19-10 FX ---------------------------------------------------------------------
+
+/// Colour FX: `kind` = none | filter | phaser | flanger | noise | dub_echo; `param` −1..1.
+#[tauri::command]
+fn fx_color_set(
+    deck: String,
+    kind: String,
+    param: f32,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
+    let deck = parse_deck(&deck)?;
+    let kind = ColorFxKind::parse(&kind).ok_or_else(|| format!("unknown colour fx '{kind}'"))?;
+    if !param.is_finite() {
+        return Err("param must be finite".into());
+    }
+    with_engine(&state, |e| e.set_color_fx(deck, kind, param))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BeatFxReq {
+    deck: String,
+    /// none | echo | reverb | roll | gate
+    kind: String,
+    /// Wet/dry 0..1 (roll engages above 0.5).
+    wet: f32,
+    /// Beat fraction 1/32..8 (echo time, roll length, gate step).
+    beats: f64,
+    /// Echo feedback / reverb decay / gate depth, 0..1 (default 0.5).
+    feedback: Option<f32>,
+}
+
+/// Beat FX synced to the master clock.
+#[tauri::command]
+fn fx_beat_set(req: BeatFxReq, state: State<'_, EngineState>) -> Result<(), String> {
+    let deck = parse_deck(&req.deck)?;
+    let kind =
+        BeatFxKind::parse(&req.kind).ok_or_else(|| format!("unknown beat fx '{}'", req.kind))?;
+    if !req.wet.is_finite() || !req.beats.is_finite() || req.beats <= 0.0 {
+        return Err("wet/beats must be finite and beats > 0".into());
+    }
+    let fb = req.feedback.filter(|f| f.is_finite()).unwrap_or(0.5);
+    with_engine(&state, |e| {
+        e.set_beat_fx(deck, kind, req.wet, req.beats, fb)
+    })
 }
 
 /// Start recording the master mix to a WAV file at `path`.
 #[tauri::command]
 fn start_recording(path: String, state: State<'_, EngineState>) -> Result<(), String> {
-    with_engine(&state, |e| e.start_recording(std::path::PathBuf::from(&path)))
+    with_engine(&state, |e| {
+        e.start_recording(std::path::PathBuf::from(&path))
+    })
 }
 
 /// Stop recording and finalize the WAV file.
@@ -448,14 +720,23 @@ fn load_stems(req: LoadStemsReq, state: State<'_, EngineState>) -> Result<Vec<us
 
 /// Enable/disable stem playback for a deck (keeps loaded buffers).
 #[tauri::command]
-fn deck_set_stems_active(deck: String, on: bool, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_set_stems_active(
+    deck: String,
+    on: bool,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
     with_engine(&state, |e| e.set_stems_active(deck, on))
 }
 
 /// Set the live gain (0..1.5) for a stem (0=vocals,1=drums,2=bass,3=melody).
 #[tauri::command]
-fn deck_set_stem_gain(deck: String, idx: usize, gain: f32, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_set_stem_gain(
+    deck: String,
+    idx: usize,
+    gain: f32,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
     with_engine(&state, |e| e.set_stem_gain(deck, idx, gain))
 }
@@ -476,7 +757,11 @@ fn deck_set_fx_wet(deck: String, wet: f32, state: State<'_, EngineState>) -> Res
 
 /// Set the FX beat division (echo time) for a deck.
 #[tauri::command]
-fn deck_set_fx_beats(deck: String, beats: f64, state: State<'_, EngineState>) -> Result<(), String> {
+fn deck_set_fx_beats(
+    deck: String,
+    beats: f64,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
     with_engine(&state, |e| e.set_fx_beats(deck, beats))
 }
@@ -516,7 +801,11 @@ fn sampler_set_gain(pad: usize, gain: f32, state: State<'_, EngineState>) -> Res
 
 /// Toggle one-shot vs. loop for a sampler pad.
 #[tauri::command]
-fn sampler_set_looping(pad: usize, looping: bool, state: State<'_, EngineState>) -> Result<(), String> {
+fn sampler_set_looping(
+    pad: usize,
+    looping: bool,
+    state: State<'_, EngineState>,
+) -> Result<(), String> {
     with_engine(&state, |e| e.set_sample_looping(pad, looping))
 }
 
@@ -528,7 +817,11 @@ fn list_midi_inputs() -> Vec<String> {
 }
 
 #[tauri::command]
-fn midi_connect(name: String, app: tauri::AppHandle, midi: State<'_, MidiState>) -> Result<String, String> {
+fn midi_connect(
+    name: String,
+    app: tauri::AppHandle,
+    midi: State<'_, MidiState>,
+) -> Result<String, String> {
     midi::connect(app, &midi, &name)
 }
 
@@ -563,7 +856,11 @@ fn list_hid_devices() -> Result<Vec<hid::HidDeviceInfo>, String> {
 }
 
 #[tauri::command]
-fn hid_connect(path: String, app: tauri::AppHandle, hid: State<'_, HidState>) -> Result<String, String> {
+fn hid_connect(
+    path: String,
+    app: tauri::AppHandle,
+    hid: State<'_, HidState>,
+) -> Result<String, String> {
     hid::connect(app, &hid, &path)
 }
 
@@ -612,15 +909,17 @@ pub fn run() {
 
             // 30 Hz state pump → webview.
             let handle = app.handle().clone();
-            std::thread::spawn(move || loop {
-                std::thread::sleep(Duration::from_millis(33));
-                let state: State<'_, EngineState> = handle.state();
-                let snapshot = {
-                    let guard = state.0.lock().unwrap();
-                    guard.as_ref().map(|e| e.snapshot_state())
-                };
-                if let Some(s) = snapshot {
-                    let _ = handle.emit("mixer://state", s);
+            std::thread::spawn(move || {
+                loop {
+                    std::thread::sleep(Duration::from_millis(33));
+                    let state: State<'_, EngineState> = handle.state();
+                    let snapshot = {
+                        let guard = state.0.lock().unwrap();
+                        guard.as_ref().map(|e| e.snapshot_state())
+                    };
+                    if let Some(s) = snapshot {
+                        let _ = handle.emit("mixer://state", s);
+                    }
                 }
             });
 
@@ -654,6 +953,22 @@ pub fn run() {
             deck_beatloop,
             deck_loop_scale,
             deck_sync,
+            deck_phase_sync,
+            deck_set_sync_lock,
+            deck_set_beatgrid,
+            deck_set_quantize,
+            deck_beat_jump,
+            deck_set_slip,
+            deck_set_reverse,
+            deck_set_key_shift,
+            deck_key_match,
+            deck_set_key,
+            master_set_clock,
+            engine_clock_state,
+            routing_set,
+            routing_get,
+            fx_color_set,
+            fx_beat_set,
             list_midi_inputs,
             midi_connect,
             midi_disconnect,

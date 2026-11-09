@@ -99,39 +99,159 @@ pub fn ddj_flx4_preset() -> Preset {
 
     let mut m = Vec::new();
     // Per-deck (A on ch1, B on ch2) transport + mixer.
-    for (deck, note_st, cc_st, pad_st) in
-        [(DeckId::A, 0x90u8, 0xB0u8, 0x97u8), (DeckId::B, 0x91u8, 0xB1u8, 0x99u8)]
-    {
+    for (deck, note_st, cc_st, pad_st) in [
+        (DeckId::A, 0x90u8, 0xB0u8, 0x97u8),
+        (DeckId::B, 0x91u8, 0xB1u8, 0x99u8),
+    ] {
         let d = Some(deck);
-        m.push(Mapping { status: note_st, midino: 0x0B, action: Play, deck: d, control_type: Note });
-        m.push(Mapping { status: note_st, midino: 0x0C, action: Cue, deck: d, control_type: Note });
-        m.push(Mapping { status: note_st, midino: 0x58, action: Sync, deck: d, control_type: Note });
-        m.push(Mapping { status: note_st, midino: 0x3F, action: Shift, deck: d, control_type: Note });
-        m.push(Mapping { status: note_st, midino: 0x54, action: HeadphoneCue, deck: d, control_type: Note });
+        m.push(Mapping {
+            status: note_st,
+            midino: 0x0B,
+            action: Play,
+            deck: d,
+            control_type: Note,
+        });
+        m.push(Mapping {
+            status: note_st,
+            midino: 0x0C,
+            action: Cue,
+            deck: d,
+            control_type: Note,
+        });
+        m.push(Mapping {
+            status: note_st,
+            midino: 0x58,
+            action: Sync,
+            deck: d,
+            control_type: Note,
+        });
+        m.push(Mapping {
+            status: note_st,
+            midino: 0x3F,
+            action: Shift,
+            deck: d,
+            control_type: Note,
+        });
+        m.push(Mapping {
+            status: note_st,
+            midino: 0x54,
+            action: HeadphoneCue,
+            deck: d,
+            control_type: Note,
+        });
         // Loops.
-        m.push(Mapping { status: note_st, midino: 0x10, action: LoopIn, deck: d, control_type: Note });
-        m.push(Mapping { status: note_st, midino: 0x11, action: LoopOut, deck: d, control_type: Note });
-        m.push(Mapping { status: note_st, midino: 0x4D, action: Reloop, deck: d, control_type: Note });
-        m.push(Mapping { status: note_st, midino: 0x51, action: LoopHalve, deck: d, control_type: Note });
-        m.push(Mapping { status: note_st, midino: 0x53, action: LoopDouble, deck: d, control_type: Note });
+        m.push(Mapping {
+            status: note_st,
+            midino: 0x10,
+            action: LoopIn,
+            deck: d,
+            control_type: Note,
+        });
+        m.push(Mapping {
+            status: note_st,
+            midino: 0x11,
+            action: LoopOut,
+            deck: d,
+            control_type: Note,
+        });
+        m.push(Mapping {
+            status: note_st,
+            midino: 0x4D,
+            action: Reloop,
+            deck: d,
+            control_type: Note,
+        });
+        m.push(Mapping {
+            status: note_st,
+            midino: 0x51,
+            action: LoopHalve,
+            deck: d,
+            control_type: Note,
+        });
+        m.push(Mapping {
+            status: note_st,
+            midino: 0x53,
+            action: LoopDouble,
+            deck: d,
+            control_type: Note,
+        });
         // Continuous controls (we use the 7-bit MSB only for v0.1).
-        m.push(Mapping { status: cc_st, midino: 0x00, action: TempoSlider, deck: d, control_type: Cc });
-        m.push(Mapping { status: cc_st, midino: 0x07, action: EqHi, deck: d, control_type: Cc });
-        m.push(Mapping { status: cc_st, midino: 0x0B, action: EqMid, deck: d, control_type: Cc });
-        m.push(Mapping { status: cc_st, midino: 0x0F, action: EqLow, deck: d, control_type: Cc });
-        m.push(Mapping { status: cc_st, midino: 0x13, action: VolumeFader, deck: d, control_type: Cc });
-        m.push(Mapping { status: cc_st, midino: 0x18, action: Filter, deck: d, control_type: Cc });
+        m.push(Mapping {
+            status: cc_st,
+            midino: 0x00,
+            action: TempoSlider,
+            deck: d,
+            control_type: Cc,
+        });
+        m.push(Mapping {
+            status: cc_st,
+            midino: 0x07,
+            action: EqHi,
+            deck: d,
+            control_type: Cc,
+        });
+        m.push(Mapping {
+            status: cc_st,
+            midino: 0x0B,
+            action: EqMid,
+            deck: d,
+            control_type: Cc,
+        });
+        m.push(Mapping {
+            status: cc_st,
+            midino: 0x0F,
+            action: EqLow,
+            deck: d,
+            control_type: Cc,
+        });
+        m.push(Mapping {
+            status: cc_st,
+            midino: 0x13,
+            action: VolumeFader,
+            deck: d,
+            control_type: Cc,
+        });
+        m.push(Mapping {
+            status: cc_st,
+            midino: 0x18,
+            action: Filter,
+            deck: d,
+            control_type: Cc,
+        });
         // Hot-cue pads 1..8 on the performance-pad channel.
-        let cues = [Hotcue1, Hotcue2, Hotcue3, Hotcue4, Hotcue5, Hotcue6, Hotcue7, Hotcue8];
+        let cues = [
+            Hotcue1, Hotcue2, Hotcue3, Hotcue4, Hotcue5, Hotcue6, Hotcue7, Hotcue8,
+        ];
         for (i, action) in cues.into_iter().enumerate() {
-            m.push(Mapping { status: pad_st, midino: i as u8, action, deck: d, control_type: Note });
+            m.push(Mapping {
+                status: pad_st,
+                midino: i as u8,
+                action,
+                deck: d,
+                control_type: Note,
+            });
         }
     }
     // Master / global.
-    m.push(Mapping { status: 0xB6, midino: 0x1F, action: Crossfader, deck: None, control_type: Cc });
-    m.push(Mapping { status: 0xB6, midino: 0x09, action: MasterVolume, deck: None, control_type: Cc });
+    m.push(Mapping {
+        status: 0xB6,
+        midino: 0x1F,
+        action: Crossfader,
+        deck: None,
+        control_type: Cc,
+    });
+    m.push(Mapping {
+        status: 0xB6,
+        midino: 0x09,
+        action: MasterVolume,
+        deck: None,
+        control_type: Cc,
+    });
 
-    Preset { name: "Pioneer DDJ-FLX4".into(), mappings: m }
+    Preset {
+        name: "Pioneer DDJ-FLX4".into(),
+        mappings: m,
+    }
 }
 
 // ---- runtime -----------------------------------------------------------------
@@ -179,11 +299,7 @@ pub fn list_inputs() -> Vec<String> {
 
 /// Connect to the input (and matching output, if any) whose name contains
 /// `name_contains`. Replaces any existing connection.
-pub fn connect(
-    app: AppHandle,
-    midi: &MidiState,
-    name_contains: &str,
-) -> Result<String, String> {
+pub fn connect(app: AppHandle, midi: &MidiState, name_contains: &str) -> Result<String, String> {
     let input = MidiInput::new("mixai-in").map_err(|e| e.to_string())?;
     let port = input
         .ports()
@@ -218,17 +334,16 @@ pub fn connect(
     guard._conn_in = Some(conn);
 
     // Best-effort matching output for LED feedback (follow-up wiring).
-    if let Ok(output) = MidiOutput::new("mixai-out") {
-        if let Some(op) = output.ports().into_iter().find(|p| {
+    if let Ok(output) = MidiOutput::new("mixai-out")
+        && let Some(op) = output.ports().into_iter().find(|p| {
             output
                 .port_name(p)
                 .map(|n| n.to_lowercase().contains(&name_contains.to_lowercase()))
                 .unwrap_or(false)
-        }) {
-            if let Ok(oc) = output.connect(&op, "mixai-out") {
-                guard.conn_out = Some(oc);
-            }
-        }
+        })
+        && let Ok(oc) = output.connect(&op, "mixai-out")
+    {
+        guard.conn_out = Some(oc);
     }
 
     Ok(port_name)
@@ -278,7 +393,14 @@ fn handle_message(
     let value = *bytes.get(2).unwrap_or(&0);
 
     if learn.load(std::sync::atomic::Ordering::Relaxed) {
-        let _ = app.emit("midi://learn", LearnEvent { status, midino, value });
+        let _ = app.emit(
+            "midi://learn",
+            LearnEvent {
+                status,
+                midino,
+                value,
+            },
+        );
         return;
     }
 

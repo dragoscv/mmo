@@ -1,0 +1,23 @@
+[package]
+name = "decks-render"
+version = "0.1.0"
+description = "MixAI Decks GPU views (waveforms, overview, stacked decks, platter, DVS scope) drawn once in Rust wgpu (ADR-0014 D61)"
+license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.87"
+# Path crate inside the app workspace; never published (also lets cargo-deny accept the path dep).
+publish = false
+
+[dependencies]
+wgpu = "30.0.1"
+raw-window-handle = "0.6.2"
+bytemuck = { version = "1.25.2", features = ["derive"] }
+pollster = "1.0.1"
+
+[dev-dependencies]
+winit = "0.30.13"
+png = "0.18.1"
+
+[[example]]
+name = "window"
+path = "examples/window.rs"

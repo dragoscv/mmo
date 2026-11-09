@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 use std::thread::JoinHandle;
 
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, bounded};
 use hound::{SampleFormat, WavSpec, WavWriter};
 
 /// One block of interleaved stereo samples handed from the RT thread.
@@ -45,7 +45,12 @@ impl Recorder {
             .expect("spawn recorder thread");
 
         (
-            Recorder { audio_tx: audio_tx.clone(), ctl_tx, handle: Some(handle), active: false },
+            Recorder {
+                audio_tx: audio_tx.clone(),
+                ctl_tx,
+                handle: Some(handle),
+                active: false,
+            },
             audio_tx,
         )
     }

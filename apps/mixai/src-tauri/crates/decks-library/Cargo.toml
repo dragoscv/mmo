@@ -1,0 +1,27 @@
+[package]
+name = "decks-library"
+version = "0.1.0"
+description = "MixAI Decks music library: SQLite catalogue, smart crates, history and DJ-software interop (rekordbox, Serato, Traktor, Engine DJ)"
+edition = "2024"
+# rusqlite 0.41 and lofty 0.25 need Rust 1.89 (the app crate keeps its own rust-version).
+rust-version = "1.89"
+license = "MIT OR Apache-2.0"
+# Internal crate of the MixAI Decks app (also lets cargo-deny accept the path dependency).
+publish = false
+
+[dependencies]
+# Every dependency is permissive (ADR-0014 licence gate, deny.toml): no GPL/AGPL/LGPL.
+rusqlite = { version = "0.41", features = ["bundled"] } # MIT; bundled SQLite ships FTS5
+quick-xml = "0.39"                                      # MIT
+serde = { version = "1", features = ["derive"] }        # MIT OR Apache-2.0
+serde_json = "1"                                        # MIT OR Apache-2.0
+uuid = { version = "1", features = ["v4"] }             # MIT OR Apache-2.0
+thiserror = "2"                                         # MIT OR Apache-2.0
+walkdir = "2"                                           # Unlicense OR MIT
+base64 = "0.22"                                         # MIT OR Apache-2.0
+lofty = "0.25"                                          # MIT OR Apache-2.0
+flate2 = "1"                                            # MIT OR Apache-2.0 (Engine DJ qCompress blobs)
+sha2 = "0.10"                                           # MIT OR Apache-2.0
+
+[dev-dependencies]
+tempfile = "3"                                          # MIT OR Apache-2.0

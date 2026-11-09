@@ -1,0 +1,38 @@
+[package]
+name = "decks-analysis"
+version = "0.1.0"
+description = "MixAI Decks offline track analysis: downbeat beatgrids (variable tempo anchors), EBU R128 loudness + true peak, multi-band GPU waveform peaks; key + live analysis from the shared mixai-listen crate"
+authors = ["mwrty <vladulescu.catalin@gmail.com>"]
+# Permissive on purpose (ADR-0014): hand-written DSP, permissive deps only. Never port GPL/AGPL
+# analysers (Essentia, aubio, Mixxx, libKeyFinder) into this crate.
+license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.87"
+publish = false
+
+[lib]
+name = "decks_analysis"
+crate-type = ["rlib"]
+
+[dependencies]
+# Shared on-device key / live analysis engine (WP18-01, crates/mixai-listen, MIT OR Apache-2.0).
+# Path dependency into the repo-level workspace; it inherits its fields from that workspace.
+mixai-listen = { path = "../../../../../crates/mixai-listen" }
+# Real-input FFT (MIT/Apache) on top of rustfft; already in the workspace graph via rubato.
+realfft = "3.5.0"
+serde = { version = "1.0.229", features = ["derive"] }
+# Optional file decoding (MPL-2.0, file-level copyleft, allowed by deny.toml). Same feature set as
+# mixai-core so the workspace compiles symphonia once.
+symphonia = { version = "0.6.1", optional = true, features = ["all-codecs", "all-formats"] }
+
+[dev-dependencies]
+serde_json = "1.0.154"
+
+[features]
+default = []
+# `analyze_file` / `decode_file` via symphonia.
+decode = ["dep:symphonia"]
+
+[[example]]
+name = "analyze"
+required-features = ["decode"]

@@ -5,14 +5,14 @@
 //! `http://127.0.0.1:17899`. We proxy those requests through Rust rather than
 //! `fetch` from the webview for two reasons:
 //!
-//!   1. The companion's CORS allowlist accepts loopback + the muzicai.ro web
+//!   1. The companion's CORS allowlist accepts loopback + the mixai.ro web
 //!      origins, NOT the Tauri webview origin (`tauri.localhost` /
 //!      `https://tauri.localhost`). A direct browser fetch would be blocked.
 //!   2. Keeping the device token in the Rust process avoids exposing it to any
 //!      web content that might run in the webview.
 //!
 //! Auth: `/library/*` requires `X-Device-Token` (the companion device token)
-//! plus `X-User-Id` (the signed-in muzicai.ro user id). Both are configured by
+//! plus `X-User-Id` (the signed-in mixai.ro user id). Both are configured by
 //! the UI and held here. Since the companion runs on the same machine, the
 //! track rows carry a local `filepath` that the audio core decodes directly —
 //! no streaming endpoint is needed for local playback.
@@ -32,7 +32,7 @@ pub struct CompanionConfig {
     pub base_url: String,
     /// Companion device token (`X-Device-Token`).
     pub device_token: String,
-    /// muzicai.ro user id (`X-User-Id`).
+    /// mixai.ro user id (`X-User-Id`).
     pub user_id: String,
 }
 

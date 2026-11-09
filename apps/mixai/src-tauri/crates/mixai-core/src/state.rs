@@ -24,6 +24,8 @@ impl DeckId {
         }
     }
 
+    // Inherent helper returning Option (used across the app); not the FromStr trait.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<DeckId> {
         match s {
             "a" => Some(DeckId::A),

@@ -81,7 +81,11 @@ struct AllPass {
 
 impl AllPass {
     fn new(len: usize, gain: f32) -> Self {
-        AllPass { buf: vec![0.0; len.max(1)], idx: 0, gain }
+        AllPass {
+            buf: vec![0.0; len.max(1)],
+            idx: 0,
+            gain,
+        }
     }
     #[inline]
     fn process(&mut self, x: f32) -> f32 {
@@ -106,7 +110,11 @@ struct Comb {
 
 impl Comb {
     fn new(len: usize, feedback: f32) -> Self {
-        Comb { buf: vec![0.0; len.max(1)], idx: 0, feedback }
+        Comb {
+            buf: vec![0.0; len.max(1)],
+            idx: 0,
+            feedback,
+        }
     }
     #[inline]
     fn process(&mut self, x: f32) -> f32 {
@@ -160,7 +168,10 @@ impl Fx {
             Comb::new(cl(1356 + 23), 0.84),
         ];
         let aps_l = [AllPass::new(cl(556), 0.5), AllPass::new(cl(441), 0.5)];
-        let aps_r = [AllPass::new(cl(556 + 23), 0.5), AllPass::new(cl(441 + 23), 0.5)];
+        let aps_r = [
+            AllPass::new(cl(556 + 23), 0.5),
+            AllPass::new(cl(441 + 23), 0.5),
+        ];
         Fx {
             kind: FxKind::Off,
             wet: Smoothed::new(0.0, sr, 30.0),
@@ -251,7 +262,10 @@ impl Fx {
             }
             FxKind::Off => (0.0, 0.0),
         };
-        (dry_l * (1.0 - wet) + wl * wet, dry_r * (1.0 - wet) + wr * wet)
+        (
+            dry_l * (1.0 - wet) + wl * wet,
+            dry_r * (1.0 - wet) + wr * wet,
+        )
     }
 }
 

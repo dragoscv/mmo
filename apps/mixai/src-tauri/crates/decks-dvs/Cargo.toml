@@ -1,0 +1,22 @@
+[package]
+name = "decks-dvs"
+version = "0.1.0"
+description = "MixAI Decks DVS timecode decoder (clean-room): quadrature front-end, relative/absolute modes, MixAI timecode generator, calibration."
+authors = ["mwrty <vladulescu.catalin@gmail.com>"]
+# Permissive on purpose (ADR-0014 / D65): pure DSP, no GPL/LGPL/AGPL code or tables.
+# Provenance: docs/decks/dvs-clean-room.md.
+license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.87"
+publish = false
+
+[dependencies]
+# None: pure std DSP so the crate stays trivially licence-clean and RT-auditable.
+
+[dev-dependencies]
+# Apache-2.0 — used only to prove the generator's WAV output interoperates.
+hound = "3.5.1"
+
+[lib]
+name = "decks_dvs"
+crate-type = ["rlib"]

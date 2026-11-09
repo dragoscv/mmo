@@ -28,6 +28,7 @@ impl Smoothed {
     }
 
     #[inline]
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> f32 {
         self.current = self.target + (self.current - self.target) * self.coeff;
         self.current

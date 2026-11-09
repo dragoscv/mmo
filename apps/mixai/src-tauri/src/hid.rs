@@ -19,8 +19,8 @@
 //! machine (keyboards, mice, etc.).
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -76,7 +76,10 @@ const DJ_VENDORS: &[(u16, &str)] = &[
 ];
 
 fn label_for(vendor: u16, product: u16, product_name: &Option<String>) -> (bool, String) {
-    if let Some((_, _, name)) = KNOWN_DJ_HID.iter().find(|(v, p, _)| *v == vendor && *p == product) {
+    if let Some((_, _, name)) = KNOWN_DJ_HID
+        .iter()
+        .find(|(v, p, _)| *v == vendor && *p == product)
+    {
         return (true, (*name).to_string());
     }
     if let Some((_, vname)) = DJ_VENDORS.iter().find(|(v, _)| *v == vendor) {
@@ -143,7 +146,11 @@ pub fn list_devices() -> Result<Vec<HidDeviceInfo>, String> {
     out.sort_by(|a, b| a.path.cmp(&b.path));
     out.dedup_by(|a, b| a.path == b.path);
     // DJ gear bubbles to the top, then by label.
-    out.sort_by(|a, b| b.is_dj_gear.cmp(&a.is_dj_gear).then_with(|| a.label.cmp(&b.label)));
+    out.sort_by(|a, b| {
+        b.is_dj_gear
+            .cmp(&a.is_dj_gear)
+            .then_with(|| a.label.cmp(&b.label))
+    });
     Ok(out)
 }
 
@@ -163,7 +170,11 @@ pub fn connect(app: AppHandle, hid: &HidState, path: &str) -> Result<String, Str
             .device_list()
             .find(|d| d.path().to_string_lossy() == path);
         match info {
-            Some(d) => label_for(d.vendor_id(), d.product_id(), &d.product_string().map(|s| s.to_string())),
+            Some(d) => label_for(
+                d.vendor_id(),
+                d.product_id(),
+                &d.product_string().map(|s| s.to_string()),
+            ),
             None => (false, path.to_string()),
         }
     };
@@ -190,7 +201,11 @@ pub fn connect(app: AppHandle, hid: &HidState, path: &str) -> Result<String, Str
                 }
                 Ok(n) => {
                     let bytes = buf[..n].to_vec();
-                    let hex = bytes.iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(" ");
+                    let hex = bytes
+                        .iter()
+                        .map(|b| format!("{b:02x}"))
+                        .collect::<Vec<_>>()
+                        .join(" ");
                     let _ = app_cb.emit("hid://input", HidInputEvent { bytes, hex });
                 }
                 Err(_) => {
@@ -229,5 +244,6 @@ pub fn open_path(hid: &HidState) -> Option<String> {
 pub fn write_report(hid: &HidState, bytes: Vec<u8>) -> Result<(), String> {
     let guard = hid.inner.lock().unwrap();
     let tx = guard.tx.as_ref().ok_or("no HID device connected")?;
-    tx.send(bytes).map_err(|_| "HID writer unavailable".to_string())
+    tx.send(bytes)
+        .map_err(|_| "HID writer unavailable".to_string())
 }

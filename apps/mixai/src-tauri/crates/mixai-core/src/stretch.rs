@@ -45,12 +45,20 @@ impl<'a> StemMix<'a> {
         layers[0] = Some((left, right));
         let mut gains = [0.0; MAX_LAYERS];
         gains[0] = 1.0;
-        StemMix { layers, gains, count: 1, len }
+        StemMix {
+            layers,
+            gains,
+            count: 1,
+            len,
+        }
     }
 
     /// Multi-layer stem source. `layers[i]` paired with `gains[i]`; `None`
     /// slots are skipped. Length is the shortest present layer.
-    pub fn stems(layers: [Option<(&'a [f32], &'a [f32])>; MAX_LAYERS], gains: [f32; MAX_LAYERS]) -> Self {
+    pub fn stems(
+        layers: [Option<(&'a [f32], &'a [f32])>; MAX_LAYERS],
+        gains: [f32; MAX_LAYERS],
+    ) -> Self {
         let mut len = usize::MAX;
         let mut count = 0;
         for l in layers.iter().flatten() {
@@ -60,7 +68,12 @@ impl<'a> StemMix<'a> {
         if count == 0 {
             len = 0;
         }
-        StemMix { layers, gains, count, len }
+        StemMix {
+            layers,
+            gains,
+            count,
+            len,
+        }
     }
 
     #[inline]
@@ -157,27 +170,31 @@ impl TimeStretch {
     }
 
     /// Synthesize one hop (HOP samples) from the source and append to output.
-    /// `tempo` = time scale (>1 faster), `rate_ratio` = track_sr/device_sr.
+    /// `tempo` = time scale (>1 faster), `rate_ratio` = track_sr/device_sr,
+    /// `pitch` = frequency multiplier (grains are read `pitch`× faster while the
+    /// analysis hop stays tempo-driven, so duration is unaffected).
     /// Returns false when the source is exhausted.
     pub fn process_hop(
         &mut self,
         src: &StemMix<'_>,
         tempo: f64,
         rate_ratio: f64,
+        pitch: f64,
     ) -> bool {
         let n = src.len();
         if n < FRAME {
             return false;
         }
+        let step = rate_ratio * pitch.clamp(0.25, 4.0);
 
         // First grain: no tail to match, take it straight.
         let best_delta = if self.primed {
-            self.find_best_delta(src, rate_ratio)
+            self.find_best_delta(src, step)
         } else {
             0
         };
 
-        let base = self.analysis_pos + best_delta as f64 * rate_ratio;
+        let base = self.analysis_pos + best_delta as f64 * step;
         if base as usize >= n.saturating_sub(1) {
             return false; // Past end.
         }
@@ -185,7 +202,7 @@ impl TimeStretch {
         // Read + window the grain, overlap-add the first OVERLAP samples with
         // the stored tail, emit HOP samples, and keep the new tail.
         for k in 0..FRAME {
-            let pos = base + k as f64 * rate_ratio;
+            let pos = base + k as f64 * step;
             let (sl, sr) = src.read_stereo(pos);
             let w = self.window[k];
             let gl = sl * w;
@@ -237,7 +254,11 @@ impl TimeStretch {
                 energy += s * s;
             }
             // Normalise by grain energy to avoid biasing toward loud regions.
-            let score = if energy > 1e-9 { dot / energy.sqrt() } else { dot };
+            let score = if energy > 1e-9 {
+                dot / energy.sqrt()
+            } else {
+                dot
+            };
             if score > best_score {
                 best_score = score;
                 best = delta;
@@ -250,6 +271,256 @@ impl TimeStretch {
 impl Default for TimeStretch {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ---- Stretcher abstraction (WP19-07) ------------------------------------------------
+
+/// A real-time, pitch-independent time-stretcher pulled one stereo frame at a time.
+///
+/// Implementations must not allocate or lock inside [`Stretcher::next_frame`]; all
+/// buffers are sized at construction. `reset` is cheap and may be called from the
+/// audio thread; the actual re-priming happens lazily on the next pull (it needs
+/// the source).
+pub trait Stretcher: Send {
+    /// Short identifier for logs / UI (`"signalsmith"`, `"wsola"`).
+    fn name(&self) -> &'static str;
+    /// Discontinuity (seek, loop wrap, cue jump): restart at source frame `pos`.
+    fn reset(&mut self, pos: f64);
+    /// Produce the next output frame. `tempo` = time ratio (0.5..2.0), `rate_ratio` =
+    /// track_sr / device_sr, `pitch` = frequency multiplier. `None` = source exhausted.
+    fn next_frame(
+        &mut self,
+        src: &StemMix<'_>,
+        tempo: f64,
+        rate_ratio: f64,
+        pitch: f64,
+    ) -> Option<(f32, f32)>;
+    /// Source frame (track rate) of the audio most recently returned.
+    fn position(&self) -> f64;
+}
+
+/// The original WSOLA engine behind the [`Stretcher`] trait (fallback; pure Rust).
+pub struct WsolaStretcher {
+    ts: TimeStretch,
+    pos: f64,
+}
+
+impl WsolaStretcher {
+    pub fn new() -> Self {
+        WsolaStretcher {
+            ts: TimeStretch::new(),
+            pos: 0.0,
+        }
+    }
+}
+
+impl Default for WsolaStretcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Stretcher for WsolaStretcher {
+    fn name(&self) -> &'static str {
+        "wsola"
+    }
+
+    fn reset(&mut self, pos: f64) {
+        self.ts.reset(pos);
+        self.pos = pos.max(0.0);
+    }
+
+    fn next_frame(
+        &mut self,
+        src: &StemMix<'_>,
+        tempo: f64,
+        rate_ratio: f64,
+        pitch: f64,
+    ) -> Option<(f32, f32)> {
+        if self.ts.available() == 0 && !self.ts.process_hop(src, tempo, rate_ratio, pitch) {
+            return None;
+        }
+        let out = self.ts.pop();
+        self.pos += tempo * rate_ratio;
+        Some(out)
+    }
+
+    fn position(&self) -> f64 {
+        self.pos
+    }
+}
+
+/// Output frames rendered per Signalsmith `process` call.
+const SS_BLOCK: usize = 128;
+/// Max source frames consumed per block (tempo 2.0 × rate ratio up to 4.0).
+const SS_MAX_IN: usize = SS_BLOCK * 8 + 4;
+
+/// High-quality spectral stretcher: Signalsmith Stretch (MIT) via the
+/// `signalsmith-stretch` crate. Default key-lock engine.
+pub struct SignalsmithStretcher {
+    inner: signalsmith_stretch::Stretch,
+    /// Interleaved stereo scratch input (sized for both blocks and seek pre-roll).
+    input: Vec<f32>,
+    /// Interleaved stereo output block.
+    output: Vec<f32>,
+    out_idx: usize,
+    out_len: usize,
+    /// Next source frame to feed.
+    read_pos: f64,
+    /// Fractional input-frame accumulator.
+    in_acc: f64,
+    /// Source frame of the last returned output.
+    pos: f64,
+    pending_reset: bool,
+    transpose: f32,
+    in_latency: usize,
+    out_latency: usize,
+    seek_len: usize,
+}
+
+impl SignalsmithStretcher {
+    /// Build for a device sample rate. Allocates (call off the audio thread).
+    pub fn new(sample_rate: f32) -> Self {
+        let sr = sample_rate.max(8_000.0);
+        // ~80 ms block, 4× overlap: DJ-grade latency (~40 ms each side) with clean transients.
+        let block = ((sr * 0.08) as usize).max(256);
+        let interval = (block / 4).max(64);
+        let mut inner = signalsmith_stretch::Stretch::new(2, block, interval);
+        let in_latency = inner.input_latency();
+        let out_latency = inner.output_latency();
+        let seek_len = block + interval;
+        let frames = seek_len.max(SS_MAX_IN);
+        let input = vec![0.0f32; frames * 2];
+        // Warm the C++ scratch buffers once so later process/seek calls never allocate.
+        inner.seek(&input[..seek_len * 2], 1.0);
+        let mut warm_out = vec![0.0f32; SS_BLOCK * 2];
+        inner.process(&input[..SS_BLOCK * 2], &mut warm_out);
+        inner.reset();
+        SignalsmithStretcher {
+            inner,
+            input,
+            output: vec![0.0f32; SS_BLOCK * 2],
+            out_idx: 0,
+            out_len: 0,
+            read_pos: 0.0,
+            in_acc: 0.0,
+            pos: 0.0,
+            pending_reset: true,
+            transpose: 1.0,
+            in_latency,
+            out_latency,
+            seek_len,
+        }
+    }
+
+    /// Total algorithmic latency (input + output) in frames.
+    pub fn latency_frames(&self) -> usize {
+        self.in_latency + self.out_latency
+    }
+
+    fn fill_input(&mut self, src: &StemMix<'_>, start: f64, frames: usize) {
+        for i in 0..frames {
+            let (l, r) = src.read_stereo(start + i as f64);
+            self.input[2 * i] = l;
+            self.input[2 * i + 1] = r;
+        }
+    }
+
+    fn render_block(&mut self, src: &StemMix<'_>, speed: f64) {
+        let want = self.in_acc + SS_BLOCK as f64 * speed;
+        let n_in = (want.floor() as usize).min(SS_MAX_IN);
+        self.in_acc = (want - n_in as f64).clamp(0.0, 1.0);
+        self.fill_input(src, self.read_pos, n_in);
+        self.read_pos += n_in as f64;
+        self.inner
+            .process(&self.input[..n_in * 2], &mut self.output[..SS_BLOCK * 2]);
+        self.out_idx = 0;
+        self.out_len = SS_BLOCK;
+    }
+
+    /// Re-prime: pre-roll so the processing time lands exactly on `self.pos`, then
+    /// discard the output latency so the first returned frame is the cue point.
+    fn prime(&mut self, src: &StemMix<'_>, speed: f64) {
+        self.inner.reset();
+        self.inner.set_transpose_factor(self.transpose, None);
+        let start = self.pos + self.in_latency as f64 - self.seek_len as f64;
+        self.fill_input(src, start, self.seek_len);
+        self.inner
+            .seek(&self.input[..self.seek_len * 2], speed.max(0.01));
+        self.read_pos = self.pos + self.in_latency as f64;
+        self.in_acc = 0.0;
+        let mut discard = self.out_latency;
+        while discard > 0 {
+            self.render_block(src, speed);
+            let take = discard.min(SS_BLOCK);
+            self.out_idx = take;
+            discard -= take;
+        }
+        self.pending_reset = false;
+    }
+}
+
+impl Stretcher for SignalsmithStretcher {
+    fn name(&self) -> &'static str {
+        "signalsmith"
+    }
+
+    fn reset(&mut self, pos: f64) {
+        self.pos = pos.max(0.0);
+        self.out_idx = 0;
+        self.out_len = 0;
+        self.pending_reset = true;
+    }
+
+    fn next_frame(
+        &mut self,
+        src: &StemMix<'_>,
+        tempo: f64,
+        rate_ratio: f64,
+        pitch: f64,
+    ) -> Option<(f32, f32)> {
+        if src.is_empty() || self.pos >= src.len() as f64 {
+            return None;
+        }
+        let speed = (tempo * rate_ratio).clamp(0.01, 8.0);
+        // Input is fed at the track rate and played at the device rate: compensate
+        // the resulting rate_ratio pitch change inside the transpose factor.
+        let transpose = (pitch * rate_ratio).clamp(0.125, 8.0) as f32;
+        if (transpose - self.transpose).abs() > 1e-6 {
+            self.transpose = transpose;
+            self.inner.set_transpose_factor(transpose, None);
+        }
+        if self.pending_reset {
+            self.prime(src, speed);
+        }
+        if self.out_idx >= self.out_len {
+            self.render_block(src, speed);
+        }
+        let i = self.out_idx;
+        self.out_idx += 1;
+        let out = (self.output[2 * i], self.output[2 * i + 1]);
+        self.pos += speed;
+        Some(out)
+    }
+
+    fn position(&self) -> f64 {
+        self.pos
+    }
+}
+
+/// Which engine a deck uses for key lock / key shift.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StretcherKind {
+    Signalsmith,
+    Wsola,
+}
+
+/// Construct a stretcher (allocates; call off the audio thread).
+pub fn make_stretcher(kind: StretcherKind, sample_rate: f32) -> Box<dyn Stretcher> {
+    match kind {
+        StretcherKind::Signalsmith => Box::new(SignalsmithStretcher::new(sample_rate)),
+        StretcherKind::Wsola => Box::new(WsolaStretcher::new()),
     }
 }
 
@@ -277,7 +548,7 @@ mod tests {
         let mut emitted = 0usize;
         for _ in 0..200 {
             let src = StemMix::single(&l, &r);
-            if !ts.process_hop(&src, 0.8, 1.0) {
+            if !ts.process_hop(&src, 0.8, 1.0, 1.0) {
                 break;
             }
             while ts.available() > 0 {
@@ -296,13 +567,90 @@ mod tests {
         let mut ts = TimeStretch::new();
         ts.reset(0.0);
         let src = StemMix::single(&l, &r);
-        ts.process_hop(&src, 1.0, 1.0);
+        ts.process_hop(&src, 1.0, 1.0, 1.0);
         let after_one = ts.analysis_pos;
-        ts.process_hop(&src, 1.0, 1.0);
+        ts.process_hop(&src, 1.0, 1.0, 1.0);
         let after_two = ts.analysis_pos;
         // At tempo 1.0 each hop advances ~HOP source samples.
         let step = after_two - after_one;
         assert!(step > 0.0, "analysis position must advance");
-        assert!((step - HOP as f64).abs() < SEARCH as f64 + 2.0, "step {step} off");
+        assert!(
+            (step - HOP as f64).abs() < SEARCH as f64 + 2.0,
+            "step {step} off"
+        );
+    }
+
+    /// Frequency estimate from positive-going zero crossings (linear-interpolated).
+    fn zero_cross_freq(x: &[f32], sr: f32) -> f32 {
+        let mut first = None;
+        let mut last = 0.0f32;
+        let mut count = 0usize;
+        for i in 1..x.len() {
+            if x[i - 1] <= 0.0 && x[i] > 0.0 {
+                let t = (i - 1) as f32 + (-x[i - 1]) / (x[i] - x[i - 1]);
+                if first.is_none() {
+                    first = Some(t);
+                } else {
+                    count += 1;
+                }
+                last = t;
+            }
+        }
+        match first {
+            Some(f) if count > 0 => count as f32 * sr / (last - f),
+            _ => 0.0,
+        }
+    }
+
+    fn run(st: &mut dyn Stretcher, tempo: f64, pitch: f64, frames: usize) -> Vec<f32> {
+        let (l, r) = sine(1000.0, 48_000.0, 48_000 * 6);
+        let src = StemMix::single(&l, &r);
+        st.reset(4_800.0);
+        let mut out = Vec::with_capacity(frames);
+        for _ in 0..frames {
+            match st.next_frame(&src, tempo, 1.0, pitch) {
+                Some((a, _)) => out.push(a),
+                None => break,
+            }
+        }
+        out
+    }
+
+    fn assert_freq(out: &[f32], expect: f32, label: &str) {
+        // Skip the first 0.25 s (spectral settling) and measure the next second.
+        let seg = &out[12_000..12_000 + 48_000];
+        assert!(seg.iter().all(|s| s.is_finite()), "{label}: non-finite");
+        let f = zero_cross_freq(seg, 48_000.0);
+        assert!(
+            (f - expect).abs() / expect < 0.01,
+            "{label}: got {f} Hz, want {expect} Hz"
+        );
+    }
+
+    #[test]
+    fn signalsmith_keeps_pitch_at_tempo_1_25() {
+        let mut st = SignalsmithStretcher::new(48_000.0);
+        let out = run(&mut st, 1.25, 1.0, 72_000);
+        assert_freq(&out, 1000.0, "tempo 1.25");
+        // Position advanced at 1.25× the output rate.
+        let expect = 4_800.0 + out.len() as f64 * 1.25;
+        assert!((st.position() - expect).abs() < 1.0);
+    }
+
+    #[test]
+    fn signalsmith_key_shift_octave_doubles_frequency() {
+        let mut st = SignalsmithStretcher::new(48_000.0);
+        let out = run(&mut st, 1.0, 2.0, 72_000);
+        assert_freq(&out, 2000.0, "+12 st");
+    }
+
+    #[test]
+    fn wsola_fallback_pitch_shift_and_tempo() {
+        let mut st = WsolaStretcher::new();
+        let out = run(&mut st, 1.25, 1.0, 72_000);
+        assert_freq(&out, 1000.0, "wsola tempo 1.25");
+        let mut st = WsolaStretcher::new();
+        let out = run(&mut st, 1.0, 2.0, 72_000);
+        assert_freq(&out, 2000.0, "wsola +12 st");
     }
 }

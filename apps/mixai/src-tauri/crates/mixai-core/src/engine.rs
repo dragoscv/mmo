@@ -9,17 +9,90 @@
 //!   - A shared `Arc<AtomicSnapshot>` lets the UI poll cheap meter/transport
 //!     state at ~30 Hz without touching the RT mixer.
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Stream, StreamConfig};
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, bounded};
+use serde::{Deserialize, Serialize};
 
-use crate::deck::{Deck, TrackBuffer};
+use crate::beatfx::BeatFxKind;
+use crate::beatgrid::{BeatGrid, wrap_phase};
+use crate::colorfx::ColorFxKind;
+use crate::deck::{Deck, TEMPO_MAX, TEMPO_MIN, TrackBuffer};
 use crate::dsp::{crossfader_gain, soft_clip};
 use crate::error::CoreError;
+use crate::routing::{CompDelay, RoutingConfig, write_frame};
 use crate::state::{AudioDevice, CrossfaderAssign, DeckId, MixerState};
+
+/// Where the master clock comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ClockSource {
+    /// First playing deck with a valid beatgrid, else the internal clock.
+    #[default]
+    Auto,
+    /// Always the internal clock.
+    Internal,
+    /// This deck while it plays with a valid grid (internal clock otherwise).
+    Deck(DeckId),
+}
+
+impl ClockSource {
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "auto" => Some(Self::Auto),
+            "internal" => Some(Self::Internal),
+            other => DeckId::from_str(other).map(Self::Deck),
+        }
+    }
+}
+
+/// Max correction applied by sync lock (fraction of tempo).
+const SYNC_NUDGE_MAX: f64 = 0.02;
+/// Beats per bar assumed for the internal clock.
+const INTERNAL_BPB: f64 = 4.0;
+
+/// Per-deck clock view for the UI / MIDI clock consumers.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeckClock {
+    pub id: DeckId,
+    /// Audible tempo (grid × tempo fader × sync nudge).
+    pub bpm: f64,
+    /// Fractional beat number at the playhead.
+    pub beat: f64,
+    /// Position inside the bar (0..beatsPerBar) when the downbeat is known.
+    pub bar_phase: Option<f64>,
+    pub key_shift: f64,
+    pub slip: bool,
+    pub quantize: bool,
+    pub sync_lock: bool,
+}
+
+/// Master clock snapshot: enough to drive MIDI clock / Ableton-Link style followers.
+/// `beat` is valid at audio frame `frame`; extrapolate with `bpm` and `sampleRate`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClockState {
+    /// Configured source (`auto`, `internal`, `a`..`d`).
+    pub configured: String,
+    /// Source actually driving the clock right now (`internal` or a deck id).
+    pub source: String,
+    pub bpm: f64,
+    /// Fractional master beat count.
+    pub beat: f64,
+    /// `beat` modulo 1 (0..1).
+    pub beat_phase: f64,
+    /// Position in the bar (0..beatsPerBar); internal clock counts bars from beat 0.
+    pub bar_phase: Option<f64>,
+    pub beats_per_bar: u32,
+    /// Output frame counter at which `beat` was sampled.
+    pub frame: u64,
+    pub sample_rate: u32,
+    pub decks: Vec<DeckClock>,
+}
 
 /// Commands sent from the UI thread to the real-time mixer.
 pub enum Command {
@@ -77,6 +150,35 @@ pub enum Command {
     StopSample(usize),
     SetSampleGain(usize, f32),
     SetSampleLooping(usize, bool),
+    // ---- WP19-05 sync / performance ----
+    /// Replace a deck's beatgrid (built off the audio thread).
+    SetGrid(DeckId, Box<BeatGrid>),
+    /// Match tempo + align beat (bar when downbeats known) phase to the master.
+    /// `lock` keeps the deck locked (continuous tempo follow + phase nudging).
+    PhaseSync {
+        deck: DeckId,
+        lock: bool,
+    },
+    SetSyncLock(DeckId, bool),
+    SetQuantize(DeckId, bool),
+    BeatJump(DeckId, f64),
+    SetSlip(DeckId, bool),
+    SetReverse(DeckId, bool),
+    /// Key shift in semitones (independent of tempo).
+    SetKeyShift(DeckId, f64),
+    /// Master clock source and internal clock tempo (`None` keeps the current tempo).
+    SetClock(ClockSource, Option<f64>),
+    // ---- WP19-06 routing ----
+    SetRouting(RoutingConfig),
+    // ---- WP19-10 FX ----
+    SetColorFx(DeckId, ColorFxKind, f32),
+    SetBeatFx {
+        deck: DeckId,
+        kind: BeatFxKind,
+        wet: f32,
+        beats: f64,
+        feedback: f32,
+    },
 }
 
 /// Lightweight, lock-free snapshot for the UI poll (positions + meters).
@@ -92,11 +194,31 @@ pub struct Snapshot {
     pub deck_loop_active: [AtomicBool; 4],
     pub deck_loop_start_ms: [AtomicU32; 4],
     pub deck_loop_end_ms: [AtomicU32; 4],
+    // Master clock (f64 values stored as bits).
+    pub clock_bpm: AtomicU64,
+    pub clock_beat: AtomicU64,
+    /// 0..3 = deck index, 4 = internal.
+    pub clock_source: AtomicU8,
+    pub clock_frame: AtomicU64,
+    pub deck_beat: [AtomicU64; 4],
+    pub deck_bpm: [AtomicU64; 4],
+    /// Bar phase bits; `u64::MAX` = unknown.
+    pub deck_bar_phase: [AtomicU64; 4],
+    /// Live tempo ratio (fader × sync nudge); sync lock changes it on the RT side.
+    pub deck_tempo: [AtomicU64; 4],
 }
 
 impl Snapshot {
     fn new() -> Self {
         Snapshot {
+            clock_bpm: AtomicU64::new(120f64.to_bits()),
+            clock_beat: AtomicU64::new(0f64.to_bits()),
+            clock_source: AtomicU8::new(4),
+            clock_frame: AtomicU64::new(0),
+            deck_beat: Default::default(),
+            deck_bpm: Default::default(),
+            deck_bar_phase: Default::default(),
+            deck_tempo: std::array::from_fn(|_| AtomicU64::new(1f64.to_bits())),
             master_vu: AtomicU32::new(0),
             deck_vu: Default::default(),
             deck_pos_ms: Default::default(),
@@ -119,10 +241,19 @@ struct Mixer {
     crossfader: f32,
     curve: u8,
     master_vol: crate::dsp::Smoothed,
-    // Reserved for the headphone cue bus mixdown (full routing matrix).
-    #[allow(dead_code)]
-    cue_vol: f32,
     master_vu: f32,
+    // Master clock.
+    clock_cfg: ClockSource,
+    internal_bpm: f64,
+    internal_beat: f64,
+    /// Deck index driving the clock in the current block (None = internal).
+    clock_master: Option<usize>,
+    frames_total: u64,
+    // Routing matrix (WP19-06).
+    routing: RoutingConfig,
+    comp_master: CompDelay,
+    comp_phones: CompDelay,
+    comp_booth: CompDelay,
     snapshot: Arc<Snapshot>,
     rx: Receiver<Command>,
     frame_counter: u64,
@@ -148,8 +279,16 @@ impl Mixer {
             crossfader: 0.0,
             curve: 1, // smooth
             master_vol: crate::dsp::Smoothed::new(0.85, sr, 15.0),
-            cue_vol: 0.7,
             master_vu: 0.0,
+            clock_cfg: ClockSource::Auto,
+            internal_bpm: 120.0,
+            internal_beat: 0.0,
+            clock_master: None,
+            frames_total: 0,
+            routing: RoutingConfig::default(),
+            comp_master: CompDelay::new(sr),
+            comp_phones: CompDelay::new(sr),
+            comp_booth: CompDelay::new(sr),
             snapshot,
             rx,
             frame_counter: 0,
@@ -163,7 +302,14 @@ impl Mixer {
     fn drain_commands(&mut self) {
         while let Ok(cmd) = self.rx.try_recv() {
             match cmd {
-                Command::Load { deck, buffer, track_id, title, artist, bpm } => {
+                Command::Load {
+                    deck,
+                    buffer,
+                    track_id,
+                    title,
+                    artist,
+                    bpm,
+                } => {
                     let d = &mut self.decks[deck.index()];
                     d.load(buffer, (track_id, title, artist, bpm));
                 }
@@ -210,7 +356,151 @@ impl Mixer {
                 Command::StopSample(pad) => self.sampler.stop(pad),
                 Command::SetSampleGain(pad, g) => self.sampler.set_gain(pad, g),
                 Command::SetSampleLooping(pad, on) => self.sampler.set_looping(pad, on),
+                Command::SetGrid(d, grid) => self.decks[d.index()].set_grid(*grid),
+                Command::PhaseSync { deck, lock } => {
+                    self.phase_sync(deck.index());
+                    self.decks[deck.index()].sync_lock = lock;
+                }
+                Command::SetSyncLock(d, on) => {
+                    let deck = &mut self.decks[d.index()];
+                    deck.sync_lock = on;
+                    if !on {
+                        deck.set_sync_nudge(1.0);
+                    }
+                }
+                Command::SetQuantize(d, on) => self.decks[d.index()].set_quantize(on),
+                Command::BeatJump(d, beats) => self.decks[d.index()].beat_jump(beats),
+                Command::SetSlip(d, on) => self.decks[d.index()].set_slip(on),
+                Command::SetReverse(d, on) => self.decks[d.index()].set_reverse(on),
+                Command::SetKeyShift(d, st) => self.decks[d.index()].set_key_shift(st),
+                Command::SetClock(src, bpm) => {
+                    // Hand over seamlessly: the internal clock continues from the current master.
+                    let (_, cur_bpm, cur_beat) = self.master_now();
+                    self.internal_bpm = cur_bpm;
+                    self.internal_beat = cur_beat;
+                    if let Some(b) = bpm.filter(|b| b.is_finite() && *b >= 20.0 && *b <= 300.0) {
+                        self.internal_bpm = b;
+                    }
+                    self.clock_cfg = src;
+                }
+                Command::SetRouting(cfg) => {
+                    let cfg = cfg.sanitized();
+                    self.comp_master.set_ms(cfg.master_latency_ms, self.sr);
+                    self.comp_phones.set_ms(cfg.headphone_latency_ms, self.sr);
+                    self.comp_booth.set_ms(cfg.booth_latency_ms, self.sr);
+                    self.routing = cfg;
+                }
+                Command::SetColorFx(d, kind, param) => {
+                    self.decks[d.index()].set_color_fx(kind, param)
+                }
+                Command::SetBeatFx {
+                    deck,
+                    kind,
+                    wet,
+                    beats,
+                    feedback,
+                } => self.decks[deck.index()].set_beat_fx(kind, wet, beats, feedback),
             }
+        }
+    }
+
+    // ---- master clock + sync (WP19-05) ---------------------------------------
+
+    /// Deck index that may drive the clock now.
+    fn resolve_master(&self) -> Option<usize> {
+        match self.clock_cfg {
+            ClockSource::Internal => None,
+            ClockSource::Deck(id) => Some(id.index()).filter(|&i| clock_usable(&self.decks[i])),
+            ClockSource::Auto => self.decks.iter().position(clock_usable),
+        }
+    }
+
+    /// (master deck, bpm, beat) right now.
+    fn master_now(&self) -> (Option<usize>, f64, f64) {
+        match self.resolve_master() {
+            Some(i) => {
+                let d = &self.decks[i];
+                (Some(i), d.effective_bpm(), d.beat_pos())
+            }
+            None => (None, self.internal_bpm, self.internal_beat),
+        }
+    }
+
+    /// Beats (signed, shortest way round) deck `i` must move to line up with the
+    /// master: bar phase when both downbeats are known, beat phase otherwise.
+    fn phase_error(&self, i: usize, master: Option<usize>, master_beat: f64) -> f64 {
+        let d = &self.decks[i];
+        let master_bar = match master {
+            Some(m) => self.decks[m]
+                .bar_phase()
+                .map(|p| (p, self.decks[m].grid().beats_per_bar as f64)),
+            None => Some((master_beat.rem_euclid(INTERNAL_BPB), INTERNAL_BPB)),
+        };
+        match (master_bar, d.bar_phase()) {
+            (Some((mp, bpb)), Some(dp)) if d.grid().beats_per_bar as f64 == bpb => {
+                wrap_phase(mp - dp, bpb)
+            }
+            _ => wrap_phase(master_beat - d.beat_pos(), 1.0),
+        }
+    }
+
+    /// One-shot phase sync: tempo match + phase alignment of deck `i`.
+    fn phase_sync(&mut self, i: usize) {
+        let (mut master, mut bpm, mut beat) = self.master_now();
+        if master == Some(i) && self.clock_cfg == ClockSource::Auto {
+            // The target itself drives the auto clock: follow the next playing deck.
+            let other = (0..self.decks.len()).find(|&k| k != i && clock_usable(&self.decks[k]));
+            match other {
+                Some(k) => {
+                    master = Some(k);
+                    bpm = self.decks[k].effective_bpm();
+                    beat = self.decks[k].beat_pos();
+                }
+                None => return,
+            }
+        }
+        if master == Some(i) || !self.decks[i].grid_valid() {
+            return;
+        }
+        let local = self.decks[i].local_bpm();
+        if local <= 0.0 || bpm <= 0.0 {
+            return;
+        }
+        let err = self.phase_error(i, master, beat);
+        let d = &mut self.decks[i];
+        d.set_sync_nudge(1.0);
+        d.set_tempo((bpm / local).clamp(TEMPO_MIN, TEMPO_MAX));
+        d.shift_beats(err);
+    }
+
+    /// Per-block clock update: resolve the master, keep sync-locked decks on it
+    /// and hand every deck the clock for beat-synced FX.
+    fn begin_block(&mut self) {
+        let (master, bpm, beat) = self.master_now();
+        self.clock_master = master;
+        if master.is_some() {
+            // Internal clock shadows the master so a handover never jumps.
+            self.internal_bpm = bpm;
+            self.internal_beat = beat;
+        }
+        for i in 0..self.decks.len() {
+            if Some(i) == master || !self.decks[i].sync_lock {
+                continue;
+            }
+            let local = self.decks[i].local_bpm();
+            if !self.decks[i].playing || !self.decks[i].grid_valid() || local <= 0.0 {
+                continue;
+            }
+            let err = self.phase_error(i, master, beat);
+            let d = &mut self.decks[i];
+            d.set_tempo((bpm / local).clamp(TEMPO_MIN, TEMPO_MAX));
+            // Correct the phase error within ~1 s, inaudibly (±2 %).
+            let nudge = (err * 60.0 / bpm).clamp(-SYNC_NUDGE_MAX, SYNC_NUDGE_MAX);
+            d.set_sync_nudge(1.0 + nudge);
+        }
+        let inc = bpm / 60.0 / self.sr as f64;
+        for d in self.decks.iter_mut() {
+            d.set_clock(bpm, beat, inc);
         }
     }
 
@@ -225,16 +515,22 @@ impl Mixer {
         }
     }
 
-    /// Fill an interleaved stereo output buffer.
+    /// Fill an interleaved output buffer through the routing matrix.
     fn render(&mut self, out: &mut [f32], channels: usize) {
         self.drain_commands();
+        if channels == 0 {
+            return;
+        }
+        self.begin_block();
 
         for frame in out.chunks_mut(channels) {
             let mut mix_l = 0.0f32;
             let mut mix_r = 0.0f32;
+            let (mut cue_l, mut cue_r) = (0.0f32, 0.0f32);
 
             for deck in self.decks.iter_mut() {
-                let (l, r) = deck.render_frame();
+                let o = deck.render_frame();
+                let (l, r) = o.main;
                 let g = match deck.crossfader_assign {
                     CrossfaderAssign::Thru => 1.0,
                     CrossfaderAssign::A => crossfader_gain(self.crossfader, true, self.curve),
@@ -242,6 +538,8 @@ impl Mixer {
                 };
                 mix_l += l * g;
                 mix_r += r * g;
+                cue_l += o.pfl.0;
+                cue_r += o.pfl.1;
             }
 
             // Sampler pads sum straight into the master bus (no crossfader).
@@ -271,27 +569,40 @@ impl Mixer {
                 self.master_vu *= 0.9995;
             }
 
-            // Write to all output channels (mono-sum to extras).
-            if channels >= 2 {
-                frame[0] = mix_l;
-                frame[1] = mix_r;
-                for c in frame.iter_mut().skip(2) {
-                    *c = 0.0;
-                }
-            } else if channels == 1 {
-                frame[0] = (mix_l + mix_r) * 0.5;
-            }
+            // Headphone bus: PFL sum blended with master, then the headphone level.
+            let rt = &self.routing;
+            let hp = rt.headphone_level;
+            let phones = (
+                soft_clip((cue_l * (1.0 - rt.cue_mix) + mix_l * rt.cue_mix) * hp),
+                soft_clip((cue_r * (1.0 - rt.cue_mix) + mix_r * rt.cue_mix) * hp),
+            );
+            let booth = (mix_l * rt.booth_level, mix_r * rt.booth_level);
+            let master = self.comp_master.process(mix_l, mix_r);
+            let phones = self.comp_phones.process(phones.0, phones.1);
+            let booth = self.comp_booth.process(booth.0, booth.1);
+            write_frame(frame, &self.routing, master, phones, booth);
         }
 
+        let frames = (out.len() / channels) as u64;
+        if self.clock_master.is_none() {
+            self.internal_beat += self.internal_bpm / 60.0 / self.sr as f64 * frames as f64;
+        }
+        self.frames_total = self.frames_total.wrapping_add(frames);
         self.publish_snapshot();
     }
 
     fn publish_snapshot(&mut self) {
         // Publish a few times per buffer is wasteful; once per buffer is fine.
         let s = &self.snapshot;
-        s.master_vu.store((self.master_vu.clamp(0.0, 1.0) * 1000.0) as u32, Ordering::Relaxed);
+        s.master_vu.store(
+            (self.master_vu.clamp(0.0, 1.0) * 1000.0) as u32,
+            Ordering::Relaxed,
+        );
         for (i, deck) in self.decks.iter().enumerate() {
-            s.deck_vu[i].store((deck.vu().clamp(0.0, 1.0) * 1000.0) as u32, Ordering::Relaxed);
+            s.deck_vu[i].store(
+                (deck.vu().clamp(0.0, 1.0) * 1000.0) as u32,
+                Ordering::Relaxed,
+            );
             s.deck_pos_ms[i].store((deck.position_secs() * 1000.0) as u32, Ordering::Relaxed);
             s.deck_dur_ms[i].store((deck.duration_secs() * 1000.0) as u32, Ordering::Relaxed);
             s.deck_playing[i].store(deck.playing, Ordering::Relaxed);
@@ -308,7 +619,18 @@ impl Mixer {
             s.deck_loop_active[i].store(lact, Ordering::Relaxed);
             s.deck_loop_start_ms[i].store((lstart * 1000.0) as u32, Ordering::Relaxed);
             s.deck_loop_end_ms[i].store((lend * 1000.0) as u32, Ordering::Relaxed);
+            s.deck_beat[i].store(deck.beat_pos().to_bits(), Ordering::Relaxed);
+            s.deck_bpm[i].store(deck.effective_bpm().to_bits(), Ordering::Relaxed);
+            let bar = deck.bar_phase().map(f64::to_bits).unwrap_or(u64::MAX);
+            s.deck_bar_phase[i].store(bar, Ordering::Relaxed);
+            s.deck_tempo[i].store(deck.tempo.to_bits(), Ordering::Relaxed);
         }
+        let (master, bpm, beat) = self.master_now();
+        s.clock_bpm.store(bpm.to_bits(), Ordering::Relaxed);
+        s.clock_beat.store(beat.to_bits(), Ordering::Relaxed);
+        s.clock_source
+            .store(master.map(|m| m as u8).unwrap_or(4), Ordering::Relaxed);
+        s.clock_frame.store(self.frames_total, Ordering::Relaxed);
         self.frame_counter = self.frame_counter.wrapping_add(1);
     }
 }
@@ -327,6 +649,21 @@ pub struct Engine {
     mirror: Mutex<MixerState>,
     /// Owns the WAV writer thread; the RT mixer holds the matching sender.
     recorder: Mutex<crate::recorder::Recorder>,
+    /// UI-side mirror of the WP19 performance / routing settings.
+    perf: Mutex<PerfMirror>,
+}
+
+/// UI-side record of WP19 settings (the RT side never echoes these back).
+#[derive(Debug, Clone, Default)]
+pub struct PerfMirror {
+    pub clock: ClockSource,
+    pub routing: RoutingConfig,
+    pub key_shift: [f64; 4],
+    pub quantize: [bool; 4],
+    pub slip: [bool; 4],
+    pub sync_lock: [bool; 4],
+    /// Last known musical key per deck (0..23), see [`crate::keys`].
+    pub key: [Option<u8>; 4],
 }
 
 // cpal::Stream isn't Send on all platforms; the Tauri state wrapper keeps the
@@ -347,7 +684,8 @@ impl Engine {
             .default_output_config()
             .map_err(|e| CoreError::Device(format!("default config: {e}")))?;
 
-        let sample_rate = supported.sample_rate().0;
+        // cpal 0.17+: `SampleRate` is a plain `u32` alias.
+        let sample_rate = supported.sample_rate();
         let channels = supported.channels();
         let config: StreamConfig = supported.config();
 
@@ -357,10 +695,12 @@ impl Engine {
         let mut mixer = Mixer::new(sample_rate as f32, rx, snapshot.clone(), rec_tx);
 
         let ch = channels as usize;
-        let err_fn = |e| log::error!("mixai audio stream error: {e}");
+        let err_fn = |e: cpal::Error| log::error!("mixai audio stream error: {e}");
+        // cpal 0.18: `StreamConfig` is `Copy` and passed by value; streams no longer
+        // auto-start, so the explicit `play()` below is required on every backend.
         let stream = device
             .build_output_stream(
-                &config,
+                config,
                 move |data: &mut [f32], _| mixer.render(data, ch),
                 err_fn,
                 None,
@@ -385,7 +725,200 @@ impl Engine {
             latency_ms,
             mirror: Mutex::new(MixerState::initial(sample_rate)),
             recorder: Mutex::new(recorder),
+            perf: Mutex::new(PerfMirror::default()),
         })
+    }
+
+    // ---- WP19-05 sync / clock ---------------------------------------------
+
+    pub fn perf(&self) -> std::sync::MutexGuard<'_, PerfMirror> {
+        self.perf.lock().unwrap()
+    }
+
+    /// Replace a deck's beatgrid (normalised here, off the audio thread).
+    pub fn set_grid(&self, deck: DeckId, grid: BeatGrid) {
+        let grid = grid.normalized();
+        {
+            let mut m = self.mirror();
+            let d = &mut m.decks[deck.index()];
+            if grid.bpm > 0.0 {
+                d.bpm = grid.bpm;
+            }
+            d.first_beat = grid.first_beat;
+        }
+        self.send(Command::SetGrid(deck, Box::new(grid)));
+    }
+
+    /// Phase sync `deck` to the master clock; `lock` keeps it locked.
+    pub fn phase_sync(&self, deck: DeckId, lock: bool) {
+        self.perf().sync_lock[deck.index()] = lock;
+        self.send(Command::PhaseSync { deck, lock });
+    }
+
+    pub fn set_sync_lock(&self, deck: DeckId, on: bool) {
+        self.perf().sync_lock[deck.index()] = on;
+        self.send(Command::SetSyncLock(deck, on));
+    }
+
+    pub fn set_quantize(&self, deck: DeckId, on: bool) {
+        self.perf().quantize[deck.index()] = on;
+        self.send(Command::SetQuantize(deck, on));
+    }
+
+    pub fn beat_jump(&self, deck: DeckId, beats: f64) {
+        self.send(Command::BeatJump(deck, beats));
+    }
+
+    pub fn set_slip(&self, deck: DeckId, on: bool) {
+        self.perf().slip[deck.index()] = on;
+        self.send(Command::SetSlip(deck, on));
+    }
+
+    pub fn set_reverse(&self, deck: DeckId, on: bool) {
+        self.send(Command::SetReverse(deck, on));
+    }
+
+    pub fn set_key_shift(&self, deck: DeckId, semitones: f64) {
+        let st = if semitones.is_finite() {
+            semitones.clamp(-crate::deck::KEY_SHIFT_MAX, crate::deck::KEY_SHIFT_MAX)
+        } else {
+            0.0
+        };
+        self.perf().key_shift[deck.index()] = st;
+        self.send(Command::SetKeyShift(deck, st));
+    }
+
+    /// Remember a deck's musical key (0..23) for key matching.
+    pub fn set_deck_key(&self, deck: DeckId, key: Option<u8>) {
+        self.perf().key[deck.index()] = key.filter(|k| *k < crate::keys::KEY_COUNT);
+    }
+
+    /// Key-shift `deck` so it sounds in the master deck's key (or its relative).
+    /// Keys default to the remembered ones; returns the applied shift.
+    pub fn key_match(
+        &self,
+        deck: DeckId,
+        deck_key: Option<u8>,
+        master_key: Option<u8>,
+    ) -> Result<f64, CoreError> {
+        let master = self.clock_master_deck();
+        let (dk, mk, master_shift) = {
+            let mut p = self.perf();
+            if let Some(k) = deck_key {
+                p.key[deck.index()] = Some(k);
+            }
+            let dk = deck_key.or(p.key[deck.index()]);
+            let mk = master_key.or_else(|| master.and_then(|m| p.key[m.index()]));
+            let ms = master.map(|m| p.key_shift[m.index()]).unwrap_or(0.0);
+            (dk, mk, ms)
+        };
+        let (Some(dk), Some(mk)) = (dk, mk) else {
+            return Err(CoreError::Device("key unknown for deck or master".into()));
+        };
+        let offset = |id: DeckId| {
+            let tempo =
+                f64::from_bits(self.snapshot.deck_tempo[id.index()].load(Ordering::Relaxed));
+            let lock = self.mirror().decks[id.index()].key_lock;
+            crate::keys::tempo_semitones(tempo, lock)
+        };
+        let deck_off = offset(deck);
+        let master_off = master_shift + master.map(offset).unwrap_or(0.0);
+        let shift = crate::keys::key_match_shift(dk, deck_off, mk, master_off)
+            .ok_or_else(|| CoreError::Device("key out of range (0..23)".into()))?;
+        self.set_key_shift(deck, shift);
+        Ok(shift)
+    }
+
+    fn clock_master_deck(&self) -> Option<DeckId> {
+        let src = self.snapshot.clock_source.load(Ordering::Relaxed) as usize;
+        DeckId::ALL.get(src).copied()
+    }
+
+    /// Set the master clock source and/or the internal clock tempo.
+    pub fn set_clock(&self, source: ClockSource, bpm: Option<f64>) {
+        self.perf().clock = source;
+        self.send(Command::SetClock(source, bpm));
+    }
+
+    /// Master clock + per-deck beat positions (for UI, MIDI clock out, Link).
+    pub fn clock_state(&self) -> ClockState {
+        let s = &self.snapshot;
+        let ld = |a: &AtomicU64| f64::from_bits(a.load(Ordering::Relaxed));
+        let beat = ld(&s.clock_beat);
+        let master = self.clock_master_deck();
+        let p = self.perf().clone();
+        let configured = match p.clock {
+            ClockSource::Auto => "auto".to_string(),
+            ClockSource::Internal => "internal".to_string(),
+            ClockSource::Deck(d) => deck_name(d).to_string(),
+        };
+        let bar_bits = master.map(|m| s.deck_bar_phase[m.index()].load(Ordering::Relaxed));
+        let bar_phase = match bar_bits {
+            None => Some(beat.rem_euclid(INTERNAL_BPB)),
+            Some(u64::MAX) => None,
+            Some(b) => Some(f64::from_bits(b)),
+        };
+        let decks = DeckId::ALL
+            .iter()
+            .map(|&id| {
+                let i = id.index();
+                let bar = s.deck_bar_phase[i].load(Ordering::Relaxed);
+                DeckClock {
+                    id,
+                    bpm: ld(&s.deck_bpm[i]),
+                    beat: ld(&s.deck_beat[i]),
+                    bar_phase: (bar != u64::MAX).then(|| f64::from_bits(bar)),
+                    key_shift: p.key_shift[i],
+                    slip: p.slip[i],
+                    quantize: p.quantize[i],
+                    sync_lock: p.sync_lock[i],
+                }
+            })
+            .collect();
+        ClockState {
+            configured,
+            source: master.map(deck_name).unwrap_or("internal").to_string(),
+            bpm: ld(&s.clock_bpm),
+            beat,
+            beat_phase: beat.rem_euclid(1.0),
+            bar_phase,
+            beats_per_bar: INTERNAL_BPB as u32,
+            frame: s.clock_frame.load(Ordering::Relaxed),
+            sample_rate: self.sample_rate,
+            decks,
+        }
+    }
+
+    // ---- WP19-06 routing ---------------------------------------------------
+
+    pub fn set_routing(&self, cfg: RoutingConfig) {
+        let cfg = cfg.sanitized();
+        {
+            let mut m = self.mirror();
+            m.cue_volume = cfg.headphone_level;
+        }
+        self.perf().routing = cfg;
+        self.send(Command::SetRouting(cfg));
+    }
+
+    pub fn routing(&self) -> RoutingConfig {
+        self.perf().routing
+    }
+
+    // ---- WP19-10 FX --------------------------------------------------------
+
+    pub fn set_color_fx(&self, deck: DeckId, kind: ColorFxKind, param: f32) {
+        self.send(Command::SetColorFx(deck, kind, param));
+    }
+
+    pub fn set_beat_fx(&self, deck: DeckId, kind: BeatFxKind, wet: f32, beats: f64, feedback: f32) {
+        self.send(Command::SetBeatFx {
+            deck,
+            kind,
+            wet,
+            beats,
+            feedback,
+        });
     }
 
     pub fn send(&self, cmd: Command) {
@@ -430,7 +963,10 @@ impl Engine {
             d.has_stems = any;
             d.stems_active = any;
         }
-        self.send(Command::LoadStems { deck, layers: Box::new(layers) });
+        self.send(Command::LoadStems {
+            deck,
+            layers: Box::new(layers),
+        });
     }
 
     /// Enable/disable stem playback for a deck (keeps loaded buffers).
@@ -522,37 +1058,247 @@ impl Engine {
             deck.playing = s.deck_playing[i].load(Ordering::Relaxed);
             for slot in 0..8 {
                 let v = s.deck_hot_cues_ms[i][slot].load(Ordering::Relaxed);
-                deck.hot_cues[slot] = if v == u32::MAX { None } else { Some(v as f64 / 1000.0) };
+                deck.hot_cues[slot] = if v == u32::MAX {
+                    None
+                } else {
+                    Some(v as f64 / 1000.0)
+                };
             }
             deck.loop_active = s.deck_loop_active[i].load(Ordering::Relaxed);
             deck.loop_start = s.deck_loop_start_ms[i].load(Ordering::Relaxed) as f64 / 1000.0;
             deck.loop_end = s.deck_loop_end_ms[i].load(Ordering::Relaxed) as f64 / 1000.0;
+            // Sync lock moves the tempo on the RT side; report the live value.
+            deck.tempo = f64::from_bits(s.deck_tempo[i].load(Ordering::Relaxed));
         }
         state
     }
 }
 
+fn deck_name(d: DeckId) -> &'static str {
+    match d {
+        DeckId::A => "a",
+        DeckId::B => "b",
+        DeckId::C => "c",
+        DeckId::D => "d",
+    }
+}
+
+/// A deck can drive the master clock while it plays with a valid grid.
+fn clock_usable(d: &Deck) -> bool {
+    d.playing && d.grid_valid() && d.effective_bpm() > 0.0
+}
+
 /// Enumerate output devices for the settings UI.
 pub fn list_output_devices() -> Vec<AudioDevice> {
     let host = cpal::default_host();
-    let default_name = host
-        .default_output_device()
-        .and_then(|d| d.name().ok());
+    // cpal 0.18 removed `DeviceTrait::name()`: the human name comes from
+    // `description()`, and `id()` is a stable per-host identifier (`host:id`).
+    let default_device = host.default_output_device();
     let mut out = Vec::new();
     if let Ok(devices) = host.output_devices() {
         for d in devices {
-            let name = d.name().unwrap_or_else(|_| "Unknown".into());
-            let channels = d
-                .default_output_config()
-                .map(|c| c.channels())
-                .unwrap_or(2);
+            let name = d
+                .description()
+                .map(|desc| desc.name().to_owned())
+                .unwrap_or_else(|_| "Unknown".into());
+            let id = d
+                .id()
+                .map(|id| id.to_string())
+                .unwrap_or_else(|_| name.clone());
+            let channels = d.default_output_config().map(|c| c.channels()).unwrap_or(2);
             out.push(AudioDevice {
-                id: name.clone(),
-                is_default: Some(&name) == default_name.as_ref(),
+                id,
+                is_default: default_device.as_ref() == Some(&d),
                 name,
                 channels,
             });
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::deck::tests::click_track;
+
+    const SR: f32 = 48_000.0;
+
+    fn mixer() -> (Mixer, Sender<Command>) {
+        let (tx, rx) = bounded::<Command>(64);
+        let (rec_tx, _rec_rx) = bounded(4);
+        (Mixer::new(SR, rx, Arc::new(Snapshot::new()), rec_tx), tx)
+    }
+
+    fn load(m: &mut Mixer, d: DeckId, bpm: f64, first_beat: f64) {
+        let deck = &mut m.decks[d.index()];
+        deck.load(
+            click_track(bpm, first_beat, 40.0, SR as u32),
+            (None, None, None, bpm),
+        );
+        deck.set_grid(BeatGrid::constant(bpm, first_beat));
+        deck.set_key_lock(false);
+    }
+
+    /// Render `frames` in 256-frame blocks, returning onset frames per deck
+    /// (first sample above 0.1 after >= 10 ms of silence).
+    fn run(m: &mut Mixer, frames: usize, start: usize, onsets: &mut [Vec<usize>; 2]) {
+        let mut quiet = [usize::MAX / 2; 2];
+        let mut f = 0;
+        while f < frames {
+            m.drain_commands();
+            m.begin_block();
+            for _ in 0..256 {
+                for (k, deck) in m.decks.iter_mut().take(2).enumerate() {
+                    let s = deck.render_frame().main.0.abs();
+                    if s > 0.1 {
+                        if quiet[k] >= 480 {
+                            onsets[k].push(start + f);
+                        }
+                        quiet[k] = 0;
+                    } else {
+                        quiet[k] += 1;
+                    }
+                }
+                for deck in m.decks.iter_mut().skip(2) {
+                    deck.render_frame();
+                }
+                f += 1;
+            }
+        }
+    }
+
+    #[test]
+    fn phase_sync_aligns_clicks_within_1ms() {
+        let (mut m, tx) = mixer();
+        load(&mut m, DeckId::A, 120.0, 0.1);
+        load(&mut m, DeckId::B, 126.0, 0.37);
+        m.decks[0].play();
+        m.decks[1].seek_secs(3.013);
+        m.decks[1].play();
+        let mut onsets = [Vec::new(), Vec::new()];
+        run(&mut m, 24_000, 0, &mut onsets);
+        tx.send(Command::PhaseSync {
+            deck: DeckId::B,
+            lock: false,
+        })
+        .unwrap();
+        let mut onsets = [Vec::new(), Vec::new()];
+        run(&mut m, 48_000 * 4, 24_000, &mut onsets);
+        assert!((m.decks[1].effective_bpm() - 120.0).abs() < 1e-9);
+        let (a, b) = (&onsets[0], &onsets[1]);
+        assert!(b.len() >= 6, "B onsets {b:?}");
+        for &ob in b {
+            let near = a.iter().map(|&oa| oa.abs_diff(ob)).min().unwrap();
+            assert!(
+                near <= 48,
+                "B onset {ob} is {near} samples from A (A {a:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn phase_sync_matches_bar_phase_when_downbeats_known() {
+        let (mut m, tx) = mixer();
+        load(&mut m, DeckId::A, 120.0, 0.0);
+        load(&mut m, DeckId::B, 126.0, 0.0);
+        let mut ga = BeatGrid::constant(120.0, 0.0);
+        ga.downbeat = Some(0);
+        let mut gb = BeatGrid::constant(126.0, 0.0);
+        gb.downbeat = Some(1);
+        m.decks[0].set_grid(ga);
+        m.decks[1].set_grid(gb);
+        m.decks[0].play();
+        m.decks[1].seek_secs(5.0);
+        m.decks[1].play();
+        tx.send(Command::PhaseSync {
+            deck: DeckId::B,
+            lock: true,
+        })
+        .unwrap();
+        let mut onsets = [Vec::new(), Vec::new()];
+        run(&mut m, 48_000 * 2, 0, &mut onsets);
+        let pa = m.decks[0].bar_phase().unwrap();
+        let pb = m.decks[1].bar_phase().unwrap();
+        let err = wrap_phase(pa - pb, 4.0) * 0.5; // seconds at 120 bpm
+        assert!(err.abs() < 0.001, "bar phase A {pa} B {pb}");
+    }
+
+    #[test]
+    fn internal_clock_runs_and_is_reported() {
+        let (mut m, tx) = mixer();
+        tx.send(Command::SetClock(ClockSource::Internal, Some(128.0)))
+            .unwrap();
+        let mut out = vec![0.0f32; 512];
+        for _ in 0..375 {
+            m.render(&mut out, 2); // 375 × 256 frames = 2 s
+        }
+        let beat = f64::from_bits(m.snapshot.clock_beat.load(Ordering::Relaxed));
+        assert!((beat - 128.0 / 60.0 * 2.0).abs() < 1e-6, "beat {beat}");
+        assert_eq!(m.snapshot.clock_source.load(Ordering::Relaxed), 4);
+    }
+
+    #[test]
+    fn split_mono_routes_cue_only_left() {
+        let (mut m, tx) = mixer();
+        load(&mut m, DeckId::A, 120.0, 0.0);
+        load(&mut m, DeckId::B, 120.0, 0.0);
+        // Deck A: cued, crossfader closed on its side → only in the headphones.
+        m.decks[0].set_cue(true);
+        m.decks[0].play();
+        tx.send(Command::Crossfader(1.0)).unwrap();
+        tx.send(Command::SetRouting(RoutingConfig {
+            split_mono: true,
+            cue_mix: 0.0,
+            headphone_level: 1.0,
+            ..Default::default()
+        }))
+        .unwrap();
+        let mut out = vec![0.0f32; 512];
+        let (mut l, mut r) = (0.0f32, 0.0f32);
+        for _ in 0..200 {
+            m.render(&mut out, 2);
+            for fr in out.chunks(2) {
+                l = l.max(fr[0].abs());
+                r = r.max(fr[1].abs());
+            }
+        }
+        assert!(l > 0.1, "cue missing on L: {l}");
+        assert!(r < 1e-6, "cue leaked to R: {r}");
+        // Deck B on master, not cued → R only.
+        m.decks[0].pause();
+        m.decks[1].play();
+        let (mut l, mut r) = (0.0f32, 0.0f32);
+        for _ in 0..200 {
+            m.render(&mut out, 2);
+            for fr in out.chunks(2) {
+                l = l.max(fr[0].abs());
+                r = r.max(fr[1].abs());
+            }
+        }
+        assert!(r > 0.1 && l < 1e-6, "master L {l} R {r}");
+    }
+
+    #[test]
+    fn four_channel_puts_headphones_on_3_4() {
+        let (mut m, tx) = mixer();
+        load(&mut m, DeckId::A, 120.0, 0.0);
+        m.decks[0].set_cue(true);
+        m.decks[0].play();
+        tx.send(Command::Crossfader(1.0)).unwrap();
+        tx.send(Command::SetRouting(RoutingConfig::default()))
+            .unwrap();
+        let mut out = vec![0.0f32; 1024];
+        let mut peak = [0.0f32; 4];
+        for _ in 0..200 {
+            m.render(&mut out, 4);
+            for fr in out.chunks(4) {
+                for (p, s) in peak.iter_mut().zip(fr) {
+                    *p = p.max(s.abs());
+                }
+            }
+        }
+        assert!(peak[0] < 1e-6 && peak[1] < 1e-6, "{peak:?}");
+        assert!(peak[2] > 0.05 && peak[3] > 0.05, "{peak:?}");
+    }
 }

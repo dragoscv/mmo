@@ -97,7 +97,11 @@ fn fold_bpm(mut bpm: f64) -> f64 {
 pub fn analyze(buf: &TrackBuffer) -> BeatAnalysis {
     let (env, env_sr) = onset_envelope(buf);
     if env.len() < 16 || env_sr <= 0.0 {
-        return BeatAnalysis { bpm: 0.0, first_beat_secs: 0.0, confidence: 0.0 };
+        return BeatAnalysis {
+            bpm: 0.0,
+            first_beat_secs: 0.0,
+            confidence: 0.0,
+        };
     }
 
     // Lag search bounds (in envelope samples) for the BPM range.
@@ -149,5 +153,9 @@ pub fn analyze(buf: &TrackBuffer) -> BeatAnalysis {
         0.0
     };
 
-    BeatAnalysis { bpm, first_beat_secs, confidence }
+    BeatAnalysis {
+        bpm,
+        first_beat_secs,
+        confidence,
+    }
 }

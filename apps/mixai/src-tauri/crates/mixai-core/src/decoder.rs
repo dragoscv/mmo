@@ -7,19 +7,20 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::Path;
 
-use symphonia::core::audio::{AudioBufferRef, Signal};
-use symphonia::core::codecs::DecoderOptions;
-use symphonia::core::formats::FormatOptions;
+use symphonia::core::audio::GenericAudioBufferRef;
+use symphonia::core::codecs::audio::AudioDecoderOptions;
+use symphonia::core::errors::Error as SymphoniaError;
+use symphonia::core::formats::probe::Hint;
+use symphonia::core::formats::{FormatOptions, TrackType};
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
-use symphonia::core::probe::Hint;
 
 use crate::deck::TrackBuffer;
 use crate::error::CoreError;
 
 pub fn decode_file(path: &str) -> Result<TrackBuffer, CoreError> {
-    let file = File::open(Path::new(path))
-        .map_err(|e| CoreError::Decode(format!("open {path}: {e}")))?;
+    let file =
+        File::open(Path::new(path)).map_err(|e| CoreError::Decode(format!("open {path}: {e}")))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
     let mut hint = Hint::new();
@@ -44,37 +45,46 @@ pub fn decode_bytes(bytes: Vec<u8>, ext: Option<&str>) -> Result<TrackBuffer, Co
 
 /// Shared decode loop over any `MediaSourceStream`.
 fn decode_stream(mss: MediaSourceStream, hint: Hint) -> Result<TrackBuffer, CoreError> {
-    let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+    // symphonia 0.6: `Probe::probe` returns the `FormatReader` directly and takes options by value.
+    let mut format = symphonia::default::get_probe()
+        .probe(
+            &hint,
+            mss,
+            FormatOptions::default(),
+            MetadataOptions::default(),
+        )
         .map_err(|e| CoreError::Decode(format!("probe: {e}")))?;
 
-    let mut format = probed.format;
+    // 0.6: tracks carry `Option<CodecParameters>` (audio/video/subtitle); `default_track`
+    // picks the default-flagged or first audio track with a known codec.
     let track = format
-        .tracks()
-        .iter()
-        .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
+        .default_track(TrackType::Audio)
         .ok_or_else(|| CoreError::Decode("no audio track".into()))?;
     let track_id = track.id;
-    let sample_rate = track.codec_params.sample_rate.unwrap_or(44100);
+    let params = track
+        .codec_params
+        .as_ref()
+        .and_then(|p| p.audio())
+        .ok_or_else(|| CoreError::Decode("no audio codec parameters".into()))?
+        .clone();
+    let sample_rate = params.sample_rate.unwrap_or(44100);
 
     let mut decoder = symphonia::default::get_codecs()
-        .make(&track.codec_params, &DecoderOptions::default())
+        .make_audio_decoder(&params, &AudioDecoderOptions::default())
         .map_err(|e| CoreError::Decode(format!("make decoder: {e}")))?;
 
     let mut left: Vec<f32> = Vec::new();
     let mut right: Vec<f32> = Vec::new();
+    let mut planes: Vec<Vec<f32>> = Vec::new();
 
-    loop {
-        let packet = match format.next_packet() {
-            Ok(p) => p,
-            Err(_) => break, // end of stream / IO end
-        };
-        if packet.track_id() != track_id {
+    // 0.6: end of stream is `Ok(None)` instead of an `UnexpectedEof` IO error.
+    while let Ok(Some(packet)) = format.next_packet() {
+        if packet.track_id != track_id {
             continue;
         }
         match decoder.decode(&packet) {
-            Ok(decoded) => append_samples(&decoded, &mut left, &mut right),
-            Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
+            Ok(decoded) => append_samples(&decoded, &mut planes, &mut left, &mut right),
+            Err(SymphoniaError::DecodeError(_)) | Err(SymphoniaError::IoError(_)) => continue,
             Err(_) => break,
         }
     }
@@ -95,34 +105,75 @@ fn decode_stream(mss: MediaSourceStream, hint: Hint) -> Result<TrackBuffer, Core
 }
 
 /// Convert any symphonia buffer to planar stereo f32 and append.
-fn append_samples(decoded: &AudioBufferRef<'_>, left: &mut Vec<f32>, right: &mut Vec<f32>) {
-    macro_rules! handle {
-        ($buf:expr, $conv:expr) => {{
-            let spec = $buf.spec();
-            let frames = $buf.frames();
-            let chans = spec.channels.count();
-            if chans == 0 {
-                return;
+///
+/// symphonia 0.6 converts every sample format to f32 itself (`copy_to_vecs_planar`), so the
+/// per-format match of 0.5 is gone. `planes` is a reusable scratch buffer (one Vec per channel).
+fn append_samples(
+    decoded: &GenericAudioBufferRef<'_>,
+    planes: &mut Vec<Vec<f32>>,
+    left: &mut Vec<f32>,
+    right: &mut Vec<f32>,
+) {
+    if decoded.num_planes() == 0 || decoded.frames() == 0 {
+        return;
+    }
+    decoded.copy_to_vecs_planar::<f32>(planes);
+    let l = &planes[0];
+    let r = planes.get(1).unwrap_or(l);
+    left.extend_from_slice(l);
+    right.extend_from_slice(r);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Encode a WAV in memory with hound (already a dependency) so the test needs no fixture file.
+    fn wav_bytes(channels: u16, sample_rate: u32, frames: &[(i16, i16)]) -> Vec<u8> {
+        let spec = hound::WavSpec {
+            channels,
+            sample_rate,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut cur = Cursor::new(Vec::new());
+        {
+            let mut w = hound::WavWriter::new(&mut cur, spec).unwrap();
+            for &(l, r) in frames {
+                w.write_sample(l).unwrap();
+                if channels == 2 {
+                    w.write_sample(r).unwrap();
+                }
             }
-            let l = $buf.chan(0);
-            let r = if chans > 1 { $buf.chan(1) } else { $buf.chan(0) };
-            for i in 0..frames {
-                left.push($conv(l[i]));
-                right.push($conv(r[i]));
-            }
-        }};
+            w.finalize().unwrap();
+        }
+        cur.into_inner()
     }
 
-    match decoded {
-        AudioBufferRef::F32(b) => handle!(b, |s: f32| s),
-        AudioBufferRef::S16(b) => handle!(b, |s: i16| s as f32 / 32768.0),
-        AudioBufferRef::S32(b) => handle!(b, |s: i32| s as f32 / 2147483648.0),
-        AudioBufferRef::U8(b) => handle!(b, |s: u8| (s as f32 - 128.0) / 128.0),
-        AudioBufferRef::F64(b) => handle!(b, |s: f64| s as f32),
-        AudioBufferRef::S24(b) => handle!(b, |s: symphonia::core::sample::i24| s.inner() as f32 / 8388608.0),
-        AudioBufferRef::U24(b) => handle!(b, |s: symphonia::core::sample::u24| (s.inner() as f32 - 8388608.0) / 8388608.0),
-        AudioBufferRef::U16(b) => handle!(b, |s: u16| (s as f32 - 32768.0) / 32768.0),
-        AudioBufferRef::U32(b) => handle!(b, |s: u32| (s as f32 - 2147483648.0) / 2147483648.0),
-        AudioBufferRef::S8(b) => handle!(b, |s: i8| s as f32 / 128.0),
+    #[test]
+    fn decodes_stereo_wav_to_planar_f32() {
+        let frames: Vec<(i16, i16)> = (0..4096)
+            .map(|i| ((i % 100) as i16 * 100, -16384))
+            .collect();
+        let buf = decode_bytes(wav_bytes(2, 48_000, &frames), Some("wav")).unwrap();
+        assert_eq!(buf.sample_rate, 48_000);
+        assert_eq!(buf.left.len(), frames.len());
+        assert_eq!(buf.right.len(), frames.len());
+        assert!((buf.left[1] - 100.0 / 32768.0).abs() < 1e-4);
+        assert!((buf.right[0] + 0.5).abs() < 1e-4);
+    }
+
+    #[test]
+    fn mono_wav_is_duplicated_to_both_channels() {
+        let frames: Vec<(i16, i16)> = (0..1000).map(|i| (i as i16 * 10, 0)).collect();
+        let buf = decode_bytes(wav_bytes(1, 44_100, &frames), None).unwrap();
+        assert_eq!(buf.sample_rate, 44_100);
+        assert_eq!(buf.left.len(), 1000);
+        assert_eq!(buf.left, buf.right);
+    }
+
+    #[test]
+    fn garbage_input_is_a_decode_error() {
+        assert!(decode_bytes(vec![0u8; 64], Some("mp3")).is_err());
     }
 }

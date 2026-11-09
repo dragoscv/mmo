@@ -104,11 +104,9 @@ impl Sampler {
 
     /// Trigger a pad from the start (re-trigger restarts playback).
     pub fn trigger(&mut self, idx: usize) {
-        if let Some(p) = self.pads.get_mut(idx) {
-            if p.buffer.is_some() {
-                p.pos = 0.0;
-                p.playing = true;
-            }
+        if let Some(p) = self.pads.get_mut(idx).filter(|p| p.buffer.is_some()) {
+            p.pos = 0.0;
+            p.playing = true;
         }
     }
 
@@ -179,7 +177,7 @@ mod tests {
             }
         }
         // Played roughly the sample length, then stopped.
-        assert!(nonzero >= 90 && nonzero <= 105, "played {nonzero} frames");
+        assert!((90..=105).contains(&nonzero), "played {nonzero} frames");
         assert!(!s.is_playing(0));
     }
 

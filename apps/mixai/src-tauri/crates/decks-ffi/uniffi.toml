@@ -1,0 +1,8 @@
+[bindings.kotlin]
+package_name = "ro.mixai.decks.ffi"
+cdylib_name = "decks_ffi"
+
+[bindings.swift]
+module_name = "DecksFFI"
+ffi_module_name = "decks_ffiFFI"
+ffi_module_filename = "decks_ffiFFI"

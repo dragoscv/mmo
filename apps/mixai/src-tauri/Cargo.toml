@@ -1,37 +1,44 @@
 [package]
 name = "mixai"
-version = "1.0.0"
-description = "MIXAI — native DJ software"
+version = "1.1.0"
+description = "MixAI Decks — native DJ software"
 authors = ["mwrty <vladulescu.catalin@gmail.com>"]
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/dragoscv/mmo"
-edition = "2021"
-rust-version = "1.85"
+edition = "2024"
+rust-version = "1.90"
+# Shipped as an app bundle, never to crates.io (also lets cargo-deny accept the path dep).
+publish = false
+
+# MixAI Decks crates (ADR-0014): every folder under crates/ is a member, so new crates need no edit here.
+[workspace]
+members = [".", "crates/*"]
+resolver = "3"
 
 [lib]
 name = "mixai_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6", features = [] }
+tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
-tauri = { version = "2.11", features = [] }
-tauri-plugin-shell = "2.3"
-tauri-plugin-dialog = "2.7"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-log = "0.4"
-env_logger = "0.11"
+tauri = { version = "2.12.5", features = [] }
+tauri-plugin-shell = "2.6.0"
+tauri-plugin-dialog = "2.8.4"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+log = "0.4.35"
+env_logger = "0.11.11"
 # The audio engine (local path crate, permissive-licensed).
 mixai-core = { path = "crates/mixai-core" }
 # Cross-platform MIDI I/O (MIT) for DJ controller support.
-midir = "0.11"
+midir = "0.11.1"
 # Cross-platform HID I/O (MIT) for CDJs and HID-class DJ controllers.
-hidapi = "2.6"
+hidapi = "2.6.7"
 # HTTP client to talk to the MMO Companion library API (rustls = no OpenSSL).
 # reqwest 0.13: `rustls-tls` renamed to `rustls`; `query` is now an opt-in feature.
-reqwest = { version = "0.13", default-features = false, features = ["json", "query", "rustls"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "query", "rustls"] }
 
 [features]
 # Forward the ASIO opt-in to the core for low-latency Windows builds.

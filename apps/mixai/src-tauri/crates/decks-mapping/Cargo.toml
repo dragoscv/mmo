@@ -1,0 +1,33 @@
+[package]
+name = "decks-mapping"
+version = "0.1.0"
+description = "MixAI Decks controller mapping engine: mapping format v1 (JSON + JSON Schema), sandboxed rhai scripts, MIDI learn, soft takeover, MIDI clock, groove lane, BLE-MIDI codec and built-in controller profiles."
+authors = ["mwrty <vladulescu.catalin@gmail.com>"]
+# Permissive on purpose (ADR-0014): this crate may link into mixai-core builds.
+license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.87"
+publish = false
+
+[lib]
+name = "decks_mapping"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+# JSON Schema emitted from the Rust types (MIT).
+schemars = "1.2.1"
+# Device name matching (MIT OR Apache-2.0).
+regex = "1.12.4"
+thiserror = "2.0.21"
+# Sandboxed per-mapping scripts (MIT OR Apache-2.0). `no_module` removes `import`
+# (and with it the file module resolver), `sync` makes the engine Send + Sync.
+rhai = { version = "1.27.0", default-features = false, features = ["std", "sync", "serde", "no_module"] }
+# Optional OS MIDI transport (MIT).
+midir = { version = "0.11.1", optional = true }
+
+[features]
+default = []
+# `MidiTransport` implementation over midir (WinMM / CoreMIDI / ALSA).
+midir = ["dep:midir"]
