@@ -206,6 +206,18 @@ qr_width, qr_modules}`, `rotate(role)`, `set_track_labels(deck, title?, artist?)
 `clients() -> [RemoteClient]`, `stop()`, `is_running()`. A stopped server returns `NotRunning`; a port
 that cannot open fails `start` with `Unsupported`.
 
+### Transition Designer
+
+Free functions ([transitions.md](transitions.md)): `transition_rank_next(playing, [NextCandidate], EnergyTrend,
+limit) -> [NextSuggestion]`, `transition_plan(from, to, from_deck, to_deck, from_pos_sec, bars?, style?,
+not_before_bars) -> TransitionPlanInfo{style, bars, start_sec, beats_until_start, to_cue_sec, to_tempo_ratio,
+automation_json, reasons}`, `transition_check_safety(playing, position_sec, tempo_ratio, next?, planned_bars?) ->
+[SafetyWarning{code, severity, detail_json}]`, `transition_parse_intent(text) -> DjIntent?`,
+`transition_validate_intent(json) -> DjIntent?`, `transition_intent_schema() -> String`,
+`transition_render_riser(key, bpm, bars, sample_rate, seed) -> [f32]`. Object `TransitionRunner(automation_json,
+start_beat)`: `tick(engine, master_beat) -> TransitionTick{applied, errors, done, progress}`, `is_done()`.
+`DecksEngine` gained `set_stems_active(deck, on)` and `set_stem_gain(deck, stem, gain)`.
+
 ## Limits (2026-11-09)
 
 * Device / config: `mixai_core::Engine::start_with(device, sample_rate, buffer_frames)` applies

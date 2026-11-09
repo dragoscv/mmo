@@ -1233,6 +1233,26 @@ impl DecksEngine {
         self.with(|e| e.start_recording(path.into()))
     }
 
+    /// Stem playback on/off for a deck (the deck must have stems loaded; buffers are kept).
+    pub fn set_stems_active(&self, deck: u8, on: bool) -> Result<(), DecksError> {
+        let id = deck_id(deck)?;
+        self.with(|e| e.set_stems_active(id, on))
+    }
+
+    /// Live gain 0..1.5 of stem `stem` (0 vocals, 1 drums, 2 bass, 3 melody).
+    pub fn set_stem_gain(&self, deck: u8, stem: u8, gain: f32) -> Result<(), DecksError> {
+        let id = deck_id(deck)?;
+        if stem > 3 {
+            return Err(DecksError::invalid(format!(
+                "stem {stem} out of range 0..=3"
+            )));
+        }
+        if !gain.is_finite() {
+            return Err(DecksError::invalid("gain must be finite"));
+        }
+        self.with(|e| e.set_stem_gain(id, stem as usize, gain))
+    }
+
     pub fn record_stop(&self) -> Result<(), DecksError> {
         self.with(|e| e.stop_recording())
     }

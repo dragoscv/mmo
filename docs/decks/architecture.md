@@ -22,6 +22,7 @@ root (path dependency).
 | `decks-render` | `crates/decks-render` | wgpu 30 GPU views: scrolling 3-band waveform + beatgrid, overview, stacked decks, platter, DVS scope; native surface or headless | MIT OR Apache-2.0 |
 | `decks-stems` | `crates/decks-stems` | On-device stem separation (HT-Demucs ONNX via ort, load-dynamic), stem cache shared with the MMO Server — see [stems.md](stems.md) | MIT OR Apache-2.0 |
 | `decks-remote` | `crates/decks-remote` | Connected mode: LAN HTTP + WebSocket server, phone remote / second screen / Party DJ requests, QR pairing — see [remote.md](remote.md) | MIT OR Apache-2.0 |
+| `decks-transition` | `crates/decks-transition` | AI Transition Designer: next-track ranking, phrase-aligned transition plans as editable automation, runner, 32-bar safety, RO/EN intents, in-key risers — see [transitions.md](transitions.md) | MIT OR Apache-2.0 |
 | `decks-ffi` | `crates/decks-ffi` | UniFFI surface for Swift and Kotlin over all of the above — see [ffi.md](ffi.md) | MIT OR Apache-2.0 |
 
 Planned (WP19-04): a `decks-core` facade with a stable command/event API and the UniFFI 0.31 surface for Swift and
@@ -45,6 +46,7 @@ flowchart LR
     FFI --> MAP[decks-mapping]
     FFI --> REN[decks-render]
     FFI --> REM[decks-remote]
+    FFI --> TRN[decks-transition]
     CORE --> DVS[decks-dvs]
     LIB --> ANA[decks-analysis]
     ANA --> LST[mixai-listen]

@@ -82,6 +82,7 @@ fun DecksScreen(
     }
     var zoom by remember { mutableStateOf(8f) }
     var showConnect by remember { mutableStateOf(false) }
+    var showAi by remember { mutableStateOf(false) }
 
     BoxWithConstraints(
         Modifier.fillMaxSize()
@@ -100,8 +101,9 @@ fun DecksScreen(
         val peaks = ctl.controls.map { it.peaks }
         val frame = ctl.waveFrame(zoom, reduced)
         Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusBar(ctl, skins) { showConnect = !showConnect }
+            StatusBar(ctl, skins, { showAi = !showAi }) { showConnect = !showConnect }
             if (showConnect) ConnectPanel(ctl, Modifier.fillMaxWidth())
+            if (showAi) AiPanel(ctl, Modifier.fillMaxWidth())
             val waveLabel = str(Str.Waveform)
             val waveH = when {
                 !wide -> 110.dp
@@ -155,7 +157,7 @@ fun DecksScreen(
 }
 
 @Composable
-private fun StatusBar(ctl: DecksController, skins: SkinState?, onConnect: () -> Unit) {
+private fun StatusBar(ctl: DecksController, skins: SkinState?, onAi: () -> Unit, onConnect: () -> Unit) {
     val type = LocalDecksType.current
     val clock = ctl.engine.clock
     Panel(Modifier.fillMaxWidth()) {
@@ -188,6 +190,7 @@ private fun StatusBar(ctl: DecksController, skins: SkinState?, onConnect: () -> 
                 style = type.small.copy(color = DecksColors.muted), maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             ConnectChip(ctl, onConnect)
+            PadButton(str(Str.AiTitle), str(Str.AiTitle), active = ctl.mixProgress != null, onClick = onAi)
             if (skins != null) {
                 val name = skinName(skins.skin)
                 PadButton(str(Str.Skin, name), "${str(Str.SkinNext)} · ${str(Str.Skin, name)}") { skins.cycle() }

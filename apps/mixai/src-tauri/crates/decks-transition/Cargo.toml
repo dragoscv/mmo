@@ -1,0 +1,18 @@
+[package]
+name = "decks-transition"
+version = "0.1.0"
+description = "MixAI Decks AI Transition Designer (WP19-20): next-track ranking, phrase-aligned transition plans as editable EQ / filter / stem / FX automation, 32-bar set-safety look-ahead, RO/EN voice intents, in-key risers"
+authors = ["mwrty <vladulescu.catalin@gmail.com>"]
+# Permissive on purpose (ADR-0014).
+license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.87"
+publish = false
+
+[lib]
+name = "decks_transition"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"

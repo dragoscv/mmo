@@ -269,6 +269,9 @@ class FfiBackend(libraryDbPath: String?) : DecksBackend {
 
     override fun startRemote(): RemotePort? = FfiRemote.start(engine)
 
+    private val transitionPort by lazy { FfiTransition(engine) }
+    override fun transitions(): TransitionPort? = transitionPort
+
     override fun close() {
         runCatching { engine.stop() }
         runCatching { engine.close() }

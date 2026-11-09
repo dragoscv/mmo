@@ -90,4 +90,7 @@ interface DecksBackend : AutoCloseable {
 
     /** Connected mode (WP19-21): start the LAN remote server; null when unavailable (demo engine). */
     fun startRemote(): RemotePort? = null
+
+    /** AI Transition Designer (WP19-20); null when unavailable (demo engine). */
+    fun transitions(): TransitionPort? = null
 }

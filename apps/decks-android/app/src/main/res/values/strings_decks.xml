@@ -104,4 +104,13 @@
     <string name="decks_request_accepted" formatted="false">up next</string>
     <string name="decks_request_rejected" formatted="false">rejected</string>
     <string name="decks_request_played_state" formatted="false">played</string>
+    <string name="decks_ai_title" formatted="false">AI mix</string>
+    <string name="decks_ai_suggest" formatted="false">Suggest next</string>
+    <string name="decks_ai_mix" formatted="false">Auto mix</string>
+    <string name="decks_ai_mixing" formatted="false">Mixing %1%</string>
+    <string name="decks_ai_cancel" formatted="false">Cancel mix</string>
+    <string name="decks_ai_load" formatted="false">Load</string>
+    <string name="decks_ai_warning" formatted="false">Heads-up: %1</string>
+    <string name="decks_ai_command_hint" formatted="false">Type a command, e.g. mix next in 16 bars with a bass swap</string>
+    <string name="decks_ai_run" formatted="false">Run</string>
 </resources>

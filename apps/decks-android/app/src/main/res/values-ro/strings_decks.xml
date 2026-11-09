@@ -104,4 +104,13 @@
     <string name="decks_request_accepted" formatted="false">urmează</string>
     <string name="decks_request_rejected" formatted="false">respinsă</string>
     <string name="decks_request_played_state" formatted="false">pusă</string>
+    <string name="decks_ai_title" formatted="false">Mix AI</string>
+    <string name="decks_ai_suggest" formatted="false">Sugerează următoarea</string>
+    <string name="decks_ai_mix" formatted="false">Mixează automat</string>
+    <string name="decks_ai_mixing" formatted="false">Se mixează %1%</string>
+    <string name="decks_ai_cancel" formatted="false">Anulează mixul</string>
+    <string name="decks_ai_load" formatted="false">Încarcă</string>
+    <string name="decks_ai_warning" formatted="false">Atenție: %1</string>
+    <string name="decks_ai_command_hint" formatted="false">Scrie o comandă, de ex. mixează următoarea în 16 măsuri cu schimb de bas</string>
+    <string name="decks_ai_run" formatted="false">Execută</string>
 </resources>

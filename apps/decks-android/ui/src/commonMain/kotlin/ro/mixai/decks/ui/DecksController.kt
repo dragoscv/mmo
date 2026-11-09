@@ -6,13 +6,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ro.mixai.decks.ui.engine.Band
 import ro.mixai.decks.ui.engine.DecksBackend
+import ro.mixai.decks.ui.engine.IntentUi
 import ro.mixai.decks.ui.engine.Monitoring
+import ro.mixai.decks.ui.engine.PlanUi
 import ro.mixai.decks.ui.engine.RemoteMixerUi
 import ro.mixai.decks.ui.engine.RemotePairingUi
 import ro.mixai.decks.ui.engine.RemotePort
 import ro.mixai.decks.ui.engine.RemoteRoleUi
 import ro.mixai.decks.ui.engine.RequestStateUi
+import ro.mixai.decks.ui.engine.SafetyUi
 import ro.mixai.decks.ui.engine.SongRequestUi
+import ro.mixai.decks.ui.engine.SuggestionUi
+import ro.mixai.decks.ui.engine.TransitionRun
+import ro.mixai.decks.ui.engine.TransitionStyleUi
+import ro.mixai.decks.ui.engine.TransitionTrackUi
 import ro.mixai.decks.ui.logic.DeckMath
 import ro.mixai.decks.ui.model.CrateItem
 import ro.mixai.decks.ui.model.EngineState
@@ -101,6 +108,23 @@ class DecksController(val backend: DecksBackend) {
     var remoteClients by mutableStateOf(0)
         private set
 
+    // AI Transition Designer
+    var suggestions by mutableStateOf<List<SuggestionUi>>(emptyList())
+        private set
+    var plan by mutableStateOf<PlanUi?>(null)
+        private set
+    var mixProgress by mutableStateOf<Double?>(null)
+        private set
+    var safety by mutableStateOf<List<SafetyUi>>(emptyList())
+        private set
+    var lastIntent by mutableStateOf<IntentUi?>(null)
+        private set
+    private var mixRun: TransitionRun? = null
+    private var planFrom = 0
+    private var planTo = 1
+    private var planBars: Int? = null
+    private var planStyle: TransitionStyleUi? = null
+
     private val loadTickets = LongArray(EngineState.DECKS) { -1L }
     private var scanId = -1L
     private var frame = 0L
@@ -121,6 +145,116 @@ class DecksController(val backend: DecksBackend) {
         frame++
         if (frame % 6L == 0L) pollJobs()
         if (remote != null && frame % 4L == 0L) pumpRemote()
+        mixRun?.let { r ->
+            val (p, done) = r.tick(engine.clock.beat)
+            mixProgress = p
+            if (done) { mixRun = null; mixProgress = null; plan = null }
+        }
+        if (frame % 30L == 0L) refreshSafety()
+    }
+
+    // ---- AI Transition Designer ----------------------------------------------------------
+
+    /** The deck carrying the mix right now: the louder playing deck (crossfader-aware), else 0. */
+    fun liveDeck(): Int {
+        val playing = engine.decks.take(2).filter { it.playing && it.loaded }
+        if (playing.size == 1) return playing[0].index
+        if (playing.size == 2) return if (crossfader <= 0f) 0 else 1
+        return 0
+    }
+
+    private fun deckTrack(d: Int): TransitionTrackUi? {
+        val s = deck(d) ?: return null
+        if (!s.loaded) return null
+        val m = controls[d].meta
+        return TransitionTrackUi(
+            id = "deck$d:${s.title}",
+            title = m?.title ?: s.title ?: "",
+            artist = deckArtists[d] ?: "",
+            bpm = s.bpm ?: m?.bpm,
+            key = s.key ?: m?.key,
+            durationSec = s.durationSec,
+            firstBeatSec = m?.firstBeatSec ?: 0.0,
+        )
+    }
+
+    private fun TrackRow.features() = TransitionTrackUi(id, title, artist ?: "", bpm, key, durationSec ?: 0.0)
+
+    /** Rank the visible library rows as next after the live deck. */
+    fun suggestNext() {
+        val port = backend.transitions() ?: return
+        val live = deckTrack(liveDeck()) ?: return
+        suggestions = port.rankNext(live, results.take(500).map { it.features() }, 8)
+    }
+
+    /** Load the best suggestion on the other deck. */
+    fun loadSuggestion(id: String) {
+        val row = results.firstOrNull { it.id == id } ?: return
+        loadToDeck(1 - liveDeck(), row)
+    }
+
+    /** Plan a transition from the live deck to the other one (both loaded). */
+    fun planMix(bars: Int? = planBars, style: TransitionStyleUi? = planStyle): PlanUi? {
+        val port = backend.transitions() ?: return null
+        val from = liveDeck()
+        val to = 1 - from
+        val a = deckTrack(from) ?: return null
+        val b = deckTrack(to) ?: return null
+        val p = port.plan(a, b, from, to, deck(from)?.playheadSec ?: 0.0, bars, style) ?: return null
+        planFrom = from
+        planTo = to
+        planBars = bars
+        planStyle = style
+        plan = p
+        return p
+    }
+
+    /** Prepare the incoming deck (cue + tempo) and start the automation on the planned beat. */
+    fun startMix(): Boolean {
+        val port = backend.transitions() ?: return false
+        val p = plan ?: planMix() ?: return false
+        backend.seek(planTo, p.toCueSec)
+        val ratio = p.toTempoRatio
+        val c = controls[planTo]
+        c.tempoFader = DeckMath.ratioToFader(ratio, c.tempoRange).coerceIn(-1f, 1f)
+        backend.setTempo(planTo, ratio)
+        val r = port.startRun(p.automationJson, engine.clock.beat + p.beatsUntilStart) ?: return false
+        mixRun = r
+        mixProgress = 0.0
+        return true
+    }
+
+    fun cancelMix() {
+        mixRun = null
+        mixProgress = null
+        plan = null
+    }
+
+    private fun refreshSafety() {
+        val port = backend.transitions() ?: return
+        val d = liveDeck()
+        val live = deckTrack(d)
+        if (live == null || deck(d)?.playing != true) { safety = emptyList(); return }
+        safety = port.safety(live, deck(d)?.playheadSec ?: 0.0, deck(d)?.tempo ?: 1.0, deckTrack(1 - d), plan?.bars)
+    }
+
+    /** Voice / typed command (RO / EN). Returns false when not understood. */
+    fun command(text: String): Boolean {
+        val port = backend.transitions() ?: return false
+        val i = port.parseIntent(text) ?: return false
+        lastIntent = i
+        val d = i.deck ?: liveDeck()
+        when (i.action) {
+            "mix_next" -> { plan = null; planMix(i.bars, i.style); startMix() }
+            "suggest" -> suggestNext()
+            "cancel" -> cancelMix()
+            "play" -> backend.play(d)
+            "pause" -> backend.pause(d)
+            "sync" -> syncTap(d)
+            "loop" -> { i.beats?.let { controls[d].loopBeats = it }; backend.loopAuto(d, controls[d].loopBeats) }
+            else -> return false
+        }
+        return true
     }
 
     // ---- Connected mode ------------------------------------------------------------------
