@@ -1,14 +1,35 @@
 /** Detail panel for the selected insert: every parameter as knob / select / switch, generated from specs. */
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from "@mmo/ui";
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, cn } from "@mmo/ui";
 import { useT } from "../i18n";
 import { controlKind, type ParamSpec } from "../lib/params";
 import type { InsertState } from "../lib/protocol";
 import { EMPTY_CHAIN, useStore } from "../store";
 import { Knob } from "./Knob";
 import { GrBar } from "./Meters";
+import { MidiLearnButton, useMidiLearn } from "./MidiLearn";
 import { choiceLabel, fxLabel, paramLabel, valueLabel } from "./fx-labels";
+
+/** Parameter control with a MIDI learn button; right-click also arms / cancels learn. */
+function LearnableParam({ insert, spec, value }: { insert: InsertState; spec: ParamSpec; value: number }) {
+    const t = useT();
+    const target = { kind: "param", fx: insert.fx, param: spec.id } as const;
+    const { armed, available, toggle } = useMidiLearn(target);
+    return (
+        <div
+            className={cn("relative rounded-lg p-0.5", armed && "animate-pulse ring-2 ring-primary/60")}
+            onContextMenu={(e) => {
+                if (!available) return;
+                e.preventDefault();
+                toggle();
+            }}
+        >
+            <ParamControl insert={insert} spec={spec} value={value} />
+            <MidiLearnButton target={target} label={paramLabel(t, spec.id)} className="absolute -top-1 -right-1 size-5" />
+        </div>
+    );
+}
 
 function ParamControl({ insert, spec, value }: { insert: InsertState; spec: ParamSpec; value: number }) {
     const t = useT();
@@ -87,10 +108,15 @@ export function InsertDetail() {
                 >
                     <header className="flex items-center gap-3">
                         <h2 className="font-heading text-lg font-semibold">{fxLabel(t, insert.fx)}</h2>
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <MidiLearnButton target={{ kind: "enable", fx: insert.fx }} label={t("midi.enableTarget", { fx: fxLabel(t, insert.fx) })} />
+                        </span>
                         <div className="w-40">
                             <GrBar index={index} label={t("chain.gr")} />
                         </div>
-                        <span className="ms-auto text-xs text-muted-foreground">{t("chain.resetHint")}</span>
+                        <span className="ms-auto text-xs text-muted-foreground">
+                            {t("chain.resetHint")} {t("midi.contextHint")}
+                        </span>
                         <Button variant="ghost" size="icon-sm" aria-label={t("chain.close")} onClick={() => select(null)}>
                             <X />
                         </Button>
@@ -101,7 +127,7 @@ export function InsertDetail() {
                         <div className="flex min-h-0 flex-wrap content-start items-start gap-x-3 gap-y-4 overflow-y-auto">
                             {specs.map((spec) => {
                                 const v = insert.params.find(([id]) => id === spec.id)?.[1] ?? spec.default;
-                                return <ParamControl key={spec.id} insert={insert} spec={spec} value={v} />;
+                                return <LearnableParam key={spec.id} insert={insert} spec={spec} value={v} />;
                             })}
                         </div>
                     )}

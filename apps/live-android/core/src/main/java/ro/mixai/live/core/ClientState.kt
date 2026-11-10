@@ -23,6 +23,12 @@ data class ClientState(
     val role: Role get() = hello?.role ?: engine?.role ?: Role.VIEWER
     val connected: Boolean get() = phase == Phase.CONNECTED
     fun can(required: Role): Boolean = connected && role.atLeast(required)
+
+    /** `state.midi` with engine-default values when the engine is older than 0.1.0+midi. */
+    val midi: MidiState get() = session?.midi ?: MidiState()
+
+    /** Target the engine is waiting for a CC / note on, or null when MIDI learn is idle. */
+    val midiLearning: MidiTarget? get() = midi.learning
 }
 
 sealed interface ClientEvent {

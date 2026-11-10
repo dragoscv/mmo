@@ -51,6 +51,53 @@ export interface Position {
     part: number;
 }
 
+/* ── MIDI (docs/live/midi.md, serde forms of `live_engine::midi`) ──────────────────────────── */
+
+export type MidiSourceKind = "cc" | "note";
+
+/** What a binding listens to. `channel`: 0-based 0..15, `null`/absent = any channel (omni). */
+export interface MidiSource {
+    kind: MidiSourceKind;
+    channel?: number | null;
+    number: number;
+}
+
+/** Continuous mix fields a fader / expression pedal can drive. */
+export type MixField = "input_db" | "main_db" | "monitor_db" | "monitor_dry";
+
+/** One-shot actions (note on / CC crossing 64 upwards). */
+export type MidiAction = "next" | "prev" | "tap_tempo" | "panic" | "toggle_bypass" | "toggle_mute";
+
+/** What a binding controls (`kind`-tagged enum; params address the first insert of an effect kind). */
+export type MidiTarget =
+    | { kind: "param"; fx: string; param: string }
+    | { kind: "enable"; fx: string }
+    | { kind: "mix"; field: MixField }
+    | { kind: "action"; action: MidiAction };
+
+export interface MidiBinding {
+    source: MidiSource;
+    target: MidiTarget;
+}
+
+/** Persisted map (`midi.json`). */
+export interface MidiMap {
+    bindings: MidiBinding[];
+    program_change: boolean;
+    /** Listen only to this channel (0..15); `null` = omni. */
+    channel?: number | null;
+}
+
+export interface MidiState {
+    map: MidiMap;
+    /** Target waiting for the next CC / note (MIDI learn), `null` when idle. */
+    learning: MidiTarget | null;
+    /** Input ports the engine has open. */
+    ports: string[];
+    /** Last message seen, e.g. `"cc 1/64 = 100"`. */
+    last: string | null;
+}
+
 export interface SessionState {
     preset: string;
     chain: InsertState[];
@@ -58,7 +105,13 @@ export interface SessionState {
     setlist: Setlist | null;
     position: Position | null;
     presets: string[];
+    /** Built-in preset names (engines before 0.1.0+midi omit this). */
+    factory_presets?: string[];
+    /** Factory presets overridden by a user copy (engine 0.1.0+midi); only these can be reverted. */
+    modified_presets?: string[];
     bpm: number | null;
+    /** MIDI map, learn target, open ports, last message (omitted by older engines). */
+    midi?: MidiState;
     revision: number;
 }
 
@@ -129,6 +182,7 @@ export type ClientMsg =
     | { type: "move_insert"; insert: number; to: number }
     | { type: "load_preset"; name: string }
     | { type: "save_preset"; name: string }
+    | { type: "delete_preset"; name: string }
     | ({ type: "set_mix" } & MixPatch)
     | { type: "load_setlist"; setlist: Setlist }
     | { type: "goto"; song: number; part: number }
@@ -137,7 +191,70 @@ export type ClientMsg =
     | { type: "tap_tempo" }
     | { type: "panic" }
     | { type: "latency_probe" }
+    | { type: "midi_learn"; target: MidiTarget | null }
+    | { type: "midi_unbind"; index: number }
+    | { type: "midi_settings"; program_change?: boolean; channel?: number }
     | { type: "ping"; t: number };
+
+/* ── Client message builders for the MIDI / preset controls ───────────────────────────────── */
+
+/** Delete a user preset (a modified factory preset reverts; an unmodified one → `factory_preset`). */
+export function deletePreset(name: string): ClientMsg {
+    return { type: "delete_preset", name };
+}
+
+/** Arm MIDI learn for `target`; `null` cancels the pending learn. */
+export function midiLearn(target: MidiTarget | null): ClientMsg {
+    return { type: "midi_learn", target };
+}
+
+/** Remove the binding at `index` in `state.midi.map.bindings`. */
+export function midiUnbind(index: number): ClientMsg {
+    return { type: "midi_unbind", index: Math.max(0, Math.trunc(index)) };
+}
+
+/**
+ * Change MIDI settings. `channel` is the wire form: 0 = omni, 1..16 = that channel
+ * (the map stores it 0-based, so `state.midi.map.channel` is one lower).
+ */
+export function midiSettings(patch: { program_change?: boolean; channel?: number }): ClientMsg {
+    return {
+        type: "midi_settings",
+        ...(patch.program_change === undefined ? {} : { program_change: patch.program_change }),
+        ...(patch.channel === undefined ? {} : { channel: Math.min(16, Math.max(0, Math.trunc(patch.channel))) }),
+    };
+}
+
+/** Wire channel (0 = omni, 1..16) from the 0-based map channel. */
+export function wireChannel(mapChannel: number | null | undefined): number {
+    return mapChannel == null ? 0 : mapChannel + 1;
+}
+
+/** Stable key for a target, so UI controls can tell "is this the one being learned?". */
+export function targetKey(target: MidiTarget): string {
+    switch (target.kind) {
+        case "param":
+            return `param:${target.fx}:${target.param}`;
+        case "enable":
+            return `enable:${target.fx}`;
+        case "mix":
+            return `mix:${target.field}`;
+        case "action":
+            return `action:${target.action}`;
+    }
+}
+
+/** True when `learning` is armed for exactly this target. */
+export function isLearning(learning: MidiTarget | null | undefined, target: MidiTarget): boolean {
+    return !!learning && targetKey(learning) === targetKey(target);
+}
+
+/** Human-readable source, e.g. `CC 80 · ch 1` / `Note 36 · omni`. */
+export function sourceLabel(source: MidiSource, omni: string): string {
+    const kind = source.kind === "cc" ? "CC" : "Note";
+    const ch = source.channel == null ? omni : String(source.channel + 1);
+    return `${kind} ${source.number} · ${ch}`;
+}
 
 const KNOWN = new Set(["hello", "state", "meters", "ack", "error", "pong"]);
 

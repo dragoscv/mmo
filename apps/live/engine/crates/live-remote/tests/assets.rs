@@ -75,3 +75,38 @@ fn page_carries_both_locales() {
     assert!(kr.len() > 20);
     assert_eq!(kr, ke, "RO and EN string tables have the same keys");
 }
+
+#[test]
+fn page_exposes_midi_and_preset_controls() {
+    for needle in [
+        "midi_learn",
+        "midi_unbind",
+        "midi_settings",
+        "delete_preset",
+        "factory_presets",
+        "id=\"learnbar\"",
+        "id=\"midibinds\"",
+        "id=\"midich\"",
+        "id=\"midipc\"",
+        "id=\"midiports\"",
+    ] {
+        assert!(PAGE.contains(needle), "remote page is missing `{needle}`");
+    }
+    for action in [
+        "\"next\"",
+        "\"prev\"",
+        "\"tap_tempo\"",
+        "\"panic\"",
+        "\"toggle_bypass\"",
+        "\"toggle_mute\"",
+    ] {
+        assert!(
+            PAGE.contains(action),
+            "no MIDI learn button for action {action}"
+        );
+    }
+    assert!(
+        PAGE.contains("class=\"card wide ctl ctrl-only\" id=\"midi\""),
+        "the MIDI panel must stay controller-only"
+    );
+}

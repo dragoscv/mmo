@@ -44,7 +44,7 @@ public struct LiveError: Equatable, Sendable {
     /// Catalog key for the error code (`live.error.<code>`).
     public var key: String {
         let known = ["unauthorized", "forbidden", "bad_request", "unknown_insert", "unknown_param", "unknown_preset", "unknown_fx",
-                     "chain_full", "no_setlist", "rate_limited"]
+                     "chain_full", "no_setlist", "factory_preset", "unknown_binding", "rate_limited"]
         return "live.error." + (known.contains(code) ? code : "generic")
     }
 }

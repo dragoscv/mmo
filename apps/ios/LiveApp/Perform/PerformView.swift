@@ -139,9 +139,11 @@ struct MixSliders: View {
 struct PresetsCard: View {
     @Environment(LiveSession.self) private var session
     let state: SessionState
+    @State private var removing: String?
 
     var body: some View {
         let ok = session.model.can(.loadPreset(name: ""))
+        let manage = session.model.can(.deletePreset(name: ""))
         VStack(alignment: .leading, spacing: 10) {
             Text("live.perform.presets").font(.caption.weight(.semibold)).foregroundStyle(LiveTheme.muted)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -157,12 +159,36 @@ struct PresetsCard: View {
                         .buttonStyle(.plain)
                         .disabled(!ok)
                         .accessibilityAddTraits(on ? .isSelected : [])
+                        .contextMenu {
+                            if manage && state.isRemovable(p) {
+                                // Factory presets are reverted (the engine refuses an unmodified one), user presets deleted.
+                                Button(role: .destructive) { removing = p } label: {
+                                    if state.isFactory(p) {
+                                        Label("live.preset.revert", systemImage: "arrow.uturn.backward")
+                                    } else {
+                                        Label("live.preset.delete", systemImage: "trash")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
+            if manage { Text("live.preset.manage_hint").font(.caption2).foregroundStyle(LiveTheme.muted) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .liveCard()
+        .confirmationDialog(Text(verbatim: removing ?? ""), isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+                            titleVisibility: .visible, presenting: removing) { name in
+            if state.isFactory(name) {
+                Button("live.preset.revert_confirm", role: .destructive) { session.client.send(.deletePreset(name: name)) }
+            } else {
+                Button("live.preset.delete_confirm", role: .destructive) { session.client.send(.deletePreset(name: name)) }
+            }
+            Button("common.cancel", role: .cancel) {}
+        } message: { name in
+            Text(LocalizedStringKey(state.isFactory(name) ? "live.preset.revert_message" : "live.preset.delete_message"))
+        }
     }
 }
 

@@ -58,6 +58,8 @@ fun errorText(code: String, message: String): String = when (code) {
     "rate_limited" -> stringResource(R.string.err_rate_limited)
     "no_setlist" -> stringResource(R.string.err_no_setlist)
     "unknown_preset" -> stringResource(R.string.err_unknown_preset)
+    "factory_preset" -> stringResource(R.string.err_factory_preset)
+    "unknown_binding" -> stringResource(R.string.err_unknown_binding)
     else -> stringResource(R.string.err_generic, message.ifBlank { code })
 }
 
@@ -84,6 +86,8 @@ fun EngineSlider(
     enabled: Boolean,
     onSend: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    /** Extra behaviour on the label row only (e.g. long-press MIDI learn); the slider stays draggable. */
+    labelModifier: Modifier = Modifier,
 ) {
     var drag by remember { mutableStateOf<Float?>(null) }
     val send by rememberUpdatedState(onSend)
@@ -91,7 +95,7 @@ fun EngineSlider(
     val shown = drag ?: engineValue.coerceIn(range.start, range.endInclusive)
     val valueText = format(shown)
     Column(modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(labelModifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(label, style = MaterialTheme.typography.labelLarge)
             Text(valueText, style = MaterialTheme.typography.labelMedium, color = Mixai.colors.muted)
         }

@@ -1,14 +1,78 @@
-/** Presets bar: one-click recall (load_preset) + "save as" (save_preset). */
+/** Presets bar: one-click recall (load_preset), "save as" (save_preset), delete / revert (delete_preset). */
 import { useState, type FormEvent } from "react";
 import { motion } from "motion/react";
-import { Save } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, cn } from "@mmo/ui";
+import { RotateCcw, Save, Trash2 } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    cn,
+} from "@mmo/ui";
 import { useT } from "../i18n";
+import { deletePreset } from "../lib/protocol";
 import { EMPTY_CHAIN, useStore } from "../store";
+import { MidiLearnButton } from "./MidiLearn";
+
+/**
+ * Delete (user preset) or revert (user copy of a factory preset) for the current preset. The state only
+ * lists factory NAMES, not whether a factory preset was modified, so "revert" is offered for every
+ * factory name; the engine answers `factory_preset` when it is already the factory version.
+ */
+function DeletePreset({ name, factory }: { name: string; factory: boolean }) {
+    const t = useT();
+    const send = useStore((s) => s.send);
+    const canEdit = useStore((s) => s.proto.hello?.role === "controller");
+    const [open, setOpen] = useState(false);
+    if (!name || !canEdit) return null;
+    const label = factory ? t("presets.revert") : t("presets.delete");
+    return (
+        <>
+            <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`${label}: ${name}`}
+                title={`${label}: ${name}`}
+                className={factory ? undefined : "hover:text-destructive"}
+                onClick={() => setOpen(true)}
+            >
+                {factory ? <RotateCcw /> : <Trash2 />}
+            </Button>
+            <AlertDialog open={open} onOpenChange={setOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{factory ? t("presets.revertTitle", { name }) : t("presets.deleteTitle", { name })}</AlertDialogTitle>
+                        <AlertDialogDescription>{factory ? t("presets.revertBody") : t("presets.deleteBody")}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>{t("presets.cancel")}</AlertDialogCancel>
+                        <AlertDialogAction variant={factory ? "default" : "destructive"} onClick={() => send(deletePreset(name))}>
+                            {factory ? t("presets.revertConfirm") : t("presets.deleteConfirm")}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
+    );
+}
 
 export function PresetsBar() {
     const t = useT();
     const presets: string[] = useStore((s) => s.proto.state?.presets ?? EMPTY_CHAIN);
+    const factory: string[] = useStore((s) => s.proto.state?.factory_presets ?? EMPTY_CHAIN);
+    const modified: string[] = useStore((s) => s.proto.state?.modified_presets ?? EMPTY_CHAIN);
     const current = useStore((s) => s.proto.state?.preset ?? "");
     const send = useStore((s) => s.send);
     const notify = useStore((s) => s.notify);
@@ -48,6 +112,9 @@ export function PresetsBar() {
                     );
                 })}
             </div>
+            {presets.includes(current) && (!factory.includes(current) || modified.includes(current)) ? (
+                <DeletePreset name={current} factory={factory.includes(current)} />
+            ) : null}
             <Button
                 variant="outline"
                 size="sm"
@@ -93,24 +160,27 @@ export function TapTempo() {
     const send = useStore((s) => s.send);
     const [pulse, setPulse] = useState(0);
     return (
-        <Button
-            variant="outline"
-            className="relative w-32 overflow-hidden tabular-nums"
-            aria-label={`${t("tap.label")} (T)`}
-            onClick={() => {
-                send({ type: "tap_tempo" });
-                setPulse((p) => p + 1);
-            }}
-        >
-            <motion.span
-                key={pulse}
-                aria-hidden
-                className="absolute inset-0 bg-primary/25"
-                initial={{ opacity: pulse ? 1 : 0 }}
-                animate={{ opacity: 0 }}
-                transition={{ duration: 0.35 }}
-            />
-            <span className="relative">{bpm ? t("tap.bpm", { bpm: Math.round(bpm) }) : t("tap.none")}</span>
-        </Button>
+        <div className="flex items-center gap-0.5">
+            <Button
+                variant="outline"
+                className="relative w-32 overflow-hidden tabular-nums"
+                aria-label={`${t("tap.label")} (T)`}
+                onClick={() => {
+                    send({ type: "tap_tempo" });
+                    setPulse((p) => p + 1);
+                }}
+            >
+                <motion.span
+                    key={pulse}
+                    aria-hidden
+                    className="absolute inset-0 bg-primary/25"
+                    initial={{ opacity: pulse ? 1 : 0 }}
+                    animate={{ opacity: 0 }}
+                    transition={{ duration: 0.35 }}
+                />
+                <span className="relative">{bpm ? t("tap.bpm", { bpm: Math.round(bpm) }) : t("tap.none")}</span>
+            </Button>
+            <MidiLearnButton target={{ kind: "action", action: "tap_tempo" }} label={t("tap.label")} />
+        </div>
     );
 }

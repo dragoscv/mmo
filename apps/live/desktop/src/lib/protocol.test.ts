@@ -2,14 +2,22 @@ import { describe, expect, it } from "vitest";
 import {
     applyOptimistic,
     currentPart,
+    deletePreset,
     initialProtocol,
+    isLearning,
     linToDb,
+    midiLearn,
+    midiSettings,
+    midiUnbind,
     moveItem,
     noteName,
     parseServer,
     parseSetlist,
     reduce,
+    sourceLabel,
+    targetKey,
     trackPending,
+    wireChannel,
     type SessionState,
 } from "./protocol";
 
@@ -105,5 +113,54 @@ describe("helpers", () => {
         expect(noteName(-1)).toBe("–");
         expect(linToDb(1)).toBeCloseTo(0);
         expect(linToDb(0)).toBe(-90);
+    });
+});
+
+describe("MIDI and preset messages (serde shapes of live_engine::control::Control)", () => {
+    it("builds delete_preset and midi_learn with a kind-tagged target or null", () => {
+        expect(deletePreset("Pop Polish")).toEqual({ type: "delete_preset", name: "Pop Polish" });
+        expect(JSON.parse(JSON.stringify(midiLearn({ kind: "param", fx: "reverb", param: "mix" })))).toEqual({
+            type: "midi_learn",
+            target: { kind: "param", fx: "reverb", param: "mix" },
+        });
+        expect(midiLearn({ kind: "action", action: "toggle_bypass" })).toEqual({ type: "midi_learn", target: { kind: "action", action: "toggle_bypass" } });
+        expect(midiLearn({ kind: "mix", field: "monitor_dry" })).toEqual({ type: "midi_learn", target: { kind: "mix", field: "monitor_dry" } });
+        // null must be sent explicitly (cancel), not dropped.
+        expect(JSON.stringify(midiLearn(null))).toBe('{"type":"midi_learn","target":null}');
+    });
+
+    it("builds midi_unbind and midi_settings with only the given fields, channel clamped to 0..16", () => {
+        expect(midiUnbind(2)).toEqual({ type: "midi_unbind", index: 2 });
+        expect(midiUnbind(-1)).toEqual({ type: "midi_unbind", index: 0 });
+        expect(midiSettings({ program_change: false })).toEqual({ type: "midi_settings", program_change: false });
+        expect(midiSettings({ channel: 0 })).toEqual({ type: "midi_settings", channel: 0 });
+        expect(midiSettings({ channel: 99 })).toEqual({ type: "midi_settings", channel: 16 });
+        expect(JSON.stringify(midiSettings({}))).toBe('{"type":"midi_settings"}');
+    });
+
+    it("maps the 0-based map channel to the 1..16 wire channel and labels sources", () => {
+        expect(wireChannel(null)).toBe(0);
+        expect(wireChannel(undefined)).toBe(0);
+        expect(wireChannel(0)).toBe(1);
+        expect(wireChannel(15)).toBe(16);
+        expect(sourceLabel({ kind: "cc", channel: 0, number: 80 }, "omni")).toBe("CC 80 · 1");
+        expect(sourceLabel({ kind: "note", channel: null, number: 36 }, "omni")).toBe("Note 36 · omni");
+    });
+
+    it("matches the armed learn target by value", () => {
+        const t = { kind: "param", fx: "reverb", param: "mix" } as const;
+        expect(isLearning({ kind: "param", fx: "reverb", param: "mix" }, t)).toBe(true);
+        expect(isLearning({ kind: "param", fx: "reverb", param: "size" }, t)).toBe(false);
+        expect(isLearning(null, t)).toBe(false);
+        expect(targetKey({ kind: "enable", fx: "delay" })).not.toBe(targetKey({ kind: "param", fx: "delay", param: "enable" }));
+    });
+
+    it("accepts a state with midi + factory_presets and one without (older engines)", () => {
+        const withMidi = state(1, {
+            factory_presets: ["Natural Vocal"],
+            midi: { map: { bindings: [], program_change: true, channel: null }, learning: null, ports: ["Pedal"], last: "cc 1/4 = 10" },
+        });
+        expect(parseServer(JSON.stringify({ type: "state", state: withMidi }))?.type).toBe("state");
+        expect(parseServer(JSON.stringify({ type: "state", state: state(2) }))?.type).toBe("state");
     });
 });

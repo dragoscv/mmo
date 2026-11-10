@@ -37,6 +37,7 @@
     <string name="tab_perform">Scenă</string>
     <string name="tab_setlist">Program</string>
     <string name="tab_chain">Efecte</string>
+    <string name="tab_midi">MIDI</string>
     <string name="meter_in">INTRARE</string>
     <string name="meter_out">IEȘIRE</string>
     <string name="clip">SATURAT</string>
@@ -56,6 +57,14 @@
     <string name="db_value">%1$.1f dB</string>
     <string name="percent_value">%1$d %%</string>
     <string name="presets">Presetări</string>
+    <string name="preset_delete">Șterge presetarea %1$s</string>
+    <string name="preset_delete_title">Ștergi presetarea?</string>
+    <string name="preset_delete_body">„%1$s” este eliminată din motor. Acțiunea nu poate fi anulată.</string>
+    <string name="preset_delete_confirm">Șterge</string>
+    <string name="preset_revert">Readu presetarea %1$s la varianta din fabrică</string>
+    <string name="preset_revert_title">Revii la varianta din fabrică?</string>
+    <string name="preset_revert_body">„%1$s” este o presetare din fabrică: modificările tale se pierd și revine varianta originală.</string>
+    <string name="preset_revert_confirm">Revino</string>
     <string name="tuner">Acordor</string>
     <string name="tuner_cents">%1$+.0f cenți</string>
     <string name="dsp_load">DSP %1$d %%</string>
@@ -79,11 +88,41 @@
     <string name="retry">Reîncearcă</string>
     <string name="enabled">Activ</string>
 
+    <!-- MIDI -->
+    <string name="midi_controller_only">Pentru maparea MIDI e nevoie de o asociere cu control complet.</string>
+    <string name="midi_learn">Învățare MIDI</string>
+    <string name="midi_learn_long_press">Ține apăsat pe o comandă ca s-o mapezi pe o pedală sau un buton.</string>
+    <string name="midi_learn_waiting">Aștept MIDI… %1$s</string>
+    <string name="midi_learn_hint">Mișcă pedala sau apasă butonul pe care vrei să-l folosești.</string>
+    <string name="midi_waiting_short">aștept MIDI…</string>
+    <string name="midi_ports">Intrări MIDI</string>
+    <string name="midi_no_ports">Motorul nu are nicio intrare MIDI deschisă.</string>
+    <string name="midi_no_activity">Încă nu s-a primit niciun mesaj MIDI.</string>
+    <string name="midi_bindings">Mapări</string>
+    <string name="midi_no_bindings">Nu este mapat nimic încă.</string>
+    <string name="midi_unbind">Elimină această mapare</string>
+    <string name="midi_settings">Setări MIDI</string>
+    <string name="midi_program_change">Schimbare de program</string>
+    <string name="midi_program_change_hint">Numerele de program apelează partea de piesă corespunzătoare.</string>
+    <string name="midi_channel">Canal</string>
+    <string name="midi_channel_omni">Toate</string>
+    <string name="midi_source_cc">CC %1$d</string>
+    <string name="midi_source_note">Notă %1$d</string>
+    <string name="midi_source_channel">canal %1$d</string>
+    <string name="midi_source_channel_any">orice canal</string>
+    <string name="midi_target_param">%1$s · %2$s</string>
+    <string name="midi_target_enable">%1$s pornit/oprit</string>
+    <string name="midi_target_unknown">Țintă necunoscută (%1$s)</string>
+    <string name="midi_action_toggle_bypass">Comută ocolirea</string>
+    <string name="midi_action_toggle_mute">Comută mutul</string>
+
     <!-- Erori de la motor (coduri de protocol) -->
     <string name="err_forbidden">Această asociere nu poate face asta.</string>
     <string name="err_rate_limited">Prea multe modificări deodată; mai încet.</string>
     <string name="err_no_setlist">Nu este încărcat niciun program.</string>
     <string name="err_unknown_preset">Presetarea nu mai există.</string>
+    <string name="err_factory_preset">Este o presetare din fabrică, fără modificări de anulat.</string>
+    <string name="err_unknown_binding">Maparea nu mai există.</string>
     <string name="err_generic">Eroare de la motor: %1$s</string>
 
     <string name="watch_sent">Trimis la ceas</string>

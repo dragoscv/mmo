@@ -48,7 +48,7 @@ matching `ack` or `error`.
 | `ack` | `id` | command applied |
 | `error` | `id?, code, message` | codes: `unauthorized`, `forbidden`, `bad_request`, `unknown_insert`, `unknown_param`, `unknown_preset`, `unknown_fx`, `chain_full`, `no_setlist`, `factory_preset`, `unknown_binding`, `rate_limited` |
 
-`SessionState` (additive since engine 0.1.0+midi): `preset, chain, mix, setlist, position, presets, factory_presets,
+`SessionState` (additive since engine 0.1.0+midi): `preset, chain, mix, setlist, position, presets, factory_presets, modified_presets` (factory presets overridden by a user copy — only these can be reverted),
 bpm, midi: { map: MidiMap, learning: MidiTarget | null, ports: [string], last: string | null }, revision`. The MIDI
 types are described in [MIDI control](midi.md).
 

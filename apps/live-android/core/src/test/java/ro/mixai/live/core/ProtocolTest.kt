@@ -39,6 +39,96 @@ class ProtocolTest {
         assertNull(s.bpm)
     }
 
+    @Test fun olderEngineWithoutMidiOrFactoryPresetsStillParses() {
+        val s = (ServerMsg.parse(stateJson) as ServerMsg.StateMsg).state
+        assertEquals(emptyList<String>(), s.factoryPresets)
+        assertEquals(MidiState(), s.midi)
+        assertTrue(s.midi.map.programChange)
+        assertNull(s.midi.map.channel)
+        assertNull(s.midi.learning)
+        assertFalse(s.isFactoryPreset("Warm Vocal"))
+    }
+
+    @Test fun parsesMidiStateAndFactoryPresets() {
+        val json = """
+            {"type":"state","state":{"preset":"Big","chain":[],"mix":{},"setlist":null,"position":null,
+             "presets":["Warm Vocal","Big","Mine"],"factory_presets":["Warm Vocal","Big"],"bpm":120.0,
+             "midi":{"map":{"bindings":[
+               {"source":{"kind":"cc","channel":0,"number":80},"target":{"kind":"action","action":"next"}},
+               {"source":{"kind":"cc","channel":null,"number":4},"target":{"kind":"param","fx":"reverb","param":"mix"}},
+               {"source":{"kind":"note","channel":9,"number":36},"target":{"kind":"mix","field":"monitor_dry"}},
+               {"source":{"kind":"cc","channel":2,"number":7},"target":{"kind":"enable","fx":"comp"}},
+               {"source":{"kind":"cc","channel":2,"number":8},"target":{"kind":"something_new","x":1}}],
+              "program_change":false,"channel":3},
+              "learning":{"kind":"param","fx":"reverb","param":"mix"},
+              "ports":["BT Pedal","USB MIDI"],"last":"cc 1/64 = 100"},
+             "revision":12}}
+        """.trimIndent()
+        val s = (ServerMsg.parse(json) as ServerMsg.StateMsg).state
+        assertEquals(listOf("Warm Vocal", "Big"), s.factoryPresets)
+        assertTrue(s.isFactoryPreset("Big"))
+        assertFalse(s.isFactoryPreset("Mine"))
+        val map = s.midi.map
+        assertEquals(5, map.bindings.size)
+        assertFalse(map.programChange)
+        assertEquals(3, map.channel)
+        assertEquals(MidiSource("cc", 0, 80), map.bindings[0].source)
+        assertEquals(MidiTarget.Action(MidiAction.NEXT), map.bindings[0].target)
+        assertNull(map.bindings[1].source.channel)
+        assertEquals(MidiTarget.Param("reverb", "mix"), map.bindings[1].target)
+        assertTrue(map.bindings[2].source.isNote)
+        assertEquals(MidiTarget.Mix(MixField.MONITOR_DRY), map.bindings[2].target)
+        assertEquals(MidiTarget.Enable("comp"), map.bindings[3].target)
+        assertTrue(map.bindings[4].target is MidiTarget.Unknown)
+        assertEquals("something_new", map.bindings[4].target.kind)
+        assertEquals(MidiTarget.Param("reverb", "mix"), s.midi.learning)
+        assertEquals(listOf("BT Pedal", "USB MIDI"), s.midi.ports)
+        assertEquals("cc 1/64 = 100", s.midi.last)
+    }
+
+    @Test fun midiTargetsRoundTripThroughTheRustSerdeForm() {
+        val cases = listOf(
+            MidiTarget.Param("reverb", "mix") to """{"kind":"param","fx":"reverb","param":"mix"}""",
+            MidiTarget.Enable("comp") to """{"kind":"enable","fx":"comp"}""",
+            MidiTarget.Mix(MixField.MAIN_DB) to """{"kind":"mix","field":"main_db"}""",
+            MidiTarget.Action(MidiAction.TOGGLE_BYPASS) to """{"kind":"action","action":"toggle_bypass"}""",
+        )
+        cases.forEach { (target, wire) ->
+            assertEquals(obj(wire), target.toJson())
+            assertEquals(target, MidiTarget.fromJson(obj(wire)))
+        }
+        // Every action / mix field name the engine can send is understood.
+        assertEquals(MidiAction.TAP_TEMPO, MidiAction.parse("tap_tempo"))
+        assertEquals(MidiAction.TOGGLE_MUTE, MidiAction.parse("toggle_mute"))
+        assertNull(MidiAction.parse("sing"))
+        assertEquals(MixField.INPUT_DB, MixField.parse("input_db"))
+        assertEquals(MixField.MONITOR_DB, MixField.parse("monitor_db"))
+        assertNull(MixField.parse("nope"))
+    }
+
+    @Test fun encodesMidiAndPresetControlsLikeTheRustControlEnum() {
+        assertEquals(
+            """{"type":"midi_learn","target":{"kind":"param","fx":"reverb","param":"mix"}}""",
+            ClientMsg.MidiLearn(MidiTarget.Param("reverb", "mix")).toJson(),
+        )
+        assertEquals("""{"type":"midi_learn","target":null}""", ClientMsg.MidiLearn(null).toJson())
+        assertEquals("""{"type":"midi_learn","id":4,"target":null}""", ClientMsg.MidiLearn(null).toJson(4))
+        assertEquals("""{"type":"midi_unbind","index":2}""", ClientMsg.MidiUnbind(2).toJson())
+        assertEquals("""{"type":"delete_preset","name":"Mine"}""", ClientMsg.DeletePreset("Mine").toJson())
+
+        val omni = obj(ClientMsg.MidiSettings(channel = 0).toJson())
+        assertEquals(0, omni["channel"]!!.jsonPrimitive.content.toInt())
+        assertFalse(omni.containsKey("program_change"))
+        val pc = obj(ClientMsg.MidiSettings(programChange = true).toJson())
+        assertEquals("true", pc["program_change"]!!.jsonPrimitive.content)
+        assertFalse(pc.containsKey("channel"))
+        assertEquals(16, obj(ClientMsg.MidiSettings(channel = 99).toJson())["channel"]!!.jsonPrimitive.content.toInt())
+
+        listOf(
+            ClientMsg.MidiLearn(null), ClientMsg.MidiUnbind(0), ClientMsg.MidiSettings(channel = 1), ClientMsg.DeletePreset("x"),
+        ).forEach { assertEquals(Role.CONTROLLER, it.required) }
+    }
+
     @Test fun parsesHelloMetersAckErrorPong() {
         val h = ServerMsg.parse(
             """{"type":"hello","protocol":1,"version":"0.1.0","role":"performer","engine_name":"Stage","sample_rate":48000,

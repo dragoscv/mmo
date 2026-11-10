@@ -61,6 +61,17 @@
   .fx[data-on="false"] { opacity: 0.6; }
   .fxh { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
   .fxh h3 { font-size: 0.9375rem; margin: 0; }
+  .mh { font-family: var(--font-heading); font-size: 0.9375rem; margin: 0.75rem 0 0.25rem; }
+  label.sl2 { grid-template-columns: 7rem 1fr; }
+  .mini { min-width: 2.5rem; padding: 0 0.5rem; font-size: 0.8125rem; font-weight: 700; }
+  .pbox { display: flex; gap: 0.125rem; }
+  .prow { display: flex; align-items: center; gap: 0.375rem; }
+  .prow > label { flex: 1 1 auto; min-width: 0; }
+  .binds { list-style: none; margin: 0; padding: 0; }
+  .binds > li { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+  .src { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--muted-foreground); }
+  .learnbar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0.5rem 0; padding: 0.375rem 0.5rem;
+    border: 1px solid var(--primary); border-radius: var(--radius); color: var(--primary); font-size: 0.875rem; }
   .toast { position: fixed; left: 50%; bottom: calc(var(--safe-bottom) + 1rem); transform: translateX(-50%); max-width: 90vw;
     background: var(--destructive); color: var(--destructive-foreground, var(--foreground)); padding: 0.625rem 1rem; border-radius: var(--radius);
     font-weight: 600; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
@@ -119,6 +130,23 @@
     <h2 id="c-h" data-i18n="chain">Chain</h2>
     <div id="chain"></div>
   </section>
+  <section class="card wide ctl ctrl-only" id="midi" aria-labelledby="mi-h">
+    <h2 id="mi-h" data-i18n="midi">MIDI</h2>
+    <div class="learnbar" id="learnbar" role="status" aria-live="polite" hidden>
+      <span id="learntxt"></span>
+      <button id="learncancel" data-i18n="cancel">Cancel</button>
+    </div>
+    <div class="info" id="midiports"></div>
+    <div class="info" id="midilast"></div>
+    <div class="row">
+      <label class="sl sl2"><span data-i18n="midiChannel">Channel</span><select id="midich"></select></label>
+      <button id="midipc" aria-pressed="false" data-i18n="programChange">Program change</button>
+    </div>
+    <h3 class="mh" data-i18n="actions">Actions</h3>
+    <div class="chips" id="midiactions"></div>
+    <h3 class="mh" data-i18n="bindings">Bindings</h3>
+    <ul class="binds" id="midibinds"></ul>
+  </section>
 </main>
 <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
 <script>
@@ -134,7 +162,11 @@
     controller: "control", performer: "interpret", viewer: "vizualizare", dsp: "DSP", buffer: "tampon", correction: "corecție", cents: "cenți",
     update: "Actualizează aplicația: protocol nou", noToken: "Lipsește codul de acces din adresă.",
     gate: "Poartă de zgomot", eq: "Egalizator", deesser: "De-esser", compressor: "Compresor", autotune: "Autotune", harmonizer: "Armonizator",
-    saturator: "Saturator", doubler: "Dublare", chorus: "Chorus", delay: "Ecou", reverb: "Reverberație", limiter: "Limitator"
+    saturator: "Saturator", doubler: "Dublare", chorus: "Chorus", delay: "Ecou", reverb: "Reverberație", limiter: "Limitator",
+    midi: "MIDI", midiChannel: "Canal", omni: "Toate canalele", programChange: "Schimbare de program", actions: "Acțiuni", bindings: "Asocieri",
+    learn: "Învață", learnWaiting: "Mișcă pedala sau apasă o tastă pentru", cancel: "Renunță", unbind: "Șterge", noBindings: "Nicio asociere.",
+    ports: "Porturi", noPorts: "Niciun port MIDI deschis.", lastMsg: "Ultimul mesaj", deletePreset: "Șterge presetarea",
+    revertPreset: "Revino la varianta din fabrică", confirmAgain: "Atinge din nou", tapTempo: "Tempo", toggleBypass: "Ocolire", toggleMute: "Mut"
   } : {
     title: "MixAI Live Remote", meters: "Meters", input: "Input", outL: "Out L", outR: "Out R", clip: "CLIP",
     tuner: "Tuner", perform: "Performance", panic: "PANIC", panicConfirm: "Tap again", mute: "Mute", bypass: "Bypass",
@@ -144,7 +176,11 @@
     controller: "controller", performer: "performer", viewer: "viewer", dsp: "DSP", buffer: "buffer", correction: "correction", cents: "cents",
     update: "Update the app: newer protocol", noToken: "The access code is missing from the address.",
     gate: "Noise gate", eq: "Equalizer", deesser: "De-esser", compressor: "Compressor", autotune: "Autotune", harmonizer: "Harmonizer",
-    saturator: "Saturator", doubler: "Doubler", chorus: "Chorus", delay: "Delay", reverb: "Reverb", limiter: "Limiter"
+    saturator: "Saturator", doubler: "Doubler", chorus: "Chorus", delay: "Delay", reverb: "Reverb", limiter: "Limiter",
+    midi: "MIDI", midiChannel: "Channel", omni: "All channels", programChange: "Program change", actions: "Actions", bindings: "Bindings",
+    learn: "Learn", learnWaiting: "Move the pedal or press a key for", cancel: "Cancel", unbind: "Remove", noBindings: "No bindings yet.",
+    ports: "Ports", noPorts: "No MIDI port open.", lastMsg: "Last message", deletePreset: "Delete preset",
+    revertPreset: "Revert to the factory version", confirmAgain: "Tap again", tapTempo: "Tap tempo", toggleBypass: "Bypass", toggleMute: "Mute"
   };
   document.documentElement.lang = ro ? "ro" : "en";
   document.querySelectorAll("[data-i18n]").forEach(e => { e.textContent = T[e.dataset.i18n]; });
@@ -204,6 +240,69 @@
   const fxLabel = id => T[id] || id;
   const paramLabel = p => p.replace(/_/g, " ");
 
+  // MIDI ------------------------------------------------------------------
+  const MIDI_ACTIONS = ["next", "prev", "tap_tempo", "panic", "toggle_bypass", "toggle_mute"];
+  const ACT_T = { next: "next", prev: "prev", tap_tempo: "tapTempo", panic: "panic", toggle_bypass: "toggleBypass", toggle_mute: "toggleMute" };
+  const MIX_T = { input_db: "inputDb", main_db: "mainDb", monitor_db: "monitorDb", monitor_dry: "monitorDry" };
+  const actLabel = a => T[ACT_T[a]] || a;
+  function targetLabel(t) {
+    if (!t) return "";
+    if (t.kind === "action") return actLabel(t.action);
+    if (t.kind === "param") return paramLabel(t.param) + " — " + fxLabel(t.fx);
+    if (t.kind === "enable") return fxLabel(t.fx) + ": " + T.on + "/" + T.off;
+    if (t.kind === "mix") return T[MIX_T[t.field]] || t.field;
+    return t.kind || "";
+  }
+  const sourceLabel = s => !s ? "" : s.kind + " " + (s.channel == null ? "*" : s.channel + 1) + "/" + s.number;
+  let learnWanted = null; // optimistic until the next state arrives
+  const learning = () => (state && state.midi && state.midi.learning) || learnWanted;
+  function learn(target) {
+    learnWanted = target; send({ type: "midi_learn", target }); renderMidi(state);
+  }
+  function learnBtn(target) {
+    const b = el("button", { className: "mini", type: "button" }, T.learn);
+    b.setAttribute("aria-label", T.learn + ": " + targetLabel(target));
+    b.addEventListener("click", () => learn(target));
+    return b;
+  }
+  $("learncancel").addEventListener("click", () => learn(null));
+  $("midipc").addEventListener("click", () => send({ type: "midi_settings", program_change: $("midipc").getAttribute("aria-pressed") !== "true" }));
+  (() => {
+    const s = $("midich");
+    s.append(el("option", { value: "0" }, T.omni));
+    for (let i = 1; i <= 16; i++) s.append(el("option", { value: String(i) }, String(i)));
+    s.addEventListener("change", () => send({ type: "midi_settings", channel: parseInt(s.value, 10) }));
+    const root = $("midiactions");
+    MIDI_ACTIONS.forEach(a => {
+      const b = learnBtn({ kind: "action", action: a });
+      b.textContent = actLabel(a) + " · " + T.learn;
+      root.append(b);
+    });
+  })();
+  function renderMidi(st) {
+    const m = (st && st.midi) || { map: { bindings: [] }, ports: [] };
+    const map = m.map || { bindings: [] };
+    const pend = learning();
+    $("learnbar").hidden = !pend;
+    $("learntxt").textContent = pend ? T.learnWaiting + " " + targetLabel(pend) : "";
+    $("midiports").textContent = (m.ports && m.ports.length) ? T.ports + ": " + m.ports.join(" · ") : T.noPorts;
+    $("midilast").textContent = m.last ? T.lastMsg + ": " + m.last : "";
+    $("midipc").setAttribute("aria-pressed", String(map.program_change !== false));
+    const sel = $("midich"); const ch = String(map.channel == null ? 0 : map.channel + 1);
+    if (!isFocused(sel) && sel.value !== ch) sel.value = ch;
+    const list = $("midibinds"); list.textContent = "";
+    const bs = map.bindings || [];
+    if (!bs.length) { list.append(el("li", {}, T.noBindings)); return; }
+    bs.forEach((b, i) => {
+      const li = el("li");
+      li.append(el("span", {}, targetLabel(b.target)), el("span", { className: "src" }, sourceLabel(b.source)));
+      const rm = el("button", { className: "mini", type: "button" }, "×");
+      rm.setAttribute("aria-label", T.unbind + ": " + targetLabel(b.target) + " " + sourceLabel(b.source));
+      rm.addEventListener("click", () => send({ type: "midi_unbind", index: i }));
+      li.append(rm); list.append(li);
+    });
+  }
+
   let chainSig = "";
   const chainCtl = {};
   function renderChain(chain) {
@@ -218,6 +317,7 @@
         h.append(h3, tog); card.append(h);
         const ctl = { card, tog, h3, params: {} };
         const def = fxCat && fxCat.find(f => f.id === ins.fx);
+        const prow = (node, pid) => { const d = el("div", { className: "prow" }); d.append(node, learnBtn({ kind: "param", fx: ins.fx, param: pid })); return d; };
         (KEY_PARAMS[ins.fx] || []).forEach(pid => {
           const pd = def && def.params.find(p => p.id === pid); if (!pd) return;
           const lab = paramLabel(pid) + " — " + fxLabel(ins.fx);
@@ -227,13 +327,13 @@
             pd.choices.forEach((c, i) => s.append(el("option", { value: String(i) }, String(c))));
             s.addEventListener("change", () => send({ type: "set_param", insert: ins.id, param: pid, value: parseFloat(s.value) }));
             l.append(el("span", {}, paramLabel(pid)), s, el("output", {}));
-            card.append(l);
+            card.append(prow(l, pid));
             ctl.params[pid] = { set(v) { if (!isFocused(s)) s.value = String(Math.round(v)); } };
           } else {
             const range = pd.max - pd.min; const step = range > 20 ? 0.5 : range > 2 ? 0.05 : 0.01;
             const sl = slider(paramLabel(pid), pd.min, pd.max, step, v => throttled("p:" + ins.id + ":" + pid, () => ({ type: "set_param", insert: ins.id, param: pid, value: v })), pd.unit || "");
             sl.input.setAttribute("aria-label", lab);
-            card.append(sl.root); ctl.params[pid] = sl;
+            card.append(prow(sl.root, pid)); ctl.params[pid] = sl;
           }
         });
         chainCtl[ins.id] = ctl; root.append(card);
@@ -275,11 +375,27 @@
 
   function renderPresets(st) {
     const root = $("presets"); root.textContent = "";
+    const fac = st.factory_presets || [];
+    const mod = st.modified_presets || [];
     (st.presets || []).forEach(name => {
+      const box = el("div", { className: "pbox" });
       const b = el("button", {}, name); b.setAttribute("aria-pressed", String(name === st.preset));
       b.addEventListener("click", () => send({ type: "load_preset", name }));
       if (role === "viewer") b.disabled = true;
-      root.append(b);
+      box.append(b);
+      const isFac = fac.indexOf(name) >= 0;
+      if (role === "controller" && (!isFac || mod.indexOf(name) >= 0)) {
+        const d = el("button", { className: "mini", type: "button" }, isFac ? "↺" : "×");
+        const lab = (isFac ? T.revertPreset : T.deletePreset) + ": " + name;
+        d.setAttribute("aria-label", lab); d.title = lab;
+        let arm = 0;
+        d.addEventListener("click", () => {
+          if (arm && performance.now() - arm < 2000) { arm = 0; send({ type: "delete_preset", name }); return; }
+          arm = performance.now(); toast(T.confirmAgain + " — " + lab);
+        });
+        box.append(d);
+      }
+      root.append(box);
     });
   }
 
@@ -291,7 +407,7 @@
     $("bypass").setAttribute("aria-pressed", String(!!m.bypass));
     $("bpm").textContent = st.bpm ? Math.round(st.bpm) + " BPM" : "";
     renderPresets(st); renderSetlist(st);
-    if (role === "controller") renderChain(st.chain || []);
+    if (role === "controller") { renderChain(st.chain || []); learnWanted = null; renderMidi(st); }
     buildGr(st.chain || []);
   }
 

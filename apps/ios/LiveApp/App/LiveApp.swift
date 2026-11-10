@@ -34,7 +34,7 @@ struct RootView: View {
     @Environment(LiveSession.self) private var session
     @State private var tab: Tab = .connect
 
-    enum Tab: Hashable { case perform, chain, connect }
+    enum Tab: Hashable { case perform, chain, midi, connect }
 
     var body: some View {
         TabView(selection: $tab) {
@@ -44,6 +44,9 @@ struct RootView: View {
             NavigationStack { ChainView() }
                 .tabItem { Label("live.tab.chain", systemImage: "slider.horizontal.3") }
                 .tag(Tab.chain)
+            NavigationStack { MidiView() }
+                .tabItem { Label("live.tab.midi", systemImage: "pianokeys") }
+                .tag(Tab.midi)
             NavigationStack { ConnectView() }
                 .tabItem { Label("live.tab.connect", systemImage: "antenna.radiowaves.left.and.right") }
                 .tag(Tab.connect)

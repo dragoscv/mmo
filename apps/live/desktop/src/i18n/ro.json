@@ -108,7 +108,46 @@
         "name": "Nume presetare",
         "saveConfirm": "Salvează",
         "cancel": "Anulează",
-        "saved": "Presetarea „{{name}}” a fost salvată"
+        "saved": "Presetarea „{{name}}” a fost salvată",
+        "delete": "Șterge presetarea",
+        "deleteTitle": "Ștergi „{{name}}”?",
+        "deleteBody": "Presetarea este eliminată de pe acest calculator. Părțile de cântec care o folosesc nu o vor mai încărca.",
+        "deleteConfirm": "Șterge",
+        "revert": "Revino la varianta din fabrică",
+        "revertTitle": "Readuci „{{name}}” la varianta din fabrică?",
+        "revertBody": "Modificările tale la această presetare predefinită se pierd și revine varianta din fabrică.",
+        "revertConfirm": "Revino"
+    },
+    "midi": {
+        "title": "Control MIDI",
+        "unavailable": "Această versiune a motorului nu are control MIDI.",
+        "learning": "Aștept MIDI: mișcă o pedală sau apasă un comutator ca să-l legi de {{target}}.",
+        "learnCancel": "Anulează învățarea MIDI",
+        "learnFor": "Învățare MIDI: {{name}}",
+        "learnTitle": "Învățare MIDI",
+        "learnHint": "Apasă un buton de învățare, apoi mișcă pedala sau apasă comutatorul pe care vrei să-l folosești. Parametrii efectelor au propriul buton de învățare (sau clic dreapta pe un buton rotativ).",
+        "contextHint": "Clic dreapta pe un control pentru învățare MIDI.",
+        "ports": "Porturi MIDI deschise",
+        "noPorts": "Nicio intrare MIDI găsită. Conectează un controler (sau asociază o pedală MIDI Bluetooth în sistem) și repornește motorul.",
+        "last": "Ultimul mesaj",
+        "noActivity": "niciunul încă",
+        "channel": "Ascultă pe canalul",
+        "omni": "Toate (omni)",
+        "channelN": "Canalul {{n}}",
+        "programChange": "Program change cheamă părțile de cântec",
+        "programChangeHint": "Un program change selectează partea din listă cu același număr de program.",
+        "bindings": "Asocieri",
+        "noBindings": "Nicio asociere încă.",
+        "unbind": "Elimină asocierea: {{target}}",
+        "enableTarget": "{{fx}} pornit/oprit",
+        "action": {
+            "next": "Partea următoare",
+            "prev": "Partea anterioară",
+            "tap_tempo": "Bate tempoul",
+            "panic": "Panică",
+            "toggle_bypass": "Ocolire pornit/oprit",
+            "toggle_mute": "Mut pornit/oprit"
+        }
     },
     "setlist": {
         "title": "Listă de cântece",
@@ -166,7 +205,12 @@
         "devices": "Nu am putut lista dispozitivele audio: {{message}}",
         "latency": "Măsurarea latenței a eșuat: {{message}}",
         "command": "{{message}}",
-        "notTauri": "Pornește MixAI Live ca aplicație desktop ca să folosești motorul audio."
+        "notTauri": "Pornește MixAI Live ca aplicație desktop ca să folosești motorul audio.",
+        "code": {
+            "factory_preset": "Aceasta este deja varianta din fabrică a presetării; presetările predefinite nu pot fi șterse.",
+            "unknown_binding": "Asocierea MIDI nu mai există.",
+            "unknown_preset": "Presetarea nu mai există."
+        }
     },
     "fx": {
         "gate": "Poartă",

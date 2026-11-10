@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Piano
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -113,7 +114,7 @@ private fun Connected(app: LiveApp, state: ClientState, snackbar: SnackbarHostSt
     // Haptic tick on every scene change (from any controller, foot switch or MIDI).
     LaunchedEffect(state.sceneChanges) { if (state.sceneChanges > 0) view.tick() }
     val showChain = state.role == Role.CONTROLLER
-    if (!showChain && tab == 2) tab = 0
+    if (!showChain && tab >= 2) tab = 0
     Scaffold(
         topBar = { StatusBar(app, state, onSwitch, onWatch) },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -123,6 +124,7 @@ private fun Connected(app: LiveApp, state: ClientState, snackbar: SnackbarHostSt
                 NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null) }, label = { Text(stringResource(R.string.tab_setlist)) })
                 if (showChain) {
                     NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, icon = { Icon(Icons.Filled.GraphicEq, null) }, label = { Text(stringResource(R.string.tab_chain)) })
+                    NavigationBarItem(selected = tab == 3, onClick = { tab = 3 }, icon = { Icon(Icons.Filled.Piano, null) }, label = { Text(stringResource(R.string.tab_midi)) })
                 }
             }
         },
@@ -131,7 +133,8 @@ private fun Connected(app: LiveApp, state: ClientState, snackbar: SnackbarHostSt
             when (tab) {
                 0 -> PerformScreen(app.client, state)
                 1 -> SetlistScreen(app.client, state)
-                else -> ChainScreen(app.client, state)
+                2 -> ChainScreen(app.client, state)
+                else -> MidiScreen(app.client, state)
             }
         }
     }

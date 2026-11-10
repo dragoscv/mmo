@@ -6,6 +6,7 @@ import { Button, cn } from "@mmo/ui";
 import { useT } from "../i18n";
 import { currentPart, parseSetlist } from "../lib/protocol";
 import { useStore } from "../store";
+import { MidiLearnButton } from "./MidiLearn";
 
 export function SetlistPanel() {
     const t = useT();
@@ -54,6 +55,7 @@ export function SetlistPanel() {
                         <Button variant="outline" size="icon" aria-label={`${t("setlist.prev")} (←)`} onClick={() => send({ type: "prev" })}>
                             <ChevronLeft />
                         </Button>
+                        <MidiLearnButton target={{ kind: "action", action: "prev" }} label={t("setlist.prev")} />
                         <div className="min-w-0 flex-1 text-center" aria-live="polite">
                             <div className="truncate font-heading text-base font-semibold">{cur?.song.title ?? "–"}</div>
                             <div className="truncate text-xs text-muted-foreground">
@@ -61,6 +63,7 @@ export function SetlistPanel() {
                                 {cur?.song.key || cur?.song.bpm ? ` · ${t("setlist.songMeta", { key: cur?.song.key ?? "–", bpm: cur?.song.bpm ?? "–" })}` : ""}
                             </div>
                         </div>
+                        <MidiLearnButton target={{ kind: "action", action: "next" }} label={t("setlist.next")} />
                         <Button variant="outline" size="icon" aria-label={`${t("setlist.next")} (→)`} onClick={() => send({ type: "next" })}>
                             <ChevronRight />
                         </Button>

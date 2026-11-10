@@ -143,6 +143,181 @@ public struct Setlist: Codable, Sendable, Equatable {
     }
 }
 
+// MARK: - MIDI (`live_engine::midi`, see docs/live/midi.md)
+
+public enum MidiSourceKind: String, Codable, Sendable, Equatable, Hashable, CaseIterable {
+    case cc, note
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = MidiSourceKind(rawValue: raw) ?? .cc
+    }
+}
+
+/// What a binding listens to. `channel: nil` = any channel (omni); channels are 0 based on the wire.
+public struct MidiSource: Codable, Sendable, Equatable, Hashable {
+    public var kind: MidiSourceKind
+    public var channel: UInt8?
+    public var number: UInt8
+
+    public init(kind: MidiSourceKind, channel: UInt8? = nil, number: UInt8) {
+        self.kind = kind; self.channel = channel; self.number = number
+    }
+
+    enum CodingKeys: String, CodingKey { case kind, channel, number }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = (try? c.decodeIfPresent(MidiSourceKind.self, forKey: .kind)) ?? .cc
+        channel = try? c.decodeIfPresent(UInt8.self, forKey: .channel)
+        number = (try? c.decodeIfPresent(UInt8.self, forKey: .number)) ?? 0
+    }
+
+    /// 1 based channel for display, nil when omni.
+    public var displayChannel: Int? { channel.map { Int($0) + 1 } }
+}
+
+/// Continuous mix fields a fader / expression pedal can drive.
+public enum MixField: String, Codable, Sendable, Equatable, Hashable, CaseIterable {
+    case inputDb = "input_db"
+    case mainDb = "main_db"
+    case monitorDb = "monitor_db"
+    case monitorDry = "monitor_dry"
+}
+
+/// One-shot actions (note on / CC crossing 64 upwards).
+public enum MidiAction: String, Codable, Sendable, Equatable, Hashable, CaseIterable {
+    case next, prev
+    case tapTempo = "tap_tempo"
+    case panic
+    case toggleBypass = "toggle_bypass"
+    case toggleMute = "toggle_mute"
+}
+
+/// What a binding controls (`kind` tagged, snake_case). Parameters address the first insert of an effect kind,
+/// so a binding survives a preset change.
+public enum MidiTarget: Codable, Sendable, Equatable, Hashable {
+    case param(fx: String, param: String)
+    case enable(fx: String)
+    case mix(field: MixField)
+    case action(action: MidiAction)
+    /// A target this app does not know: kept so binding indices (what `midi_unbind` addresses) stay correct.
+    case unknown(kind: String)
+
+    enum CodingKeys: String, CodingKey { case kind, fx, param, field, action }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = (try? c.decodeIfPresent(String.self, forKey: .kind)) ?? ""
+        switch kind {
+        case "param":
+            self = .param(fx: (try? c.decodeIfPresent(String.self, forKey: .fx)) ?? "",
+                          param: (try? c.decodeIfPresent(String.self, forKey: .param)) ?? "")
+        case "enable":
+            self = .enable(fx: (try? c.decodeIfPresent(String.self, forKey: .fx)) ?? "")
+        case "mix":
+            if let f = try? c.decodeIfPresent(MixField.self, forKey: .field) { self = .mix(field: f) } else { self = .unknown(kind: kind) }
+        case "action":
+            if let a = try? c.decodeIfPresent(MidiAction.self, forKey: .action) { self = .action(action: a) } else { self = .unknown(kind: kind) }
+        default:
+            self = .unknown(kind: kind)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .param(let fx, let param):
+            try c.encode("param", forKey: .kind)
+            try c.encode(fx, forKey: .fx)
+            try c.encode(param, forKey: .param)
+        case .enable(let fx):
+            try c.encode("enable", forKey: .kind)
+            try c.encode(fx, forKey: .fx)
+        case .mix(let field):
+            try c.encode("mix", forKey: .kind)
+            try c.encode(field, forKey: .field)
+        case .action(let action):
+            try c.encode("action", forKey: .kind)
+            try c.encode(action, forKey: .action)
+        case .unknown(let kind):
+            try c.encode(kind, forKey: .kind)
+        }
+    }
+}
+
+public struct MidiBinding: Codable, Sendable, Equatable, Hashable {
+    public var source: MidiSource
+    public var target: MidiTarget
+
+    public init(source: MidiSource, target: MidiTarget) { self.source = source; self.target = target }
+
+    enum CodingKeys: String, CodingKey { case source, target }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        source = (try? c.decodeIfPresent(MidiSource.self, forKey: .source)) ?? MidiSource(kind: .cc, number: 0)
+        target = (try? c.decodeIfPresent(MidiTarget.self, forKey: .target)) ?? .unknown(kind: "")
+    }
+}
+
+/// Persisted map (`midi.json` on the engine).
+public struct MidiMap: Codable, Sendable, Equatable {
+    public var bindings: [MidiBinding]
+    /// Program change recalls the song part with that number (default on).
+    public var programChange: Bool
+    /// Only listen to this channel (0..15); nil = omni.
+    public var channel: UInt8?
+
+    public init(bindings: [MidiBinding] = [], programChange: Bool = true, channel: UInt8? = nil) {
+        self.bindings = bindings; self.programChange = programChange; self.channel = channel
+    }
+
+    enum CodingKeys: String, CodingKey { case bindings, programChange = "program_change", channel }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        bindings = (try? c.decodeIfPresent([MidiBinding].self, forKey: .bindings)) ?? []
+        programChange = (try? c.decodeIfPresent(Bool.self, forKey: .programChange)) ?? true
+        channel = try? c.decodeIfPresent(UInt8.self, forKey: .channel)
+    }
+
+    /// `midi_settings` channel form: 0 = omni, 1..16.
+    public var settingsChannel: Int { channel.map { Int($0) + 1 } ?? 0 }
+}
+
+/// `state.midi`: the map plus what the engine sees right now.
+public struct MidiState: Codable, Sendable, Equatable {
+    public var map: MidiMap
+    /// Target waiting for the next CC / note (MIDI learn); nil when nothing is armed.
+    public var learning: MidiTarget?
+    /// Input ports the engine has open.
+    public var ports: [String]
+    /// Last message seen, e.g. `cc 1/64 = 100` (for the activity light).
+    public var last: String?
+
+    public init(map: MidiMap = MidiMap(), learning: MidiTarget? = nil, ports: [String] = [], last: String? = nil) {
+        self.map = map; self.learning = learning; self.ports = ports; self.last = last
+    }
+
+    enum CodingKeys: String, CodingKey { case map, learning, ports, last }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        map = (try? c.decodeIfPresent(MidiMap.self, forKey: .map)) ?? MidiMap()
+        learning = try? c.decodeIfPresent(MidiTarget.self, forKey: .learning)
+        ports = (try? c.decodeIfPresent([String].self, forKey: .ports)) ?? []
+        last = try? c.decodeIfPresent(String.self, forKey: .last)
+    }
+
+    public var isLearning: Bool { learning != nil }
+
+    /// The source bound to this target, if any (the UI shows it next to the control).
+    public func source(for target: MidiTarget) -> MidiSource? {
+        map.bindings.first { $0.target == target }?.source
+    }
+}
+
 public struct SessionState: Codable, Sendable, Equatable {
     public var preset: String
     public var chain: [InsertState]
@@ -150,16 +325,26 @@ public struct SessionState: Codable, Sendable, Equatable {
     public var setlist: Setlist?
     public var position: Position?
     public var presets: [String]
+    /// Built-in presets: they cannot be deleted, `delete_preset` reverts a modified one to factory.
+    public var factoryPresets: [String]
+    /// Factory presets overridden by a user copy: only these can be reverted.
+    public var modifiedPresets: [String] = []
     public var bpm: Float?
+    public var midi: MidiState
     public var revision: UInt64
 
     public init(preset: String = "", chain: [InsertState] = [], mix: MixState = MixState(), setlist: Setlist? = nil,
-                position: Position? = nil, presets: [String] = [], bpm: Float? = nil, revision: UInt64 = 0) {
+                position: Position? = nil, presets: [String] = [], factoryPresets: [String] = [], bpm: Float? = nil,
+                midi: MidiState = MidiState(), revision: UInt64 = 0) {
         self.preset = preset; self.chain = chain; self.mix = mix; self.setlist = setlist; self.position = position
-        self.presets = presets; self.bpm = bpm; self.revision = revision
+        self.presets = presets; self.factoryPresets = factoryPresets; self.bpm = bpm; self.midi = midi
+        self.revision = revision
     }
 
-    enum CodingKeys: String, CodingKey { case preset, chain, mix, setlist, position, presets, bpm, revision }
+    enum CodingKeys: String, CodingKey {
+        case preset, chain, mix, setlist, position, presets, factoryPresets = "factory_presets"
+        case modifiedPresets = "modified_presets", bpm, midi, revision
+    }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -169,9 +354,18 @@ public struct SessionState: Codable, Sendable, Equatable {
         setlist = try? c.decodeIfPresent(Setlist.self, forKey: .setlist)
         position = try? c.decodeIfPresent(Position.self, forKey: .position)
         presets = (try? c.decodeIfPresent([String].self, forKey: .presets)) ?? []
+        factoryPresets = (try? c.decodeIfPresent([String].self, forKey: .factoryPresets)) ?? []
+        modifiedPresets = (try? c.decodeIfPresent([String].self, forKey: .modifiedPresets)) ?? []
         bpm = try? c.decodeIfPresent(Float.self, forKey: .bpm)
+        midi = (try? c.decodeIfPresent(MidiState.self, forKey: .midi)) ?? MidiState()
         revision = (try? c.decodeIfPresent(UInt64.self, forKey: .revision)) ?? 0
     }
+
+    /// A built-in preset: `delete_preset` reverts it instead of removing it (and fails when it is unmodified).
+    public func isFactory(_ name: String) -> Bool { factoryPresets.contains(name) }
+
+    /// User presets can be deleted, modified factory presets reverted; unmodified factory presets neither.
+    public func isRemovable(_ name: String) -> Bool { !isFactory(name) || modifiedPresets.contains(name) }
 
     public var currentSong: Song? {
         guard let p = position, let s = setlist, s.songs.indices.contains(p.song) else { return nil }

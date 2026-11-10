@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Chain: the inserts of the running preset. Controllers toggle inserts, edit key parameters (ranges and curves from
 /// `GET /api/fx`), add / remove / reorder inserts and save the preset; performers and viewers see it read-only.
+/// A long-press on an insert switch or a parameter arms MIDI learn for it (`docs/live/midi.md`).
 struct ChainView: View {
     @Environment(LiveSession.self) private var session
     @State private var adding = false
@@ -34,6 +35,8 @@ struct ChainView: View {
                     .deleteDisabled(!editable)
                 } header: {
                     Text("live.chain.preset \(st.preset)")
+                } footer: {
+                    if editable && !st.chain.isEmpty { Text("live.midi.chain_hint") }
                 }
             } else {
                 Text("live.chain.empty").foregroundStyle(LiveTheme.muted)
@@ -60,7 +63,12 @@ struct ChainView: View {
                 if !n.isEmpty { session.client.send(.savePreset(name: n)) }
             }
         }
-        .overlay(alignment: .bottom) { ErrorBanner() }
+        .overlay(alignment: .bottom) {
+            VStack(spacing: 0) {
+                MidiLearnBanner()
+                ErrorBanner()
+            }
+        }
     }
 
     private func gr(_ m: LiveModel, _ i: Int) -> Float? {
@@ -88,23 +96,30 @@ struct InsertRow: View {
         DisclosureGroup(isExpanded: $open) {
             ForEach(insert.params, id: \.id) { p in
                 if let ps = spec?.param(p.id) {
-                    ParamControl(insert: insert.id, spec: ps, value: p.value, editable: editable)
+                    ParamControl(insert: insert.id, fx: insert.fx, spec: ps, value: p.value, editable: editable)
                 } else {
                     HStack { Text(verbatim: p.id); Spacer(); Text(verbatim: String(format: "%.2f", p.value)).monospacedDigit() }
                         .font(.subheadline).foregroundStyle(LiveTheme.muted)
                 }
             }
         } label: {
+            let target = MidiTarget.enable(fx: insert.fx)
+            let bound = session.model.state?.midi.source(for: target)
+            let learning = session.model.state?.midi.learning == target
             HStack {
                 Toggle(isOn: Binding(get: { insert.enabled }, set: { session.client.send(.setEnabled(insert: insert.id, on: $0)) })) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: fxName(insert.fx)).font(.headline)
+                        HStack(spacing: 6) {
+                            Text(verbatim: fxName(insert.fx)).font(.headline)
+                            if learning { ProgressView().controlSize(.small) } else if let bound { MidiBadge(source: bound) }
+                        }
                         if let gr { Text("live.chain.gr \(String(format: "%.1f", abs(gr)))").font(.caption.monospacedDigit()).foregroundStyle(LiveTheme.warning) }
                     }
                 }
                 .disabled(!editable)
                 .tint(LiveTheme.accent)
             }
+            .midiLearnable(target)
         }
     }
 }
@@ -112,12 +127,30 @@ struct InsertRow: View {
 struct ParamControl: View {
     @Environment(LiveSession.self) private var session
     let insert: UInt32
+    let fx: String
     let spec: ParamSpec
     let value: Float
     let editable: Bool
     @State private var local: Float?
 
     var body: some View {
+        let target = MidiTarget.param(fx: fx, param: spec.id)
+        let midi = session.model.state?.midi
+        VStack(alignment: .leading, spacing: 4) {
+            control
+            if midi?.learning == target {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("live.midi.waiting_short").font(.caption).foregroundStyle(LiveTheme.accent)
+                }
+            } else if let s = midi?.source(for: target) {
+                MidiBadge(source: s)
+            }
+        }
+        .midiLearnable(target)
+    }
+
+    @ViewBuilder private var control: some View {
         let label = paramName(spec.id)
         if spec.isToggle {
             Toggle(label, isOn: Binding(get: { value >= 0.5 }, set: { session.client.send(.setParam(insert: insert, param: spec.id, value: $0 ? 1 : 0)) }))

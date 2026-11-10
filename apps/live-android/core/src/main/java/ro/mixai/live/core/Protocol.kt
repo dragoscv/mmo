@@ -113,6 +113,133 @@ data class Song(
 @Serializable
 data class Setlist(val version: Int = 1, val name: String = "", val songs: List<Song> = emptyList())
 
+// --- MIDI (docs/live/midi.md; serde forms of live_engine::midi) ------------------------------------------------
+
+/** Continuous mix fields a fader/expression pedal can drive (`MixField`, snake_case on the wire). */
+enum class MixField(val wire: String) {
+    INPUT_DB("input_db"),
+    MAIN_DB("main_db"),
+    MONITOR_DB("monitor_db"),
+    MONITOR_DRY("monitor_dry");
+
+    companion object {
+        fun parse(s: String?): MixField? = entries.firstOrNull { it.wire == s }
+    }
+}
+
+/** One-shot actions (`MidiAction`). */
+enum class MidiAction(val wire: String) {
+    NEXT("next"),
+    PREV("prev"),
+    TAP_TEMPO("tap_tempo"),
+    PANIC("panic"),
+    TOGGLE_BYPASS("toggle_bypass"),
+    TOGGLE_MUTE("toggle_mute");
+
+    companion object {
+        fun parse(s: String?): MidiAction? = entries.firstOrNull { it.wire == s }
+    }
+}
+
+/**
+ * What a binding controls (`MidiTarget`, serde `{"kind": …}`). Hand-written JSON on both sides so an unknown
+ * `kind` from a newer engine becomes [Unknown] instead of failing the whole state frame.
+ */
+sealed interface MidiTarget {
+    val kind: String
+    fun toJson(): JsonObject
+
+    /** First insert of effect kind [fx], parameter [param] (normalised 0..1). */
+    data class Param(val fx: String, val param: String) : MidiTarget {
+        override val kind: String get() = "param"
+        override fun toJson(): JsonObject = obj("param", "fx" to fx, "param" to param)
+    }
+
+    /** Insert on/off by effect kind. */
+    data class Enable(val fx: String) : MidiTarget {
+        override val kind: String get() = "enable"
+        override fun toJson(): JsonObject = obj("enable", "fx" to fx)
+    }
+
+    data class Mix(val field: MixField) : MidiTarget {
+        override val kind: String get() = "mix"
+        override fun toJson(): JsonObject = obj("mix", "field" to field.wire)
+    }
+
+    data class Action(val action: MidiAction) : MidiTarget {
+        override val kind: String get() = "action"
+        override fun toJson(): JsonObject = obj("action", "action" to action.wire)
+    }
+
+    /** A target this app version does not know; kept verbatim so it survives a round trip. */
+    data class Unknown(val raw: JsonObject) : MidiTarget {
+        override val kind: String get() = (raw["kind"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+        override fun toJson(): JsonObject = raw
+    }
+
+    companion object {
+        private fun obj(kind: String, vararg fields: Pair<String, String>): JsonObject = JsonObject(
+            buildMap {
+                put("kind", JsonPrimitive(kind))
+                fields.forEach { (k, v) -> put(k, JsonPrimitive(v)) }
+            },
+        )
+
+        fun fromJson(o: JsonObject): MidiTarget {
+            fun str(k: String) = (o[k] as? JsonPrimitive)?.contentOrNull
+            return when (str("kind")) {
+                "param" -> Param(str("fx").orEmpty(), str("param").orEmpty())
+                "enable" -> Enable(str("fx").orEmpty())
+                "mix" -> MixField.parse(str("field"))?.let { Mix(it) } ?: Unknown(o)
+                "action" -> MidiAction.parse(str("action"))?.let { Action(it) } ?: Unknown(o)
+                else -> Unknown(o)
+            }
+        }
+    }
+}
+
+object MidiTargetSerializer : KSerializer<MidiTarget> {
+    override val descriptor: SerialDescriptor = JsonObject.serializer().descriptor
+
+    override fun deserialize(decoder: Decoder): MidiTarget {
+        val el = (decoder as JsonDecoder).decodeJsonElement()
+        return MidiTarget.fromJson(el as? JsonObject ?: JsonObject(emptyMap()))
+    }
+
+    override fun serialize(encoder: Encoder, value: MidiTarget) {
+        (encoder as JsonEncoder).encodeJsonElement(value.toJson())
+    }
+}
+
+/** What a binding listens to (`MidiSource`). [kind] is `cc` | `note`; [channel] null = any (0-based on the wire). */
+@Serializable
+data class MidiSource(val kind: String = "cc", val channel: Int? = null, val number: Int = 0) {
+    val isNote: Boolean get() = kind == "note"
+}
+
+@Serializable
+data class MidiBinding(
+    val source: MidiSource = MidiSource(),
+    @Serializable(with = MidiTargetSerializer::class) val target: MidiTarget = MidiTarget.Unknown(JsonObject(emptyMap())),
+)
+
+/** Persisted map (`midi.json`). [channel] null = omni, otherwise 0..15. */
+@Serializable
+data class MidiMap(
+    val bindings: List<MidiBinding> = emptyList(),
+    @SerialName("program_change") val programChange: Boolean = true,
+    val channel: Int? = null,
+)
+
+/** `state.midi`: the map, the pending learn target, open input ports and the last message seen. */
+@Serializable
+data class MidiState(
+    val map: MidiMap = MidiMap(),
+    @Serializable(with = MidiTargetSerializer::class) val learning: MidiTarget? = null,
+    val ports: List<String> = emptyList(),
+    val last: String? = null,
+)
+
 @Serializable
 data class SessionState(
     val preset: String = "",
@@ -121,11 +248,18 @@ data class SessionState(
     val setlist: Setlist? = null,
     val position: Position? = null,
     val presets: List<String> = emptyList(),
+    /** Built-in presets: never deleted, only reverted (engines before 0.1.0+midi omit this). */
+    @SerialName("factory_presets") val factoryPresets: List<String> = emptyList(),
+    @SerialName("modified_presets") val modifiedPresets: List<String> = emptyList(),
     val bpm: Float? = null,
+    val midi: MidiState = MidiState(),
     val revision: Long = 0,
 ) {
     val currentSong: Song? get() = position?.let { p -> setlist?.songs?.getOrNull(p.song) }
     val currentPart: SongPart? get() = position?.let { p -> currentSong?.parts?.getOrNull(p.part) }
+
+    /** A factory preset can only be reverted (and only while a user copy overrides it). */
+    fun isFactoryPreset(name: String): Boolean = factoryPresets.contains(name)
 }
 
 @Serializable
@@ -279,6 +413,29 @@ sealed class ClientMsg(val type: String, val required: Role) {
 
     data class LoadPreset(val name: String) : ClientMsg("load_preset", Role.PERFORMER) {
         override fun fields(b: MutableMap<String, JsonElement>) { b["name"] = JsonPrimitive(name) }
+    }
+
+    /** A user preset is removed; a modified factory preset reverts (an untouched one → `factory_preset`). */
+    data class DeletePreset(val name: String) : ClientMsg("delete_preset", Role.CONTROLLER) {
+        override fun fields(b: MutableMap<String, JsonElement>) { b["name"] = JsonPrimitive(name) }
+    }
+
+    /** Arm MIDI learn: the next CC / note binds to [target]; `null` cancels. */
+    data class MidiLearn(val target: MidiTarget?) : ClientMsg("midi_learn", Role.CONTROLLER) {
+        override fun fields(b: MutableMap<String, JsonElement>) { b["target"] = target?.toJson() ?: JsonNull }
+    }
+
+    /** Remove a binding by its index in `state.midi.map.bindings`. */
+    data class MidiUnbind(val index: Int) : ClientMsg("midi_unbind", Role.CONTROLLER) {
+        override fun fields(b: MutableMap<String, JsonElement>) { b["index"] = JsonPrimitive(index) }
+    }
+
+    /** [channel] is 1..16 on the wire, 0 = omni (the engine stores it 0-based). */
+    data class MidiSettings(val programChange: Boolean? = null, val channel: Int? = null) : ClientMsg("midi_settings", Role.CONTROLLER) {
+        override fun fields(b: MutableMap<String, JsonElement>) {
+            programChange?.let { b["program_change"] = JsonPrimitive(it) }
+            channel?.let { b["channel"] = JsonPrimitive(it.coerceIn(0, 16)) }
+        }
     }
 
     /** Only the fields that are set are sent (the engine keeps the others). */

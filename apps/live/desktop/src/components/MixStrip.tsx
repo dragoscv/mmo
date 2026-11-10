@@ -17,6 +17,7 @@ import { useT } from "../i18n";
 import type { ParamSpec } from "../lib/params";
 import { useStore } from "../store";
 import { Knob } from "./Knob";
+import { MidiLearnButton } from "./MidiLearn";
 import { valueLabel } from "./fx-labels";
 
 const GAIN: ParamSpec = { id: "gain", min: -60, max: 12, default: 0, unit: "db", curve: "linear", choices: [] };
@@ -30,15 +31,18 @@ export function MixStrip() {
     const disabled = !mix;
     const m = mix ?? { input_db: 0, main_db: 0, monitor_db: 0, monitor_dry: 0, bypass: false, mute: false };
     const knob = (key: "input_db" | "main_db" | "monitor_db" | "monitor_dry", label: string, spec: ParamSpec) => (
-        <Knob
-            spec={spec}
-            value={m[key]}
-            label={label}
-            valueText={valueLabel(t, spec, m[key])}
-            size={48}
-            disabled={disabled}
-            onChange={(v) => sendCoalesced(`mix:${key}`, { type: "set_mix", [key]: v })}
-        />
+        <div className="relative">
+            <Knob
+                spec={spec}
+                value={m[key]}
+                label={label}
+                valueText={valueLabel(t, spec, m[key])}
+                size={48}
+                disabled={disabled}
+                onChange={(v) => sendCoalesced(`mix:${key}`, { type: "set_mix", [key]: v })}
+            />
+            <MidiLearnButton target={{ kind: "mix", field: key }} label={label} className="absolute -top-1 right-0 size-5" />
+        </div>
     );
 
     return (
@@ -48,26 +52,32 @@ export function MixStrip() {
             {knob("monitor_db", t("mix.monitor"), GAIN)}
             {knob("monitor_dry", t("mix.monitorDry"), DRY)}
             <div className="ms-2 flex flex-col gap-1.5">
-                <Button
-                    size="sm"
-                    variant={m.bypass ? "default" : "outline"}
-                    aria-pressed={m.bypass}
-                    disabled={disabled}
-                    onClick={() => send({ type: "set_mix", bypass: !m.bypass })}
-                    className={cn("w-28 justify-start", m.bypass && "bg-warning text-primary-foreground hover:bg-warning/90")}
-                >
-                    <Waves /> {t("mix.bypass")}
-                </Button>
-                <Button
-                    size="sm"
-                    variant={m.mute ? "default" : "outline"}
-                    aria-pressed={m.mute}
-                    disabled={disabled}
-                    onClick={() => send({ type: "set_mix", mute: !m.mute })}
-                    className={cn("w-28 justify-start", m.mute && "bg-destructive text-destructive-foreground hover:bg-destructive/90")}
-                >
-                    <VolumeX /> {t("mix.mute")}
-                </Button>
+                <div className="flex items-center gap-0.5">
+                    <Button
+                        size="sm"
+                        variant={m.bypass ? "default" : "outline"}
+                        aria-pressed={m.bypass}
+                        disabled={disabled}
+                        onClick={() => send({ type: "set_mix", bypass: !m.bypass })}
+                        className={cn("w-28 justify-start", m.bypass && "bg-warning text-primary-foreground hover:bg-warning/90")}
+                    >
+                        <Waves /> {t("mix.bypass")}
+                    </Button>
+                    <MidiLearnButton target={{ kind: "action", action: "toggle_bypass" }} label={t("mix.bypass")} />
+                </div>
+                <div className="flex items-center gap-0.5">
+                    <Button
+                        size="sm"
+                        variant={m.mute ? "default" : "outline"}
+                        aria-pressed={m.mute}
+                        disabled={disabled}
+                        onClick={() => send({ type: "set_mix", mute: !m.mute })}
+                        className={cn("w-28 justify-start", m.mute && "bg-destructive text-destructive-foreground hover:bg-destructive/90")}
+                    >
+                        <VolumeX /> {t("mix.mute")}
+                    </Button>
+                    <MidiLearnButton target={{ kind: "action", action: "toggle_mute" }} label={t("mix.mute")} />
+                </div>
             </div>
             <AlertDialog>
                 <AlertDialogTrigger
@@ -90,6 +100,7 @@ export function MixStrip() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <MidiLearnButton target={{ kind: "action", action: "panic" }} label={t("mix.panic")} className="self-start" />
         </section>
     );
 }

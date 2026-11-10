@@ -1,6 +1,7 @@
 package ro.mixai.live.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -13,12 +14,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -26,6 +31,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +64,7 @@ import ro.mixai.live.core.ClientMsg
 import ro.mixai.live.core.ClientState
 import ro.mixai.live.core.LiveClient
 import ro.mixai.live.core.Role
+import ro.mixai.live.core.SessionState
 import ro.mixai.mobile.theme.Mixai
 
 @Composable
@@ -152,14 +159,7 @@ fun PerformScreen(client: LiveClient, state: ClientState) {
             }
 
             // Presets
-            if (!s?.presets.isNullOrEmpty()) {
-                Text(stringResource(R.string.presets), style = MaterialTheme.typography.titleMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    s.presets.forEach { p ->
-                        FilterChip(selected = p == s.preset, onClick = { client.send(ClientMsg.LoadPreset(p)) }, label = { Text(p) })
-                    }
-                }
-            }
+            if (!s?.presets.isNullOrEmpty()) PresetRow(client, state, s)
         } else if (mix != null) {
             // Viewer: state only.
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -172,6 +172,55 @@ fun PerformScreen(client: LiveClient, state: ClientState) {
 }
 
 private fun round1(v: Float) = Math.round(v * 2f) / 2f
+
+/**
+ * Presets, with (controller role) delete for user presets and revert for a factory preset a user copy overrides.
+ * The engine answers `factory_preset` when an untouched factory preset is deleted, so revert is always offered for
+ * them and the engine stays the judge.
+ */
+@Composable
+private fun PresetRow(client: LiveClient, state: ClientState, s: SessionState) {
+    val canEdit = state.can(Role.CONTROLLER)
+    var pending by remember { mutableStateOf<String?>(null) }
+    Text(stringResource(R.string.presets), style = MaterialTheme.typography.titleMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        s.presets.forEach { p ->
+            val factory = s.isFactoryPreset(p)
+            val removable = !factory || p in s.modifiedPresets
+            val editIcon: (@Composable () -> Unit)? = if (!canEdit || !removable) null else {
+                {
+                    val desc = stringResource(if (factory) R.string.preset_revert else R.string.preset_delete, p)
+                    Icon(
+                        if (factory) Icons.Filled.Restore else Icons.Filled.DeleteOutline,
+                        desc,
+                        Modifier.size(18.dp).clickable(onClickLabel = desc) { pending = p },
+                    )
+                }
+            }
+            FilterChip(
+                selected = p == s.preset,
+                onClick = { client.send(ClientMsg.LoadPreset(p)) },
+                label = { Text(p) },
+                trailingIcon = editIcon,
+            )
+        }
+    }
+    val name = pending
+    if (name != null) {
+        val factory = s.isFactoryPreset(name)
+        AlertDialog(
+            onDismissRequest = { pending = null },
+            title = { Text(stringResource(if (factory) R.string.preset_revert_title else R.string.preset_delete_title)) },
+            text = { Text(stringResource(if (factory) R.string.preset_revert_body else R.string.preset_delete_body, name)) },
+            confirmButton = {
+                TextButton(onClick = { pending = null; client.send(ClientMsg.DeletePreset(name)) }) {
+                    Text(stringResource(if (factory) R.string.preset_revert_confirm else R.string.preset_delete_confirm))
+                }
+            },
+            dismissButton = { TextButton(onClick = { pending = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+}
 
 @Composable
 private fun ToggleBig(label: String, on: Boolean, onColor: androidx.compose.ui.graphics.Color, modifier: Modifier, onClick: () -> Unit) {

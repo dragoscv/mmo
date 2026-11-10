@@ -80,10 +80,18 @@ public enum ClientCommand: Sendable, Equatable {
     case moveInsert(insert: UInt32, to: UInt32)
     case loadPreset(name: String)
     case savePreset(name: String)
+    /// Removes a user preset; a modified factory preset reverts to factory (an unmodified one → `factory_preset`).
+    case deletePreset(name: String)
     case setMix(MixChange)
     case loadSetlist(Setlist)
     case goto(song: Int, part: Int)
     case next, prev, tapTempo, panic, latencyProbe
+    /// Arm MIDI learn for `target`; nil cancels (sent as JSON `null`).
+    case midiLearn(target: MidiTarget?)
+    /// Remove a binding by its index in `state.midi.map.bindings`.
+    case midiUnbind(index: Int)
+    /// Only the set fields are sent. `channel`: 0 = omni, 1..16.
+    case midiSettings(programChange: Bool? = nil, channel: Int? = nil)
     case ping(t: Double)
 
     public var type: String {
@@ -97,6 +105,7 @@ public enum ClientCommand: Sendable, Equatable {
         case .moveInsert: "move_insert"
         case .loadPreset: "load_preset"
         case .savePreset: "save_preset"
+        case .deletePreset: "delete_preset"
         case .setMix: "set_mix"
         case .loadSetlist: "load_setlist"
         case .goto: "goto"
@@ -105,6 +114,9 @@ public enum ClientCommand: Sendable, Equatable {
         case .tapTempo: "tap_tempo"
         case .panic: "panic"
         case .latencyProbe: "latency_probe"
+        case .midiLearn: "midi_learn"
+        case .midiUnbind: "midi_unbind"
+        case .midiSettings: "midi_settings"
         case .ping: "ping"
         }
     }
@@ -141,7 +153,7 @@ public enum ClientCommand: Sendable, Equatable {
         case .addInsert(let fx, let at): o["fx"] = fx; o["at"] = at
         case .removeInsert(let i): o["insert"] = i
         case .moveInsert(let i, let to): o["insert"] = i; o["to"] = to
-        case .loadPreset(let n), .savePreset(let n): o["name"] = n
+        case .loadPreset(let n), .savePreset(let n), .deletePreset(let n): o["name"] = n
         case .setMix(let c):
             if let v = c.inputDb { o["input_db"] = Double(v) }
             if let v = c.mainDb { o["main_db"] = Double(v) }
@@ -152,6 +164,16 @@ public enum ClientCommand: Sendable, Equatable {
         case .loadSetlist(let s):
             if let data = try? JSONEncoder().encode(s), let obj = try? JSONSerialization.jsonObject(with: data) { o["setlist"] = obj }
         case .goto(let s, let p): o["song"] = s; o["part"] = p
+        case .midiLearn(let target):
+            if let target, let data = try? JSONEncoder().encode(target), let obj = try? JSONSerialization.jsonObject(with: data) {
+                o["target"] = obj
+            } else {
+                o["target"] = NSNull()
+            }
+        case .midiUnbind(let i): o["index"] = Swift.max(0, i)
+        case .midiSettings(let pc, let ch):
+            if let pc { o["program_change"] = pc }
+            if let ch { o["channel"] = Swift.min(16, Swift.max(0, ch)) }
         case .ping(let t): o["t"] = t
         case .next, .prev, .tapTempo, .panic, .latencyProbe: break
         }

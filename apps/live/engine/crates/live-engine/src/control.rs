@@ -599,6 +599,16 @@ mod tests {
                 s.delete_preset("Pop Polish"),
                 Err(SessionError::FactoryPreset(_))
             ));
+            assert!(s.state().modified_presets.is_empty());
+            // Overwriting a factory preset with a changed chain marks it modified; delete reverts it.
+            s.load_preset("Pop Polish").unwrap();
+            let first = s.chain[0].id;
+            s.apply_control(Control::RemoveInsert { insert: first }, t0)
+                .unwrap();
+            s.save_preset("Pop Polish");
+            assert_eq!(s.state().modified_presets, vec!["Pop Polish".to_string()]);
+            s.delete_preset("Pop Polish").unwrap();
+            assert!(s.state().modified_presets.is_empty());
         }
         let (mut s, _) = Session::new(48000.0, 128).with_store(crate::store::Store::new(&dir));
         assert!(s.presets.iter().any(|p| p.name == "My Gig Vocal"));

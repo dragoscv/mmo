@@ -53,6 +53,9 @@ let flushTimer: number | undefined;
 
 const DEFAULT_SETTINGS: Settings = { device: null, lastPreset: null, lan: false };
 
+/** Engine error codes with a dedicated, localised message (`errors.code.<code>`); others show the raw message. */
+const LOCALISED_CODES = new Set(["factory_preset", "unknown_binding", "unknown_preset"]);
+
 export const useStore = create<Store>((set, get) => {
     const connect = (r: StartResult) => {
         conn?.close();
@@ -69,7 +72,10 @@ export const useStore = create<Store>((set, get) => {
                 const before = get().proto;
                 const proto = reduce(before, m);
                 set({ proto });
-                if (m.type === "error") get().notify("error", "errors.command", { message: m.message });
+                if (m.type === "error") {
+                    if (LOCALISED_CODES.has(m.code)) get().notify(m.code === "factory_preset" ? "info" : "error", `errors.code.${m.code}`, { message: m.message });
+                    else get().notify("error", "errors.command", { message: m.message });
+                }
                 if (m.type === "state" && proto.state && proto.state.preset !== get().settings.lastPreset) {
                     persist({ ...get().settings, lastPreset: proto.state.preset });
                 }

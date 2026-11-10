@@ -37,6 +37,7 @@
     <string name="tab_perform">Perform</string>
     <string name="tab_setlist">Setlist</string>
     <string name="tab_chain">Chain</string>
+    <string name="tab_midi">MIDI</string>
     <string name="meter_in">IN</string>
     <string name="meter_out">OUT</string>
     <string name="clip">CLIP</string>
@@ -56,6 +57,14 @@
     <string name="db_value">%1$.1f dB</string>
     <string name="percent_value">%1$d %%</string>
     <string name="presets">Presets</string>
+    <string name="preset_delete">Delete the preset %1$s</string>
+    <string name="preset_delete_title">Delete preset?</string>
+    <string name="preset_delete_body">“%1$s” is removed from the engine. This cannot be undone.</string>
+    <string name="preset_delete_confirm">Delete</string>
+    <string name="preset_revert">Revert the preset %1$s to factory</string>
+    <string name="preset_revert_title">Revert to factory?</string>
+    <string name="preset_revert_body">“%1$s” is a built-in preset: your changes are dropped and the factory version comes back.</string>
+    <string name="preset_revert_confirm">Revert</string>
     <string name="tuner">Tuner</string>
     <string name="tuner_cents">%1$+.0f cents</string>
     <string name="dsp_load">DSP %1$d %%</string>
@@ -78,11 +87,41 @@
     <string name="retry">Retry</string>
     <string name="enabled">Enabled</string>
 
+    <!-- MIDI -->
+    <string name="midi_controller_only">MIDI mapping needs a controller pairing.</string>
+    <string name="midi_learn">MIDI learn</string>
+    <string name="midi_learn_long_press">Long-press a control to map it to a pedal or knob.</string>
+    <string name="midi_learn_waiting">Waiting for MIDI… %1$s</string>
+    <string name="midi_learn_hint">Move the pedal or press the switch you want to use.</string>
+    <string name="midi_waiting_short">waiting for MIDI…</string>
+    <string name="midi_ports">MIDI inputs</string>
+    <string name="midi_no_ports">No MIDI input is open on the engine.</string>
+    <string name="midi_no_activity">No MIDI received yet.</string>
+    <string name="midi_bindings">Mappings</string>
+    <string name="midi_no_bindings">Nothing is mapped yet.</string>
+    <string name="midi_unbind">Remove this mapping</string>
+    <string name="midi_settings">MIDI settings</string>
+    <string name="midi_program_change">Program change</string>
+    <string name="midi_program_change_hint">Program numbers recall the matching song part.</string>
+    <string name="midi_channel">Channel</string>
+    <string name="midi_channel_omni">All</string>
+    <string name="midi_source_cc">CC %1$d</string>
+    <string name="midi_source_note">Note %1$d</string>
+    <string name="midi_source_channel">ch %1$d</string>
+    <string name="midi_source_channel_any">any channel</string>
+    <string name="midi_target_param">%1$s · %2$s</string>
+    <string name="midi_target_enable">%1$s on/off</string>
+    <string name="midi_target_unknown">Unknown target (%1$s)</string>
+    <string name="midi_action_toggle_bypass">Toggle bypass</string>
+    <string name="midi_action_toggle_mute">Toggle mute</string>
+
     <!-- Errors from the engine (protocol codes) -->
     <string name="err_forbidden">This pairing cannot do that.</string>
     <string name="err_rate_limited">Too many changes at once; slow down.</string>
     <string name="err_no_setlist">No setlist is loaded.</string>
     <string name="err_unknown_preset">That preset no longer exists.</string>
+    <string name="err_factory_preset">This is a built-in preset with no changes to revert.</string>
+    <string name="err_unknown_binding">That mapping is already gone.</string>
     <string name="err_generic">Engine error: %1$s</string>
 
     <string name="watch_sent">Sent to your watch</string>

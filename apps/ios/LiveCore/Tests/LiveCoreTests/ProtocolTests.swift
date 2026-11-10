@@ -28,6 +28,21 @@ enum Frames {
      "tune":{"freq":440.0,"midi":69.02,"cents":2.1,"target":69,"correction_cents":-2.0},
      "latency_probe":{"done_ms":11.5},"chain_latency_samples":64}
     """#
+
+        /// Engine 0.1.0+midi state: factory presets, the MIDI map, an armed learn target, an unknown target kind.
+        static let midiState = #"""
+        {"type":"state","state":{"preset":"Pop Polish","chain":[],"mix":{"input_db":0.0,"main_db":0.0,"monitor_db":0.0,
+         "monitor_dry":0.0,"bypass":false,"mute":false},"setlist":null,"position":null,
+         "presets":["Pop Polish","My Voice"],"factory_presets":["Pop Polish","Warm Vocal"],"bpm":null,
+         "midi":{"map":{"bindings":[
+             {"source":{"kind":"cc","channel":0,"number":80},"target":{"kind":"action","action":"next"}},
+             {"source":{"kind":"cc","channel":null,"number":4},"target":{"kind":"param","fx":"reverb","param":"mix"}},
+             {"source":{"kind":"note","channel":9,"number":36},"target":{"kind":"warp_drive","speed":9}},
+             {"source":{"kind":"cc","number":7},"target":{"kind":"mix","field":"monitor_dry"}}],
+             "program_change":false,"channel":2},
+            "learning":{"kind":"enable","fx":"delay"},"ports":["FS-1 Pedal","BLE MIDI"],"last":"cc 1/80 = 127"},
+         "revision":3}}
+        """#
 }
 
 @Suite struct ProtocolDecodeTests {
@@ -107,6 +122,52 @@ enum Frames {
         #expect(NoteName.name(midi: 11) == "B-1")
         #expect(Tune(freq: 0, midi: 0, cents: 0, target: -1, correctionCents: 0).noteName == nil)
     }
+
+    @Test func midiStateDecodes() throws {
+        guard case .state(let s) = ServerMessage.decode(Frames.midiState) else { Issue.record("not state"); return }
+        #expect(s.factoryPresets == ["Pop Polish", "Warm Vocal"])
+        #expect(s.isFactory("Pop Polish"))
+        #expect(!s.isFactory("My Voice"))
+        let map = s.midi.map
+        #expect(map.bindings.count == 4)
+        #expect(map.bindings[0].source == MidiSource(kind: .cc, channel: 0, number: 80))
+        #expect(map.bindings[0].target == .action(action: .next))
+        #expect(map.bindings[1].source.channel == nil)
+        #expect(map.bindings[1].target == .param(fx: "reverb", param: "mix"))
+        #expect(map.bindings[2].source.displayChannel == 10)
+        #expect(map.bindings[2].target == .unknown(kind: "warp_drive"))
+        #expect(map.bindings[3].target == .mix(field: .monitorDry))
+        #expect(map.programChange == false)
+        #expect(map.channel == 2)
+        #expect(map.settingsChannel == 3)
+        #expect(s.midi.learning == .enable(fx: "delay"))
+        #expect(s.midi.isLearning)
+        #expect(s.midi.ports == ["FS-1 Pedal", "BLE MIDI"])
+        #expect(s.midi.last == "cc 1/80 = 127")
+        #expect(s.midi.source(for: .param(fx: "reverb", param: "mix"))?.number == 4)
+        #expect(s.midi.source(for: .enable(fx: "gate")) == nil)
+    }
+
+    @Test func olderEngineStateDefaultsMidi() {
+        guard case .state(let s) = ServerMessage.decode(Frames.state) else { Issue.record("not state"); return }
+        #expect(s.factoryPresets.isEmpty)
+        #expect(s.midi == MidiState())
+        #expect(s.midi.map.programChange)
+        #expect(s.midi.map.settingsChannel == 0)
+        #expect(!s.midi.isLearning)
+    }
+
+    @Test func midiTargetRoundTrips() throws {
+        let targets: [MidiTarget] = [.param(fx: "reverb", param: "mix"), .enable(fx: "delay"), .mix(field: .mainDb),
+                                     .action(action: .toggleBypass)]
+        for t in targets {
+            let data = try JSONEncoder().encode(t)
+            #expect(try JSONDecoder().decode(MidiTarget.self, from: data) == t)
+        }
+        let o = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(MidiTarget.mix(field: .monitorDb))) as? [String: Any])
+        #expect(o["kind"] as? String == "mix")
+        #expect(o["field"] as? String == "monitor_db")
+    }
 }
 
 @Suite struct CommandEncodeTests {
@@ -132,6 +193,8 @@ enum Frames {
             (.goto(song: 1, part: 2), "goto"), (.next, "next"), (.prev, "prev"), (.tapTempo, "tap_tempo"), (.panic, "panic"),
             (.latencyProbe, "latency_probe"), (.ping(t: 1), "ping"),
             (.loadSetlist(Setlist(name: "S", songs: [Song(title: "T", parts: [SongPart(name: "V", preset: "P")])])), "load_setlist"),
+            (.deletePreset(name: "A"), "delete_preset"), (.midiLearn(target: nil), "midi_learn"),
+            (.midiUnbind(index: 0), "midi_unbind"), (.midiSettings(programChange: true), "midi_settings"),
         ]
         for (c, t) in cases { #expect(try object(c.json())["type"] as? String == t) }
         let sub = try object(ClientCommand.subscribe(meters: true, hz: 50).json())
@@ -142,12 +205,43 @@ enum Frames {
         #expect((set["setlist"] as? [String: Any])?["name"] as? String == "S")
     }
 
+    @Test func midiCommandsMatchRust() throws {
+        let learn = try object(ClientCommand.midiLearn(target: .param(fx: "reverb", param: "mix")).json(id: 2))
+        #expect(learn["type"] as? String == "midi_learn")
+        let t = try #require(learn["target"] as? [String: Any])
+        #expect(t["kind"] as? String == "param")
+        #expect(t["fx"] as? String == "reverb")
+        #expect(t["param"] as? String == "mix")
+        let action = try object(ClientCommand.midiLearn(target: .action(action: .tapTempo)).json())
+        #expect((action["target"] as? [String: Any])?["action"] as? String == "tap_tempo")
+
+        // Cancel must be an explicit JSON null, not a missing key.
+        let cancel = ClientCommand.midiLearn(target: nil).json()
+        #expect(cancel == #"{"target":null,"type":"midi_learn"}"#)
+        #expect(try object(cancel)["target"] is NSNull)
+
+        #expect(ClientCommand.midiUnbind(index: 3).json() == #"{"index":3,"type":"midi_unbind"}"#)
+        #expect(ClientCommand.deletePreset(name: "My Voice").json() == #"{"name":"My Voice","type":"delete_preset"}"#)
+
+        let pc = try object(ClientCommand.midiSettings(programChange: false).json())
+        #expect(pc["program_change"] as? Bool == false)
+        #expect(pc["channel"] == nil)
+        let ch = try object(ClientCommand.midiSettings(channel: 20).json())
+        #expect(ch["channel"] as? Int == 16)
+        #expect(ch["program_change"] == nil)
+        #expect(try object(ClientCommand.midiSettings(channel: 0).json())["channel"] as? Int == 0)
+    }
+
     @Test func rolesMirrorEngine() {
         #expect(ClientCommand.next.requiredRole == .performer)
         #expect(ClientCommand.panic.requiredRole == .performer)
         #expect(ClientCommand.setMix(MixChange(mute: true)).requiredRole == .performer)
         #expect(ClientCommand.setParam(insert: 1, param: "x", value: 0).requiredRole == .controller)
         #expect(ClientCommand.savePreset(name: "x").requiredRole == .controller)
+        #expect(ClientCommand.deletePreset(name: "x").requiredRole == .controller)
+        #expect(ClientCommand.midiLearn(target: nil).requiredRole == .controller)
+        #expect(ClientCommand.midiUnbind(index: 0).requiredRole == .controller)
+        #expect(ClientCommand.midiSettings(channel: 1).requiredRole == .controller)
         #expect(ClientCommand.subscribe(meters: true).requiredRole == .viewer)
         #expect(Role.viewer < .performer && .performer < .controller)
     }

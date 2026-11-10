@@ -61,6 +61,9 @@ pub struct SessionState {
     /// Names of the built-in presets (read-only: cannot be deleted, saving over them makes a user copy).
     #[serde(default)]
     pub factory_presets: Vec<String>,
+    /// Factory presets overridden by a user copy (`delete_preset` reverts them; unmodified ones refuse).
+    #[serde(default)]
+    pub modified_presets: Vec<String>,
     pub bpm: Option<f32>,
     /// MIDI map, learn target, open ports, last message.
     #[serde(default)]
@@ -160,6 +163,12 @@ impl Session {
     }
 
     pub fn state(&self) -> SessionState {
+        let factory = factory();
+        let modified_presets = factory
+            .iter()
+            .filter(|f| self.presets.iter().any(|p| p.name == f.name && p != *f))
+            .map(|f| f.name.clone())
+            .collect();
         SessionState {
             preset: self.preset_name.clone(),
             chain: self.chain.clone(),
@@ -167,7 +176,8 @@ impl Session {
             setlist: self.setlist.clone(),
             position: self.position.clone(),
             presets: self.presets.iter().map(|p| p.name.clone()).collect(),
-            factory_presets: factory().into_iter().map(|p| p.name).collect(),
+            factory_presets: factory.into_iter().map(|p| p.name).collect(),
+            modified_presets,
             bpm: self.bpm,
             midi: self.midi.clone(),
             revision: self.revision,

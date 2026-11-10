@@ -108,7 +108,46 @@
         "name": "Preset name",
         "saveConfirm": "Save",
         "cancel": "Cancel",
-        "saved": "Preset “{{name}}” saved"
+        "saved": "Preset “{{name}}” saved",
+        "delete": "Delete preset",
+        "deleteTitle": "Delete “{{name}}”?",
+        "deleteBody": "The preset is removed from this computer. Song parts that use it will no longer load it.",
+        "deleteConfirm": "Delete",
+        "revert": "Revert to factory",
+        "revertTitle": "Revert “{{name}}” to factory?",
+        "revertBody": "Your changes to this built-in preset are discarded and the factory version comes back.",
+        "revertConfirm": "Revert"
+    },
+    "midi": {
+        "title": "MIDI control",
+        "unavailable": "This engine version does not support MIDI control.",
+        "learning": "Waiting for MIDI: move a pedal or press a switch to bind it to {{target}}.",
+        "learnCancel": "Cancel MIDI learn",
+        "learnFor": "MIDI learn: {{name}}",
+        "learnTitle": "MIDI learn",
+        "learnHint": "Press a learn button, then move the pedal or press the switch you want to use. Effect parameters have their own learn button (or right-click a knob).",
+        "contextHint": "Right-click a control for MIDI learn.",
+        "ports": "Open MIDI ports",
+        "noPorts": "No MIDI input found. Connect a controller (or pair a Bluetooth MIDI pedal in the system) and restart the engine.",
+        "last": "Last message",
+        "noActivity": "none yet",
+        "channel": "Listen on channel",
+        "omni": "All (omni)",
+        "channelN": "Channel {{n}}",
+        "programChange": "Program change recalls song parts",
+        "programChangeHint": "A program change selects the setlist part with the same program number.",
+        "bindings": "Bindings",
+        "noBindings": "No bindings yet.",
+        "unbind": "Remove binding: {{target}}",
+        "enableTarget": "{{fx}} on/off",
+        "action": {
+            "next": "Next part",
+            "prev": "Previous part",
+            "tap_tempo": "Tap tempo",
+            "panic": "Panic",
+            "toggle_bypass": "Bypass on/off",
+            "toggle_mute": "Mute on/off"
+        }
     },
     "setlist": {
         "title": "Setlist",
@@ -166,7 +205,12 @@
         "devices": "Could not list audio devices: {{message}}",
         "latency": "Latency measurement failed: {{message}}",
         "command": "{{message}}",
-        "notTauri": "Run MixAI Live as the desktop app to use the audio engine."
+        "notTauri": "Run MixAI Live as the desktop app to use the audio engine.",
+        "code": {
+            "factory_preset": "This is already the factory version of the preset; built-in presets cannot be deleted.",
+            "unknown_binding": "That MIDI binding no longer exists.",
+            "unknown_preset": "That preset no longer exists."
+        }
     },
     "fx": {
         "gate": "Gate",

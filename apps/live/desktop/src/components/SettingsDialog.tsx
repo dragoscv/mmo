@@ -4,6 +4,7 @@ import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Kbd, ThemeSet
 import { useThemePrefs } from "@mmo/ui/theme";
 import { useT } from "../i18n";
 import { useStore } from "../store";
+import { MidiPanel } from "./MidiPanel";
 
 export function SettingsDialog() {
     const t = useT();
@@ -53,6 +54,12 @@ export function SettingsDialog() {
                     <Button variant="outline" className="w-fit" onClick={() => openPanel("setup")}>
                         <SlidersHorizontal /> {t("settings.openSetup")}
                     </Button>
+                </section>
+                <section aria-labelledby="set-midi" className="flex flex-col gap-2">
+                    <h3 id="set-midi" className="text-sm font-semibold">
+                        {t("midi.title")}
+                    </h3>
+                    <MidiPanel />
                 </section>
                 <section className="flex flex-col gap-2">
                     <h3 className="text-sm font-semibold">{t("settings.keys")}</h3>
