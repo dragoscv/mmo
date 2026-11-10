@@ -162,7 +162,9 @@ impl RemoteServer {
                 replies: HashMap::new(),
                 clients: HashMap::new(),
             }),
-            state_rev: AtomicU64::new(1),
+            // 0 = nothing published yet: connections send no `state` until the engine publishes
+            // (a `"state": null` frame would wipe client UIs on connect).
+            state_rev: AtomicU64::new(0),
             meters_rev: AtomicU64::new(0),
             token_rev: AtomicU64::new(1),
             stop: AtomicBool::new(false),

@@ -58,6 +58,8 @@ pub fn server_error_code(e: &SessionError) -> &'static str {
         SessionError::UnknownFx(_) => "unknown_fx",
         SessionError::Full => "chain_full",
         SessionError::NoSetlist => "no_setlist",
+        SessionError::FactoryPreset(_) => "factory_preset",
+        SessionError::UnknownBinding(_) => "unknown_binding",
         SessionError::Preset(_) => "bad_request",
     }
 }

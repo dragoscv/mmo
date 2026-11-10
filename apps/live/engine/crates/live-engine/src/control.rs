@@ -2,6 +2,7 @@
 //! Serde form = the client messages of `docs/live/remote-protocol.md`.
 
 use crate::core::Command;
+use crate::midi::{MidiAction, MidiEvent, MidiMsg, MidiTarget, MixField};
 use crate::preset::Setlist;
 use crate::session::{Session, SessionError};
 use serde::{Deserialize, Serialize};
@@ -50,6 +51,9 @@ pub enum Control {
     SavePreset {
         name: String,
     },
+    DeletePreset {
+        name: String,
+    },
     SetMix {
         #[serde(default)]
         input_db: Option<f32>,
@@ -76,6 +80,22 @@ pub enum Control {
     TapTempo,
     Panic,
     LatencyProbe,
+    /// Arm MIDI learn: the next CC / note binds to `target`. `null` cancels.
+    MidiLearn {
+        #[serde(default)]
+        target: Option<MidiTarget>,
+    },
+    /// Remove binding by index in `state.midi.map.bindings`.
+    MidiUnbind {
+        index: u32,
+    },
+    MidiSettings {
+        #[serde(default)]
+        program_change: Option<bool>,
+        /// 1..16, or 0 = omni.
+        #[serde(default)]
+        channel: Option<u8>,
+    },
 }
 
 impl Control {
@@ -164,6 +184,10 @@ impl Session {
                 self.save_preset(&name);
                 vec![]
             }
+            Control::DeletePreset { name } => {
+                self.delete_preset(&name)?;
+                vec![]
+            }
             Control::SetMix {
                 input_db,
                 main_db,
@@ -216,12 +240,150 @@ impl Session {
                 }
                 None => vec![],
             },
-            Control::Panic => {
-                let mut v = self.set_mix(|m| m.mute = true);
-                v.push(Command::Reset);
-                v
-            }
+            Control::Panic => self.panic(),
             Control::LatencyProbe => vec![Command::StartLatencyProbe],
+            Control::MidiLearn { target } => {
+                self.midi.learning = target;
+                self.revision += 1;
+                vec![]
+            }
+            Control::MidiUnbind { index } => {
+                let i = index as usize;
+                if i >= self.midi.map.bindings.len() {
+                    return Err(SessionError::UnknownBinding(index));
+                }
+                self.midi.map.bindings.remove(i);
+                self.persist_midi();
+                self.revision += 1;
+                vec![]
+            }
+            Control::MidiSettings {
+                program_change,
+                channel,
+            } => {
+                if let Some(p) = program_change {
+                    self.midi.map.program_change = p;
+                }
+                if let Some(c) = channel {
+                    self.midi.map.channel = (1..=16).contains(&c).then(|| c - 1);
+                }
+                self.persist_midi();
+                self.revision += 1;
+                vec![]
+            }
+        })
+    }
+
+    fn panic(&mut self) -> Vec<Command> {
+        let mut v = self.set_mix(|m| m.mute = true);
+        v.push(Command::Reset);
+        v
+    }
+
+    /// Feed one raw MIDI message (from any input port). Errors (e.g. a binding for an effect the
+    /// current preset lacks) are ignored: MIDI has no reply channel.
+    pub fn apply_midi(&mut self, bytes: &[u8], now: Instant) -> Vec<Command> {
+        let Some(msg) = MidiMsg::parse(bytes) else {
+            return vec![];
+        };
+        let label = crate::midi::describe(&msg);
+        let events = self
+            .midi_router
+            .route(&mut self.midi.map, &mut self.midi.learning, msg);
+        // The activity light is UI-only: it must not bump the revision 30 times a second while a
+        // pedal sweeps, so it rides along with the next real change.
+        self.midi.last = Some(label);
+        let mut out = Vec::new();
+        for e in events {
+            out.extend(self.apply_midi_event(e, now).unwrap_or_default());
+        }
+        out
+    }
+
+    fn apply_midi_event(
+        &mut self,
+        e: MidiEvent,
+        now: Instant,
+    ) -> Result<Vec<Command>, SessionError> {
+        let first = |s: &Session, fx: &str| {
+            s.chain
+                .iter()
+                .find(|i| i.fx == fx)
+                .map(|i| (i.id, i.enabled))
+        };
+        Ok(match e {
+            MidiEvent::Learned(_) => {
+                self.persist_midi();
+                self.revision += 1;
+                vec![]
+            }
+            MidiEvent::Value {
+                target: MidiTarget::Param { fx, param },
+                norm,
+            } => match first(self, &fx) {
+                Some((insert, _)) => self.apply_control(
+                    Control::SetParamNorm {
+                        insert,
+                        param,
+                        norm,
+                    },
+                    now,
+                )?,
+                None => vec![],
+            },
+            MidiEvent::Value {
+                target: MidiTarget::Mix { field },
+                norm,
+            } => {
+                // Faders: -60..+12 dB with unity at ~83 % travel; dry blend 0..1.
+                let db = -60.0 + norm * 72.0;
+                self.set_mix(|m| match field {
+                    MixField::InputDb => m.input_db = db,
+                    MixField::MainDb => m.main_db = db,
+                    MixField::MonitorDb => m.monitor_db = db,
+                    MixField::MonitorDry => m.monitor_dry = norm,
+                })
+            }
+            MidiEvent::Value { .. } => vec![],
+            MidiEvent::Enable { fx, on } => match first(self, &fx) {
+                Some((insert, enabled)) => {
+                    vec![self.set_enabled(insert, on.unwrap_or(!enabled))?]
+                }
+                None => vec![],
+            },
+            MidiEvent::Action(a) => match a {
+                MidiAction::Next => self.next_part()?,
+                MidiAction::Prev => self.prev_part()?,
+                MidiAction::TapTempo => self.apply_control(Control::TapTempo, now)?,
+                MidiAction::Panic => self.panic(),
+                MidiAction::ToggleBypass => {
+                    let b = !self.mix.bypass;
+                    self.set_mix(|m| m.bypass = b)
+                }
+                MidiAction::ToggleMute => {
+                    let v = !self.mix.mute;
+                    self.set_mix(|m| m.mute = v)
+                }
+            },
+            MidiEvent::Program(n) => match self.find_program(n) {
+                Some((s, p)) => self.goto(s, p)?,
+                None => vec![],
+            },
+        })
+    }
+
+    /// First part whose `program` equals `n`, searching from the current song so a repeated
+    /// program number in later songs is reachable by stepping through the set.
+    fn find_program(&self, n: u8) -> Option<(usize, usize)> {
+        let sl = self.setlist.as_ref()?;
+        let start = self.position.as_ref().map_or(0, |p| p.song);
+        let count = sl.songs.len();
+        (0..count).map(|k| (start + k) % count).find_map(|s| {
+            sl.songs[s]
+                .parts
+                .iter()
+                .position(|p| p.program == Some(n))
+                .map(|p| (s, p))
         })
     }
 }
@@ -292,5 +454,167 @@ mod tests {
             )
             .unwrap();
         assert!(matches!(norm[0], Command::SetParam { value, .. } if (value - 0.5).abs() < 1e-6));
+    }
+
+    fn gig() -> Setlist {
+        use crate::preset::{Song, SongPart};
+        let part = |name: &str, preset: &str, program| SongPart {
+            name: name.into(),
+            preset: preset.into(),
+            program,
+        };
+        Setlist {
+            version: 1,
+            name: "Gig".into(),
+            songs: vec![
+                Song {
+                    title: "One".into(),
+                    artist: String::new(),
+                    key: None,
+                    bpm: None,
+                    parts: vec![
+                        part("Verse", "Natural Vocal", Some(1)),
+                        part("Chorus", "Pop Polish", Some(2)),
+                    ],
+                    lyrics: None,
+                    notes: String::new(),
+                },
+                Song {
+                    title: "Two".into(),
+                    artist: String::new(),
+                    key: None,
+                    bpm: None,
+                    parts: vec![part("All", "Hard Tune", Some(7))],
+                    lyrics: None,
+                    notes: String::new(),
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn midi_learn_then_pedal_drives_reverb_mix() {
+        let mut s = Session::new(48000.0, 128);
+        s.load_preset("Natural Vocal").unwrap();
+        let t0 = Instant::now();
+        let target = MidiTarget::Param {
+            fx: "reverb".into(),
+            param: "mix".into(),
+        };
+        s.apply_control(
+            Control::MidiLearn {
+                target: Some(target),
+            },
+            t0,
+        )
+        .unwrap();
+        assert!(s.state().midi.learning.is_some());
+        assert!(
+            s.apply_midi(&[0xB0, 4, 10], t0).is_empty(),
+            "learning swallows the first move"
+        );
+        assert!(s.midi.learning.is_none());
+        let cmds = s.apply_midi(&[0xB0, 4, 127], t0);
+        let reverb = s.chain.iter().find(|i| i.fx == "reverb").unwrap();
+        assert!(
+            matches!(cmds.as_slice(), [Command::SetParam { insert, .. }] if *insert == reverb.id)
+        );
+        assert_eq!(reverb.params.iter().find(|p| p.0 == "mix").unwrap().1, 1.0);
+        // A chain without reverb: the binding is silently inert, not an error.
+        let id = reverb.id;
+        s.apply_control(Control::RemoveInsert { insert: id }, t0)
+            .unwrap();
+        assert!(s.apply_midi(&[0xB0, 4, 64], t0).is_empty());
+    }
+
+    #[test]
+    fn foot_switch_and_program_change_navigate_the_set() {
+        let mut s = Session::new(48000.0, 128);
+        s.load_setlist(gig());
+        let t0 = Instant::now();
+        s.apply_control(
+            Control::MidiLearn {
+                target: Some(MidiTarget::Action {
+                    action: MidiAction::Next,
+                }),
+            },
+            t0,
+        )
+        .unwrap();
+        s.apply_midi(&[0xB0, 80, 127], t0); // learn
+        s.apply_midi(&[0xB0, 80, 0], t0);
+        s.apply_midi(&[0xB0, 80, 127], t0); // press -> first part
+        assert_eq!(s.preset_name, "Natural Vocal");
+        s.apply_midi(&[0xB0, 80, 0], t0);
+        s.apply_midi(&[0xB0, 80, 127], t0);
+        assert_eq!(s.preset_name, "Pop Polish");
+        s.apply_midi(&[0xC0, 7], t0);
+        assert_eq!(s.position.as_ref().map(|p| p.song), Some(1));
+        assert_eq!(s.preset_name, "Hard Tune");
+        // Unknown program: nothing happens.
+        assert!(s.apply_midi(&[0xC0, 99], t0).is_empty());
+        // Omni off on another channel ignores it.
+        s.apply_control(
+            Control::MidiSettings {
+                program_change: None,
+                channel: Some(2),
+            },
+            t0,
+        )
+        .unwrap();
+        assert_eq!(s.midi.map.channel, Some(1));
+        assert!(s.apply_midi(&[0xC0, 1], t0).is_empty());
+        assert!(matches!(
+            s.apply_control(Control::MidiUnbind { index: 9 }, t0),
+            Err(SessionError::UnknownBinding(9))
+        ));
+        s.apply_control(Control::MidiUnbind { index: 0 }, t0)
+            .unwrap();
+        assert!(s.midi.map.bindings.is_empty());
+    }
+
+    #[test]
+    fn store_persists_user_presets_setlist_and_midi_across_sessions() {
+        let dir = std::env::temp_dir().join(format!("live-session-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let t0 = Instant::now();
+        {
+            let (mut s, w) = Session::new(48000.0, 128).with_store(crate::store::Store::new(&dir));
+            assert!(w.is_empty());
+            s.load_preset("Natural Vocal").unwrap();
+            s.save_preset("My Gig Vocal");
+            s.load_setlist(gig());
+            s.apply_control(
+                Control::MidiLearn {
+                    target: Some(MidiTarget::Action {
+                        action: MidiAction::Panic,
+                    }),
+                },
+                t0,
+            )
+            .unwrap();
+            s.apply_midi(&[0x90, 36, 100], t0);
+            // Factory presets cannot be deleted while unmodified.
+            assert!(matches!(
+                s.delete_preset("Pop Polish"),
+                Err(SessionError::FactoryPreset(_))
+            ));
+        }
+        let (mut s, _) = Session::new(48000.0, 128).with_store(crate::store::Store::new(&dir));
+        assert!(s.presets.iter().any(|p| p.name == "My Gig Vocal"));
+        assert_eq!(s.setlist.as_ref().map(|l| l.songs.len()), Some(2));
+        assert_eq!(s.midi.map.bindings.len(), 1);
+        s.apply_midi(&[0x90, 36, 100], t0);
+        assert!(s.mix.mute, "restored pad binding triggers panic");
+        s.apply_control(
+            Control::DeletePreset {
+                name: "My Gig Vocal".into(),
+            },
+            t0,
+        )
+        .unwrap();
+        let (s2, _) = Session::new(48000.0, 128).with_store(crate::store::Store::new(&dir));
+        assert!(!s2.presets.iter().any(|p| p.name == "My Gig Vocal"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -4,7 +4,9 @@
 
 use crate::control::TapTempo;
 use crate::core::Command;
+use crate::midi::{MidiRouter, MidiState};
 use crate::preset::{Preset, PresetError, Setlist, factory, parse_key};
+use crate::store::Store;
 use live_dsp::param::param_index;
 use live_dsp::{FxKind, Insert};
 use serde::{Deserialize, Serialize};
@@ -56,7 +58,13 @@ pub struct SessionState {
     pub setlist: Option<Setlist>,
     pub position: Option<Position>,
     pub presets: Vec<String>,
+    /// Names of the built-in presets (read-only: cannot be deleted, saving over them makes a user copy).
+    #[serde(default)]
+    pub factory_presets: Vec<String>,
     pub bpm: Option<f32>,
+    /// MIDI map, learn target, open ports, last message.
+    #[serde(default)]
+    pub midi: MidiState,
     pub revision: u64,
 }
 
@@ -72,7 +80,11 @@ pub struct Session {
     pub position: Option<Position>,
     pub revision: u64,
     pub bpm: Option<f32>,
+    pub midi: MidiState,
+    /// Where user presets, the setlist and the MIDI map are persisted (none = memory only).
+    pub store: Option<Store>,
     pub(crate) tap: TapTempo,
+    pub(crate) midi_router: MidiRouter,
 }
 
 #[derive(Debug, thiserror::Error, PartialEq)]
@@ -89,6 +101,10 @@ pub enum SessionError {
     Full,
     #[error("no setlist loaded")]
     NoSetlist,
+    #[error("`{0}` is a factory preset and cannot be deleted")]
+    FactoryPreset(String),
+    #[error("no MIDI binding {0}")]
+    UnknownBinding(u32),
     #[error(transparent)]
     Preset(#[from] PresetError),
 }
@@ -107,8 +123,40 @@ impl Session {
             position: None,
             revision: 0,
             bpm: None,
+            midi: MidiState::default(),
+            store: None,
             tap: TapTempo::default(),
+            midi_router: MidiRouter::default(),
         }
+    }
+
+    /// Attach a data directory: loads user presets (a user preset named like a factory one wins),
+    /// the last setlist and the MIDI map. Returns non-fatal warnings (unreadable preset files).
+    pub fn with_store(mut self, store: Store) -> (Self, Vec<String>) {
+        let (user, warnings) = store.load_presets();
+        for p in user {
+            match self.presets.iter_mut().find(|x| x.name == p.name) {
+                Some(slot) => *slot = p,
+                None => self.presets.push(p),
+            }
+        }
+        self.setlist = store.load_setlist();
+        self.midi.map = store.load_midi();
+        self.store = Some(store);
+        (self, warnings)
+    }
+
+    fn persist(&self, what: &str, r: impl FnOnce(&Store) -> std::io::Result<()>) {
+        if let Some(st) = &self.store
+            && let Err(e) = r(st)
+        {
+            log::warn!("saving {what} to {}: {e}", st.dir().display());
+        }
+    }
+
+    pub(crate) fn persist_midi(&self) {
+        let m = self.midi.map.clone();
+        self.persist("MIDI map", |s| s.save_midi(&m));
     }
 
     pub fn state(&self) -> SessionState {
@@ -119,7 +167,9 @@ impl Session {
             setlist: self.setlist.clone(),
             position: self.position.clone(),
             presets: self.presets.iter().map(|p| p.name.clone()).collect(),
+            factory_presets: factory().into_iter().map(|p| p.name).collect(),
             bpm: self.bpm,
+            midi: self.midi.clone(),
             revision: self.revision,
         }
     }
@@ -188,12 +238,34 @@ impl Session {
 
     pub fn save_preset(&mut self, name: &str) {
         let p = self.capture(name);
+        self.persist("preset", |s| s.save_preset(&p));
         match self.presets.iter_mut().find(|x| x.name == name) {
             Some(slot) => *slot = p,
             None => self.presets.push(p),
         }
         self.preset_name = name.into();
         self.bump();
+    }
+
+    /// Delete a user preset. A user copy of a factory preset reverts to the factory version.
+    pub fn delete_preset(&mut self, name: &str) -> Result<(), SessionError> {
+        let i = self
+            .presets
+            .iter()
+            .position(|p| p.name == name)
+            .ok_or_else(|| SessionError::UnknownPreset(name.into()))?;
+        match factory().into_iter().find(|p| p.name == name) {
+            Some(f) if f == self.presets[i] => {
+                return Err(SessionError::FactoryPreset(name.into()));
+            }
+            Some(f) => self.presets[i] = f,
+            None => {
+                self.presets.remove(i);
+            }
+        }
+        self.persist("preset deletion", |s| s.delete_preset(name));
+        self.bump();
+        Ok(())
     }
 
     pub fn set_param(
@@ -316,6 +388,7 @@ impl Session {
     }
 
     pub fn load_setlist(&mut self, setlist: Setlist) {
+        self.persist("setlist", |s| s.save_setlist(&setlist));
         self.setlist = Some(setlist);
         self.position = None;
         self.bump();
@@ -387,6 +460,15 @@ impl Session {
 mod tests {
     use super::*;
     use crate::preset::{Song, SongPart};
+
+    #[test]
+    fn state_serializes_and_round_trips() {
+        let mut s = Session::new(48000.0, 128);
+        s.load_preset("Natural Vocal").unwrap();
+        let j = serde_json::to_string(&s.state()).expect("state must serialize");
+        let back: SessionState = serde_json::from_str(&j).expect("state must parse");
+        assert_eq!(back, s.state());
+    }
 
     fn setlist() -> Setlist {
         Setlist {

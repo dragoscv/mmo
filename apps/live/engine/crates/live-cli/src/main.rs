@@ -4,13 +4,18 @@
 //!   mixai-live-engine run --input <id|name> --output <id|name> --preset "Natural Vocal" [--buffer 128]
 //!   mixai-live-engine latency --input <..> --output <..>     (needs a loopback)
 //!   mixai-live-engine render --in voice.wav --out processed.wav --preset "Pop Polish"
-//!   mixai-live-engine serve --input <..> --output <..> [--lan] [--port 17920]   (desktop UI + phones)
+//!   mixai-live-engine serve --input <..> --output <..> [--lan] [--port 17920] [--data-dir D] [--no-midi]
+//!   mixai-live-engine midi-ports
 
 use clap::{Parser, Subcommand};
-use live_engine::{Buses, Core, IoConfig, ProbeState, Role, Session, io};
+use live_engine::{Buses, Core, IoConfig, ProbeState, Role, Session, Store, io};
 use live_remote::{RemoteConfig, RemoteServer};
 use std::net::{IpAddr, Ipv4Addr};
+use std::path::PathBuf;
+use std::sync::mpsc;
 use std::time::{Duration, Instant};
+
+mod midi_in;
 
 #[derive(Parser)]
 #[command(
@@ -80,6 +85,8 @@ enum Cmd {
     },
     /// List factory presets as JSON.
     Presets,
+    /// List MIDI input ports as JSON.
+    MidiPorts,
     /// Run the engine with the control server (desktop UI on loopback; phones with --lan).
     Serve {
         #[command(flatten)]
@@ -96,6 +103,15 @@ enum Cmd {
         /// Exit after N seconds (tests).
         #[arg(long)]
         seconds: Option<u64>,
+        /// Where user presets, the setlist and MIDI bindings are stored (default: per-user app data).
+        #[arg(long)]
+        data_dir: Option<PathBuf>,
+        /// Keep everything in memory (tests, kiosk).
+        #[arg(long)]
+        no_store: bool,
+        /// Do not open MIDI inputs.
+        #[arg(long)]
+        no_midi: bool,
     },
 }
 
@@ -147,6 +163,12 @@ fn run(cli: Cli) -> Result<(), String> {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&live_engine::factory()).unwrap_or_default()
+            );
+        }
+        Cmd::MidiPorts => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&midi_in::port_names()).unwrap_or_default()
             );
         }
         Cmd::Run {
@@ -247,11 +269,19 @@ fn run(cli: Cli) -> Result<(), String> {
             port,
             name,
             seconds,
-        } => serve(&dev, &preset, lan, port, &name, seconds)?,
+            data_dir,
+            no_store,
+            no_midi,
+        } => {
+            let store = (!no_store)
+                .then(|| Store::new(data_dir.unwrap_or_else(live_engine::store::default_dir)));
+            serve(&dev, &preset, lan, port, &name, seconds, store, !no_midi)?
+        }
     }
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn serve(
     dev: &DevArgs,
     preset: &str,
@@ -259,15 +289,35 @@ fn serve(
     port: u16,
     name: &str,
     seconds: Option<u64>,
+    store: Option<Store>,
+    midi: bool,
 ) -> Result<(), String> {
     let cfg = io_config(dev)?;
     let mut running = io::start(&cfg).map_err(|e| e.to_string())?;
-    let mut session = Session::new(
+    let session = Session::new(
         cfg.sample_rate as f32,
         running.info.buffer_frames as usize * 8,
     );
+    let mut session = match store {
+        Some(st) => {
+            let (s, warnings) = session.with_store(st);
+            for w in warnings {
+                eprintln!("preset skipped: {w}");
+            }
+            s
+        }
+        None => session,
+    };
     let first = session.load_preset(preset).map_err(|e| e.to_string())?;
     running.send(first).map_err(|_| "command ring full")?;
+    let (midi_tx, midi_rx) = mpsc::sync_channel::<Vec<u8>>(1024);
+    let _midi = if midi {
+        let inputs = midi_in::open_all(midi_tx);
+        session.midi.ports = inputs.names();
+        Some(inputs)
+    } else {
+        None
+    };
     let bind = if lan {
         IpAddr::V4(Ipv4Addr::UNSPECIFIED)
     } else {
@@ -344,6 +394,14 @@ fn serve(
                     inc.id,
                     Err((live_remote::server_error_code(&e), e.to_string())),
                 )),
+            }
+        }
+        let now = Instant::now();
+        for bytes in midi_rx.try_iter() {
+            for c in session.apply_midi(&bytes, now) {
+                if let Err(c) = running.send(c) {
+                    pending.push(c);
+                }
             }
         }
         // State first, then acks: a client seeing `ack` already has the new state.

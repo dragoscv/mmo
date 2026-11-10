@@ -22,6 +22,9 @@ or recording:
 - LAN control: HTTP + WebSocket protocol v1, OSC/UDP, mDNS discovery, QR pairing with three token roles, and a
   web remote page served by the engine ([remote protocol](remote-protocol.md)).
 - Headless binary for stage PCs and scripts, plus offline WAV rendering ([CLI](cli.md)).
+- MIDI control: every input port (incl. paired BLE MIDI pedals), MIDI learn on parameters, mix faders, insert
+  toggles and actions (next/prev/tap/panic/bypass/mute), program change recalls song parts ([MIDI](midi.md)).
+- User presets, the last setlist and the MIDI map persist in a per-user data directory.
 
 ## Surfaces
 
@@ -48,6 +51,7 @@ or recording:
 | [presets.md](presets.md) | JSON format v1: preset, insert, song, song part, setlist; factory presets |
 | [latency.md](latency.md) | Lowest latency on Windows/macOS/Linux, buffer sizes, loopback measurement, Voicemeeter/OBS setups |
 | [cli.md](cli.md) | `mixai-live-engine` subcommands, flags, output formats |
+| [midi.md](midi.md) | MIDI ports, bindings (`midi.json`), MIDI learn, program change |
 | [remote-protocol.md](remote-protocol.md) | Control protocol v1 (HTTP, WebSocket, OSC, mDNS, roles) |
 | [voice-conversion.md](voice-conversion.md) | Design: realtime voice conversion, consent, watermark — planned |
 | [plugins.md](plugins.md) | Design: sandboxed plugin host — planned |

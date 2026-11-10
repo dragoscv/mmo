@@ -20,6 +20,7 @@ Build features (forwarded to cpal): `asio` (Windows ASIO, needs the Steinberg SD
 | [`latency`](#latency) | Measure the real round trip with a click train (needs a loopback) |
 | [`render`](#render) | Process a WAV file offline through a preset |
 | [`serve`](#serve) | Run the engine with the control server (desktop UI, web remote, phones) |
+| `midi-ports` | List MIDI input port names as JSON (what `serve` will open; see [MIDI control](midi.md)) |
 
 Errors print `error: <message>` on stderr and exit with code 1.
 
@@ -114,6 +115,7 @@ rate. `--block` (default 128, clamped 16–4096) is the processing block. Prints
 
 ```text
 mixai-live-engine serve [device options] [--preset <name>] [--lan] [--port <n>] [--name <text>] [--seconds <n>]
+                        [--data-dir <dir>] [--no-store] [--no-midi]
 ```
 
 | Flag | Default | Meaning |
@@ -123,6 +125,9 @@ mixai-live-engine serve [device options] [--preset <name>] [--lan] [--port <n>] 
 | `--port` | `17920` | HTTP/WebSocket port; OSC listens on `port + 1` (or a free port if taken) |
 | `--name` | `MixAI Live` | engine name in `hello`, mDNS and the remote page |
 | `--seconds` | none | exit after N seconds (tests) |
+| `--data-dir` | per-user app data | where user presets, the last setlist and `midi.json` are kept ([presets](presets.md#storage)) |
+| `--no-store` | off | keep presets/setlist/MIDI map in memory only (tests, kiosk) |
+| `--no-midi` | off | do not open MIDI inputs (by default every input port is opened; [MIDI control](midi.md)) |
 
 On start it prints **one `ready` JSON line** on stdout — the contract for the desktop shell and scripts:
 

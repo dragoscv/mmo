@@ -46,7 +46,11 @@ matching `ack` or `error`.
 | `state` | `state: SessionState` | after `hello`, and after every change (debounced 30 ms) |
 | `meters` | `in_peak, in_rms, out_peak:[l,r], out_rms:[l,r], gr:[dB per insert], dsp_load, dsp_load_max, xruns, clipped, tune: {freq, midi, cents, target, correction_cents} \| null, latency_probe: "idle"\|"running"\|{"done_ms":x}\|"failed"` | 30 Hz to clients that sent `subscribe` with `meters:true` (watches: 10 Hz with `meters_hz`) |
 | `ack` | `id` | command applied |
-| `error` | `id?, code, message` | codes: `unauthorized`, `forbidden`, `bad_request`, `unknown_insert`, `unknown_param`, `unknown_preset`, `unknown_fx`, `chain_full`, `no_setlist`, `rate_limited` |
+| `error` | `id?, code, message` | codes: `unauthorized`, `forbidden`, `bad_request`, `unknown_insert`, `unknown_param`, `unknown_preset`, `unknown_fx`, `chain_full`, `no_setlist`, `factory_preset`, `unknown_binding`, `rate_limited` |
+
+`SessionState` (additive since engine 0.1.0+midi): `preset, chain, mix, setlist, position, presets, factory_presets,
+bpm, midi: { map: MidiMap, learning: MidiTarget | null, ports: [string], last: string | null }, revision`. The MIDI
+types are described in [MIDI control](midi.md).
 
 ### Client → server
 
@@ -61,6 +65,7 @@ matching `ack` or `error`.
 | `move_insert` | `insert, to: u32` | controller |
 | `load_preset` | `name` | performer |
 | `save_preset` | `name` | controller |
+| `delete_preset` | `name` (a modified factory preset reverts to factory; an unmodified one → `factory_preset`) | controller |
 | `set_mix` | any of `input_db, main_db, monitor_db, monitor_dry, bypass, mute` | performer |
 | `load_setlist` | `setlist: Setlist` | controller |
 | `goto` | `song, part` | performer |
@@ -68,6 +73,9 @@ matching `ack` or `error`.
 | `tap_tempo` | — (the server averages taps and sets every delay `bpm`) | performer |
 | `panic` | — (mute + reset tails; `set_mix {mute:false}` to recover) | performer |
 | `latency_probe` | — | controller |
+| `midi_learn` | `target: MidiTarget \| null` (null cancels) — the next CC / note binds to it | controller |
+| `midi_unbind` | `index` into `state.midi.map.bindings` | controller |
+| `midi_settings` | any of `program_change: bool, channel: 0 (omni) \| 1..16` | controller |
 | `ping` | `t` → server replies `{"type":"pong","t":…}` | viewer |
 
 ## OSC address space

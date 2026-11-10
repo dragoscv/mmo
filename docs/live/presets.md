@@ -71,7 +71,7 @@ Rules applied when a preset is built (control thread):
 |---|---|---|---|---|
 | `name` | string | yes | — | "Verse", "Chorus"… |
 | `preset` | string | yes | — | Preset **name**; an unknown name fails the recall with `unknown_preset` |
-| `program` | integer 0–255 \| null | no | `null` | Reserved for MIDI program / foot-switch recall — MIDI input is planned (WP21-04) |
+| `program` | integer 0–127 \| null | no | `null` | MIDI program change that recalls this part ([MIDI control](midi.md)); searched from the current song onwards, so a number may repeat across songs |
 
 ## Setlist
 
@@ -145,5 +145,16 @@ factory preset, checks it has no unknown parameters and round-trips it through J
 
 ## Storage
 
-User presets created with `save_preset` live in the engine session (memory) for now; persistence to disk, a
-JSON Schema file and import/export in the desktop app are planned (WP21-04, WP21-07).
+`mixai-live-engine serve` persists to a data directory (`--data-dir`, default per user: `%APPDATA%\ro.mixai.live`,
+`~/Library/Application Support/ro.mixai.live`, `$XDG_CONFIG_HOME/ro.mixai.live`; `--no-store` keeps memory only):
+
+| Path | Content | Written when |
+|---|---|---|
+| `presets/<slug>.json` | one user preset (this format) | `save_preset`; removed by `delete_preset` |
+| `setlist.json` | the last loaded setlist | `load_setlist`; restored on start |
+| `midi.json` | MIDI bindings and settings | learn, unbind, `midi_settings` |
+
+Slug = lowercase ASCII letters/digits joined by `-` (names with no ASCII letters get a hash). Writes go to a
+`.tmp` file and are renamed, so a crash never leaves a half-written preset. Unreadable preset files are skipped
+with a warning on stderr. A user preset with a factory name overrides it; `delete_preset` on it reverts to the
+factory version, and an unmodified factory preset cannot be deleted (`factory_preset`).

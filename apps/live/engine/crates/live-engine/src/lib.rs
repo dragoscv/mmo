@@ -5,14 +5,18 @@ pub mod control;
 pub mod core;
 pub mod io;
 pub mod latency;
+pub mod midi;
 pub mod preset;
 pub mod session;
+pub mod store;
 
 pub use crate::core::{Buses, Command, Core, Garbage, Meters, ProbeState};
 pub use control::{Control, Role};
 pub use io::{DeviceInfo, IoConfig, IoError, Running, RunningInfo, list_devices};
+pub use midi::{MidiMap, MidiState, MidiTarget};
 pub use preset::{Preset, Setlist, Song, SongPart, factory};
 pub use session::{Session, SessionError, SessionState};
+pub use store::Store;
 
 #[cfg(test)]
 #[global_allocator]
