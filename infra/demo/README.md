@@ -20,7 +20,11 @@ apps without owning a server. Owner-approved always-on VM: it has **no** server-
 (Caddy had backed off after SERVFAIL — `docker compose restart caddy` retried at once). `deploy.ps1` re-run from a
 clean tree @217a6fbf: `DEMO_HOST=demo.mixai.ro`, M3U/XMLTV + Live TV source on demo.mixai.ro (2 ch, 527 programmes).
 
-**Live state (verified 2026-11-05 ~15:20Z, image `mmo-server:3.9.4-31fb136b`)**: `https://34-118-46-71.sslip.io`
+**Live state (verified 2026-11-10 23:47Z, image `mmo-server:3.15.0-ba0bfe0f`)**: `https://demo.mixai.ro/health` answers
+`3.15.0`; profiles Reviewer (default), Kids (max age 12) and Parent (PIN); as Kids, Search, Library and Home carry
+nothing above 12 (WP17-102). Deployed with `image.ps1` + `deploy.ps1` through `deploy-clean.ps1`, then `setup.mjs`.
+
+**Earlier state (verified 2026-11-05 ~15:20Z, image `mmo-server:3.9.4-31fb136b`)**: `https://34-118-46-71.sslip.io`
 answers with a Let's Encrypt cert; `demo.mixai.ro` has its A record in Cloudflare but the zone is not yet
 delegated (registrar NS switch pending) — Caddy obtains its certificate automatically once it resolves, then
 re-run `deploy.ps1` + setup so the M3U/XMLTV/Live TV source switch to `demo.mixai.ro`.
