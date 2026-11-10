@@ -7,8 +7,11 @@ pub mod io;
 pub mod latency;
 pub mod midi;
 pub mod preset;
+pub mod sample;
 pub mod session;
 pub mod store;
+#[cfg(windows)]
+pub mod wasapi;
 
 pub use crate::core::{Buses, Command, Core, Garbage, Meters, ProbeState};
 pub use control::{Control, Role};

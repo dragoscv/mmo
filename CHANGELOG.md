@@ -10,6 +10,36 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## Age limits hold in Search and Library on every app (WP17-102, 2026-11-10)
+
+A kids profile could see titles above its age limit in Search. Two causes, both fixed:
+
+- **Apps did not say who was searching.** MixAI for iPhone and Apple TV (`MixaiCore`) and MixAI TV / MixAI for Android
+  (`:core`) called `/media/search` without the active profile, so the server answered for the unrestricted default
+  profile. They now send it. Web and Tizen already did.
+- **The server did not know the age of titles nobody had opened** and let unknown ages through for anything tagged
+  Animation. Server 3.15.0 looks the ages up before answering a profile with an age limit (see `server/CHANGELOG.md`).
+- Library: every app now sends the active profile to `/media/library`, and server 3.15.0 returns only the files of
+  titles that profile may watch. Before, Android TV and the Android phone kept showing a restricted title as a file
+  name with a still (opening it was already refused).
+- Unrated titles reach a kids profile only with the Family or Kids genre; Animation alone is no longer enough.
+- Versions: server 3.15.0, SDK 0.12.0, web 3.4.8, TV Tizen 2.4.1 (also the UI of TV desktop and webOS), TV Android
+  2.3.1 (versionCode 15), Android phone 1.3.1 (versionCode 5), iPhone 1.1.1. Apple TV stays 1.1.0 (the version in
+  App Review) with a new build.
+- Needs server 3.15.0 for the Library and unknown-age parts; with an older server the apps behave as before, except
+  that Search is now filtered for the active profile.
+
+## MixAI Live — native WASAPI hosts (WP21-03, 2026-11-10)
+
+- `live-engine`: two own Windows hosts next to cpal's: `WASAPI Exclusive` (the engine owns the endpoint, buffer =
+  one device period) and `WASAPI Low Latency` (shared mode at the smallest `IAudioClient3` engine period). One
+  event-driven duplex thread, device formats f32 / i32 / i24 / i16.
+- MMCSS "Pro Audio" on that thread and on the stream threads of the default `WASAPI` host.
+- `mixai-live-engine periods --device <name>` prints a device's period limits; `latency` mutes the dry path and
+  reports the loudest input level when no click comes back.
+- Not yet measured on hardware: on the reference interface (Microsoft class driver; minimum 144 frames exclusive,
+  336 shared low-latency at 48 kHz) the loopback probe got no click back on any host. Docs: `docs/live/latency.md`.
+
 ## MixAI Live — phone engine (WP21-06, 2026-11-10)
 
 - `live-ffi` (UniFFI 0.32): the MixAI Live engine runs on Android (AAudio low-latency, exclusive MMAP) and iOS

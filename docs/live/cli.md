@@ -15,6 +15,7 @@ Build features (forwarded to cpal): `asio` (Windows ASIO, needs the Steinberg SD
 | Subcommand | Does |
 |---|---|
 | [`devices`](#devices) | List audio hosts and devices as JSON |
+| [`periods`](#periods) | Smallest exclusive / shared periods a Windows device offers, as JSON |
 | [`presets`](#presets) | List factory presets as JSON |
 | [`run`](#run) | Process live until Ctrl+C (or `--seconds`), printing meters every second |
 | [`latency`](#latency) | Measure the real round trip with a click train (needs a loopback) |
@@ -30,7 +31,7 @@ Shared by `run`, `latency` and `serve`:
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--host <name>` | system default | cpal host: `WASAPI`, `ASIO` (feature), `CoreAudio`, `ALSA`, `JACK` (feature)… case-insensitive |
+| `--host <name>` | system default | `WASAPI`, `WASAPI Exclusive`, `WASAPI Low Latency` ([Windows hosts](latency.md#windows)), `ASIO` (feature), `CoreAudio`, `ALSA`, `JACK` (feature)… case-insensitive |
 | `--input <id\|name>` | default input | device id or exact name from `devices` |
 | `--output <id\|name>` | default output | device id or exact name from `devices` |
 | `--rate <Hz>` | `48000` | sample rate for both streams |
@@ -40,7 +41,9 @@ Shared by `run`, `latency` and `serve`:
 | `--monitor <pair>` | none | output channel pair of the in-ear monitor bus, e.g. `2,3` |
 
 The output device must have enough channels for every routed pair (`output has N channels, routing needs M`).
-The streams use `f32` samples; a device without an `f32` format is rejected.
+The cpal hosts use `f32` streams and reject a device without an `f32` format. The two native WASAPI hosts
+(`WASAPI Exclusive`, `WASAPI Low Latency`) convert to whatever the driver takes (f32, i32, i24 in 32, packed
+i24, i16) and say which in `info.notes`, together with the period the driver really runs.
 
 ## devices
 
@@ -52,6 +55,25 @@ Prints `{"hosts": [...], "devices": [DeviceInfo...]}` sorted by name. `DeviceInf
 `host`, `input_channels`, `output_channels`, `default_rate`, `is_default_input`, `is_default_output`,
 `voicemeeter` (name looks like a Voicemeeter / VB-Audio endpoint), `virtual_cable` (VB-Cable, VirtualDrivers,
 BlackHole, "loopback"…).
+
+## periods
+
+```text
+mixai-live-engine periods --device <id|name> [--rate <Hz>]
+```
+
+Windows only. Prints the period limits of one endpoint (capture or playback, by name or id), or `null` when
+the driver gives no answer (and on other systems).
+
+```json
+{ "device": "Audio Interface Out (2- HD-II)", "exclusive_min": 144, "shared_min": 336, "shared_default": 480, "shared_rate": 48000 }
+```
+
+`exclusive_min` is the smallest buffer `WASAPI Exclusive` can run, in frames at `--rate` (default 48000).
+`shared_min` is the smallest `WASAPI Low Latency` can run and `shared_default` what plain `WASAPI` runs at;
+both are frames at `shared_rate`, the rate of the Windows mixer on that device, and all three shared fields
+are `null` when the driver has no low-latency shared mode. The example is the reference rig (HD-II on the
+Microsoft class driver, 2026-11-10).
 
 ## presets
 
@@ -91,11 +113,15 @@ mixai-live-engine latency [device options]
 Runs the click-train probe described in [latency.md](latency.md#measure-the-real-round-trip) and prints:
 
 ```json
-{ "round_trip_ms": 7.9, "nominal_ms": 4.0, "chain_latency_samples": 0, "info": { "host": "ASIO", "...": "..." } }
+{ "round_trip_ms": 7.9, "nominal_ms": 4.0, "chain_latency_samples": 0, "in_peak_db": -3.1, "info": { "host": "ASIO", "...": "..." } }
 ```
 
-Fails with `no click came back: route the output to the input ...` without a loopback, or
-`latency probe timed out` after 10 s.
+The engine output is muted during the probe, so only the clicks are played (through a loopback the dry signal
+would feed back). `in_peak_db` is the loudest input sample seen during the probe. Fails with
+`no click came back (loudest input during the probe: <x> dBFS): route the output to the input ...` without a
+loopback, `latency probe timed out (loudest input: <x> dBFS)` after 10 s, or `audio stream stopped: <reason>`
+when a device stops delivering. The level tells the cases apart: a click needs to arrive above about
+−34 dBFS (0.02 of full scale) to count; `-180.0` means the input is digitally silent.
 
 ## render
 

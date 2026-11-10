@@ -30,7 +30,7 @@ or recording:
 
 | Surface | Path | Status |
 |---|---|---|
-| Engine (`live-dsp`, `live-engine`, `live-remote`, `live-cli`) | `apps/live/engine` | built — WP21-02/04/05; WASAPI exclusive + MMCSS open (WP21-03) |
+| Engine (`live-dsp`, `live-engine`, `live-remote`, `live-cli`) | `apps/live/engine` | built — WP21-02/04/05; native WASAPI exclusive / low-latency hosts + MMCSS built, loopback figure on real hardware open (WP21-03) |
 | Web remote page (any browser on the LAN) | served by `mixai-live-engine serve` | built — WP21-05 |
 | Browser `/live` FX page (Web Audio, separate engine) | `apps/web` | fixes shipped — WP21-14 |
 | Phone engine: UniFFI bindings for Kotlin + Swift (`live-ffi`), "This phone as the engine" | `apps/live/engine`, `apps/live-android/ffi`, `apps/ios/LiveFFI` | built — WP21-06 ([ffi](ffi.md)) |

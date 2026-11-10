@@ -22,6 +22,11 @@ The engine reports `nominal_latency_ms` = 3 × buffer ÷ rate (the three buffer 
 trip is always larger; measure it with the probe below — the engine never reports driver figures as the
 latency. The ADR-0015 target is ≤ 6 ms round trip at 64 frames on a good driver.
 
+The native WASAPI hosts report the periods the driver really runs: nominal = (input period + ring target +
+output period) ÷ rate, where the ring target is the larger of the two periods. With one interface for input
+and output the periods are equal and this is again 3 periods. With unequal periods (two devices) the ring
+holds up to `input − output` frames more, and a start can count one xrun before the phase settles.
+
 ### Buffer sizes at 48 kHz
 
 | `--buffer` | One period | Engine nominal (3 periods) | + one pitch effect | Typical use |
@@ -48,7 +53,7 @@ xruns appear, then go one step up.
 3. For each click the first input sample above the threshold within 350 ms is the arrival.
 4. The **median** of the detected clicks is reported; at least 3 of 5 must come back, else it fails.
 5. Everything runs inside the audio callback (no allocation); the CLI waits 500 ms for the streams to settle
-   and gives up after 10 s.
+  and gives up after 10 s. The CLI mutes the engine output for the measurement, so only the clicks are played.
 
 You need a loopback from the output back to the input — any of:
 
@@ -64,8 +69,10 @@ mixai-live-engine latency --input "Voicemeeter Out B1 (VB-Audio Voicemeeter VAIO
 ```
 
 Output (JSON): `round_trip_ms` (measured), `nominal_ms`, `chain_latency_samples` (0: the probe runs before the
-chain and the latency command loads no preset), and `info` (devices, rate, buffer, notes). Failure says
-`no click came back: route the output to the input ...`. Over the [remote protocol](remote-protocol.md) a
+chain and the latency command loads no preset), `in_peak_db` (loudest input during the probe) and `info`
+(devices, rate, buffer, notes). Failure says
+`no click came back (loudest input during the probe: <x> dBFS): route the output to the input ...`; a level
+below about −34 dBFS means the click did not arrive at a usable level. Over the [remote protocol](remote-protocol.md) a
 controller sends `latency_probe` and reads `meters.latency_probe` (`{"done_ms": x}` or `"failed"`).
 
 ## Windows
@@ -73,8 +80,13 @@ controller sends `latency_probe` and reads `meters.latency_probe` (`{"done_ms": 
 | Host | Latency | How |
 |---|---|---|
 | **ASIO** | lowest (interface driver, often 32–64 frames stable) | build with `--features asio`, run with `--host ASIO` |
-| WASAPI shared (default) | higher: the Windows audio engine adds its own period and resampling | default host, nothing to configure |
-| WASAPI exclusive | close to ASIO for interfaces without an ASIO driver | **planned (WP21-03)** — cpal 0.18 has no exclusive mode (cpal #459) |
+| **WASAPI Exclusive** | lowest without ASIO: the engine owns the endpoint, no Windows mixer, buffer = one device period | `--host "WASAPI Exclusive"`; fails with `the device is in use by another application` while anything else (Voicemeeter, a browser) holds the device |
+| WASAPI Low Latency | shared mode at the smallest engine period the driver offers (`IAudioClient3`); other apps keep the device | `--host "WASAPI Low Latency"`; the device must already run at `--rate` |
+| WASAPI (default) | highest: shared mode at the default engine period (usually 10 ms) | default host, nothing to configure |
+
+`mixai-live-engine periods --device <name>` prints the three period limits of a device ([CLI](cli.md#periods)).
+A `--buffer` below the device minimum is raised to it; `info.notes` says which period and sample format the
+driver really runs.
 
 - **ASIO build**: `cargo build --release --manifest-path apps/live/engine/Cargo.toml -p live-cli --features asio`.
   cpal's ASIO backend needs the Steinberg ASIO SDK (see cpal's ASIO setup notes: `CPAL_ASIO_DIR`, LLVM/clang
@@ -87,7 +99,9 @@ controller sends `latency_probe` and reads `meters.latency_probe` (`{"done_ms": 
 - Use the interface's own ASIO driver, not ASIO4ALL/FlexASIO on top of WASAPI, when latency matters.
 - Set the Windows power plan to High/Ultimate performance; disable USB selective suspend for the interface.
 - Realtime thread priority: cpal requests it; a refusal is logged as `realtime priority denied` and the stream
-  keeps running. MMCSS "Pro Audio" registration is planned (WP21-03).
+  keeps running. The two native WASAPI hosts run one audio thread registered with MMCSS "Pro Audio"
+  (`info.notes` says `MMCSS Pro Audio`, or that Windows refused it); streams of the default `WASAPI` host are
+  registered on their first callback.
 
 ## macOS
 
@@ -137,4 +151,12 @@ Voicemeeter adds its own buffering (set its buffering to the interface's ASIO dr
    `"voicemeeter": true` and virtual cables with `"virtual_cable": true`.
 
 Measured on the reference rig (HD-II interface → Voicemeeter In 5, WASAPI, 128 frames): DSP load 1.3 % average
-with "Natural Vocal". A measured loopback figure for this rig is still open in the tracker (WP21-03).
+with "Natural Vocal".
+
+Driver-reported periods on the same rig (HD-II on the Microsoft `usbaudio2` class driver, 48 kHz, input and
+output alike): exclusive minimum **144 frames (3 ms)**, shared low-latency minimum **336 (7 ms)**, shared
+default **480 (10 ms)**. By these figures a request of 64 or 128 frames is raised to at least 144 on this
+interface. The loopback round trip is **not measured yet**: the probe run of 2026-11-10 got no click back on
+any of the three WASAPI hosts (cause not established: no loopback cable, or the wrong input channel / gain),
+so the native hosts have opened this interface but have not yet been shown to pass audio through it. The
+figure stays open in the tracker (WP21-03).

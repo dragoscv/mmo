@@ -1,7 +1,9 @@
 //! Headless MixAI Live engine.
 //!
 //!   mixai-live-engine devices [--host ASIO]
+//!   mixai-live-engine periods --device <id|name> [--rate 48000]     (Windows)
 //!   mixai-live-engine run --input <id|name> --output <id|name> --preset "Natural Vocal" [--buffer 128]
+//!       [--host "WASAPI Exclusive" | "WASAPI Low Latency" | ASIO]
 //!   mixai-live-engine latency --input <..> --output <..>     (needs a loopback)
 //!   mixai-live-engine render --in voice.wav --out processed.wav --preset "Pop Polish"
 //!   mixai-live-engine serve --input <..> --output <..> [--lan] [--port 17920] [--data-dir D] [--no-midi]
@@ -57,6 +59,13 @@ enum Cmd {
     Devices {
         #[arg(long)]
         host: Option<String>,
+    },
+    /// Smallest exclusive / shared periods a Windows device offers, as JSON.
+    Periods {
+        #[arg(long)]
+        device: String,
+        #[arg(long, default_value_t = 48_000)]
+        rate: u32,
     },
     /// Process live until Ctrl+C (or --seconds), printing meters every second.
     Run {
@@ -159,6 +168,10 @@ fn run(cli: Cli) -> Result<(), String> {
             let out = serde_json::json!({ "hosts": io::hosts(), "devices": devices });
             println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
         }
+        Cmd::Periods { device, rate } => {
+            let p = io::device_periods(&device, rate).map_err(|e| e.to_string())?;
+            println!("{}", serde_json::to_string_pretty(&p).unwrap_or_default());
+        }
         Cmd::Presets => {
             println!(
                 "{}",
@@ -226,33 +239,58 @@ fn run(cli: Cli) -> Result<(), String> {
         Cmd::Latency { dev } => {
             let cfg = io_config(&dev)?;
             let mut running = io::start(&cfg).map_err(|e| e.to_string())?;
+            // Only the click may reach the output: through a loopback the dry path would feed back.
+            running
+                .send(live_engine::Command::Mute(true))
+                .map_err(|_| "command ring full")?;
             std::thread::sleep(Duration::from_millis(500));
             running
                 .send(live_engine::Command::StartLatencyProbe)
                 .map_err(|_| "command ring full")?;
             let t0 = Instant::now();
+            let mut in_peak = 0.0f32;
             loop {
                 std::thread::sleep(Duration::from_millis(50));
-                if let Some(m) = running.poll() {
+                if !running.alive() {
+                    return Err(format!(
+                        "audio stream stopped: {}",
+                        running
+                            .last_error()
+                            .unwrap_or_else(|| "unknown driver error".into())
+                    ));
+                }
+                // Every meter frame counts: the click lands in exactly one of them.
+                while let Ok(m) = running.meters.pop() {
+                    // Frames from before the probe started (start-up thumps) do not count.
+                    if m.latency_probe != ProbeState::Idle {
+                        in_peak = in_peak.max(m.in_peak);
+                    }
                     match m.latency_probe {
                         ProbeState::Done(ms) => {
                             let out = serde_json::json!({
                                 "round_trip_ms": ms,
                                 "nominal_ms": running.info.nominal_latency_ms,
                                 "chain_latency_samples": m.chain_latency_samples,
+                                "in_peak_db": live_dsp::lin_to_db(in_peak),
                                 "info": running.info,
                             });
                             println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
                             return Ok(());
                         }
                         ProbeState::Failed => {
-                            return Err("no click came back: route the output to the input (cable, Voicemeeter strip, or speaker → mic) and retry".into());
+                            return Err(format!(
+                                "no click came back (loudest input during the probe: {:.1} dBFS): route the output to the input (cable, Voicemeeter strip, or speaker → mic) and retry",
+                                live_dsp::lin_to_db(in_peak)
+                            ));
                         }
                         _ => {}
                     }
                 }
                 if t0.elapsed() > Duration::from_secs(10) {
-                    return Err("latency probe timed out".into());
+                    return Err(format!(
+                        "latency probe timed out (loudest input: {:.1} dBFS)",
+                        live_dsp::lin_to_db(in_peak)
+                    ));
                 }
             }
         }
