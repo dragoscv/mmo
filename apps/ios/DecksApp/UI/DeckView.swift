@@ -1,12 +1,16 @@
 import DecksFFI
 import SwiftUI
 
-/// One deck: header (title, BPM, key, time), phase meter, jog, transport, hot cues, loops, beat jump, tempo, key,
-/// sync / quantize / slip.
+/// One deck at a layout tier (WP19-34). Full: header (title, BPM, key, time), phase meter, jog, transport, hot
+/// cues, loops, beat jump, tempo, key, sync / quantize / slip. Compact: no jog, no key / tempo column. Icon:
+/// header + transport + sync only. Each tier fits the `PANEL_SPECS` minimum (deck 460×560, 340×330, 220×150 pt).
 struct DeckView: View {
     let index: Int
+    var tier: LayoutTier = .full
     @Environment(DecksStore.self) private var store
+    @Environment(LibraryStore.self) private var library
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var editingGrid = false
 
     private var tint: Color { DecksTheme.deck(index) }
     private var d: DeckSnapshot? { store.deck(index) }
@@ -16,23 +20,40 @@ struct DeckView: View {
             header
             PhaseMeter(beat: d?.beat ?? 0, playing: d?.playing ?? false, tint: tint, reduceMotion: reduceMotion)
                 .frame(height: 8)
-            HStack(alignment: .top, spacing: 12) {
-                VStack(spacing: 10) {
-                    JogWheel(index: index, tint: tint, reduceMotion: reduceMotion)
-                        .frame(width: 150, height: 150)
-                    transport
+            switch tier {
+            case .full:
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(spacing: 10) {
+                        JogWheel(index: index, tint: tint, reduceMotion: reduceMotion)
+                            .frame(width: 150, height: 150)
+                        transport
+                    }
+                    .frame(width: 170)
+                    VStack(spacing: 8) {
+                        hotCues
+                        loops
+                        jumps
+                        flags
+                    }
+                    tempo
                 }
-                .frame(width: 170)
+            case .compact:
                 VStack(spacing: 8) {
+                    transport
                     hotCues
                     loops
-                    jumps
                     flags
                 }
-                tempo
+            case .icon:
+                HStack(spacing: 6) {
+                    transport
+                    PadButton(title: "deck.sync", active: d?.syncLock == true, tint: tint) { store.syncTap(index) }
+                }
             }
+            Spacer(minLength: 0)
         }
         .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(RoundedRectangle(cornerRadius: 14).fill(DecksTheme.surface))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(tint.opacity(0.35), lineWidth: 1))
         .accessibilityElement(children: .contain)
@@ -64,6 +85,13 @@ struct DeckView: View {
                 .foregroundStyle(DecksTheme.muted)
             }
             Spacer()
+            if let tid = library.loadedTrackIds[index], d?.loaded == true {
+                Button { editingGrid = true } label: { Image(systemName: "metronome") }
+                    .accessibilityLabel(Text("grid.title"))
+                    .sheet(isPresented: $editingGrid) {
+                        gridSheet(trackId: tid)
+                    }
+            }
             VStack(alignment: .trailing, spacing: 2) {
                 Text(verbatim: DecksFormat.bpm(d?.effectiveBpm ?? d?.bpm))
                     .font(.system(size: 20, weight: .bold, design: .monospaced))
@@ -111,6 +139,20 @@ struct DeckView: View {
     private func hotCueTitle(_ slot: Int) -> LocalizedStringKey {
         let keys: [LocalizedStringKey] = ["deck.hotcue.1", "deck.hotcue.2", "deck.hotcue.3", "deck.hotcue.4"]
         return keys[slot]
+    }
+
+    /// The beatgrid editor as a sheet. It brings its own navigation bar with a Done button, so the
+    /// sheet can always be closed — macOS sheets have no swipe-to-dismiss.
+    @ViewBuilder private func gridSheet(trackId: String) -> some View {
+        let editor = GridEditorView(
+            library: library.library, engine: store.engine, deck: index, trackId: trackId,
+            playheadSec: d?.playheadSec ?? 0, fallbackBpm: d?.bpm ?? 120
+        )
+        #if os(macOS)
+        editor.frame(minWidth: 460, minHeight: 520)
+        #else
+        editor
+        #endif
     }
 
     private var loops: some View {

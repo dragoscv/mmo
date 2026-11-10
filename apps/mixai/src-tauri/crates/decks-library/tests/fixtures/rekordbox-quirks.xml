@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DJ_PLAYLISTS Version="1.0.0">
+  <PRODUCT Name="rekordbox" Version="6.8.5" Company="AlphaTheta"/>
+  <COLLECTION Entries="5">
+    <TRACK TrackID="1" Name="Windows Track" Artist="Ana" Size="8000123" AverageBpm="124.00" Location="file://localhost/D:/M%c3%bazic%C4%83/%C8%98in%C4%83%20%23%201.mp3">
+      <TEMPO Inizio="0.025" Bpm="124.00" Metro="4/4" Battito="1"/>
+      <TEMPO Inizio="1.960" Bpm="124.00" Metro="4/4" Battito="1"/>
+      <TEMPO Inizio="3.896" Bpm="124.00" Metro="4/4" Battito="1"/>
+      <TEMPO Inizio="5.831" Bpm="124.00" Metro="4/4" Battito="1"/>
+      <POSITION_MARK Name="A" Type="0" Start="0.025" Num="0" Red="300" Green="-5" Blue="128"/>
+      <POSITION_MARK Name="A" Type="0" Start="0.025" Num="0" Red="300" Green="-5" Blue="128"/>
+      <POSITION_MARK Name="Mem loop" Type="4" Start="32.000" End="40.000" Num="-1"/>
+      <POSITION_MARK Name="Bad loop" Type="4" Start="50.000" End="49.000" Num="2" Red="10" Green="20" Blue="30"/>
+      <POSITION_MARK Name="Fade" Type="1" Start="60.000" Num="-1"/>
+      <POSITION_MARK Name="Neg" Type="0" Start="-1.000" Num="3"/>
+    </TRACK>
+    <TRACK TrackID="2" Name="Mac Track" Artist="Bo" AverageBpm="0.00" Location="file://localhost/Users/dj/Music/Bo%20%26%20Co/Mac.aiff">
+      <TEMPO Inizio="120.500" Bpm="128.50" Metro="4/4" Battito="1"/>
+      <TEMPO Inizio="0.100" Bpm="128.00" Metro="4/4" Battito="2"/>
+      <TEMPO Inizio="60.100" Bpm="0.00" Metro="4/4" Battito="1"/>
+    </TRACK>
+    <TRACK TrackID="3" Name="Triple Slash" Artist="Cy" Location="file:///E:/Sets/x.flac"/>
+    <TRACK TrackID="4" Name="Share" Artist="Di" Location="file://NAS/music/y.mp3"/>
+    <TRACK TrackID="5" Name="Mac External" Artist="Ed" Location="file://localhost/Volumes/USB%20Stick/Music/z.mp3"/>
+  </COLLECTION>
+  <PLAYLISTS>
+    <NODE Type="0" Name="ROOT" Count="1">
+      <NODE Name="By location" Type="1" KeyType="1" Entries="2">
+        <TRACK Key="file://localhost/Users/dj/Music/Bo%20%26%20Co/Mac.aiff"/>
+        <TRACK Key="file://localhost/D:/M%C3%BAzic%C4%83/%C8%98in%C4%83%20%23%201.mp3"/>
+      </NODE>
+    </NODE>
+  </PLAYLISTS>
+</DJ_PLAYLISTS>

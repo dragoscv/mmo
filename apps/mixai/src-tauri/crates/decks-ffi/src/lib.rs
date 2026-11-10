@@ -27,19 +27,27 @@ use std::sync::{Mutex, MutexGuard};
 mod android;
 mod dvs;
 mod engine;
+mod grid;
+mod interop;
 mod library;
 mod mapping;
+mod packs;
 mod remote;
 mod render;
+mod safety;
 mod setlog;
 mod transition;
 
 pub use dvs::*;
 pub use engine::*;
+pub use grid::*;
+pub use interop::*;
 pub use library::*;
 pub use mapping::*;
+pub use packs::*;
 pub use remote::*;
 pub use render::*;
+pub use safety::*;
 pub use setlog::*;
 pub use transition::*;
 
@@ -78,6 +86,12 @@ pub enum DecksError {
     /// The operation is not available (format, platform or engine capability).
     #[error("unsupported: {reason}")]
     Unsupported { reason: String },
+    /// `.mixaipack` rejected (archive guard, signature, manifest, tokens or layout).
+    #[error("pack: {reason}")]
+    Pack { reason: String },
+    /// The library is protected (protect-library lock); unlock it before writing.
+    #[error("protected: {reason}")]
+    Protected { reason: String },
 }
 
 impl DecksError {

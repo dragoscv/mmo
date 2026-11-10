@@ -12,7 +12,13 @@
 //!   detector, 5.8 ms windows) nearby; the robust median offset shifts the whole grid, so the
 //!   grid lands on transients instead of the FFT frame centres.
 //! * **Grid** — least-squares line through the beats (beat index vs time) gives the BPM to
-//!   ~0.01 BPM on steady material; per-16-beat fits detect drift (> 0.5 % → variable + anchors).
+//!   ~0.01 BPM on steady material.
+//! * **Tempo changes** (WP19-37) — binary segmentation of the beat times into straight-line
+//!   sections (split where two lines fit best while a section's residual is too large), then
+//!   adjacent sections whose tempos agree within 0.25 % are merged. A step change gives exactly
+//!   one change; a drifting live tempo gives a few sections (one per ~15 ms of curvature). The
+//!   section starts are the [`TempoAnchor`]s: a short, editable tempo-marker list. Flagged
+//!   variable only when a section deviates > 0.5 % from the average.
 //! * **Downbeats** — 4/4 bar-accent pattern: the beat phase (mod 4) with the highest mean onset
 //!   accent (full-band + kick band) is the downbeat.
 
@@ -25,7 +31,14 @@ pub(crate) const ONSET_HOP: usize = 128;
 const COMB_WEIGHTS: [f64; 4] = [1.0, 0.5, 0.33, 0.25];
 const DP_TIGHTNESS: f32 = 100.0;
 const VARIABLE_THRESHOLD: f64 = 0.005;
-const SEGMENT_BEATS: usize = 16;
+/// Shortest constant-tempo section (beats).
+const MIN_SECTION_BEATS: usize = 8;
+/// A section is split while its line-fit RMS residual exceeds this (seconds)…
+const SPLIT_RMS_SEC: f64 = 0.008;
+/// …or any single beat is further than this from the line (seconds).
+const SPLIT_MAX_SEC: f64 = 0.030;
+/// Adjacent sections with tempos this close (relative) are one section.
+const MERGE_TOLERANCE: f64 = 0.0025;
 
 /// Beatgrid for a track.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -43,11 +56,23 @@ pub struct BeatGrid {
     /// Tracked beat times in seconds (omitted when `include_beats` is off).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub beats: Option<Vec<f64>>,
-    /// True when local tempo drifts more than 0.5 % from the average.
+    /// True when a constant-tempo section deviates more than 0.5 % from the average.
     pub is_variable: bool,
-    /// Tempo anchors (one per 16 beats) when `is_variable`; empty otherwise.
+    /// Constant-tempo sections when `is_variable` (the first starts at beat 0; every later
+    /// one is a tempo-change marker); empty otherwise.
     #[serde(default)]
     pub anchors: Vec<TempoAnchor>,
+}
+
+impl BeatGrid {
+    /// Tempo-change markers `(sec, bpm)`: every section start after the first one.
+    pub fn tempo_markers(&self) -> Vec<(f64, f64)> {
+        self.anchors
+            .iter()
+            .skip(1)
+            .map(|a| (a.time_sec, a.bpm))
+            .collect()
+    }
 }
 
 /// Start of a constant-tempo section of a variable beatgrid.
@@ -523,32 +548,159 @@ fn downbeat_phase(input: &TrackInput<'_>, frames: &[usize], idx: &[f64]) -> (u8,
     (order[0] as u8, conf as f32)
 }
 
-/// Per-16-beat tempo fits; `(is_variable, anchors)`.
+/// Prefix sums for O(1) least-squares line fits of `times` against `idx` over any range.
+struct LineSums {
+    x: Vec<f64>,
+    y: Vec<f64>,
+    xx: Vec<f64>,
+    xy: Vec<f64>,
+    yy: Vec<f64>,
+}
+
+impl LineSums {
+    fn new(idx: &[f64], times: &[f64]) -> Self {
+        let n = idx.len().min(times.len());
+        let mut s = Self {
+            x: vec![0.0; n + 1],
+            y: vec![0.0; n + 1],
+            xx: vec![0.0; n + 1],
+            xy: vec![0.0; n + 1],
+            yy: vec![0.0; n + 1],
+        };
+        // Centre x and y so the sums stay well-conditioned on long tracks.
+        let (x0, y0) = (
+            idx.first().copied().unwrap_or(0.0),
+            times.first().copied().unwrap_or(0.0),
+        );
+        for i in 0..n {
+            let (x, y) = (idx[i] - x0, times[i] - y0);
+            s.x[i + 1] = s.x[i] + x;
+            s.y[i + 1] = s.y[i] + y;
+            s.xx[i + 1] = s.xx[i] + x * x;
+            s.xy[i + 1] = s.xy[i] + x * y;
+            s.yy[i + 1] = s.yy[i] + y * y;
+        }
+        s
+    }
+
+    /// Sum of squared residuals of the best line through `lo..hi`.
+    fn sse(&self, lo: usize, hi: usize) -> f64 {
+        let n = (hi - lo) as f64;
+        if n < 2.0 {
+            return 0.0;
+        }
+        let sx = self.x[hi] - self.x[lo];
+        let sy = self.y[hi] - self.y[lo];
+        let cxx = (self.xx[hi] - self.xx[lo]) - sx * sx / n;
+        let cxy = (self.xy[hi] - self.xy[lo]) - sx * sy / n;
+        let cyy = (self.yy[hi] - self.yy[lo]) - sy * sy / n;
+        if cxx <= 1e-12 {
+            return cyy.max(0.0);
+        }
+        (cyy - cxy * cxy / cxx).max(0.0)
+    }
+}
+
+/// Least-squares `(intercept, slope)` over `lo..hi`, slope in seconds per beat.
+fn fit(idx: &[f64], times: &[f64], lo: usize, hi: usize) -> Option<(f64, f64)> {
+    linear_fit(&idx[lo..hi], &times[lo..hi]).filter(|f| f.1 > 0.0)
+}
+
+fn needs_split(idx: &[f64], times: &[f64], lo: usize, hi: usize) -> bool {
+    let Some((a, b)) = fit(idx, times, lo, hi) else {
+        return false;
+    };
+    let mut sum = 0.0;
+    let mut max = 0.0f64;
+    for i in lo..hi {
+        let r = (times[i] - (a + b * idx[i])).abs();
+        sum += r * r;
+        max = max.max(r);
+    }
+    (sum / (hi - lo) as f64).sqrt() > SPLIT_RMS_SEC || max > SPLIT_MAX_SEC
+}
+
+/// Binary segmentation into straight-line sections (`(start, end)` beat ranges, end exclusive).
+fn split_sections(
+    idx: &[f64],
+    times: &[f64],
+    sums: &LineSums,
+    lo: usize,
+    hi: usize,
+    out: &mut Vec<(usize, usize)>,
+) {
+    if hi - lo < 2 * MIN_SECTION_BEATS || !needs_split(idx, times, lo, hi) {
+        out.push((lo, hi));
+        return;
+    }
+    let mut best = (f64::INFINITY, lo + MIN_SECTION_BEATS);
+    for k in lo + MIN_SECTION_BEATS..=hi - MIN_SECTION_BEATS {
+        let cost = sums.sse(lo, k) + sums.sse(k, hi);
+        if cost < best.0 {
+            best = (cost, k);
+        }
+    }
+    split_sections(idx, times, sums, lo, best.1, out);
+    split_sections(idx, times, sums, best.1, hi, out);
+}
+
+fn section_bpm(idx: &[f64], times: &[f64], s: (usize, usize)) -> Option<f64> {
+    fit(idx, times, s.0, s.1).map(|(_, b)| 60.0 / b)
+}
+
+/// Merge adjacent sections whose tempos agree within [`MERGE_TOLERANCE`] (closest pair first).
+fn merge_sections(
+    idx: &[f64],
+    times: &[f64],
+    mut secs: Vec<(usize, usize)>,
+) -> Vec<(usize, usize)> {
+    loop {
+        let mut best: Option<(f64, usize)> = None;
+        for i in 0..secs.len().saturating_sub(1) {
+            let (Some(a), Some(b)) = (
+                section_bpm(idx, times, secs[i]),
+                section_bpm(idx, times, secs[i + 1]),
+            ) else {
+                continue;
+            };
+            let d = (a / b - 1.0).abs();
+            if d <= MERGE_TOLERANCE && best.is_none_or(|(bd, _)| d < bd) {
+                best = Some((d, i));
+            }
+        }
+        let Some((_, i)) = best else {
+            return secs;
+        };
+        secs[i].1 = secs[i + 1].1;
+        secs.remove(i + 1);
+    }
+}
+
+/// Constant-tempo sections of the tracked beats; `(is_variable, anchors)`.
 fn tempo_anchors(idx: &[f64], times: &[f64], bpm: f64) -> (bool, Vec<TempoAnchor>) {
-    if times.len() < 2 * SEGMENT_BEATS {
+    let n = idx.len().min(times.len());
+    if n < 2 * MIN_SECTION_BEATS {
         return (false, Vec::new());
     }
-    let mut anchors = Vec::new();
+    let sums = LineSums::new(&idx[..n], &times[..n]);
+    let mut secs = Vec::new();
+    split_sections(idx, times, &sums, 0, n, &mut secs);
+    let secs = merge_sections(idx, times, secs);
+    let mut anchors = Vec::with_capacity(secs.len());
     let mut max_dev = 0.0f64;
-    let mut start = 0;
-    while start + SEGMENT_BEATS / 2 <= times.len() {
-        let end = (start + SEGMENT_BEATS).min(times.len());
-        if end - start < SEGMENT_BEATS / 2 {
-            break;
-        }
-        if let Some((_, b)) = linear_fit(&idx[start..end], &times[start..end]).filter(|f| f.1 > 0.0)
-        {
-            let local = 60.0 / b;
-            max_dev = max_dev.max((local / bpm - 1.0).abs());
-            anchors.push(TempoAnchor {
-                beat_index: idx[start] as u32,
-                time_sec: times[start],
-                bpm: local,
-            });
-        }
-        start = end;
+    for &(lo, hi) in &secs {
+        let Some((a, b)) = fit(idx, times, lo, hi) else {
+            continue;
+        };
+        let local = 60.0 / b;
+        max_dev = max_dev.max((local / bpm - 1.0).abs());
+        anchors.push(TempoAnchor {
+            beat_index: idx[lo] as u32,
+            time_sec: a + b * idx[lo],
+            bpm: local,
+        });
     }
-    if max_dev > VARIABLE_THRESHOLD {
+    if anchors.len() >= 2 && max_dev > VARIABLE_THRESHOLD {
         (true, anchors)
     } else {
         (false, Vec::new())
@@ -577,5 +729,60 @@ mod tests {
         let beats = trim_weak(&onset, dp_beats(&onset, 40.0));
         assert_eq!(beats.first(), Some(&37));
         assert!(beats.windows(2).all(|w| w[1] - w[0] == 40));
+    }
+
+    fn beat_times(first: f64, segments: &[(f64, usize)]) -> Vec<f64> {
+        let mut t = first;
+        let mut out = Vec::new();
+        for &(bpm, n) in segments {
+            for _ in 0..n {
+                out.push(t);
+                t += 60.0 / bpm;
+            }
+        }
+        out
+    }
+
+    fn anchors_of(times: &[f64]) -> (bool, Vec<TempoAnchor>) {
+        let idx: Vec<f64> = (0..times.len()).map(|i| i as f64).collect();
+        let (_, b) = linear_fit(&idx, times).unwrap();
+        tempo_anchors(&idx, times, 60.0 / b)
+    }
+
+    #[test]
+    fn constant_tempo_has_no_markers_even_with_jitter() {
+        let mut times = beat_times(0.3, &[(126.0, 200)]);
+        for (i, t) in times.iter_mut().enumerate() {
+            *t += 0.004 * ((i * 7919) % 11) as f64 / 10.0 - 0.002;
+        }
+        assert_eq!(anchors_of(&times), (false, Vec::new()));
+    }
+
+    #[test]
+    fn step_change_gives_exactly_one_marker_at_the_step() {
+        let times = beat_times(0.5, &[(120.0, 64), (128.0, 64)]);
+        let (var, a) = anchors_of(&times);
+        assert!(var);
+        assert_eq!(a.len(), 2, "{a:?}");
+        // Beat 64 lies on both lines, so either section may own it; the marker time is exact.
+        let k = a[1].beat_index as usize;
+        assert!(k == 64 || k == 65, "{a:?}");
+        assert!((a[1].time_sec - times[k]).abs() < 1e-6, "{a:?}");
+        assert!((a[0].bpm - 120.0).abs() < 1e-6 && (a[1].bpm - 128.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn drift_gives_a_short_monotonic_marker_list() {
+        // 120 → 128 BPM ramp over 160 beats.
+        let mut times = Vec::new();
+        let mut t = 0.2;
+        for k in 0..160 {
+            times.push(t);
+            t += 60.0 / (120.0 + 8.0 * k as f64 / 160.0);
+        }
+        let (var, a) = anchors_of(&times);
+        assert!(var);
+        assert!((3..=10).contains(&a.len()), "{} sections", a.len());
+        assert!(a.windows(2).all(|w| w[1].bpm > w[0].bpm), "{a:?}");
     }
 }

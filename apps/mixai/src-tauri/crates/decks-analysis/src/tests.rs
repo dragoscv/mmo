@@ -193,6 +193,37 @@ fn tempo_drift_is_flagged_variable() {
     let first = g.anchors.first().unwrap().bpm;
     let last = g.anchors.last().unwrap().bpm;
     assert!(first < 122.0 && last > 126.0, "anchors {first} → {last}");
+    // Markers only where the tempo changes: strictly rising, short enough to edit.
+    assert!(g.anchors.len() <= 12, "{} sections", g.anchors.len());
+    assert!(
+        g.anchors.windows(2).all(|w| w[1].bpm > w[0].bpm),
+        "{:?}",
+        g.anchors
+    );
+}
+
+#[test]
+fn tempo_step_gives_one_marker_at_the_change() {
+    let sr = 22_050;
+    let secs = 60.0;
+    let mut times = Vec::new();
+    let mut t = 0.25;
+    while t < secs - 0.2 {
+        times.push(t);
+        t += 60.0 / if t < 30.0 { 120.0 } else { 128.0 };
+    }
+    let step = times.iter().copied().find(|&x| x >= 30.0).unwrap();
+    let audio = clicks(sr, secs, &times, |k| k % 4 == 0);
+    let g = analyze(&audio, 1, sr, &AnalyzeOptions::default())
+        .beatgrid
+        .expect("grid");
+    assert!(g.is_variable, "{g:?}");
+    let markers = g.tempo_markers();
+    assert_eq!(markers.len(), 1, "{:?}", g.anchors);
+    let (at, bpm) = markers[0];
+    assert!((at - step).abs() < 0.6, "marker at {at}, step at {step}");
+    assert!((bpm - 128.0).abs() < 0.3, "bpm {bpm}");
+    assert!((g.anchors[0].bpm - 120.0).abs() < 0.3, "{:?}", g.anchors);
 }
 
 fn assert_key(audio: &[f32], sr: u32, tonic: u8, mode: Mode, camelot: &str) -> KeyResult {

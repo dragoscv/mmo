@@ -11,8 +11,8 @@ use std::sync::{Arc, Mutex};
 
 use mixai_core::deck::TrackBuffer;
 use mixai_core::{
-    BeatFxKind, ClockSource, ColorFxKind, Command, DeckId, Engine, GridAnchor, OutputMode,
-    RoutingConfig,
+    BeatFxKind, ClockSource, ColorFxKind, Command, DeckId, Engine, OutputMode, RoutingConfig,
+    TempoMarker, TempoSection, valid_bpm, valid_sec,
 };
 
 use crate::{DecksError, lock};
@@ -42,6 +42,30 @@ fn finite(name: &str, v: f64) -> Result<f64, DecksError> {
         Ok(v)
     } else {
         Err(DecksError::invalid(format!("{name} must be finite")))
+    }
+}
+
+/// A tempo the grid maths can use (20..400). Every anchor and marker passes this before it can
+/// reach a deck: `beat_at` / `time_at` divide by the segment length, so a 1e-300 or 1e308 tempo
+/// would return `NaN` **on the audio thread** (WP19-37 P1-9).
+pub(crate) fn checked_bpm(name: &str, v: f64) -> Result<f64, DecksError> {
+    if valid_bpm(v) {
+        Ok(v)
+    } else {
+        Err(DecksError::invalid(format!(
+            "{name} {v} out of range 20..400"
+        )))
+    }
+}
+
+/// A usable source time: finite and not negative.
+pub(crate) fn checked_sec(name: &str, v: f64) -> Result<f64, DecksError> {
+    if valid_sec(v) {
+        Ok(v)
+    } else {
+        Err(DecksError::invalid(format!(
+            "{name} {v} must be finite and >= 0"
+        )))
     }
 }
 
@@ -160,6 +184,11 @@ impl From<&decks_analysis::WaveformPeaks> for WaveformPeaks {
 
 #[derive(Debug, Clone, Copy, PartialEq, uniffi::Record)]
 pub struct TempoAnchorInfo {
+    /// Beat number at `time_sec`, counted from the first beat. For an analysed grid (non-empty
+    /// `BeatGridInfo::beats`) it is the beat the tracker **counted** and the engine pins the
+    /// anchor to it; for an edited grid it is only the rounded beat for display and the engine
+    /// integrates the running tempo instead, so a marker between two beats stays where it is
+    /// (WP19-37 P1-8).
     pub beat_index: u32,
     pub time_sec: f64,
     pub bpm: f64,
@@ -178,6 +207,10 @@ pub struct BeatGridInfo {
     pub anchors: Vec<TempoAnchorInfo>,
     /// Tracked beat times (empty for user-set grids).
     pub beats: Vec<f64>,
+    /// Fixed-grid toggle (WP19-37): the deck plays the constant `bpm` + `first_beat_sec`
+    /// grid and the anchors are kept but ignored.
+    #[uniffi(default = false)]
+    pub fixed: bool,
 }
 
 impl From<&decks_analysis::BeatGrid> for BeatGridInfo {
@@ -199,29 +232,101 @@ impl From<&decks_analysis::BeatGrid> for BeatGridInfo {
                 })
                 .collect(),
             beats: g.beats.clone().unwrap_or_default(),
+            fixed: false,
         }
     }
 }
 
 impl BeatGridInfo {
-    fn to_core(&self) -> mixai_core::BeatGrid {
-        let anchors = if self.is_variable && self.anchors.len() >= 2 {
-            self.anchors
-                .iter()
-                .map(|a| GridAnchor {
-                    time: a.time_sec,
-                    beat: f64::from(a.beat_index),
-                })
-                .collect()
-        } else {
-            Vec::new()
+    /// Engine grid: the anchors become tempo markers (sections), so a change in the middle of
+    /// the track bends the grid instead of re-anchoring every beat. `fixed` is carried over, so
+    /// the engine ignores the markers while the toggle is on.
+    ///
+    /// Anchors that carry a beat number (`beat_index`, what the beat tracker counted) are
+    /// pinned to it instead of being re-integrated from the running tempo: the per-section line
+    /// fits disagree by up to ~15 ms at a boundary and integrating those fractional beats makes
+    /// the error accumulate at every marker (WP19-37 P1-8).
+    pub(crate) fn to_core(&self) -> mixai_core::BeatGrid {
+        let start_bpm = match self.anchors.first() {
+            Some(a) if self.is_variable && valid_bpm(a.bpm) => a.bpm,
+            _ => self.bpm,
         };
-        mixai_core::BeatGrid {
-            bpm: self.bpm,
-            first_beat: self.first_beat_sec,
-            downbeat: Some(i64::from(self.downbeat_offset_beats % 4)),
-            beats_per_bar: 4,
-            anchors,
+        let mut g = if self.is_variable && self.anchors_are_measured() {
+            let sections: Vec<TempoSection> = self
+                .anchors
+                .iter()
+                .map(|a| TempoSection {
+                    sec: a.time_sec,
+                    beat: f64::from(a.beat_index),
+                    bpm: a.bpm,
+                })
+                .collect();
+            mixai_core::BeatGrid::from_sections(
+                start_bpm,
+                self.first_beat_sec,
+                &sections,
+                self.fixed,
+            )
+        } else {
+            let markers: Vec<TempoMarker> = if self.is_variable {
+                self.anchors
+                    .iter()
+                    .skip(1)
+                    .map(|a| TempoMarker {
+                        sec: a.time_sec,
+                        bpm: a.bpm,
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            mixai_core::BeatGrid::from_markers(start_bpm, self.first_beat_sec, &markers, self.fixed)
+        };
+        // Keep the nominal (average) tempo for constant queries and the UI.
+        if self.bpm > 0.0 && g.anchors.is_empty() {
+            g.bpm = self.bpm;
+        }
+        g.downbeat = Some(i64::from(self.downbeat_offset_beats % 4));
+        g
+    }
+
+    /// True when the anchors carry the beat numbers the tracker counted: an analysed grid
+    /// (`beats` non-empty — user-set grids leave it empty) with two or more anchors, usable
+    /// tempos and strictly increasing beats and times. Edited grids keep the integrating path,
+    /// because their `beat_index` is only a rounded display value.
+    fn anchors_are_measured(&self) -> bool {
+        !self.beats.is_empty()
+            && self.anchors.len() >= 2
+            && self.anchors.iter().all(|a| valid_bpm(a.bpm))
+            && self
+                .anchors
+                .windows(2)
+                .all(|w| w[1].beat_index > w[0].beat_index && w[1].time_sec > w[0].time_sec)
+    }
+
+    /// Library grid (seconds + tempo markers) for the same beatgrid. A variable grid's first
+    /// anchor is the **starting tempo**, not a tempo change, so it becomes the grid's `bpm`
+    /// (same rule as [`BeatGridInfo::to_core`]); writing the average there would shift every
+    /// later marker's beat number (WP19-37 P1-7).
+    pub(crate) fn to_library(&self) -> decks_library::BeatGrid {
+        let bpm = match self.anchors.first() {
+            Some(a) if self.is_variable && valid_bpm(a.bpm) => a.bpm,
+            _ => self.bpm,
+        };
+        decks_library::BeatGrid {
+            bpm,
+            first_beat_sec: self.first_beat_sec,
+            downbeat_offset: self.downbeat_offset_beats % 4,
+            anchors: self
+                .anchors
+                .iter()
+                .skip(usize::from(self.is_variable))
+                .map(|a| decks_library::GridAnchor {
+                    sec: a.time_sec,
+                    bpm: a.bpm,
+                })
+                .collect(),
+            fixed: self.fixed,
         }
     }
 }
@@ -903,10 +1008,18 @@ impl DecksEngine {
     }
 
     /// Replace the beatgrid (user grid edit) and hand it to the engine.
+    ///
+    /// Every tempo (the base one **and** every anchor) must be inside 20..400 and every time
+    /// finite and non-negative, or the call fails with `InvalidArgument`: the grid is read by
+    /// the audio thread, where a `NaN` beat would poison the transport (WP19-37 P1-9).
     pub fn set_beatgrid(&self, deck: u8, grid: BeatGridInfo) -> Result<(), DecksError> {
         let id = deck_id(deck)?;
-        finite("bpm", grid.bpm)?;
-        finite("first_beat_sec", grid.first_beat_sec)?;
+        checked_bpm("bpm", grid.bpm)?;
+        checked_sec("first_beat_sec", grid.first_beat_sec)?;
+        for (i, a) in grid.anchors.iter().enumerate() {
+            checked_bpm(&format!("anchors[{i}].bpm"), a.bpm)?;
+            checked_sec(&format!("anchors[{i}].time_sec"), a.time_sec)?;
+        }
         let mut s = lock(&self.shared);
         if let Some(e) = &s.engine {
             e.set_grid(id, grid.to_core());
@@ -1364,5 +1477,179 @@ fn hot_cue_slot(slot: u8) -> Result<usize, DecksError> {
         Err(DecksError::invalid(format!(
             "hot cue slot {slot} out of range 0..=7"
         )))
+    }
+}
+
+#[cfg(test)]
+mod grid_tests {
+    use super::*;
+
+    /// Click track (20 ms decaying noise burst per beat, accent on every 4th) at `sr`.
+    fn clicks(sr: u32, secs: f64, times: &[f64]) -> Vec<f32> {
+        let mut out = vec![0.0f32; (sr as f64 * secs) as usize];
+        let mut seed = 42u64;
+        for (k, &t) in times.iter().enumerate() {
+            let start = (t * sr as f64).round() as usize;
+            let amp = if k % 4 == 0 { 0.8 } else { 0.35 };
+            for i in 0..(0.02 * sr as f64) as usize {
+                let Some(o) = out.get_mut(start + i) else {
+                    break;
+                };
+                seed = seed
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1_442_695_040_888_963_407);
+                let noise = ((seed >> 40) as f64 / (1u64 << 24) as f64) * 2.0 - 1.0;
+                let tt = i as f64 / sr as f64;
+                *o += (amp * noise * (-tt / 0.004).exp()) as f32;
+            }
+        }
+        out
+    }
+
+    /// Worst |true beat − nearest grid beat| over `beats`, in seconds.
+    fn worst_error(g: &mixai_core::BeatGrid, beats: &[f64]) -> f64 {
+        worst_at(g, beats).0
+    }
+
+    /// (worst error, true beat time where it happens).
+    fn worst_at(g: &mixai_core::BeatGrid, beats: &[f64]) -> (f64, f64) {
+        beats
+            .iter()
+            .map(|&t| ((g.nearest_beat_time(t) - t).abs(), t))
+            .fold((0.0, 0.0), |a, b| if b.0 > a.0 { b } else { a })
+    }
+
+    /// P1-8, measured: a four-section click track (120 → 127 → 117 → 129 BPM) analysed end to
+    /// end. Before the fix every section start was re-integrated from the previous section's
+    /// fitted tempo (`from_markers`), so the boundary disagreement of the line fits accumulated
+    /// into a permanent offset; now each section is pinned to the beat the tracker counted.
+    #[test]
+    fn analysed_sections_do_not_accumulate_phase_error() {
+        let sr = 22_050;
+        let secs = 72.0;
+        let mut times = Vec::new();
+        let mut t = 0.25;
+        while t < secs - 0.3 {
+            times.push(t);
+            let bpm = match t {
+                x if x < 18.0 => 120.0,
+                x if x < 36.0 => 127.0,
+                x if x < 54.0 => 117.0,
+                _ => 129.0,
+            };
+            t += 60.0 / bpm;
+        }
+        let audio = clicks(sr, secs, &times);
+        let opts = decks_analysis::AnalyzeOptions {
+            key: false,
+            loudness: false,
+            peaks_per_second: 0,
+            ..Default::default()
+        };
+        let a = decks_analysis::analyze(&audio, 1, sr, &opts);
+        let info = BeatGridInfo::from(a.beatgrid.as_ref().expect("grid"));
+        assert!(
+            info.is_variable && info.anchors.len() >= 3,
+            "{:?}",
+            info.anchors
+        );
+        assert!(!info.beats.is_empty(), "analysed grids carry their beats");
+
+        // Before: the previous (integrating) conversion.
+        let markers: Vec<TempoMarker> = info
+            .anchors
+            .iter()
+            .skip(1)
+            .map(|a| TempoMarker {
+                sec: a.time_sec,
+                bpm: a.bpm,
+            })
+            .collect();
+        let before = mixai_core::BeatGrid::from_markers(
+            info.anchors[0].bpm,
+            info.first_beat_sec,
+            &markers,
+            false,
+        );
+        // After: what the deck now gets.
+        let after = info.to_core();
+
+        let tail = &times[times.len() - 16..];
+        let (b_tail, a_tail) = (worst_error(&before, tail), worst_error(&after, tail));
+        let (b_all, a_all) = (worst_error(&before, &times), worst_error(&after, &times));
+        let (_, a_where) = worst_at(&after, &times);
+        let sections: Vec<(u32, f64, f64)> = info
+            .anchors
+            .iter()
+            .map(|a| (a.beat_index, a.time_sec, a.bpm))
+            .collect();
+        let report = format!(
+            "P1-8 anchors={} | last 16 beats: before {:.2} ms, after {:.2} ms | \
+             whole track: before {:.2} ms, after {:.2} ms (at {:.2} s) | sections {:?}",
+            info.anchors.len(),
+            b_tail * 1e3,
+            a_tail * 1e3,
+            b_all * 1e3,
+            a_all * 1e3,
+            a_where,
+            sections,
+        );
+        println!("{report}");
+        // Measured 2026-11-10: before 144.4 ms (last 16 beats) / 187.0 ms (worst), after
+        // 0.64 / 0.73 ms. Bound: 5 ms everywhere (a DJ hears flamming from ~10 ms).
+        assert!(a_tail < 0.005, "{report}");
+        assert!(a_all < 0.005, "{report}");
+        assert!(a_tail <= b_tail + 1e-9, "{report}");
+    }
+
+    /// P1-7: a variable grid is written to the library with its FIRST section's tempo, not the
+    /// average, so every later marker keeps its beat number.
+    #[test]
+    fn library_grid_starts_at_the_first_section_tempo() {
+        let info = BeatGridInfo {
+            bpm: 124.0, // the average differs from the first section (120)
+            confidence: 1.0,
+            first_beat_sec: 0.5,
+            downbeat_offset_beats: 0,
+            downbeat_confidence: 1.0,
+            is_variable: true,
+            anchors: vec![
+                TempoAnchorInfo {
+                    beat_index: 0,
+                    time_sec: 0.5,
+                    bpm: 120.0,
+                },
+                TempoAnchorInfo {
+                    beat_index: 32,
+                    time_sec: 16.5,
+                    bpm: 128.0,
+                },
+            ],
+            beats: Vec::new(),
+            fixed: false,
+        };
+        let lib = info.to_library();
+        assert_eq!(lib.bpm, 120.0);
+        assert_eq!(lib.anchors.len(), 1);
+        // And the engine and library agree on where the marker falls (beat 32).
+        let core = info.to_core();
+        assert!((core.beat_at(16.5) - 32.0).abs() < 1e-9);
+        let back = mixai_core::BeatGrid::from_markers(
+            lib.bpm,
+            lib.first_beat_sec,
+            &[TempoMarker {
+                sec: lib.anchors[0].sec,
+                bpm: lib.anchors[0].bpm,
+            }],
+            false,
+        );
+        assert!((back.beat_at(16.5) - 32.0).abs() < 1e-9);
+        // Constant grids still write the nominal tempo.
+        let constant = BeatGridInfo {
+            is_variable: false,
+            anchors: Vec::new(),
+            ..info
+        };
+        assert_eq!(constant.to_library().bpm, 124.0);
     }
 }

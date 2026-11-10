@@ -90,3 +90,48 @@ browser. Enter loads to the deck that is not playing, Shift+Enter to B.
   reduced motion, theme pref, and the governor (`shell/governor.ts`: average frame > 18.2 ms for
   1.5 s → reduced; < 17.2 ms for 8 s → back).
 - **Beat accent** (opt-in): `--beat` CSS variable from the master clock phase.
+
+## Native apps (Compose + SwiftUI) — WP19-34
+
+The native apps use the **same layout JSON and the same solver**, ported once to Rust:
+**`apps/mixai/src-tauri/crates/decks-layout`** (MSRV 1.87, MIT OR Apache-2.0) is an exact port of
+`types.ts`, `solver.ts` (`tracks`, `fits` with the 0.5 px tolerance, `pick_tier`, `solve`,
+`validate_layout` with identical messages, `minimum_size`), `presets.ts` (`PANEL_SPECS`, the five
+built-ins + Stage) and the namespacing of `src/packs/pack-layouts.ts`. The Tauri renderer keeps its
+synchronous TS solver (no IPC round-trip per resize).
+
+**Golden fixtures** keep the two in lockstep: `apps/mixai/scripts/gen-layout-fixtures.mjs` runs the TS
+solver over every preset × 9 widths × 6 heights (324 cases, 360×300 up to 3440×1440, so icon tiers and
+docking are covered), plus `minimumSize` and validator cases, into
+`docs/decks/fixtures/layout-cases.json`. Asserted by `src/layout/solver.test.ts` (byte-equal to a fresh
+generation), by `decks-layout` (`include_str!`, mutation-checked: a 0 px tolerance makes 7 cases fail),
+and on the JVM by `desktopTest/LayoutFixturesTest` (Kotlin fallback solver and the FFI solver). Any
+change to the TS solver, presets or validator ⇒ regenerate the file in the same commit.
+
+**Unknown panels.** The format has 11 panels; the native apps render deck A/B, mixer, crossfader and
+library. The FFI solver takes the list of panels the host renders
+(`layout_solve(layout_json, w, h, available)`): any other panel is *unavailable* and always goes to the
+dock (a tab showing "not available in this app yet"), whatever its size. deckA, deckB and mixer stay
+required by the validator, so every layout, built-in or from a pack, works on every surface.
+
+FFI (`crates/decks-ffi/src/packs.rs`): `layout_solve` → `LayoutSolution { placements: [{ panel, rect, tier }],
+docked, dock? }`, `layout_validate(json)` → messages, `layout_minimum_size(json)`, `layout_presets_json()`.
+Sizes are dp (Compose) / pt (SwiftUI), 1:1 with the CSS px of `PANEL_SPECS`.
+
+Hosts:
+
+- **Compose** (`apps/decks-android/ui`, Android + Desktop): `screens/LayoutHost.kt` —
+  `BoxWithConstraints` → `PackPort.solve(dp)` → panels placed by `Modifier.offset/size`, dock tabs at the
+  dock rect. `DecksScreen` has no `verticalScroll` any more. `DeckPanel` / `MixerPanel` take a `PanelTier`
+  (icon tier added; the crossfader is its own `CrossfaderPanel`). Under 700 dp wide the native phone
+  layout (`DemoPacks.phone`: decks side by side, mixer, crossfader, library) replaces the chosen one.
+  `engine/PackPort.kt` defines the port plus `DemoPacks` (built-in presets + a Kotlin solver used when
+  the native library cannot load, fixture-tested too); `jvmShared/engine/FfiPacks.kt` is the decks-ffi
+  adapter. The chosen layout is `DecksSkin.layoutId` (`classic`… or `<packId>/<layoutId>`); the old
+  `layout=classic|performance|library` preference values are the built-in ids, and a bare pack-local id
+  is remapped when exactly one pack layout matches.
+- **SwiftUI** (`apps/ios/DecksApp`): `UI/LayoutHost.swift` — `GeometryReader` → `layoutSolve` → panels
+  positioned by rect + dock tabs; replaces the regular-size-class branch of `RootView` (compact width
+  keeps its tabs). `DeckView` / `MixerView` take a `LayoutTier`; `CrossfaderView` is the crossfader
+  panel. Layout / skin / pack pickers: `UI/AppearanceSettingsSection.swift`; state in
+  `Engine/PackStore.swift` (`AppearanceStore`).

@@ -15,6 +15,7 @@ impl From<decks_library::Error> for DecksError {
         match e {
             decks_library::Error::NotFound(reason) => DecksError::NotFound { reason },
             decks_library::Error::Unsupported(reason) => DecksError::Unsupported { reason },
+            decks_library::Error::Protected(reason) => DecksError::Protected { reason },
             decks_library::Error::Rule(r) => DecksError::invalid(format!("smart crate rule: {r}")),
             other => DecksError::Library {
                 reason: other.to_string(),
@@ -56,6 +57,9 @@ pub struct LibraryGrid {
     pub first_beat_sec: f64,
     pub downbeat_offset: u8,
     pub anchors: Vec<LibraryGridAnchor>,
+    /// Fixed-grid toggle: anchors kept but ignored (WP19-37).
+    #[uniffi(default = false)]
+    pub fixed: bool,
 }
 
 /// A track (library row or interop record).
@@ -143,6 +147,7 @@ impl From<decks_library::TrackRecord> for LibraryTrack {
                         bpm: a.bpm,
                     })
                     .collect(),
+                fixed: g.fixed,
             }),
         }
     }
@@ -210,6 +215,7 @@ impl LibraryTrack {
                         bpm: a.bpm,
                     })
                     .collect(),
+                fixed: g.fixed,
             }),
         })
     }
@@ -374,25 +380,35 @@ impl From<decks_library::MigrationReport> for MigrationSummary {
 /// thread with their own connection (WAL), so searches stay responsive.
 #[derive(uniffi::Object)]
 pub struct DecksLibrary {
-    lib: Arc<Mutex<Library>>,
-    path: Option<PathBuf>,
-    scans: Arc<Mutex<Vec<ScanStatus>>>,
+    pub(crate) lib: Arc<Mutex<Library>>,
+    pub(crate) path: Option<PathBuf>,
+    scans: Arc<Mutex<ScanGate>>,
+    /// Set when a restore left the handle without a real connection (WP19-40 review P1-16).
+    pub(crate) unusable: Arc<Mutex<Option<String>>>,
     next_scan: AtomicU64,
+}
+
+/// Background scans plus the restore gate behind ONE mutex, so "no scan is running" and "a
+/// restore is starting" cannot race (WP19-40 review P1-4).
+#[derive(Default)]
+struct ScanGate {
+    list: Vec<ScanStatus>,
+    restoring: bool,
 }
 
 fn n32(v: usize) -> u32 {
     u32::try_from(v).unwrap_or(u32::MAX)
 }
 
-fn set_scan(scans: &Mutex<Vec<ScanStatus>>, id: u64, f: impl FnOnce(&mut ScanStatus)) {
-    if let Some(s) = lock(scans).iter_mut().find(|s| s.scan_id == id) {
+fn set_scan(scans: &Mutex<ScanGate>, id: u64, f: impl FnOnce(&mut ScanStatus)) {
+    if let Some(s) = lock(scans).list.iter_mut().find(|s| s.scan_id == id) {
         f(s);
     }
 }
 
 fn run_scan(
     lib: &mut Library,
-    scans: &Mutex<Vec<ScanStatus>>,
+    scans: &Mutex<ScanGate>,
     id: u64,
     folder: &Path,
 ) -> Result<decks_library::library::ScanReport, decks_library::Error> {
@@ -406,26 +422,73 @@ fn run_scan(
 }
 
 impl DecksLibrary {
-    fn with<R>(
+    pub(crate) fn with<R>(
         &self,
         f: impl FnOnce(&mut Library) -> Result<R, decks_library::Error>,
     ) -> Result<R, DecksError> {
-        Ok(f(&mut lock(&self.lib))?)
+        let mut guard = lock(&self.lib);
+        if let Some(reason) = lock(&self.unusable).clone() {
+            return Err(DecksError::Library { reason });
+        }
+        Ok(f(&mut guard)?)
+    }
+
+    /// Raises the restore gate: refuses while a background scan (own connection) is running or
+    /// another restore is in flight, so no scan can open the file between the check and the
+    /// swap (WP19-40 review P1-4). Pair with [`DecksLibrary::end_restore`].
+    pub(crate) fn begin_restore(&self) -> Result<(), DecksError> {
+        let mut gate = lock(&self.scans);
+        if gate.list.iter().any(|s| s.state == ScanState::Running) {
+            return Err(DecksError::invalid(
+                "a folder scan is running; restore after it finishes",
+            ));
+        }
+        if gate.restoring {
+            return Err(DecksError::invalid("another restore is running"));
+        }
+        gate.restoring = true;
+        Ok(())
+    }
+
+    pub(crate) fn end_restore(&self) {
+        lock(&self.scans).restoring = false;
+    }
+
+    /// Mandatory snapshot before an import / migration (file-backed libraries only). Skipped
+    /// while protected: the write itself is refused right after.
+    pub(crate) fn snapshot_before(&self, op: &str) -> Result<(), DecksError> {
+        let Some(dir) = self.snapshot_dir() else {
+            return Ok(());
+        };
+        self.with(|l| {
+            if !l.is_protected()? {
+                l.snapshot_before(&dir, op)?;
+            }
+            Ok(())
+        })
     }
 }
 
 #[uniffi::export]
 impl DecksLibrary {
-    /// Open (or create) a library file and apply pending schema migrations.
+    /// Open (or create) a library file and apply pending schema migrations. Refuses a corrupt
+    /// file (`Library` error "corrupt library"; restore with `restore_snapshot_file`), and takes
+    /// the daily automatic snapshot into `<db dir>/snapshots` when one is due (WP19-40).
     #[uniffi::constructor]
     pub fn open(path: String) -> Result<Arc<Self>, DecksError> {
         let lib = Library::open(&path)?;
-        Ok(Arc::new(Self {
+        let this = Arc::new(Self {
             lib: Arc::new(Mutex::new(lib)),
             path: Some(PathBuf::from(path)),
             scans: Arc::default(),
+            unusable: Arc::default(),
             next_scan: AtomicU64::new(1),
-        }))
+        });
+        // Best effort: a full disk must not stop the DJ from opening the library.
+        if let Err(e) = this.auto_snapshot() {
+            eprintln!("[decks-library] automatic snapshot failed: {e}");
+        }
+        Ok(this)
     }
 
     /// Throw-away in-memory library (previews, tests).
@@ -435,6 +498,7 @@ impl DecksLibrary {
             lib: Arc::new(Mutex::new(Library::open_in_memory()?)),
             path: None,
             scans: Arc::default(),
+            unusable: Arc::default(),
             next_scan: AtomicU64::new(1),
         }))
     }
@@ -506,17 +570,25 @@ impl DecksLibrary {
             });
         }
         let id = self.next_scan.fetch_add(1, Ordering::Relaxed);
-        lock(&self.scans).push(ScanStatus {
-            scan_id: id,
-            state: ScanState::Running,
-            done: 0,
-            total: 0,
-            current: String::new(),
-            added: 0,
-            updated: 0,
-            failed: Vec::new(),
-            error: None,
-        });
+        {
+            let mut gate = lock(&self.scans);
+            if gate.restoring {
+                return Err(DecksError::invalid(
+                    "a snapshot restore is running; scan after it finishes",
+                ));
+            }
+            gate.list.push(ScanStatus {
+                scan_id: id,
+                state: ScanState::Running,
+                done: 0,
+                total: 0,
+                current: String::new(),
+                added: 0,
+                updated: 0,
+                failed: Vec::new(),
+                error: None,
+            });
+        }
         let scans = Arc::clone(&self.scans);
         let shared = Arc::clone(&self.lib);
         let path = self.path.clone();
@@ -556,6 +628,7 @@ impl DecksLibrary {
 
     pub fn scan_status(&self, scan_id: u64) -> Option<ScanStatus> {
         lock(&self.scans)
+            .list
             .iter()
             .find(|s| s.scan_id == scan_id)
             .cloned()
@@ -587,13 +660,7 @@ impl DecksLibrary {
     }
 
     pub fn rename_crate(&self, crate_id: i64, name: String) -> Result<(), DecksError> {
-        let n = self.with(|l| {
-            Ok(l.connection().execute(
-                "UPDATE crates SET name = ?1 WHERE id = ?2",
-                (&name, crate_id),
-            )?)
-        })?;
-        if n == 0 {
+        if !self.with(|l| l.rename_crate(crate_id, &name))? {
             return Err(DecksError::NotFound {
                 reason: format!("crate {crate_id}"),
             });
@@ -603,11 +670,7 @@ impl DecksLibrary {
 
     /// Delete a crate (children and memberships cascade; tracks stay in the library).
     pub fn delete_crate(&self, crate_id: i64) -> Result<bool, DecksError> {
-        self.with(|l| {
-            Ok(l.connection()
-                .execute("DELETE FROM crates WHERE id = ?1", [crate_id])?
-                > 0)
-        })
+        self.with(|l| l.delete_crate(crate_id))
     }
 
     pub fn crate_tracks(&self, crate_id: i64) -> Result<Vec<LibraryTrack>, DecksError> {
@@ -650,11 +713,7 @@ impl DecksLibrary {
     }
 
     pub fn delete_smart_crate(&self, id: i64) -> Result<bool, DecksError> {
-        self.with(|l| {
-            Ok(l.connection()
-                .execute("DELETE FROM smart_crates WHERE id = ?1", [id])?
-                > 0)
-        })
+        self.with(|l| l.delete_smart_crate(id))
     }
 
     pub fn evaluate_smart_crate(&self, id: i64) -> Result<Vec<LibraryTrack>, DecksError> {
@@ -677,6 +736,7 @@ impl DecksLibrary {
     pub fn import_file(&self, format: LibraryFormat, path: String) -> Result<u32, DecksError> {
         let col = format.interchange().read(Path::new(&path))?;
         let n = n32(col.tracks.len());
+        self.snapshot_before("import")?;
         self.with(|l| l.import_collection(&col))?;
         Ok(n)
     }
@@ -711,6 +771,7 @@ impl DecksLibrary {
         path: String,
     ) -> Result<MigrationSummary, DecksError> {
         let src = format.source(&path);
+        self.snapshot_before("migrate")?;
         self.with(|l| decks_library::migrate_from(l, src))
             .map(Into::into)
     }

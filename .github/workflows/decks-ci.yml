@@ -106,7 +106,7 @@ jobs:
                   test -f dist/index.html || echo '<!doctype html><title>ci</title>' > dist/index.html
 
             - name: cargo fmt --check (Decks crates; shared crates/mixai-listen is formatted by its own workspace)
-              run: cargo fmt --check -p mixai -p mixai-core -p decks-analysis -p decks-library -p decks-mapping -p decks-dvs -p decks-render -p decks-stems -p decks-remote -p decks-transition -p decks-setlog -p decks-ffi
+              run: cargo fmt --check -p mixai -p mixai-core -p decks-analysis -p decks-library -p decks-mapping -p decks-dvs -p decks-render -p decks-stems -p decks-remote -p decks-transition -p decks-setlog -p decks-packs -p decks-layout -p decks-ffi
 
             # Clippy is BLOCKING on ubuntu-24.04 (the reference platform). On Windows/macOS it is report-only:
             # platform-specific cfg branches (WASAPI/ASIO, CoreAudio, hidapi backends) get their warnings surfaced

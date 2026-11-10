@@ -1,6 +1,6 @@
 import { Suspense, lazy } from "react";
 import { motion } from "motion/react";
-import { Layers, Lock, LockOpen, Minus, Pause, Play, Plus, Repeat, SlidersHorizontal, Sparkles, Target } from "lucide-react";
+import { Grid3x3, Layers, Lock, LockOpen, Minus, Pause, Play, Plus, Repeat, SlidersHorizontal, Sparkles, Target } from "lucide-react";
 import { Skeleton, Tabs, TabsContent, TabsList, TabsTrigger, cn } from "@mmo/ui";
 import { engine } from "@/bridge/engine";
 import type { DeckId, DeckState } from "@/bridge/types";
@@ -17,6 +17,7 @@ import { useDeckUi, type DeckTab } from "./deck-ui-store";
 // Tab bodies not needed for first paint of the transport.
 const StemControls = lazy(() => import("./StemControls").then((m) => ({ default: m.StemControls })));
 const FxPanel = lazy(() => import("./FxPanel").then((m) => ({ default: m.FxPanel })));
+const GridEditor = lazy(() => import("./GridEditor").then((m) => ({ default: m.GridEditor })));
 
 function fmtTime(sec: number): string {
     if (!isFinite(sec) || sec < 0) sec = 0;
@@ -260,6 +261,12 @@ function TabBody({ ctx, tab, compact }: { ctx: DeckCtx; tab: DeckTab; compact?: 
                 </div>
             </Suspense>
         );
+    if (tab === "grid")
+        return (
+            <Suspense fallback={<Skeleton className="h-full w-full" />}>
+                <GridEditor deck={deck} className="h-full min-h-0" />
+            </Suspense>
+        );
     return (
         <Suspense fallback={<Skeleton className="h-full w-full" />}>
             <StemControls deckId={deckId} deck={deck} accent={accent} className="h-full" />
@@ -267,11 +274,16 @@ function TabBody({ ctx, tab, compact }: { ctx: DeckCtx; tab: DeckTab; compact?: 
     );
 }
 
-const TABS: readonly { tab: DeckTab; label: "deckui.tabCues" | "deckui.tabLoops" | "deckui.tabFx" | "deckui.tabStems"; Icon: typeof Target }[] = [
+const TABS: readonly {
+    tab: DeckTab;
+    label: "deckui.tabCues" | "deckui.tabLoops" | "deckui.tabFx" | "deckui.tabStems" | "deckui.tabGrid";
+    Icon: typeof Target;
+}[] = [
     { tab: "cues", label: "deckui.tabCues", Icon: Target },
     { tab: "loops", label: "deckui.tabLoops", Icon: Repeat },
     { tab: "fx", label: "deckui.tabFx", Icon: Sparkles },
     { tab: "stems", label: "deckui.tabStems", Icon: Layers },
+    { tab: "grid", label: "deckui.tabGrid", Icon: Grid3x3 },
 ];
 
 /** Tabbed lower area: only one of hot cues / loops / FX / stems is visible at a time. */

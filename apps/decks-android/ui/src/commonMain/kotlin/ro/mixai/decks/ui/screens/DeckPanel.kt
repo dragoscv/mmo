@@ -27,6 +27,7 @@ import ro.mixai.decks.ui.components.Panel
 import ro.mixai.decks.ui.components.PhaseMeter
 import ro.mixai.decks.ui.components.Readout
 import ro.mixai.decks.ui.components.Spacer
+import ro.mixai.decks.ui.engine.PanelTier
 import ro.mixai.decks.ui.i18n.Str
 import ro.mixai.decks.ui.i18n.str
 import ro.mixai.decks.ui.logic.DeckMath
@@ -36,8 +37,14 @@ import ro.mixai.decks.ui.model.LoadPhase
 import ro.mixai.decks.ui.theme.DecksColors
 import ro.mixai.decks.ui.theme.LocalDecksType
 
+/**
+ * One deck at a layout tier (WP19-34): [PanelTier.Full] = everything + jog wheel, [PanelTier.Compact]
+ * = no jog and no key/mode row, [PanelTier.Icon] = title, BPM and the transport only. Each tier
+ * fits the `PANEL_SPECS` minimum of presets.ts (deck: 460×560, 340×330, 220×150 dp).
+ */
 @Composable
-fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, compact: Boolean = false) {
+fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, tier: PanelTier = PanelTier.Full) {
+    val compact = tier != PanelTier.Full
     val d: DeckState = ctl.deck(index) ?: DeckState(index)
     val c = ctl.controls[index]
     val color = DecksColors.deck(index)
@@ -47,6 +54,10 @@ fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, c
     val off = str(Str.Off)
     fun st(b: Boolean) = if (b) on else off
 
+    if (tier == PanelTier.Icon) {
+        DeckIcon(ctl, index, d, deckName, modifier)
+        return
+    }
     Panel(modifier) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             // Header: deck name, title, BPM, key, tempo
@@ -135,8 +146,8 @@ fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, c
                         PadButton("◀$jb", str(Str.BeatJumpBack, jb) + " $deckName", enabled = d.loaded) { ctl.beatJump(index, false) }
                         PadButton("$jb▶", str(Str.BeatJumpForward, jb) + " $deckName", enabled = d.loaded) { ctl.beatJump(index, true) }
                     }
-                    // Key + modes
-                    ButtonRow {
+                    // Key + modes (full tier only: the compact minimum has no room for a fourth row)
+                    if (!compact) ButtonRow {
                         PadButton("♭", "${str(Str.KeyShiftDown)} $deckName", enabled = d.loaded) { ctl.shiftKey(index, -1.0) }
                         PadButton("♯", "${str(Str.KeyShiftUp)} $deckName", enabled = d.loaded) { ctl.shiftKey(index, 1.0) }
                         PadButton(str(Str.KeyMatch), "${str(Str.KeyMatch)} $deckName", Modifier.weight(1f), enabled = d.loaded) {
@@ -172,6 +183,44 @@ fun DeckPanel(ctl: DecksController, index: Int, modifier: Modifier = Modifier, c
                 }
             }
             Spacer(0.dp)
+        }
+    }
+}
+
+/** Icon tier: deck name + title, BPM / key, play / cue / sync. */
+@Composable
+private fun DeckIcon(ctl: DecksController, index: Int, d: DeckState, deckName: String, modifier: Modifier) {
+    val type = LocalDecksType.current
+    val color = DecksColors.deck(index)
+    Panel(modifier) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BasicText(deckName, style = type.title.copy(color = color), modifier = Modifier.semantics { heading() })
+                BasicText(
+                    d.title ?: str(Str.NoTrack), style = type.small, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            BasicText(
+                "${Format.bpm(d.effectiveBpm ?: d.bpm)} · ${d.effectiveKey ?: d.key ?: "—"} · ${Format.remaining(d.playheadSec, d.durationSec)}",
+                style = type.small.copy(color = color), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            ButtonRow {
+                PadButton(
+                    if (d.playing) "❚❚" else "▶", "${str(if (d.playing) Str.Pause else Str.Play)} $deckName",
+                    Modifier.weight(1f), active = d.playing, accent = color, enabled = d.loaded,
+                ) { ctl.togglePlay(index) }
+                PadButton(
+                    str(Str.Cue).uppercase(), "${str(Str.Cue)} $deckName", Modifier.weight(1f),
+                    accent = DecksColors.warning, enabled = d.loaded,
+                    onPress = { ctl.cue(index, true) }, onRelease = { ctl.cue(index, false) },
+                )
+                PadButton(
+                    str(Str.Sync).uppercase(), "${str(Str.Sync)} $deckName", Modifier.weight(1f),
+                    active = d.syncLock, accent = color, enabled = d.loaded,
+                    state = str(if (d.syncLock) Str.On else Str.Off),
+                ) { ctl.syncTap(index) }
+            }
         }
     }
 }

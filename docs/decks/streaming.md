@@ -28,14 +28,20 @@ written agreement and a review of its display / attribution rules.
 ## OneLibrary
 
 - Launched Oct 2025 by AlphaTheta, Algoriddim and Native Instruments as a shared device library format.
-- **Status 2026-11-08: no public specification or SDK.** The partner pages
-  (<https://www.alphatheta.com/en/onelibrary/>) describe compatibility only.
+- **Blocker (WP19-38, status 2026-11-09): no public specification or SDK, and no AlphaTheta partner access for
+  MixAI.** The partner pages (<https://www.alphatheta.com/en/onelibrary/>) describe compatibility only. Import and
+  export of OneLibrary stay off until one of the two exists.
 - Community reverse-engineering project: <https://github.com/v1vendi/onelibrary> — the device export is a
   **SQLCipher**-encrypted SQLite database (`exportLibrary.db`). We do not ship code derived from it without a
   licence and a legal check of the encryption key's provenance.
-- `decks-library` keeps a `OneLibrary` interop slot (`Source::OneLibrary`) that returns "pending spec"; until then
-  CDJ users export `rekordbox.xml` + USB layout ([library-interop.md](library-interop.md)).
-- Action: request developer access from AlphaTheta (checklist below).
+- **Clean-room only, and only after a legal review**: if we ever write our own reader, one person documents the
+  format from devices and exports we own (no third-party code, no extracted keys), another implements from that
+  document, and a lawyer signs off first on the encryption (circumvention rules) and on the partners' terms.
+- `decks-library` keeps a `OneLibrary` interop slot (`Source::OneLibrary`, FFI `LibraryFormat::OneLibrary`) that
+  refuses I/O with "pending a public specification or AlphaTheta partner access". Meanwhile rekordbox users import
+  through *Export Collection in xml format* (every rekordbox plan has it), and CDJ users get `rekordbox.xml` + the
+  USB layout ([library-interop.md](library-interop.md)).
+- Action: request developer access from AlphaTheta (checklist row 6).
 
 ## Application checklist (owner = user)
 
@@ -46,7 +52,7 @@ written agreement and a review of its display / attribution rules.
 | 3 | Beatport partner API | Beatport partnerships / API team (email in Appendix B) | Product, platforms, launch stage, revenue model, integration scope | API credentials (catalogue + streaming), per-trial / per-subscription bounty terms, co-marketing | to send |
 | 4 | SoundCloud B2B (DJ streaming) | SoundCloud partner team | Same product brief | DJ streaming API access + terms | later |
 | 5 | TIDAL B2B (DJ extension) | TIDAL partner team | Same product brief | Full-length DJ streaming access (beyond 30 s previews) | later |
-| 6 | OneLibrary developer access | AlphaTheta (OneLibrary partners) | Product brief, interop scope (read + write device library) | Specification / SDK + licence terms | to send |
+| 6 | OneLibrary developer access | AlphaTheta (OneLibrary partners) | Product brief, interop scope (read + write device library) | Specification / SDK + licence terms | to send — blocks OneLibrary in WP19-38 (2026-11-09) |
 | 7 | Phase (MWM) HID partnership | MWM | DVS brief ([dvs.md](dvs.md)) | HID protocol for Phase remotes | to send (D65) |
 
 For every application keep: date sent, contact, reply, and the resulting terms in this table.

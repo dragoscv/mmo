@@ -12,11 +12,13 @@
 
 pub mod cdj;
 pub mod colour;
+pub mod drift;
 pub mod interop;
 pub mod keys;
 pub mod library;
 pub mod migrate;
 pub mod model;
+pub mod safety;
 pub mod schema;
 pub mod smart;
 pub mod tags;
@@ -46,6 +48,9 @@ pub enum Error {
     Rule(String),
     #[error("not found: {0}")]
     NotFound(String),
+    /// The protect-library lock is on; imports and bulk edits are refused (WP19-38/40).
+    #[error("protected: {0}")]
+    Protected(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

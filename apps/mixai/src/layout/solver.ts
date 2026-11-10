@@ -73,7 +73,15 @@ export function solve(layout: LayoutDoc, size: { w: number; h: number }, specs: 
     return { placements, docked, dock };
 }
 
-/** Validation errors for a (user or marketplace) layout. Empty = valid. */
+/**
+ * Validation errors for a (user or marketplace) layout. Empty = valid.
+ *
+ * Runs on untrusted input (pack inspect / install / every pack listing, including unsigned
+ * community packs), so when the column/row weights are not 1..8 the grid geometry is
+ * meaningless and the per-cell checks are skipped entirely — otherwise 10 000 declared rows
+ * plus one spanning area cost ~1e8 set operations (WP19-37 P1-11). Must stay byte-identical in
+ * message and order to `validate_layout` in crates/decks-layout.
+ */
 export function validateLayout(raw: unknown, known: readonly PanelId[]): string[] {
     const errs: string[] = [];
     if (!raw || typeof raw !== "object") return ["not an object"];
@@ -82,8 +90,11 @@ export function validateLayout(raw: unknown, known: readonly PanelId[]): string[
     if (typeof l.id !== "string" || !/^[a-z0-9][a-z0-9.-]{0,63}$/.test(l.id)) errs.push("id must be a lowercase slug");
     if (typeof l.name !== "string" || l.name.length === 0 || l.name.length > 60) errs.push("name 1..60 chars");
     const okWeights = (w: unknown) => Array.isArray(w) && w.length >= 1 && w.length <= 8 && w.every((x) => typeof x === "number" && x > 0 && x <= 20);
-    if (!okWeights(l.columns)) errs.push("columns: 1..8 weights in (0, 20]");
-    if (!okWeights(l.rows)) errs.push("rows: 1..8 weights in (0, 20]");
+    const columnsOk = okWeights(l.columns);
+    if (!columnsOk) errs.push("columns: 1..8 weights in (0, 20]");
+    const rowsOk = okWeights(l.rows);
+    if (!rowsOk) errs.push("rows: 1..8 weights in (0, 20]");
+    const gridOk = columnsOk && rowsOk;
     if (l.gap !== undefined && (typeof l.gap !== "number" || l.gap < 0 || l.gap > 32)) errs.push("gap 0..32");
     if (!Array.isArray(l.areas) || l.areas.length === 0) return [...errs, "areas required"];
     const nc = Array.isArray(l.columns) ? l.columns.length : 0;
@@ -97,9 +108,13 @@ export function validateLayout(raw: unknown, known: readonly PanelId[]): string[
         }
         if (seen.has(a.panel)) errs.push(`areas[${i}]: ${a.panel} used twice`);
         seen.add(a.panel);
+        // No usable grid to place this area in; the weights error already says why.
+        if (!gridOk) continue;
         const cs = a.colSpan ?? 1;
         const rs = a.rowSpan ?? 1;
         const int = (n: unknown) => Number.isInteger(n) && (n as number) >= 0;
+        // Number.isInteger is false for ±Infinity, so the sums below stay finite; the Rust port
+        // needs checked_add here because huge JSON numbers saturate to i64::MAX (P1-11).
         if (!int(a.col) || !int(a.row) || !int(cs) || !int(rs) || cs < 1 || rs < 1 || a.col + cs > nc || a.row + rs > nr) {
             errs.push(`areas[${i}]: ${a.panel} outside the grid`);
             continue;

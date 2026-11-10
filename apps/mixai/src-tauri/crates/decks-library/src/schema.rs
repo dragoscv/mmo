@@ -143,6 +143,14 @@ CREATE TRIGGER tracks_fts_au AFTER UPDATE ON tracks BEGIN
 END;
 INSERT INTO tracks_fts(tracks_fts) VALUES ('rebuild');
 "#,
+    // v3: fixed-grid toggle (WP19-37) + key/value library metadata (WP19-40 protect lock, snapshots).
+    r#"
+ALTER TABLE beatgrids ADD COLUMN fixed INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE library_meta (
+    key    TEXT PRIMARY KEY NOT NULL,
+    value  TEXT NOT NULL
+);
+"#,
 ];
 
 /// Current schema version.

@@ -165,3 +165,35 @@ exactly one pack layout matches. Code: `apps/mixai/src/packs/pack-layouts.ts`.
 `tauri.conf.json` sets a CSP (since 1.3.1): scripts `'self'` only, network `ipc:` + `https://mixai.ro`,
 images/fonts `'self' data:` (+ marketplace previews), no frames/objects. `style-src` keeps
 `'unsafe-inline'` (skins inject a `<style>`), so Tauri's nonce injection is disabled for it only.
+
+## Native apps (Android, Desktop, iOS/iPadOS/macOS) — WP19-34
+
+One verifier for every surface: the pure part of the old `src-tauri/src/pack.rs` (limits, archive
+guards, `canonical_digest`, Ed25519 `verify_strict`, manifest / token / layout validation,
+`inspect_with`, `sign_pack`) lives in the crate **`apps/mixai/src-tauri/crates/decks-packs`**
+(MIT OR Apache-2.0, MSRV 1.90), together with a path-based **`PackStore { dir }`**
+(`<dir>/<id>.mixaipack` + `index.json`, atomic writes, re-verification on `list`, a less trusted pack
+never replaces a more trusted one). The Tauri commands above are now thin wrappers over it
+(`src-tauri/src/pack.rs` keeps only the commands and `raw_body`); names, signatures and the camelCase
+wire shape are unchanged.
+
+`decks-ffi` exports it to Kotlin and Swift (`crates/decks-ffi/src/packs.rs`, tests in
+`crates/decks-ffi/tests/packs.rs`):
+
+| FFI | Returns |
+|---|---|
+| `pack_inspect(bytes)` | `PackSummary` record: id, name, version, kind, author, description, pro, trust, sha256, size, installed_at?, mode?, accent?, `colors: [PackColor]`, `layouts_json` (namespaced), `info_json` (the full camelCase `PackInfo`) |
+| `PackStore(dir)` · `install(bytes)` · `list()` · `remove(id)` · `layouts_json()` · `dir()` | object over `decks_packs::PackStore` |
+| `pack_resolve_colors(tokens_json)` | `[PackColor { key, rgb: 0xRRGGBB, alpha }]` from a flat or DTCG tokens object; `decks.a..d` → `deck-a..deck-d`, a colour `accent` → `accent` |
+
+Native code never parses zip, Ed25519 or `oklch(...)`: every colour arrives as packed sRGB
+(OKLCH → sRGB uses the same constants as packages/design-tokens). Errors are `DecksError::Pack { reason }`
+with the same English strings as the desktop.
+
+Where packs live: Android `filesDir/packs`, Desktop `~/.mixai-decks/packs`, iOS / macOS
+`Application Support/packs`. Import: Android SAF (`OpenDocument`), Desktop a file dialog
+(`*.mixaipack`), iOS/macOS `fileImporter` with the exported UTType **`ro.mixai.mixaipack`**
+(extension `mixaipack`, conforms to `public.zip-archive`; declared through `apps/ios/project.yml`).
+A skin or bundle pack becomes the colour source of the active skin: Kotlin `DecksSkin.packId` →
+`DecksPalette(skin, overrides)`, Swift `AppearanceStore.packId` → `DecksPalette.shared`. Supported
+override keys are the `COLOR_KEYS` above; roles the native palettes do not have (e.g. `popover`) are ignored.

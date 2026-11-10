@@ -4,6 +4,14 @@
 //! beat-in-bar), `POSITION_MARK` (Type 0 cue / 4 loop, `Num` -1 = memory, RGB colours),
 //! track `Colour`, `Rating` (0/51/…/255), and the `PLAYLISTS/NODE` tree (KeyType 0 = TrackID,
 //! 1 = Location).
+//!
+//! Real-export quirks handled (WP19-38): `file://localhost/C:/…`, `file:///C:/…`,
+//! `file://localhost/Users/…` (macOS), UNC shares (`file://NAS/share/…`,
+//! `file://localhost//NAS/…`), lower-case percent escapes and back slashes; unsorted TEMPO
+//! lists, zero-BPM entries and the hundreds of redundant TEMPO rows dynamic analysis writes for
+//! a constant tempo; POSITION_MARK colours outside 0..255, memory loops (`Type 4`, `Num -1`),
+//! loops whose `End` is missing or not after `Start` (kept as cues), fade / load marks
+//! (Types 1–3, kept as cues) and exact duplicate marks.
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
@@ -17,12 +25,24 @@ use crate::util::{
 use crate::{Error, Result};
 
 /// `file://localhost/C:/Music/a.mp3` → `C:/Music/a.mp3`; `file://localhost/Users/x` → `/Users/x`.
+/// UNC shares come back as `//host/share/…`.
 pub fn location_to_path(loc: &str) -> String {
-    let rest = loc
-        .strip_prefix("file://localhost")
-        .or_else(|| loc.strip_prefix("file://"))
-        .unwrap_or(loc);
-    let decoded = percent_decode(rest);
+    let loc = loc.trim();
+    let lower = loc.to_ascii_lowercase();
+    let rest = if lower.starts_with("file://localhost") {
+        &loc["file://localhost".len()..]
+    } else if lower.starts_with("file:///") {
+        &loc["file://".len()..]
+    } else if lower.starts_with("file://") {
+        // file://host/share/x = a network share.
+        return format!(
+            "//{}",
+            percent_decode(&loc["file://".len()..]).replace('\\', "/")
+        );
+    } else {
+        loc
+    };
+    let decoded = percent_decode(rest).replace('\\', "/");
     let b = decoded.as_bytes();
     if b.len() >= 3 && b[0] == b'/' && b[1].is_ascii_alphabetic() && b[2] == b':' {
         decoded[1..].to_owned()
@@ -33,8 +53,31 @@ pub fn location_to_path(loc: &str) -> String {
 
 pub fn path_to_location(path: &str) -> String {
     let p = path.replace('\\', "/");
+    if let Some(unc) = p.strip_prefix("//") {
+        return format!("file://{}", percent_encode_path(unc));
+    }
     let p = p.trim_start_matches('/');
     format!("file://localhost/{}", percent_encode_path(p))
+}
+
+/// `Size` (bytes) per path key, for relocating moved files (exact match, no tolerance).
+pub fn file_sizes(xml: &str) -> HashMap<String, (u64, u64)> {
+    let Ok(root) = xmltree::parse(xml) else {
+        return HashMap::new();
+    };
+    root.child("COLLECTION")
+        .map(|c| {
+            c.children_named("TRACK")
+                .filter_map(|t| {
+                    let size = t.i64("Size").filter(|s| *s > 0)?;
+                    Some((
+                        path_key(&location_to_path(t.attr("Location")?)),
+                        (size as u64, 0),
+                    ))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn rating_from_rb(v: i64) -> Option<u8> {
@@ -43,6 +86,45 @@ fn rating_from_rb(v: i64) -> Option<u8> {
 
 fn rating_to_rb(stars: u8) -> u32 {
     u32::from(stars.min(5)) * 51
+}
+
+fn channel(v: Option<i64>) -> Option<u8> {
+    v.map(|x| x.clamp(0, 255) as u8)
+}
+
+/// Grid from TEMPO rows: sorted, zero/negative BPMs dropped, and an anchor kept only where the
+/// tempo changes or the beat phase jumps (rows that merely continue the previous tempo are
+/// what dynamic analysis writes for a constant track).
+fn grid_from_tempos(tempos: &[&Node]) -> Option<BeatGrid> {
+    let mut rows: Vec<(f64, f64, i64)> = tempos
+        .iter()
+        .filter_map(|t| {
+            let start = t.f64("Inizio")?;
+            let bpm = t.f64("Bpm").filter(|b| *b > 0.0)?;
+            Some((start, bpm, t.i64("Battito").unwrap_or(1)))
+        })
+        .collect();
+    rows.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let (start, bpm, beat) = *rows.first()?;
+    let mut anchors: Vec<GridAnchor> = Vec::new();
+    let (mut cur_start, mut cur_bpm) = (start, bpm);
+    for &(s, b, _) in &rows[1..] {
+        let period = 60.0 / cur_bpm;
+        let beats = (s - cur_start) / period;
+        let off_phase = (beats - beats.round()).abs() * period > 0.005;
+        if (b - cur_bpm).abs() > 0.005 || off_phase {
+            anchors.push(GridAnchor { sec: s, bpm: b });
+            cur_start = s;
+            cur_bpm = b;
+        }
+    }
+    Some(BeatGrid {
+        bpm,
+        first_beat_sec: start,
+        downbeat_offset: (beat.clamp(1, 16) - 1) as u8,
+        anchors,
+        fixed: false,
+    })
 }
 
 fn parse_track(n: &Node) -> TrackRecord {
@@ -70,50 +152,39 @@ fn parse_track(n: &Node) -> TrackRecord {
     };
 
     let tempos: Vec<&Node> = n.children_named("TEMPO").collect();
-    if let Some(first) = tempos.first()
-        && let (Some(start), Some(bpm)) = (first.f64("Inizio"), first.f64("Bpm"))
-    {
-        let beat = first.i64("Battito").unwrap_or(1).clamp(1, 16);
-        rec.grid = Some(BeatGrid {
-            bpm,
-            first_beat_sec: start,
-            downbeat_offset: (beat - 1) as u8,
-            anchors: tempos[1..]
-                .iter()
-                .filter_map(|t| {
-                    Some(GridAnchor {
-                        sec: t.f64("Inizio")?,
-                        bpm: t.f64("Bpm")?,
-                    })
-                })
-                .collect(),
-        });
-    }
+    rec.grid = grid_from_tempos(&tempos);
 
     for m in n.children_named("POSITION_MARK") {
-        let Some(start) = m.f64("Start") else {
+        let Some(start) = m.f64("Start").filter(|s| *s >= 0.0) else {
             continue;
         };
         let num = m.i64("Num").unwrap_or(-1);
         let ty = m.i64("Type").unwrap_or(0);
-        let end = m.f64("End");
+        let end = m.f64("End").filter(|e| *e > start);
         let kind = match (ty, num) {
-            (4, _) => CueKind::Loop,
+            (4, _) if end.is_some() => CueKind::Loop,
             (_, n) if n >= 0 => CueKind::Hot,
             _ => CueKind::Memory,
         };
-        let colour = match (m.i64("Red"), m.i64("Green"), m.i64("Blue")) {
-            (Some(r), Some(g), Some(b)) => Some(Rgb::new(r as u8, g as u8, b as u8)),
+        let colour = match (
+            channel(m.i64("Red")),
+            channel(m.i64("Green")),
+            channel(m.i64("Blue")),
+        ) {
+            (Some(r), Some(g), Some(b)) => Some(Rgb::new(r, g, b)),
             _ => None,
         };
-        rec.cues.push(Cue {
+        let cue = Cue {
             kind,
             index: (num >= 0).then_some(num.min(255) as u8),
             start_sec: start,
             end_sec: if kind == CueKind::Loop { end } else { None },
             colour,
             label: m.text("Name"),
-        });
+        };
+        if !rec.cues.contains(&cue) {
+            rec.cues.push(cue);
+        }
     }
     rec
 }

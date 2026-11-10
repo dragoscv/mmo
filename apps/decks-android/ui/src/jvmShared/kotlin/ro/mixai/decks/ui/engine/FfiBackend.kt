@@ -35,7 +35,7 @@ import ro.mixai.decks.ui.model.TrackRow
  * path given via the `uniffi.component.decks_ffi.libraryOverride` system property).
  * Every FFI error is caught: the UI must never crash because the engine refused a command.
  */
-class FfiBackend(libraryDbPath: String?) : DecksBackend {
+class FfiBackend(libraryDbPath: String?, private val packsDir: String? = null) : DecksBackend {
     private val engine = DecksEngine(DecksEngineConfig(null, null, null))
     private val library: DecksLibrary =
         if (libraryDbPath == null) DecksLibrary.openInMemory() else DecksLibrary.open(libraryDbPath)
@@ -274,6 +274,18 @@ class FfiBackend(libraryDbPath: String?) : DecksBackend {
 
     private val setRecordPort by lazy { FfiSetRecord(engine) }
     override fun setRecorder(): SetRecordPort? = setRecordPort
+
+    private val packPort by lazy { FfiPacks.create(packsDir) }
+    override fun packs(): PackPort? = packPort
+
+    private val gridPort by lazy { FfiGrid(engine, library) }
+    override fun grids(): GridPort? = gridPort
+
+    private val importPort by lazy { FfiImport(library) }
+    override fun importer(): ImportPort? = importPort
+
+    private val safetyPort by lazy { FfiSafety(library) }
+    override fun librarySafety(): SafetyPort? = safetyPort
 
     override fun close() {
         runCatching { engine.stop() }

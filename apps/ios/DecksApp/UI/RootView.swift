@@ -1,14 +1,17 @@
 import DecksFFI
 import SwiftUI
 
-/// Layout: waveforms on top (Rust renderer), decks + mixer in the middle, library below. Compact width (iPhone
-/// portrait) switches to a tabbed layout (decks / mixer / library).
+/// Layout: waveforms on top (Rust renderer), then the zero-scroll [LayoutHost] (WP19-34: the chosen layout
+/// preset or pack layout, solved by the Rust solver; panels that do not fit go to the dock). Compact width
+/// (iPhone portrait) keeps the tabbed layout (decks / mixer / library).
 struct RootView: View {
     @Environment(DecksStore.self) private var store
     @Environment(\.horizontalSizeClass) private var hSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var tab = 0
     @State private var showSettings = false
+    /// Skins / layouts / packs (shared with [AppearanceSettingsSection]).
+    @State private var appearance = AppearanceStore.shared
 
     var body: some View {
         ZStack {
@@ -20,6 +23,7 @@ struct RootView: View {
             }
         }
         .foregroundStyle(DecksTheme.foreground)
+        .tint(DecksTheme.accent)
         .onAppear { store.reduceMotion = reduceMotion }
         .onChange(of: reduceMotion) { _, v in store.reduceMotion = v }
         .overlay(alignment: .bottom) { errorBanner }
@@ -64,19 +68,27 @@ struct RootView: View {
     }
 
     private var regular: some View {
-        VStack(spacing: 10) {
-            waveforms.frame(minHeight: 150, idealHeight: 200, maxHeight: 240)
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 10) {
-                    DeckView(index: 0)
-                    MixerView()
-                    DeckView(index: 1)
+        GeometryReader { geo in
+            let layout = appearance.currentLayout
+            let narrow = geo.size.width < 700
+            let json = narrow ? LayoutHostDefaults.phoneJson : (layout?.json ?? LayoutHostDefaults.phoneJson)
+            let hasLibrary = json.contains(#""panel":"library""#)
+            let hasCrossfader = json.contains(#""panel":"crossfader""#)
+            VStack(spacing: 10) {
+                waveforms.frame(height: geo.size.height < 700 ? 110 : (hasLibrary ? 160 : 220))
+                LayoutHost(layoutJson: json) { id, tier in
+                    switch id {
+                    case .deckA: DeckView(index: 0, tier: tier)
+                    case .deckB: DeckView(index: 1, tier: tier)
+                    case .mixer: MixerView(tier: tier, withCrossfader: !hasCrossfader)
+                    case .crossfader: CrossfaderView(tier: tier)
+                    case .library: LibraryView()
+                    default: EmptyView()
+                    }
                 }
             }
-            .scrollBounceBehavior(.basedOnSize)
-            LibraryView().frame(minHeight: 200)
+            .padding(10)
         }
-        .padding(10)
     }
 
     private var compact: some View {

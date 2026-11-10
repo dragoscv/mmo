@@ -7,6 +7,13 @@
 //!
 //! Traktor has no per-cue colour; we write the exact colour in an extra `MIXAI_COLOR`
 //! attribute (Traktor ignores unknown attributes) and fall back to Traktor's per-type colour.
+//!
+//! Real-export quirks handled (WP19-38): `VOLUME` is a drive (`C:`) on Windows and a volume
+//! *name* on macOS: the startup disk (`Macintosh HD`, whatever it is called) maps to `/…`,
+//! any other volume to `/Volumes/<name>/…`; `DIR` with or without the trailing `/:`, empty
+//! `DIR`; `CUE_V2` grid markers (TYPE 4) that also sit on a hot-cue slot, loops with `LEN` 0
+//! (kept as cues), negative cue starts (dropped), unknown TYPEs (kept as cues) and duplicate
+//! entries; `INFO FILESIZE` (KiB) for relocation.
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
@@ -45,14 +52,63 @@ pub fn split_location(path: &str) -> (String, String, String) {
     (volume, dir_t, file.to_owned())
 }
 
-/// Reassembles a path from `LOCATION`. Drive-letter volumes (`C:`) are kept; named volumes
-/// (`Macintosh HD`) map to POSIX root paths.
+/// Top-level folders of a macOS startup disk: a named volume whose DIR starts with one of these
+/// is the system volume (its name varies per Mac), anything else is mounted under `/Volumes`.
+const MAC_ROOT_DIRS: [&str; 9] = [
+    "Users",
+    "Volumes",
+    "Applications",
+    "Library",
+    "System",
+    "private",
+    "tmp",
+    "opt",
+    "home",
+];
+
+/// Reassembles a path from `LOCATION`. Drive-letter volumes (`C:`) are kept; the macOS startup
+/// disk maps to POSIX root paths and other named volumes to `/Volumes/<name>`.
 pub fn join_location(volume: &str, dir: &str, file: &str) -> String {
-    let dir = dir.replace("/:", "/");
-    let dir = if dir.is_empty() { "/".to_owned() } else { dir };
+    let mut dir = dir.replace("/:", "/");
+    if !dir.starts_with('/') {
+        dir.insert(0, '/');
+    }
+    if !dir.ends_with('/') {
+        dir.push('/');
+    }
     let is_drive = volume.len() == 2 && volume.as_bytes()[1] == b':';
-    let prefix = if is_drive { volume } else { "" };
-    format!("{prefix}{dir}{file}")
+    if is_drive {
+        return format!("{volume}{dir}{file}");
+    }
+    let first = dir.trim_start_matches('/').split('/').next().unwrap_or("");
+    if volume.is_empty() || MAC_ROOT_DIRS.contains(&first) {
+        format!("{dir}{file}")
+    } else {
+        format!("/Volumes/{volume}{dir}{file}")
+    }
+}
+
+/// `INFO FILESIZE` (KiB) per path key, for relocating moved files (±1 KiB).
+pub fn file_sizes(xml: &str) -> HashMap<String, (u64, u64)> {
+    let Ok(root) = xmltree::parse(xml) else {
+        return HashMap::new();
+    };
+    root.child("COLLECTION")
+        .map(|c| {
+            c.children_named("ENTRY")
+                .filter_map(|e| {
+                    let kib = e.child("INFO")?.i64("FILESIZE").filter(|s| *s > 0)?;
+                    let loc = e.child("LOCATION")?;
+                    let path = join_location(
+                        loc.attr("VOLUME").unwrap_or_default(),
+                        loc.attr("DIR").unwrap_or("/:"),
+                        loc.attr("FILE").unwrap_or_default(),
+                    );
+                    Some((path_key(&path), (kib as u64 * 1024, 1024)))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn key_to_path(key: &str) -> String {
@@ -72,10 +128,14 @@ fn key_to_path(key: &str) -> String {
 
 fn parse_entry(n: &Node) -> Option<TrackRecord> {
     let loc = n.child("LOCATION")?;
+    let file = loc.attr("FILE").unwrap_or_default();
+    if file.is_empty() {
+        return None; // stream / broken entry: nothing to locate
+    }
     let path = join_location(
         loc.attr("VOLUME").unwrap_or_default(),
         loc.attr("DIR").unwrap_or("/:"),
-        loc.attr("FILE").unwrap_or_default(),
+        file,
     );
     let info = n.child("INFO");
     let get = |k: &str| info.and_then(|i| i.text(k));
@@ -129,9 +189,12 @@ fn parse_entry(n: &Node) -> Option<TrackRecord> {
             grid_markers.push((start, c.child("GRID").and_then(|g| g.f64("BPM"))));
             continue;
         }
+        if start < 0.0 {
+            continue;
+        }
         let len = c.f64("LEN").unwrap_or(0.0) / 1000.0;
         let kind = match (ty, hot) {
-            (5, _) => CueKind::Loop,
+            (5, _) if len > 0.0 => CueKind::Loop,
             (_, h) if h >= 0 => CueKind::Hot,
             _ => CueKind::Memory,
         };
@@ -139,15 +202,20 @@ fn parse_entry(n: &Node) -> Option<TrackRecord> {
             .attr("MIXAI_COLOR")
             .and_then(Rgb::parse_hex)
             .or_else(|| Some(traktor_cue_type_colour(ty.clamp(0, 5) as u8)));
-        rec.cues.push(Cue {
+        let cue = Cue {
             kind,
             index: (hot >= 0).then_some(hot.min(255) as u8),
             start_sec: start,
-            end_sec: (kind == CueKind::Loop && len > 0.0).then_some(start + len),
+            end_sec: (kind == CueKind::Loop).then_some(start + len),
             colour,
             label: c.text("NAME").filter(|s| s != "n.n."),
-        });
+        };
+        if !rec.cues.contains(&cue) {
+            rec.cues.push(cue);
+        }
     }
+    grid_markers.sort_by(|a, b| a.0.total_cmp(&b.0));
+    grid_markers.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-6);
     if let (Some((first, first_bpm)), Some(bpm)) = (grid_markers.first().copied(), rec.bpm) {
         rec.grid = Some(BeatGrid {
             bpm: first_bpm.unwrap_or(bpm),
@@ -160,6 +228,7 @@ fn parse_entry(n: &Node) -> Option<TrackRecord> {
                     bpm: b.unwrap_or(bpm),
                 })
                 .collect(),
+            fixed: false,
         });
     }
     Some(rec)
@@ -205,9 +274,15 @@ pub fn parse(xml: &str) -> Result<Collection> {
     if root.name != "NML" {
         return Err(Error::Format(format!("expected NML, found {}", root.name)));
     }
+    let mut seen = std::collections::HashSet::new();
     let tracks = root
         .child("COLLECTION")
-        .map(|c| c.children_named("ENTRY").filter_map(parse_entry).collect())
+        .map(|c| {
+            c.children_named("ENTRY")
+                .filter_map(parse_entry)
+                .filter(|t| seen.insert(path_key(&t.path)))
+                .collect()
+        })
         .unwrap_or_default();
     let mut playlists = Vec::new();
     if let Some(r) = root.child("PLAYLISTS").and_then(|p| p.child("NODE")) {

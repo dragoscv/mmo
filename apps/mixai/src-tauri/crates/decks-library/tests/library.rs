@@ -89,6 +89,7 @@ fn upsert_merges_by_path_and_hash_and_cascades() {
         first_beat_sec: 0.2,
         downbeat_offset: 1,
         anchors: vec![],
+        fixed: false,
     });
     let (id, how) = lib.upsert_track(&a).unwrap();
     assert_eq!(how, Upserted::Inserted);
@@ -345,6 +346,7 @@ fn temp_rekordbox_xml(root: &Path) -> (PathBuf, Vec<PathBuf>) {
         first_beat_sec: 0.1,
         downbeat_offset: 0,
         anchors: vec![],
+        fixed: false,
     });
     let col = Collection {
         tracks: vec![

@@ -250,6 +250,7 @@ fn library_roundtrip_via_ffi_types() {
             first_beat_sec: 0.12,
             downbeat_offset: 0,
             anchors: vec![],
+            fixed: false,
         }),
         ..Default::default()
     };

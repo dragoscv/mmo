@@ -660,5 +660,301 @@ fn onelibrary_slot_reports_pending_spec() {
         .unwrap_err()
         .to_string();
     assert!(err.contains("pending"), "{err}");
+    assert!(err.contains("2026-11-09"), "{err}");
     assert!(!interop::OneLibrary.can_write());
+}
+
+// ------------------------------------------------------------------ real-export quirks (WP19-38)
+
+#[test]
+fn rekordbox_quirks_urls_tempos_marks() {
+    let col = rekordbox::parse(&read("rekordbox-quirks.xml")).unwrap();
+    assert_eq!(col.tracks.len(), 5);
+    // Lower-case escapes, Romanian diacritics, '#'.
+    let w = find(&col, "Windows Track");
+    assert_eq!(w.path, "D:/Múzică/Șină # 1.mp3");
+    // Four TEMPO rows continuing one constant tempo collapse to a constant grid.
+    let g = w.grid.as_ref().unwrap();
+    assert_eq!((g.bpm, g.first_beat_sec), (124.0, 0.025));
+    assert!(g.anchors.is_empty(), "{:?}", g.anchors);
+    // Duplicate mark dropped, colours clamped, negative start dropped.
+    assert_eq!(w.cues.len(), 4, "{:?}", w.cues);
+    assert_eq!(w.cues[0].colour, Some(Rgb::new(255, 0, 128)));
+    let mem_loop = w
+        .cues
+        .iter()
+        .find(|c| c.label.as_deref() == Some("Mem loop"))
+        .unwrap();
+    assert_eq!((mem_loop.kind, mem_loop.index), (CueKind::Loop, None));
+    assert_eq!(mem_loop.end_sec, Some(40.0));
+    let bad = w
+        .cues
+        .iter()
+        .find(|c| c.label.as_deref() == Some("Bad loop"))
+        .unwrap();
+    assert_eq!(
+        (bad.kind, bad.index, bad.end_sec),
+        (CueKind::Hot, Some(2), None)
+    );
+    let fade = w
+        .cues
+        .iter()
+        .find(|c| c.label.as_deref() == Some("Fade"))
+        .unwrap();
+    assert_eq!(fade.kind, CueKind::Memory);
+
+    // macOS path; unsorted TEMPO list with a zero-BPM row; AverageBpm 0 = unknown.
+    let m = find(&col, "Mac Track");
+    assert_eq!(m.path, "/Users/dj/Music/Bo & Co/Mac.aiff");
+    assert_eq!(m.bpm, None);
+    let g = m.grid.as_ref().unwrap();
+    assert_eq!(
+        (g.bpm, g.first_beat_sec, g.downbeat_offset),
+        (128.0, 0.1, 1)
+    );
+    assert_eq!(g.anchors.len(), 1);
+    assert_eq!((g.anchors[0].sec, g.anchors[0].bpm), (120.5, 128.5));
+
+    assert_eq!(find(&col, "Triple Slash").path, "E:/Sets/x.flac");
+    assert_eq!(find(&col, "Share").path, "//NAS/music/y.mp3");
+    assert_eq!(
+        find(&col, "Mac External").path,
+        "/Volumes/USB Stick/Music/z.mp3"
+    );
+    // KeyType 1 playlist with upper-case escapes resolves to the same paths.
+    assert_eq!(
+        col.playlists[0].tracks,
+        vec!["/Users/dj/Music/Bo & Co/Mac.aiff", "D:/Múzică/Șină # 1.mp3"]
+    );
+    // UNC survives a write/read round trip.
+    let back = rekordbox::parse(&rekordbox::to_xml(&col)).unwrap();
+    assert!(back.track_by_path("//NAS/music/y.mp3").is_some());
+    // Sizes for relocation.
+    let sizes = rekordbox::file_sizes(&read("rekordbox-quirks.xml"));
+    assert_eq!(
+        sizes.get(&decks_library::util::path_key("D:/Múzică/Șină # 1.mp3")),
+        Some(&(8_000_123, 0))
+    );
+}
+
+#[test]
+fn traktor_quirks_volumes_dirs_cue_types() {
+    let col = nml::parse(&read("traktor-quirks.nml")).unwrap();
+    // Duplicate entry and the empty stream entry are dropped.
+    assert_eq!(
+        col.tracks.len(),
+        3,
+        "{:?}",
+        col.tracks.iter().map(|t| &t.path).collect::<Vec<_>>()
+    );
+    let a = find(&col, "Startup Disk");
+    assert_eq!(a.path, "/Users/dj/Music/a.mp3"); // named startup volume → POSIX root
+    let g = a.grid.as_ref().unwrap();
+    assert_eq!((g.bpm, g.first_beat_sec), (122.0, 0.1));
+    assert!(g.anchors.is_empty()); // two markers at the same spot = one
+    assert_eq!(a.cues.len(), 2, "{:?}", a.cues);
+    let zero = a
+        .cues
+        .iter()
+        .find(|c| c.label.as_deref() == Some("Zero loop"))
+        .unwrap();
+    assert_eq!(
+        (zero.kind, zero.index, zero.end_sec),
+        (CueKind::Hot, Some(1), None)
+    );
+    let odd = a
+        .cues
+        .iter()
+        .find(|c| c.label.as_deref() == Some("Odd type"))
+        .unwrap();
+    assert_eq!(odd.kind, CueKind::Memory);
+    assert_eq!(
+        find(&col, "External").path,
+        "/Volumes/USB Stick/DJ Music/House/b.mp3"
+    );
+    assert_eq!(find(&col, "Windows").path, "E:/Muzică/Șină/c & d.flac");
+    assert_eq!(
+        col.playlists[0].tracks,
+        vec![
+            "/Volumes/USB Stick/DJ Music/House/b.mp3",
+            "E:/Muzică/Șină/c & d.flac"
+        ]
+    );
+    let sizes = nml::file_sizes(&read("traktor-quirks.nml"));
+    assert_eq!(
+        sizes.get(&decks_library::util::path_key("/Users/dj/Music/a.mp3")),
+        Some(&(7812 * 1024, 1024))
+    );
+}
+
+fn utf16be(s: &str) -> Vec<u8> {
+    s.encode_utf16().flat_map(u16::to_be_bytes).collect()
+}
+
+fn tag(name: &[u8; 4], payload: &[u8]) -> Vec<u8> {
+    let mut v = name.to_vec();
+    v.extend_from_slice(&(payload.len() as u32).to_be_bytes());
+    v.extend_from_slice(payload);
+    v
+}
+
+#[test]
+fn serato_quirks_database_v2_bom_subcrates_bad_crate() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+    let sd = root.join("_Serato_");
+    std::fs::create_dir_all(sd.join("Subcrates")).unwrap();
+
+    // database V2: a track in no crate, with metadata.
+    let mut otrk = tag(b"pfil", &utf16be("Music/Ăsta/Only DB.mp3"));
+    otrk.extend(tag(b"tsng", &utf16be("Only In Database")));
+    otrk.extend(tag(b"tart", &utf16be("Șerban")));
+    otrk.extend(tag(b"tbpm", &utf16be("124,5")));
+    otrk.extend(tag(b"tkey", &utf16be("Am")));
+    otrk.extend(tag(b"tlen", &utf16be("05:30.00")));
+    otrk.extend(tag(b"tbit", &utf16be("320.0kbps")));
+    let mut db = tag(b"vrsn", &utf16be("2.0/Serato Scratch LIVE Database"));
+    db.extend(tag(b"otrk", &otrk));
+    std::fs::write(sd.join("database V2"), db).unwrap();
+
+    // Crate whose ptrk has a BOM, a trailing NUL, back slashes and a leading slash.
+    let mut ptrk = vec![0xFE, 0xFF];
+    ptrk.extend(utf16be("\\Music\\Ăsta\\Șină.mp3\0"));
+    let mut buf = tag(b"vrsn", &utf16be(serato::CRATE_VERSION));
+    buf.extend(tag(b"otrk", &tag(b"ptrk", &ptrk)));
+    std::fs::write(sd.join("Subcrates/Gigs%%Friday%%Peak.crate"), &buf).unwrap();
+    // Truncated crate next to it: skipped, not fatal.
+    std::fs::write(sd.join("Subcrates/Broken.crate"), b"vrsn\x00\x00\x00\x40ab").unwrap();
+    // Smart crate: ignored.
+    std::fs::write(sd.join("Subcrates/Rules.scrate"), b"junk").unwrap();
+
+    let col = interop::SeratoCrates {
+        volume_root: root.to_path_buf(),
+    }
+    .read(&sd)
+    .unwrap();
+    let slash = |p: &str| decks_library::util::path_key(&format!("{}/{p}", root.display()));
+    assert_eq!(col.tracks.len(), 2);
+    let db_t = find(&col, "Only In Database");
+    assert_eq!(
+        decks_library::util::path_key(&db_t.path),
+        slash("Music/Ăsta/Only DB.mp3")
+    );
+    assert_eq!(db_t.artist.as_deref(), Some("Șerban"));
+    assert_eq!(db_t.bpm, Some(124.5));
+    assert_eq!(db_t.key.unwrap().camelot(), "8A");
+    assert_eq!(db_t.duration_sec, Some(330.0));
+    assert_eq!(db_t.bitrate, Some(320));
+    assert_eq!(col.playlists.len(), 1);
+    let pl = &col.playlists[0];
+    assert_eq!(
+        (pl.name.as_str(), pl.folder.clone()),
+        ("Peak", vec!["Gigs".to_owned(), "Friday".into()])
+    );
+    assert_eq!(
+        decks_library::util::path_key(&pl.tracks[0]),
+        slash("Music/Ăsta/Șină.mp3")
+    );
+
+    // Only broken crates and no database: the error surfaces.
+    let lone = root.join("lone/_Serato_");
+    std::fs::create_dir_all(lone.join("Subcrates")).unwrap();
+    std::fs::write(
+        lone.join("Subcrates/Broken.crate"),
+        b"vrsn\x00\x00\x00\x40ab",
+    )
+    .unwrap();
+    assert!(
+        interop::SeratoCrates {
+            volume_root: root.to_path_buf()
+        }
+        .read(&lone)
+        .is_err()
+    );
+}
+
+fn markers_sample() -> serato::Markers2 {
+    serato::Markers2 {
+        track_colour: Some(Rgb::new(0x99, 0xFF, 0x99)),
+        bpm_lock: None,
+        cues: vec![Cue {
+            kind: CueKind::Hot,
+            index: Some(0),
+            start_sec: 12.5,
+            end_sec: None,
+            colour: Some(Rgb::new(0xCC, 0, 0)),
+            label: Some("Drop".into()),
+        }],
+        unknown: vec![],
+    }
+}
+
+/// Minimal FLAC with only a Vorbis comment block carrying `SERATO_MARKERS_V2`.
+fn flac_with_markers(m: &serato::Markers2) -> Vec<u8> {
+    use base64::Engine as _;
+    let mut inner = b"application/octet-stream\0\0Serato Markers2\0".to_vec();
+    inner.extend(serato::encode_markers2(m));
+    let mut b64 = base64::engine::general_purpose::STANDARD_NO_PAD.encode(inner);
+    b64.insert(72, '\n'); // Serato wraps the text
+    let comment = format!("SERATO_MARKERS_V2={b64}");
+    let mut body = Vec::new();
+    body.extend_from_slice(&4u32.to_le_bytes());
+    body.extend_from_slice(b"test");
+    body.extend_from_slice(&1u32.to_le_bytes());
+    body.extend_from_slice(&(comment.len() as u32).to_le_bytes());
+    body.extend_from_slice(comment.as_bytes());
+    let mut out = b"fLaC".to_vec();
+    out.push(0x80 | 4);
+    out.extend_from_slice(&(body.len() as u32).to_be_bytes()[1..]);
+    out.extend(body);
+    out
+}
+
+#[test]
+fn serato_markers2_from_flac_and_aiff() {
+    let m = markers_sample();
+    let tmp = tempfile::tempdir().unwrap();
+    let flac = tmp.path().join("a.flac");
+    std::fs::write(&flac, flac_with_markers(&m)).unwrap();
+    assert_eq!(
+        serato::read_markers2_from_file(&flac).unwrap(),
+        Some(m.clone())
+    );
+
+    // AIFF: FORM/AIFF with a COMM chunk then an `ID3 ` chunk holding the ID3v2 tag.
+    let mut body = vec![0u8];
+    body.extend_from_slice(b"application/octet-stream\0\0Serato Markers2\0");
+    body.extend(serato::encode_markers2(&m));
+    let ss = |n: usize| {
+        [
+            ((n >> 21) & 0x7F) as u8,
+            ((n >> 14) & 0x7F) as u8,
+            ((n >> 7) & 0x7F) as u8,
+            (n & 0x7F) as u8,
+        ]
+    };
+    let mut frame = b"GEOB".to_vec();
+    frame.extend_from_slice(&ss(body.len()));
+    frame.extend_from_slice(&[0, 0]);
+    frame.extend(body);
+    let mut id3 = b"ID3\x04\x00\x00".to_vec();
+    id3.extend_from_slice(&ss(frame.len()));
+    id3.extend(frame);
+    let mut chunks = tag(b"COMM", &[0u8; 18]);
+    if id3.len() % 2 == 1 {
+        id3.push(0);
+    }
+    chunks.extend(tag(b"ID3 ", &id3));
+    let mut aiff = b"FORM".to_vec();
+    aiff.extend_from_slice(&((chunks.len() + 4) as u32).to_be_bytes());
+    aiff.extend_from_slice(b"AIFF");
+    aiff.extend(chunks);
+    let path = tmp.path().join("b.aiff");
+    std::fs::write(&path, aiff).unwrap();
+    assert_eq!(serato::read_markers2_from_file(&path).unwrap(), Some(m));
+
+    // Plain file without markers.
+    let none = tmp.path().join("c.flac");
+    std::fs::write(&none, b"fLaC\x80\x00\x00\x00").unwrap();
+    assert_eq!(serato::read_markers2_from_file(&none).unwrap(), None);
 }

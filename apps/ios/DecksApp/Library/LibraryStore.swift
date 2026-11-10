@@ -16,7 +16,8 @@ final class LibraryStore {
     var selectedCrate: Int64?
     var lastError: String?
 
-    @ObservationIgnored private var library: DecksLibrary?
+    /// The Rust catalogue handle (import, safety and grid views call the FFI on it directly).
+    @ObservationIgnored private(set) var library: DecksLibrary?
     @ObservationIgnored private var scanId: UInt64?
     @ObservationIgnored private var scanQueue: [URL] = []
     @ObservationIgnored private var accessed: [URL] = []
@@ -198,8 +199,12 @@ final class LibraryStore {
         }
     }
 
+    /// Library track id loaded on each deck (grid editor, WP19-37).
+    private(set) var loadedTrackIds: [Int: String] = [:]
+
     func recordLoad(_ track: LibraryTrack, deck: Int) {
         guard let library, let tid = track.id else { return }
+        loadedTrackIds[deck] = tid
         if session == nil { session = try? library.startSession(name: nil) }
         if let s = session { try? library.recordPlay(sessionId: s, trackId: tid, deck: UInt8(deck)) }
     }

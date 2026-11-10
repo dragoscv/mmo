@@ -117,14 +117,32 @@ fn opt_merge<T: Clone>(new: &Option<T>, old: Option<T>) -> Option<T> {
 }
 
 /// The library handle (one SQLite connection).
+///
+/// Every catalogue mutation (tracks, cues, grids, crates, smart crates, scans, imports) first
+/// calls [`Library::ensure_writable`] and fails with `Error::Protected` while the
+/// protect-library lock is on (WP19-40). Play history and the analysis cache stay writable.
 pub struct Library {
-    conn: Connection,
+    pub(crate) conn: Connection,
 }
 
 impl Library {
     /// Opens (or creates) a library file and applies pending migrations.
+    ///
+    /// A corrupt file is refused (`PRAGMA quick_check`, `Error::Format("corrupt library: …")`)
+    /// so the shell can offer a snapshot restore. Before a schema upgrade of an existing
+    /// library a `before-schema-vN` snapshot goes to `<db dir>/snapshots`.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
         let mut conn = Connection::open(path)?;
+        crate::safety::ensure_healthy(&conn)?;
+        let version: u32 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if version > 0 && version < schema::SCHEMA_VERSION {
+            crate::safety::snapshot_conn(
+                &conn,
+                &crate::safety::default_snapshot_dir(path),
+                &format!("before-schema-v{}", schema::SCHEMA_VERSION),
+            )?;
+        }
         schema::prepare(&mut conn)?;
         Ok(Self { conn })
     }
@@ -152,6 +170,7 @@ impl Library {
     /// Inserts or merges a track (match by path, then by file hash) including cues and grid.
     /// Non-empty incoming fields win; cues/grid are replaced only when the record carries any.
     pub fn upsert_track(&mut self, rec: &TrackRecord) -> Result<(String, Upserted)> {
+        self.ensure_writable()?;
         let tx = self.conn.transaction()?;
         let out = upsert_in(&tx, rec)?;
         tx.commit()?;
@@ -160,6 +179,7 @@ impl Library {
 
     /// Batch upsert in one transaction.
     pub fn upsert_tracks(&mut self, recs: &[TrackRecord]) -> Result<Vec<(String, Upserted)>> {
+        self.ensure_writable()?;
         let tx = self.conn.transaction()?;
         let out = recs
             .iter()
@@ -196,6 +216,7 @@ impl Library {
     }
 
     pub fn delete_track(&mut self, id: &str) -> Result<bool> {
+        self.ensure_writable()?;
         Ok(self
             .conn
             .execute("DELETE FROM tracks WHERE id = ?1", [id])?
@@ -242,7 +263,7 @@ impl Library {
         let row = self
             .conn
             .query_row(
-                "SELECT bpm, first_beat_sec, downbeat_offset, anchors FROM beatgrids WHERE track_id = ?1",
+                "SELECT bpm, first_beat_sec, downbeat_offset, anchors, fixed FROM beatgrids WHERE track_id = ?1",
                 [track_id],
                 |r| {
                     Ok((
@@ -250,22 +271,25 @@ impl Library {
                         r.get::<_, f64>(1)?,
                         r.get::<_, u8>(2)?,
                         r.get::<_, String>(3)?,
+                        r.get::<_, bool>(4)?,
                     ))
                 },
             )
             .optional()?;
-        row.map(|(bpm, first, off, anchors)| {
+        row.map(|(bpm, first, off, anchors, fixed)| {
             Ok(BeatGrid {
                 bpm,
                 first_beat_sec: first,
                 downbeat_offset: off,
                 anchors: serde_json::from_str::<Vec<GridAnchor>>(&anchors)?,
+                fixed,
             })
         })
         .transpose()
     }
 
     pub fn set_cues(&mut self, track_id: &str, cues: &[Cue]) -> Result<()> {
+        self.ensure_writable()?;
         let tx = self.conn.transaction()?;
         write_cues(&tx, track_id, cues)?;
         tx.commit()?;
@@ -273,6 +297,7 @@ impl Library {
     }
 
     pub fn set_grid(&mut self, track_id: &str, grid: &BeatGrid) -> Result<()> {
+        self.ensure_writable()?;
         write_grid(&self.conn, track_id, grid)
     }
 
@@ -316,6 +341,7 @@ impl Library {
         dir: impl AsRef<Path>,
         mut progress: impl FnMut(&ScanProgress),
     ) -> Result<ScanReport> {
+        self.ensure_writable()?;
         let files: Vec<_> = walkdir::WalkDir::new(dir.as_ref())
             .follow_links(true)
             .into_iter()
@@ -361,6 +387,7 @@ impl Library {
         parent_id: Option<i64>,
         is_folder: bool,
     ) -> Result<i64> {
+        self.ensure_writable()?;
         let pos: i64 = self.conn.query_row(
             "SELECT COALESCE(MAX(position) + 1, 0) FROM crates WHERE parent_id IS ?1",
             [parent_id],
@@ -394,6 +421,24 @@ impl Library {
         }
     }
 
+    /// Renames a crate; `false` when it does not exist.
+    pub fn rename_crate(&mut self, crate_id: i64, name: &str) -> Result<bool> {
+        self.ensure_writable()?;
+        Ok(self.conn.execute(
+            "UPDATE crates SET name = ?1 WHERE id = ?2",
+            params![name, crate_id],
+        )? > 0)
+    }
+
+    /// Deletes a crate (children and memberships cascade; tracks stay).
+    pub fn delete_crate(&mut self, crate_id: i64) -> Result<bool> {
+        self.ensure_writable()?;
+        Ok(self
+            .conn
+            .execute("DELETE FROM crates WHERE id = ?1", [crate_id])?
+            > 0)
+    }
+
     pub fn crates(&self) -> Result<Vec<CrateInfo>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, name, parent_id, is_folder, position FROM crates ORDER BY parent_id, position, id",
@@ -414,6 +459,7 @@ impl Library {
 
     /// Replaces a crate's ordered track list.
     pub fn set_crate_tracks(&mut self, crate_id: i64, track_ids: &[String]) -> Result<()> {
+        self.ensure_writable()?;
         let tx = self.conn.transaction()?;
         tx.execute("DELETE FROM crate_tracks WHERE crate_id = ?1", [crate_id])?;
         {
@@ -429,6 +475,7 @@ impl Library {
     }
 
     pub fn add_to_crate(&mut self, crate_id: i64, track_id: &str) -> Result<()> {
+        self.ensure_writable()?;
         self.conn.execute(
             "INSERT INTO crate_tracks(crate_id, position, track_id) \
              VALUES (?1, (SELECT COALESCE(MAX(position) + 1, 0) FROM crate_tracks WHERE crate_id = ?1), ?2)",
@@ -474,12 +521,21 @@ impl Library {
     // ---------------------------------------------------------------- smart crates
 
     pub fn create_smart_crate(&mut self, name: &str, rule: &Rule) -> Result<i64> {
+        self.ensure_writable()?;
         smart::compile(rule, now_unix())?; // validate before storing
         self.conn.execute(
             "INSERT INTO smart_crates(name, rule, created_at) VALUES (?1, ?2, ?3)",
             params![name, serde_json::to_string(rule)?, now_unix()],
         )?;
         Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn delete_smart_crate(&mut self, id: i64) -> Result<bool> {
+        self.ensure_writable()?;
+        Ok(self
+            .conn
+            .execute("DELETE FROM smart_crates WHERE id = ?1", [id])?
+            > 0)
     }
 
     pub fn smart_crates(&self) -> Result<Vec<SmartCrate>> {
@@ -694,6 +750,7 @@ impl Library {
 
     /// Imports a neutral collection; returns path → library id for every track.
     pub fn import_collection(&mut self, col: &Collection) -> Result<HashMap<String, String>> {
+        self.ensure_writable()?;
         let mut ids = HashMap::new();
         for (rec, (id, _)) in col.tracks.iter().zip(self.upsert_tracks(&col.tracks)?) {
             ids.insert(path_key(&rec.path), id);
@@ -740,7 +797,8 @@ fn find_existing(tx: &Transaction<'_>, rec: &TrackRecord) -> Result<Option<(Stri
     Ok(None)
 }
 
-fn upsert_in(tx: &Transaction<'_>, rec: &TrackRecord) -> Result<(String, Upserted)> {
+/// Upsert inside the caller's transaction (also used by `migrate.rs` for one-transaction imports).
+pub(crate) fn upsert_in(tx: &Transaction<'_>, rec: &TrackRecord) -> Result<(String, Upserted)> {
     let existing = find_existing(tx, rec)?;
     let (id, how) = match existing {
         Some((id, how)) => {
@@ -902,15 +960,16 @@ fn write_cues(conn: &Connection, track_id: &str, cues: &[Cue]) -> Result<()> {
 
 fn write_grid(conn: &Connection, track_id: &str, g: &BeatGrid) -> Result<()> {
     conn.execute(
-        "INSERT INTO beatgrids(track_id, bpm, first_beat_sec, downbeat_offset, anchors) VALUES (?1, ?2, ?3, ?4, ?5) \
+        "INSERT INTO beatgrids(track_id, bpm, first_beat_sec, downbeat_offset, anchors, fixed) VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
          ON CONFLICT(track_id) DO UPDATE SET bpm = excluded.bpm, first_beat_sec = excluded.first_beat_sec, \
-         downbeat_offset = excluded.downbeat_offset, anchors = excluded.anchors",
+         downbeat_offset = excluded.downbeat_offset, anchors = excluded.anchors, fixed = excluded.fixed",
         params![
             track_id,
             g.bpm,
             g.first_beat_sec,
             g.downbeat_offset,
-            serde_json::to_string(&g.anchors)?
+            serde_json::to_string(&g.anchors)?,
+            g.fixed
         ],
     )?;
     Ok(())

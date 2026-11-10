@@ -32,6 +32,24 @@ test("validator rejects overlaps, unknown panels and missing decks", () => {
     assert.ok(errs.some((e) => e.includes("deckB")));
 });
 
+test("invalid weights skip the per-cell checks (huge pack input stays cheap, P1-11)", () => {
+    const n = 10_000;
+    const bad = {
+        ...CLASSIC,
+        columns: Array(n).fill(1),
+        rows: Array(n).fill(1),
+        areas: [
+            { panel: "deckA", col: 0, row: 0, colSpan: n, rowSpan: n },
+            { panel: "deckB", col: 0, row: 0, colSpan: n, rowSpan: n },
+            { panel: "mixer", col: 0, row: 0 },
+        ],
+    };
+    const t = performance.now();
+    const errs = validateLayout(bad, PANEL_IDS);
+    assert.deepEqual(errs, ["columns: 1..8 weights in (0, 20]", "rows: 1..8 weights in (0, 20]"]);
+    assert.ok(performance.now() - t < 500, "validator must not walk 1e8 cells");
+});
+
 test("pickTier falls back full -> compact -> icon -> null", () => {
     const s = PANEL_SPECS.library;
     assert.equal(pickTier({ x: 0, y: 0, w: 900, h: 400 }, s), "full");
@@ -112,4 +130,15 @@ test("a docked panel always has a host, even when only essential panels are plac
     const sol = solve(tiny, { w: 1100, h: 700 }, PANEL_SPECS);
     assert.deepEqual(sol.docked, ["library"]);
     assert.ok(sol.dock, "dock slot exists");
+});
+
+test("solver still matches the golden fixtures shared with the Rust port (WP19-34)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { buildFixtures } = await import("./fixtures.ts");
+    const url = new URL("../../../../docs/decks/fixtures/layout-cases.json", import.meta.url);
+    const committed = readFileSync(url, "utf8").replace(/\r\n/g, "\n");
+    // Byte-equal: any solver/preset/validator change must regenerate the file
+    // (node scripts/gen-layout-fixtures.mjs) so crates/decks-layout is re-checked against it.
+    assert.equal(buildFixtures(), committed, "docs/decks/fixtures/layout-cases.json is stale");
+    assert.ok(JSON.parse(committed).cases.length >= 300);
 });

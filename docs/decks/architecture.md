@@ -16,7 +16,7 @@ root (path dependency).
 | `mixai-core` | `crates/mixai-core` | Real-time engine: cpal 0.18 output, symphonia 0.6 decode, decks, mixer, sync / quantize / slip / key shift, routing matrix (master, headphone cue, booth), Signalsmith stretcher (WSOLA fallback), colour + beat FX, sampler, recorder | MIT OR Apache-2.0 |
 | `decks-analysis` | `crates/decks-analysis` | Offline analysis: tempo, beatgrid + downbeats, drift anchors, EBU R128 LUFS + true peak, 3-band waveform peaks; key via `mixai-listen` | MIT OR Apache-2.0 |
 | `mixai-listen` | `crates/mixai-listen` (repo root) | Key (CNN + chroma), tuning, live listening; shared with Key & BPM (WP18) | MIT OR Apache-2.0 |
-| `decks-library` | `crates/decks-library` | SQLite catalogue (WAL, FTS5): tracks, cues, grids, crates, smart crates, history; interop (rekordbox XML / PDB, NML, Serato, Engine DJ, JSON); CDJ USB export — see [library-interop.md](library-interop.md) | MIT OR Apache-2.0 |
+| `decks-library` | `crates/decks-library` | SQLite catalogue (WAL, FTS5): tracks, cues, grids, crates, smart crates, history; interop (rekordbox XML / PDB, NML, Serato, Engine DJ, JSON); CDJ USB export; snapshots, protect lock, rollback — see [library-interop.md](library-interop.md), [library-safety.md](library-safety.md) | MIT OR Apache-2.0 |
 | `decks-mapping` | `crates/decks-mapping` | Controller runtime: mapping format v1 + JSON Schema, rhai sandbox scripts, MIDI learn, MIDI clock master/follower, groove lane, BLE MIDI codec, built-in profiles — see [mapping-format.md](mapping-format.md), [controllers.md](controllers.md) | MIT OR Apache-2.0 |
 | `decks-dvs` | `crates/decks-dvs` | Clean-room DVS decoder: MixAI timecode (absolute + relative), Serato CV02.5 / Traktor MK2 relative (experimental) — see [dvs.md](dvs.md), [dvs-clean-room.md](dvs-clean-room.md) | MIT OR Apache-2.0 |
 | `decks-render` | `crates/decks-render` | wgpu 30 GPU views: scrolling 3-band waveform + beatgrid, overview, stacked decks, platter, DVS scope; native surface or headless | MIT OR Apache-2.0 |
@@ -28,6 +28,7 @@ root (path dependency).
 
 Planned (WP19-04): a `decks-core` facade with a stable command/event API and the UniFFI 0.31 surface for Swift and
 Kotlin. The binding layer is specified in [ffi.md](ffi.md).
+Flexible beatgrid (tempo markers, fixed-grid toggle) and MP3 encoder-drift correction: [beatgrid.md](beatgrid.md).
 
 ```mermaid
 flowchart LR

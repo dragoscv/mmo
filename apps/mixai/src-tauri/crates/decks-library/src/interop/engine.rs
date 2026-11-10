@@ -125,6 +125,7 @@ fn grid_from_markers(markers: &[(f64, i64)], sr: f64) -> Option<BeatGrid> {
         first_beat_sec: first.max(0.0),
         downbeat_offset: (k.rem_euclid(4)) as u8,
         anchors: Vec::new(),
+        fixed: false,
     })
 }
 

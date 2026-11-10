@@ -3,8 +3,9 @@ package ro.mixai.decks.ui
 import androidx.compose.ui.graphics.Color
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import ro.mixai.decks.ui.theme.DeckLayout
+import ro.mixai.decks.ui.engine.DemoPacks
 import ro.mixai.decks.ui.theme.DecksColors
 import ro.mixai.decks.ui.theme.DecksPalette
 import ro.mixai.decks.ui.theme.DecksSkin
@@ -70,9 +71,43 @@ class SkinTest {
         assertEquals(club.accent, junk.accent)
         assertEquals(club.radius, junk.radius)
         assertEquals(club.dark, junk.dark)
-        assertEquals(DeckLayout.Classic, junk.layout)
+        // An invalid layout id falls back to the preset's own layout.
+        assertEquals(club.layoutId, junk.layoutId)
+        assertNull(junk.packId)
         assertEquals(DecksSkin.default, DecksSkin.decode(null))
         assertEquals(DecksSkin.default, DecksSkin.decode("garbage"))
+    }
+
+    @Test fun legacyLayoutValuesMapToBuiltinPresets() {
+        // Decks 1.3 stored layout=classic|performance|library (the old DeckLayout enum keys).
+        for (key in listOf("classic", "performance", "library")) {
+            val s = DecksSkin.decode("id=nocturne;layout=$key")
+            assertEquals(key, s.layoutId)
+            assertEquals(key, s.resolveLayout(DemoPacks.presets)?.id)
+        }
+        // A bare pack-local id maps to the namespaced pack layout when it is unique.
+        val pack = DemoPacks.presets.first { it.id == "stage" }.copy(id = "com.example.bundle.x/festival")
+        val all = DemoPacks.presets + pack
+        assertEquals(pack.id, DecksSkin.decode("layout=festival").resolveLayout(all)?.id)
+        assertEquals(pack.id, DecksSkin.decode("layout=com.example.bundle.x/festival").resolveLayout(all)?.id)
+        assertEquals("classic", DecksSkin.decode("layout=missing").resolveLayout(all)?.id)
+        assertEquals("classic", DecksSkin.decode("layout=../evil").layoutId)
+        val withPack = DecksSkin.default.copy(layoutId = pack.id, packId = "com.example.bundle.x")
+        assertEquals(withPack, DecksSkin.decode(withPack.encode()))
+    }
+
+    @Test fun packColourOverridesReplaceRoles() {
+        val red = Color(0xFFFF0000.toInt())
+        val cyan = Color(0xFF00E5FF.toInt())
+        val p = DecksPalette(DecksSkin.default, mapOf("primary" to red, "deck-a" to cyan, "card" to red))
+        assertEquals(red, p.primary)
+        assertEquals(cyan, p.decks[0])
+        assertEquals(Tokens.brandDeckB, p.decks[1])
+        assertEquals(1f, p.surface.alpha, "an explicit pack card colour is kept as given")
+        DecksColors.apply(DecksSkin.default, mapOf("deck-a" to cyan))
+        assertEquals(cyan, DecksColors.deck(0))
+        DecksColors.apply(DecksSkin.default)
+        assertEquals(Tokens.brandDeckA, DecksColors.deck(0))
     }
 
     @Test fun skinDimensionsComeFromTokens() {

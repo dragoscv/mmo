@@ -122,4 +122,84 @@
     <string name="decks_set_export" formatted="false">Exportă</string>
     <string name="decks_set_export_text" formatted="false">Text</string>
     <string name="decks_set_default_name" formatted="false">Set MixAI Decks</string>
+    <string name="decks_safety_title" formatted="false">Siguranța bibliotecii</string>
+    <string name="decks_safety_protect" formatted="false">Protejează biblioteca</string>
+    <string name="decks_safety_protect_hint" formatted="false">Blochează editarea pieselor, cue-urilor, grilelor și colecțiilor. Istoricul redărilor se înregistrează în continuare.</string>
+    <string name="decks_safety_protected" formatted="false">Protejată</string>
+    <string name="decks_safety_snapshot_now" formatted="false">Fă un snapshot acum</string>
+    <string name="decks_safety_snapshots" formatted="false">Snapshot-uri</string>
+    <string name="decks_safety_none" formatted="false">Niciun snapshot încă. Unul se face automat în fiecare zi.</string>
+    <string name="decks_safety_counts" formatted="false">%1 piese · %2 colecții · %3 cue-uri</string>
+    <string name="decks_safety_restore" formatted="false">Restaurează</string>
+    <string name="decks_safety_restore_confirm" formatted="false">Înlocuiești biblioteca cu snapshot-ul din %1? Starea actuală se salvează înainte.</string>
+    <string name="decks_safety_restore_yes" formatted="false">Înlocuiește biblioteca</string>
+    <string name="decks_safety_cancel" formatted="false">Anulează</string>
+    <string name="decks_safety_restored" formatted="false">Biblioteca a fost restaurată. Starea anterioară este cel mai nou snapshot.</string>
+    <string name="decks_safety_failed" formatted="false">Acțiunea de siguranță a eșuat: %1</string>
+    <string name="decks_safety_unavailable" formatted="false">Snapshot-urile au nevoie de o bibliotecă salvată pe disc.</string>
+    <string name="decks_safety_reason_auto" formatted="false">Automat</string>
+    <string name="decks_safety_reason_manual" formatted="false">Manual</string>
+    <string name="decks_safety_reason_import" formatted="false">Înainte de import</string>
+    <string name="decks_safety_reason_schema" formatted="false">Înainte de actualizare</string>
+    <string name="decks_safety_reason_pre_restore" formatted="false">Înainte de restaurare</string>
+    <string name="decks_deck_c" formatted="false">Deck C</string>
+    <string name="decks_deck_d" formatted="false">Deck D</string>
+    <string name="decks_panel_clock" formatted="false">Ceas</string>
+    <string name="decks_panel_automix" formatted="false">Automix</string>
+    <string name="decks_panel_sampler" formatted="false">Sampler</string>
+    <string name="decks_panel_plugins" formatted="false">Pluginuri</string>
+    <string name="decks_panel_unavailable" formatted="false">%1 nu este încă disponibil în această aplicație.</string>
+    <string name="decks_dock_tab" formatted="false">Afișează %1</string>
+    <string name="decks_layout" formatted="false">Aranjament: %1</string>
+    <string name="decks_layout_next" formatted="false">Aranjamentul următor</string>
+    <string name="decks_layout_classic" formatted="false">Clasic</string>
+    <string name="decks_layout_performance" formatted="false">Performanță</string>
+    <string name="decks_layout_library" formatted="false">Bibliotecă</string>
+    <string name="decks_layout_four_deck" formatted="false">4 deck-uri</string>
+    <string name="decks_layout_ultrawide" formatted="false">Ultra-lat</string>
+    <string name="decks_layout_stage" formatted="false">Scenă</string>
+    <string name="decks_pack_import" formatted="false">Importă pachet…</string>
+    <string name="decks_pack_installed" formatted="false">Instalat: %1</string>
+    <string name="decks_pack_rejected" formatted="false">Pachet respins: %1</string>
+    <string name="decks_import_title" formatted="false">Importă din altă aplicație DJ</string>
+    <string name="decks_import_source" formatted="false">Sursă</string>
+    <string name="decks_import_auto" formatted="false">Detectare automată</string>
+    <string name="decks_import_pick" formatted="false">Alege fișier sau dosar</string>
+    <string name="decks_import_unsupported" formatted="false">Importul necesită motorul nativ.</string>
+    <string name="decks_import_not_recognised" formatted="false">Nu este o bibliotecă rekordbox, Serato sau Traktor.</string>
+    <string name="decks_import_protected" formatted="false">Biblioteca este blocată. Deblocheaz-o din Siguranța bibliotecii ca să imporți.</string>
+    <string name="decks_import_failed" formatted="false">Importul a eșuat: %1</string>
+    <string name="decks_import_preview_title" formatted="false">Previzualizare (încă nu s-a scris nimic)</string>
+    <string name="decks_import_tracks" formatted="false">%1 piese: %2 noi, %3 potrivite după cale, %4 potrivite după conținut</string>
+    <string name="decks_import_extras" formatted="false">%1 cue-uri, %2 grile de beat, %3 playlisturi</string>
+    <string name="decks_import_missing" formatted="false">%1 fișiere lipsă, %2 găsite în dosarele de relocare</string>
+    <string name="decks_import_warnings" formatted="false">%1 avertismente</string>
+    <string name="decks_import_conflict" formatted="false">Când piesa există deja în bibliotecă</string>
+    <string name="decks_import_keep" formatted="false">Păstrează ce am</string>
+    <string name="decks_import_prefer" formatted="false">Folosește importul</string>
+    <string name="decks_import_merge" formatted="false">Combină</string>
+    <string name="decks_import_drift" formatted="false">Corectează decalajul cue-urilor MP3</string>
+    <string name="decks_import_relocate" formatted="false">Adaugă dosar pentru fișierele lipsă</string>
+    <string name="decks_import_remove_folder" formatted="false">Elimină dosarul</string>
+    <string name="decks_import_run" formatted="false">Importă</string>
+    <string name="decks_import_running" formatted="false">Se importă…</string>
+    <string name="decks_import_close" formatted="false">Închide</string>
+    <string name="decks_import_done" formatted="false">Importat: %1 noi, %2 actualizate, %3 cue-uri, %4 playlisturi</string>
+    <string name="decks_import_report_relocated" formatted="false">%1 fișiere relocate, %2 piese cu decalaj corectat</string>
+    <string name="decks_import_report_missing" formatted="false">%1 fișiere încă lipsă (importate, marcate pentru relocare)</string>
+    <string name="decks_grid_title" formatted="false">Grilă de bătăi</string>
+    <string name="decks_grid_fixed" formatted="false">Grilă fixă</string>
+    <string name="decks_grid_fixed_hint" formatted="false">Păstrează marcajele de tempo, dar redă o grilă constantă</string>
+    <string name="decks_grid_flex_hint" formatted="false">Bătăile urmează fiecare marcaj de tempo</string>
+    <string name="decks_grid_markers" formatted="false">Marcaje de tempo</string>
+    <string name="decks_grid_marker_empty" formatted="false">Încă nicio schimbare de tempo</string>
+    <string name="decks_grid_marker_add" formatted="false">Adaugă un marcaj de tempo la capul de redare</string>
+    <string name="decks_grid_marker_item" formatted="false">Marcaj la %1, %2 BPM</string>
+    <string name="decks_grid_marker_remove" formatted="false">Șterge marcajul de la %1</string>
+    <string name="decks_grid_marker_earlier" formatted="false">Mută mai devreme marcajul de la %1</string>
+    <string name="decks_grid_marker_later" formatted="false">Mută mai târziu marcajul de la %1</string>
+    <string name="decks_grid_tempo_up" formatted="false">Tempo mai rapid la %1</string>
+    <string name="decks_grid_tempo_down" formatted="false">Tempo mai lent la %1</string>
+    <string name="decks_grid_bpm_at" formatted="false">%1 BPM la capul de redare</string>
+    <string name="decks_grid_close" formatted="false">Închide editorul de grilă</string>
 </resources>

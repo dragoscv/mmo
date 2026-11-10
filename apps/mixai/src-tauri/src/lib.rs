@@ -7,7 +7,8 @@ use std::time::Duration;
 
 use mixai_core::{
     AudioDevice, BeatFxKind, BeatGrid, ClockSource, ClockState, ColorFxKind, Command, DeckId,
-    Engine, MixerState, OutputInfo, RoutingConfig, list_output_devices,
+    Engine, MixerState, OutputInfo, RoutingConfig, TempoMarker, list_output_devices, valid_bpm,
+    valid_sec,
 };
 use serde::Deserialize;
 use tauri::{Emitter, Manager, State};
@@ -34,6 +35,45 @@ pub struct EngineState(pub Mutex<Option<Engine>>);
 
 fn parse_deck(s: &str) -> Result<DeckId, String> {
     DeckId::from_str(s).ok_or_else(|| format!("invalid deck '{s}'"))
+}
+
+/// A tempo the grid maths can use (20..400). The grid is read by the audio thread, where a
+/// `NaN` from a 1e-300 / 1e308 tempo would poison `beat_at` / `time_at` (WP19-37 P1-9).
+fn check_bpm(what: &str, bpm: f64) -> Result<(), String> {
+    if valid_bpm(bpm) {
+        Ok(())
+    } else {
+        Err(format!("{what} {bpm} must be a tempo in 20..400"))
+    }
+}
+
+/// A usable source time: finite and not before the start of the file.
+fn check_sec(what: &str, sec: f64) -> Result<(), String> {
+    if valid_sec(sec) {
+        Ok(())
+    } else {
+        Err(format!("{what} {sec} must be finite and >= 0"))
+    }
+}
+
+/// Every tempo and time of a seconds-based engine grid (base plus every anchor). Anchors are
+/// `{time, beat}` pairs, so their tempo is the slope between neighbours: checked on the same
+/// normalised list the engine will use (`Engine::set_grid` normalises too).
+fn check_grid(grid: &BeatGrid) -> Result<(), String> {
+    check_bpm("bpm", grid.bpm)?;
+    check_sec("firstBeat", grid.first_beat)?;
+    for (i, a) in grid.anchors.iter().enumerate() {
+        check_sec(&format!("anchors[{i}].time"), a.time)?;
+        if !a.beat.is_finite() {
+            return Err(format!("anchors[{i}].beat must be finite"));
+        }
+    }
+    let norm = grid.clone().normalized();
+    for (i, w) in norm.anchors.windows(2).enumerate() {
+        let bpm = (w[1].beat - w[0].beat) / (w[1].time - w[0].time) * 60.0;
+        check_bpm(&format!("anchor segment {i} tempo"), bpm)?;
+    }
+    Ok(())
 }
 
 // ---- commands ----------------------------------------------------------------
@@ -482,7 +522,8 @@ fn deck_set_sync_lock(
 }
 
 /// Replace a deck's beatgrid (seconds-based: bpm, firstBeat, downbeat, beatsPerBar,
-/// anchors `[{time, beat}]` for variable tempo).
+/// anchors `[{time, beat}]` for variable tempo, `fixed` to ignore the anchors).
+/// Every tempo must be in 20..400 and every time finite and non-negative.
 #[tauri::command]
 fn deck_set_beatgrid(
     deck: String,
@@ -490,7 +531,63 @@ fn deck_set_beatgrid(
     state: State<'_, EngineState>,
 ) -> Result<(), String> {
     let deck = parse_deck(&deck)?;
+    check_grid(&grid)?;
     with_engine(&state, |e| e.set_grid(deck, grid))
+}
+
+/// One tempo change for [`deck_set_grid_markers`].
+#[derive(Deserialize)]
+struct GridMarkerReq {
+    sec: f64,
+    bpm: f64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GridMarkersReq {
+    deck: String,
+    bpm: f64,
+    first_beat: f64,
+    #[serde(default)]
+    downbeat: Option<i64>,
+    #[serde(default)]
+    fixed: bool,
+    #[serde(default)]
+    markers: Vec<GridMarkerReq>,
+}
+
+/// Flexible beatgrid from tempo-change markers (WP19-37): `bpm` is the tempo from
+/// `firstBeat` to the first marker, every `markers[i]` means "from `sec` on the tempo is
+/// `bpm`", and `fixed` keeps the markers but plays the constant grid. Equivalent to building
+/// the anchors in the UI and calling `deck_set_beatgrid`, with the same maths as the engine.
+#[tauri::command]
+fn deck_set_grid_markers(req: GridMarkersReq, state: State<'_, EngineState>) -> Result<(), String> {
+    let deck = parse_deck(&req.deck)?;
+    let grid = grid_from_markers_req(&req)?;
+    with_engine(&state, |e| e.set_grid(deck, grid))
+}
+
+/// Validated grid for [`deck_set_grid_markers`]. Every marker is checked, not just the base
+/// tempo: `merge_markers` would drop an out-of-range one silently, leaving the user with a grid
+/// that is not the one they asked for (WP19-37 P1-9).
+fn grid_from_markers_req(req: &GridMarkersReq) -> Result<BeatGrid, String> {
+    check_bpm("bpm", req.bpm)?;
+    check_sec("firstBeat", req.first_beat)?;
+    for (i, m) in req.markers.iter().enumerate() {
+        check_bpm(&format!("markers[{i}].bpm"), m.bpm)?;
+        check_sec(&format!("markers[{i}].sec"), m.sec)?;
+    }
+    let markers: Vec<TempoMarker> = req
+        .markers
+        .iter()
+        .map(|m| TempoMarker {
+            sec: m.sec,
+            bpm: m.bpm,
+        })
+        .collect();
+    let mut grid = BeatGrid::from_markers(req.bpm, req.first_beat, &markers, req.fixed);
+    grid.downbeat = req.downbeat;
+    Ok(grid)
 }
 
 #[tauri::command]
@@ -1035,6 +1132,7 @@ pub fn run() {
             deck_phase_sync,
             deck_set_sync_lock,
             deck_set_beatgrid,
+            deck_set_grid_markers,
             deck_set_quantize,
             deck_beat_jump,
             deck_set_slip,
@@ -1097,4 +1195,99 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running MIXAI");
+}
+
+#[cfg(test)]
+mod grid_command_tests {
+    use super::*;
+    use mixai_core::GridAnchor;
+
+    fn req(bpm: f64, first_beat: f64, markers: &[(f64, f64)]) -> GridMarkersReq {
+        GridMarkersReq {
+            deck: "a".into(),
+            bpm,
+            first_beat,
+            downbeat: Some(0),
+            fixed: false,
+            markers: markers
+                .iter()
+                .map(|&(sec, bpm)| GridMarkerReq { sec, bpm })
+                .collect(),
+        }
+    }
+
+    /// P1-9: every marker of `deck_set_grid_markers` is range-checked, not just the base tempo.
+    #[test]
+    fn grid_markers_reject_every_out_of_range_value() {
+        let ok = grid_from_markers_req(&req(120.0, 0.5, &[(16.5, 128.0)])).expect("valid");
+        assert!(ok.is_variable() && ok.beat_at(30.0).is_finite());
+        for bad in [
+            1e-300,
+            1e308,
+            0.0,
+            -1.0,
+            19.9,
+            400.1,
+            f64::NAN,
+            f64::INFINITY,
+        ] {
+            assert!(
+                grid_from_markers_req(&req(120.0, 0.5, &[(16.5, bad)])).is_err(),
+                "marker bpm {bad}"
+            );
+            assert!(
+                grid_from_markers_req(&req(bad, 0.5, &[])).is_err(),
+                "bpm {bad}"
+            );
+        }
+        for bad in [-0.1, f64::NAN, f64::INFINITY] {
+            assert!(
+                grid_from_markers_req(&req(120.0, 0.5, &[(bad, 128.0)])).is_err(),
+                "marker sec {bad}"
+            );
+            assert!(
+                grid_from_markers_req(&req(120.0, bad, &[])).is_err(),
+                "firstBeat {bad}"
+            );
+        }
+    }
+
+    /// P1-9: `deck_set_beatgrid` rejects bpm <= 0 and non-finite anchors.
+    #[test]
+    fn beatgrid_rejects_bad_tempo_and_anchors() {
+        let good = BeatGrid::constant(128.0, 0.25);
+        assert!(check_grid(&good).is_ok());
+        for bad in [0.0, -128.0, 1e-300, 1e308, f64::NAN] {
+            assert!(check_grid(&BeatGrid::constant(bad, 0.25)).is_err(), "{bad}");
+        }
+        assert!(check_grid(&BeatGrid::constant(128.0, -1.0)).is_err());
+        let mut g = good.clone();
+        g.anchors = vec![
+            GridAnchor {
+                time: 0.0,
+                beat: 0.0,
+            },
+            GridAnchor {
+                time: f64::NAN,
+                beat: 4.0,
+            },
+        ];
+        assert!(check_grid(&g).is_err());
+        g.anchors[1] = GridAnchor {
+            time: 2.0,
+            beat: f64::INFINITY,
+        };
+        assert!(check_grid(&g).is_err());
+        g.anchors[1] = GridAnchor {
+            time: 2.0,
+            beat: 4.0,
+        };
+        assert!(check_grid(&g).is_ok());
+        // A 1e-300 s segment is a 1e302 BPM tempo: rejected like any other anchor tempo.
+        g.anchors[1] = GridAnchor {
+            time: 1e-300,
+            beat: 1.0,
+        };
+        assert!(check_grid(&g).is_err());
+    }
 }

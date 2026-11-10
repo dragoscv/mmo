@@ -96,4 +96,16 @@ interface DecksBackend : AutoCloseable {
 
     /** Set recording + automatic tracklist (WP19-22); null when unavailable (demo engine). */
     fun setRecorder(): SetRecordPort? = null
+
+    /** `.mixaipack` packs + layout solver (WP19-34); null = built-in presets only (demo engine). */
+    fun packs(): PackPort? = null
+
+    /** Flexible beatgrid editing (WP19-37); null when unavailable (demo engine). */
+    fun grids(): GridPort? = null
+
+    /** Import from rekordbox / Serato / Traktor (WP19-38); null when unavailable (demo engine). */
+    fun importer(): ImportPort? = null
+
+    /** Library snapshots, protect lock, rollback (WP19-40); null when unavailable (demo engine). */
+    fun librarySafety(): SafetyPort? = null
 }

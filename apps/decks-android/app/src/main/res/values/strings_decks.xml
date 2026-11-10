@@ -122,4 +122,84 @@
     <string name="decks_set_export" formatted="false">Export</string>
     <string name="decks_set_export_text" formatted="false">Text</string>
     <string name="decks_set_default_name" formatted="false">MixAI Decks set</string>
+    <string name="decks_safety_title" formatted="false">Library safety</string>
+    <string name="decks_safety_protect" formatted="false">Protect library</string>
+    <string name="decks_safety_protect_hint" formatted="false">Blocks edits to tracks, cues, grids and crates. Play history keeps recording.</string>
+    <string name="decks_safety_protected" formatted="false">Protected</string>
+    <string name="decks_safety_snapshot_now" formatted="false">Snapshot now</string>
+    <string name="decks_safety_snapshots" formatted="false">Snapshots</string>
+    <string name="decks_safety_none" formatted="false">No snapshots yet. One is taken automatically every day.</string>
+    <string name="decks_safety_counts" formatted="false">%1 tracks · %2 crates · %3 cues</string>
+    <string name="decks_safety_restore" formatted="false">Restore</string>
+    <string name="decks_safety_restore_confirm" formatted="false">Replace the library with the snapshot from %1? The current state is saved first.</string>
+    <string name="decks_safety_restore_yes" formatted="false">Replace library</string>
+    <string name="decks_safety_cancel" formatted="false">Cancel</string>
+    <string name="decks_safety_restored" formatted="false">Library restored. The previous state is the newest snapshot.</string>
+    <string name="decks_safety_failed" formatted="false">Library safety action failed: %1</string>
+    <string name="decks_safety_unavailable" formatted="false">Snapshots need a library saved on disk.</string>
+    <string name="decks_safety_reason_auto" formatted="false">Automatic</string>
+    <string name="decks_safety_reason_manual" formatted="false">Manual</string>
+    <string name="decks_safety_reason_import" formatted="false">Before import</string>
+    <string name="decks_safety_reason_schema" formatted="false">Before update</string>
+    <string name="decks_safety_reason_pre_restore" formatted="false">Before restore</string>
+    <string name="decks_deck_c" formatted="false">Deck C</string>
+    <string name="decks_deck_d" formatted="false">Deck D</string>
+    <string name="decks_panel_clock" formatted="false">Clock</string>
+    <string name="decks_panel_automix" formatted="false">Automix</string>
+    <string name="decks_panel_sampler" formatted="false">Sampler</string>
+    <string name="decks_panel_plugins" formatted="false">Plugins</string>
+    <string name="decks_panel_unavailable" formatted="false">%1 is not available in this app yet.</string>
+    <string name="decks_dock_tab" formatted="false">Show %1</string>
+    <string name="decks_layout" formatted="false">Layout: %1</string>
+    <string name="decks_layout_next" formatted="false">Next layout</string>
+    <string name="decks_layout_classic" formatted="false">Classic</string>
+    <string name="decks_layout_performance" formatted="false">Performance</string>
+    <string name="decks_layout_library" formatted="false">Library</string>
+    <string name="decks_layout_four_deck" formatted="false">4 decks</string>
+    <string name="decks_layout_ultrawide" formatted="false">Ultra-wide</string>
+    <string name="decks_layout_stage" formatted="false">Stage</string>
+    <string name="decks_pack_import" formatted="false">Import pack…</string>
+    <string name="decks_pack_installed" formatted="false">Installed %1</string>
+    <string name="decks_pack_rejected" formatted="false">Pack rejected: %1</string>
+    <string name="decks_import_title" formatted="false">Import from another DJ app</string>
+    <string name="decks_import_source" formatted="false">Source</string>
+    <string name="decks_import_auto" formatted="false">Auto-detect</string>
+    <string name="decks_import_pick" formatted="false">Choose file or folder</string>
+    <string name="decks_import_unsupported" formatted="false">Import needs the native engine.</string>
+    <string name="decks_import_not_recognised" formatted="false">Not a rekordbox, Serato or Traktor library.</string>
+    <string name="decks_import_protected" formatted="false">The library is locked. Unlock it in Library safety to import.</string>
+    <string name="decks_import_failed" formatted="false">Import failed: %1</string>
+    <string name="decks_import_preview_title" formatted="false">Preview (nothing written yet)</string>
+    <string name="decks_import_tracks" formatted="false">%1 tracks: %2 new, %3 matched by path, %4 matched by content</string>
+    <string name="decks_import_extras" formatted="false">%1 cues, %2 beat grids, %3 playlists</string>
+    <string name="decks_import_missing" formatted="false">%1 files missing, %2 found in relocation folders</string>
+    <string name="decks_import_warnings" formatted="false">%1 warnings</string>
+    <string name="decks_import_conflict" formatted="false">When a track is already in the library</string>
+    <string name="decks_import_keep" formatted="false">Keep mine</string>
+    <string name="decks_import_prefer" formatted="false">Use imported</string>
+    <string name="decks_import_merge" formatted="false">Merge</string>
+    <string name="decks_import_drift" formatted="false">Correct MP3 cue drift</string>
+    <string name="decks_import_relocate" formatted="false">Add folder to find missing files</string>
+    <string name="decks_import_remove_folder" formatted="false">Remove folder</string>
+    <string name="decks_import_run" formatted="false">Import</string>
+    <string name="decks_import_running" formatted="false">Importing…</string>
+    <string name="decks_import_close" formatted="false">Close</string>
+    <string name="decks_import_done" formatted="false">Imported: %1 new, %2 updated, %3 cues, %4 playlists</string>
+    <string name="decks_import_report_relocated" formatted="false">%1 files relocated, %2 tracks drift-corrected</string>
+    <string name="decks_import_report_missing" formatted="false">%1 files still missing (imported, marked for relocation)</string>
+    <string name="decks_grid_title" formatted="false">Beatgrid</string>
+    <string name="decks_grid_fixed" formatted="false">Fixed grid</string>
+    <string name="decks_grid_fixed_hint" formatted="false">Keep the tempo markers but play a constant grid</string>
+    <string name="decks_grid_flex_hint" formatted="false">The beats follow every tempo marker</string>
+    <string name="decks_grid_markers" formatted="false">Tempo markers</string>
+    <string name="decks_grid_marker_empty" formatted="false">No tempo changes yet</string>
+    <string name="decks_grid_marker_add" formatted="false">Add a tempo marker at the playhead</string>
+    <string name="decks_grid_marker_item" formatted="false">Marker at %1, %2 BPM</string>
+    <string name="decks_grid_marker_remove" formatted="false">Delete the marker at %1</string>
+    <string name="decks_grid_marker_earlier" formatted="false">Move the marker at %1 earlier</string>
+    <string name="decks_grid_marker_later" formatted="false">Move the marker at %1 later</string>
+    <string name="decks_grid_tempo_up" formatted="false">Tempo up at %1</string>
+    <string name="decks_grid_tempo_down" formatted="false">Tempo down at %1</string>
+    <string name="decks_grid_bpm_at" formatted="false">%1 BPM at the playhead</string>
+    <string name="decks_grid_close" formatted="false">Close the beatgrid editor</string>
 </resources>

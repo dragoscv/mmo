@@ -7,7 +7,7 @@
 import { create } from "zustand";
 import type { DeckId } from "@/bridge/types";
 
-export type DeckTab = "cues" | "loops" | "fx" | "stems";
+export type DeckTab = "cues" | "loops" | "fx" | "stems" | "grid";
 
 interface DeckUi {
     cuePoint: Record<DeckId, number>;

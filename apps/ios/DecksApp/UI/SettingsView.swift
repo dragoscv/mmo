@@ -8,6 +8,7 @@ struct SettingsView: View {
     @Environment(MidiManager.self) private var midi
     @Environment(\.dismiss) private var dismiss
     @State private var bluetooth = false
+    @State private var importing = false
 
     var body: some View {
         @Bindable var store = store
@@ -68,8 +69,19 @@ struct SettingsView: View {
             } header: {
                 Text("settings.folders")
             }
+            Section {
+                Button("import.title") { importing = true }
+                    .disabled(library.library == nil)
+            }
+            AppearanceSettingsSection()
+            SafetyView(library: library.library) { library.refresh() }
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $importing) {
+            NavigationStack {
+                ImportView(library: library.library) { library.refresh() }
+            }
+        }
         .navigationTitle(Text("settings.title"))
         #if os(iOS)
         .toolbar {

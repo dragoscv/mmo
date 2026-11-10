@@ -31,7 +31,11 @@ import type {
     KeyMatchRequest,
     OutputInfo,
     RoutingConfig,
+    TempoMarker,
 } from "./types";
+// Relative + explicit extension so `node --test` can load this module without the Vite alias.
+import { resetDeckGrid, setGridBridge } from "../grid/grid-store.ts";
+import { gridFromDeck } from "../grid/markers.ts";
 
 type InvokeFn = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -52,7 +56,8 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T |
     const invoke = await getInvoke();
     if (!invoke) {
         // Design-mode mock: log and return null so the UI keeps working.
-        if (import.meta.env.DEV) console.debug(`[mixai mock] ${cmd}`, args ?? {});
+        // `?.` so the module also loads outside Vite (node --test covers the load paths).
+        if (import.meta.env?.DEV) console.debug(`[mixai mock] ${cmd}`, args ?? {});
         return null;
     }
     return invoke<T>(cmd, args);
@@ -93,6 +98,7 @@ export const engine = {
 
     /** Loads a track and returns its downsampled waveform peaks (0..1). */
     loadTrack(req: LoadTrackRequest): Promise<number[] | null> {
+        resetDeckGrid(req.deck, req.trackId ?? null, gridFromDeck(req.bpm && req.bpm > 0 ? req.bpm : 0, 0));
         return call<number[]>("load_track", { req });
     },
 
@@ -108,6 +114,7 @@ export const engine = {
         artist?: string | null;
         bpm?: number | null;
     }): Promise<number[] | null> {
+        resetDeckGrid(req.deck, String(req.trackId), gridFromDeck(req.bpm && req.bpm > 0 ? req.bpm : 0, 0));
         return call<number[]>("load_track_stream", { req });
     },
 
@@ -474,9 +481,24 @@ export const engine = {
         return call<null>("deck_set_sync_lock", { deck, enabled });
     },
 
-    /** Replace a deck's beatgrid (constant or anchored variable tempo). */
+    /**
+     * Replace a deck's beatgrid (constant, or variable through `anchors`). Build it from
+     * tempo markers with `toBeatGrid()` in `src/grid/markers.ts`; `fixed` keeps the markers
+     * but makes the deck use the constant `bpm` + `firstBeat` grid (WP19-37).
+     */
     setBeatgrid(deck: DeckId, grid: BeatGrid): Promise<null> {
         return call<null>("deck_set_beatgrid", { deck, grid });
+    },
+
+    /**
+     * Flexible beatgrid from tempo-change markers (WP19-37). `bpm` is the tempo from
+     * `firstBeat` to the first marker; `fixed` keeps the markers but plays the constant grid.
+     */
+    setGridMarkers(
+        deck: DeckId,
+        req: { bpm: number; firstBeat: number; markers: TempoMarker[]; fixed?: boolean; downbeat?: number | null },
+    ): Promise<null> {
+        return call<null>("deck_set_grid_markers", { req: { deck, ...req } });
     },
 
     setQuantize(deck: DeckId, enabled: boolean): Promise<null> {
@@ -543,3 +565,7 @@ export const engine = {
         return call<null>("fx_beat_set", { req });
     },
 };
+
+// The grid store pushes edits through this bridge. It is injected rather than imported there so
+// `src/grid/` stays Tauri-free (and testable) and there is no import cycle with this module.
+setGridBridge(engine);

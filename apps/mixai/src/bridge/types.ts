@@ -298,6 +298,17 @@ export interface BeatGrid {
     downbeat?: number | null;
     beatsPerBar?: number;
     anchors?: GridAnchor[];
+    /** Fixed-grid toggle (WP19-37): anchors kept but ignored. */
+    fixed?: boolean;
+}
+
+/**
+ * WP19-37 tempo-change marker: from `sec` on, the tempo is `bpm`. The editable form of a
+ * variable grid (see `src/grid/markers.ts`); the engine gets `BeatGrid.anchors`.
+ */
+export interface TempoMarker {
+    sec: number;
+    bpm: number;
 }
 
 /** Key-match request (matches Rust `KeyMatchReq`). Keys are 0..23 or Camelot / Open Key names. */

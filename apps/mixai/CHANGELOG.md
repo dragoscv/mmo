@@ -1,5 +1,29 @@
 # MixAI Decks changelog
 
+## 1.4.0 — 2026-11-10
+
+- **Flexible beatgrid**: tracks whose tempo changes (live drummers, edits, old records) get a grid
+  that follows them, with tempo-change markers only where the tempo really changes. Markers can be
+  added at the playhead, nudged, retuned and deleted (new **Grid** tab on each deck), and a
+  **fixed grid** switch flattens the grid without losing the markers.
+- **Encoder-drift correction on import**: MP3s from Traktor whose cues and grids land one MP3 frame
+  (~26 ms) off are shifted back automatically. The offset is confirmed against rekordbox converters,
+  not yet measured against Decks' own decoder; other apps are left unchanged until measured (see
+  docs/decks/beatgrid.md).
+- **Import from rekordbox, Serato and Traktor** (Android, Windows/macOS/Linux desktop and iPhone/iPad
+  apps): preview before anything is written, choose who wins when a track already exists, find moved
+  files under folders you pick, and get a report. Many real-export quirks are handled (Windows and
+  macOS paths, Traktor volume names, Serato `database V2`, FLAC/AIFF markers). No subscription is
+  needed to bring your library or to use your controller. OneLibrary stays unavailable: there is no
+  public specification and no partner access.
+- **Library safety**: an automatic snapshot every day and before every import or upgrade,
+  "Snapshot now", one-click restore (the current state is kept as a snapshot first), and a
+  **Protect library** switch that blocks every change except play history. A damaged library file is
+  detected when it opens.
+- **Skins and layouts on the native apps**: `.mixaipack` skins and layouts now work in the Android,
+  desktop and iPhone/iPad apps with the same solver as this app, so nothing scrolls there either.
+  Panels the native apps do not have yet go to the dock.
+
 ## 1.3.1 — 2026-11-09
 
 - **Safer webview**: a strict Content Security Policy replaces the empty one: only the app's own

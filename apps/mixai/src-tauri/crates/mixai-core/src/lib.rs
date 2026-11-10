@@ -24,7 +24,9 @@ pub mod stretch;
 
 pub use analysis::{BeatAnalysis, analyze};
 pub use beatfx::BeatFxKind;
-pub use beatgrid::{BeatGrid, GridAnchor};
+pub use beatgrid::{
+    BeatGrid, GridAnchor, MAX_BPM, MIN_BPM, TempoMarker, TempoSection, valid_bpm, valid_sec,
+};
 pub use colorfx::ColorFxKind;
 pub use engine::{ClockSource, ClockState, Command, DeckClock, Engine, list_output_devices};
 pub use error::CoreError;

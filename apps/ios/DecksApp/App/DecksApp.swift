@@ -11,17 +11,19 @@ struct DecksApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environment(store)
-                .environment(library)
-                .environment(cursor)
-                .environment(midi)
-                .preferredColorScheme(.dark)
-                .tint(DecksTheme.accent)
-                .task {
-                    store.startEngine()
-                    midi.start(store: store, dispatcher: MidiDispatcher(store: store, library: library, browser: cursor))
-                }
+            SkinColorScheme {
+                RootView()
+                    .environment(store)
+                    .environment(library)
+                    .environment(cursor)
+                    .environment(midi)
+                    .tint(DecksTheme.accent)
+                    .task {
+                        store.startEngine()
+                        midi.start(store: store, dispatcher: MidiDispatcher(store: store, library: library, browser: cursor))
+                    }
+                    .onOpenURL { url in openPack(url) }
+            }
         }
         #if os(macOS)
         .defaultSize(width: 1280, height: 820)
@@ -30,14 +32,41 @@ struct DecksApp: App {
 
         #if os(macOS)
         Settings {
-            SettingsView()
-                .environment(store)
-                .environment(library)
-                .environment(midi)
-                .preferredColorScheme(.dark)
-                .frame(width: 520, height: 460)
+            SkinColorScheme {
+                SettingsView()
+                    .environment(store)
+                    .environment(library)
+                    .environment(midi)
+                    .frame(width: 520, height: 460)
+            }
         }
         #endif
+    }
+
+    /// A `.mixaipack` opened from Files / Finder (the document type registered in project.yml):
+    /// install it, apply it, and report a rejection in the main error banner.
+    private func openPack(_ url: URL) {
+        guard url.isFileURL, url.pathExtension.lowercased() == "mixaipack" else { return }
+        Task { @MainActor in
+            let result = await AppearanceStore.shared.install(from: url)
+            if case let .failure(e) = result {
+                store.lastError = String(format: String(localized: "appearance.pack.rejected %@"), e.reason)
+            }
+        }
+    }
+}
+
+/// Follows the active skin instead of forcing `.dark`: an installed light pack must not get dark
+/// system materials (dark text on dark rows). A `View` rather than a scene modifier, so Observation
+/// re-renders it when [DecksPalette] changes.
+private struct SkinColorScheme<Content: View>: View {
+    @State private var palette = DecksPalette.shared
+    private let content: Content
+
+    init(@ViewBuilder content: () -> Content) { self.content = content() }
+
+    var body: some View {
+        content.preferredColorScheme(palette.dark ? .dark : .light)
     }
 }
 

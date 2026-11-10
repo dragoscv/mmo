@@ -104,6 +104,9 @@ pub struct BeatGrid {
     /// Extra tempo markers for variable grids (empty for constant grids).
     #[serde(default)]
     pub anchors: Vec<GridAnchor>,
+    /// User forced a constant grid: `anchors` are kept but ignored (WP19-37 fixed-grid toggle).
+    #[serde(default)]
+    pub fixed: bool,
 }
 
 /// One track as seen by every format. Unknown fields stay `None`.

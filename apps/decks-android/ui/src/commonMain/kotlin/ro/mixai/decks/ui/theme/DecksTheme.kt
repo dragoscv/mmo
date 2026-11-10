@@ -24,15 +24,18 @@ import ro.mixai.mobile.theme.Tokens
  */
 object DecksColors {
     private var palette by mutableStateOf(DecksPalette(DecksSkin.default))
+    private var overrides: Map<String, Color> = emptyMap()
 
     /** Active skin (set by [DecksTheme]). */
     var skin by mutableStateOf(DecksSkin.default)
         private set
 
-    fun apply(s: DecksSkin) {
-        if (s == skin) return
+    /** [packColors] = colour overrides of the skin's pack ([packColorOverrides]). */
+    fun apply(s: DecksSkin, packColors: Map<String, Color> = emptyMap()) {
+        if (s == skin && packColors == overrides) return
         skin = s
-        palette = DecksPalette(s)
+        overrides = packColors
+        palette = DecksPalette(s, packColors)
     }
 
     val background get() = palette.background
@@ -50,8 +53,11 @@ object DecksColors {
     val danger get() = palette.danger
     val warning get() = palette.warning
     val success get() = palette.success
-    /** Deck identity colours are brand-fixed (never re-hued) so A/B stay recognisable in every skin. */
-    val decks = listOf(Tokens.brandDeckA, Tokens.brandDeckB, Tokens.brandDeckC, Tokens.brandDeckD)
+    /**
+     * Deck identity colours are brand-fixed (never re-hued by the accent) so A/B stay recognisable in
+     * every skin; only an installed skin pack may set them explicitly (`deck-a..deck-d`).
+     */
+    val decks: List<Color> get() = palette.decks
     val waveLow get() = palette.waveLow
     val waveMid get() = palette.waveMid
     val waveHigh get() = palette.waveHigh
@@ -104,10 +110,15 @@ fun controlShape(skin: DecksSkin) = RoundedCornerShape((skin.radiusDp * 0.8f).dp
 fun panelShape(skin: DecksSkin) = RoundedCornerShape((skin.radiusDp * 1.2f).dp)
 
 @Composable
-fun DecksTheme(reducedMotion: Boolean, skin: DecksSkin = DecksSkin.default, content: @Composable () -> Unit) {
-    DecksColors.apply(skin)
+fun DecksTheme(
+    reducedMotion: Boolean,
+    skin: DecksSkin = DecksSkin.default,
+    packColors: Map<String, Color> = emptyMap(),
+    content: @Composable () -> Unit,
+) {
+    DecksColors.apply(skin, packColors)
     // Recomputed per skin: TextStyles capture the colours at creation time.
-    val type = remember(skin) { decksType(skin.textScale) }
+    val type = remember(skin, packColors) { decksType(skin.textScale) }
     CompositionLocalProvider(
         LocalReducedMotion provides (reducedMotion || skin.reducedMotion),
         LocalDecksSkin provides skin,
@@ -120,6 +131,14 @@ fun DecksTheme(reducedMotion: Boolean, skin: DecksSkin = DecksSkin.default, cont
 class SkinState(initial: DecksSkin, private val onChange: (DecksSkin) -> Unit = {}) {
     var skin by mutableStateOf(initial)
         private set
+
+    /** Bumped after a pack install / removal so pack layouts and colours are re-read. */
+    var packRevision by mutableStateOf(0)
+        private set
+
+    fun packsChanged() {
+        packRevision++
+    }
 
     fun select(s: DecksSkin) {
         if (s == skin) return

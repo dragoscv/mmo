@@ -9,7 +9,7 @@
 //! | Engine DJ `m.db` (2.x+)    | yes  | no    |
 //! | rekordbox `export.pdb`     | yes (tracks, playlists) | no |
 //! | Neutral JSON               | yes  | yes   |
-//! | OneLibrary                 | pending spec | pending spec |
+//! | OneLibrary                 | blocked (no partner access) | blocked |
 
 pub mod engine;
 pub mod json;
@@ -51,12 +51,14 @@ pub struct SeratoCrates {
 
 /// OneLibrary (AlphaTheta / Algoriddim / Native Instruments, launched Oct 2025).
 ///
-/// Status 2026-11-08: no public specification or SDK. The partners' pages
-/// (<https://www.alphatheta.com/en/onelibrary/>) only describe compatibility; the on-device
-/// database (`exportLibrary.db`) is SQLCipher-encrypted and documented only by community
-/// reverse engineering (e.g. <https://github.com/v1vendi/onelibrary>, MIT, pre-alpha,
-/// "not tested on hardware"). Until an official spec ships, this slot refuses I/O; use
-/// [`NeutralJson`] for lossless exchange and [`RekordboxXml`] / `cdj::export_usb` for players.
+/// Status 2026-11-09 (WP19-38 blocker): no public specification or SDK, and no AlphaTheta
+/// partner access for MixAI. The partners' pages (<https://www.alphatheta.com/en/onelibrary/>)
+/// only describe compatibility; the on-device database (`exportLibrary.db`) is
+/// SQLCipher-encrypted and documented only by community reverse engineering (e.g.
+/// <https://github.com/v1vendi/onelibrary>, MIT, pre-alpha, "not tested on hardware"). A
+/// clean-room reader would need a legal review first. Until then this slot refuses I/O; use
+/// [`RekordboxXml`] (rekordbox exports it on every plan) for import, [`NeutralJson`] for
+/// lossless exchange and `cdj::export_usb` for players.
 pub struct OneLibrary;
 
 impl Interchange for RekordboxXml {
@@ -156,5 +158,5 @@ impl Interchange for OneLibrary {
     }
 }
 
-pub const ONELIBRARY_PENDING: &str =
-    "OneLibrary: pending a public specification (none published as of 2026-11-08)";
+pub const ONELIBRARY_PENDING: &str = "OneLibrary: pending a public specification or AlphaTheta \
+    partner access (neither available as of 2026-11-09); export rekordbox XML instead";

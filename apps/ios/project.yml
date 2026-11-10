@@ -394,12 +394,25 @@ targets:
       path: DecksApp/Info-iOS.plist
       properties:
         UIBackgroundModes: [audio]
-        UIUserInterfaceStyle: Dark
+        # No UIUserInterfaceStyle here: the app follows the active skin (AppearanceStore →
+        # DecksPalette.dark → `.preferredColorScheme`), so a light pack is not drawn dark-on-dark.
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         CFBundleLocalizations: [en, ro]
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        # .mixaipack skin / layout packs (WP19-34, docs/decks/packs.md § Native apps).
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: ro.mixai.mixaipack
+            UTTypeDescription: MixAI Decks pack
+            UTTypeConformsTo: [public.zip-archive, public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [mixaipack]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: MixAI Decks pack
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [ro.mixai.mixaipack]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.dj
@@ -434,6 +447,18 @@ targets:
         CFBundleLocalizations: [en, ro]
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        # .mixaipack skin / layout packs (WP19-34, docs/decks/packs.md § Native apps).
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: ro.mixai.mixaipack
+            UTTypeDescription: MixAI Decks pack
+            UTTypeConformsTo: [public.zip-archive, public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [mixaipack]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: MixAI Decks pack
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [ro.mixai.mixaipack]
     # App Sandbox: user-selected folders read-write (library + security-scoped bookmarks), no microphone
     # (DVS input off in the MVP), outgoing network for the MixAI companion / server.
     entitlements:

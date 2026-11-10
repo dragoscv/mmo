@@ -227,6 +227,9 @@ class DecksController(val backend: DecksBackend) {
 
     private val deckRows = arrayOfNulls<TrackRow>(EngineState.DECKS)
 
+    /** Library row loaded on [i] (null when the deck is empty or the file came from outside the library). */
+    fun deckRow(i: Int): TrackRow? = deckRows.getOrNull(i)
+
     // ---- AI Transition Designer ----------------------------------------------------------
 
     /** The deck carrying the mix right now: the louder playing deck (crossfader-aware), else 0. */

@@ -226,6 +226,45 @@ tracklist; `NotRunning` when the engine is stopped): `set_label(deck, SetTrackLa
 `elapsed_sec()`, `wav_path()`, `stop(engine) -> [TracklistEntry]` (idempotent). Free function
 `tracklist_export(entries, TracklistFormat{Text, Cue, OrdaUcmrCsv, MixcloudSections, M3u8}, wav_file, set_title, dj)`.
 
+### Packs and layouts (WP19-34)
+
+([packs.md](packs.md), [layouts.md](layouts.md)) Backed by `decks-packs` (archive guards, Ed25519 trust,
+validation) and `decks-layout` (the zero-scroll solver; parity with the TS solver is asserted against
+`docs/decks/fixtures/layout-cases.json`). Free functions: `pack_inspect(bytes) -> PackSummary` (records plus
+`info_json`), `pack_resolve_colors(tokens_json) -> [PackColor{key, rgb}]` (native code never parses OKLCH),
+`layout_solve(layout_json, w, h, available: [LayoutPanel]) -> LayoutSolution{placements, docked, dock?}`
+(panels not in `available` always go to the dock), `layout_validate(layout_json) -> [problem]`,
+`layout_minimum_size(layout_json) -> LayoutSize`, `layout_presets_json()`. Object `PackStore(dir)`:
+`install(bytes)`, `list()`, `remove(id)`, `layouts_json()` (installed layouts as `<packId>/<layoutId>`),
+`dir()`. Errors: `DecksError::Pack{reason}`.
+
+### Beatgrid (WP19-37)
+
+([beatgrid.md](beatgrid.md)) Records `GridState{track_id, bpm, first_beat_sec, downbeat_offset, fixed,
+markers: [GridMarker{sec, bpm, beat}]}`, `DriftReport`, enum `DriftSource`. Library edits (each writes back):
+`track_grid(library, track_id)`, `track_grid_markers`, `grid_set_fixed`, `grid_set_base`, `grid_add_marker`,
+`grid_move_marker(…, tolerance_sec)`, `grid_remove_marker`. Engine: `grid_apply_to_deck(engine, deck, grid)`,
+`deck_grid(engine, deck)`. `drift_check(path, source) -> DriftReport` (MP3 header case + shift). `LibraryGrid`
+and `BeatGridInfo` carry `fixed` (default `false`).
+
+### Cross-app import (WP19-38)
+
+([library-interop.md](library-interop.md)) `detect_import_format(path) -> DetectedImport?`,
+`import_preview(library, LibraryFormat, path, ImportOptions) -> ImportPreviewRecord` (writes nothing),
+`import_run(library, LibraryFormat, path, ImportOptions) -> ImportRunReport`. `ImportOptions{conflict:
+ImportConflict{KeepExisting, PreferImported, Merge}, relocate_roots, correct_drift}`. A protected library
+returns `DecksError::Protected`; a snapshot is taken before every import.
+
+### Library safety (WP19-40)
+
+([library-safety.md](library-safety.md)) `DecksLibrary` methods: `can_snapshot()`, `snapshot_now(reason)`,
+`auto_snapshot_if_due()`, `list_snapshots()`, `restore_snapshot(id) -> RestoreOutcome` (verified first, current
+state kept as a `pre-restore` snapshot, connection reopened on the same handle), `prune_snapshots(keep_last,
+keep_daily_days)`, `set_protected(on)`, `is_protected()`, `integrity_problems()`. Path-based, for a library too
+damaged to open: `library_snapshots(db_path)`, `library_integrity(db_path)`, `restore_library_file(db_path,
+snapshot_id)`. `open()` takes the daily automatic snapshot. With the lock on, every catalogue write returns
+`DecksError::Protected`; history keeps recording.
+
 ## Limits (2026-11-09)
 
 * Device / config: `mixai_core::Engine::start_with(device, sample_rate, buffer_frames)` applies
