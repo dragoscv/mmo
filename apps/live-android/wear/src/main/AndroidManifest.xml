@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- :mobile-common (minSdk 31) is used only for its generated Tokens.kt on the watch. -->
+    <uses-sdk tools:overrideLibrary="ro.mixai.mobile" />
+
+    <!-- Merged from :core (MixAI Music player) via :mobile-common: the watch controller plays no media. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" tools:node="remove" />
+
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <!-- Direct LAN control of the paired MixAI Live engine over the watch's Wi-Fi. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <!-- Haptic tick on scene change / PANIC. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application
+        android:name=".LiveWearApp"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@android:style/Theme.DeviceDefault"
+        android:usesCleartextTraffic="true"
+        android:allowBackup="false"
+        android:supportsRtl="true">
+
+        <!-- Companion-optional: pairing normally comes from the phone app, but the watch can be paired on its own. -->
+        <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Receives the paired engine from the phone (DataClient /live/engine) even when the app is not running. -->
+        <service
+            android:name=".PhoneEngineService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/live" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".LiveTileService"
+            android:exported="true"
+            android:label="@string/tile_label"
+            android:description="@string/tile_desc"
+            android:icon="@drawable/ic_stat_live"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data android:name="androidx.wear.tiles.PREVIEW" android:resource="@drawable/tile_preview" />
+        </service>
+
+        <service
+            android:name=".LiveComplicationService"
+            android:exported="true"
+            android:label="@string/complication_label"
+            android:icon="@drawable/ic_stat_live"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data android:name="android.support.wearable.complications.SUPPORTED_TYPES" android:value="SHORT_TEXT,LONG_TEXT" />
+            <meta-data android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS" android:value="0" />
+        </service>
+
+        <service android:name="ro.mixai.tv.player.MusicService" tools:node="remove" />
+    </application>
+</manifest>

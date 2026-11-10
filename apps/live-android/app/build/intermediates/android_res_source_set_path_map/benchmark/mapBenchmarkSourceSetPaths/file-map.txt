@@ -1,0 +1,9 @@
+ro.mixai.live-pngs-0 E:\gh\mmo\apps\live-android\app\build\generated\res\pngs\benchmark
+ro.mixai.live-updated_navigation_xml-1 E:\gh\mmo\apps\live-android\app\build\generated\updated_navigation_xml\benchmark
+ro.mixai.live-packageBenchmarkResources-2 E:\gh\mmo\apps\live-android\app\build\intermediates\incremental\benchmark\packageBenchmarkResources\merged.dir
+ro.mixai.live-packageBenchmarkResources-3 E:\gh\mmo\apps\live-android\app\build\intermediates\incremental\benchmark\packageBenchmarkResources\stripped.dir
+ro.mixai.live-merged-not-compiled-resources-4 E:\gh\mmo\apps\live-android\app\build\intermediates\merged-not-compiled-resources\benchmark
+ro.mixai.live-benchmark-5 E:\gh\mmo\apps\live-android\app\build\intermediates\merged_res\benchmark\mergeBenchmarkResources
+ro.mixai.live-benchmark-6 E:\gh\mmo\apps\live-android\app\src\benchmark\res
+ro.mixai.live-main-7 E:\gh\mmo\apps\live-android\app\src\main\res
+gradleHome-0 C:\Users\vladu\.gradle

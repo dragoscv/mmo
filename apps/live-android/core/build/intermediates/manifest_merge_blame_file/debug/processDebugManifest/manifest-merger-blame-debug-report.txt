@@ -1,0 +1,27 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="ro.mixai.live.core" >
+4
+5    <uses-sdk android:minSdkVersion="26" />
+5-->INJECTED
+5-->INJECTED
+6    <!-- WebSocket + HTTP to the MixAI Live engine on the LAN. -->
+7    <uses-permission android:name="android.permission.INTERNET" />
+7-->E:\gh\mmo\apps\live-android\core\src\main\AndroidManifest.xml:4:5-67
+7-->E:\gh\mmo\apps\live-android\core\src\main\AndroidManifest.xml:4:22-64
+8    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+8-->E:\gh\mmo\apps\live-android\core\src\main\AndroidManifest.xml:5:5-79
+8-->E:\gh\mmo\apps\live-android\core\src\main\AndroidManifest.xml:5:22-76
+9    <!-- mDNS discovery of `_mixai-live._tcp` (NsdManager needs a MulticastLock on Wi-Fi). -->
+10    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+10-->E:\gh\mmo\apps\live-android\core\src\main\AndroidManifest.xml:7:5-76
+10-->E:\gh\mmo\apps\live-android\core\src\main\AndroidManifest.xml:7:22-73
+11    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+11-->E:\gh\mmo\apps\live-android\core\src\main\AndroidManifest.xml:8:5-86
+11-->E:\gh\mmo\apps\live-android\core\src\main\AndroidManifest.xml:8:22-83
+12    <!-- Android 17 local network access (enforced as a runtime permission from targetSdk 37). -->
+13    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+13-->E:\gh\mmo\apps\live-android\core\src\main\AndroidManifest.xml:10:5-79
+13-->E:\gh\mmo\apps\live-android\core\src\main\AndroidManifest.xml:10:22-76
+14
+15</manifest>

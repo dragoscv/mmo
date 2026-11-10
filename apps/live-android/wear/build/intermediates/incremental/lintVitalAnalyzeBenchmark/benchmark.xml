@@ -1,0 +1,31 @@
+<variant
+    name="benchmark"
+    package="ro.mixai.live.wear"
+    minSdkVersion="30"
+    targetSdkVersion="36.0"
+    shrinking="true"
+    mergedManifest="build\intermediates\merged_manifest\benchmark\processBenchmarkMainManifest\AndroidManifest.xml"
+    proguardFiles="build\intermediates\default_proguard_files\global\proguard-android-optimize.txt-9.4.0;proguard-rules.pro"
+    partialResultsDir="build\intermediates\lint_vital_partial_results\benchmark\lintVitalAnalyzeBenchmark\out"
+    desugaredMethodsFiles="C:\Users\vladu\.gradle\caches\9.7.1\transforms\b71aa5a6d633b64cfb4e952118e5e169\transformed\D8BackportedDesugaredMethods.txt">
+  <buildFeatures/>
+  <sourceProviders>
+    <sourceProvider
+        manifests="src\main\AndroidManifest.xml"
+        javaDirectories="src\main\java;src\benchmark\java;src\main\kotlin;src\benchmark\kotlin"
+        resDirectories="src\main\res;src\benchmark\res"
+        assetsDirectories="src\main\assets;src\benchmark\assets"
+        keepRulesDirectories="src\main\keepRules;src\benchmark\keepRules"/>
+  </sourceProviders>
+  <testSourceProviders>
+  </testSourceProviders>
+  <testFixturesSourceProviders>
+  </testFixturesSourceProviders>
+  <artifact
+      classOutputs="build\intermediates\javac\benchmark\compileBenchmarkJavaWithJavac\classes;build\intermediates\built_in_kotlinc\benchmark\compileBenchmarkKotlin\classes;build\intermediates\compile_r_class_jar\benchmark\generateBenchmarkRFile\R.jar"
+      type="MAIN"
+      applicationId="ro.mixai.live"
+      generatedSourceFolders="build\generated\ap_generated_sources\benchmark\out;build\generated\source\buildConfig\benchmark"
+      desugaredMethodsFiles="C:\Users\vladu\.gradle\caches\9.7.1\transforms\b71aa5a6d633b64cfb4e952118e5e169\transformed\D8BackportedDesugaredMethods.txt">
+  </artifact>
+</variant>

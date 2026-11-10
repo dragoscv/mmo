@@ -1,0 +1,404 @@
+{
+    "$schema" : "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+    "version" : "2.1.0",
+    "runs" : [
+        {
+            "tool": {
+                "driver": {
+                    "name": "Android Lint",
+                    "fullName": "Android Lint (in gradle)",
+                    "version": "9.4.0",
+                    "semanticVersion": "9.4.0",
+                    "organization": "Google",
+                    "informationUri": "https://developer.android.com/studio/write/lint",
+                    "fullDescription": {
+                        "text": "Static analysis originally for Android source code but now performing general analysis"
+                    },
+                    "language": "en-US",
+                    "rules": [
+                        {
+                            "id": "DataExtractionRules",
+                            "shortDescription": {
+                                "text": "Missing data extraction rules"
+                            },
+                            "fullDescription": {
+                                "text": "Before Android 12, the attributes android:allowBackup and android:fullBackupContent were used to configure all forms of backup, including cloud backups, device-to-device transfers and adb backup.\n\nIn Android 12 and higher, these attributes have been deprecated and will only apply to cloud backups. You should instead use the attribute android:dataExtractionRules, specifying an @xml resource that configures which files to back up, for cloud backups and for device-to-device transfers, separately. If your minSdkVersion supports older versions, you'll still want to specify an android:fullBackupContent resource if the default behavior is not right for your app.",
+                                "markdown": "Before Android 12, the attributes `android:allowBackup` and `android:fullBackupContent` were used to configure all forms of backup, including cloud backups, device-to-device transfers and adb backup.\n\nIn Android 12 and higher, these attributes have been deprecated and will only apply to cloud backups. You should instead use the attribute `android:dataExtractionRules`, specifying an `@xml` resource that configures which files to back up, for cloud backups and for device-to-device transfers, separately. If your `minSdkVersion` supports older versions, you'll still want to specify an `android:fullBackupContent` resource if the default behavior is not right for your app."
+                            },
+                            "defaultConfiguration": {
+                                "level": "warning",
+                                "rank": 80
+                            },
+                            "properties": {
+                                "tags": [
+                                    "Security"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "ObsoleteSdkInt",
+                            "shortDescription": {
+                                "text": "Obsolete SDK_INT Version Check"
+                            },
+                            "fullDescription": {
+                                "text": "This check flags version checks that are not necessary, because the minSdkVersion (or surrounding known API level) is already at least as high as the version checked for.\n\nSimilarly, it also looks for resources in -vNN folders, such as values-v14 where the version qualifier is less than or equal to the minSdkVersion, where the contents should be merged into the best folder.",
+                                "markdown": "This check flags version checks that are not necessary, because the `minSdkVersion` (or surrounding known API level) is already at least as high as the version checked for.\n\nSimilarly, it also looks for resources in `-vNN` folders, such as `values-v14` where the version qualifier is less than or equal to the `minSdkVersion`, where the contents should be merged into the best folder."
+                            },
+                            "defaultConfiguration": {
+                                "level": "warning",
+                                "rank": 50
+                            },
+                            "properties": {
+                                "tags": [
+                                    "Performance"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "UnusedResources",
+                            "shortDescription": {
+                                "text": "Unused resources"
+                            },
+                            "fullDescription": {
+                                "text": "Unused resources make applications larger and slow down builds.\n\n\nThe unused resource check can ignore tests. If you want to include resources that are only referenced from tests, consider packaging them in a test source set instead.\n\nYou can include test sources in the unused resource check by setting the system property lint.unused-resources.include-tests=true, and to exclude them (usually for performance reasons), use lint.unused-resources.exclude-tests=true.\n",
+                                "markdown": "Unused resources make applications larger and slow down builds.\n\n\nThe unused resource check can ignore tests. If you want to include resources that are only referenced from tests, consider packaging them in a test source set instead.\n\nYou can include test sources in the unused resource check by setting the system property `lint.unused-resources.include-tests=true`, and to exclude them (usually for performance reasons), use `lint.unused-resources.exclude-tests=true`.\n"
+                            },
+                            "defaultConfiguration": {
+                                "level": "warning",
+                                "rank": 80
+                            },
+                            "properties": {
+                                "tags": [
+                                    "Performance"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "UseKtx",
+                            "shortDescription": {
+                                "text": "Use KTX extension function"
+                            },
+                            "fullDescription": {
+                                "text": "The Android KTX libraries decorates the Android platform SDK as well as various libraries with more convenient extension functions available from Kotlin, allowing you to use default parameters, named parameters, and more."
+                            },
+                            "defaultConfiguration": {
+                                "level": "warning",
+                                "rank": 50
+                            },
+                            "properties": {
+                                "tags": [
+                                    "Productivity"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            "originalUriBaseIds": {
+                "%SRCROOT%": {
+                    "uri": "file:///E:/gh/mmo/apps/"
+                }
+            },
+            "results": [
+                {
+                    "ruleId": "DataExtractionRules",
+                    "ruleIndex": 0,
+                    "message": {
+                        "text": "The attribute android:allowBackup is deprecated from Android 12 and higher and may be removed in future versions. Consider adding the attribute android:dataExtractionRules specifying an @xml resource which configures cloud backups and device transfers on Android 12 and higher.",
+                        "markdown": "The attribute `android:allowBackup` is deprecated from Android 12 and higher and may be removed in future versions. Consider adding the attribute `android:dataExtractionRules` specifying an `@xml` resource which configures cloud backups and device transfers on Android 12 and higher."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "live-android/wear/src/main/AndroidManifest.xml"
+                                },
+                                "region": {
+                                    "startLine": 30,
+                                    "startColumn": 30,
+                                    "endLine": 30,
+                                    "endColumn": 35,
+                                    "charOffset": 1607,
+                                    "charLength": 5,
+                                    "snippet": {
+                                        "text": "false"
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 28,
+                                    "endLine": 33,
+                                    "snippet": {
+                                        "text": "        android:theme=\"@android:style/Theme.DeviceDefault\"\n        android:usesCleartextTraffic=\"true\"\n        android:allowBackup=\"false\"\n        android:supportsRtl=\"true\">\n\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "fixes": [
+                        {
+                            "description": {
+                                "text": "Create data_extraction_rules.xml"
+                            },
+                            "artifactChanges": [
+                                {
+                                    "artifactLocation": {
+                                        "uriBaseId": "%SRCROOT%",
+                                        "uri": "live-android/wear/src/main/res/xml/data_extraction_rules.xml"
+                                    },
+                                    "replacements": [
+                                        {
+                                            "deletedRegion": {
+                                                "startLine": 1,
+                                                "startColumn": 1,
+                                                "charOffset": 0
+                                            },
+                                            "insertedContent": {
+                                                "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!--\n   Sample data extraction rules file; uncomment and customize as necessary.\n   See https://developer.android.com/about/versions/12/backup-restore#xml-changes\n   for details.\n-->\n<data-extraction-rules>\n    <cloud-backup>\n        <!--\n        TODO: Use <include> and <exclude> to control what is backed up.\n        The domain can be file, database, sharedpref, external or root.\n        Examples:\n\n        <include domain=\"file\" path=\"file_to_include\"/>\n        <exclude domain=\"file\" path=\"file_to_exclude\"/>\n        <include domain=\"file\" path=\"include_folder\"/>\n        <exclude domain=\"file\" path=\"include_folder/file_to_exclude\"/>\n        <exclude domain=\"file\" path=\"exclude_folder\"/>\n        <include domain=\"file\" path=\"exclude_folder/file_to_include\"/>\n\n        <include domain=\"sharedpref\" path=\"include_shared_pref1.xml\"/>\n        <include domain=\"database\" path=\"db_name/file_to_include\"/>\n        <exclude domain=\"database\" path=\"db_name/include_folder/file_to_exclude\"/>\n        <include domain=\"external\" path=\"file_to_include\"/>\n        <exclude domain=\"external\" path=\"file_to_exclude\"/>\n        <include domain=\"root\" path=\"file_to_include\"/>\n        <exclude domain=\"root\" path=\"file_to_exclude\"/>\n        -->\n    </cloud-backup>\n    <!--\n    <device-transfer>\n        <include .../>\n        <exclude .../>\n    </device-transfer>\n    -->\n</data-extraction-rules>\n"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "artifactLocation": {
+                                        "uriBaseId": "%SRCROOT%",
+                                        "uri": "live-android/wear/src/main/AndroidManifest.xml"
+                                    },
+                                    "replacements": [
+                                        {
+                                            "deletedRegion": {
+                                                "startLine": 25,
+                                                "startColumn": 9,
+                                                "charOffset": 1351
+                                            },
+                                            "insertedContent": {
+                                                "text": "android:dataExtractionRules=\"@xml/data_extraction_rules\" \n"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "202247e189a1311d"
+                    }
+                },
+                {
+                    "ruleId": "ObsoleteSdkInt",
+                    "ruleIndex": 1,
+                    "message": {
+                        "text": "This folder configuration (v26) is unnecessary; minSdkVersion is 30. Merge all the resources in this folder into mipmap-anydpi.",
+                        "markdown": "This folder configuration (`v26`) is unnecessary; `minSdkVersion` is 30. Merge all the resources in this folder into `mipmap-anydpi`."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "live-android/wear/src/main/res/mipmap-anydpi-v26"
+                                },
+                                "region": {
+                                    "startLine": 1
+                                }                            }
+                        }
+                    ],
+                    "fixes": [
+                    ],
+                    "partialFingerprints": {
+                    }
+                },
+                {
+                    "ruleId": "UnusedResources",
+                    "ruleIndex": 2,
+                    "message": {
+                        "text": "The resource R.string.open_on_phone appears to be unused",
+                        "markdown": "The resource `R.string.open_on_phone` appears to be unused"
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "live-android/wear/src/main/res/values/strings.xml"
+                                },
+                                "region": {
+                                    "startLine": 6,
+                                    "startColumn": 13,
+                                    "endLine": 6,
+                                    "endColumn": 33,
+                                    "charOffset": 238,
+                                    "charLength": 20,
+                                    "snippet": {
+                                        "text": "name=\"open_on_phone\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 4,
+                                    "endLine": 9,
+                                    "snippet": {
+                                        "text": "    <string name=\"app_short\">Live</string>\n    <string name=\"not_paired\">Pair on your phone: MixAI Live → watch icon.</string>\n    <string name=\"open_on_phone\">Open on phone</string>\n    <string name=\"connecting\">Connecting…</string>\n    <string name=\"reconnecting\">Reconnecting…</string>\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "fixes": [
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "2cf8990d93b5b06e"
+                    }
+                },
+                {
+                    "ruleId": "UnusedResources",
+                    "ruleIndex": 2,
+                    "message": {
+                        "text": "The resource R.string.cents appears to be unused",
+                        "markdown": "The resource `R.string.cents` appears to be unused"
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "live-android/wear/src/main/res/values/strings.xml"
+                                },
+                                "region": {
+                                    "startLine": 21,
+                                    "startColumn": 13,
+                                    "endLine": 21,
+                                    "endColumn": 25,
+                                    "charOffset": 996,
+                                    "charLength": 12,
+                                    "snippet": {
+                                        "text": "name=\"cents\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 19,
+                                    "endLine": 24,
+                                    "snippet": {
+                                        "text": "    <string name=\"tuner\">Tuner</string>\n    <string name=\"no_tune\">No pitch</string>\n    <string name=\"cents\">%1$+.0f ¢</string>\n    <string name=\"engine\">Engine</string>\n    <string name=\"disconnect\">Disconnect</string>\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "fixes": [
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "02f03529a8d195db"
+                    }
+                },
+                {
+                    "ruleId": "UseKtx",
+                    "ruleIndex": 3,
+                    "message": {
+                        "text": "Use the KTX extension function SharedPreferences.edit instead?",
+                        "markdown": "Use the KTX extension function `SharedPreferences.edit` instead?"
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "live-android/wear/src/main/java/ro/mixai/live/wear/LiveWearApp.kt"
+                                },
+                                "region": {
+                                    "startLine": 77,
+                                    "startColumn": 9,
+                                    "endLine": 77,
+                                    "endColumn": 69,
+                                    "charOffset": 3067,
+                                    "charLength": 60,
+                                    "snippet": {
+                                        "text": "ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()"
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 75,
+                                    "endLine": 80,
+                                    "snippet": {
+                                        "text": "\n    fun save(ctx: Context, g: Glance) {\n        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()\n            .putBoolean(\"c\", g.connected).putString(\"p\", g.part).putString(\"s\", g.song).putBoolean(\"m\", g.muted).apply()\n    }\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "fixes": [
+                        {
+                            "description": {
+                                "text": "Replace with the edit extension function"
+                            },
+                            "artifactChanges": [
+                                {
+                                    "artifactLocation": {
+                                        "uriBaseId": "%SRCROOT%",
+                                        "uri": "live-android/wear/src/main/java/ro/mixai/live/wear/LiveWearApp.kt"
+                                    },
+                                    "replacements": [
+                                        {
+                                            "deletedRegion": {
+                                                "startLine": 77,
+                                                "startColumn": 63,
+                                                "charOffset": 3121,
+                                                "endLine": 77,
+                                                "endColumn": 68,
+                                                "charLength": 5
+                                            },
+                                            "insertedContent": {
+                                                "text": "edit\n"
+                                            }
+                                        },
+                                        {
+                                            "deletedRegion": {
+                                                "startLine": 77,
+                                                "startColumn": 68,
+                                                "charOffset": 3126,
+                                                "endLine": 77,
+                                                "endColumn": 69,
+                                                "charLength": 1
+                                            },
+                                            "insertedContent": {
+                                                "text": " {\n"
+                                            }
+                                        },
+                                        {
+                                            "deletedRegion": {
+                                                "startLine": 78,
+                                                "startColumn": 13,
+                                                "charOffset": 3140,
+                                                "endLine": 78,
+                                                "endColumn": 14,
+                                                "charLength": 1
+                                            },
+                                            "insertedContent": {
+                                                "text": "\n"
+                                            }
+                                        },
+                                        {
+                                            "deletedRegion": {
+                                                "startLine": 78,
+                                                "startColumn": 113,
+                                                "charOffset": 3240,
+                                                "endLine": 78,
+                                                "endColumn": 121,
+                                                "charLength": 8
+                                            },
+                                            "insertedContent": {
+                                                "text": "}\n"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "ae37bb45a3fd0773"
+                    }
+                }
+            ]
+        }
+    ]
+}

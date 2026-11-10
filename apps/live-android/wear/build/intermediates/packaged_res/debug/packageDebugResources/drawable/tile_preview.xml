@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tile picker preview (static): part name, prev/next and mute buttons. Vector so it needs no binary asset. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    <path android:fillColor="@color/bg" android:pathData="M0,0h200v200h-200z" />
+    <path android:fillColor="@color/fg" android:fillAlpha="0.9" android:pathData="M60,48h80v18h-80z" />
+    <path android:fillColor="@color/accent" android:pathData="M30,92h62a14,14 0 0,1 0,28h-62a14,14 0 0,1 0,-28z" />
+    <path android:fillColor="@color/accent" android:pathData="M108,92h62a14,14 0 0,1 0,28h-62a14,14 0 0,1 0,-28z" />
+    <path android:fillColor="@color/danger" android:pathData="M50,156h100a14,14 0 0,1 0,28h-100a14,14 0 0,1 0,-28z" />
+</vector>

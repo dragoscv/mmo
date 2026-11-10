@@ -1,0 +1,378 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="ro.mixai.live"
+4    android:versionCode="1"
+5    android:versionName="0.1.0" >
+6    <!--
+7 :mobile-common declares minSdk 31 for its sign-in screens; this app uses only its theme, tokens and fonts
+8         (API 26 safe), so the controller keeps minSdk 26.
+9    -->
+10    <uses-sdk
+10-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:7:5-57
+11        android:minSdkVersion="26"
+11-->INJECTED
+12        android:targetSdkVersion="36" />
+12-->INJECTED
+13
+14    <!-- LAN control of the user's own MixAI Live engine (WebSocket + HTTP, mDNS discovery). -->
+15    <uses-permission android:name="android.permission.INTERNET" />
+15-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:14:5-67
+15-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:14:22-64
+16    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+16-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:15:5-79
+16-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:15:22-76
+17    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+17-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:16:5-76
+17-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:16:22-73
+18    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+18-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:17:5-86
+18-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:17:22-83
+19    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+19-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:18:5-79
+19-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:18:22-76
+20    <!-- Scan the pairing QR code shown by the engine; frames are decoded on the device and never stored. -->
+21    <uses-permission android:name="android.permission.CAMERA" />
+21-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:20:5-65
+21-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:20:22-62
+22    <!-- Haptic tick on scene change and PANIC. -->
+23    <uses-permission android:name="android.permission.VIBRATE" />
+23-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:22:5-66
+23-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:22:22-63
+24
+25    <uses-feature
+25-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:24:5-85
+26        android:name="android.hardware.camera"
+26-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:24:19-57
+27        android:required="false" />
+27-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:24:58-82
+28    <uses-feature
+28-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:25:5-90
+29        android:name="android.hardware.touchscreen"
+29-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:25:19-62
+30        android:required="false" />
+30-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:25:63-87
+31    <uses-feature
+31-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:26:5-83
+32        android:name="android.hardware.wifi"
+32-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:26:19-55
+33        android:required="false" />
+33-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:26:56-80
+34
+35    <uses-permission android:name="android.permission.USE_BIOMETRIC" /> <!-- suppress DeprecatedClassUsageInspection -->
+35-->[androidx.biometric:biometric:1.1.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\b931959808be204526bf6bacc4908a12\transformed\biometric-1.1.0\AndroidManifest.xml:24:5-72
+35-->[androidx.biometric:biometric:1.1.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\b931959808be204526bf6bacc4908a12\transformed\biometric-1.1.0\AndroidManifest.xml:24:22-69
+36    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+36-->[androidx.biometric:biometric:1.1.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\b931959808be204526bf6bacc4908a12\transformed\biometric-1.1.0\AndroidManifest.xml:27:5-74
+36-->[androidx.biometric:biometric:1.1.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\b931959808be204526bf6bacc4908a12\transformed\biometric-1.1.0\AndroidManifest.xml:27:22-71
+37    <uses-permission android:name="android.permission.WAKE_LOCK" />
+37-->[androidx.media3:media3-exoplayer:1.11.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\1084610299139de3508768465c40f33e\transformed\media3-exoplayer-1.11.1\AndroidManifest.xml:23:5-68
+37-->[androidx.media3:media3-exoplayer:1.11.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\1084610299139de3508768465c40f33e\transformed\media3-exoplayer-1.11.1\AndroidManifest.xml:23:22-65
+38
+39    <permission
+39-->[androidx.core:core:1.19.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\9890c62a4ff272aa6cc3ab40baa6f39a\transformed\core-1.19.0\AndroidManifest.xml:22:5-24:47
+40        android:name="ro.mixai.live.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+40-->[androidx.core:core:1.19.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\9890c62a4ff272aa6cc3ab40baa6f39a\transformed\core-1.19.0\AndroidManifest.xml:23:9-81
+41        android:protectionLevel="signature" />
+41-->[androidx.core:core:1.19.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\9890c62a4ff272aa6cc3ab40baa6f39a\transformed\core-1.19.0\AndroidManifest.xml:24:9-44
+42
+43    <uses-permission android:name="ro.mixai.live.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+43-->[androidx.core:core:1.19.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\9890c62a4ff272aa6cc3ab40baa6f39a\transformed\core-1.19.0\AndroidManifest.xml:26:5-97
+43-->[androidx.core:core:1.19.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\9890c62a4ff272aa6cc3ab40baa6f39a\transformed\core-1.19.0\AndroidManifest.xml:26:22-94
+44
+45    <application
+45-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:28:5-60:19
+46        android:name="ro.mixai.live.LiveApp"
+46-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:29:9-32
+47        android:allowBackup="false"
+47-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:36:9-36
+48        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+48-->[androidx.core:core:1.19.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\9890c62a4ff272aa6cc3ab40baa6f39a\transformed\core-1.19.0\AndroidManifest.xml:28:18-86
+49        android:enableOnBackInvokedCallback="true"
+49-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:34:9-51
+50        android:extractNativeLibs="false"
+50-->INJECTED
+51        android:icon="@mipmap/ic_launcher"
+51-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:31:9-43
+52        android:label="@string/app_name"
+52-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:30:9-41
+53        android:roundIcon="@mipmap/ic_launcher"
+53-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:32:9-48
+54        android:supportsRtl="true"
+54-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:37:9-35
+55        android:theme="@style/Theme.Live"
+55-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:33:9-42
+56        android:usesCleartextTraffic="true" >
+56-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:35:9-44
+57        <activity
+57-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:39:9-57:20
+58            android:name="ro.mixai.live.MainActivity"
+58-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:40:13-41
+59            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density"
+59-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:45:13-141
+60            android:exported="true"
+60-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:41:13-36
+61            android:launchMode="singleTask"
+61-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:42:13-44
+62            android:resizeableActivity="true"
+62-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:43:13-46
+63            android:windowSoftInputMode="adjustResize" >
+63-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:44:13-55
+64            <intent-filter>
+64-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:46:13-49:29
+65                <action android:name="android.intent.action.MAIN" />
+65-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:47:17-69
+65-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:47:25-66
+66
+67                <category android:name="android.intent.category.LAUNCHER" />
+67-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:48:17-77
+67-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:48:27-74
+68            </intent-filter>
+69            <!-- Pairing link from the engine QR: mixai-live://pair?host=…&port=…&t=…&name=… -->
+70            <intent-filter>
+70-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:51:13-56:29
+71                <action android:name="android.intent.action.VIEW" />
+71-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:52:17-69
+71-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:52:25-66
+72
+73                <category android:name="android.intent.category.DEFAULT" />
+73-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:53:17-76
+73-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:53:27-73
+74                <category android:name="android.intent.category.BROWSABLE" />
+74-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:54:17-78
+74-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:54:27-75
+75
+76                <data
+76-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:55:17-73
+77                    android:host="pair"
+77-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:55:51-70
+78                    android:scheme="mixai-live" />
+78-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:55:23-50
+79            </intent-filter>
+80        </activity>
+81
+82        <service
+82-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:24:9-32:19
+83            android:name="androidx.credentials.playservices.CredentialProviderMetadataHolder"
+83-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:25:13-94
+84            android:enabled="true"
+84-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:26:13-35
+85            android:exported="false" >
+85-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:27:13-37
+86            <meta-data
+86-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:29:13-31:104
+87                android:name="androidx.credentials.CREDENTIAL_PROVIDER_KEY"
+87-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:30:17-76
+88                android:value="androidx.credentials.playservices.CredentialProviderPlayServicesImpl" />
+88-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:31:17-101
+89        </service>
+90
+91        <activity
+91-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:34:9-41:20
+92            android:name="androidx.credentials.playservices.controllers.identityauth.HiddenActivity"
+92-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:35:13-101
+93            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+93-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:36:13-87
+94            android:enabled="true"
+94-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:37:13-35
+95            android:exported="false"
+95-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:38:13-37
+96            android:fitsSystemWindows="true"
+96-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:39:13-45
+97            android:theme="@style/Theme.Hidden" >
+97-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:40:13-48
+98        </activity>
+99        <activity
+99-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:42:9-49:20
+100            android:name="androidx.credentials.playservices.controllers.identitycredentials.IdentityCredentialApiHiddenActivity"
+100-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:43:13-129
+101            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+101-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:44:13-87
+102            android:enabled="true"
+102-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:45:13-35
+103            android:exported="false"
+103-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:46:13-37
+104            android:fitsSystemWindows="true"
+104-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:47:13-45
+105            android:theme="@style/Theme.Hidden" >
+105-->[androidx.credentials:credentials-play-services-auth:1.6.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\de227d35c95a3286d4dd78cff7e6ae81\transformed\credentials-play-services-auth-1.6.0\AndroidManifest.xml:48:13-48
+106        </activity>
+107
+108        <service
+108-->[androidx.camera:camera-camera2:1.6.2] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cc0c21d2f0e9dff72b35f089ac11ef93\transformed\camera-camera2-1.6.2\AndroidManifest.xml:24:9-33:19
+109            android:name="androidx.camera.core.impl.MetadataHolderService"
+109-->[androidx.camera:camera-camera2:1.6.2] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cc0c21d2f0e9dff72b35f089ac11ef93\transformed\camera-camera2-1.6.2\AndroidManifest.xml:25:13-75
+110            android:enabled="false"
+110-->[androidx.camera:camera-camera2:1.6.2] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cc0c21d2f0e9dff72b35f089ac11ef93\transformed\camera-camera2-1.6.2\AndroidManifest.xml:26:13-36
+111            android:exported="false" >
+111-->[androidx.camera:camera-camera2:1.6.2] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cc0c21d2f0e9dff72b35f089ac11ef93\transformed\camera-camera2-1.6.2\AndroidManifest.xml:27:13-37
+112            <meta-data
+112-->[androidx.camera:camera-camera2:1.6.2] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cc0c21d2f0e9dff72b35f089ac11ef93\transformed\camera-camera2-1.6.2\AndroidManifest.xml:30:13-32:89
+113                android:name="androidx.camera.core.impl.MetadataHolderService.DEFAULT_CONFIG_PROVIDER"
+113-->[androidx.camera:camera-camera2:1.6.2] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cc0c21d2f0e9dff72b35f089ac11ef93\transformed\camera-camera2-1.6.2\AndroidManifest.xml:31:17-103
+114                android:value="androidx.camera.camera2.Camera2Config$DefaultProvider" />
+114-->[androidx.camera:camera-camera2:1.6.2] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cc0c21d2f0e9dff72b35f089ac11ef93\transformed\camera-camera2-1.6.2\AndroidManifest.xml:32:17-86
+115        </service>
+116
+117        <activity
+117-->[com.google.android.gms:play-services-auth:21.1.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\4890d1be08f6c9eaf11334bd2763a052\transformed\play-services-auth-21.1.1\AndroidManifest.xml:23:9-27:75
+118            android:name="com.google.android.gms.auth.api.signin.internal.SignInHubActivity"
+118-->[com.google.android.gms:play-services-auth:21.1.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\4890d1be08f6c9eaf11334bd2763a052\transformed\play-services-auth-21.1.1\AndroidManifest.xml:24:13-93
+119            android:excludeFromRecents="true"
+119-->[com.google.android.gms:play-services-auth:21.1.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\4890d1be08f6c9eaf11334bd2763a052\transformed\play-services-auth-21.1.1\AndroidManifest.xml:25:13-46
+120            android:exported="false"
+120-->[com.google.android.gms:play-services-auth:21.1.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\4890d1be08f6c9eaf11334bd2763a052\transformed\play-services-auth-21.1.1\AndroidManifest.xml:26:13-37
+121            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+121-->[com.google.android.gms:play-services-auth:21.1.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\4890d1be08f6c9eaf11334bd2763a052\transformed\play-services-auth-21.1.1\AndroidManifest.xml:27:13-72
+122        <!--
+123            Service handling Google Sign-In user revocation. For apps that do not integrate with
+124            Google Sign-In, this service will never be started.
+125        -->
+126        <service
+126-->[com.google.android.gms:play-services-auth:21.1.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\4890d1be08f6c9eaf11334bd2763a052\transformed\play-services-auth-21.1.1\AndroidManifest.xml:33:9-37:51
+127            android:name="com.google.android.gms.auth.api.signin.RevocationBoundService"
+127-->[com.google.android.gms:play-services-auth:21.1.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\4890d1be08f6c9eaf11334bd2763a052\transformed\play-services-auth-21.1.1\AndroidManifest.xml:34:13-89
+128            android:exported="true"
+128-->[com.google.android.gms:play-services-auth:21.1.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\4890d1be08f6c9eaf11334bd2763a052\transformed\play-services-auth-21.1.1\AndroidManifest.xml:35:13-36
+129            android:permission="com.google.android.gms.auth.api.signin.permission.REVOCATION_NOTIFICATION"
+129-->[com.google.android.gms:play-services-auth:21.1.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\4890d1be08f6c9eaf11334bd2763a052\transformed\play-services-auth-21.1.1\AndroidManifest.xml:36:13-107
+130            android:visibleToInstantApps="true" />
+130-->[com.google.android.gms:play-services-auth:21.1.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\4890d1be08f6c9eaf11334bd2763a052\transformed\play-services-auth-21.1.1\AndroidManifest.xml:37:13-48
+131
+132        <activity
+132-->[com.google.android.gms:play-services-base:18.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\e450ceca270e477bcf9669ef5737c8ab\transformed\play-services-base-18.5.0\AndroidManifest.xml:5:9-173
+133            android:name="com.google.android.gms.common.api.GoogleApiActivity"
+133-->[com.google.android.gms:play-services-base:18.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\e450ceca270e477bcf9669ef5737c8ab\transformed\play-services-base-18.5.0\AndroidManifest.xml:5:19-85
+134            android:exported="false"
+134-->[com.google.android.gms:play-services-base:18.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\e450ceca270e477bcf9669ef5737c8ab\transformed\play-services-base-18.5.0\AndroidManifest.xml:5:146-170
+135            android:theme="@android:style/Theme.Translucent.NoTitleBar" /> <!-- TODO: b/510644544 - Remove this workaround once minSdk is 38 -->
+135-->[com.google.android.gms:play-services-base:18.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\e450ceca270e477bcf9669ef5737c8ab\transformed\play-services-base-18.5.0\AndroidManifest.xml:5:86-145
+136        <activity
+136-->[androidx.media3:media3-session:1.11.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\d9dbe8bede117c39d2c486043163284d\transformed\media3-session-1.11.1\AndroidManifest.xml:25:9-43:20
+137            android:name="androidx.media3.session.BluetoothValidationActivity"
+137-->[androidx.media3:media3-session:1.11.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\d9dbe8bede117c39d2c486043163284d\transformed\media3-session-1.11.1\AndroidManifest.xml:26:13-79
+138            android:excludeFromRecents="true"
+138-->[androidx.media3:media3-session:1.11.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\d9dbe8bede117c39d2c486043163284d\transformed\media3-session-1.11.1\AndroidManifest.xml:27:13-46
+139            android:exported="true"
+139-->[androidx.media3:media3-session:1.11.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\d9dbe8bede117c39d2c486043163284d\transformed\media3-session-1.11.1\AndroidManifest.xml:28:13-36
+140            android:noHistory="true"
+140-->[androidx.media3:media3-session:1.11.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\d9dbe8bede117c39d2c486043163284d\transformed\media3-session-1.11.1\AndroidManifest.xml:29:13-37
+141            android:permission="android.permission.BLUETOOTH_PRIVILEGED"
+141-->[androidx.media3:media3-session:1.11.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\d9dbe8bede117c39d2c486043163284d\transformed\media3-session-1.11.1\AndroidManifest.xml:30:13-73
+142            android:theme="@android:style/Theme.NoDisplay" >
+142-->[androidx.media3:media3-session:1.11.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\d9dbe8bede117c39d2c486043163284d\transformed\media3-session-1.11.1\AndroidManifest.xml:31:13-59
+143            <intent-filter>
+143-->[androidx.media3:media3-session:1.11.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\d9dbe8bede117c39d2c486043163284d\transformed\media3-session-1.11.1\AndroidManifest.xml:32:13-42:29
+144
+145                <!-- Omit CATEGORY_DEFAULT to avoid listing this app as a generic audio app. -->
+146                <action android:name="android.intent.action.VIEW" />
+146-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:52:17-69
+146-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:52:25-66
+147
+148                <data android:scheme="content" />
+148-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:55:17-73
+148-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:55:23-50
+149                <data android:host="media" />
+149-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:55:17-73
+149-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:55:51-70
+150                <!-- Satisfies the probe used in Bluetooths's MediaPlayerList.java on API 36 and 37. -->
+151                <data android:pathPrefix="/internal/audio/media/" />
+151-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:55:17-73
+152                <data android:mimeType="audio/*" />
+152-->E:\gh\mmo\apps\live-android\app\src\main\AndroidManifest.xml:55:17-73
+153            </intent-filter>
+154        </activity>
+155
+156        <uses-library
+156-->[androidx.window:window:1.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\0d737d6da3cad1fd1a4aac0becdd0cf1\transformed\window-1.5.0\AndroidManifest.xml:23:9-25:40
+157            android:name="androidx.window.extensions"
+157-->[androidx.window:window:1.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\0d737d6da3cad1fd1a4aac0becdd0cf1\transformed\window-1.5.0\AndroidManifest.xml:24:13-54
+158            android:required="false" />
+158-->[androidx.window:window:1.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\0d737d6da3cad1fd1a4aac0becdd0cf1\transformed\window-1.5.0\AndroidManifest.xml:25:13-37
+159        <uses-library
+159-->[androidx.window:window:1.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\0d737d6da3cad1fd1a4aac0becdd0cf1\transformed\window-1.5.0\AndroidManifest.xml:26:9-28:40
+160            android:name="androidx.window.sidecar"
+160-->[androidx.window:window:1.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\0d737d6da3cad1fd1a4aac0becdd0cf1\transformed\window-1.5.0\AndroidManifest.xml:27:13-51
+161            android:required="false" />
+161-->[androidx.window:window:1.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\0d737d6da3cad1fd1a4aac0becdd0cf1\transformed\window-1.5.0\AndroidManifest.xml:28:13-37
+162
+163        <provider
+163-->[androidx.emoji2:emoji2:1.4.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cee741d18aa93dcd16038a1bae3b0b5b\transformed\emoji2-1.4.0\AndroidManifest.xml:24:9-32:20
+164            android:name="androidx.startup.InitializationProvider"
+164-->[androidx.emoji2:emoji2:1.4.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cee741d18aa93dcd16038a1bae3b0b5b\transformed\emoji2-1.4.0\AndroidManifest.xml:25:13-67
+165            android:authorities="ro.mixai.live.androidx-startup"
+165-->[androidx.emoji2:emoji2:1.4.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cee741d18aa93dcd16038a1bae3b0b5b\transformed\emoji2-1.4.0\AndroidManifest.xml:26:13-68
+166            android:exported="false" >
+166-->[androidx.emoji2:emoji2:1.4.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cee741d18aa93dcd16038a1bae3b0b5b\transformed\emoji2-1.4.0\AndroidManifest.xml:27:13-37
+167            <meta-data
+167-->[androidx.emoji2:emoji2:1.4.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cee741d18aa93dcd16038a1bae3b0b5b\transformed\emoji2-1.4.0\AndroidManifest.xml:29:13-31:52
+168                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+168-->[androidx.emoji2:emoji2:1.4.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cee741d18aa93dcd16038a1bae3b0b5b\transformed\emoji2-1.4.0\AndroidManifest.xml:30:17-75
+169                android:value="androidx.startup" />
+169-->[androidx.emoji2:emoji2:1.4.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\cee741d18aa93dcd16038a1bae3b0b5b\transformed\emoji2-1.4.0\AndroidManifest.xml:31:17-49
+170            <meta-data
+170-->[androidx.lifecycle:lifecycle-process:2.11.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\7d58fc8d715d5f4f28966e403fc692e2\transformed\lifecycle-process-2.11.0\AndroidManifest.xml:29:13-31:52
+171                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+171-->[androidx.lifecycle:lifecycle-process:2.11.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\7d58fc8d715d5f4f28966e403fc692e2\transformed\lifecycle-process-2.11.0\AndroidManifest.xml:30:17-78
+172                android:value="androidx.startup" />
+172-->[androidx.lifecycle:lifecycle-process:2.11.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\7d58fc8d715d5f4f28966e403fc692e2\transformed\lifecycle-process-2.11.0\AndroidManifest.xml:31:17-49
+173            <meta-data
+173-->[com.squareup.okhttp3:okhttp-android:5.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\d2a537f3badc9fe04b7ae382b8b8d9ef\transformed\okhttp\AndroidManifest.xml:16:13-18:52
+174                android:name="okhttp3.internal.platform.PlatformInitializer"
+174-->[com.squareup.okhttp3:okhttp-android:5.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\d2a537f3badc9fe04b7ae382b8b8d9ef\transformed\okhttp\AndroidManifest.xml:17:17-77
+175                android:value="androidx.startup" />
+175-->[com.squareup.okhttp3:okhttp-android:5.5.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\d2a537f3badc9fe04b7ae382b8b8d9ef\transformed\okhttp\AndroidManifest.xml:18:17-49
+176            <meta-data
+176-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:29:13-31:52
+177                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+177-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:30:17-85
+178                android:value="androidx.startup" />
+178-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:31:17-49
+179        </provider>
+180
+181        <receiver
+181-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:34:9-52:20
+182            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+182-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:35:13-76
+183            android:directBootAware="false"
+183-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:36:13-44
+184            android:enabled="true"
+184-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:37:13-35
+185            android:exported="true"
+185-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:38:13-36
+186            android:permission="android.permission.DUMP" >
+186-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:39:13-57
+187            <intent-filter>
+187-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:40:13-42:29
+188                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+188-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:41:17-91
+188-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:41:25-88
+189            </intent-filter>
+190            <intent-filter>
+190-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:43:13-45:29
+191                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+191-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:44:17-85
+191-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:44:25-82
+192            </intent-filter>
+193            <intent-filter>
+193-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:46:13-48:29
+194                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+194-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:47:17-88
+194-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:47:25-85
+195            </intent-filter>
+196            <intent-filter>
+196-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:49:13-51:29
+197                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+197-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:50:17-95
+197-->[androidx.profileinstaller:profileinstaller:1.4.1] C:\Users\vladu\.gradle\caches\9.7.1\transforms\a3d60c1d5c69daae81c9a828f79bffbe\transformed\profileinstaller-1.4.1\AndroidManifest.xml:50:25-92
+198            </intent-filter>
+199        </receiver>
+200
+201        <meta-data
+201-->[com.google.android.gms:play-services-basement:18.9.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\0c990126f036326960593e04dc510504\transformed\play-services-basement-18.9.0\AndroidManifest.xml:21:9-23:69
+202            android:name="com.google.android.gms.version"
+202-->[com.google.android.gms:play-services-basement:18.9.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\0c990126f036326960593e04dc510504\transformed\play-services-basement-18.9.0\AndroidManifest.xml:22:13-58
+203            android:value="@integer/google_play_services_version" />
+203-->[com.google.android.gms:play-services-basement:18.9.0] C:\Users\vladu\.gradle\caches\9.7.1\transforms\0c990126f036326960593e04dc510504\transformed\play-services-basement-18.9.0\AndroidManifest.xml:23:13-66
+204    </application>
+205
+206</manifest>

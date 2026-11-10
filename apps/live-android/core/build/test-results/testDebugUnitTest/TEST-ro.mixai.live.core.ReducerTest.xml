@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ro.mixai.live.core.ReducerTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-09T22:24:28.799Z" hostname="DRAGOS" time="0.006">
+  <properties/>
+  <testcase name="connectHelloStateFlow" classname="ro.mixai.live.core.ReducerTest" time="0.0"/>
+  <testcase name="closeReconnectsAndUnauthorizedStops" classname="ro.mixai.live.core.ReducerTest" time="0.0"/>
+  <testcase name="roleFallsBackToStoredEngine" classname="ro.mixai.live.core.ReducerTest" time="0.0"/>
+  <testcase name="backoffGrowsAndCaps" classname="ro.mixai.live.core.ReducerTest" time="0.0"/>
+  <testcase name="errorsAreKeptUntilCleared" classname="ro.mixai.live.core.ReducerTest" time="0.001"/>
+  <testcase name="throttleSendsLeadingAndTrailing" classname="ro.mixai.live.core.ReducerTest" time="0.003"/>
+  <testcase name="disconnectResets" classname="ro.mixai.live.core.ReducerTest" time="0.001"/>
+  <testcase name="newerProtocolAsksForUpdateAndStays" classname="ro.mixai.live.core.ReducerTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

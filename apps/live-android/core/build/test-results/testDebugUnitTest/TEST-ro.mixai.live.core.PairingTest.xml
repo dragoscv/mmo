@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ro.mixai.live.core.PairingTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-09T22:24:28.629Z" hostname="DRAGOS" time="0.014">
+  <properties/>
+  <testcase name="ipv6Bracketing" classname="ro.mixai.live.core.PairingTest" time="0.003"/>
+  <testcase name="parsesQrSchemeLink" classname="ro.mixai.live.core.PairingTest" time="0.001"/>
+  <testcase name="jsonRoundTripForWatch" classname="ro.mixai.live.core.PairingTest" time="0.008"/>
+  <testcase name="parsesHandTypedForms" classname="ro.mixai.live.core.PairingTest" time="0.0"/>
+  <testcase name="rejectsBadInput" classname="ro.mixai.live.core.PairingTest" time="0.001"/>
+  <testcase name="parsesWebRemoteLink" classname="ro.mixai.live.core.PairingTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

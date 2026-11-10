@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resource shrinker: the Data Layer reads android_wear_capabilities by name (no code reference); without this the
+     release build drops the capability and the watch never finds the phone (lesson from WP18-04). -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities" />

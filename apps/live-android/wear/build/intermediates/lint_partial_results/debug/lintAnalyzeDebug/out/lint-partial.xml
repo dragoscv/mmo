@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<incidents format="6" by="lint 9.4.0" type="partial_results">
+    <map id="UnsafeIntentLaunch">
+            <map id="unprotected">
+                <entry
+                    name="ro.mixai.live.wear.MainActivity"
+                    boolean="true"/>
+                <entry
+                    name="ro.mixai.live.wear.PhoneEngineService"
+                    boolean="true"/>
+            </map>
+    </map>
+    <map id="UnusedResources">
+        <entry
+            name="model"
+            string="array[android_wear_capabilities(U)],color[accent(U),accent2(U),bg(U),fg(U),danger(U)],drawable[ic_stat_live(U),tile_preview(U),ic_launcher_foreground(U)],mipmap[ic_launcher(U)],raw[keep(U)],string[app_name(U),tile_desc(U),tile_label(U),complication_label(U),app_short(U),not_paired(U),connecting(U),reconnecting(U),unauthorized(U),update_required(U),prev(U),next(U),mute(U),unmute(U),panic(U),panic_hold(U),viewer_only(U),no_song(U),tuner(U),no_tune(U),cents(U),engine(U),disconnect(U),connect(U),cd_level(U),tile_empty(U),cd_complication(U)];7^3^4^1^5,8^1^2,9^3^8,a^0;@array/android_wear_capabilities;;"/>
+    </map>
+
+</incidents>

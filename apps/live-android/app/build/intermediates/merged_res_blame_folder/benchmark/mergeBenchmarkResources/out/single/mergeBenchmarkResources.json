@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "ro.mixai.live-benchmark-68:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "ro.mixai.live-main-70:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "ro.mixai.live-benchmark-68:/mipmap-anydpi_ic_launcher.xml.flat",
+        "source": "ro.mixai.live-main-70:/mipmap-anydpi/ic_launcher.xml"
+    },
+    {
+        "merged": "ro.mixai.live-benchmark-68:/raw_keep.xml.flat",
+        "source": "ro.mixai.live-main-70:/raw/keep.xml"
+    }
+]

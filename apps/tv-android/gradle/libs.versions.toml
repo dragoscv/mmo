@@ -59,6 +59,9 @@ fragment = "1.9.1"
 # MixAI Decks (WP19-16/17): Compose Multiplatform for the shared Android + Desktop UI, latest stable on
 # Maven Central 2026-11-09 (1.13 is beta). Coroutines core/swing = same `coroutines` version.
 composeMultiplatform = "1.12.2"
+# MixAI Live controller (WP21-08): QR pairing scanner (CameraX + zxing core decode), latest stable on Google Maven
+# 2026-11-09 (1.7 is rc).
+camerax = "1.6.2"
 
 # compose-bom 2026.09.00 / coil 3.6.2 AARs require compileSdk ≥ 37 (checkAarMetadata); targetSdk stays 36.
 compileSdk = "37"
@@ -145,6 +148,13 @@ androidx-test-runner = { group = "androidx.test", name = "runner", version.ref =
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
 
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+
+# MixAI Live controller (WP21-08): QR scan + loopback WebSocket tests for :live-core.
+camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+mockwebserver3 = { group = "com.squareup.okhttp3", name = "mockwebserver3", version.ref = "okhttp" }
 
 # Android TV "Watch Next" channel (WatchNextProgram / TvContractCompat). 1.1.0 is the latest stable (Google Maven 2025-05).
 tvprovider = { group = "androidx.tvprovider", name = "tvprovider", version.ref = "tvprovider" }

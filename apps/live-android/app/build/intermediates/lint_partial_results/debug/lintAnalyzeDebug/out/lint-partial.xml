@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<incidents format="6" by="lint 9.4.0" type="partial_results">
+    <map id="UnsafeIntentLaunch">
+            <map id="unprotected">
+                <entry
+                    name="ro.mixai.live.MainActivity"
+                    boolean="true"/>
+            </map>
+    </map>
+    <map id="UnusedResources">
+        <entry
+            name="model"
+            string="array[android_wear_capabilities(U)],color[accent(U),accent2(U),bg(U)],drawable[ic_launcher_foreground(U)],mipmap[ic_launcher(U)],plurals[xruns(U)],raw[keep(U)],string[app_name(U),connect_title(U),connect_hint(U),discovered(U),discovered_empty(U),discovered_needs_token(U),paired(U),scan_qr(U),paste_link(U),paste_link_hint(U),connect(U),forget(U),link_invalid(U),camera_denied(U),scan_title(U),cancel(U),status_connecting(U),status_connected(U),status_reconnecting(U),status_unauthorized(U),status_update(U),status_idle(U),disconnect(U),role_viewer(U),role_performer(U),role_controller(U),viewer_hint(U),rtt(U),tab_perform(U),tab_setlist(U),tab_chain(U),meter_in(U),meter_out(U),clip(U),panic(U),panic_hold(U),panic_sent(U),mute(U),bypass(U),prev_scene(U),next_scene(U),tap(U),bpm_value(U),input_gain(U),main_level(U),monitor_level(U),monitor_dry(U),db_value(U),percent_value(U),presets(U),tuner(U),tuner_cents(U),dsp_load(U),no_setlist(U),song_of(U),lyrics(U),no_lyrics(U),chain_empty(U),chain_controller_only(U),fx_loading(U),fx_failed(U),retry(U),enabled(U),err_forbidden(U),err_rate_limited(U),err_no_setlist(U),err_unknown_preset(U),err_generic(U),watch_sent(U),send_to_watch(U)],style[Theme_Live(U)];4^1^2,5^3^4,7^0,4e^3;@array/android_wear_capabilities;;"/>
+    </map>
+
+</incidents>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wearable Data Layer capability: the phone app sends the paired engine to nodes that declare it (WP21-08). -->
+<resources>
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>mixai_live_watch</item>
+    </string-array>
+</resources>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MixAI Live</string>
+    <string name="app_short">Live</string>
+    <string name="not_paired">Pair on your phone: MixAI Live → watch icon.</string>
+    <string name="connecting">Connecting…</string>
+    <string name="reconnecting">Reconnecting…</string>
+    <string name="unauthorized">Pairing refused. Pair again on your phone.</string>
+    <string name="update_required">Update MixAI Live on the watch.</string>
+    <string name="prev">Previous</string>
+    <string name="next">Next</string>
+    <string name="mute">MUTE</string>
+    <string name="unmute">UNMUTE</string>
+    <string name="panic">PANIC</string>
+    <string name="panic_hold">Hold for panic</string>
+    <string name="viewer_only">View only</string>
+    <string name="no_song">No setlist</string>
+    <string name="tuner">Tuner</string>
+    <string name="no_tune">No pitch</string>
+    <string name="cents">%1$+.0f ¢</string>
+    <string name="engine">Engine</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="connect">Connect</string>
+    <string name="cd_level">Input level</string>
+    <string name="tile_label">MixAI Live</string>
+    <string name="tile_desc">Previous / next scene and mute</string>
+    <string name="tile_empty">Not connected</string>
+    <string name="complication_label">Current part</string>
+    <string name="cd_complication">MixAI Live: %1$s</string>
+</resources>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MixAI Live</string>
+    <string name="app_short">Live</string>
+    <string name="cd_complication">MixAI Live: %1$s</string>
+    <string name="cd_level">Nivel intrare</string>
+    <string name="cents">%1$+.0f ¢</string>
+    <string name="complication_label">Partea curentă</string>
+    <string name="connect">Conectează</string>
+    <string name="connecting">Se conectează…</string>
+    <string name="disconnect">Deconectează</string>
+    <string name="engine">Motor</string>
+    <string name="mute">MUT</string>
+    <string name="next">Următoarea</string>
+    <string name="no_song">Niciun program</string>
+    <string name="no_tune">Fără ton</string>
+    <string name="not_paired">Asociază din telefon: MixAI Live → iconița de ceas.</string>
+    <string name="panic">PANICĂ</string>
+    <string name="panic_hold">Ține apăsat pentru panică</string>
+    <string name="prev">Anterioara</string>
+    <string name="reconnecting">Se reconectează…</string>
+    <string name="tile_desc">Scena anterioară / următoare și mut</string>
+    <string name="tile_empty">Neconectat</string>
+    <string name="tile_label">MixAI Live</string>
+    <string name="tuner">Acordor</string>
+    <string name="unauthorized">Asociere refuzată. Asociază din nou din telefon.</string>
+    <string name="unmute">PORNEȘTE</string>
+    <string name="update_required">Actualizează MixAI Live pe ceas.</string>
+    <string name="viewer_only">Doar vizualizare</string>
+</resources>
