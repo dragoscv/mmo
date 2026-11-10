@@ -212,6 +212,11 @@ fun HomeScreen(deps: ScreenDeps, nav: Navigator) {
             serverError = e
         }
         if (ui is HomeUi.Server) { HomeMemo.last = deps.media.profile to ui; return@LaunchedEffect }
+        // A profile with an age limit never sees the raw `/video/scan` list: it is not filtered by age (WP17-102).
+        if (deps.profiles.activeProfile.value?.maxAge != null) {
+            ui = serverError?.let { HomeUi.Failed(it) } ?: HomeUi.Empty
+            return@LaunchedEffect
+        }
         // Fallback: library rows from `/video/scan` (servers without /media or TMDB, or no rows yet).
         val err = serverError
         ui = try {

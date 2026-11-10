@@ -46,4 +46,5 @@ dependencies {
     api(libs.bundles.coil)
 
     testImplementation(libs.junit)
+    testImplementation(libs.mockwebserver3)
 }

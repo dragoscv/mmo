@@ -83,7 +83,9 @@ export function Home({ ctx }: ScreenProps<"home">) {
     }, [active, revalidate]);
 
     // ─── Scan fallback ───────────────────────────────────────────────────
-    const needScan = !mediaMode && (unsupported || remote.s === "error" || (remote.s === "ok" && rows.length === 0));
+    // A profile with an age limit never sees the raw `/video/scan` list: it is not filtered by age (WP17-102).
+    const restricted = ctx.profiles.active?.maxAge != null;
+    const needScan = !restricted && !mediaMode && (unsupported || remote.s === "error" || (remote.s === "ok" && rows.length === 0));
     useEffect(() => {
         if (!needScan || scan.s !== "idle") return;
         setScan({ s: "loading" });
@@ -215,7 +217,10 @@ export function Home({ ctx }: ScreenProps<"home">) {
             <div className="wh-rows" data-scroll="home-rows">
                 {mediaMode && rows.map(renderRow)}
                 {!mediaMode && remote.s === "loading" && <LoadingRows rows={2} />}
-                {!mediaMode && remote.s !== "loading" && <ScanRows ctx={ctx} scan={scan} busy={busy} onPlay={playScan}
+                {!mediaMode && remote.s === "error" && restricted && <ErrorState message={remote.message} onRetry={() => { setRemote({ s: "loading" }); revalidate(true); }} />}
+                {!mediaMode && remote.s === "ok" && restricted && <Empty icon="movie" title={t("wh.emptyTitle")} message={t("home.moviesEmpty")}
+                    action={{ label: t("common.retry"), icon: "refresh", onClick: () => { setRemote({ s: "loading" }); revalidate(true); } }} />}
+                {!mediaMode && remote.s !== "loading" && !restricted && <ScanRows ctx={ctx} scan={scan} busy={busy} onPlay={playScan}
                     onOpenShow={(show) => ctx.nav.push({ name: "show", show })}
                     onRetry={() => { setScan({ s: "idle" }); setRemote({ s: "loading" }); revalidate(true); }}
                     mediaError={remote.s === "error" ? remote.message : null} />}

@@ -88,10 +88,11 @@ export class MediaClient {
     }
 
     private async cached<T>(key: string, path: string): Promise<T | null> {
+        // Key before the await: `path` already names the profile, the key must name the same one.
+        const k = `${this.profile}|${key}`;
         const etag = await this.mediaEtag();
         if (etag === null) return null;
         const tag = tagOf(etag);
-        const k = `${this.profile}|${key}`;
         const hit = this.cache.get(k) as CacheEntry<T> | undefined;
         if (hit && hit.etag === tag && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
         const value = await this.get<T>(path);
@@ -185,9 +186,12 @@ export class MediaClient {
         return this.get<MediaSearchPage>(`/media/search?q=${encodeURIComponent(q)}&${this.pq()}`);
     }
 
-    /** Full video index (serverFileId ↔ tmdbId), used for resume + migration + library grids. */
+    /**
+     * Video index (serverFileId ↔ tmdbId), used for resume + migration + library grids. Server 3.15+ returns only
+     * the files of titles the active profile may watch; older servers ignore `profile`.
+     */
     mediaLibrary(): Promise<LibraryIndex | null> {
-        return this.cached<LibraryIndex>("library", "/media/library");
+        return this.cached<LibraryIndex>("library", `/media/library?${this.pq()}`);
     }
 
     // ─── Watchlist ───────────────────────────────────────────────────────

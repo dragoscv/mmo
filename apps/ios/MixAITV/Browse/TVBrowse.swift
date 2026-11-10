@@ -101,6 +101,12 @@ struct TVSearchView: View {
             }
         }
         .searchable(text: $query, prompt: Text("search.placeholder"))
+        .task {
+            #if DEBUG
+            // Simulator checks: SIMCTL_CHILD_MIXAI_SEARCH=<text> fills the query (simctl cannot drive the tvOS keyboard).
+            if query.isEmpty, let q = ProcessInfo.processInfo.environment["MIXAI_SEARCH"], !q.isEmpty { query = q }
+            #endif
+        }
         .task(id: query) {
             let q = query.trimmingCharacters(in: .whitespaces)
             guard q.count >= 2, let store = model.media else { results = []; return }

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MMO Server API
-  version: 3.14.4
+  version: 3.15.0
   summary: Local-first media companion server (Express 5) behind the MixAI apps.
   description: |
     REST API of the MMO Server (the "companion"): library, video, audio, voice,
@@ -4724,8 +4724,16 @@ paths:
         Without `since` (or with a stale/future value) the response is the full index (`full: true`).
         With `since=<libraryEtag>` from a previous call only rows written after that etag are returned,
         plus the `removed` file ids (tombstones). `serverFileId` is the id `/video/direct/{fileId}` expects.
+
+        `profile` scopes the index to a viewer profile (server 3.15+). A profile with a max age gets only the
+        files of titles it may watch (titles above the limit, unrated titles outside the Family / Kids genres
+        and unmatched files are left out) and the response is then always the full filtered index
+        (`full: true`), whatever `since` says. Without `profile` the profile of a valid `x-profile-token` is
+        used; without either the whole index is returned (clients older than 3.15).
       parameters:
         - { name: since, in: query, schema: { type: integer }, description: 'Previously seen libraryEtag.' }
+        - { name: profile, in: query, schema: { type: string }, description: 'Active viewer profile id.' }
+        - { $ref: '#/components/parameters/ProfileToken' }
       responses:
         '200':
           description: Library index
@@ -4733,6 +4741,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/LibraryIndex' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
 
   /media/providers:
     get:
@@ -4798,9 +4807,16 @@ paths:
       operationId: mediaSearch
       tags: [media]
       summary: TMDB multi search (movies + tv), flags titles present locally
+      description: |
+        Results are filtered for the profile: a profile with a max age gets no title above it. TMDB search
+        results carry no certification, so the server looks up the age of results it has not seen before
+        (cached 30 days); a result whose age is still unknown is left out. Without `profile` the request is
+        answered for the `default` profile, so clients must send the active profile.
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, maxLength: 200 } }
         - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: profile, in: query, schema: { type: string, default: default } }
+        - { $ref: '#/components/parameters/ProfileToken' }
       responses:
         '200':
           description: Search page
@@ -4809,6 +4825,7 @@ paths:
               schema: { $ref: '#/components/schemas/MediaSearchPage' }
         '400': { $ref: '#/components/responses/ErrorJson' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/ErrorJson' }
 
   /media/progress:
     get:

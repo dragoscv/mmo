@@ -23,6 +23,8 @@ A kids profile could see titles above its age limit in Search. Two causes, both 
   titles that profile may watch. Before, Android TV and the Android phone kept showing a restricted title as a file
   name with a still (opening it was already refused).
 - Unrated titles reach a kids profile only with the Family or Kids genre; Animation alone is no longer enough.
+- TV Home (Android TV, Tizen / TV desktop / webOS) no longer falls back to the unfiltered `/video/scan` file list for
+  a profile with an age limit when the server has no rows for it; it shows the empty or error state instead.
 - Versions: server 3.15.0, SDK 0.12.0, web 3.4.8, TV Tizen 2.4.1 (also the UI of TV desktop and webOS), TV Android
   2.3.1 (versionCode 15), Android phone 1.3.1 (versionCode 5), iPhone 1.1.1. Apple TV stays 1.1.0 (the version in
   App Review) with a new build.

@@ -13,7 +13,8 @@ const old = readFileSync(csvP, "utf8");
 const q = (s) => `"${String(s).replace(/"/g, '""')}"`;
 const rows = [];
 for (const line of md.split(/\r?\n/)) {
-  const m = line.match(/^\| (WP\d{1,2}-\d\d) \| (.*) \|\s*$/);
+  // Item numbers have two or three digits (`\d\d` silently dropped WP17-100+).
+  const m = line.match(/^\| (WP\d{1,2}-\d{2,3}) \| (.*) \|\s*$/);
   if (!m) continue;
   const cells = m[2].split(" | ").map((c) => c.trim());
   // MD row shapes seen: [type, surface, title, status] or [title, status] or [type,surface,title,status,notes]
@@ -26,7 +27,7 @@ for (const line of md.split(/\r?\n/)) {
   const note = status.replace(/^(done|doing|blocked|dropped|todo)\b\s*/i, "").trim() || notes;
   rows.push([m[1], type, surface, title, st, "agent", note]);
 }
-const keep = old.split(/\r?\n/).filter((l) => l && !/^"?WP\d{1,2}-\d\d"?,/.test(l) && !/^ID,/i.test(l) && !/^id,type,surface/.test(l));
+const keep = old.split(/\r?\n/).filter((l) => l && !/^"?WP\d{1,2}-\d{2,3}"?,/.test(l) && !/^ID,/i.test(l) && !/^id,type,surface/.test(l));
 const header = "id,type,surface,title,status,owner,decision_or_notes";
 const outLines = [header, ...rows.map((r) => r.map(q).join(","))];
 if (keep.length) outLines.push("", ...keep);

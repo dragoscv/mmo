@@ -14,7 +14,7 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    MARKETING_VERSION: '1.1.0'
+    MARKETING_VERSION: '1.1.1'
     CURRENT_PROJECT_VERSION: '1'
     SWIFT_VERSION: '6.0'
     SWIFT_STRICT_CONCURRENCY: complete
@@ -231,6 +231,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ro.mixai.app
         PRODUCT_NAME: MixAITV
+        # tvOS has its own App Store version: 1.1.0 is still open (rejected 2026-11-10, guideline 2.3.6), so new
+        # tvOS builds stay on it. Drop this line once tvOS 1.1.0 is approved; the iPhone app is on 1.1.1.
+        MARKETING_VERSION: '1.1.0'
         TARGETED_DEVICE_FAMILY: '3'
         ASSETCATALOG_COMPILER_APPICON_NAME: App Icon & Top Shelf Image
         GENERATE_INFOPLIST_FILE: YES

@@ -68,21 +68,23 @@ export function ageForRatings(ratings: Record<string, string> | undefined, regio
 
 /**
  * True when a title is allowed for a profile with `maxAge`.
- * `maxAge` null/undefined = no restriction. Unknown age is blocked for restricted profiles,
- * except for clearly family genres (Animation 16 / Family 10751 / Kids 10762) with no adult signal.
+ * `maxAge` null/undefined = no restriction. For a restricted profile:
+ *  - `age` undefined = nobody looked the title up yet → blocked (TMDB list results carry no certification;
+ *    callers resolve ages first, see `age-lookup.ts`);
+ *  - `age` null = looked up, no certification anywhere → only the Family (10751) and Kids (10762) genres pass.
+ *    Animation (16) alone is not enough: adult animation is often unrated.
  */
 export function allowedForAge(age: number | null | undefined, maxAge: number | null | undefined, genreIds: number[] = []): boolean {
     if (maxAge === null || maxAge === undefined) return true;
-    if (age === null || age === undefined) {
-        return genreIds.some((g) => g === 10751 || g === 10762) || (genreIds.includes(16) && maxAge >= 7);
-    }
+    if (age === undefined) return false;
+    if (age === null) return genreIds.some((g) => g === 10751 || g === 10762);
     return age <= maxAge;
 }
 
-/** Filter cards for a profile; `ageOf` resolves the cached age of a card (may be undefined = unknown). */
+/** Filter cards for a profile; `ageOf` resolves the cached age of a card (undefined = not looked up yet). */
 export function filterCardsForAge<T extends TitleCard>(cards: T[], maxAge: number | null | undefined, ageOf: (c: T) => number | null | undefined): T[] {
     if (maxAge === null || maxAge === undefined) return cards;
-    return cards.filter((c) => allowedForAge(c.age ?? ageOf(c), maxAge, c.genreIds));
+    return cards.filter((c) => allowedForAge(c.age !== undefined ? c.age : ageOf(c), maxAge, c.genreIds));
 }
 
 export function ageOfDetails(t: TitleDetails | null | undefined): number | null | undefined {

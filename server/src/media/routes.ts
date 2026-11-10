@@ -4,8 +4,8 @@
  *   GET  /media/status                          configured flags, region, revision, serverId/serverName
  *   GET  /media/home?profile=&region=&providers= HomeRow[]
  *   GET  /media/title/:kind/:tmdbId?region=&profile=  title + availability + local files + progress
- *   GET  /media/search?q=
- *   GET  /media/library?since=<libraryEtag>      {revision, full, items[], removed[]}
+ *   GET  /media/search?q=&page=&profile=         TMDB multi search, filtered by the profile's max age
+ *   GET  /media/library?since=<libraryEtag>&profile=  {revision, full, items[], removed[]}
  *   GET  /media/progress?profile=&kind=&tmdbId=&since=<revision>
  *   PUT  /media/progress                         body: ProgressInput | ProgressInput[]
  *   POST /media/plays                            body: {profile, trackKey, durationSec, completed}
@@ -20,7 +20,8 @@
  *   GET  /media/watchlist?profile=               cards; PUT/DELETE /media/watchlist/:kind/:tmdbId?profile=
  *
  * Profiles with a PIN require `x-profile-token` (from unlock) on profile-scoped reads/writes;
- * kids profiles get every card list filtered by max age (unrated blocked).
+ * profiles with a max age get every card list and the library index filtered by it. Ages of titles
+ * nobody opened yet are looked up first (`age-lookup.ts`); what is still unknown stays hidden.
  *
  * Auth is the caller's concern (mount behind authMiddleware). JSON only.
  */
@@ -38,6 +39,7 @@ import type { MediaSyncClient } from "./sync-client";
 import { ProfileError, ProfileStore, type ProfileInput } from "./profiles";
 import { WatchlistStore } from "./watchlist";
 import { allowedForAge, filterCardsForAge } from "./ratings";
+import { AgeLookup, type TitleRating } from "./age-lookup";
 import { parseVersion } from "./versions";
 import { MusicService } from "./music";
 import { createMusicRouter } from "./music-routes";
@@ -74,7 +76,12 @@ export interface MediaRouterDeps {
     subtitleIndexing?: () => SubtitleIndexing | null;
     plexFetch?: PlexFetch;
     now?: () => number;
+    /** Age lookups for profiles with an age limit; one shared instance by default. */
+    ages?: AgeLookup;
 }
+
+/** A title page waits this long for the ages of its recommendations; the rest appear on a later visit. */
+const TITLE_LISTS_AGE_BUDGET_MS = 1500;
 
 const isKind = (v: unknown): v is MediaKind => v === "movie" || v === "tv";
 const qs = (v: unknown): string | undefined => (typeof v === "string" && v.length > 0 ? v : undefined);
@@ -168,6 +175,7 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
     const library = deps.library ?? new LibraryIndex(db, tmdb, log);
     const profiles = deps.profiles ?? new ProfileStore(db);
     const watchlist = deps.watchlist ?? new WatchlistStore(db, progress);
+    const ages = deps.ages ?? new AgeLookup(tmdb);
     const defaultRegion = deps.region.toUpperCase();
     const serverId = () => deps.getServerId?.() ?? null;
     const serverName = () => deps.getServerName?.() ?? os.hostname();
@@ -252,11 +260,34 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
         res.json({ revision: progress.getRevision(), libraryEtag: library.getEtag() });
     });
 
-    router.get("/library", (req, res) => {
+    router.get("/library", wrap(async (req, res) => {
         const since = qint(req.query.since);
-        const delta = library.list(since);
-        res.json({ ...delta, serverId: serverId(), serverName: serverName() });
-    });
+        // Clients older than 3.15 send no profile here and keep the whole index. A profile (named in the query, or
+        // the one the profile token belongs to) with an age limit gets only the files of titles it may watch.
+        const profileId = qs(req.query.profile) ?? profiles.verifyToken(req.header("x-profile-token") ?? qs(req.query.pt)) ?? undefined;
+        const prof = profileId ? profileOf(req, res, profileId) : { id: "default", maxAge: null };
+        if (!prof) return;
+        if (prof.maxAge === null) {
+            res.json({ ...library.list(since), serverId: serverId(), serverName: serverName() });
+            return;
+        }
+        // Always the full filtered index: a delta could not say which rows this profile lost or gained.
+        const all = library.list();
+        const matched = all.items.filter((r) => r.tmdbId !== null);
+        await ages.resolve(matched.map((r) => ({ kind: r.kind, tmdbId: r.tmdbId! })));
+        const ratings = new Map<string, TitleRating>();
+        const ratingOf = (kind: MediaKind, tmdbId: number): TitleRating => {
+            const key = `${kind}:${tmdbId}`;
+            let r = ratings.get(key);
+            if (!r) { r = ages.rating(kind, tmdbId); ratings.set(key, r); }
+            return r;
+        };
+        const items = matched.filter((r) => {
+            const rating = ratingOf(r.kind, r.tmdbId!);
+            return allowedForAge(rating.age, prof.maxAge, rating.genreIds);
+        });
+        res.json({ revision: all.revision, full: true, items, removed: [], serverId: serverId(), serverName: serverName() });
+    }));
 
     router.get("/providers", wrap(async (req, res) => {
         const r = region(req.query.region, defaultRegion);
@@ -328,6 +359,7 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
         rows = [...rows.slice(0, contIdx + 1), ...extra, ...rows.slice(contIdx + 1)];
 
         const libKeys = new Set(libraryItems.map((l) => `${l.kind}:${l.tmdbId}`));
+        if (prof.maxAge !== null) await ages.resolve(rows.flatMap((row) => row.items));
         rows = rows
             .map((row) => ({
                 ...row,
@@ -349,7 +381,9 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
         if (!prof) return;
         const r = region(req.query.region, defaultRegion);
         const profileId = prof.id;
-        const title = await tmdb.getTitle(kind, tmdbId);
+        let title = await tmdb.getTitle(kind, tmdbId);
+        // Cached before certifications were stored: ask again rather than guess for a restricted profile.
+        if (title && prof.maxAge !== null && title.age === undefined) title = (await tmdb.getTitle(kind, tmdbId, { force: true })) ?? title;
         if (!title) {
             res.status(tmdb.configured ? 404 : 503).json({ error: tmdb.configured ? "Title not found" : "TMDB not configured" });
             return;
@@ -361,6 +395,7 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
         const [avail] = await Promise.all([availability.getAvailability(kind, tmdbId, r)]);
         const entries = progress.getProgress(profileId, { kind, tmdbId });
         const files = libraryRows(db, kind, tmdbId).map((f) => ({ ...f, version: parseVersion(f.path) }));
+        if (prof.maxAge !== null) await ages.resolve([...title.recommendations, ...title.similar], TITLE_LISTS_AGE_BUDGET_MS);
         const filtered = (cards: TitleCard[]) => filterCardsForAge(cards.map(withAge), prof.maxAge, ageOf);
         res.json({
             title: { ...title, recommendations: filtered(title.recommendations), similar: filtered(title.similar) },
@@ -381,7 +416,11 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
         const prof = profileOf(req, res);
         if (!prof) return;
         const title = tmdb.getCachedTitle("tv", tmdbId) ?? (await tmdb.getTitle("tv", tmdbId));
-        if (title && !allowedForAge(title.age, prof.maxAge, title.genreIds)) { res.status(403).json({ error: "age_restricted" }); return; }
+        // A show whose rating cannot be checked (no TMDB data) stays closed for a profile with an age limit.
+        if (prof.maxAge !== null && (!title || !allowedForAge(title.age, prof.maxAge, title.genreIds))) {
+            res.status(403).json({ error: "age_restricted" });
+            return;
+        }
         const season = await tmdb.getSeason(tmdbId, n);
         const files = libraryRows(db, "tv", tmdbId).filter((f) => f.season === n);
         const prog = progress.getProgress(prof.id, { kind: "tv", tmdbId }).filter((p) => p.season === n);
@@ -504,6 +543,8 @@ export function createMediaRouter(deps: MediaRouterDeps): express.Router {
         if (!prof) return;
         const page = await tmdb.search(q.slice(0, 200), qint(req.query.page) ?? 1);
         const libKeys = new Set(libraryRows(db).map((l) => `${l.kind}:${l.tmdbId}`));
+        // TMDB search results carry no certification: look the unknown ones up before filtering.
+        if (prof.maxAge !== null) await ages.resolve(page.results);
         const results = filterCardsForAge(page.results.map(withAge), prof.maxAge, ageOf)
             .map((c) => (libKeys.has(`${c.kind}:${c.tmdbId}`) ? { ...c, inLibrary: true } : c));
         res.json({ ...page, results });

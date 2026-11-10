@@ -20,12 +20,15 @@ public struct MediaStore: Sendable {
         try await client.get(MediaSeasonResponse.self, "/media/title/tv/\(tmdbId)/season/\(number)?profile=\(p)")
     }
 
+    /// The profile decides what a search may return (a kid profile gets nothing above its age limit): without it
+    /// the server answers for the unrestricted default profile.
     public func search(_ q: String, page: Int = 1) async throws -> MediaSearchPage {
-        try await client.get(MediaSearchPage.self, "/media/search?q=\(MmoClient.enc(q))&page=\(page)")
+        try await client.get(MediaSearchPage.self, "/media/search?q=\(MmoClient.enc(q))&page=\(page)&profile=\(p)")
     }
 
+    /// Server 3.15+ returns only the files of titles this profile may watch; older servers ignore `profile`.
     public func library() async throws -> LibraryIndex {
-        try await client.get(LibraryIndex.self, "/media/library")
+        try await client.get(LibraryIndex.self, "/media/library?profile=\(p)")
     }
 
     public func progress() async throws -> ProgressList {

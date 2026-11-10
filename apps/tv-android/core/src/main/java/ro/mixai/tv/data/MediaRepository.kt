@@ -161,8 +161,10 @@ class MediaRepository(
     suspend fun stats(year: Int? = null): MediaStats =
         json.decodeFromString(api.getJson("/media/stats?profile=${api.encode(profile)}" + (year?.let { "&year=$it" } ?: "")))
 
+    // The profile decides what a search may return (a kid profile gets nothing above its age limit):
+    // without it the server answers for the unrestricted default profile.
     suspend fun search(q: String, page: Int = 1): MediaSearchPage =
-        json.decodeFromString(api.getJson("/media/search?q=${api.encode(q)}&page=$page"))
+        json.decodeFromString(api.getJson("/media/search?q=${api.encode(q)}&page=$page&profile=${api.encode(profile)}"))
 
     suspend fun getProgress(since: Long? = null): ProgressList {
         val qs = buildString {
@@ -185,8 +187,9 @@ class MediaRepository(
         api.postJson("/media/plays?profile=${api.encode(profile)}", json.encodeToString(TrackPlayInput.serializer(), input.copy(profileId = input.profileId ?: profile)))
     }
 
+    // Server 3.15+ returns only the files of titles this profile may watch; older servers ignore `profile`.
     suspend fun library(since: Long? = null): LibraryIndex =
-        json.decodeFromString(api.getJson("/media/library" + if (since != null) "?since=$since" else ""))
+        json.decodeFromString(api.getJson("/media/library?profile=${api.encode(profile)}" + if (since != null) "&since=$since" else ""))
 
     companion object {
         private const val TAG = "MediaRepository"

@@ -21,6 +21,8 @@ export const TITLE_TTL_MS = 30 * 24 * 3600_000;
 export const SEASON_TTL_MS = 7 * 24 * 3600_000;
 export const LIST_TTL_MS = 6 * 3600_000;
 export const PROVIDER_CATALOG_TTL_MS = 24 * 3600_000;
+/** A TMDB call that hangs would otherwise hold an `AgeLookup` slot and a rate-limiter token forever. */
+export const TMDB_FETCH_TIMEOUT_MS = 15_000;
 
 export type FetchLike = (url: string, init?: { headers?: Record<string, string> }) => Promise<{
     ok: boolean; status: number; json(): Promise<unknown>;
@@ -211,7 +213,7 @@ export class TmdbClient {
         this.bearer = Boolean(this.apiKey && this.apiKey.startsWith("eyJ"));
         this.language = opts.language ?? "ro-RO";
         this.region = (opts.region ?? "RO").toUpperCase();
-        this.fetchImpl = opts.fetch ?? ((url, init) => fetch(url, init) as unknown as ReturnType<FetchLike>);
+        this.fetchImpl = opts.fetch ?? ((url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(TMDB_FETCH_TIMEOUT_MS) }) as unknown as ReturnType<FetchLike>);
         this.now = opts.now ?? Date.now;
         this.bucket = new TokenBucket(opts.ratePerSec ?? 30, this.now);
         this.log = opts.log;
@@ -302,6 +304,23 @@ export class TmdbClient {
         const row = this.db.prepare("SELECT json FROM titles WHERE kind = ? AND tmdb_id = ?").get(kind, tmdbId) as { json: string } | undefined;
         if (!row) return null;
         try { return JSON.parse(row.json) as TitleDetails; } catch { return null; }
+    }
+
+    /**
+     * Age and genres of a cached title without parsing its JSON (a title row is 20-50 KB; the Library of a
+     * restricted profile reads one per file). `null` when the title is not cached; `age` undefined when the row
+     * predates ratings.
+     */
+    getCachedRating(kind: MediaKind, tmdbId: number): { age: number | null | undefined; genreIds: number[] } | null {
+        const row = this.db.prepare(
+            "SELECT json_type(json, '$.age') AS t, json_extract(json, '$.age') AS age, json_extract(json, '$.genreIds') AS genres FROM titles WHERE kind = ? AND tmdb_id = ?",
+        ).get(kind, tmdbId) as { t: string | null; age: number | null; genres: string | null } | undefined;
+        if (!row) return null;
+        let genreIds: number[] = [];
+        if (row.genres) {
+            try { genreIds = (JSON.parse(row.genres) as unknown[]).filter((g): g is number => typeof g === "number"); } catch { /* keep [] */ }
+        }
+        return { age: row.t === null ? undefined : typeof row.age === "number" ? row.age : null, genreIds };
     }
 
     /** TV season with episodes (7 d cache in recs_cache). */

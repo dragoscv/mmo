@@ -45,7 +45,9 @@ Containers (`docker compose`, host network): `mmo-server` (`MMO_DEMO=1`), `caddy
   watchlist, bookmarks, Watch Together, favourites work; library/folder/Live TV source/profile admin,
   `/fs`, `/logs`, `/folders` and Subsonic `create*/update*/delete*` answer `403 demo_read_only`.
 - Admin = direct loopback on the VM (`sudo docker exec -i mmo-server node - < setup.mjs`).
-- Profiles: `Reviewer` (adult, no PIN) and `Kids` (max age 12).
+- Profiles: `Reviewer` (adult, no PIN), `Kids` (max age 12, no PIN) and `Parent` (adult, PIN `1234` — public on
+    purpose, it is in the store review notes so reviewers can see the lock and the PIN pad; five wrong tries lock that
+    profile for five minutes for everyone).
 
 ## Runbook
 

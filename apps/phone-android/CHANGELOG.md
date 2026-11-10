@@ -1,5 +1,13 @@
 # Changelog — MixAI for Android phones
 
+## 1.3.1 — 2026-11-10
+
+WP17-102. versionCode 5.
+
+- Search and the Library are requested for the active profile (`/media/search?profile=`, `/media/library?profile=`),
+  so a profile with an age limit no longer sees titles above it in results or restricted files in the Library
+  (needs MMO Server 3.15.0 for the Library part).
+
 ## 1.3.0 — 2026-11-08
 
 WP17-101 (D59). versionCode 4.

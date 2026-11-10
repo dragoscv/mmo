@@ -24,6 +24,7 @@ Server operations: `infra/demo/README.md`.
 3. The server is found. Tap **Pair with a code** (Quick Connect). A 6-digit code appears and is approved
   by the demo server within ~3 seconds; the app opens automatically.
 4. Pick the profile **Reviewer** (no PIN). **Kids** shows the age-filtered view (max age 12).
+  **Parent** is PIN-protected (PIN `1234`): it shows the lock on the profile and the PIN pad.
 5. Try: Home → *Sintel* → Play (direct play, seeking, subtitles on *Tears of Steel*); Shows → *The Beverly
    Hillbillies* → Season 1/2 episodes; Music → *Kevin MacLeod* → play, queue, lyrics view (instrumental);
    Live TV → *MixAI Demo 1/2* (guide, zapping); Watch Together → create a room.

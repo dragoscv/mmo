@@ -2,6 +2,23 @@
 
 All notable changes to the companion (Electron desktop app + local Express server) are recorded here. The web app (`/app`), the browser extension (`/apps/extension`) and the native shells (`/apps/native`) each have their own changelogs / release notes.
 
+## 3.15.0 — Age limits hold in search and in the library (WP17-102)
+
+- **Fix:** a profile with an age limit could get titles above it in `GET /media/search`, in Home rows and in a title's
+	recommendations. TMDB list results carry no certification, so the age of a title was unknown until someone opened
+	it, and an unknown age passed for anything tagged Animation. The server now looks up the age of unseen results
+	before answering a restricted profile (`media/age-lookup.ts`: 8 lookups at a time, a request waits at most 6 s,
+	details cached 30 days); a title whose age is still unknown is left out. TMDB calls now time out after 15 s.
+- **Changed:** an unrated title (no certification in any country) reaches a restricted profile only when it has the
+	Family or Kids genre. Animation alone no longer qualifies.
+- `GET /media/library?profile=`: a profile with an age limit gets only the files of titles it may watch (no unmatched
+	files) and always the full filtered index. Without `profile` the profile of a valid `x-profile-token` is used;
+	without either the whole index is returned, as before, for clients older than this release.
+- `GET /media/title/tv/{id}/season/{n}` answers 403 `age_restricted` for a restricted profile when the show's rating
+	cannot be checked.
+- `profile` is now documented on `/media/search` and `/media/library` in `openapi.yaml`; Kotlin/Swift models and SDK
+	types regenerated (SDK 0.12.0).
+
 ## 3.14.4 — pnpm 12 (WP20-01)
 
 - pnpm 12.18.0: settings moved from `.npmrc` / `package.json#pnpm` (no longer read by pnpm 11+) to `server/pnpm-workspace.yaml` — `nodeLinker: hoisted` (electron-builder), `overrides`, `allowBuilds` (audify, better-sqlite3, electron, electron-winstaller, ffmpeg-static; register-scheme denied), `minimumReleaseAge: 1440`.

@@ -32,8 +32,13 @@
 - Un profil poate avea **PIN de 4 cifre**. După **5 încercări greșite** profilul se blochează **5 minute** (ecranul arată
    câte încercări mai ai și cât mai durează blocarea). Pe TV poți tasta PIN-ul și cu tastele numerice ale telecomenzii.
 - Profil **copil**: are vârstă maximă (0, 7, 12, 14, 15 sau 18 ani). Titlurile sunt filtrate după clasificarea TMDB
-   convertită la vârstă (în România scala CNC: AG, AP-12, I.C.-14, N-15, IM-18). **Titlurile fără clasificare nu apar**
-   pentru copii.
+   convertită la vârstă (în România scala CNC: AG, AP-12, I.C.-14, N-15, IM-18). Filtrul se aplică în Acasă, Căutare,
+   Bibliotecă, „Lista mea” și în recomandările de pe pagina unui titlu; pagina unui titlu peste limită răspunde 403
+   (redarea după id de fișier nu este încă verificată după vârstă — WP17-103).
+   **Titlurile fără clasificare nu apar** pentru copii, cu o singură excepție: cele cu genul *Familie* sau *Copii*.
+   Genul *Animație* singur nu ajunge (multe animații pentru adulți nu au clasificare). Fișierele fără titlu TMDB
+   potrivit nu apar în Biblioteca unui copil. Filtrarea în Căutare și Bibliotecă cere MMO Server 3.15.0 sau mai nou
+   și aplicațiile din 2026-11-10 (WP17-102).
 - Gestionare: web `/profiles` (și **Setări → Profiluri**), pe TV din meniul lateral (schimbare profil) și din Setări.
 
 ## Acasă
@@ -189,7 +194,7 @@ Dispozitivele online și ce redă fiecare se văd în indicatorul de hub din bar
 | **Web** | `/` (`app/page.tsx` → `MediaHome`), `/media/[kind]/[tmdbId]`, `/settings/media`, vechiul panou la `/dashboard` | Agregă toate serverele utilizatorului (`aggregateAcrossCompanions`), dedup pe `tmdbId`, cipuri per server, stare *offline* per server. Serverele sunt căutate la `devices.lan_url` — un server local nepublicat nu apare. |
 | **TV Android** | `apps/tv-android` — `MediaRepository`, `ui/MediaRows.kt`, `ui/TitleScreen.kt`, `ProviderLauncher` | Erou + rânduri; ecranul de titlu are „Redă de pe <server>” pentru fișiere locale și un buton per ofertă. Deep link `mixai://title/<kind>/<tmdbId>` (Watch Next). Profil implicit `default`. |
 | **TV Tizen** | `apps/tv-tizen` — `lib/media.ts`, `lib/launch.ts`, `screens/Title.tsx` | Aceeași structură; ofertele se deschid cu `tizen.application.launchAppControl` către `appId`-ul platformei. Profil = `userId` din config, altfel `default`. |
-| **MMO Server** | `GET /media/home?profile=`, `/media/title/:kind/:id`, `/media/search?q=`, `/media/progress` (GET/PUT), `/media/plays`, `/media/status`, `/media/library` | Toate cer `x-device-token`. `/media/status` arată `tmdb`, `motn`, `region`, `revision`, `sync.last`. |
+| **MMO Server** | `GET /media/home?profile=`, `/media/title/:kind/:id?profile=`, `/media/search?q=&profile=`, `/media/progress` (GET/PUT), `/media/plays`, `/media/status`, `/media/library?profile=` | Toate cer `x-device-token`. Rutele cu `profile=` filtrează după limita de vârstă a profilului; fără `profile=` răspund pentru profilul `default`. `/media/status` arată `tmdb`, `motn`, `region`, `revision`, `sync.last`. |
 
 ### Platforme (registru `server/src/media/providers.ts`)
 

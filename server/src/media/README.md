@@ -22,7 +22,7 @@ catalog provideri 24 h, rânduri Home 24 h, potriviri `match:` 30 z) · `progres
 ## Endpoint-uri (`createMediaRouter`, montat la `/media` în `server.ts` după `authMiddleware`)
 
 `GET /status` · `GET /home?profile=&region=&providers=8,337` · `GET /title/:kind/:tmdbId?region=&profile=` ·
-`GET /search?q=` · `GET /library?since=<libraryEtag>` · `GET /progress?profile=&since=<revision>` ·
+`GET /search?q=&profile=` · `GET /library?since=<libraryEtag>&profile=` · `GET /progress?profile=&since=<revision>` ·
 `PUT /progress` (obiect sau array 1..500) · `POST /plays` · `GET /plays?profile=&limit=` · `GET /etag` ·
 `GET /providers?region=`. Detalii: `docs/companion/api.md` §`/media`.
 

@@ -3158,6 +3158,12 @@ export interface paths {
          * @description Without `since` (or with a stale/future value) the response is the full index (`full: true`).
          *     With `since=<libraryEtag>` from a previous call only rows written after that etag are returned,
          *     plus the `removed` file ids (tombstones). `serverFileId` is the id `/video/direct/{fileId}` expects.
+         *
+         *     `profile` scopes the index to a viewer profile (server 3.15+). A profile with a max age gets only the
+         *     files of titles it may watch (titles above the limit, unrated titles outside the Family / Kids genres
+         *     and unmatched files are left out) and the response is then always the full filtered index
+         *     (`full: true`), whatever `since` says. Without `profile` the profile of a valid `x-profile-token` is
+         *     used; without either the whole index is returned (clients older than 3.15).
          */
         get: operations["mediaLibrary"];
         put?: never;
@@ -3229,7 +3235,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** TMDB multi search (movies + tv), flags titles present locally */
+        /**
+         * TMDB multi search (movies + tv), flags titles present locally
+         * @description Results are filtered for the profile: a profile with a max age gets no title above it. TMDB search
+         *     results carry no certification, so the server looks up the age of results it has not seen before
+         *     (cached 30 days); a result whose age is still unknown is left out. Without `profile` the request is
+         *     answered for the `default` profile, so clients must send the active profile.
+         */
         get: operations["mediaSearch"];
         put?: never;
         post?: never;
@@ -12171,8 +12183,13 @@ export interface operations {
             query?: {
                 /** @description Previously seen libraryEtag. */
                 since?: number;
+                /** @description Active viewer profile id. */
+                profile?: string;
             };
-            header?: never;
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -12188,6 +12205,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
         };
     };
     mediaProviders: {
@@ -12285,8 +12303,12 @@ export interface operations {
             query: {
                 q: string;
                 page?: number;
+                profile?: string;
             };
-            header?: never;
+            header?: {
+                /** @description Token from `POST /media/profiles/{id}/unlock`; required when the profile has a PIN (403 `profile_locked` otherwise). */
+                "x-profile-token"?: components["parameters"]["ProfileToken"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -12303,6 +12325,7 @@ export interface operations {
             };
             400: components["responses"]["ErrorJson"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ErrorJson"];
         };
     };
     mediaGetProgress: {

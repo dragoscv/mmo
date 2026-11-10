@@ -1,8 +1,8 @@
 // One-shot demo configuration, run INSIDE the mmo-server container (loopback, no X-Forwarded-For = demo admin):
 //   sudo docker exec -i -e DEMO_HOST=<host> mmo-server node - < setup.mjs
 // Idempotent: scans video roots, ingests the music library, names the default profile "Reviewer",
-// adds a "Kids" profile, registers the demo Live TV source. Reads the device token from /data/config.json
-// and never prints it.
+// adds a "Kids" profile and a PIN-protected "Parent" profile, registers the demo Live TV source. Reads the
+// device token from /data/config.json and never prints it.
 import fs from "node:fs";
 
 const BASE = "http://127.0.0.1:17899";
@@ -48,6 +48,10 @@ const profiles = (await api("GET", "/media/profiles")).json.profiles ?? [];
 const def = profiles.find((p) => p.id === "default");
 if (def && def.name !== "Reviewer") console.log("rename default", (await api("PATCH", "/media/profiles/default", { name: "Reviewer", color: "violet" })).status);
 if (!profiles.some((p) => p.name === "Kids")) console.log("create Kids", (await api("POST", "/media/profiles", { name: "Kids", kind: "kid", maxAge: 12, color: "amber" })).status);
+// "Parent" (adult, PIN) shows store reviewers the lock and the PIN pad. The PIN is public on purpose: it is in the
+// review notes (docs/store/review-notes.md). "Reviewer" stays without a PIN, every store's notes say to pick it.
+const DEMO_PARENT_PIN = "1234";
+if (!profiles.some((p) => p.name === "Parent")) console.log("create Parent", (await api("POST", "/media/profiles", { name: "Parent", kind: "adult", pin: DEMO_PARENT_PIN, color: "blue" })).status);
 
 // 4. Live TV: the two looping demo channels (M3U + XMLTV served by Caddy).
 const sources = (await api("GET", "/livetv/sources")).json.sources ?? [];
