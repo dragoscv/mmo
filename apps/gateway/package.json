@@ -14,11 +14,11 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.4",
     "hono": "^4.13.17",
     "postgres": "^3.4.9",
-    "ws": "^8.18.0",
-    "zod": "^4.4.3"
+    "ws": "^8.22.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
