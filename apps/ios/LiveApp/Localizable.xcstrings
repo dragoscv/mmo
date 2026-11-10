@@ -885,6 +885,295 @@
         }
       }
     },
+    "live.local.failed %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not start the engine: %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motorul nu a pornit: %@"
+          }
+        }
+      }
+    },
+    "live.local.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No computer? Run the vocal chain on this phone. Use wired headphones or an audio interface: the speaker next to the mic will howl. Starts muted."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fără calculator? Rulează lanțul vocal pe acest telefon. Folosește căști cu fir sau o interfață audio: difuzorul de lângă microfon face feedback. Pornește pe mut."
+          }
+        }
+      }
+    },
+    "live.local.lan": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let other devices control it (Wi-Fi)"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permite controlul de pe alte dispozitive (Wi-Fi)"
+          }
+        }
+      }
+    },
+    "live.local.lan_at %@ %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Others connect to %@:%lld"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Celelalte dispozitive se conectează la %@:%lld"
+          }
+        }
+      }
+    },
+    "live.local.latency": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Measure latency"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Măsoară latența"
+          }
+        }
+      }
+    },
+    "live.local.latency_failed %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latency not measured: %@"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latența nu a fost măsurată: %@"
+          }
+        }
+      }
+    },
+    "live.local.latency_result %@ %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Round trip %@ ms (buffers %@ ms)"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dus-întors %@ ms (buffere %@ ms)"
+          }
+        }
+      }
+    },
+    "live.local.latency_running": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listening for clicks… raise the volume or connect the output to the input."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ascult clicurile… dă volumul mai tare sau leagă ieșirea la intrare."
+          }
+        }
+      }
+    },
+    "live.local.mic_denied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone access is needed to process your voice on this phone."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accesul la microfon este necesar pentru a-ți procesa vocea pe telefon."
+          }
+        }
+      }
+    },
+    "live.local.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This phone"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acest telefon"
+          }
+        }
+      }
+    },
+    "live.local.running %@ %lld %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running · %@ · %lld Hz · %lld frames"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rulează · %@ · %lld Hz · %lld cadre"
+          }
+        }
+      }
+    },
+    "live.local.start": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start engine on this phone"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pornește motorul pe telefon"
+          }
+        }
+      }
+    },
+    "live.local.starting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting…"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pornesc…"
+          }
+        }
+      }
+    },
+    "live.local.stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oprește"
+          }
+        }
+      }
+    },
+    "live.local.stopped_unexpectedly": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the audio stream stopped"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fluxul audio s-a oprit"
+          }
+        }
+      }
+    },
+    "live.local.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This phone as the engine"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telefonul ca motor"
+          }
+        }
+      }
+    },
+    "live.local.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This build does not include the engine. Connect to MixAI Live on a computer instead."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Această versiune nu include motorul. Conectează-te la MixAI Live pe un computer."
+          }
+        }
+      }
+    },
     "live.manual.address": {
       "extractionState": "manual",
       "localizations": {

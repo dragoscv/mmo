@@ -127,4 +127,27 @@
 
     <string name="watch_sent">Trimis la ceas</string>
     <string name="send_to_watch">Trimite la ceas</string>
+    <!-- Local engine (phone as a backup processor, WP21-06) -->
+    <string name="local_title">Telefonul ca motor</string>
+    <string name="local_hint">Fără calculator? Rulează lanțul vocal pe acest telefon. Folosește căști cu fir sau o interfață audio: difuzorul de lângă microfon face feedback. Pornește pe mut.</string>
+    <string name="local_lan">Permite controlul de pe alte dispozitive (Wi-Fi)</string>
+    <string name="local_start">Pornește motorul pe telefon</string>
+    <string name="local_starting">Pornesc…</string>
+    <string name="local_running">Rulează · %1$s · %2$d Hz · %3$d cadre</string>
+    <string name="local_lan_at">Celelalte dispozitive se conectează la %1$s:%2$d</string>
+    <string name="local_open">Deschide</string>
+    <string name="local_stop">Oprește</string>
+    <string name="local_latency">Măsoară latența</string>
+    <string name="local_latency_running">Ascult clicurile… dă volumul mai tare sau leagă ieșirea la intrare.</string>
+    <string name="local_latency_result">Dus-întors %1$.1f ms (buffere %2$.1f ms)</string>
+    <string name="local_latency_failed">Latența nu a fost măsurată: %1$s</string>
+    <string name="local_failed">Motorul nu a pornit: %1$s</string>
+    <string name="local_engine_name">MixAI Live (%1$s)</string>
+    <string name="local_notif_channel">Motor pe telefon</string>
+    <string name="local_notif_title">MixAI Live îți procesează vocea</string>
+    <string name="local_notif_text">Sunetul rămâne pe telefon. Atinge pentru a deschide.</string>
+    <string name="mic_denied">Accesul la microfon este necesar pentru a-ți procesa vocea pe telefon.</string>
+    <string name="local_stopped_unexpectedly">fluxul audio s-a oprit</string>
+    <string name="local_qr">Cod de asociere pentru alte dispozitive din această rețea Wi-Fi (acces interpret)</string>
+    <string name="local_watch_needs_lan">Ca să folosești ceasul cu motorul de pe telefon, pornește-l cu „Permite controlul de pe alte dispozitive” activat.</string>
 </resources>

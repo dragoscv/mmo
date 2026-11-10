@@ -80,6 +80,8 @@ fun LiveRoot(app: LiveApp, pendingLink: MutableStateFlow<String?>) {
     LaunchedEffect(state.hello) {
         val h = state.hello ?: return@LaunchedEffect
         val e = state.engine ?: return@LaunchedEffect
+        // The phone engine gets fresh tokens on every start: never store it as a paired engine.
+        if (e.key == app.local.key) return@LaunchedEffect
         val named = e.copy(role = h.role, name = h.engineName.ifBlank { e.name })
         if (named != e) app.store.save(named)
     }
@@ -99,7 +101,12 @@ fun LiveRoot(app: LiveApp, pendingLink: MutableStateFlow<String?>) {
         } else {
             Connected(app, state, snackbar, onSwitch = { showConnect = true }, onWatch = {
                 scope.launch {
-                    val e = state.engine ?: return@launch
+                    // The phone engine is reachable for the watch only over the LAN, with its performer token.
+                    val e = if (state.engine?.key == app.local.key) app.local.lanPairing() else state.engine
+                    if (e == null) {
+                        snackbar.showSnackbar(app.getString(R.string.local_watch_needs_lan))
+                        return@launch
+                    }
                     if (app.watch.send(e)) snackbar.showSnackbar(app.getString(R.string.watch_sent))
                 }
             })

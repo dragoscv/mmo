@@ -126,4 +126,27 @@
 
     <string name="watch_sent">Sent to your watch</string>
     <string name="send_to_watch">Send to watch</string>
+    <!-- Local engine (phone as a backup processor, WP21-06) -->
+    <string name="local_title">This phone as the engine</string>
+    <string name="local_hint">No computer? Run the vocal chain on this phone. Use wired headphones or an audio interface: the speaker next to the mic will howl. Starts muted.</string>
+    <string name="local_lan">Let other devices control it (Wi-Fi)</string>
+    <string name="local_start">Start engine on this phone</string>
+    <string name="local_starting">Starting…</string>
+    <string name="local_running">Running · %1$s · %2$d Hz · %3$d frames</string>
+    <string name="local_lan_at">Others connect to %1$s:%2$d</string>
+    <string name="local_open">Open</string>
+    <string name="local_stop">Stop</string>
+    <string name="local_latency">Measure latency</string>
+    <string name="local_latency_running">Listening for clicks… raise the volume or connect the output to the input.</string>
+    <string name="local_latency_result">Round trip %1$.1f ms (buffers %2$.1f ms)</string>
+    <string name="local_latency_failed">Latency not measured: %1$s</string>
+    <string name="local_failed">Could not start the engine: %1$s</string>
+    <string name="local_engine_name">MixAI Live (%1$s)</string>
+    <string name="local_notif_channel">Phone engine</string>
+    <string name="local_notif_title">MixAI Live is processing your voice</string>
+    <string name="local_notif_text">Audio stays on this phone. Tap to open.</string>
+    <string name="mic_denied">Microphone access is needed to process your voice on this phone.</string>
+    <string name="local_stopped_unexpectedly">the audio stream stopped</string>
+    <string name="local_qr">Pairing code for other devices on this Wi-Fi (performer access)</string>
+    <string name="local_watch_needs_lan">To use the watch with the phone engine, start it with "Let other devices control it" on.</string>
 </resources>
