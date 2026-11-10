@@ -12,8 +12,8 @@ importers:
         specifier: ^2.1.6
         version: 2.1.6(hono@4.13.17)
       drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2(postgres@3.4.9)
+        specifier: ^0.45.4
+        version: 0.45.4(postgres@3.4.9)
       hono:
         specifier: ^4.13.17
         version: 4.13.17
@@ -21,11 +21,11 @@ importers:
         specifier: ^3.4.9
         version: 3.4.9
       ws:
-        specifier: ^8.18.0
-        version: 8.21.0
+        specifier: ^8.22.1
+        version: 8.22.1
       zod:
-        specifier: ^4.4.3
-        version: 4.4.3
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       '@types/node':
         specifier: ^24.19.2
@@ -643,8 +643,8 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
-  drizzle-orm@0.45.2:
-    resolution: {integrity: sha512-kY0BSaTNYWnoDMVoyY8uxmyHjpJW1geOmBMdSSicKo9CIIWkSxMIj2rkeSR51b8KAPB7m+qysjuHme5nKP+E5Q==}
+  drizzle-orm@0.45.4:
+    resolution: {integrity: sha512-NiM1YZpJ2UxyeE67DpDDZ+Tsw4YLX3trSlkNT7Tm9eKoUNb1LvaAaQzXgYQsWs+AQ9TUmmwMmBOCXuqqxUWKKQ==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
       '@cloudflare/workers-types': '>=4'
@@ -652,6 +652,7 @@ packages:
       '@libsql/client': '>=0.10.0'
       '@libsql/client-wasm': '>=0.10.0'
       '@neondatabase/serverless': '>=0.10.0'
+      '@netlify/db': '>=0.4.0'
       '@op-engineering/op-sqlite': '>=2'
       '@opentelemetry/api': ^1.4.1
       '@planetscale/database': '>=1.13'
@@ -687,6 +688,8 @@ packages:
       '@libsql/client-wasm':
         optional: true
       '@neondatabase/serverless':
+        optional: true
+      '@netlify/db':
         optional: true
       '@op-engineering/op-sqlite':
         optional: true
@@ -1098,8 +1101,8 @@ packages:
     engines: {node: '>=20.11'}
     hasBin: true
 
-  ws@8.21.0:
-    resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
+  ws@8.22.1:
+    resolution: {integrity: sha512-oyL6OPYme/CmiFvNuGzeoxCJ4nOrZE2O1FwM9MWM1AsGri6nLXB2pg+lNA8aLeXMSav0J6eIVS1j6vUPzUtK9g==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -1119,8 +1122,8 @@ packages:
       '@yuku-toolchain/wasm':
         optional: true
 
-  zod@4.4.3:
-    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
@@ -1472,7 +1475,7 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
-  drizzle-orm@0.45.2(postgres@3.4.9):
+  drizzle-orm@0.45.4(postgres@3.4.9):
     optionalDependencies:
       postgres: 3.4.9
 
@@ -1784,7 +1787,7 @@ snapshots:
 
   why-is-node-running@3.2.1: {}
 
-  ws@8.21.0: {}
+  ws@8.22.1: {}
 
   yuku@0.27.0:
     optionalDependencies:
@@ -1795,4 +1798,4 @@ snapshots:
       '@yuku-toolchain/win32-arm64': 0.27.0
       '@yuku-toolchain/win32-x64': 0.27.0
 
-  zod@4.4.3: {}
+  zod@4.6.7: {}
