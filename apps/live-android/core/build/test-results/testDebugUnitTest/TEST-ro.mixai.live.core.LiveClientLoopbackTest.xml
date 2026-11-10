@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="ro.mixai.live.core.LiveClientLoopbackTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-09T22:24:23.345Z" hostname="DRAGOS" time="5.279">
-  <properties/>
-  <testcase name="reconnectsAfterServerDrop" classname="ro.mixai.live.core.LiveClientLoopbackTest" time="4.012"/>
-  <testcase name="unauthorizedStopsReconnecting" classname="ro.mixai.live.core.LiveClientLoopbackTest" time="1.169"/>
-  <testcase name="performerRoundTrip" classname="ro.mixai.live.core.LiveClientLoopbackTest" time="0.086"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
