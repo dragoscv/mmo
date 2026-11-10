@@ -51,6 +51,23 @@
           }
         }
       }
+    },
+    "NSMicrophoneUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In Local engine mode MixAI Live processes your voice on this device. Audio is never recorded or sent."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "În modul Motor local MixAI Live îți procesează vocea pe acest dispozitiv. Sunetul nu este înregistrat și nu este trimis."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -30,13 +30,13 @@ or recording:
 
 | Surface | Path | Status |
 |---|---|---|
-| Engine (`live-dsp`, `live-engine`, `live-remote`, `live-cli`) | `apps/live/engine` | built — WP21-02/03/05 |
+| Engine (`live-dsp`, `live-engine`, `live-remote`, `live-cli`) | `apps/live/engine` | built — WP21-02/04/05; WASAPI exclusive + MMCSS open (WP21-03) |
 | Web remote page (any browser on the LAN) | served by `mixai-live-engine serve` | built — WP21-05 |
 | Browser `/live` FX page (Web Audio, separate engine) | `apps/web` | fixes shipped — WP21-14 |
-| UniFFI bindings for Kotlin + Swift (`live-ffi`) | `apps/live/engine` | planned (WP21-06) |
-| Desktop app (Tauri 2 + React + `@mmo/ui`) | `apps/live` | planned (WP21-07) |
-| Android phone/tablet + Wear OS controller | Gradle build | planned (WP21-08) |
-| iOS + watchOS controller | `apps/ios` | planned (WP21-09) |
+| Phone engine: UniFFI bindings for Kotlin + Swift (`live-ffi`), "This phone as the engine" | `apps/live/engine`, `apps/live-android/ffi`, `apps/ios/LiveFFI` | built — WP21-06 ([ffi](ffi.md)) |
+| Desktop app (Tauri 2 + React + `@mmo/ui`) | `apps/live/desktop` | built — WP21-07 |
+| Android phone/tablet + Wear OS controller | `apps/live-android` | built — WP21-08 |
+| iOS + watchOS controller | `apps/ios` | built — WP21-09 |
 | Plugin host (CLAP, VST3, AU, LV2) | `live-host` | planned (WP21-10) — [design](plugins.md) |
 | Voice conversion | `live-vc` | planned (WP21-11) — [design](voice-conversion.md) |
 | Virtual audio devices, Voicemeeter Remote API | — | planned (WP21-12) |
@@ -53,6 +53,7 @@ or recording:
 | [cli.md](cli.md) | `mixai-live-engine` subcommands, flags, output formats |
 | [midi.md](midi.md) | MIDI ports, bindings (`midi.json`), MIDI learn, program change |
 | [remote-protocol.md](remote-protocol.md) | Control protocol v1 (HTTP, WebSocket, OSC, mDNS, roles) |
+| [ffi.md](ffi.md) | Phone engine (`live-ffi`): API, Android/iOS integration, Null test host, measured latency |
 | [voice-conversion.md](voice-conversion.md) | Design: realtime voice conversion, consent, watermark — planned |
 | [plugins.md](plugins.md) | Design: sandboxed plugin host — planned |
 

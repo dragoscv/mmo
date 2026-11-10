@@ -113,6 +113,7 @@ fun ConnectScreen(app: LiveApp, onConnected: () -> Unit, onBack: (() -> Unit)?) 
             }
             if (cameraDenied) Text(stringResource(R.string.camera_denied), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
+        item { LocalEngineCard(app, onOpen = onConnected) }
         item {
             OutlinedTextField(
                 value = link,

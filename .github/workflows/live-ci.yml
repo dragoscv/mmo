@@ -1,6 +1,6 @@
 name: live-ci
 
-# MixAI Live engine (apps/live/engine: live-dsp, live-engine, live-remote, live-cli) — fmt, clippy, tests on
+# MixAI Live engine (apps/live/engine: live-dsp, live-engine, live-remote, live-cli, live-ffi) — fmt, clippy, tests on
 # Linux / Windows / macOS and cargo-deny licences. ADR-0015, WP21-17. Own Cargo workspace + lockfile.
 # Default features only for build/test: `asio` needs the Steinberg SDK (GPLv3/proprietary, opt-in) and
 # `pipewire` / `jack` need extra system libraries. cargo-deny still checks the --all-features graph.

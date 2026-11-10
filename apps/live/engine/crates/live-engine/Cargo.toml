@@ -24,6 +24,8 @@ asio = ["cpal/asio"]
 # PipeWire host on Linux.
 pipewire = ["cpal/pipewire"]
 jack = ["cpal/jack"]
+# AAudio low-latency performance mode + realtime audio thread priority (Android / Linux / WASAPI).
+realtime = ["cpal/realtime"]
 
 [dev-dependencies]
 assert_no_alloc = "1.1.2"

@@ -1,0 +1,8 @@
+[bindings.kotlin]
+package_name = "ro.mixai.live.ffi"
+cdylib_name = "live_ffi"
+
+[bindings.swift]
+module_name = "LiveFFI"
+ffi_module_name = "live_ffiFFI"
+ffi_module_filename = "live_ffiFFI"

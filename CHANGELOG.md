@@ -10,6 +10,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Live — phone engine (WP21-06, 2026-11-10)
+
+- `live-ffi` (UniFFI 0.32): the MixAI Live engine runs on Android (AAudio low-latency, exclusive MMAP) and iOS
+  (CoreAudio) as a backup processor; same Session/Control and protocol v1, the app connects over 127.0.0.1.
+- "This phone as the engine" on the Android `:live` Connect screen (microphone foreground service, optional LAN
+  control, latency measurement) and in iOS LiveApp (`LiveFFI` package, background audio).
+- `live_remote::EngineHost` shared by `mixai-live-engine serve` and the FFI; `Null` audio host (simulated loopback)
+  for CI. Measured on a Galaxy S25 Ultra: 52.9-55.7 ms speaker-to-mic round trip at 192 frames (nominal 12 ms).
+
 ## MixAI Live engine 0.1.0 — realtime vocal engine, LAN remote, docs + CI (WP21-02/03/05/17)
 
 - New product **MixAI Live** (`live.mixai.ro`, ADR-0015): Rust engine workspace `apps/live/engine` (own `Cargo.lock`), docs in [`docs/live/`](docs/live/README.md).

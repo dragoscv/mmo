@@ -21,7 +21,7 @@ flowchart LR
   end
   desk["Desktop UI (planned, WP21-07)"] -->|"WS 127.0.0.1"| remote
   web["Web remote page"] -->|"HTTP + WS (LAN)"| remote
-  phone["Android / iOS / watches<br/>(planned, WP21-08/09)"] -->|"WS + OSC (LAN)"| remote
+  phone["Android / iOS / watches"] -->|"WS + OSC (LAN)"| remote
   osc["OSC surfaces"] -->|"UDP"| remote
   dev["Audio interface / virtual device"] <--> audio
 ```
@@ -163,6 +163,14 @@ sequenceDiagram
   `harmonizer` insert and the song `bpm` to every `delay` insert. Tap tempo averages 2–8 taps (reset after 2 s
   idle) and sets `bpm` on every delay.
 
+## Engine host
+
+`live_remote::EngineHost` owns the streams, the `Session` and the `RemoteServer` on one control thread (5 ms
+tick: retry queued commands, drain remote + in-process controls, MIDI, publish state then acks, meters, stream
+health). `mixai-live-engine serve` and the phone engine (`live-ffi`) both run it, so every surface behaves the
+same. The streams are opened inside that thread and never cross threads. `io::start` with host `Null` is a
+simulated loopback device for tests.
+
 ## Crate map
 
 | Crate | Licence | Depends on | Role |
@@ -171,4 +179,5 @@ sequenceDiagram
 | `live-engine` | MIT OR Apache-2.0 | `live-dsp`, cpal 0.18, rtrb, serde | `Core`, `Command`, `Meters`, device I/O, presets/setlists, `Session`, `Control`, latency probe |
 | `live-remote` | MIT OR Apache-2.0 | `live-engine`, tungstenite (handshake), rosc, mdns-sd, qrcode | HTTP + WebSocket server, OSC, mDNS, QR, web remote page |
 | `live-cli` | MIT OR Apache-2.0 | all of the above, clap | `mixai-live-engine` binary |
-| `live-ffi`, `live-host`, `live-vc` | — | — | planned (WP21-06, WP21-10, WP21-11) |
+| `live-ffi` | MIT OR Apache-2.0 | `live-engine`, `live-remote`, uniffi 0.32 | Phone engine for Kotlin/Swift ([ffi](ffi.md)) |
+| `live-host`, `live-vc` | — | — | planned (WP21-10, WP21-11) |

@@ -12,6 +12,7 @@ struct ConnectView: View {
     var body: some View {
         List {
             statusSection
+            LocalEngineSection()
             if !session.store.engines.isEmpty {
                 Section("live.connect.paired") {
                     ForEach(session.store.engines) { e in pairedRow(e) }

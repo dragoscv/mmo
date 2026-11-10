@@ -2,7 +2,8 @@ import java.util.Base64
 
 // MixAI Live controller for Android phones/tablets (WP21-08, ADR-0015): pairs with the MixAI Live engine by QR /
 // link / mDNS and drives it over protocol v1 (WebSocket): meters, tuner, PANIC/MUTE/BYPASS, scenes + setlist with a
-// lyrics teleprompter, mix sliders, presets, and (controller role) the insert chain. Pure LAN client: no Rust/FFI.
+// lyrics teleprompter, mix sliders, presets, and (controller role) the insert chain. "Local engine" mode runs the
+// same Rust engine on the phone (:live-ffi) and connects to it over 127.0.0.1.
 // Built by the apps/tv-android Gradle build as `:live`. AGP 9 ships built-in Kotlin.
 plugins {
     alias(libs.plugins.android.application)
@@ -71,6 +72,8 @@ android {
 
 dependencies {
     implementation(project(":live-core"))
+    // The engine itself, for "Local engine" mode (phone as a backup processor, WP21-06).
+    implementation(project(":live-ffi"))
     // Design tokens + fonts + Material 3 theme (MixaiTheme); the MMO data layer it re-exports is unused here.
     implementation(project(":mobile-common"))
 

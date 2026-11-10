@@ -6,12 +6,14 @@
 //! 3. publishes meters as JSON ([`meters_json`]).
 
 pub mod discovery;
+pub mod host;
 pub mod http;
 pub mod osc;
 pub mod qr;
 pub mod server;
 pub mod token;
 
+pub use host::{ControlError, ControlHandle, EngineHost, HostConfig, HostError, HostReady};
 pub use server::{ClientInfo, DEFAULT_PORT, Incoming, RemoteConfig, RemoteServer, lan_ip};
 
 pub const PROTOCOL_VERSION: u32 = 1;

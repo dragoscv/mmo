@@ -8,8 +8,8 @@
 //!   mixai-live-engine midi-ports
 
 use clap::{Parser, Subcommand};
-use live_engine::{Buses, Core, IoConfig, ProbeState, Role, Session, Store, io};
-use live_remote::{RemoteConfig, RemoteServer};
+use live_engine::{Buses, Core, IoConfig, ProbeState, Session, Store, io};
+use live_remote::{EngineHost, HostConfig};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -292,136 +292,47 @@ fn serve(
     store: Option<Store>,
     midi: bool,
 ) -> Result<(), String> {
-    let cfg = io_config(dev)?;
-    let mut running = io::start(&cfg).map_err(|e| e.to_string())?;
-    let session = Session::new(
-        cfg.sample_rate as f32,
-        running.info.buffer_frames as usize * 8,
-    );
-    let mut session = match store {
-        Some(st) => {
-            let (s, warnings) = session.with_store(st);
-            for w in warnings {
-                eprintln!("preset skipped: {w}");
-            }
-            s
-        }
-        None => session,
-    };
-    let first = session.load_preset(preset).map_err(|e| e.to_string())?;
-    running.send(first).map_err(|_| "command ring full")?;
     let (midi_tx, midi_rx) = mpsc::sync_channel::<Vec<u8>>(1024);
-    let _midi = if midi {
-        let inputs = midi_in::open_all(midi_tx);
-        session.midi.ports = inputs.names();
-        Some(inputs)
-    } else {
-        None
-    };
-    let bind = if lan {
-        IpAddr::V4(Ipv4Addr::UNSPECIFIED)
-    } else {
-        IpAddr::V4(Ipv4Addr::LOCALHOST)
-    };
-    let server = RemoteServer::start(RemoteConfig {
-        bind,
+    let inputs = midi.then(|| midi_in::open_all(midi_tx));
+    let host = EngineHost::start(HostConfig {
+        io: io_config(dev)?,
+        preset: preset.into(),
+        bind: if lan {
+            IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+        } else {
+            IpAddr::V4(Ipv4Addr::LOCALHOST)
+        },
         port,
+        name: name.into(),
+        announce: lan,
         osc: true,
-        engine_name: name.into(),
+        store,
+        start_muted: false,
+        midi: inputs.as_ref().map(|i| (i.names(), midi_rx)),
     })
-    .map_err(|e| format!("control server on port {port}: {e}"))?;
-    server.set_hello(serde_json::json!({
-        "sample_rate": running.info.sample_rate,
-        "buffer_frames": running.info.buffer_frames,
-        "devices": running.info,
-    }));
-    let host = if lan {
-        live_remote::lan_ip()
-    } else {
-        IpAddr::V4(Ipv4Addr::LOCALHOST)
-    };
-    let _mdns = if lan {
-        match live_remote::discovery::Announcer::start(name, host, server.port(), server.osc_port())
-        {
-            Ok(a) => Some(a),
-            Err(e) => {
-                eprintln!("mDNS announcement failed ({e}); pairing by QR still works");
-                None
-            }
-        }
-    } else {
-        None
-    };
+    .map_err(|e| e.to_string())?;
+    let r = host.ready();
+    for w in &r.warnings {
+        eprintln!("{w}");
+    }
     // One JSON line for the desktop shell / scripts: where to connect and with which tokens.
     println!(
         "{}",
         serde_json::json!({
             "event": "ready",
-            "port": server.port(),
-            "osc_port": server.osc_port(),
-            "controller_url": server.pairing_url(Role::Controller, host),
-            "performer_url": server.pairing_url(Role::Performer, host),
-            "viewer_url": server.pairing_url(Role::Viewer, host),
-            "info": running.info,
+            "port": r.port,
+            "osc_port": r.osc_port,
+            "controller_url": r.controller_url,
+            "performer_url": r.performer_url,
+            "viewer_url": r.viewer_url,
+            "info": r.info,
         })
     );
     let start = Instant::now();
-    let mut last_rev = u64::MAX;
-    let mut pending: Vec<live_engine::Command> = Vec::new();
     loop {
-        std::thread::sleep(Duration::from_millis(5));
-        // Commands that did not fit last tick go first (ring full = engine stalled briefly).
-        let mut retry = Vec::new();
-        for c in pending.drain(..) {
-            if let Err(c) = running.send(c) {
-                retry.push(c);
-            }
-        }
-        pending = retry;
-        let mut replies = Vec::new();
-        for inc in server.drain() {
-            match session.apply_control(inc.control, Instant::now()) {
-                Ok(cmds) => {
-                    for c in cmds {
-                        if let Err(c) = running.send(c) {
-                            pending.push(c);
-                        }
-                    }
-                    replies.push((inc.conn, inc.id, Ok(())));
-                }
-                Err(e) => replies.push((
-                    inc.conn,
-                    inc.id,
-                    Err((live_remote::server_error_code(&e), e.to_string())),
-                )),
-            }
-        }
-        let now = Instant::now();
-        for bytes in midi_rx.try_iter() {
-            for c in session.apply_midi(&bytes, now) {
-                if let Err(c) = running.send(c) {
-                    pending.push(c);
-                }
-            }
-        }
-        // State first, then acks: a client seeing `ack` already has the new state.
-        if session.revision != last_rev {
-            last_rev = session.revision;
-            server.publish_state(&session.state());
-        }
-        for (conn, id, r) in replies {
-            server.reply(conn, id, r);
-        }
-        if let Some(m) = running.poll() {
-            server.publish_meters(live_remote::meters_json(&m));
-        }
-        if !running.alive() {
-            return Err(format!(
-                "audio stream stopped: {}",
-                running
-                    .last_error()
-                    .unwrap_or_else(|| "unknown driver error".into())
-            ));
+        std::thread::sleep(Duration::from_millis(50));
+        if !host.alive() {
+            return Err(host.error().unwrap_or_else(|| "engine stopped".into()));
         }
         if seconds.is_some_and(|s| start.elapsed() >= Duration::from_secs(s)) {
             return Ok(());

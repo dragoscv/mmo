@@ -13,4 +13,6 @@ class LiveApp : Application() {
     val store by lazy { EngineStore(this) }
     val client by lazy { LiveClient(clientId = "phone-" + android.os.Build.MODEL.filter { it.isLetterOrDigit() }.take(16).ifEmpty { "android" }) }
     val watch by lazy { WatchHandoff(this) }
+    /** The engine running on this phone (backup processor, WP21-06). */
+    val local by lazy { LocalEngineHost(this, client, appScope) }
 }

@@ -47,6 +47,10 @@ packages:
   # MixAI Live controller core (WP21-09, ADR-0015): protocol v1 models, reducer, WebSocket LiveClient, watch link.
   LiveCore:
     path: LiveCore
+  # MixAI Live engine on the phone (WP21-06): LiveFFI.xcframework + generated Swift bindings, built by
+  # scripts/build-live-xcframework.sh (gitignored artefacts; Package.swift committed).
+  LiveFFI:
+    path: LiveFFI
 targets:
   MixAI:
     type: application
@@ -698,6 +702,7 @@ targets:
     dependencies:
       - package: MixaiCore
       - package: LiveCore
+      - package: LiveFFI
       - target: MixAILiveWatch
         embed: true
         codeSign: true
@@ -708,6 +713,8 @@ targets:
       path: LiveApp/Info.plist
       properties:
         NSBonjourServices: [_mixai-live._tcp]
+        # Local engine mode keeps processing the microphone with the screen locked on stage (WP21-06).
+        UIBackgroundModes: [audio]
         # The engine speaks plain HTTP / WebSocket on the LAN; nothing else is exempted from ATS.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
@@ -731,6 +738,7 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: MixAI Live finds and controls the MixAI Live engine on your computer over this network.
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: In Local engine mode MixAI Live processes your voice on this device. Audio is never recorded or sent.
         INFOPLIST_KEY_NSCameraUsageDescription: MixAI Live uses the camera only to scan the pairing QR code shown by MixAI Live on your computer.
         SWIFT_EMIT_LOC_STRINGS: YES
   # Watch controller: scene prev / next, mute / panic, current part, input level ring. Commands go through the iPhone
