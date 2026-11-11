@@ -2,8 +2,8 @@
 
 /**
  * `/media/music` (WP16-40, WP17-40): Home / Artists A–Z / Albums / Songs / Playlists tabs (tab in `?tab=`), search box, "Surprise me"
- * (random 50 → play → Now Playing). Home rows: recently played, recently added, most played, playlists,
- * genre chips, random albums. Albums grid uses `content-visibility:auto` (music.css) for 1000+ items.
+ * (random 50 → play → Now Playing), playback settings (crossfade + automix). Home rows: recently played, recently added,
+ * most played, playlists, genre chips, random albums. Albums grid uses `content-visibility:auto` (music.css) for 1000+ items.
  */
 import Link, { usePathname, useRouter } from "@/components/host/host-context";
 import { useSearchParams } from "next/navigation";
@@ -19,6 +19,7 @@ import { rowKeys } from "../row";
 import {
     AlbumTile, ArtistTile, MusicEmptyLibrary, MusicError, MusicLoading, NOW_PLAYING_HREF, PlaylistTile, TileGrid, TrackList, genreHref,
 } from "./common";
+import { PlaybackSettingsButton } from "./playback-settings";
 import { useDownloadable, useLoad, useMusic, useMusicIntent } from "./use-music";
 
 type Tab = "home" | "artists" | "albums" | "songs" | "playlists";
@@ -74,6 +75,7 @@ export function MusicHomeScreen() {
                     <Button onClick={() => void surprise()} loading={surprising}>
                         <Shuffle aria-hidden />{t("home.surprise")}
                     </Button>
+                    <PlaybackSettingsButton />
                 </div>
             </div>
             <Tabs value={tab} onValueChange={setTab}>

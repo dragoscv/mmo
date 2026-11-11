@@ -12,11 +12,18 @@ function mockFetch(status: number, body: unknown) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("MusicClient (WP17-40 routes)", () => {
-    it("radio sends the seed + size and returns the tracks", async () => {
+    it("radio sends the seed + size, asks for harmonic order by default and returns the tracks", async () => {
         const f = mockFetch(200, { seed: "tr_1", tracks: [{ id: "tr_1" }, { id: "tr_2" }] });
         const r = await new MusicClient(cfg).radio("tr_1", 30);
         expect(r?.map((t) => t.id)).toEqual(["tr_1", "tr_2"]);
-        expect(String((f.mock.calls[0] as unknown[])[0])).toBe("https://srv.test/media/music/radio?seed=tr_1&size=30");
+        expect(String((f.mock.calls[0] as unknown[])[0])).toBe("https://srv.test/media/music/radio?seed=tr_1&size=30&order=harmonic");
+    });
+
+    it("radio in artist order sends no order parameter", async () => {
+        const f = mockFetch(200, { seed: "al_4", tracks: [{ id: "tr_7" }] });
+        const r = await new MusicClient(cfg).radio("al_4", 20, "artist");
+        expect(r?.map((t) => t.id)).toEqual(["tr_7"]);
+        expect(String((f.mock.calls[0] as unknown[])[0])).toBe("https://srv.test/media/music/radio?seed=al_4&size=20");
     });
 
     it("tracks pages with offset/limit", async () => {

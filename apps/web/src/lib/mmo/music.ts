@@ -72,9 +72,12 @@ export class MusicClient {
     }
 
     /** Radio from a track / album / artist id (server 3.10+): the seed first, then similar artists interleaved.
+     *  `order` "harmonic" (default; server 3.13+, older servers ignore it) keeps the seed first and sorts the rest
+     *  by key (Camelot) and tempo so neighbours mix well; "artist" is the plain interleaved order.
      *  `null` = the server has no radio route (older than 3.10) or the seed is gone. */
-    async radio(seed: string, size = 50): Promise<TrackCard[] | null> {
-        const r = await this.http.get<{ seed: string; tracks: TrackCard[] }>(`/media/music/radio?seed=${enc(seed)}&size=${size}`, { allow404: true });
+    async radio(seed: string, size = 50, order: "artist" | "harmonic" = "harmonic"): Promise<TrackCard[] | null> {
+        const q = `seed=${enc(seed)}&size=${size}${order === "harmonic" ? "&order=harmonic" : ""}`;
+        const r = await this.http.get<{ seed: string; tracks: TrackCard[] }>(`/media/music/radio?${q}`, { allow404: true });
         return r ? r.tracks : null;
     }
 

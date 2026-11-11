@@ -20,6 +20,13 @@ test("music play args are normalised", () => {
     assert.deepEqual(parseMusicPlayArgs({ trackIds: ["a"], fileId: "" }), { trackIds: ["a"], index: 0, positionSec: 0, shuffle: false });
 });
 
+test("the web music handoff (apps/web send-to-tv.ts) is accepted as sent", () => {
+    // Exactly what `buildQueueHandoff(...).command` produces: whole seconds, shuffle always false, repeat always set.
+    const fromWeb = { trackIds: ["tr_1", "tr_2", "tr_3"], index: 1, positionSec: 61, shuffle: false, repeat: "one" };
+    assert.equal(isMusicPlay(fromWeb), true);
+    assert.deepEqual(parseMusicPlayArgs(fromWeb), fromWeb);
+});
+
 test("bad values are clamped or dropped", () => {
     const p = parseMusicPlayArgs({ trackIds: ["a", 3, "", " b ", null], index: 99, positionSec: -4, shuffle: "yes", repeat: "forever" });
     assert.deepEqual(p, { trackIds: ["a", "b"], index: 1, positionSec: 0, shuffle: false });

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { TrackCard } from "./media-types";
 import {
-    currentLineIndex, cycleRepeat, discGroups, fmtClock, indexAfterMove, indexAfterRemove, looksLikeLrc, moveItem, nextIndex,
-    parseLrc, playThresholdSec, prevIndex, shuffleKeepFirst, shuffleOrder, trackKeyOf,
+    DEFAULT_PLAYBACK, crossfadeFor, currentLineIndex, cycleRepeat, discGroups, fadeInGain, fadeOutGain, fadeStartSec, fmtClock,
+    glideRate, indexAfterMove, indexAfterRemove, isAlbumContinuation, looksLikeLrc, mixPlan, moveItem, nextIndex, normalizePlayback,
+    parseLrc, playThresholdSec, prevIndex, rateFor, shuffleKeepFirst, shuffleOrder, trackKeyOf, wholeBarsSec, type MixTrack,
 } from "./music-core";
 
 function seq(values: number[]): () => number {
@@ -15,6 +16,11 @@ function track(id: string, disc?: number): TrackCard {
         id, title: id, albumId: "al", durationSec: 100, format: "flac", hasLyrics: false, hasSyncedLyrics: false,
         coverArt: id, coverUrlPath: "", streamUrlPath: "", disc: disc ?? null,
     };
+}
+
+/** Planner input: 200 s track on its own album unless overridden. */
+function mt(o: Partial<MixTrack> = {}): MixTrack {
+    return { durationSec: 200, albumId: `al_${o.bpm ?? "x"}_${o.track ?? 0}`, ...o };
 }
 
 describe("shuffle", () => {
@@ -81,6 +87,131 @@ describe("repeat + queue edits", () => {
         expect(playThresholdSec(300)).toBe(30);
         expect(playThresholdSec(40)).toBe(20);
         expect(playThresholdSec(0)).toBe(30);
+    });
+});
+
+describe("automix planner (WP17-44, same numbers as Android AutomixPlanTest)", () => {
+    it("matches the tempo within 6 %, folding half and double tempo", () => {
+        expect(rateFor(mt({ bpm: 128 }), mt({ bpm: 124 }))).toBeCloseTo(128 / 124, 9);
+        expect(rateFor(mt({ bpm: 128 }), mt({ bpm: 64 }))).toBe(1);
+        expect(rateFor(mt({ bpm: 87 }), mt({ bpm: 174 }))).toBe(1);
+        expect(rateFor(mt({ bpm: 87 }), mt({ bpm: 170 }))).toBeCloseTo(87 / 85, 9);
+        // 128 → 118 would need +8.5 %: no beat match.
+        expect(rateFor(mt({ bpm: 128 }), mt({ bpm: 118 }))).toBeNull();
+        expect(rateFor(mt({ bpm: 128 }), mt())).toBeNull();
+        expect(rateFor(null, mt({ bpm: 128 }))).toBeNull();
+    });
+
+    it("ignores a low-confidence or absurd tempo", () => {
+        expect(rateFor(mt({ bpm: 128, bpmConfidence: 0.2 }), mt({ bpm: 126 }))).toBeNull();
+        expect(rateFor(mt({ bpm: 128, bpmConfidence: 0.9 }), mt({ bpm: 126 }))).toBeCloseTo(128 / 126, 9);
+        expect(rateFor(mt({ bpm: 500 }), mt({ bpm: 126 }))).toBeNull();
+        expect(rateFor(mt({ bpm: 128 }), mt({ bpm: 30 }))).toBeNull();
+    });
+
+    it("beat plan: matched rate, incoming on its first downbeat, fade of whole bars from an outgoing downbeat", () => {
+        // 120 BPM → 2 s per bar; downbeats of the outgoing track at 0.5 + 2k s; 200 - 8 = 192 → previous downbeat 190.5.
+        const p = mixPlan(mt({ bpm: 120, firstBeatSec: 0.5 }), mt({ durationSec: 180, bpm: 122, firstBeatSec: 0.48 }), 8);
+        expect(p.mode).toBe("beat");
+        expect(p.rate).toBeCloseTo(120 / 122, 9);
+        expect(p.rate).toBeGreaterThan(0.94);
+        expect(p.inStartSec).toBe(0.48);
+        expect(p.fadeSec).toBe(8);
+        expect(p.fadeStartSec).toBe(190.5);
+        expect(p.glideSec).toBe(8);
+        // The fade ends before the outgoing track does (early handoff).
+        expect(p.fadeStartSec + p.fadeSec).toBe(198.5);
+    });
+
+    it("beat plan: the fade is cut down to whole bars, never made longer than asked", () => {
+        const seven = mixPlan(mt({ bpm: 120, firstBeatSec: 0.5 }), mt({ bpm: 120 }), 7);
+        expect([seven.mode, seven.fadeSec, seven.fadeStartSec]).toEqual(["beat", 6, 192.5]);
+        // 6 s at 128 BPM (1.875 s per bar) → 3 bars = 5.625 s, starting on the downbeat at 0.1 + 124 bars.
+        const dflt = mixPlan(mt({ durationSec: 240, bpm: 128, firstBeatSec: 0.1 }), mt({ bpm: 126 }), 6);
+        expect([dflt.fadeSec, dflt.fadeStartSec]).toEqual([5.625, 232.6]);
+        // Shorter than one bar → the requested length.
+        expect(mixPlan(mt({ bpm: 120 }), mt({ bpm: 120 }), 1.5).fadeSec).toBe(1.5);
+        expect(wholeBarsSec(7.9, 120)).toBe(6);
+        expect(wholeBarsSec(8, 120)).toBe(8);
+        expect(wholeBarsSec(1.5, 120)).toBe(1.5);
+    });
+
+    it("beat plan: double tempo is folded and an equal tempo needs no glide", () => {
+        const dbl = mixPlan(mt({ bpm: 87, firstBeatSec: 0 }), mt({ bpm: 170, firstBeatSec: 1.2 }), 6);
+        expect(dbl.mode).toBe("beat");
+        expect(dbl.rate).toBeCloseTo(87 / 85, 9);
+        expect(dbl.inStartSec).toBe(1.2);
+        expect(dbl.glideSec).toBe(8);
+        const half = mixPlan(mt({ bpm: 128 }), mt({ bpm: 64 }), 6);
+        expect([half.mode, half.rate, half.glideSec]).toEqual(["beat", 1, 0]);
+    });
+
+    it("starts the fade on a downbeat only when the outgoing grid is known", () => {
+        expect(fadeStartSec(200, mt({ bpm: 120, firstBeatSec: 0.5 }), 8)).toBe(190.5);
+        expect(fadeStartSec(200, mt({ bpm: 120 }), 8)).toBe(192);
+        expect(fadeStartSec(200, mt({ firstBeatSec: 0.5 }), 8)).toBe(192);
+        // The measured duration of the element wins over the card.
+        // 210.4 - 8 = 202.4 → previous downbeat 0.5 + 100 bars = 200.5.
+        expect(mixPlan(mt({ bpm: 120, firstBeatSec: 0.5 }), mt({ bpm: 120 }), 8, { durationSec: 210.4 }).fadeStartSec).toBe(200.5);
+    });
+
+    it("never skips more than 8 s of lead-in", () => {
+        expect(mixPlan(mt({ bpm: 120 }), mt({ bpm: 120, firstBeatSec: 12 }), 6).inStartSec).toBe(0);
+        expect(mixPlan(mt({ bpm: 120 }), mt({ bpm: 120, firstBeatSec: 7.5 }), 6).inStartSec).toBe(7.5);
+    });
+
+    it("falls back to a plain time-based crossfade without usable tempo data or with automix off", () => {
+        const plain = { mode: "plain", rate: 1, inStartSec: 0, fadeStartSec: 194, fadeSec: 6, glideSec: 0 };
+        expect(mixPlan(mt({ bpm: 120, firstBeatSec: 0.5 }), mt({ firstBeatSec: 1 }), 6)).toEqual(plain);
+        expect(mixPlan(mt(), mt({ bpm: 120 }), 6)).toEqual(plain);
+        expect(mixPlan(mt({ bpm: 128 }), mt({ bpm: 118 }), 6)).toEqual(plain);
+        expect(mixPlan(mt({ bpm: 120, firstBeatSec: 0.5 }), mt({ bpm: 121, firstBeatSec: 1 }), 6, { automix: false })).toEqual(plain);
+    });
+
+    it("caps the fade at a third of either track", () => {
+        expect(crossfadeFor(12, 15, mt({ durationSec: 15 }), mt())).toBe(5);
+        expect(crossfadeFor(12, 200, mt(), mt({ durationSec: 9 }))).toBe(3);
+        const short = mixPlan(mt({ durationSec: 15 }), mt(), 12);
+        expect([short.mode, short.fadeSec, short.fadeStartSec]).toEqual(["plain", 5, 10]);
+    });
+
+    it("plans no crossfade when it is off, inside an album, or the track is too short", () => {
+        const none = { mode: "none", rate: 1, inStartSec: 0, fadeStartSec: 200, fadeSec: 0, glideSec: 0 };
+        expect(mixPlan(mt({ bpm: 120 }), mt({ bpm: 120 }), 0)).toEqual(none);
+        expect(mixPlan(mt({ bpm: 120 }), null, 6)).toEqual(none);
+        const a1: MixTrack = { durationSec: 200, albumId: "al_1", track: 3, disc: 1, bpm: 120 };
+        const a2: MixTrack = { durationSec: 200, albumId: "al_1", track: 4, disc: 1, bpm: 120 };
+        expect(isAlbumContinuation(a1, a2)).toBe(true);
+        expect(isAlbumContinuation(a1, { ...a2, disc: 2, track: 1 })).toBe(true);
+        expect(isAlbumContinuation(a2, a1)).toBe(false);
+        expect(isAlbumContinuation(a1, { ...a2, albumId: "al_2" })).toBe(false);
+        expect(mixPlan(a1, a2, 6)).toEqual(none);
+        // Same album out of order (shuffle) does crossfade.
+        expect(mixPlan(a2, a1, 6).mode).toBe("beat");
+        expect(mixPlan(mt({ durationSec: 2 }), mt(), 6)).toEqual({ ...none, fadeStartSec: 2 });
+    });
+
+    it("glides the rate back to native speed and fades with equal power", () => {
+        expect(glideRate(0.98, 0, 4)).toBeCloseTo(0.98, 9);
+        expect(glideRate(0.98, 2, 4)).toBeCloseTo(0.99, 9);
+        expect(glideRate(1.04, 6, 8)).toBeCloseTo(1.01, 9);
+        expect(glideRate(0.98, 5, 4)).toBe(1);
+        expect(glideRate(0.98, 1, 0)).toBe(1);
+        expect([fadeOutGain(0), fadeInGain(0)]).toEqual([1, 0]);
+        expect(fadeInGain(1)).toBe(1);
+        expect(fadeOutGain(1)).toBeCloseTo(0, 9);
+        expect(fadeOutGain(0.5)).toBeCloseTo(Math.SQRT1_2, 9);
+        expect(fadeInGain(0.25) ** 2 + fadeOutGain(0.25) ** 2).toBeCloseTo(1, 9);
+        expect(fadeInGain(7)).toBe(1);
+    });
+
+    it("normalises stored playback settings (crossfade 0..12 whole seconds; default off with automix on, as on Android and iOS)", () => {
+        expect(DEFAULT_PLAYBACK).toEqual({ crossfadeSec: 0, automix: true });
+        expect(normalizePlayback(null)).toEqual({ crossfadeSec: 0, automix: true });
+        expect(normalizePlayback({ crossfadeSec: 20, automix: false })).toEqual({ crossfadeSec: 12, automix: false });
+        expect(normalizePlayback({ crossfadeSec: -3 })).toEqual({ crossfadeSec: 0, automix: true });
+        expect(normalizePlayback({ crossfadeSec: 3.4, automix: "yes" })).toEqual({ crossfadeSec: 3, automix: true });
+        expect(normalizePlayback({ crossfadeSec: "x" })).toEqual({ crossfadeSec: 0, automix: true });
     });
 });
 

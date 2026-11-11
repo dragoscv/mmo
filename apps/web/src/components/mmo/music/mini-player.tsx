@@ -2,8 +2,9 @@
 
 /**
  * `MusicMiniPlayer` (WP16-40): fixed bottom bar for the web music engine — cover, title/artist (link to Now
- * Playing), prev / play-pause / next, elapsed time, progress line. Hidden when nothing is queued, after Stop,
- * on the Now Playing page itself, and while a video/live player owns the player bus. Mounted by the media shell.
+ * Playing), prev / play-pause / next, playback settings (crossfade + automix), elapsed time, progress line. Hidden
+ * when nothing is queued, after Stop, on the Now Playing page itself, and while a video/live player owns the player
+ * bus. Mounted by the media shell.
  */
 import "./music.css";
 import Link, { usePathname } from "@/components/host/host-context";
@@ -12,6 +13,7 @@ import { useNowPlaying } from "@/lib/mmo/player-bus";
 import { fmtClock } from "@/lib/mmo/music-core";
 import { useWebMusicProgress, useWebMusicState } from "@/lib/mmo/web-music-player";
 import { Cover, NOW_PLAYING_HREF } from "./common";
+import { PlaybackSettingsButton } from "./playback-settings";
 import { NextButton, PlayPauseButton, PrevButton } from "./transport";
 import { useMusic } from "./use-music";
 
@@ -35,6 +37,7 @@ export function MusicMiniPlayer() {
                 <PrevButton className="is-optional" />
                 <PlayPauseButton st={st} />
                 <NextButton />
+                <PlaybackSettingsButton variant="mini" className="is-optional" />
             </div>
             <MiniBar fallback={cur.durationSec} />
         </section>

@@ -5,6 +5,19 @@
  */
 import type { HubMedia, RepeatMode, TrackCard } from "./media-types";
 
+/**
+ * Hub `cmd "play"` for a music queue — shared arg shape (devices advertising the `music` cap):
+ *
+ *   { trackIds: string[]   Subsonic track ids (`tr_<n>`), ≤ 2000, in play order
+ *     index: number        position of the track to start with in `trackIds`
+ *     positionSec: number  where to start inside that track
+ *     shuffle: boolean     true = shuffle the list here (start track stays first)
+ *     repeat: "off" | "all" | "one" }
+ *
+ * Senders: web music "Play on TV" (`apps/web/src/components/mmo/music/send-to-tv.ts`), MixAI Music Android
+ * (`apps/tv-android/core/.../cast/Transports.kt` `HubTvTransport.load`), MixAI Music iOS (`MusicAppModel.handoff`).
+ * The same names are read by tv-android `MainActivity.kt` `playMusicQueue` — change all sides together.
+ */
 export interface MusicPlayArgs {
     trackIds: string[];
     index: number;

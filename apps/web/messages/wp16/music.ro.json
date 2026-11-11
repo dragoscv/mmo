@@ -133,5 +133,22 @@
         "queued": "{count, plural, one {# melodie pusă la descărcat} few {# melodii puse la descărcat} other {# de melodii puse la descărcat}}",
         "error": "Descărcările nu au putut fi pornite.",
         "unavailable": "Browserul acesta nu poate păstra muzica offline."
+    },
+    "playback": {
+        "title": "Redare",
+        "open": "Setări de redare",
+        "crossfade": "Tranziție între piese",
+        "crossfadeOff": "Oprită (fără pauză)",
+        "crossfadeSeconds": "{count, plural, one {# secundă} few {# secunde} other {# de secunde}}",
+        "crossfadeHint": "Suprapune finalul unei piese cu începutul următoarei. Albumele redate în ordine rămân mereu fără pauză.",
+        "automix": "Automix (pe ritm)",
+        "automixHint": "Cu tranziția pornită: potrivește tempoul (până la 6%) și pornește piesa următoare pe ritm când serverul îi știe BPM-ul. Altfel, tranziția este simplă."
+    },
+    "tv": {
+        "button": "Redă pe TV",
+        "title": "Redă coada pe",
+        "sent": "Coada se redă acum pe {device}",
+        "errEmpty": "Nu există nimic în coadă de trimis.",
+        "errNotFound": "{device} nu a găsit aceste melodii. Verifică dacă este conectat la același server."
     }
 }

@@ -322,6 +322,14 @@ export interface TrackCard {
     hasLyrics: boolean;
     hasSyncedLyrics: boolean;
     plays?: number;
+    /** Tempo in BPM (file tag, Deezer or analyzer); absent when unknown (server 3.13+). */
+    bpm?: number | null;
+    /** Analyzer tempo confidence 0..1; absent for tag / Deezer BPM. */
+    bpmConfidence?: number | null;
+    /** Camelot key (analyzer or file tag), e.g. `8A`. */
+    keyCamelot?: string | null;
+    /** First downbeat (else first beat) in seconds; present only when a beat grid was measured. */
+    firstBeatSec?: number | null;
     coverArt: string;
     coverUrlPath: string;
     streamUrlPath: string;

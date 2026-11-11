@@ -8,6 +8,7 @@
  *
  *   <PlayOnTvButton kind="movie" tmdbId={603} title="The Matrix" />   — popover picker (title pages)
  *   <TvDeviceList … onSent={…} />                                     — inline list (player side panel)
+ *   <HubDevicePicker list busy onPick />                              — the bare list (music `send-to-tv-button.tsx` reuses it)
  */
 import "./player/player.css";
 import { useMemo, useState } from "react";
@@ -36,20 +37,31 @@ export interface PlayOnTvProps {
 export function castableDevices(devices: readonly HubDevice[], selfId: string): HubDevice[] {
     return devices
         .filter((d) => d.deviceId !== selfId && !d.guest && Array.isArray(d.caps) && d.caps.includes("play"))
-        .sort((a, b) => Number(isTv(b)) - Number(isTv(a)) || a.name.localeCompare(b.name));
+        .sort(tvFirst);
 }
 
 export function isTv(d: Pick<HubDevice, "platform">): boolean {
     return /tizen|android-tv|androidtv|tv|webos/i.test(d.platform);
 }
 
+/** Sort order of device pickers: TVs first, then by name. */
+export function tvFirst(a: Pick<HubDevice, "platform" | "name">, b: Pick<HubDevice, "platform" | "name">): number {
+    return Number(isTv(b)) - Number(isTv(a)) || a.name.localeCompare(b.name);
+}
+
 export type SendResult = { ok: true; device: HubDevice } | { ok: false; reason: "no_file" | "offline" | "timeout" | "rejected"; detail?: string };
+
+/** This browser's hub device id ("" during SSR). */
+export function useSelfDeviceId(): string {
+    const [selfId] = useState(() => (typeof window === "undefined" ? "" : deviceId()));
+    return selfId;
+}
 
 /** Resolve (when needed) + send `play` to one device. Pure-ish: all I/O comes through `clients`. */
 export function usePlayOnTv(p: PlayOnTvProps) {
     const { clients, devices } = useMmo();
     const [busy, setBusy] = useState<string | null>(null);
-    const [selfId] = useState(() => (typeof window === "undefined" ? "" : deviceId()));
+    const selfId = useSelfDeviceId();
     const list = useMemo(() => castableDevices(devices, selfId), [devices, selfId]);
 
     const send = async (d: HubDevice): Promise<SendResult> => {
@@ -85,27 +97,17 @@ export function usePlayOnTv(p: PlayOnTvProps) {
     return { list, busy, send };
 }
 
-export interface TvDeviceListProps extends PlayOnTvProps {
-    /** Called after the TV acknowledged `play`. */
-    onSent?(device: HubDevice): void;
+export interface HubDevicePickerProps {
+    list: readonly HubDevice[];
+    /** deviceId of the device being sent to (disables the list). */
+    busy: string | null;
+    onPick(device: HubDevice): void;
 }
 
-export function TvDeviceList({ onSent, ...p }: TvDeviceListProps) {
+/** Hub status line / empty state / clickable device list (strings from `mx.player.cast`, device-generic). */
+export function HubDevicePicker({ list, busy, onPick }: HubDevicePickerProps) {
     const t = useTranslations("mx.player.cast");
     const { hubStatus } = useMmo();
-    const { list, busy, send } = usePlayOnTv(p);
-
-    const pick = async (d: HubDevice) => {
-        const r = await send(d);
-        if (r.ok) {
-            toast.success(t("sent", { device: d.name, title: p.title }));
-            onSent?.(d);
-            return;
-        }
-        toast.error(r.reason === "no_file" ? t("errNoFile") : r.reason === "timeout" ? t("errTimeout", { device: d.name })
-            : r.reason === "offline" ? t("errOffline", { device: d.name }) : t("errRejected", { device: d.name, reason: r.detail ?? "?" }));
-    };
-
     if (hubStatus !== "connected") {
         return <p className="mxp-muted" role="status">{hubStatus === "connecting" ? t("connecting") : t("hubOffline")}</p>;
     }
@@ -124,7 +126,7 @@ export function TvDeviceList({ onSent, ...p }: TvDeviceListProps) {
                 const playing = d.nowPlaying?.media?.title;
                 return (
                     <li key={d.deviceId}>
-                        <button type="button" className="mxp-cast-item" onClick={() => { void pick(d); }} disabled={busy !== null} aria-busy={busy === d.deviceId || undefined}>
+                        <button type="button" className="mxp-cast-item" onClick={() => onPick(d)} disabled={busy !== null} aria-busy={busy === d.deviceId || undefined}>
                             {busy === d.deviceId ? <Loader2 aria-hidden className="size-5 mxp-spin" /> : isTv(d) ? <Tv aria-hidden className="size-5" /> : <MonitorPlay aria-hidden className="size-5" />}
                             <span className="mxp-cast-text">
                                 <span className="mxp-cast-name">{d.name}</span>
@@ -138,11 +140,33 @@ export function TvDeviceList({ onSent, ...p }: TvDeviceListProps) {
     );
 }
 
+export interface TvDeviceListProps extends PlayOnTvProps {
+    /** Called after the TV acknowledged `play`. */
+    onSent?(device: HubDevice): void;
+}
+
+export function TvDeviceList({ onSent, ...p }: TvDeviceListProps) {
+    const t = useTranslations("mx.player.cast");
+    const { list, busy, send } = usePlayOnTv(p);
+
+    const pick = async (d: HubDevice) => {
+        const r = await send(d);
+        if (r.ok) {
+            toast.success(t("sent", { device: d.name, title: p.title }));
+            onSent?.(d);
+            return;
+        }
+        toast.error(r.reason === "no_file" ? t("errNoFile") : r.reason === "timeout" ? t("errTimeout", { device: d.name })
+            : r.reason === "offline" ? t("errOffline", { device: d.name }) : t("errRejected", { device: d.name, reason: r.detail ?? "?" }));
+    };
+    return <HubDevicePicker list={list} busy={busy} onPick={(d) => { void pick(d); }} />;
+}
+
 /** Compact button + popover picker for title / episode rows. Hidden while the hub has no castable devices. */
 export function PlayOnTvButton(p: PlayOnTvProps & { size?: "default" | "sm" | "lg"; variant?: "outline" | "secondary" | "ghost" }) {
     const t = useTranslations("mx.player.cast");
     const { devices } = useMmo();
-    const [selfId] = useState(() => (typeof window === "undefined" ? "" : deviceId()));
+    const selfId = useSelfDeviceId();
     const [open, setOpen] = useState(false);
     const any = castableDevices(devices, selfId).length > 0;
     if (!any) return null;

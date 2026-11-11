@@ -395,8 +395,21 @@ private fun ConnectedScreen(route: Route, nav: Navigator, d: ScreenDeps, progres
 }
 
 /**
- * Hub `play {trackIds,index,positionSec,shuffle,repeat}` (WP17-41h): a phone sends its music queue; it plays in the
- * TV's background music (own crossfade / normalisation). A video on screen is stopped first; Now Playing opens.
+ * Hub `play {trackIds,index,positionSec,shuffle,repeat}` (WP17-41h): a phone or the web music player sends its
+ * queue; it plays in the TV's background music (own crossfade / normalisation). A video on screen is stopped
+ * first; Now Playing opens.
+ *
+ * Shared arg shape (devices advertising the `music` cap):
+ *
+ *   { trackIds: string[]   Subsonic track ids (`tr_<n>`), ≤ 2000, in play order
+ *     index: number        position of the track to start with in `trackIds`
+ *     positionSec: number  where to start inside that track
+ *     shuffle: boolean     true = shuffle the list here
+ *     repeat: "off" | "all" | "one" }
+ *
+ * Senders: web music "Play on TV" (`apps/web/src/components/mmo/music/send-to-tv.ts`), MixAI Music Android
+ * (`cast/Transports.kt` `HubTvTransport.load`), MixAI Music iOS (`MusicAppModel.handoff`). The same names are read
+ * by tv-tizen `src/lib/music-remote.ts` `parseMusicPlayArgs` — change all sides together.
  */
 private fun playMusicQueue(d: ScreenDeps, nav: Navigator, cmd: HubCommand, ids: List<String>, scope: CoroutineScope) {
     val hub = d.hub

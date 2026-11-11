@@ -133,5 +133,22 @@
         "queued": "{count, plural, one {# song queued for download} other {# songs queued for download}}",
         "error": "Could not queue the downloads.",
         "unavailable": "This browser cannot keep music offline."
+    },
+    "playback": {
+        "title": "Playback",
+        "open": "Playback settings",
+        "crossfade": "Crossfade",
+        "crossfadeOff": "Off (gapless)",
+        "crossfadeSeconds": "{count, plural, one {# second} other {# seconds}}",
+        "crossfadeHint": "Blends the end of a song into the start of the next one. Albums played in order always stay gapless.",
+        "automix": "Automix (beat-matched)",
+        "automixHint": "With crossfade on: matches the tempo (up to 6%) and brings the next song in on the beat when the server knows its BPM. Otherwise it is a plain crossfade."
+    },
+    "tv": {
+        "button": "Play on TV",
+        "title": "Play the queue on",
+        "sent": "The queue is now playing on {device}",
+        "errEmpty": "There is nothing in the queue to send.",
+        "errNotFound": "{device} could not find these songs. Check that it is connected to the same server."
     }
 }

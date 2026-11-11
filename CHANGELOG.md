@@ -10,6 +10,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI Music on the web: automix, harmonic radio, Play on TV (WP17-105, 2026-11-11)
+
+Web 3.5.0. The music player at music.mixai.ro — also the window of MixAI Music for Mac and Windows — gains the three
+things the desktop store listings already promised:
+
+- **Crossfade and automix.** A new Playback setting (music home, mini player, Now Playing): crossfade 0–12 s (off by
+  default, as on Android and iPhone) and Automix (on by default). With crossfade on, the next song is tempo-matched (up to 6 %, pitch kept), comes in
+  on its first downbeat, the fade starts on a downbeat of the playing song and lasts whole bars, then the tempo
+  glides back. Without tempo data from the server it is a plain crossfade. Albums played in order keep playing
+  without a fade.
+- **Harmonic radio.** A radio started from a song, album or artist now asks the server for key- and tempo-aware
+  order (`order=harmonic`, server 3.13 or newer; older servers ignore it).
+- **Play on TV.** Now Playing can hand the queue, the current song and the position to a MixAI TV (Android TV,
+  Tizen, webOS, TV desktop) connected to the same server; the browser pauses once the TV confirms.
+
+Not measured on a device yet: beat alignment by ear, and a handoff to a real TV (covered by unit and contract tests).
+
 ## Age limits hold in Search and Library on every app (WP17-102, 2026-11-10)
 
 A kids profile could see titles above its age limit in Search. Two causes, both fixed:

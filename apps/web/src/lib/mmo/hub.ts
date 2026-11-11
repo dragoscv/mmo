@@ -5,6 +5,7 @@
  *  - `time {t0}` pings (3 × 1 s, then every 30 s) → `ClockEstimator` (sync-math.ts);
  *  - reconnect with exponential backoff 1 s → 30 s, rejoin the room after a reconnect;
  *  - incoming `cmd` → `commands` emitter (App routes them; reply with `ack(seq, ok)`);
+ *  - incoming `ack` (answer to a `cmd` this browser sent) → `acks` emitter / `commandAwait()`;
  *  - forwards `playerBus` now-playing as `state` (≤ 1/s);
  *  - Watch Together rooms (`room:*`).
  * Everything is safe to call while disconnected (messages are dropped).
@@ -115,6 +116,8 @@ export class HubClient {
 
     readonly statusChanged = new Emitter<HubStatus>();
     readonly commands = new Emitter<HubCommand>();
+    /** Acks for commands sent with `command()` / `commandAwait()` (matched by `seq`). */
+    readonly acks = new Emitter<HubAck>();
     readonly devicesChanged = new Emitter<HubDevice[]>();
     readonly roomChanged = new Emitter<RoomState | null>();
     readonly chat = new Emitter<RoomChat>();
@@ -266,6 +269,13 @@ export class HubClient {
                 this.commands.emit({ action, args: obj(msg.args) ?? {}, seq: str(msg.seq) ?? "", fromName: str(from?.name) ?? "", fromDeviceId: str(from?.deviceId) ?? "" });
                 return;
             }
+            case "ack": {
+                const seq = str(msg.seq);
+                if (!seq) return;
+                const error = str(msg.error), from = str(msg.from), state = obj(msg.state);
+                this.acks.emit({ ok: msg.ok !== false, seq, ...(error ? { error } : {}), ...(from ? { from } : {}), ...(state ? { state } : {}) });
+                return;
+            }
             case "devices":
                 this.devices = Array.isArray(msg.devices) ? (msg.devices as HubDevice[]) : [];
                 this.devicesChanged.emit(this.devices);
@@ -374,6 +384,23 @@ export class HubClient {
         const seq = `tz${Date.now().toString(36)}${(this.seqN++).toString(36)}`;
         this.send({ type: "cmd", target: targetDeviceId, action, args, seq });
         return seq;
+    }
+
+    /**
+     * Send a command over the socket and wait for the target's ack. Unlike `sendCommand()` (HTTP, the server
+     * gives the device 4 s) the wait is ours, so slow commands — a TV resolving a long music queue — still
+     * answer. Never rejects: `{ok:false, error}` with `offline` (socket closed), `no_such_device` (server) or
+     * `timeout`.
+     */
+    commandAwait(targetDeviceId: string, action: string, args: Json = {}, timeoutMs = 12_000): Promise<HubAck> {
+        const seq = `tz${Date.now().toString(36)}${(this.seqN++).toString(36)}`;
+        return new Promise<HubAck>((resolve) => {
+            let timer: ReturnType<typeof setTimeout> | null = null;
+            const done = (a: HubAck) => { if (timer) clearTimeout(timer); off(); resolve(a); };
+            const off = this.acks.on((a) => { if (a.seq === seq) done(a); });
+            timer = setTimeout(() => done({ ok: false, seq, error: "timeout" }), timeoutMs);
+            if (!this.send({ type: "cmd", target: targetDeviceId, action, args, seq })) done({ ok: false, seq, error: "offline" });
+        });
     }
 
     // ─── outbound: Watch Together ─────────────────────────────────────────

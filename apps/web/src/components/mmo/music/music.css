@@ -321,6 +321,17 @@
     .mu-mini-time, .mu-mini .is-optional { display: none; }
 }
 
+/* ─── playback settings (crossfade + automix) ─────────────────────── */
+
+.mu-pb { display: grid; gap: 0.9rem; }
+.mu-pb-title { margin: 0; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground); }
+.mu-pb-field { display: grid; gap: 0.35rem; }
+.mu-pb-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.9rem; font-weight: 600; }
+.mu-pb-value { color: var(--muted-foreground); font-weight: 500; font-variant-numeric: tabular-nums; }
+.mu-pb-range { width: 100%; min-height: 1.5rem; accent-color: var(--primary); }
+.mu-pb-hint { margin: 0; color: var(--muted-foreground); font-size: 0.8rem; line-height: 1.4; }
+.mu-pb-switch { cursor: pointer; }
+
 /* ─── reduced motion ──────────────────────────────────────────────── */
 
 [data-motion="reduced"] .mu-bars.is-on i { animation: none; transform: scaleY(0.7); }

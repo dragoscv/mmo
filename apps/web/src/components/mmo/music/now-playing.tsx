@@ -2,8 +2,9 @@
 
 /**
  * `/media/music/now-playing` (WP16-40): large cover over a blurred cover backdrop, seek bar, transport,
- * volume; Lyrics / Queue panel. Synced lyrics auto-scroll to keep the current line centred (instant under
- * reduced motion; paused 4 s after the user scrolls), click a line to seek. Queue: play, move up/down, remove.
+ * volume; Lyrics / Queue panel + "Play on TV" (hands the queue to a hub device, `send-to-tv-button.tsx`).
+ * Synced lyrics auto-scroll to keep the current line centred (instant under reduced motion; paused 4 s after
+ * the user scrolls), click a line to seek. Queue: play, move up/down, remove.
  * Space toggles play when focus is not in a form field.
  */
 import Link from "@/components/host/host-context";
@@ -16,6 +17,8 @@ import type { MusicClient } from "@/lib/mmo/music";
 import { currentLineIndex, fmtClock, looksLikeLrc, parseLrc } from "@/lib/mmo/music-core";
 import { useWebMusicProgress, useWebMusicState, useWebMusicVolume, webMusicPlayer } from "@/lib/mmo/web-music-player";
 import { Cover, PlayingBars, RadioButton, albumHref, artistHref } from "./common";
+import { PlaybackSettingsButton } from "./playback-settings";
+import { SendQueueToTv } from "./send-to-tv-button";
 import { NextButton, PlayPauseButton, PrevButton, RepeatButton, ShuffleButton } from "./transport";
 import { useLoad, useMusic } from "./use-music";
 
@@ -91,13 +94,16 @@ export function NowPlayingScreen() {
                 </div>
             </div>
             <div className="np-right">
-                <div className="np-tabs" role="group" aria-label={t("player.panel")}>
-                    <button type="button" className="mu-chip" aria-pressed={panel === "lyrics"} onClick={() => setPanel("lyrics")}>
-                        <Mic2 aria-hidden className="size-4" />{t("player.lyrics")}
-                    </button>
-                    <button type="button" className="mu-chip" aria-pressed={panel === "queue"} onClick={() => setPanel("queue")}>
-                        <ListMusic aria-hidden className="size-4" />{t("player.queue", { count: st.queue.length })}
-                    </button>
+                <div className="np-tabs flex-wrap">
+                    <div className="flex flex-wrap gap-2" role="group" aria-label={t("player.panel")}>
+                        <button type="button" className="mu-chip" aria-pressed={panel === "lyrics"} onClick={() => setPanel("lyrics")}>
+                            <Mic2 aria-hidden className="size-4" />{t("player.lyrics")}
+                        </button>
+                        <button type="button" className="mu-chip" aria-pressed={panel === "queue"} onClick={() => setPanel("queue")}>
+                            <ListMusic aria-hidden className="size-4" />{t("player.queue", { count: st.queue.length })}
+                        </button>
+                    </div>
+                    <SendQueueToTv className="mu-chip ml-auto" />
                 </div>
                 <div className="np-panel">
                     {panel === "lyrics" ? <LyricsPanel music={music} trackId={cur.id} /> : <QueuePanel music={music} />}
@@ -142,6 +148,7 @@ function VolumeControl() {
             </button>
             <input type="range" min={0} max={100} step={1} value={Math.round(level * 100)} aria-label={t("volume")}
                 aria-valuetext={`${Math.round(level * 100)} %`} onChange={(e) => webMusicPlayer.setVolume(Number(e.target.value) / 100)} />
+            <PlaybackSettingsButton variant="mini" />
         </div>
     );
 }
