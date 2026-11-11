@@ -254,7 +254,7 @@ final class AppModel {
                 if let k = c.args["kind"]?.stringValue.flatMap(MediaKind.init(rawValue:)), let id = c.args["tmdbId"]?.doubleValue {
                     ref = MediaRef(kind: k, tmdbId: Int(id), season: c.args["season"]?.doubleValue.map { Int($0) }, episode: c.args["episode"]?.doubleValue.map { Int($0) })
                 }
-                player.start(PlayRequest(source: .file(fileId: fid, ref: ref, startSec: start), title: c.args["title"]?.stringValue ?? "MixAI", subtitle: nil, artwork: nil), app: self)
+                player.start(PlayRequest(source: .file(fileId: fid, ref: ref, startSec: start), title: c.args["title"]?.stringValue ?? "MixAI TV", subtitle: nil, artwork: nil), app: self)
             } else if video {
                 player.play()
             } else if music.current != nil {
@@ -434,7 +434,7 @@ final class AppModel {
     /// Notification tap / action (`url`, optional `fileId` + `title` for "Download").
     func handleNotification(action: String, url: String?, fileId: String?, title: String?) {
         if action == "DOWNLOAD", let fileId {
-            offline.enqueue(fileId: fileId, audio: 0, ref: nil, title: title ?? "MixAI", show: nil, posterPath: nil, smart: false)
+            offline.enqueue(fileId: fileId, audio: 0, ref: nil, title: title ?? "MixAI TV", show: nil, posterPath: nil, smart: false)
             pendingRoute = .downloads
             return
         }

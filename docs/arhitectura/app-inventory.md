@@ -1,34 +1,36 @@
-# MixAI app inventory (2026-11-06)
+# MixAI app inventory (2026-11-06, versions and names refreshed 2026-11-11)
 
-Canonical list of every app and surface, today and target. Decisions: [ADR-0013](../adr/0013-product-family-and-domains.md).
-Work: tracker §12 WP17. Update this table in the same commit as any release, rename or new store listing.
+Canonical list of every app and surface, today and target. Decisions: [ADR-0013](../adr/0013-product-family-and-domains.md),
+[ADR-0016](../adr/0016-mixai-tv-name-brand-and-experience.md) (MixAI TV name on phones, one Play listing, rebrand).
+Work: tracker §12 WP17 and §15 WP22. Update this table in the same commit as any release, rename or new store listing.
 
 ## Today
 
 | Surface | Path | Name today | ID | Version | Purpose | Distribution today |
 |---|---|---|---|---|---|---|
-| Web | `apps/web` | MixAI | — | 3.1.7 | Watching (`/media`) + organizer + DJ live + AI | Cloud Run, `mixai.ro` |
-| Android TV | `apps/tv-android` | MixAI TV | `ro.mixai.tv` | 2.1.2 | Watching | Sideload / CI artifact |
-| Phone Android | `apps/phone-android` | MixAI | `ro.mixai.app` | 1.1.0 | Watching, remote, downloads | **Google Play production, live 2026-11-06** |
+| Web | `apps/web` | MixAI | — | 3.5.0 | Watching (`/media`) + organizer + DJ live + AI | Cloud Run, `mixai.ro` |
+| Android TV | `apps/tv-android` | MixAI TV | `ro.mixai.tv` (moves to `ro.mixai.app`, D72) | 2.3.1 | Watching | Sideload / GitHub release `tv-v2.3.1` (unsigned) |
+| Phone Android | `apps/phone-android` | MixAI TV (was MixAI up to 1.3.1) | `ro.mixai.app` | 1.3.2 | Watching, remote, downloads | **Google Play production** (1.3.1 live 2026-11-11 as "MixAI"; 1.3.2 carries the rename, WP22-01) |
 | Music Android | `apps/music-android/app` (`:music`) | MixAI Music | `ro.mixai.music` | 0.1.0 | Music: library, search, now playing, lyrics, queue | Debug builds; Play record pending (WP17-41i) |
 | Android shared libs | `apps/mobile-android-common` (`:mobile-common`), `apps/music-android/music-ui` (`:music-ui`) | — | `ro.mixai.mobile`, `ro.mixai.music.ui` | — | Theme/tokens, connect + sign-in, profiles; shared music screens (D50/D52) | Built into `:phone` and `:music` |
-| iPhone | `apps/ios` | MixAI | `ro.mixai.app` | 1.1.0 | Watching, remote, downloads, widgets | App Store, waiting for review |
-| Apple Watch | `apps/ios/MixAIWatch` | MixAI | `ro.mixai.app.watchkitapp` | 1.1.0 | Remote, now playing | Not embedded in 1.1.x |
-| Samsung TV | `apps/tv-tizen` | MixAI TV | `mXa1TvApp0` | 2.2.0 | Watching | Sideload (signed `.wgt`) |
-| Web shell | `apps/native` | MixAI | `ro.mixai.app` (clash) | 1.0.0 | Tauri/Capacitor wrapper that loads `mixai.ro` | GH Release |
+| iPhone | `apps/ios` | MixAI TV in source from 1.1.2 (store record still "MixAI") | `ro.mixai.app` | 1.1.2 | Watching, remote, downloads, widgets | App Store: 1.1.1 approved 2026-11-11 (not sold in the 27 EU storefronts, WP16-48); 1.1.2 not submitted (WP22-02) |
+| Apple TV | `apps/ios/MixAITV` | MixAI TV (same store record as iPhone) | `ro.mixai.app` | 1.1.0 | Watching | App Store: 1.1.0 build 516 waiting for review |
+| Apple Watch | `apps/ios/MixAIWatch` | MixAI TV in source from 1.1.2 | `ro.mixai.app.watchkitapp` | 1.1.2 | Remote, now playing | Not embedded in 1.1.x |
+| Samsung TV | `apps/tv-tizen` | MixAI TV | `mXa1TvApp0` | 2.4.1 | Watching | Sideload (signed `.wgt`) |
+| Web shell | `apps/native` | MixAI Studio | `ro.mixai.studio` | 1.1.1 | Tauri/Capacitor wrapper that loads `mixai.ro` | GH Release |
 | Decks | `apps/mixai` | MixAI Decks (was MixAI DJ, D60) | `ro.mixai.dj` | 1.1.0 | DJ / creation. Rust crates in `apps/mixai/src-tauri/crates`: `mixai-core` (engine), `decks-analysis`, `decks-library`, `decks-mapping`, `decks-dvs`, `decks-render` + shared `crates/mixai-listen` — built and unit-tested; UniFFI facade + native UIs (2.0) todo. Docs: [`docs/decks/`](../decks/README.md) | 1.0.0 MSIX in MS Store certification (as MixAI DJ); 1.x Tauri on `decks-release.yml` |
 | Live (browser) | `apps/web` route `/live` | MixAI Live (web) | — | web | Browser vocal processor (Web Audio FX engine `lib/audio-fx-engine.ts`); host `live.mixai.ro` mounts it at `/` once host routing is on (ADR-0015) | Cloud Run (inside Studio today) |
 | Live (native) | `apps/live` | MixAI Live | `ro.mixai.live` | — | Realtime vocal processor: Rust engine (`apps/live/engine`), Tauri desktop, remote controllers (ADR-0015, WP21) | In development; no store records yet; tags `live-v*` |
 | Extension | `apps/extension` | MixAI downloader | `mixai-downloader@mixai.ro` | 3.0.1 | Download helper | Release workflow exists, not published |
-| Server | `server` | MixAI Companion — MMO Server | `ro.mixai.companion` | 3.9.6 | Server | GH Release, Docker, Pi |
+| Server | `server` | MixAI Companion — MMO Server | `ro.mixai.companion` | 3.15.0 | Server | GH Release, Docker, Pi |
 | Gateway | `apps/gateway` | — | — | 0.1.0 | Infra | Cloud Run |
 
 ## Target
 
 | Product | Platform | Store | Path (planned) | ID | Tracker |
 |---|---|---|---|---|---|
-| MixAI TV | Android TV / Google TV | Google Play | `apps/tv-android` | `ro.mixai.tv` | WP17-20 |
-| MixAI TV | Fire TV | Amazon Appstore | `apps/tv-android` (flavor `amazon`) | `ro.mixai.tv` | WP17-21 |
+| MixAI TV | Android TV / Google TV | Google Play, same listing as the phone app (D72) | `apps/tv-android` | `ro.mixai.app` | WP22-11, WP17-20 |
+| MixAI TV | Fire TV | Amazon Appstore | `apps/tv-android` (same build) | `ro.mixai.app` | WP17-21 |
 | MixAI TV | Samsung Tizen | Samsung Seller Office (Partner) | `apps/tv-web` (ex tv-tizen) | `mXa1TvApp0` | WP17-22 |
 | MixAI TV | LG webOS | LG Content Store | `apps/tv-web` platform `webos` | `ro.mixai.tv` | WP17-23 |
 | MixAI TV | Apple TV | App Store (universal with iOS) | `apps/ios` tvOS target | `ro.mixai.app` | WP17-24 |
@@ -36,8 +38,8 @@ Work: tracker §12 WP17. Update this table in the same commit as any release, re
 | MixAI TV | macOS | Mac App Store + DMG | `apps/tv-desktop` | `ro.mixai.tv.desktop` | WP17-26 |
 | MixAI TV | Linux | Flathub | `apps/tv-desktop` | `ro.mixai.tv.desktop` | WP17-27 |
 | MixAI TV | Web | `tv.mixai.ro` (PWA) | `apps/web` host routing | — | WP17-10 |
-| MixAI TV | Android phone/tablet | Google Play | `apps/phone-android` (rename) | `ro.mixai.app` | WP17-28 |
-| MixAI TV | iPhone/iPad | App Store | `apps/ios` (rename, iPad) | `ro.mixai.app` | WP17-29 |
+| MixAI TV | Android phone/tablet | Google Play | `apps/phone-android` (tablet layout) | `ro.mixai.app` | WP22-01, WP17-28 |
+| MixAI TV | iPhone/iPad | App Store | `apps/ios` (iPad) | `ro.mixai.app` | WP22-02, WP17-29 |
 | MixAI Music | Web | `music.mixai.ro` (PWA) | `apps/web` host routing | — | WP17-40 |
 | MixAI Music | Android phone + Wear + Auto | Google Play | `apps/music-android` | `ro.mixai.music` | WP17-41 |
 | MixAI Music | iPhone + CarPlay | App Store | `apps/ios` target `MixAIMusic` | `ro.mixai.music` | WP17-42 |

@@ -2,7 +2,7 @@
 <resources>
     <!-- play on / handoff / cast -->
     <string name="playon_title">Redă pe</string>
-    <string name="playon_empty">Niciun televizor cu MixAI nu e conectat la acest server. Deschide MixAI pe televizor și asociază-l cu același MMO Server.</string>
+    <string name="playon_empty">Niciun televizor cu MixAI TV nu e conectat la acest server. Deschide MixAI TV pe televizor și asociază-l cu același MMO Server.</string>
     <string name="playon_now_playing">Rulează: %1$s</string>
     <string name="playon_ready">Pregătit</string>
     <string name="playon_sent">Se redă pe %1$s</string>

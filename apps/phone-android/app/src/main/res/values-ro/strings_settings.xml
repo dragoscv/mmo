@@ -27,8 +27,8 @@
     <string name="settings_device_name_hint">Apare pe celelalte dispozitive în MMO Server. Lasă gol pentru a folosi modelul telefonului.</string>
     <string name="settings_save">Salvează</string>
     <string name="settings_section_about">Despre</string>
-    <string name="settings_version">MixAI %1$s</string>
+    <string name="settings_version">MixAI TV %1$s</string>
     <string name="settings_licences">Fonturile Inter și Space Grotesk sunt folosite sub licența SIL Open Font License 1.1.</string>
     <string name="settings_live_tv_title">TV live</string>
-    <string name="settings_live_tv_notice">MixAI nu include niciun canal. TV live redă doar listele pe care le adaugi tu în MMO Server.</string>
+    <string name="settings_live_tv_notice">MixAI TV nu include niciun canal. TV live redă doar listele pe care le adaugi tu în MMO Server.</string>
 </resources>

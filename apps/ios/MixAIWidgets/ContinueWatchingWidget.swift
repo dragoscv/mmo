@@ -66,7 +66,7 @@ struct ContinueWatchingProvider: AppIntentTimelineProvider {
             date: .now,
             profileName: nil,
             items: [
-                WidgetSnapshot.Item(kind: "movie", tmdbId: 0, title: "MixAI", subtitle: nil, progress: 0.4, imageFile: nil),
+                WidgetSnapshot.Item(kind: "movie", tmdbId: 0, title: "MixAI TV", subtitle: nil, progress: 0.4, imageFile: nil),
             ])
     }
 

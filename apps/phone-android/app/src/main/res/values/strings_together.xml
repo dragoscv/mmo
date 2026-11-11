@@ -22,7 +22,7 @@
     <string name="together_room_id_label">Room %1$s</string>
     <string name="together_invite">Invite</string>
     <string name="together_invite_share_title">Invite to Watch Together</string>
-    <string name="together_invite_text">Watch with me on MixAI: %1$s</string>
+    <string name="together_invite_text">Watch with me on MixAI TV: %1$s</string>
     <string name="together_leave">Leave</string>
     <string name="together_members">Members (%1$d)</string>
     <string name="together_host">Host</string>

@@ -10,7 +10,7 @@ struct NowPlayingProvider: TimelineProvider {
     func placeholder(in context: Context) -> NowPlayingEntry {
         NowPlayingEntry(
             date: .now,
-            nowPlaying: WidgetSnapshot.NowPlaying(title: "MixAI", subtitle: nil, playing: true, source: .music, imageFile: nil, updatedAt: .now))
+            nowPlaying: WidgetSnapshot.NowPlaying(title: "MixAI TV", subtitle: nil, playing: true, source: .music, imageFile: nil, updatedAt: .now))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (NowPlayingEntry) -> Void) {

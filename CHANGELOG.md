@@ -10,6 +10,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ---
 
+## MixAI TV: the phone apps take the product name (WP22-01/02, 2026-11-11)
+
+Android phone 1.3.2 (versionCode 6), iPhone 1.1.2. No feature change.
+
+- **The watching app is called MixAI TV on phones too.** Until now only the TV, desktop and web apps used the name;
+  the Android phone app, the iPhone app, its widgets and its watch app said "MixAI". The launcher / Home-screen name
+  and the texts that name the app (welcome title, version line, Watch Together invite, "open MixAI TV on your TV"
+  hints, the Live TV notice, widget texts) now say MixAI TV, in English and Romanian. Account and server texts
+  ("your MixAI account", "MixAI Server") are unchanged, and so are the app ids (`ro.mixai.app`).
+- **iPhone:** the local-network permission text now says "MixAI Server" like the Apple TV app. The App Store record
+  (shared by iPhone and Apple TV) takes the new name with the next submission, after the Apple TV 1.1.0 review ends.
+- Decisions and the plan for the family rebrand and the TV redesign: `docs/adr/0016-mixai-tv-name-brand-and-experience.md`,
+  tracker §15 (WP22).
+
 ## MixAI Music on the web: automix, harmonic radio, Play on TV (WP17-105, 2026-11-11)
 
 Web 3.5.0. The music player at music.mixai.ro — also the window of MixAI Music for Mac and Windows — gains the three

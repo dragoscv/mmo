@@ -22,7 +22,7 @@
     <string name="together_room_id_label">Camera %1$s</string>
     <string name="together_invite">Invită</string>
     <string name="together_invite_share_title">Invitație la vizionare împreună</string>
-    <string name="together_invite_text">Urmărește cu mine pe MixAI: %1$s</string>
+    <string name="together_invite_text">Urmărește cu mine pe MixAI TV: %1$s</string>
     <string name="together_leave">Ieși</string>
     <string name="together_members">Participanți (%1$d)</string>
     <string name="together_host">Gazdă</string>

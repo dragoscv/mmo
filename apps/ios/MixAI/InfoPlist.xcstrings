@@ -7,13 +7,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "MixAI"
+            "value": "MixAI TV"
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "MixAI"
+            "value": "MixAI TV"
           }
         }
       }
@@ -24,13 +24,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "MixAI finds and connects to your MMO Server on this network to play your movies, shows and music."
+            "value": "MixAI TV finds and connects to your MixAI Server on this network to play your movies, shows and music."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "MixAI găsește serverul MMO în această rețea și se conectează la el ca să redea filmele, serialele și muzica ta."
+            "value": "MixAI TV găsește serverul MixAI în această rețea și se conectează la el ca să redea filmele, serialele și muzica ta."
           }
         }
       }

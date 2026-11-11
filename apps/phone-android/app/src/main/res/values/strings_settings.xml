@@ -27,8 +27,8 @@
     <string name="settings_device_name_hint">Shown to your other devices in MMO Server. Leave empty to use the phone model.</string>
     <string name="settings_save">Save</string>
     <string name="settings_section_about">About</string>
-    <string name="settings_version">MixAI %1$s</string>
+    <string name="settings_version">MixAI TV %1$s</string>
     <string name="settings_licences">Fonts Inter and Space Grotesk are used under the SIL Open Font License 1.1.</string>
     <string name="settings_live_tv_title">Live TV</string>
-    <string name="settings_live_tv_notice">MixAI ships no channels. Live TV plays only the playlists you add yourself in MMO Server.</string>
+    <string name="settings_live_tv_notice">MixAI TV ships no channels. Live TV plays only the playlists you add yourself in MMO Server.</string>
 </resources>

@@ -57,7 +57,7 @@ struct SplashView: View {
         ZStack {
             Theme.background.ignoresSafeArea()
             Image("BrandMark").resizable().scaledToFit().frame(width: 96)
-                .accessibilityLabel("MixAI")
+                .accessibilityLabel("MixAI TV")
         }
     }
 }

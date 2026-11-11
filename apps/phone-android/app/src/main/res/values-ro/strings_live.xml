@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="live_notice_title">TV live folosește sursele tale</string>
-    <string name="live_notice_body">Sursele le adaugi tu în MMO Server. MixAI nu include niciun canal. Folosește doar surse pe care ai dreptul să le urmărești.</string>
+    <string name="live_notice_body">Sursele le adaugi tu în MMO Server. MixAI TV nu include niciun canal. Folosește doar surse pe care ai dreptul să le urmărești.</string>
     <string name="live_notice_accept">Am înțeles</string>
     <string name="live_mode_channels">Canale</string>
     <string name="live_mode_guide">Ghid</string>

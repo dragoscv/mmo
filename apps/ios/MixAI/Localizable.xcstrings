@@ -1180,13 +1180,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "MixAI uses %@ · %@ free"
+            "value": "MixAI TV uses %@ · %@ free"
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "MixAI folosește %@ · %@ liber"
+            "value": "MixAI TV folosește %@ · %@ liber"
           }
         }
       }
@@ -1622,13 +1622,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Opens MixAI on Live TV."
+            "value": "Opens MixAI TV on Live TV."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deschide MixAI la TV live."
+            "value": "Deschide MixAI TV la TV live."
           }
         }
       }
@@ -2370,13 +2370,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "You add your own sources; MixAI ships no channels. Only use streams you have the right to watch."
+            "value": "You add your own sources; MixAI TV ships no channels. Only use streams you have the right to watch."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tu adaugi propriile surse; MixAI nu include niciun canal. Folosește doar fluxuri pe care ai dreptul să le urmărești."
+            "value": "Tu adaugi propriile surse; MixAI TV nu include niciun canal. Folosește doar fluxuri pe care ai dreptul să le urmărești."
           }
         }
       }
@@ -5634,13 +5634,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open MixAI on your TV connected to the same MMO Server."
+            "value": "Open MixAI TV on your TV connected to the same MMO Server."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deschide MixAI pe televizorul conectat la același server MMO."
+            "value": "Deschide MixAI TV pe televizorul conectat la același server MMO."
           }
         }
       }
@@ -8371,13 +8371,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Welcome to MixAI"
+            "value": "Welcome to MixAI TV"
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bun venit în MixAI"
+            "value": "Bun venit în MixAI TV"
           }
         }
       }
@@ -8405,13 +8405,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open MixAI to start watching"
+            "value": "Open MixAI TV to start watching"
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deschide MixAI ca să începi vizionarea"
+            "value": "Deschide MixAI TV ca să începi vizionarea"
           }
         }
       }
@@ -8507,13 +8507,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "What's playing in MixAI right now."
+            "value": "What's playing in MixAI TV right now."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ce se redă acum în MixAI."
+            "value": "Ce se redă acum în MixAI TV."
           }
         }
       }

@@ -148,7 +148,7 @@ final class TogetherModel {
             if let k = m.kind.flatMap(MediaKind.init(rawValue:)), let id = m.tmdbId { ref = MediaRef(kind: k, tmdbId: id, season: m.season, episode: m.episode) }
             loadedFileId = fid
             drift.reset()
-            app.player.start(PlayRequest(source: .file(fileId: fid, ref: ref, startSec: anchor?.positionSec ?? 0), title: m.title ?? "MixAI", subtitle: nil, artwork: nil), app: app)
+            app.player.start(PlayRequest(source: .file(fileId: fid, ref: ref, startSec: anchor?.positionSec ?? 0), title: m.title ?? "MixAI TV", subtitle: nil, artwork: nil), app: app)
             let pos = anchor?.positionSec ?? 0
             Task { await self.send(RoomMessage.ready(true, positionSec: pos)) }
         }

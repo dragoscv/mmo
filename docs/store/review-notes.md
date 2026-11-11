@@ -1,8 +1,10 @@
-# Store review notes — MixAI (ro.mixai.app)
+# Store review notes — MixAI TV (ro.mixai.app)
 
 Text for the **App Review Information** (App Store Connect) and **App access** (Google Play Console)
 fields. The apps need a MixAI media server; reviewers use the public demo server below (WP16-53, D39).
-Server operations: `infra/demo/README.md`.
+Server operations: `infra/demo/README.md`. The app was named "MixAI" until Android 1.3.1 / iPhone 1.1.1; from
+Android 1.3.2 / iPhone 1.1.2 it is "MixAI TV" (ADR-0016). The "Submitted text" blocks below keep the wording that was
+actually sent at the time.
 
 ## Demo server
 
@@ -18,7 +20,7 @@ Server operations: `infra/demo/README.md`.
 
 ## Steps for the reviewer (both stores)
 
-1. Install and open MixAI. On the welcome screen choose **Connect to a server on this network**
+1. Install and open MixAI TV. On the welcome screen choose **Connect to a server on this network**
   (iOS: **Connect to a server**).
 2. Tap **Enter the address manually** and type `https://demo.mixai.ro`, then **Connect**.
 3. The server is found. Tap **Pair with a code** (Quick Connect). A 6-digit code appears and is approved
@@ -34,7 +36,7 @@ Server operations: `infra/demo/README.md`.
 ## App Store Connect — "Notes" field (paste)
 
 ```
-MixAI plays the user's own media from their own MixAI server (self-hosted). For review we run a public
+MixAI TV plays the user's own media from their own MixAI server (self-hosted). For review we run a public
 demo server with legally licensed content (Blender open movies CC BY, public-domain series, CC BY music).
 Steps: Connect to a server > Enter the address manually > https://demo.mixai.ro > Connect > Pair with a
 code (approved automatically within seconds) > profile "Reviewer". No login is required.
@@ -56,7 +58,7 @@ builds in review keep working; switch the listing URLs to mixai.ro at the next s
 - "All or some functionality is restricted": **Yes** → instructions:
 
 ```
-Open MixAI > Connect to a server on this network > Enter the address manually > type
+Open MixAI TV > Connect to a server on this network > Enter the address manually > type
 https://demo.mixai.ro > Connect > Pair with a code. The demo server approves the code automatically;
 choose the profile "Reviewer".
 No username or password is needed.

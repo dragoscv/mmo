@@ -1,7 +1,8 @@
-# MixAI for iPhone (`apps/ios`)
+# MixAI TV for iPhone (`apps/ios`)
 
 Native SwiftUI app (WP16-47, tracker D34/D36/D37). iOS 26+, Swift 6 strict concurrency, bundle id `ro.mixai.app`,
-team `S6D533QSV2`.
+team `S6D533QSV2`. Users see the name **MixAI TV** from 1.1.2 (D71, ADR-0016: display name, widgets, watch, App Store
+record); the XcodeGen target, scheme and binary keep the name `MixAI`.
 
 | Path | What |
 |---|---|

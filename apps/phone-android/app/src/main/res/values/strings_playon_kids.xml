@@ -2,7 +2,7 @@
 <resources>
     <!-- play on / handoff / cast -->
     <string name="playon_title">Play on</string>
-    <string name="playon_empty">No TV with MixAI is connected to this server. Open MixAI on the TV and pair it with the same MMO Server.</string>
+    <string name="playon_empty">No TV with MixAI TV is connected to this server. Open MixAI TV on the TV and pair it with the same MMO Server.</string>
     <string name="playon_now_playing">Playing: %1$s</string>
     <string name="playon_ready">Ready</string>
     <string name="playon_sent">Playing on %1$s</string>

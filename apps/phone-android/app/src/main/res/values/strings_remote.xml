@@ -3,7 +3,7 @@
     <string name="remote_title">Remote</string>
     <string name="remote_back">Back</string>
     <string name="remote_empty_title">No TV connected</string>
-    <string name="remote_empty_hint">Open MixAI on your TV and pair it with the same MMO Server as this phone.</string>
+    <string name="remote_empty_hint">Open MixAI TV on your TV and pair it with the same MMO Server as this phone.</string>
     <string name="remote_hub_status">Server link: %1$s</string>
     <string name="remote_hub_connected">connected</string>
     <string name="remote_hub_connecting">connecting</string>

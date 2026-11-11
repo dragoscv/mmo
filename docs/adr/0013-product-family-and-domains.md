@@ -7,6 +7,10 @@
 - **Amendment 2026-11-09: MixAI Live** (`live.mixai.ro`, app id `ro.mixai.live`, tags `live-v*`) joins the family as a
   realtime vocal processor with remote controllers; the browser `/live` route moves from Studio to the `live` host.
   See [ADR-0015](0015-mixai-live-performance.md).
+- **Amendment 2026-11-11 (D71, D72):** the phone apps are renamed to **MixAI TV** now (Android 1.3.2, iPhone 1.1.2),
+  and the Android TV app will ship inside the `ro.mixai.app` Play listing instead of its own `ro.mixai.tv` listing.
+  This replaces "no published ID changes" for the never-published `ro.mixai.tv`. See
+  [ADR-0016](0016-mixai-tv-name-brand-and-experience.md).
 - Tracker: [`docs/mixai-design-tracker.md`](../mixai-design-tracker.md) §12 (D40–D49, WP17)
 - Inventory: [`docs/arhitectura/app-inventory.md`](../arhitectura/app-inventory.md)
 - Related: [ADR-0001](0001-naming-mixai-and-mmo-server.md) (brand), [ADR-0004](0004-tv-apps-compose-media3-and-tizen-web.md)

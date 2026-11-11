@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="live_notice_title">Live TV uses your own sources</string>
-    <string name="live_notice_body">You add your own sources in MMO Server. MixAI ships no channels. Only use sources you have the right to watch.</string>
+    <string name="live_notice_body">You add your own sources in MMO Server. MixAI TV ships no channels. Only use sources you have the right to watch.</string>
     <string name="live_notice_accept">I understand</string>
     <string name="live_mode_channels">Channels</string>
     <string name="live_mode_guide">Guide</string>
