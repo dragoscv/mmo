@@ -16,5 +16,13 @@ struct ProfilePickerView: View {
         } reload: {
             if let ps = app.profileStore { app.profiles = (try? await ps.refresh()) ?? [] }
         }
+        .task {
+            #if DEBUG
+            // Simulator checks: SIMCTL_CHILD_MIXAI_PROFILE=<name> picks a profile without a PIN.
+            if let name = ProcessInfo.processInfo.environment["MIXAI_PROFILE"], let p = app.profiles.first(where: { $0.name == name }), !p.hasPin {
+                await app.choose(p)
+            }
+            #endif
+        }
     }
 }

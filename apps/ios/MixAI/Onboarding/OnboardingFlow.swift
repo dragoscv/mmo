@@ -25,6 +25,17 @@ struct OnboardingFlow: View {
                     }
                 }
         }
+        .task {
+            #if DEBUG
+            // Simulator screenshots / UI checks: SIMCTL_CHILD_MIXAI_AUTOPAIR=https://demo.mixai.ro opens Quick Connect
+            // for that server without input (the demo server approves every code).
+            guard path.isEmpty, let auto = ProcessInfo.processInfo.environment["MIXAI_AUTOPAIR"] else { return }
+            let base = MmoClient.normalise(auto)
+            if let info = try? await MmoClient(baseURL: base, token: "").pairInfo() {
+                path.append(.pair(DiscoveredServer(name: info.name, baseURL: base, pairing: info.pairingSupported)))
+            }
+            #endif
+        }
     }
 }
 

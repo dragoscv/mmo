@@ -32,7 +32,13 @@ struct MainTabs: View {
             .sheet(isPresented: $model.showPlayOn) { PlayOnSheet(request: app.playOnRequest) }
             .overlay(alignment: .top) { ToastBanner() }
             .environment(app.musicEnv)
-            .onAppear { RemoteCommands.install(app) }
+            .onAppear {
+                RemoteCommands.install(app)
+                #if DEBUG
+                // Simulator checks: SIMCTL_CHILD_MIXAI_TAB=<0-4> opens that tab.
+                if let t = ProcessInfo.processInfo.environment["MIXAI_TAB"].flatMap(Int.init) { app.selectedTab = t }
+                #endif
+            }
     }
 
     private func tabs(_ selection: Binding<Int>) -> some View {

@@ -68,6 +68,12 @@ struct SearchView: View {
         .searchable(text: $query, prompt: Text("search.placeholder"))
         .toolbar { ProfileToolbar() }
         .task(id: query) { await search() }
+        .task {
+            #if DEBUG
+            // Simulator checks: SIMCTL_CHILD_MIXAI_SEARCH=<text> fills the query (simctl cannot type).
+            if query.isEmpty, let q = ProcessInfo.processInfo.environment["MIXAI_SEARCH"], !q.isEmpty { query = q }
+            #endif
+        }
     }
 
     private func search() async {
