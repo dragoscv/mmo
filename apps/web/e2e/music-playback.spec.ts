@@ -4,6 +4,7 @@ import { test, expect, type Page } from "@playwright/test";
  * WP17-105 — what the desktop listings of MixAI Music promise, in a real browser, as a GUEST of the public demo
  * server (Connect → Try the demo): the Playback settings, a harmonic radio request, a real crossfade (both
  * `<audio>` elements audible at once, then the next song alone at full volume) and the "Play on TV" control.
+ * The interface language follows the browser (the cloud runner gets Romanian), so locators accept EN and RO.
  * Run: `node scripts/e2e-cloud/run.mjs --target https://music.mixai.ro e2e/music-playback.spec.ts --project=chromium`
  * (or `--target vm-prod` for the tree before a deploy).
  */
@@ -80,6 +81,48 @@ test("playback settings: crossfade is off by default, the slider and the automix
     await expect(page.getByTestId("music-automix")).toHaveAttribute("aria-checked", "false");
 });
 
+test("default settings (crossfade off): the next song starts at the end, the two never overlap", async ({ page }) => {
+    test.setTimeout(240_000);
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(String(e)));
+    await connectDemo(page);
+    await page.goto("/media/music");
+    await passProfileGate(page);
+    const album = page.locator('main a[href*="/album/"]').first();
+    await album.waitFor({ timeout: 30_000 });
+    await album.click();
+    await page.getByTestId("music-album").waitFor({ timeout: 30_000 });
+    await page.getByTestId("music-radio").first().click();
+    await page.waitForURL(/\/media\/music\/now-playing/, { timeout: 30_000 });
+    expect(await page.evaluate((k) => localStorage.getItem(k), PLAYBACK_KEY), "nothing stored: the defaults apply").toBeNull();
+    const title = page.getByTestId("np-title");
+    await title.waitFor({ timeout: 30_000 });
+    await expect.poll(async () => (await decks(page)).some((d) => !d.paused && d.t > 1 && Number.isFinite(d.d)), { timeout: 45_000, message: "no deck is playing" }).toBe(true);
+    const first = (await title.textContent()) ?? "";
+
+    await page.evaluate(() => {
+        const a = Array.from(document.querySelectorAll<HTMLAudioElement>("audio[data-mixai-web-music]")).find((x) => !x.paused);
+        if (a && Number.isFinite(a.duration)) a.currentTime = Math.max(0, a.duration - 8);
+    });
+    let overlap = 0, samples = 0, changed = false;
+    const until = Date.now() + 45_000;
+    while (Date.now() < until) {
+        const playing = (await decks(page)).filter((d) => !d.paused);
+        samples++;
+        if (playing.length === 2) overlap++;
+        if (((await title.textContent()) ?? "") !== first) { changed = true; break; }
+        await page.waitForTimeout(200);
+    }
+    console.log(`WP17-105 default path: ${samples} samples 200 ms apart, overlap samples ${overlap}, next song started: ${changed}`);
+    expect(changed, "the next song never started").toBe(true);
+    expect(overlap, "two songs were audible together although crossfade is off").toBe(0);
+    await expect.poll(async () => {
+        const pl = (await decks(page)).filter((d) => !d.paused);
+        return pl.length === 1 && pl[0]!.volume > 0.99 && pl[0]!.rate === 1 && pl[0]!.t > 0.5;
+    }, { timeout: 30_000, message: "the next song is not playing alone at full volume and native tempo" }).toBe(true);
+    expect(errors, "uncaught page errors").toEqual([]);
+});
+
 test("radio asks for harmonic order; two songs really overlap in a crossfade; Play on TV opens", async ({ page }) => {
     test.setTimeout(300_000);
     const errors: string[] = [];
@@ -105,10 +148,13 @@ test("radio asks for harmonic order; two songs really overlap in a crossfade; Pl
     // Songs that follow each other on one album never crossfade (they stay gapless): start from the first pair that is not one.
     const continuation = (a: (typeof body.tracks)[number], b: (typeof body.tracks)[number]) =>
         !!a.albumId && a.albumId === b.albumId && (a.disc ?? 1) === (b.disc ?? 1) && typeof a.track === "number" && typeof b.track === "number" && b.track === a.track + 1;
-    const at = body.tracks.findIndex((t, i) => i + 1 < body.tracks.length && !continuation(t, body.tracks[i + 1]!));
-    expect(at, "every pair in the radio is an album continuation").toBeGreaterThanOrEqual(0);
+    const hasBpm = (t: (typeof body.tracks)[number]) => typeof t.bpm === "number" && t.bpm > 0;
+    const pairs = body.tracks.map((t, i) => ({ i, t, n: body.tracks[i + 1] })).filter((x) => x.n !== undefined && !continuation(x.t, x.n));
+    expect(pairs.length, "every pair in the radio is an album continuation").toBeGreaterThan(0);
+    // Prefer a pair where both songs carry a tempo (the beat-matched path), within the first few songs; else the first pair.
+    const at = (pairs.find((x) => x.i <= 6 && hasBpm(x.t) && hasBpm(x.n!)) ?? pairs[0]!).i;
     const [ta, tb] = [body.tracks[at]!, body.tracks[at + 1]!];
-    console.log(`WP17-105 radio: ${body.tracks.length} tracks, ${withBpm} with bpm; crossfade pair at index ${at}: bpm ${ta.bpm ?? "-"} -> ${tb.bpm ?? "-"}`);
+    console.log(`WP17-105 radio: ${body.tracks.length} tracks, ${withBpm} with bpm; crossfade pair at index ${at}: bpm ${ta.bpm ?? "-"} -> ${tb.bpm ?? "-"} (${hasBpm(ta) && hasBpm(tb) ? "tempo on both: beat-matched when within 6 %" : "no tempo on one side: plain crossfade"})`);
 
     // 2. It plays (the radio button opens Now Playing itself; a full page load here would drop the player).
     await page.waitForURL(/\/media\/music\/now-playing/, { timeout: 30_000 });
@@ -116,7 +162,7 @@ test("radio asks for harmonic order; two songs really overlap in a crossfade; Pl
     await title.waitFor({ timeout: 30_000 });
     await expect.poll(async () => (await decks(page)).some((d) => !d.paused && d.t > 1), { timeout: 45_000, message: "no deck is playing (codec or autoplay?)" }).toBe(true);
     for (let i = 0; i < at; i++) {
-        await page.getByRole("button", { name: "Next", exact: true }).first().click();
+        await page.getByRole("button", { name: /^(Next|Următoarea)$/ }).first().click();
         await expect(title).toHaveText(body.tracks[i + 1]!.title, { timeout: 20_000 });
     }
     await expect.poll(async () => (await decks(page)).some((d) => !d.paused && d.t > 1 && Number.isFinite(d.d)), { timeout: 45_000, message: "the song before the crossfade is not playing" }).toBe(true);
@@ -155,7 +201,7 @@ test("radio asks for harmonic order; two songs really overlap in a crossfade; Pl
 
     // 4. Play on TV: the control opens with real strings (a guest of the demo server usually has no TV to pick).
     await page.getByTestId("music-send-to-tv").click();
-    await expect(page.getByText("Play the queue on")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: /^(Play the queue on|Redă coada pe)$/ })).toBeVisible();
     await expectNoRawKeys(page);
 
     expect(errors, "uncaught page errors").toEqual([]);
