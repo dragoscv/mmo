@@ -18,6 +18,9 @@ substitutions:
   _IMAGE: europe-west1-docker.pkg.dev/mmo-mw-prod/mixai/mixai-web:manual
   _COMMIT_SHA: unknown
 options:
-  machineType: E2_HIGHCPU_8
+  # 32 GB builder. On E2_HIGHCPU_8 (8 GB) the "Running TypeScript" step of `next build` grew 51 s -> 2.3 min and
+  # then never finished (build 55d2c845, 2026-11-11: INTERNAL_ERROR after 38 min); the same commit builds in
+  # 55 s of type check on E2_HIGHCPU_32 (build 557feee7). Cloud Build has no 16 GB high-CPU size in between.
+  machineType: E2_HIGHCPU_32
   logging: CLOUD_LOGGING_ONLY
 timeout: 2400s

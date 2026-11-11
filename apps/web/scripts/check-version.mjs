@@ -144,6 +144,8 @@ const IGNORED_PREFIXES = [
 const IGNORED_FILES = new Set([
     "apps/web/README.md",
     "apps/web/pnpm-lock.yaml",
+    // Cloud Build settings (builder size, timeout): they change how the image is built, not what is in it.
+    "apps/web/cloudbuild.yaml",
     "apps/web/eslint-snapshot.json",
     "apps/web/eslint-out.json",
     "apps/web/eslint-out.txt",
