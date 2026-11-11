@@ -195,9 +195,7 @@ fn load_decoded(
     let dur = buffer.duration_secs();
     // Precompute waveform peaks while we own the buffer (engine takes ownership).
     let peaks = buffer.compute_peaks(2000);
-    let bands = buffer
-        .compute_band_peaks(WAVE_POINTS_PER_SECOND)
-        .to_bytes();
+    let bands = buffer.compute_band_peaks(WAVE_POINTS_PER_SECOND).to_bytes();
     // Analyse tempo + beat phase. Use the supplied BPM when present (library
     // metadata is authoritative); otherwise fall back to local detection.
     let analysis = mixai_core::analyze(&buffer);
