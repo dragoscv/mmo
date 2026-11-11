@@ -189,8 +189,8 @@ Toate stringurile noi sunt în `res/values/strings.xml` **și** `res/values-ro/s
 
 ## Release
 
-Workflow: `.github/workflows/tv-android-release.yml` (neversionat încă)
-— la tag `tv-v*` sau manual. Produce `app-debug.apk` și `app-release.apk` (semnat doar
+Workflow: `.github/workflows/tv-android-release.yml`
+— la tag `tv-v*` sau manual. Construiește doar `:app` și produce `app-debug.apk` și `app-release.apk` (semnat doar
 dacă există secretele `TV_KEYSTORE_B64`, `TV_KEYSTORE_PASSWORD`, `TV_KEY_ALIAS`,
 `TV_KEY_PASSWORD`; altfel release-ul rămâne nesemnat).
 
